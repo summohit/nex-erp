@@ -47,6 +47,10 @@ function makeService(over: any = {}) {
       findMany: jest.fn().mockResolvedValue([DAY]),
       update: jest.fn().mockImplementation((a: any) => Promise.resolve({ id: 44, ...a.data })),
     },
+    // Empty by default: this trip describes its work rather than adopting any,
+    // which is the shape the tests below are written against. The adopting
+    // cases pass their own.
+    fieldVisitRequestTask: { findMany: jest.fn().mockResolvedValue([]) },
     issue: {
       findMany: jest.fn().mockResolvedValue([{ id: 501 }, { id: 502 }]),
     },

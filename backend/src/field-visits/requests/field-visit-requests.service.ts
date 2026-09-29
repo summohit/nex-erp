@@ -38,7 +38,12 @@ export interface FieldVisitRequestInput {
   endTime: string;
   remarks?: string;
   employeeIds: number[];
-  tasks: { name: string; description?: string }[];
+  /**
+   * What the trip is for. `issueId` names a task that already exists on the
+   * project, which approval adopts rather than recreating; omitting it describes
+   * new work and keeps approval's old behaviour of minting a card per person.
+   */
+  tasks: { name?: string; description?: string; issueId?: number }[];
   attachments?: { fileName: string; fileUrl: string; fileSize?: number }[];
   /** Raise and submit in one go, which is what the form's Submit button does. */
   submit?: boolean;
@@ -99,7 +104,13 @@ export class FieldVisitRequestsService {
     reviewedBy: { select: { id: true, firstName: true, lastName: true } },
     members: { select: { id: true, employee: this.PERSON } },
     tasks: {
-      select: { id: true, name: true, description: true, position: true },
+      select: {
+        id: true, name: true, description: true, position: true, issueId: true,
+        // Enough to render the line as the task it points at, rather than as a
+        // remembered title: key and status are what tell somebody the work
+        // picked from the board is the same work the board still shows.
+        issue: { select: { id: true, key: true, title: true, status: true, priority: true } },
+      },
       orderBy: { position: 'asc' as const },
     },
     attachments: {
@@ -170,6 +181,91 @@ export class FieldVisitRequestsService {
   }
 
   /**
+   * The trip's scope, with every linked task checked against the project.
+   *
+   * A line carrying `issueId` is a task the trip adopts rather than retypes, so
+   * two things have to be settled here rather than trusted from the form. The
+   * task must be one this project actually owns — otherwise a trip could adopt
+   * work off another project's board and approval would quietly widen its
+   * reach. And the line's `name` is taken from the task rather than from the
+   * request, because a remembered title is how the board and the trip end up
+   * saying different things about the same piece of work; the task is the
+   * record of what it is called.
+   *
+   * Archived tasks are refused outright. The picker hides them, but the trip
+   * is a live commitment about what people will be doing, and sending somebody
+   * to a site to do work the board has already closed is not a thing to leave
+   * for approval to discover.
+   */
+  private async normalizeTasks(
+    companyId: number, projectId: number, raw: FieldVisitRequestInput['tasks'],
+  ) {
+    const wanted = (raw ?? [])
+      .map((t) => ({ task: t, issueId: t?.issueId == null ? null : Number(t.issueId) }))
+      .filter((r) => r.issueId != null || String(r.task?.name ?? '').trim().length > 0);
+
+    const issueIds = [...new Set(
+      wanted.map((r) => r.issueId).filter((id): id is number => Number.isInteger(id)),
+    )];
+    const linked = new Map<number, { key: string; title: string; isArchived: boolean }>();
+    if (issueIds.length) {
+      const found = await this.prisma.issue.findMany({
+        where: { id: { in: issueIds }, companyId, projectId },
+        select: { id: true, key: true, title: true, isArchived: true },
+      });
+      if (found.length !== issueIds.length) {
+        throw new BadRequestException(
+          'One of the selected tasks is not on this project — pick the task from this project\'s own board',
+        );
+      }
+      for (const issue of found) {
+        if (issue.isArchived) {
+          throw new BadRequestException(
+            `${issue.key} ${issue.title} has been archived. Restore it before putting it on a visit.`,
+          );
+        }
+        linked.set(issue.id, issue);
+      }
+    }
+
+    const seenIssues = new Set<number>();
+    const seenNames = new Set<string>();
+    const out: { name: string; description: string | null; position: number; issueId: number | null }[] = [];
+
+    for (const { task, issueId } of wanted) {
+      if (issueId != null) {
+        // The same task twice is one piece of work, not two. Kept rather than
+        // rejected: the form can legitimately offer a task the request already
+        // carries, and collapsing it is kinder than an error over a duplicate.
+        if (seenIssues.has(issueId)) continue;
+        seenIssues.add(issueId);
+        out.push({
+          name: linked.get(issueId)!.title,
+          description: String(task?.description ?? '').trim() || null,
+          position: out.length,
+          issueId,
+        });
+        continue;
+      }
+
+      const name = String(task?.name ?? '').trim();
+      // Two free-text lines that read the same become two cards per person on
+      // approval, so the second is folded into the first here instead.
+      const fingerprint = name.toLowerCase();
+      if (seenNames.has(fingerprint)) continue;
+      seenNames.add(fingerprint);
+      out.push({
+        name,
+        description: String(task?.description ?? '').trim() || null,
+        position: out.length,
+        issueId: null,
+      });
+    }
+
+    return out;
+  }
+
+  /**
    * Everything the request needs, checked before anything is written.
    *
    * The checks that look fussy are the ones the rest of the feature rests on:
@@ -231,13 +327,7 @@ export class FieldVisitRequestsService {
       throw new BadRequestException('One of the selected people is not an employee of this company');
     }
 
-    const tasks = (data?.tasks ?? [])
-      .map((t, i) => ({
-        name: String(t?.name ?? '').trim(),
-        description: String(t?.description ?? '').trim() || null,
-        position: i,
-      }))
-      .filter((t) => t.name.length > 0);
+    const tasks = await this.normalizeTasks(companyId, project.id, data?.tasks);
     if (tasks.length === 0) {
       throw new BadRequestException('Add at least one task — after approval these are what each person is assigned');
     }
@@ -498,7 +588,7 @@ export class FieldVisitRequestsService {
         location: true, startDate: true, endDate: true,
         latitude: true, longitude: true, startTime: true, endTime: true,
         members: { select: { employeeId: true } },
-        tasks: { select: { name: true } },
+        tasks: { select: { name: true, issueId: true } },
       },
     });
     if (!existing) throw new NotFoundException('Field visit request not found');
@@ -554,7 +644,8 @@ export class FieldVisitRequestsService {
 
   /** Which of the things an approver cares about actually moved. */
   private describeChanges(
-    existing: any, fields: any, employeeIds: number[], tasks: { name: string }[],
+    existing: any, fields: any, employeeIds: number[],
+    tasks: { name: string; issueId: number | null }[],
   ): string[] {
     const changed: string[] = [];
     if (existing.location !== fields.location) changed.push('site');
@@ -570,8 +661,12 @@ export class FieldVisitRequestsService {
     }
     const before = (existing.members ?? []).map((m: any) => m.employeeId).sort().join(',');
     if (before !== [...employeeIds].sort().join(',')) changed.push('people');
-    const beforeTasks = (existing.tasks ?? []).map((t: any) => t.name).join('|');
-    if (beforeTasks !== tasks.map((t) => t.name).join('|')) changed.push('tasks');
+    // The link, not the wording. Two different tasks can share a title, and
+    // swapping one for the other is exactly the change an approver needs told
+    // about even though every line still reads the same.
+    const taskFingerprint = (rows: any[]) =>
+      rows.map((t: any) => `${t.issueId ?? ''}:${t.name}`).join('|');
+    if (taskFingerprint(existing.tasks ?? []) !== taskFingerprint(tasks)) changed.push('tasks');
     return changed;
   }
 
@@ -590,7 +685,7 @@ export class FieldVisitRequestsService {
         project: { select: { id: true, name: true } },
         members: { select: { employeeId: true } },
         tasks: {
-          select: { id: true, name: true, description: true, position: true },
+          select: { id: true, name: true, description: true, position: true, issueId: true },
           orderBy: { position: 'asc' },
         },
       },
@@ -1044,6 +1139,7 @@ export class FieldVisitRequestsService {
           members: saved.members.map((m: any) => ({ employeeId: m.employee.id })),
           tasks: saved.tasks.map((t: any) => ({
             id: t.id, name: t.name, description: t.description, position: t.position,
+            issueId: t.issueId,
           })),
         },
         reviewerId,

@@ -66,6 +66,12 @@ function makeTx(over: any = {}) {
       create: jest.fn().mockResolvedValue({}),
       updateMany: jest.fn().mockResolvedValue({ count: 6 }),
     },
+    // Empty by default: this trip describes its work rather than adopting any
+    // of the project's own tasks. The adopting cases supply their own.
+    issueMember: {
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     ...over,
   };
   return { tx, service: new FieldVisitActivationService() };

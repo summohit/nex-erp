@@ -426,44 +426,242 @@
       <div class="form-section">
         <div class="section-header">
           <span class="section-tag">Step 4</span>
-          <span class="section-title">Site Tasks & Scope</span>
+          <div class="section-title-wrap">
+            <span class="section-title">Site Tasks & Scope</span>
+            <span class="count-pill">{{ form.tasks.length }} selected</span>
+          </div>
         </div>
 
-        <div class="tasks-container">
-          @for (task of form.tasks; track $index) {
-            <div class="task-card-row">
-              <span class="task-num-badge">{{ $index + 1 }}</span>
-              <div class="task-inputs">
-                <input
-                  type="text"
-                  placeholder="Task title (e.g. Site Inspection, Hardware Setup)"
-                  class="task-title-input"
-                  [(ngModel)]="task.name"
-                  [ngModelOptions]="{standalone: true}" />
-                <input
-                  type="text"
-                  placeholder="Notes or instructions (optional)"
-                  class="task-desc-input"
-                  [(ngModel)]="task.description"
-                  [ngModelOptions]="{standalone: true}" />
+        @if (tasksError()) {
+          <div class="tasks-inline-error">
+            <svg lucideCircleAlert [size]="15"></svg>
+            <span>{{ tasksError() }}</span>
+          </div>
+        }
+
+        <!-- The trip's scope, collapsed into a dropdown so the whole thing stays
+             one glanceable list however many tasks are picked. -->
+        <div class="searchable-select-container">
+          <button
+            type="button"
+            class="searchable-select-trigger scope-trigger"
+            [class.open]="isTaskDropdownOpen()"
+            [class.has-value]="form.tasks.length > 0"
+            (click)="toggleTaskDropdown()"
+            [disabled]="!selectedProjectId()">
+            <div class="trigger-left">
+              <svg lucideListChecks [size]="16" class="select-icon"></svg>
+              <div class="loc-text-col">
+                <span class="selected-text">
+                  @if (form.tasks.length) {
+                    {{ form.tasks.length === 1 ? form.tasks[0].name : (form.tasks.length + ' tasks selected') }}
+                  } @else {
+                    Select the tasks for this visit…
+                  }
+                </span>
+                <span class="selected-subtext" [class.subtle]="!form.tasks.length">
+                  @if (!selectedProjectId()) {
+                    Pick a project first — tasks come from that project's board
+                  } @else if (form.tasks.length > 1) {
+                    {{ form.tasks[0].key ? form.tasks[0].key + ' and ' + (form.tasks.length - 1) + ' more' : form.tasks[0].name }}
+                  } @else {
+                    From {{ selectedProject()?.name }}
+                  }
+                </span>
               </div>
-              <button
-                class="btn-delete-task"
-                type="button"
-                (click)="removeTask($index)"
-                [disabled]="form.tasks.length === 1 && !task.name && !task.description"
-                title="Remove task">
-                <svg lucideTrash2 [size]="15"></svg>
-              </button>
+            </div>
+            <div class="trigger-right">
+              @if (form.tasks.length) {
+                <span class="scope-count-chip">{{ form.tasks.length }}</span>
+              }
+              <svg lucideChevronDown [size]="16" class="chevron-icon" [class.rotated]="isTaskDropdownOpen()"></svg>
+            </div>
+          </button>
+
+          @if (isTaskDropdownOpen()) {
+            <div class="searchable-select-menu scope-menu" (click)="$event.stopPropagation()">
+
+              <!-- Already picked. These stay visible at the top of the list
+                   because removing something is as much a part of picking as
+                   adding is, and a chip row buried under a search box is a
+                   thing people fail to find. -->
+              @if (form.tasks.length) {
+                <div class="scope-picked-block">
+                  <div class="scope-menu-heading">
+                    <span>Selected for this visit</span>
+                    <button type="button" class="scope-clear-all" (click)="form.tasks = []">Clear all</button>
+                  </div>
+                  <div class="scope-chip-row">
+                    @for (t of form.tasks; track $index) {
+                      <span class="scope-chip" [class.free-text]="t.issueId == null">
+                        @if (t.key) {
+                          <span class="scope-chip-key">{{ t.key }}</span>
+                        } @else {
+                          <svg lucideListChecks [size]="12"></svg>
+                        }
+                        <span class="scope-chip-name">{{ t.name }}</span>
+                        <button type="button" class="scope-chip-x" (click)="removeTaskAt($index)" title="Remove {{ t.name }}">
+                          <svg lucideX [size]="12"></svg>
+                        </button>
+                      </span>
+                    }
+                  </div>
+                </div>
+              }
+
+              <div class="select-search-bar">
+                <svg lucideSearch [size]="14" class="search-icon"></svg>
+                <input
+                  type="text"
+                  placeholder="Search tasks by title or key (e.g. ACME-42)…"
+                  [ngModel]="taskSearchQuery()"
+                  (ngModelChange)="taskSearchQuery.set($event)"
+                  autofocus />
+                @if (taskSearchQuery()) {
+                  <button type="button" class="search-clear-btn" (click)="taskSearchQuery.set('')">
+                    <svg lucideX [size]="12"></svg>
+                  </button>
+                }
+              </div>
+
+              <!-- Whose tasks are on offer. Off, the list is the people going in
+                   Step 3 plus anything unassigned; on, the whole board. -->
+              <div class="scope-filter-bar">
+                <div class="scope-filter-copy">
+                  <svg lucideFilter [size]="13"></svg>
+                  <span>{{ showAllProjectTasks() ? 'All project tasks' : 'Tasks for the people going' }}</span>
+                </div>
+                <label class="scope-switch" [title]="showAllProjectTasks() ? 'Show only their tasks' : 'Show every task on this project'">
+                  <input
+                    type="checkbox"
+                    [ngModel]="showAllProjectTasks()"
+                    (ngModelChange)="showAllProjectTasks.set($event)" />
+                  <span class="scope-switch-track"><span class="scope-switch-thumb"></span></span>
+                </label>
+              </div>
+
+              <div class="select-options-list scope-options-list">
+                @if (isLoadingTasks()) {
+                  <div class="select-empty-state">
+                    <svg lucideLoader [size]="18" class="spin-icon"></svg>
+                    <p>Loading this project's tasks…</p>
+                  </div>
+                } @else {
+                  @for (t of filteredProjectTasks(); track t.id) {
+                    <button type="button" class="scope-option" (click)="toggleTaskOption(t)">
+                      <div class="scope-option-left">
+                        <span class="scope-key-badge">{{ t.key }}</span>
+                        <div class="scope-option-text">
+                          <span class="scope-option-title">{{ t.title }}</span>
+                          <span class="scope-option-meta">
+                            @if (t.assigneeId) {
+                              <span class="scope-owner">
+                                @if (t.assigneeAvatarUrl) {
+                                  <img [src]="t.assigneeAvatarUrl" [alt]="t.assigneeName" class="scope-owner-avatar" />
+                                } @else {
+                                  <span class="scope-owner-initial">{{ getInitials(t.assigneeName || '?') }}</span>
+                                }
+                                {{ t.assigneeName }}
+                              </span>
+                            } @else {
+                              <span class="scope-owner unassigned">
+                                <svg lucideUserPlus [size]="12"></svg>
+                                Unassigned
+                              </span>
+                            }
+                            <span class="scope-dot">·</span>
+                            <span class="scope-status" [attr.data-status]="t.status">{{ statusLabel(t.status) }}</span>
+                            @if (t.dueDate) {
+                              <span class="scope-dot">·</span>
+                              <span class="scope-due">due {{ t.dueDate | date:'d MMM' }}</span>
+                            }
+                          </span>
+                        </div>
+                      </div>
+                      <span class="scope-add-hint">
+                        <svg lucidePlus [size]="14"></svg>
+                        <span>Add</span>
+                      </span>
+                    </button>
+                  }
+
+                  @if (!filteredProjectTasks().length) {
+                    <div class="select-empty-state scope-empty">
+                      <svg lucideListChecks [size]="22"></svg>
+                      @if (projectTaskFilterNote()) {
+                        <p>{{ projectTaskFilterNote() }}</p>
+                      } @else {
+                        <p>No task matches "{{ taskSearchQuery() }}".</p>
+                      }
+                    </div>
+                  }
+                }
+              </div>
+
+              <!-- Escape hatch. Only shown when the list is empty, so it reads
+                   as what it is: a project with nothing on its board still
+                   needs a way to raise a visit. -->
+              @if (!isLoadingTasks() && !filteredProjectTasks().length) {
+                <div class="scope-manual-block">
+                  <label class="scope-manual-label">
+                    Or describe work that is not on the project board
+                  </label>
+                  <div class="scope-manual-row">
+                    <input
+                      type="text"
+                      placeholder="e.g. Client walkthrough and sign-off"
+                      [ngModel]="manualTaskName"
+                      (ngModelChange)="addManualTaskFromInput($event)"
+                      (keydown.enter)="commitManualTask()" />
+                    <button
+                      type="button"
+                      class="scope-manual-btn"
+                      [disabled]="!manualTaskName.trim()"
+                      (click)="commitManualTask()">
+                      <svg lucidePlus [size]="14"></svg>
+                      Add
+                    </button>
+                  </div>
+                </div>
+              }
             </div>
           }
-
-          <button class="add-task-dashed-btn" type="button" (click)="addTask()">
-            <svg lucidePlus [size]="16"></svg>
-            <span>Add another task</span>
-          </button>
-          <p class="section-hint">Each approved task is automatically assigned to all selected personnel upon visit approval.</p>
         </div>
+
+        <!-- The scope as it will be read, outside the dropdown. -->
+        @if (form.tasks.length) {
+          <div class="scope-summary">
+            <div class="scope-summary-head">
+              <span>What this visit will cover</span>
+            </div>
+            <ul class="scope-summary-list">
+              @for (t of form.tasks; track $index) {
+                <li class="scope-summary-item">
+                  <span class="scope-summary-num">{{ $index + 1 }}</span>
+                  @if (t.key) {
+                    <span class="scope-summary-key">{{ t.key }}</span>
+                  } @else {
+                    <span class="scope-summary-free">New</span>
+                  }
+                  <span class="scope-summary-name">{{ t.name }}</span>
+                  @if (t.issueId) {
+                    <span class="scope-summary-linked" title="This task is already on the project board — approval attaches the people going to it rather than creating a copy">
+                      linked
+                    </span>
+                  }
+                  <button type="button" class="scope-summary-x" (click)="removeTaskAt($index)" title="Remove">
+                    <svg lucideTrash2 [size]="13"></svg>
+                  </button>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        <p class="section-hint">
+          Pick from the project board so the visit and the board cannot disagree about what is
+          being done. Anything selected is attached to the people going when this is approved.
+        </p>
       </div>
 
       <!-- SECTION 5: ATTACHMENTS (DRAG & DROP) -->

@@ -10,6 +10,8 @@ import {
   LucideSearch, LucideChevronDown, LucideCheck,
   LucideUpload, LucideFileText, LucideClock, LucideMapPin,
   LucideLoader, LucideBuilding, LucideRoute, LucideExternalLink,
+  LucideListChecks, LucideFilter, LucideUserRound, LucideUserPlus,
+  LucideCircleAlert, LucideChevronUp,
 } from '@lucide/angular';
 import {
   FieldVisitRequestsService, FieldVisitRequest, FieldVisitRequestInput,
@@ -20,6 +22,31 @@ import { MasterDataService, VisitLocation } from '../../services/master-data.ser
 import { environment } from '../../../environments/environment';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * One task from the selected project's board, flattened for the picker.
+ *
+ * A task is narrowed to what the picker has to draw next to it — who it belongs
+ * to, so the "these are the people going" filter can be read at a glance, and
+ * whether it is finished, so work nobody should be sent to do can be left out.
+ */
+interface ProjectTaskOption {
+  id: number;
+  key: string;
+  title: string;
+  status: string;
+  priority: string;
+  dueDate?: string | null;
+  assigneeId: number | null;
+  assigneeName: string | null;
+  assigneeAvatarUrl: string | null;
+  /** Issue members, so a shared task counts as being a person's task. */
+  memberIds: number[];
+  memberNames: string[];
+}
+
+/** Statuses that mean the work is finished, or abandoned, and not a thing to send anyone to do. */
+const CLOSED_TASK_STATUSES = new Set(['DONE', 'CANCELLED', 'ARCHIVED']);
 
 /** What the form is being opened for. */
 export type FieldVisitFormMode = 'create' | 'edit' | 'modify';
@@ -42,6 +69,8 @@ export type FieldVisitFormMode = 'create' | 'edit' | 'modify';
     LucideSearch, LucideChevronDown, LucideCheck,
     LucideUpload, LucideFileText, LucideClock, LucideMapPin,
     LucideLoader, LucideBuilding, LucideRoute, LucideExternalLink,
+    LucideListChecks, LucideFilter, LucideUserRound, LucideUserPlus,
+    LucideCircleAlert, LucideChevronUp,
   ],
   templateUrl: './field-visit-request-form.html',
   styleUrls: ['./field-visit-request-form.css'],
@@ -91,10 +120,36 @@ export class FieldVisitRequestFormComponent implements OnInit {
   selectedEmployeeIds = signal<number[]>([]);
   employeeSearchQuery = signal('');
 
+  // ── Project task picker ────────────────────────────────────────────────
+  /** The selected project's own tasks, loaded when the project is picked. */
+  projectTasks = signal<ProjectTaskOption[]>([]);
+  isLoadingTasks = signal(false);
+  tasksError = signal<string | null>(null);
+  isTaskDropdownOpen = signal(false);
+  taskSearchQuery = signal('');
+  /**
+   * On by default: the dropdown is the project's task list, in full.
+   *
+   * Filtering by the people going is a shortcut for the common case, not the
+   * starting position — a trip is often raised for work that has not been
+   * assigned to anybody yet, and for a colleague's backlog item, and hiding
+   * those behind a switch makes people conclude the project has no tasks. Turned
+   * off, the list narrows to the Step 3 people plus anything unassigned.
+   */
+  showAllProjectTasks = signal(true);
+
   // Drag and drop attachment state
   isDragging = signal(false);
   isUploading = signal(false);
-
+  /**
+   * The picked tasks, in the order they were picked.
+   *
+   * `issueId` null means free text — new work approval will mint a card for.
+   * Carried on the row rather than looked up on render, so a task that has been
+   * archived or reassigned since it was picked still shows what the trip is
+   * committed to rather than silently turning into a blank.
+   */
+  /** One line of the trip's scope, as the form holds it. */
   form = {
     projectId: null as number | null,
     location: '',
@@ -107,7 +162,13 @@ export class FieldVisitRequestFormComponent implements OnInit {
     endTime: '18:00',
     remarks: '',
     employeeIds: [] as number[],
-    tasks: [{ name: '', description: '' }],
+    tasks: [] as {
+      issueId: number | null;
+      name: string;
+      description: string;
+      key?: string;
+      status?: string;
+    }[],
     attachments: [] as { fileName: string; fileUrl: string; fileSize?: number }[],
   };
 
@@ -133,9 +194,17 @@ export class FieldVisitRequestFormComponent implements OnInit {
         endTime: this.request.endTime,
         remarks: this.request.remarks ?? '',
         employeeIds: this.request.members.map((m) => m.employee.id),
-        tasks: this.request.tasks.length
-          ? this.request.tasks.map((t) => ({ name: t.name, description: t.description ?? '' }))
-          : [{ name: '', description: '' }],
+        // A line saved before this picker existed, or one describing work that
+        // is not on the board, comes back as free text. Keeping it renders
+        // honestly as "not a board task" instead of pretending it has a key it
+        // does not have.
+        tasks: this.request.tasks.map((t) => ({
+          issueId: t.issueId ?? null,
+          name: t.name,
+          description: t.description ?? '',
+          key: t.issue?.key,
+          status: t.issue?.status,
+        })),
         attachments: this.request.attachments.map((a) => ({
           fileName: a.fileName, fileUrl: a.fileUrl, fileSize: a.fileSize ?? undefined,
         })),
@@ -143,6 +212,10 @@ export class FieldVisitRequestFormComponent implements OnInit {
     }
 
     this.loadLists();
+    // The trip's own board, so the picker can show what is already picked as
+    // picked and offer everything else. Started after the request has been read
+    // into the form, or the first render would come back emptied.
+    if (this.selectedProjectId()) this.loadProjectTasks(this.selectedProjectId()!);
   }
 
   /** The projects and people the form picks from. */
@@ -334,6 +407,187 @@ export class FieldVisitRequestFormComponent implements OnInit {
     this.selectedProjectId.set(projectId);
     this.form.projectId = projectId;
     this.isProjectDropdownOpen.set(false);
+
+    // A task belongs to the project it was picked from, so a different project
+    // means a different set of tasks. Anything already picked goes with the old
+    // one rather than being quietly re-pointed at a board it was never on.
+    if (projectId !== this.tasksLoadedFor) {
+      this.form.tasks = [];
+      this.projectTasks.set([]);
+      this.tasksError.set(null);
+      this.showAllProjectTasks.set(true);
+      if (projectId != null) this.loadProjectTasks(projectId);
+    }
+  }
+
+  // ── Project task picker ─────────────────────────────────────────────────
+
+  /** Which project's board `projectTasks` currently holds, so a re-pick is a no-op. */
+  private tasksLoadedFor: number | null = null;
+
+  /**
+   * The project's own tasks, read once per project.
+   *
+   * Failed loads are not fatal in the way the project list failing is: a
+   * person can still raise a trip with a scope they type, so the error is said
+   * in place rather than replacing the whole form with a retry.
+   */
+  loadProjectTasks(projectId: number): void {
+    this.tasksLoadedFor = projectId;
+    this.isLoadingTasks.set(true);
+    this.tasksError.set(null);
+
+    this.projectsService.getIssues(projectId).subscribe({
+      next: (rows: any[]) => {
+        this.isLoadingTasks.set(false);
+        this.projectTasks.set((rows || []).map((i: any) => ({
+          id: i.id,
+          key: i.key,
+          title: i.title,
+          status: i.status,
+          priority: i.priority,
+          dueDate: i.dueDate ?? null,
+          assigneeId: i.assigneeId ?? null,
+          assigneeName: i.assignee
+            ? `${i.assignee.firstName ?? ''} ${i.assignee.lastName ?? ''}`.trim()
+            : null,
+          assigneeAvatarUrl: i.assignee?.avatarUrl ?? null,
+          memberIds: (i.members ?? []).map((m: any) => m.employeeId ?? m.employee?.id).filter((id: any) => id != null),
+          memberNames: (i.members ?? [])
+            .map((m: any) => `${m.employee?.firstName ?? ''} ${m.employee?.lastName ?? ''}`.trim())
+            .filter((n: string) => n.length > 0),
+        })));
+      },
+      error: (err) => {
+        this.isLoadingTasks.set(false);
+        this.projectTasks.set([]);
+        this.tasksError.set(
+          `Could not load this project's tasks: ${this.messageOf(err)}.`
+          + ' You can still add the scope by hand below.',
+        );
+      },
+    });
+  }
+
+  /**
+   * The tasks on offer, in the order they should be read.
+   *
+   * Three filters, each answering a question the person is implicitly asking.
+   * Whose work it is: only the people going, unless the whole board is asked
+   * for — plus anything nobody owns, which is often exactly the backlog item a
+   * trip exists to pick up. Whether it is worth going: finished and cancelled
+   * work is left out, since sending somebody to a site to do a task the board
+   * has already closed helps nobody. And what is already picked, which is
+   * dropped so the list only ever offers something that changes the trip.
+   */
+  filteredProjectTasks = computed(() => {
+    const q = this.taskSearchQuery().trim().toLowerCase();
+    const people = this.selectedEmployeeIds();
+    const picked = this.form.tasks.map((t) => t.issueId).filter((id): id is number => id != null);
+    const showAll = this.showAllProjectTasks();
+
+    const isClosed = (t: ProjectTaskOption) => CLOSED_TASK_STATUSES.has(t.status);
+    const isTheirs = (t: ProjectTaskOption) =>
+      (t.assigneeId != null && people.includes(t.assigneeId))
+      || t.memberIds.some((id) => people.includes(id));
+
+    return this.projectTasks()
+      .filter((t) => showAll || isTheirs(t) || (t.assigneeId == null && t.memberIds.length === 0))
+      .filter((t) => !isClosed(t) || picked.includes(t.id))
+      .filter((t) => !picked.includes(t.id))
+      .filter((t) => !q || t.title.toLowerCase().includes(q) || t.key.toLowerCase().includes(q))
+      .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
+  });
+
+  /** Why the list is short, so an empty one does not read as "nothing to do". */
+  projectTaskFilterNote = computed(() => {
+    if (this.isLoadingTasks()) return 'Loading this project\'s tasks…';
+    if (!this.projectTasks().length) return 'This project has no tasks on its board yet.';
+    if (this.showAllProjectTasks()) return '';
+    if (!this.selectedEmployeeIds().length) {
+      return 'Pick who is going in Step 3 to see their tasks — or show the whole project.';
+    }
+    if (!this.filteredProjectTasks().length) {
+      return 'No open task belongs to the people going. Show all project tasks, or add the scope by hand.';
+    }
+    return '';
+  });
+
+  toggleTaskDropdown(): void {
+    this.isTaskDropdownOpen.update((v) => !v);
+    if (this.isTaskDropdownOpen()) this.taskSearchQuery.set('');
+  }
+
+  toggleTaskOption(option: ProjectTaskOption): void {
+    this.form.tasks = [
+      ...this.form.tasks,
+      {
+        issueId: option.id,
+        name: option.title,
+        description: '',
+        key: option.key,
+        status: option.status,
+      },
+    ];
+  }
+
+  /**
+   * Drop one line of scope.
+   *
+   * Clearing a task that was picked off the board is a no-op on the board
+   * itself — the trip stops claiming it, and nothing else happens. Only the
+   * cards approval minted for a described task follow the line out, which is
+   * what the server reconciles on re-approval.
+   */
+  removeTaskAt(index: number): void {
+    this.form.tasks = this.form.tasks.filter((_, i) => i !== index);
+  }
+
+  /**
+   * The escape hatch, for work that is not on the board.
+   *
+   * Deliberately not the front door: a trip whose scope is a set of existing
+   * tasks is one the board and the trip cannot disagree about, and that is the
+   * whole reason this replaced free typing. Offered only from the empty state
+   * and the link below the list, because a project with no tasks at all would
+   * otherwise be unable to raise a visit.
+   */
+  addTaskManually(name?: string): void {
+    const title = String(name ?? '').trim();
+    if (!title) return;
+    this.form.tasks = [
+      ...this.form.tasks,
+      { issueId: null, name: title, description: '' },
+    ];
+  }
+
+  /** The half-typed free-text line, kept so a click on Add can read it. */
+  manualTaskName = '';
+
+  addManualTaskFromInput(value: string): void {
+    this.manualTaskName = value;
+  }
+
+  commitManualTask(): void {
+    this.addTaskManually(this.manualTaskName);
+    this.manualTaskName = '';
+  }
+
+  /**
+   * A board status in words, rather than a code.
+   *
+   * Read next to a title somebody is about to commit a day of somebody's
+   * working life to, so "IN_REVIEW" and "TODO" are translated rather than shown
+   * as the column names they are stored as.
+   */
+  statusLabel(status: string): string {
+    return ({
+      TODO: 'To do',
+      IN_PROGRESS: 'In progress',
+      IN_REVIEW: 'In review',
+      DONE: 'Done',
+      CANCELLED: 'Cancelled',
+    } as Record<string, string>)[status] ?? status.replace(/_/g, ' ').toLowerCase();
   }
 
   // ── Searchable Visit Location Picker (§PB10) ───────────────────────────
@@ -373,6 +627,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
     if (!target.closest('.searchable-select-container')) {
       this.isProjectDropdownOpen.set(false);
       this.isLocationDropdownOpen.set(false);
+      this.isTaskDropdownOpen.set(false);
     }
   }
 
@@ -426,16 +681,6 @@ export class FieldVisitRequestFormComponent implements OnInit {
       return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
     return name.slice(0, 2).toUpperCase();
-  }
-
-  // ── Tasks ───────────────────────────────────────────────────────────────
-  addTask(): void {
-    this.form.tasks = [...this.form.tasks, { name: '', description: '' }];
-  }
-
-  removeTask(index: number): void {
-    this.form.tasks = this.form.tasks.filter((_, i) => i !== index);
-    if (!this.form.tasks.length) this.addTask();
   }
 
   // ── Drag & Drop Attachments ──────────────────────────────────────────────
@@ -544,9 +789,16 @@ export class FieldVisitRequestFormComponent implements OnInit {
       endTime: this.form.endTime,
       remarks: this.form.remarks.trim() || undefined,
       employeeIds: this.selectedEmployeeIds(),
+      // `issueId` is what makes a line an adopted task rather than a phrase;
+      // `name` alone would have approval mint a second card for work the
+      // project already has.
       tasks: this.form.tasks
-        .filter((t) => t.name.trim())
-        .map((t) => ({ name: t.name.trim(), description: t.description.trim() || undefined })),
+        .filter((t) => t.issueId != null || t.name.trim())
+        .map((t) => ({
+          issueId: t.issueId ?? undefined,
+          name: t.name.trim(),
+          description: t.description.trim() || undefined,
+        })),
       attachments: this.form.attachments,
       submit,
     };

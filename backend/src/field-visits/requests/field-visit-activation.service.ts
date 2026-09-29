@@ -23,7 +23,15 @@ export interface ActivationRequest {
   startTime: string;
   endTime: string;
   members: { employeeId: number }[];
-  tasks: { id: number; name: string; description: string | null; position: number }[];
+  /**
+   * The trip's scope. `issueId` is set when the line points at a task that
+   * already exists on the project, which approval adopts; it is null for a line
+   * describing new work, which approval turns into a card per person.
+   */
+  tasks: {
+    id: number; name: string; description: string | null; position: number;
+    issueId?: number | null;
+  }[];
 }
 
 export interface ActivationResult {
@@ -260,6 +268,15 @@ export class FieldVisitActivationService {
    * tasks is twelve tasks, not four shared ones. It is more rows, but "who is
    * doing the site inspection" then has an answer per person, and each of them
    * has something of their own to clock against on the day.
+   *
+   * The exception is a task the trip *adopted* rather than described. That one
+   * already exists on the project board, with its own key, its own history and
+   * probably hours logged against it. Making a second card with the same title
+   * would leave the board and the trip asserting two separate pieces of work
+   * that are the same piece of work, and would strand the real task with
+   * nothing to show it is happening. So the card is left alone and each person
+   * going is added to it instead, which is what puts it in front of them on the
+   * day without rewriting what the task is.
    */
   private async writeTasks(
     tx: Tx, request: ActivationRequest, employeeIds: number[],
@@ -272,6 +289,12 @@ export class FieldVisitActivationService {
     });
     if (!project) return 0;
 
+    const ordered = [...request.tasks].sort((a, b) => a.position - b.position);
+
+    // Adopted first: they need no board, no key and no column, and doing them
+    // first keeps the counting below about cards that were actually minted.
+    const linked = await this.attachLinkedTasks(tx, request, ordered, employeeIds);
+
     // What this trip already put on the board, so a re-approval adds only what
     // is missing. Matched on person and title because that pair is what the
     // fan-out is defined by.
@@ -282,6 +305,9 @@ export class FieldVisitActivationService {
     const done = new Set<string>(
       already.map((i: any) => `${i.assigneeId}|${i.title}`),
     );
+
+    const described = ordered.filter((t) => t.issueId == null);
+    if (!described.length) return linked;
 
     const board = await tx.board.findFirst({
       where: { projectId: request.projectId },
@@ -323,7 +349,7 @@ export class FieldVisitActivationService {
     };
 
     let created = 0;
-    for (const task of [...request.tasks].sort((a, b) => a.position - b.position)) {
+    for (const task of described) {
       for (const employeeId of employeeIds) {
         if (done.has(`${employeeId}|${task.name}`)) continue;
 
@@ -365,7 +391,62 @@ export class FieldVisitActivationService {
         created++;
       }
     }
-    return created;
+    return created + linked;
+  }
+
+  /**
+   * Put the adopted tasks in front of everyone going, without touching the
+   * tasks themselves.
+   *
+   * Returns how many people were newly put on one, which is what the approval
+   * reports as assigned work — a trip that adopted four tasks for three people
+   * did assign twelve things, and reporting "0" would read as nothing having
+   * happened.
+   *
+   * Marked with the request id rather than created blind, so the trip can take
+   * back exactly what it put on later without touching a membership somebody
+   * added by hand on the board.
+   */
+  private async attachLinkedTasks(
+    tx: Tx, request: ActivationRequest,
+    tasks: ActivationRequest['tasks'], employeeIds: number[],
+  ): Promise<number> {
+    const issueIds = tasks
+      .map((t) => t.issueId)
+      .filter((id): id is number => Number.isInteger(id));
+    if (!issueIds.length) return 0;
+
+    const rows = employeeIds.flatMap((employeeId) =>
+      issueIds.map((issueId) => ({
+        issueId,
+        employeeId,
+        // A person already on the task by hand is left exactly as it is; the
+        // composite key means the insert below is skipped for them anyway, and
+        // writing the marker here is what lets a later cancel leave them be.
+        fieldVisitRequestId: request.id,
+      })),
+    );
+    if (!rows.length) return 0;
+
+    const { count } = await tx.issueMember.createMany({ data: rows, skipDuplicates: true });
+    return count;
+  }
+
+  /**
+   * Take back the memberships this trip added.
+   *
+   * Scoped by the marker rather than by "who is on this task", because the two
+   * are not the same set: somebody assigned on the board before the trip was
+   * raised stays assigned when it is cancelled. Scoped by the request id for
+   * the same reason a cancelled trip's roster entries are found by note alone —
+   * filtering on the current shape would strand the rows of people already
+   * taken off the trip, which are the ones most in need of clearing.
+   */
+  private async releaseLinkedTasks(tx: Tx, request: ActivationRequest): Promise<number> {
+    const { count } = await tx.issueMember.deleteMany({
+      where: { fieldVisitRequestId: request.id },
+    });
+    return count;
   }
 
   // ─── Undoing it ────────────────────────────────────────────────────────────
@@ -421,10 +502,15 @@ export class FieldVisitActivationService {
       data: { isArchived: true },
     });
 
+    // Adopted tasks are not archived — they are the project's own and outlive
+    // the trip. What the trip owes them is undone instead: everybody it put on
+    // them comes off again.
+    const released = await this.releaseLinkedTasks(tx, request);
+
     return {
       attendanceDays: attendance.count,
       rosterEntries: rosterRows.length,
-      issues: issues.count,
+      issues: issues.count + released,
     };
   }
 
@@ -780,6 +866,13 @@ export class FieldVisitActivationService {
    *
    * Archived, not deleted: time may have been logged against them, and a task
    * somebody worked on is not a row to make disappear because the plan moved.
+   *
+   * The query is on `fieldVisitRequestId`, which is what the trip created
+   * rather than adopted — an adopted task has no such id and so cannot be swept
+   * up here, which is exactly right. What does need undoing for those is the
+   * membership, and only for people who are off the trip or a task that is no
+   * longer on the list; a re-approval that merely reordered the scope must not
+   * take somebody off a task they are still going to be on.
    */
   private async dropStaleTasks(
     tx: Tx, request: ActivationRequest, employeeIds: number[], wantedTasks: Set<string>,
@@ -792,12 +885,27 @@ export class FieldVisitActivationService {
     const stale = issues
       .filter((i: any) => !employeeIds.includes(i.assigneeId) || !wantedTasks.has(i.title))
       .map((i: any) => i.id);
-    if (!stale.length) return 0;
 
-    const archived = await tx.issue.updateMany({
-      where: { id: { in: stale } },
-      data: { isArchived: true },
+    // Not an early return on the created cards: a trip whose only scope is
+    // adopted tasks has no cards to archive at all, and would otherwise never
+    // reach the membership cleanup below.
+    const archived = stale.length
+      ? await tx.issue.updateMany({ where: { id: { in: stale } }, data: { isArchived: true } })
+      : { count: 0 };
+
+    const wantedIssues = new Set(
+      request.tasks.map((t) => t.issueId).filter((id): id is number => id != null),
+    );
+    const { count: released } = await tx.issueMember.deleteMany({
+      where: {
+        fieldVisitRequestId: request.id,
+        OR: [
+          { employeeId: { notIn: employeeIds } },
+          { issueId: { notIn: [...wantedIssues] } },
+        ],
+      },
     });
-    return archived.count;
+
+    return archived.count + released;
   }
 }

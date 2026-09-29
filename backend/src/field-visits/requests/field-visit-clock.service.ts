@@ -100,16 +100,52 @@ export class FieldVisitClockService {
 
     return Promise.all(days.map(async (day) => ({
       ...day,
-      tasks: await this.prisma.issue.findMany({
-        where: {
-          fieldVisitRequestId: day.request.id,
-          assigneeId: employee.id,
-          isArchived: false,
-        },
-        select: { id: true, key: true, title: true, status: true },
-        orderBy: [{ position: 'asc' }],
-      }),
+      tasks: await this.clockableIssues(day.request.id, employee.id),
     })));
+  }
+
+  /**
+   * The tasks this person may clock against on this trip.
+   *
+   * Two kinds, and they have to be found two different ways. A task the trip
+   * created belongs to the trip outright and names its person in `assigneeId`.
+   * A task the trip adopted is the project's own — it may have had an assignee
+   * and a history of its own long before anybody mentioned a site visit — and
+   * the trip reaches it through the lines that point at it, with the person
+   * identified as a member.
+   *
+   * Reading only the first kind would offer somebody who went on a visit to do
+   * project work nothing at all, which is the whole point of adopting a task in
+   * the first place. Reading only the second would hide the cards the trip
+   * genuinely made for them.
+   */
+  private async clockableIssues(requestId: number, employeeId: number) {
+    const links = await this.prisma.fieldVisitRequestTask.findMany({
+      where: { requestId, issueId: { not: null } },
+      select: { issueId: true },
+    });
+    const adopted = links.map((l) => l.issueId).filter((id): id is number => id != null);
+
+    return this.prisma.issue.findMany({
+      where: {
+        isArchived: false,
+        OR: [
+          { fieldVisitRequestId: requestId, assigneeId: employeeId },
+          // Either end of the relationship counts. The trip's own insert adds a
+          // membership, but somebody already the assignee of this task was
+          // never going to gain one, and they are plainly somebody who can be
+          // doing it.
+          ...(adopted.length
+            ? [{
+                id: { in: adopted },
+                OR: [{ assigneeId: employeeId }, { members: { some: { employeeId } } }],
+              }]
+            : []),
+        ],
+      },
+      select: { id: true, key: true, title: true, status: true },
+      orderBy: [{ position: 'asc' }],
+    });
   }
 
   // ─── The 500 metres ────────────────────────────────────────────────────────
@@ -186,10 +222,7 @@ export class FieldVisitClockService {
   private async resolveTask(
     requestId: number, employeeId: number, issueId?: number,
   ): Promise<number | null> {
-    const assigned = await this.prisma.issue.findMany({
-      where: { fieldVisitRequestId: requestId, assigneeId: employeeId, isArchived: false },
-      select: { id: true },
-    });
+    const assigned = await this.clockableIssues(requestId, employeeId);
     if (!assigned.length) return null;
 
     if (issueId == null) {

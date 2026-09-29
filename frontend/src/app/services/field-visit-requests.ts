@@ -17,6 +17,15 @@ export interface FieldVisitRequestTask {
   name: string;
   description?: string | null;
   position: number;
+  /** The project task this line adopts, rather than describing new work. */
+  issueId?: number | null;
+  issue?: {
+    id: number;
+    key: string;
+    title: string;
+    status: string;
+    priority: string;
+  } | null;
 }
 
 export interface FieldVisitRequestAttachment {
@@ -97,7 +106,7 @@ export interface PendingFieldVisitChange {
   endTime: string;
   remarks?: string | null;
   employeeIds: number[];
-  tasks: { name: string; description?: string | null }[];
+  tasks: { name?: string; description?: string | null; issueId?: number | null }[];
 }
 
 export interface FieldVisitActivity {
@@ -124,7 +133,9 @@ export interface FieldVisitRequestInput {
   endTime: string;
   remarks?: string;
   employeeIds: number[];
-  tasks: { name: string; description?: string }[];
+  /** `issueId` adopts a task already on the project board; without it the line
+   *  describes new work and approval mints a card per person. */
+  tasks: { name?: string; description?: string; issueId?: number }[];
   attachments?: { fileName: string; fileUrl: string; fileSize?: number }[];
   submit?: boolean;
 }

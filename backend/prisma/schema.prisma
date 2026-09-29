@@ -2169,6 +2169,10 @@ model Issue {
   /// Raised from a site visit, when it was.
   fieldVisitRequestId Int?
   fieldVisitRequest   FieldVisitRequest? @relation(fields: [fieldVisitRequestId], references: [id])
+  /// The reverse of the same fact, for a task that *already* existed and a trip
+  /// adopted rather than created. Distinct from the relation above: this task
+  /// is still the project's own, and `fieldVisitRequestId` stays null on it.
+  fieldVisitTaskLinks FieldVisitRequestTask[]
 
   /// The field-visit days clocked against this task (§5).
   fieldVisitAttendances FieldVisitAttendance[] @relation("FieldVisitAttendanceIssue")
@@ -2389,6 +2393,14 @@ model IssueMember {
   employeeId Int
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   assignedAt DateTime @default(now())
+
+  /// The field visit that put this person on this task, when one did.
+  ///
+  /// Marked rather than merely created, because a person can be on a task for
+  /// a perfectly ordinary reason and must not be quietly removed from it when a
+  /// trip is cancelled. Only rows this column names belong to the trip, so
+  /// cancelling or amending it withdraws exactly what it added and nothing else.
+  fieldVisitRequestId Int?
 
   @@id([issueId, employeeId])
   /// The primary key leads with issueId, so "every issue this person is on" —
@@ -4089,9 +4101,23 @@ model FieldVisitRequestTask {
   name        String
   description String?
   position    Int               @default(0)
-  createdAt   DateTime          @default(now())
+  /// The project task this line points at, when it points at one rather than
+  /// describing new work.
+  ///
+  /// Approval reads this to decide the difference: a linked line puts the
+  /// existing task in front of the people going instead of minting a second
+  /// card with the same title, so "the work" and "the trip" cannot disagree
+  /// about what was supposed to happen. Null — the common case — still means
+  /// "create a task per person", exactly as approval behaved before.
+  ///
+  /// SetNull rather than Cascade: a task deleted from the board must not take
+  /// the trip's line with it. The trip still happened, and still has a scope.
+  issueId Int?
+  issue   Issue? @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
 
   @@index([requestId])
+  @@index([issueId])
 }
 
 model FieldVisitRequestAttachment {
