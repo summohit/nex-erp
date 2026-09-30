@@ -20,7 +20,7 @@ export class JobsService {
         },
         applications: {
           where: { status: { in: ['HIRED', 'ONBOARDED'] } },
-          select: { id: true }
+          select: { id: true, updatedAt: true }
         }
       },
       orderBy: [
@@ -29,27 +29,50 @@ export class JobsService {
       ],
     });
 
-    // Auto-close logic
-    let needsRefetch = false;
+    // Auto-close logic.
+    //
+    // A posting closes itself when it expires or when every opening is taken.
+    // What it must never do is overrule a recruiter who deliberately set the
+    // status by hand: the edit drawer saves the whole form and the client
+    // immediately re-reads this list, so an unconditional rule here would
+    // revert the choice within the same click — the save reports success and
+    // the status silently snaps back.
+    //
+    // So each trigger only counts while the posting has not been edited since
+    // the trigger became true. `updatedAt` moves on every explicit save, so
+    // reopening a filled or expired posting pins it open, and a later hire
+    // pushes the application's own timestamp past the posting's again and
+    // closes it as before. Unattended postings still close on their own.
     for (const job of jobs) {
-      if (job.status !== 'Closed') {
-        let shouldClose = false;
-        
-        // 1. Check end date
-        if (job.endDate && new Date(job.endDate) < new Date()) {
-          shouldClose = true;
-        }
-        
-        // 2. Check total openings
-        const filled = job.applications.length;
-        if (job.totalOpenings > 0 && filled >= job.totalOpenings) {
-          shouldClose = true;
-        }
+      // Only a live posting can lapse. A draft is not published, so flipping it
+      // to Closed would be a state change nobody asked for.
+      if (job.status !== 'Open') continue;
 
-        if (shouldClose) {
-          await this.prisma.job.update({ where: { id: job.id }, data: { status: 'Closed' } });
-          job.status = 'Closed';
-        }
+      // Nothing has touched this posting since...
+      const untouchedSince = job.updatedAt;
+
+      // ...its end date passed.
+      const expiredUntouched =
+        !!job.endDate &&
+        new Date(job.endDate) < new Date() &&
+        untouchedSince <= new Date(job.endDate);
+
+      // ...its last opening was taken. A posting with 0 openings is unlimited
+      // and never fills, matching the drawer's "0 = unlimited" hint.
+      const filled = job.applications.length;
+      const lastFilledAt = job.applications.reduce<Date | null>(
+        (latest, app) => (!latest || app.updatedAt > latest ? app.updatedAt : latest),
+        null,
+      );
+      const filledUntouched =
+        job.totalOpenings > 0 &&
+        filled >= job.totalOpenings &&
+        lastFilledAt !== null &&
+        untouchedSince <= lastFilledAt;
+
+      if (expiredUntouched || filledUntouched) {
+        await this.prisma.job.update({ where: { id: job.id }, data: { status: 'Closed' } });
+        job.status = 'Closed';
       }
     }
 
@@ -111,7 +134,9 @@ export class JobsService {
         maxSalary: maxSalary ? parseFloat(maxSalary) : null,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
-        totalOpenings: totalOpenings ? parseInt(totalOpenings, 10) : 1,
+        totalOpenings: totalOpenings === undefined || totalOpenings === null || totalOpenings === ''
+          ? 1
+          : parseInt(totalOpenings, 10),
         recruiterId: recruiterId ? parseInt(recruiterId, 10) : null,
         discloseSalary: discloseSalary === true || discloseSalary === 'true',
         companyId,
@@ -132,7 +157,12 @@ export class JobsService {
     if (maxSalary !== undefined) updateData.maxSalary = maxSalary ? parseFloat(maxSalary) : null;
     if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
     if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
-    if (totalOpenings !== undefined) updateData.totalOpenings = totalOpenings ? parseInt(totalOpenings, 10) : 1;
+    // 0 is a real value here, not a missing one: the drawer offers it to mean
+    // "keep this posting open indefinitely", so it has to survive the write
+    // instead of collapsing back to a single opening.
+    if (totalOpenings !== undefined && totalOpenings !== null && totalOpenings !== '') {
+      updateData.totalOpenings = parseInt(totalOpenings, 10);
+    }
     if (recruiterId !== undefined) updateData.recruiterId = recruiterId ? parseInt(recruiterId, 10) : null;
     if (discloseSalary !== undefined) updateData.discloseSalary = discloseSalary === true || discloseSalary === 'true';
     

@@ -569,7 +569,8 @@ export class JobPostingsComponent implements OnInit {
       workLocationType: (job as any).workLocationType || 'On-site',
       recruiterId: (job as any).recruiterId ? String((job as any).recruiterId) : '',
       recruiterName: hr ? `${hr.firstName} ${hr.lastName}` : '',
-      totalOpenings: (job as any).totalOpenings || 1,
+      // 0 is "unlimited" and must survive the round trip into the form.
+      totalOpenings: (job as any).totalOpenings ?? 1,
       startDate: (job as any).startDate ? new Date((job as any).startDate).toISOString().split('T')[0] : '',
       endDate: (job as any).endDate ? new Date((job as any).endDate).toISOString().split('T')[0] : '',
       // No end date stored means the posting was set to never expire.
@@ -649,7 +650,10 @@ export class JobPostingsComponent implements OnInit {
       type: this.jobForm.type === 'Other' ? this.jobForm.typeOther : this.jobForm.type,
       workLocationType: this.jobForm.workLocationType,
       recruiterId: hr ? hr.id : null,
-      totalOpenings: this.jobForm.totalOpenings ? Number(this.jobForm.totalOpenings) : 1,
+      // 0 means "unlimited" in this form, so only an empty box falls back to 1.
+      totalOpenings: this.jobForm.totalOpenings === '' || this.jobForm.totalOpenings === null || this.jobForm.totalOpenings === undefined
+        ? 1
+        : Number(this.jobForm.totalOpenings),
       startDate: this.jobForm.startDate || null,
       endDate: this.jobForm.neverExpires ? null : (this.jobForm.endDate || null),
       discloseSalary: this.jobForm.discloseSalary,

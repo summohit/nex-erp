@@ -199,10 +199,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
   dashboard = signal<DashboardPayload | null>(null);
   pendingApprovals = signal<any[]>([]);
   isLoadingMetrics = signal<boolean>(true);
-myLeaveBalanceDays = computed(() => {
+  myLeaveBalanceDays = computed(() => {
     const b = (this.dashboard()?.common?.myLeaveBalance || []) as any[];
     const total = b.reduce((s: number, x: any) => s + ((x.allocated || 0) - (x.used || 0)), 0);
     return total % 1 !== 0 ? total.toFixed(1) : String(Math.round(total));
+  });
+
+  myLeaveUsedTotal = computed(() => {
+    const b = (this.dashboard()?.common?.myLeaveBalance || []) as any[];
+    const fmt = (n: number) => (n % 1 !== 0 ? n.toFixed(1) : String(Math.round(n)));
+    const used = b.reduce((s: number, x: any) => s + (x.used || 0), 0);
+    const allocated = b.reduce((s: number, x: any) => s + (x.allocated || 0), 0);
+    return `${fmt(used)}/${fmt(allocated)}`;
+  });
+
+  myLeaveUsageDetail = computed(() => {
+    const b = (this.dashboard()?.common?.myLeaveBalance || []) as any[];
+    const fmt = (n: number) => (n % 1 !== 0 ? n.toFixed(1) : String(Math.round(n)));
+    const used = b.reduce((s: number, x: any) => s + (x.used || 0), 0);
+    const allocated = b.reduce((s: number, x: any) => s + (x.allocated || 0), 0);
+    return `${fmt(used)} of ${fmt(allocated)} days used`;
   });
 
   // ---------------- NEW WIDGET HELPERS ----------------
