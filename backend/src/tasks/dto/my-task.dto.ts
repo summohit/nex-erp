@@ -44,6 +44,15 @@ export interface MyTaskDto {
   /** When the work was raised — My Tasks sorts newest-first on this. */
   createdAt: Date | null;
   /**
+   * §PB8: where this task stands in approval, when it needed any.
+   *
+   * Null for the overwhelming majority — a general task, a lead task, and
+   * anything raised by somebody whose tasks do not need approving. The list
+   * has to carry it so a manager can see their own task is not work yet.
+   */
+  approvalState?: string | null;
+  approvalRejectionReason?: string | null;
+  /**
    * The id of the project the issue lives in, even when the row presents as
    * GENERAL (system project). Null on a pre-sales task. This is what the
    * row's status dropdown and its socket room key off.

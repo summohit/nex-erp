@@ -19,6 +19,9 @@ import {
 import { ProjectsService } from '../../services/projects';
 import { EmployeeService } from '../../services/employee.service';
 import { MasterDataService, VisitLocation } from '../../services/master-data.service';
+import { RoleService } from '../../services/role.service';
+import { VisitLocationRequestsService } from '../../services/visit-location-requests.service';
+import { VisitLocationFormModalComponent } from '../../shared/components/visit-location-form-modal/visit-location-form-modal';
 import { environment } from '../../../environments/environment';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -71,6 +74,7 @@ export type FieldVisitFormMode = 'create' | 'edit' | 'modify';
     LucideLoader, LucideBuilding, LucideRoute, LucideExternalLink,
     LucideListChecks, LucideFilter, LucideUserRound, LucideUserPlus,
     LucideCircleAlert, LucideChevronUp,
+    VisitLocationFormModalComponent,
   ],
   templateUrl: './field-visit-request-form.html',
   styleUrls: ['./field-visit-request-form.css'],
@@ -87,9 +91,11 @@ export class FieldVisitRequestFormComponent implements OnInit {
   private projectsService = inject(ProjectsService);
   private employeeService = inject(EmployeeService);
   private masterData = inject(MasterDataService);
+  private roleService = inject(RoleService);
   private sanitizer = inject(DomSanitizer);
   private toast = inject(HotToastService);
   private http = inject(HttpClient);
+  private locationRequests = inject(VisitLocationRequestsService);
 
   projects = signal<{ id: number; name: string }[]>([]);
   /** Sites the company keeps on file, for the location picker (§PB10). */
@@ -105,7 +111,41 @@ export class FieldVisitRequestFormComponent implements OnInit {
   isSaving = signal(false);
   error = signal<string | null>(null);
   loadError = signal<string | null>(null);
+
+  isAdmin = this.roleService.isAdmin;
+
+  /**
+   * Adding a site from inside the form, so a missing one doesn't mean leaving
+   * a half-filled trip. An admin's site is saved at once; anyone else's goes to
+   * an administrator for approval (Delivery → Requests), same as the Add Visit
+   * Location button on the requests page.
+   */
+  canAddVisitLocation = signal(false);
+  isLocationModalOpen = signal(false);
+  locationSubmissionMode = computed<'direct' | 'request'>(() => this.isAdmin() ? 'direct' : 'request');
+
+  openAddVisitLocation(): void {
+    this.isLocationDropdownOpen.set(false);
+    this.isLocationModalOpen.set(true);
+  }
+
+  onVisitLocationSaved(): void {
+    this.isLocationModalOpen.set(false);
+    // A requested site is not on the list until it's approved; only a direct
+    // save can be picked straight away.
+    if (this.locationSubmissionMode() !== 'direct') return;
+    const known = new Set(this.visitLocations().map((l) => l.id));
+    this.masterData.getVisitLocations(true).subscribe({
+      next: (rows) => {
+        this.visitLocations.set(rows || []);
+        const added = (rows || []).find((l) => !known.has(l.id));
+        if (added) this.onVisitLocationPicked(added.id);
+      },
+    });
+  }
   isLoadingLists = signal(false);
+  /** The project picker shows a loader, not "no projects", until this is false. */
+  isLoadingProjects = signal(true);
 
   // Searchable Project select state
   selectedProjectId = signal<number | null>(null);
@@ -240,12 +280,23 @@ export class FieldVisitRequestFormComponent implements OnInit {
       error: () => this.visitLocations.set([]),
     });
 
+    this.locationRequests.capabilities().subscribe({
+      next: (c) => this.canAddVisitLocation.set(!!c?.canAdd),
+      error: () => this.canAddVisitLocation.set(false),
+    });
+
+    this.isLoadingProjects.set(true);
     this.projectsService.getProjects().subscribe({
       next: (rows: any[]) => {
         this.projects.set((rows || []).map((p) => ({ id: p.id, name: p.name })));
+        this.isLoadingProjects.set(false);
         done();
       },
-      error: (err) => { this.projects.set([]); failed('the project list', err); },
+      error: (err) => {
+        this.projects.set([]);
+        this.isLoadingProjects.set(false);
+        failed('the project list', err);
+      },
     });
     this.employeeService.getEmployeesBasicList().subscribe({
       next: (rows: any[]) => {

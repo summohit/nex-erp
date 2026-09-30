@@ -743,6 +743,115 @@ export class MailService {
   }
 
   /** Submitter-supplied values land inside an HTML email, so escape them. */
+  async sendOnboardingInitiatedEmail(email: string, employeeName: string) {
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #1e3a8a; text-align: center;">Welcome to the Team, ${this.escapeHtml(employeeName)}!</h2>
+        <p style="color: #475569; font-size: 16px;">
+          Your onboarding process has officially been initiated. We are preparing everything you need to get started. 
+          You will receive another email shortly with your login credentials once the setup is complete.
+        </p>
+        <p style="color: #475569; font-size: 16px;">We are thrilled to have you on board!</p>
+      </div>
+    `;
+
+    try {
+      if (this.brevoApiKey) {
+        return await this.sendBrevoEmail({
+          to: email,
+          subject: 'Your Onboarding Process is Initiated',
+          html: htmlContent,
+        });
+      }
+      return await this.sendWithRetry({
+        from: `"NEX ERP" <${this.fromEmail}>`,
+        to: email,
+        envelope: { from: this.fromEmail, to: email },
+        subject: 'Your Onboarding Process is Initiated',
+        html: htmlContent,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send onboarding initiation email to ${email}: ${this.errorDetail(error)}`);
+    }
+  }
+
+  async sendOnboardingCompletedEmail(email: string, employeeName: string) {
+    const crmUrl = process.env.APP_URL || 'http://localhost:4200';
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #1e3a8a; text-align: center;">Onboarding Complete! Welcome to NEX ERP</h2>
+        <p style="color: #475569; font-size: 16px;">Hi ${this.escapeHtml(employeeName)},</p>
+        <p style="color: #475569; font-size: 16px;">
+          Your onboarding setup is now complete! You can log into the system using the credentials below.
+        </p>
+        <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0; border: 1px solid #e2e8f0;">
+          <p style="margin: 0 0 10px 0; color: #334155; font-size: 14px;"><strong>CRM URL:</strong> <a href="${crmUrl}">${crmUrl}</a></p>
+          <p style="margin: 0 0 10px 0; color: #334155; font-size: 14px;"><strong>Username:</strong> ${this.escapeHtml(email)}</p>
+          <p style="margin: 0; color: #334155; font-size: 14px;"><strong>Temporary Password:</strong> nexerp2026</p>
+        </div>
+        <p style="color: #ef4444; font-size: 14px; font-weight: bold;">
+          * For your security, please change your password immediately after logging in.
+        </p>
+      </div>
+    `;
+
+    try {
+      if (this.brevoApiKey) {
+        return await this.sendBrevoEmail({
+          to: email,
+          subject: 'Onboarding Complete - Your Login Credentials',
+          html: htmlContent,
+        });
+      }
+      return await this.sendWithRetry({
+        from: `"NEX ERP" <${this.fromEmail}>`,
+        to: email,
+        envelope: { from: this.fromEmail, to: email },
+        subject: 'Onboarding Complete - Your Login Credentials',
+        html: htmlContent,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send onboarding completion email to ${email}: ${this.errorDetail(error)}`);
+    }
+  }
+
+  async sendInterviewScheduledEmail(email: string, candidateName: string, interviewTitle: string, scheduledAt: string, duration: number, meetingLink: string) {
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #1e3a8a; text-align: center;">Interview Scheduled: ${this.escapeHtml(interviewTitle)}</h2>
+        <p style="color: #475569; font-size: 16px;">Hi ${this.escapeHtml(candidateName)},</p>
+        <p style="color: #475569; font-size: 16px;">
+          We are pleased to inform you that an interview has been scheduled for your application.
+        </p>
+        <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0; border: 1px solid #e2e8f0;">
+          <p style="margin: 0 0 10px 0; color: #334155; font-size: 14px;"><strong>Date & Time:</strong> ${this.escapeHtml(scheduledAt)}</p>
+          <p style="margin: 0 0 10px 0; color: #334155; font-size: 14px;"><strong>Duration:</strong> ${duration} minutes</p>
+          <p style="margin: 0; color: #334155; font-size: 14px;"><strong>Meeting Link:</strong> <a href="${this.escapeHtml(meetingLink)}">${this.escapeHtml(meetingLink)}</a></p>
+        </div>
+        <p style="color: #475569; font-size: 16px;">Best regards,<br>The Hiring Team</p>
+      </div>
+    `;
+
+    try {
+      if (this.brevoApiKey) {
+        return await this.sendBrevoEmail({
+          to: email,
+          subject: `Interview Scheduled: ${interviewTitle}`,
+          html: htmlContent,
+        });
+      }
+      return await this.sendWithRetry({
+        from: `"NEX ERP" <${this.fromEmail}>`,
+        to: email,
+        envelope: { from: this.fromEmail, to: email },
+        subject: `Interview Scheduled: ${interviewTitle}`,
+        html: htmlContent,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send interview scheduled email to ${email}: ${this.errorDetail(error)}`);
+    }
+  }
+
   private escapeHtml(value: string | null | undefined): string {
     if (!value) return '';
     return value

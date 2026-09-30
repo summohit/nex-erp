@@ -25,10 +25,15 @@ import { EventsModule } from '../events/events.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 // For resolving a chosen lead contact to the Client a project is saved against.
 import { CrmModule } from '../crm/crm.module';
+import { ScopeRequestsController } from './scope-requests/scope-requests.controller';
+import { ScopeRequestsService } from './scope-requests/scope-requests.service';
+import { TaskApprovalsController } from './issues/task-approvals.controller';
+import { VisitLocationRequestsController } from './visit-location-requests/visit-location-requests.controller';
+import { VisitLocationRequestsService } from './visit-location-requests/visit-location-requests.service';
 
 @Module({
   imports: [PrismaModule, EventsModule, NotificationsModule, CrmModule],
-  controllers: [ProjectsController, IssuesController, BoardsController, LabelsController, MilestonesController, ProjectTicketsController, BudgetRequestsController, TaskHoursRequestsController, ProjectDiscussionsController],
-  providers: [ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, MilestonesService, IssueRemindersCron, ProjectTicketsService, BudgetRequestsService, TaskHoursRequestsService, ProjectDiscussionsService]
+  controllers: [ProjectsController, IssuesController, BoardsController, LabelsController, MilestonesController, ProjectTicketsController, BudgetRequestsController, TaskHoursRequestsController, ProjectDiscussionsController, ScopeRequestsController, TaskApprovalsController, VisitLocationRequestsController],
+  providers: [ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, MilestonesService, IssueRemindersCron, ProjectTicketsService, BudgetRequestsService, TaskHoursRequestsService, ProjectDiscussionsService, ScopeRequestsService, VisitLocationRequestsService]
 })
 export class ProjectsModule {}

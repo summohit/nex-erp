@@ -1155,6 +1155,45 @@
     </div>
 
     <!-- Filtered Empty State -->
+    <!-- §Tasks1: who has been delivering, over the last 30 days. Super Admin
+         only — the server refuses anybody else, so this is not the permission,
+         just the reason not to render an empty box for everyone else. -->
+    <div class="ttp-panel" *ngIf="canSeeTopPerformers && topPerformers().length > 0">
+      <div class="ttp-head">
+        <div>
+          <h3>Top task performers</h3>
+          <p>Last {{ topPerformersWindow() }} days · on-time delivery and throughput on project work</p>
+        </div>
+        <span class="ttp-private" title="Only a Super Admin can see this panel">Admin only</span>
+      </div>
+
+      <div class="ttp-podium">
+        <div class="ttp-card" *ngFor="let p of topPerformers(); let i = index" [ngClass]="performerRankClass(i)">
+          <div class="ttp-rank">{{ i + 1 }}</div>
+          <div class="ttp-avatar">
+            <img *ngIf="p.avatarUrl" [src]="p.avatarUrl" [alt]="p.name">
+            <span *ngIf="!p.avatarUrl">{{ performerInitials(p) }}</span>
+          </div>
+          <div class="ttp-body">
+            <strong class="ttp-name" [title]="p.name">{{ p.name }}</strong>
+            <div class="ttp-stats">
+              <span class="ttp-stat">
+                <b>{{ p.completed }}</b> completed
+              </span>
+              <!-- Shown only when it means something: somebody whose tasks
+                   carried no due dates has no on-time rate to report. -->
+              <span class="ttp-stat" *ngIf="p.withDueDate > 0">
+                <b>{{ p.onTimeRate }}%</b> on time
+              </span>
+              <span class="ttp-stat muted" *ngIf="p.withDueDate === 0">
+                no due dates set
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="boards-table-wrapper empty-wrap" *ngIf="!myTasksLoading() && myTasks().length > 0 && filteredMyTasks().length === 0">
       <div class="my-tasks-empty-card">
         <div class="empty-icon-badge search">

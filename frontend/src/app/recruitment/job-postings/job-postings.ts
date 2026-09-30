@@ -104,6 +104,12 @@ export class JobPostingsComponent implements OnInit {
             screeningQuestions: questions as any
           };
         });
+        mappedJobs.sort((a, b) => {
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          if (timeB !== timeA) return timeB - timeA;
+          return (b.id || 0) - (a.id || 0);
+        });
         this.jobs.set(mappedJobs);
         this.isLoading.set(false);
       },
@@ -671,6 +677,11 @@ export class JobPostingsComponent implements OnInit {
     } else {
       this.jobsService.createJob(payload).subscribe({
         next: () => {
+          if (this.gridApi) {
+            this.gridApi.applyColumnState({
+              defaultState: { sort: null }
+            });
+          }
           this.loadJobs();
           this.closeCreateModal();
           this.toast.success('Job created!');

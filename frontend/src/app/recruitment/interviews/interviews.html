@@ -43,6 +43,31 @@
       </button>
     </div>
 
+    <!-- DATE FILTER DROPDOWN -->
+    <div class="date-filter-group" style="position: relative; margin-left: 12px; margin-right: auto; display: flex; gap: 8px; align-items: center;">
+      <select class="form-select date-filter-select" [ngModel]="dateFilter()" (ngModelChange)="dateFilter.set($event)" style="min-width: 140px; padding: 6px 30px 6px 12px; border-radius: 6px; font-size: 13px;">
+        <option value="all">All Time</option>
+        <option value="today">Today</option>
+        <option value="this_week">This Week</option>
+        <option value="this_month">This Month</option>
+        <option value="last_month">Last Month</option>
+        <option value="last_30">Last 30 Days</option>
+        <option value="last_90">Last 90 Days</option>
+        <option value="this_year">This Year</option>
+        <option value="last_year">Last Year</option>
+        <option value="custom">Custom Dates</option>
+      </select>
+
+      <div class="custom-date-range" *ngIf="dateFilter() === 'custom'" style="display: flex; gap: 6px; align-items: center;">
+        <input type="date" class="form-control" [ngModel]="customStartDate()" (ngModelChange)="customStartDate.set($event)" style="padding: 6px; font-size: 13px;">
+        <span style="color: #64748b;">-</span>
+        <input type="date" class="form-control" [ngModel]="customEndDate()" (ngModelChange)="customEndDate.set($event)" style="padding: 6px; font-size: 13px;">
+        <button class="btn-clear-search" (click)="customStartDate.set(''); customEndDate.set('')" style="position: static; margin-left: 4px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px;">
+          <svg lucideX size="14"></svg>
+        </button>
+      </div>
+    </div>
+
     <div class="filter-tabs-pills">
       <button 
         type="button" 
@@ -155,7 +180,7 @@
           <div class="quick-links-row" *ngIf="interview.locationUrl || interview.application?.resumeUrl">
             <a 
               *ngIf="interview.locationUrl" 
-              [href]="interview.locationUrl" 
+              [href]="interview.locationUrl.startsWith('http') ? interview.locationUrl : 'https://' + interview.locationUrl" 
               target="_blank" 
               class="link-action join-call"
               title="Open video meeting">

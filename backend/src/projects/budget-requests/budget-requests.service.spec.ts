@@ -46,6 +46,10 @@ function makeService(over: any = {}) {
       create: jest.fn().mockImplementation((a: any) => Promise.resolve(a.data)),
       update: jest.fn().mockImplementation((a: any) => Promise.resolve(a.data)),
     },
+    // §PB8: reviewing now asks what the reviewer is ON THIS PROJECT, because a
+    // technical architect has a step of their own before the administrator.
+    // No membership unless a test says otherwise.
+    projectMember: { findFirst: jest.fn().mockResolvedValue(null) },
     ...over,
   };
   prisma.$transaction = jest.fn().mockImplementation((fn: any) => fn(prisma));
@@ -120,6 +124,21 @@ describe('raising a request', () => {
 describe('approving a request', () => {
   it('refuses anybody who is not an administrator', async () => {
     const { service } = makeService();
+    await expect(service.review(1, 70, 'EMPLOYEE', 5, 'APPROVED')).rejects.toThrow(ForbiddenException);
+  });
+
+  /**
+   * The technical architect's step belongs to task creation and nowhere else.
+   * A budget increase asks whether the company will spend more, which is not a
+   * technical question — so the architect gets no say here, even though they
+   * do on a task raised by the same manager.
+   */
+  it('refuses the technical architect, who approves tasks but not money', async () => {
+    const { service } = makeService({
+      projectMember: {
+        findFirst: jest.fn().mockResolvedValue({ role: 'TECHNICAL_ARCHITECT' }),
+      },
+    });
     await expect(service.review(1, 70, 'EMPLOYEE', 5, 'APPROVED')).rejects.toThrow(ForbiddenException);
   });
 

@@ -5009,3 +5009,44 @@
   border: none;
   background: transparent;
 }
+
+.status-action-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 12px;
+}
+
+.status-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
+}
+
+.status-btn.complete {
+  color: #10b981;
+  background: #ecfdf5;
+  border-color: #d1fae5;
+}
+.status-btn.complete:hover {
+  background: #d1fae5;
+}
+
+.status-btn.cancel {
+  color: #ef4444;
+  background: #fef2f2;
+  border-color: #fee2e2;
+}
+.status-btn.cancel:hover {
+  background: #fee2e2;
+}

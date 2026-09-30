@@ -394,7 +394,13 @@ export class CrmController {
   /**
    * Identity-only list for pickers, such as the project form's Client field.
    * Declared before 'lead-contacts/:id' so "options" is not read as an id.
+   *
+   * Open to any signed-in user, not just CRM: the visit-location form's Client
+   * picker uses it too, and an employee without crm/leads got a 403 there and
+   * an empty dropdown with no explanation. Identity fields only (name,
+   * company, email, code) — no deals, notes or values.
    */
+  @Permissions()
   @Get('lead-contacts/options')
   getLeadContactOptions(@Request() req) {
     return this.crmService.getLeadContactOptions(req.user.companyId);

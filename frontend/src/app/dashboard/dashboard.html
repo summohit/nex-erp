@@ -146,19 +146,39 @@
   <!-- ======================================================================= -->
   <div class="kpi-grid" *ngIf="user()">
 
-    <!-- COMMON EMPLOYEE KPIS -->
+    <!-- COMMON EMPLOYEE KPIS — tasks, tickets and projects lead; the rest follow -->
     <ng-container>
-      <app-stat-card 
-        label="My Tasks" 
-        [value]="dashboard()?.common?.taskStats?.pending || 0" 
+      <app-stat-card
+        label="My Tasks"
+        [value]="dashboard()?.common?.taskStats?.pending || 0"
         colorClass="bg-orange"
-        badge="Open"
-        subtitle="Pending assignments"
+        badge="Pending"
+        [subtitle]="(dashboard()?.common?.taskStats?.overdue || 0) + ' overdue'"
       >
         <svg icon lucideCheckSquare size="20"></svg>
       </app-stat-card>
 
-      <app-stat-card 
+      <app-stat-card
+        label="My Tickets"
+        [value]="dashboard()?.common?.ticketStats?.pending || 0"
+        colorClass="bg-purple"
+        badge="Pending"
+        [subtitle]="(dashboard()?.common?.ticketStats?.overdue || 0) + ' overdue'"
+      >
+        <svg icon lucideTicket size="20"></svg>
+      </app-stat-card>
+
+      <app-stat-card
+        label="My Projects"
+        [value]="dashboard()?.common?.projectStats?.inProgress || 0"
+        colorClass="bg-indigo"
+        badge="Ongoing"
+        [subtitle]="(dashboard()?.common?.projectStats?.overdue || 0) + ' overdue'"
+      >
+        <svg icon lucideFolderKanban size="20"></svg>
+      </app-stat-card>
+
+      <app-stat-card
         label="My Attendance" 
         [value]="dashboard()?.common?.myAttendanceThisMonth?.presentCount || 0" 
         colorClass="bg-emerald"
@@ -176,16 +196,6 @@
         subtitle="Unused leave days"
       >
         <svg icon lucideCalendar size="20"></svg>
-      </app-stat-card>
-
-      <app-stat-card 
-        label="My Tickets" 
-        [value]="myOpenTicketsCount()" 
-        colorClass="bg-purple"
-        badge="Open"
-        subtitle="Active support tickets"
-      >
-        <svg icon lucideTicket size="20"></svg>
       </app-stat-card>
     </ng-container>
 

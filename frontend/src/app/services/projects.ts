@@ -39,6 +39,25 @@ export interface ProjectBudgetSummary {
   unratedHours: number;
 }
 
+/** A decision somebody needs on a project that is not a task or a budget. */
+export interface ScopeRequest {
+  id: number;
+  projectId: number;
+  title: string;
+  /** IN_SCOPE or OUT_OF_SCOPE — the requester's reading, which may be disputed. */
+  scope: string;
+  /** Rich text. Rendered through Angular's sanitiser, never bypassSecurityTrust. */
+  body: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  decisionNote?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  project?: { id: number; name: string; key: string };
+  raisedBy?: { id: number; firstName: string; lastName: string; avatarUrl?: string | null };
+  reviewedBy?: { id: number; firstName: string; lastName: string } | null;
+  attachments?: { id: number; url: string; name: string; sizeBytes?: number | null }[];
+}
+
 export interface ProjectSummary {
   budget?: ProjectBudgetSummary;
   metrics: {
@@ -69,6 +88,72 @@ export class ProjectsService {
 
   getProject(id: number) {
     return this.http.get<any>(`${this.apiUrl}/${id}`);
+  }
+
+  // ── §PB8: task approval ───────────────────────────────────────────────────
+
+  /**
+   * Rule on a task waiting for approval.
+   *
+   * Deliberately not the same endpoint as the work-completion review: that one
+   * decides whether finished work is done, this one decides whether the task
+   * should exist. They sound alike and mean opposite things.
+   */
+  reviewIssueApproval(projectId: number, issueId: number, action: 'APPROVE' | 'REJECT', reason?: string) {
+    return this.http.post<any>(
+      `${this.apiUrl}/${projectId}/issues/${issueId}/approval`, { action, reason },
+    );
+  }
+
+  /** §Tasks2: copy a task, with a few things changed. */
+  duplicateIssue(projectId: number, issueId: number, data: {
+    title?: string; assigneeIds?: number[]; startDate?: string | null;
+    dueDate?: string | null; priority?: string; estimatedHours?: number | null;
+    includeChecklists?: boolean;
+  }) {
+    return this.http.post<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/duplicate`, data);
+  }
+
+  /** §PB8: send a rejected task back for approval after changing it. */
+  resubmitIssueForApproval(projectId: number, issueId: number) {
+    return this.http.post<any>(
+      `${this.apiUrl}/${projectId}/issues/${issueId}/approval/resubmit`, {},
+    );
+  }
+
+  /** §PB8: the third button — archive instead of sending it back. */
+  archiveIssueFromApproval(projectId: number, issueId: number, reason: string) {
+    return this.http.post<any>(
+      `${this.apiUrl}/${projectId}/issues/${issueId}/approval/archive`, { reason },
+    );
+  }
+
+  // ── Scope ("Fix") requests ────────────────────────────────────────────────
+
+  getScopeRequests(projectId: number) {
+    return this.http.get<ScopeRequest[]>(`${this.apiUrl}/${projectId}/scope-requests`);
+  }
+
+  createScopeRequest(projectId: number, data: {
+    title: string; scope: string; body: string;
+    attachments?: { url: string; name: string; sizeBytes?: number }[];
+  }) {
+    return this.http.post<ScopeRequest>(`${this.apiUrl}/${projectId}/scope-requests`, data);
+  }
+
+  /** Tasks waiting on this person's approval, across every project (§PB8). */
+  getPendingTaskApprovals() {
+    return this.http.get<any[]>(`${environment.apiUrl}/task-approvals/pending`);
+  }
+
+  getPendingScopeRequests() {
+    return this.http.get<ScopeRequest[]>(`${environment.apiUrl}/scope-requests/pending`);
+  }
+
+  reviewScopeRequest(id: number, decision: 'APPROVED' | 'REJECTED', note?: string) {
+    return this.http.post<ScopeRequest>(
+      `${environment.apiUrl}/scope-requests/${id}/review`, { decision, note },
+    );
   }
 
   getProjectSummary(id: number) {

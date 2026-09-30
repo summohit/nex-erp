@@ -81,6 +81,10 @@ export class EmployeesService {
         avatarUrl: true,
         managerId: true,
         employeeCode: true,
+        // A flag, not a secret, and the assignee pickers badge PMs with it.
+        // Without it those dropdowns fell back to pattern-matching the
+        // designation name, which is a guess dressed up as a fact.
+        isProjectManager: true,
         department: { select: { id: true, name: true } },
         designation: { select: { id: true, name: true } },
         user: { select: { email: true, role: true } },

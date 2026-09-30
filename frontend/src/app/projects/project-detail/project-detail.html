@@ -101,21 +101,21 @@
       </div>
 
       <div class="filter-popover-container relative" style="position: relative; margin-left: 12px;">
-        <button class="top-bar-icon-btn" title="Archived lists" (click)="togglePopover('archivedLists')">
+        <button class="top-bar-icon-btn" title="Archived columns" (click)="togglePopover('archivedLists')">
           <svg lucideArchive size="16"></svg>
         </button>
 
         <!-- Archived Lists Popover -->
         <div class="trello-popover filter-popover-panel" *ngIf="activePopover() === 'archivedLists'" (click)="$event.stopPropagation()">
           <div class="popover-header filter-header">
-            <span class="filter-title">Archived lists</span>
+            <span class="filter-title">Archived columns</span>
             <button class="btn-icon-tiny filter-close-btn" (click)="closePopover()">
               <svg lucideX size="14"></svg>
             </button>
           </div>
           <div class="popover-body filter-body">
             <div *ngIf="archivedColumns().length === 0" style="padding: 12px; color: #44546f; font-size: 14px; text-align: center;">
-              No archived lists.
+              No archived columns.
             </div>
             <div *ngFor="let col of archivedColumns()" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #dfe1e6;">
               <span style="font-weight: 500; font-size: 14px; color: #172b4d;">{{ col.name }}</span>
@@ -528,6 +528,13 @@
           </div>
         </div>
       </div>
+      <!-- Raise anything about this project that needs a decision and is not a
+           task or a budget increase. Always available: the whole point is that
+           somebody noticed a problem, and who noticed it is not a permission. -->
+      <button class="top-bar-fix-btn" (click)="openScopeRequest()" title="Raise a request about this project">
+        <svg lucideWrench size="14"></svg>
+        <span>Fix</span>
+      </button>
       <button class="top-bar-add-task-btn" *ngIf="showAddTaskButton()" (click)="openCreateIssue()" title="Add task to this project">
         <svg lucidePlus size="14"></svg>
         <span>Add task</span>
@@ -550,6 +557,7 @@
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'field-visits'" (click)="setProjectTab('field-visits')"><svg lucideMapPin size="14"></svg> Client Visits<span class="tab-count" *ngIf="fieldVisits().length > 0">{{ fieldVisits().length }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'tickets'" (click)="setProjectTab('tickets')"><svg lucideTicket size="14"></svg> Tickets<span class="tab-count" *ngIf="tabCounts().tickets > 0">{{ tabCounts().tickets }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'discussions'" (click)="setProjectTab('discussions')"><svg lucideMessageSquare size="14"></svg> Discussions<span class="tab-count" *ngIf="tabCounts().discussions > 0">{{ tabCounts().discussions }}</span></button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'requests'" (click)="setProjectTab('requests')"><svg lucideWrench size="14"></svg> Requests<span class="tab-count" *ngIf="scopeRequests().length > 0">{{ scopeRequests().length }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'budget-requests'" (click)="setProjectTab('budget-requests')" *ngIf="canSeeFinancialTabs"><svg lucideTrendingUp size="14"></svg> Budget requests<span class="tab-count" *ngIf="tabCounts().budgetRequests > 0">{{ tabCounts().budgetRequests }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'reports'" (click)="setProjectTab('reports')" *ngIf="canSeeFinancialTabs"><svg lucideBarChart size="14"></svg> Reports</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'archived'" (click)="setProjectTab('archived')"><svg lucideArchive size="14"></svg> Archived work items<span class="tab-count" *ngIf="archivedIssues().length > 0">{{ archivedIssues().length }}</span></button>
@@ -1470,6 +1478,288 @@
     <app-milestones-tab [projectId]="projectId" />
   </div>
 
+  <!-- The Scope & Decision requests raised on this project. -->
+  <div class="scope-requests-panel" *ngIf="activeProjectTab() === 'requests'">
+    <!-- Enhanced Header Banner -->
+    <div class="scope-header-card">
+      <div class="scope-header-left">
+        <div class="scope-header-icon-wrap">
+          <svg lucideWrench size="22"></svg>
+        </div>
+        <div class="scope-header-text">
+          <div class="scope-header-title-row">
+            <h3>Project Scope &amp; Decision Requests</h3>
+            <span class="scope-header-count-pill">{{ scopeRequests().length }} Total</span>
+            <span class="scope-header-pending-pill" *ngIf="pendingScopeCount() > 0">
+              <span class="pulse-dot"></span> {{ pendingScopeCount() }} Pending Review
+            </span>
+          </div>
+          <p>Submit, track, and review requests requiring scope determination, contractual alignment, or administrative decisions.</p>
+        </div>
+      </div>
+      <div class="scope-header-actions">
+        <button type="button" class="scope-btn-raise" (click)="openScopeRequest()">
+          <svg lucidePlus size="16"></svg>
+          <span>Raise a request</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 4 KPI Metrics Stats Grid -->
+    <div class="scope-stats-grid">
+      <div class="scope-stat-card" [class.active]="scopeFilterStatus() === 'ALL' && scopeFilterType() === 'ALL'" (click)="resetScopeFilters()">
+        <div class="scope-stat-icon-wrap total">
+          <svg lucideFileCheck size="20"></svg>
+        </div>
+        <div class="scope-stat-content">
+          <span class="scope-stat-label">Total Requests</span>
+          <div class="scope-stat-value-row">
+            <span class="scope-stat-value">{{ scopeRequests().length }}</span>
+            <span class="scope-stat-sub">All submissions</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="scope-stat-card pending" [class.active]="scopeFilterStatus() === 'PENDING'" (click)="setScopeStatusFilter('PENDING')">
+        <div class="scope-stat-icon-wrap pending">
+          <svg lucideClock size="20"></svg>
+        </div>
+        <div class="scope-stat-content">
+          <span class="scope-stat-label">Pending Decision</span>
+          <div class="scope-stat-value-row">
+            <span class="scope-stat-value">{{ pendingScopeCount() }}</span>
+            <span class="scope-stat-badge pending" *ngIf="pendingScopeCount() > 0">Action needed</span>
+            <span class="scope-stat-sub" *ngIf="pendingScopeCount() === 0">Up to date</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="scope-stat-card out-of-scope" [class.active]="scopeFilterType() === 'OUT_OF_SCOPE'" (click)="setScopeTypeFilter(scopeFilterType() === 'OUT_OF_SCOPE' ? 'ALL' : 'OUT_OF_SCOPE')">
+        <div class="scope-stat-icon-wrap out-of-scope">
+          <svg lucideAlertCircle size="20"></svg>
+        </div>
+        <div class="scope-stat-content">
+          <span class="scope-stat-label">Out of Scope</span>
+          <div class="scope-stat-value-row">
+            <span class="scope-stat-value">{{ outOfScopeCount() }}</span>
+            <span class="scope-stat-sub">Contract change impact</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="scope-stat-card approved" [class.active]="scopeFilterStatus() === 'APPROVED'" (click)="setScopeStatusFilter('APPROVED')">
+        <div class="scope-stat-icon-wrap approved">
+          <svg lucideCheckCircle2 size="20"></svg>
+        </div>
+        <div class="scope-stat-content">
+          <span class="scope-stat-label">Approved</span>
+          <div class="scope-stat-value-row">
+            <span class="scope-stat-value">{{ approvedScopeCount() }}</span>
+            <span class="scope-stat-sub">Formally sanctioned</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search & Filter Controls Toolbar -->
+    <div class="scope-toolbar">
+      <div class="scope-search-box">
+        <svg lucideSearch size="16" class="search-icon"></svg>
+        <input 
+          type="text" 
+          placeholder="Search requests by title, details, requester..." 
+          [ngModel]="scopeSearchQuery()" 
+          (ngModelChange)="scopeSearchQuery.set($event)"
+        />
+        <button type="button" class="scope-search-clear" *ngIf="scopeSearchQuery()" (click)="scopeSearchQuery.set('')">
+          <svg lucideX size="14"></svg>
+        </button>
+      </div>
+
+      <div class="scope-filter-group">
+        <!-- Status Tabs -->
+        <div class="scope-pill-filters">
+          <button type="button" class="scope-filter-pill" [class.active]="scopeFilterStatus() === 'ALL'" (click)="setScopeStatusFilter('ALL')">
+            All
+          </button>
+          <button type="button" class="scope-filter-pill" [class.active]="scopeFilterStatus() === 'PENDING'" (click)="setScopeStatusFilter('PENDING')">
+            <span class="filter-dot pending"></span> Pending <span class="pill-count" *ngIf="pendingScopeCount() > 0">({{ pendingScopeCount() }})</span>
+          </button>
+          <button type="button" class="scope-filter-pill" [class.active]="scopeFilterStatus() === 'APPROVED'" (click)="setScopeStatusFilter('APPROVED')">
+            <span class="filter-dot approved"></span> Approved <span class="pill-count" *ngIf="approvedScopeCount() > 0">({{ approvedScopeCount() }})</span>
+          </button>
+          <button type="button" class="scope-filter-pill" [class.active]="scopeFilterStatus() === 'REJECTED'" (click)="setScopeStatusFilter('REJECTED')">
+            <span class="filter-dot rejected"></span> Rejected <span class="pill-count" *ngIf="rejectedScopeCount() > 0">({{ rejectedScopeCount() }})</span>
+          </button>
+        </div>
+
+        <!-- Scope Classification Filter -->
+        <div class="scope-type-select-wrap">
+          <select class="scope-filter-select" [ngModel]="scopeFilterType()" (ngModelChange)="scopeFilterType.set($event)">
+            <option value="ALL">All Scopes</option>
+            <option value="OUT_OF_SCOPE">Out of Scope ({{ outOfScopeCount() }})</option>
+            <option value="IN_SCOPE">In Scope ({{ inScopeCount() }})</option>
+          </select>
+        </div>
+
+        <!-- Sort Order Toggle -->
+        <button type="button" class="scope-sort-btn" (click)="toggleScopeSortOrder()" [title]="'Sort by ' + (scopeSortOrder() === 'NEWEST' ? 'Oldest first' : 'Newest first')">
+          <svg lucideArrowUpDown size="14"></svg>
+          <span>{{ scopeSortOrder() === 'NEWEST' ? 'Newest' : 'Oldest' }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Skeleton Loader State -->
+    <div class="scope-cards-container" *ngIf="isScopeLoading()">
+      <div class="scope-skeleton-card" *ngFor="let i of [1, 2, 3]">
+        <div class="scope-skeleton-top">
+          <div class="scope-skeleton-pill w-28"></div>
+          <div class="scope-skeleton-pill w-20"></div>
+          <div class="scope-skeleton-pill w-16 ml-auto"></div>
+        </div>
+        <div class="scope-skeleton-line w-60 h-20"></div>
+        <div class="scope-skeleton-author">
+          <div class="scope-skeleton-circle"></div>
+          <div class="scope-skeleton-author-text">
+            <div class="scope-skeleton-line w-36 h-12"></div>
+            <div class="scope-skeleton-line w-24 h-10"></div>
+          </div>
+        </div>
+        <div class="scope-skeleton-body-box">
+          <div class="scope-skeleton-line w-full h-12"></div>
+          <div class="scope-skeleton-line w-80 h-12"></div>
+          <div class="scope-skeleton-line w-50 h-12"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State: Zero requests in project -->
+    <div class="scope-empty-rich" *ngIf="!isScopeLoading() && !scopeRequests().length">
+      <div class="scope-empty-icon-glow">
+        <svg lucideFileCheck size="38"></svg>
+      </div>
+      <h4>No Requests Raised Yet</h4>
+      <p>Need a decision on whether a feature or revision is in-scope or out-of-scope? Raise a request to notify administrators, keep an audit trail, and resolve uncertainties.</p>
+      <button type="button" class="scope-empty-cta-btn" (click)="openScopeRequest()">
+        <svg lucidePlus size="16"></svg>
+        <span>Raise First Request</span>
+      </button>
+    </div>
+
+    <!-- Empty State: Filters yielded no results -->
+    <div class="scope-empty-filter" *ngIf="!isScopeLoading() && scopeRequests().length > 0 && filteredScopeRequests().length === 0">
+      <svg lucideSearch size="32"></svg>
+      <h4>No Matching Requests Found</h4>
+      <p>No scope requests match your search or active filter criteria.</p>
+      <button type="button" class="scope-btn ghost" (click)="resetScopeFilters()">Reset Filters</button>
+    </div>
+
+    <!-- Request Cards Feed -->
+    <div class="scope-cards-container" *ngIf="!isScopeLoading() && filteredScopeRequests().length > 0">
+      <article 
+        class="scope-card-modern" 
+        *ngFor="let r of filteredScopeRequests()" 
+        [class.status-pending]="r.status === 'PENDING'"
+        [class.status-approved]="r.status === 'APPROVED'"
+        [class.status-rejected]="r.status === 'REJECTED'"
+      >
+        <!-- Top Row: Scope Pill + Status Badge + Time -->
+        <div class="scope-card-top-bar">
+          <div class="scope-card-badges">
+            <span class="scope-type-badge" [class.out-scope]="r.scope === 'OUT_OF_SCOPE'" [class.in-scope]="r.scope === 'IN_SCOPE'">
+              <svg lucideAlertCircle size="12" *ngIf="r.scope === 'OUT_OF_SCOPE'"></svg>
+              <svg lucideCheck size="12" *ngIf="r.scope === 'IN_SCOPE'"></svg>
+              {{ scopeLabel(r.scope) }}
+            </span>
+            <span class="scope-status-badge" [ngClass]="r.status.toLowerCase()">
+              <span class="status-indicator-dot"></span>
+              {{ r.status === 'PENDING' ? 'Pending Decision' : (r.status | titlecase) }}
+            </span>
+          </div>
+
+          <div class="scope-card-timestamp">
+            <svg lucideClock size="13"></svg>
+            <span [title]="r.createdAt | date:'d MMM y, HH:mm'">{{ getScopeRelativeTime(r.createdAt) }}</span>
+          </div>
+        </div>
+
+        <!-- Card Title -->
+        <h4 class="scope-card-heading">{{ r.title }}</h4>
+
+        <!-- Requester Meta Bar -->
+        <div class="scope-card-author-row">
+          <div class="scope-author-avatar" [style.background-color]="getScopeAvatarColor(r.raisedBy?.firstName + ' ' + r.raisedBy?.lastName)">
+            <img *ngIf="r.raisedBy?.avatarUrl" [src]="r.raisedBy?.avatarUrl" [alt]="r.raisedBy?.firstName" />
+            <span *ngIf="!r.raisedBy?.avatarUrl">{{ getScopeUserInitials(r.raisedBy) }}</span>
+          </div>
+          <div class="scope-author-info">
+            <span class="scope-author-name">
+              {{ r.raisedBy ? (r.raisedBy.firstName + ' ' + r.raisedBy.lastName) : 'Unknown requester' }}
+            </span>
+            <span class="scope-author-date">
+              submitted on {{ r.createdAt | date:'d MMM y, HH:mm' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Request Body Content -->
+        <!-- Angular sanitises this on render. Never bypassSecurityTrustHtml: the
+             body is text somebody typed, and the server strips what can execute,
+             but the framework's sanitiser is the guarantee that matters here. -->
+        <div class="scope-card-body-content" [innerHTML]="r.body"></div>
+
+        <!-- Attachments Section -->
+        <div class="scope-card-attachments" *ngIf="r.attachments?.length">
+          <div class="attachments-label">
+            <svg lucidePaperclip size="13"></svg>
+            <span>Attachments ({{ r.attachments?.length }})</span>
+          </div>
+          <div class="attachments-pills-list">
+            <a *ngFor="let a of r.attachments" [href]="a.url" target="_blank" rel="noopener noreferrer" class="scope-attachment-pill" [title]="a.name">
+              <svg lucideFileText size="14"></svg>
+              <span class="attachment-name">{{ a.name }}</span>
+              <span class="attachment-size" *ngIf="a.sizeBytes">{{ formatFileSize(a.sizeBytes) }}</span>
+              <svg lucideExternalLink size="12" class="attachment-ext-icon"></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Decision Callout (Approved / Rejected) -->
+        <div class="scope-decision-banner" *ngIf="r.decisionNote || r.reviewedAt" [ngClass]="r.status.toLowerCase()">
+          <div class="decision-icon-wrap">
+            <svg lucideCheckCircle2 size="16" *ngIf="r.status === 'APPROVED'"></svg>
+            <svg lucideAlertCircle size="16" *ngIf="r.status === 'REJECTED'"></svg>
+            <svg lucideClock size="16" *ngIf="r.status === 'PENDING'"></svg>
+          </div>
+          <div class="decision-content">
+            <div class="decision-title">
+              <strong>{{ r.status === 'APPROVED' ? 'Approved' : 'Rejected' }}</strong>
+              <span *ngIf="r.reviewedBy" class="reviewer-name">by {{ r.reviewedBy.firstName }} {{ r.reviewedBy.lastName }}</span>
+              <span *ngIf="r.reviewedAt" class="reviewer-date">({{ r.reviewedAt | date:'d MMM y, HH:mm' }})</span>
+            </div>
+            <p class="decision-reason" *ngIf="r.decisionNote">{{ r.decisionNote }}</p>
+          </div>
+        </div>
+
+        <!-- Admin Decision Actions (for PENDING requests) -->
+        <div class="scope-card-actions-bar" *ngIf="r.status === 'PENDING' && canDecideScopeRequests">
+          <span class="action-prompt-text">
+            <svg lucideWrench size="14"></svg> Admin Decision Required
+          </span>
+          <div class="action-btn-group">
+            <button type="button" class="scope-action-btn reject" (click)="decideScopeRequest(r, 'REJECTED')">
+              <svg lucideX size="14"></svg> Reject
+            </button>
+            <button type="button" class="scope-action-btn approve" (click)="decideScopeRequest(r, 'APPROVED')">
+              <svg lucideCheck size="14"></svg> Approve
+            </button>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+
   <!-- §29/§30 Project tickets, and §25 budget requests. Self-contained
        components for the same reason milestones is one: this page is already
        four and a half thousand lines, and each owns its own endpoint and its
@@ -2351,7 +2641,7 @@
   <div class="archived-tab-container" *ngIf="activeProjectTab() === 'archived'" style="display: flex; flex-direction: column; flex: 1; padding: 24px 32px; background: #ffffff; min-height: 0; overflow-y: auto;">
     <div style="max-width: 1200px; width: 100%; margin: 0 auto;">
       <h2 style="font-size: 20px; font-weight: 600; color: #172b4d; margin-bottom: 8px;">Archived Work Items</h2>
-      <p style="font-size: 14px; color: #5e6c84; margin-bottom: 24px;">Items that have been archived are removed from active boards and lists. You can unarchive them to restore them to their original location.</p>
+      <p style="font-size: 14px; color: #5e6c84; margin-bottom: 24px;">Items that have been archived are removed from active boards and columns. You can unarchive them to restore them to their original location.</p>
 
       <div *ngIf="archivedIssues().length > 0; else noArchived" style="border: 1px solid #dfe1e6; border-radius: 8px; overflow: hidden;">
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
@@ -2458,7 +2748,7 @@
             <!-- List Actions Popover -->
             <div class="trello-popover" *ngIf="activeColumnPopoverId() === col.id" style="position: absolute; right: 0; top: 32px; z-index: 100; min-width: 280px; text-align: left;" (click)="$event.stopPropagation()">
               <div class="popover-header">
-                <span>List actions</span>
+                <span>Column actions</span>
                 <button class="btn-icon-tiny" (click)="activeColumnPopoverId.set(null)"><svg lucideX size="14"></svg></button>
               </div>
               <div class="popover-body list-actions-body">
@@ -2466,7 +2756,7 @@
                 <div class="list-action-divider"></div>
                 
                 <div class="popover-subtitle-row">
-                  <span class="popover-subtitle mb-0">Change list color</span>
+                  <span class="popover-subtitle mb-0">Change column color</span>
                   <span class="premium-badge">PREMIUM</span>
                 </div>
                 <div class="color-swatches-grid">
@@ -2511,7 +2801,7 @@
                 </button>
 
                 <div class="list-action-divider"></div>
-                <button class="list-action-btn danger-btn" (click)="archiveColumn(col.id)">Archive this list</button>
+                <button class="list-action-btn danger-btn" (click)="archiveColumn(col.id)">Archive this column</button>
               </div>
             </div>
           </div>
@@ -2538,10 +2828,47 @@
           <div class="trello-card" 
                [class.is-updating]="isIssueUpdating(issue.id)"
                [class.read-only-card]="isReadOnlyArchitect"
+               [class.awaiting-approval]="isAwaitingApproval(issue)"
                *ngFor="let issue of getColumnIssues(col.id)" 
                cdkDrag
-               [cdkDragDisabled]="isReadOnlyArchitect"
+               [cdkDragDisabled]="isReadOnlyArchitect || isAwaitingApproval(issue)"
                (click)="openIssueDetails(issue)">
+
+            <!-- §PB8: refused, with the reason on the card and the way back
+                 next to it. Rejection is "fix this and return", so the card has
+                 to carry both the what and the how — a reason the manager has
+                 to go hunting for is a reason nobody reads. -->
+            <div class="card-rejected-banner" *ngIf="isRejectedApproval(issue)"
+                 (click)="$event.stopPropagation()">
+              <div class="card-rejected-head">
+                <svg lucideAlertCircle size="12"></svg>
+                <span>Needs changes</span>
+              </div>
+              <p class="card-rejected-reason" *ngIf="issue.approvalRejectionReason">
+                {{ issue.approvalRejectionReason }}
+              </p>
+              <button type="button" class="card-approval-btn resubmit"
+                      (click)="resubmitIssueForApproval(issue)">
+                Send for approval
+              </button>
+            </div>
+
+            <!-- §PB8: a task waiting for approval is visible but not yet work.
+                 Drag is disabled above; this says why, so a card that will not
+                 move is explained rather than merely broken. -->
+            <div class="card-approval-banner" *ngIf="isAwaitingApproval(issue)"
+                 (click)="$event.stopPropagation()">
+              <span class="card-approval-label">
+                <svg lucideClock size="12"></svg>
+                {{ approvalLabel(issue) }}
+              </span>
+              <span class="card-approval-actions" *ngIf="canDecideApproval(issue)">
+                <button type="button" class="card-approval-btn reject"
+                        (click)="decideIssueApproval(issue, 'REJECT')">Reject</button>
+                <button type="button" class="card-approval-btn approve"
+                        (click)="decideIssueApproval(issue, 'APPROVE')">Approve</button>
+              </span>
+            </div>
 
             <!-- Moving / Updating Card Overlay Loader -->
             <div class="card-updating-overlay" *ngIf="isIssueUpdating(issue.id)" (click)="$event.stopPropagation()">
@@ -2596,6 +2923,22 @@
                       <svg lucideClock size="11"></svg>
                       <span>{{ ts.display }}</span>
                     </div>
+                  </ng-container>
+
+                  <!-- Hours used, as a share. Same helper the Tasks table
+                       reads, so a card and its row cannot disagree: red past
+                       the ceiling, orange when the ceiling was raised to get
+                       there. Nothing at all when the task has no estimate. -->
+                  <ng-container *ngIf="taskBudget(issue) as tb">
+                    <span class="card-budget-pill" *ngIf="tb.percent !== null"
+                          [ngClass]="taskBudgetClass(issue)"
+                          [title]="tb.state === 'over'
+                              ? ('Over its hours by ' + (tb.percent - 100) + '%')
+                              : tb.state === 'raised'
+                                ? (tb.extra + 'h added by an approved request')
+                                : (tb.percent + '% of assigned hours used')">
+                      {{ tb.percent }}%
+                    </span>
                   </ng-container>
 
                   <!-- Comments Indicator -->
@@ -2705,17 +3048,17 @@
       <div class="add-another-list-col" *ngIf="isProjectOwner">
         <button type="button" class="btn-add-list" *ngIf="!isAddingColumn()" (click)="isAddingColumn.set(true)">
           <svg lucidePlus size="16"></svg>
-          <span>Add another list</span>
+          <span>Add another column</span>
         </button>
 
         <div class="add-list-form-container" *ngIf="isAddingColumn()">
           <input type="text" class="add-list-input"
-                 placeholder="Enter list title..."
+                 placeholder="Enter column title..."
                  [ngModel]="newColumnName()"
                  (ngModelChange)="newColumnName.set($event)"
                  (keyup.enter)="addColumn()" autofocus>
           <div class="add-list-actions">
-            <button class="btn-primary" (click)="addColumn()">Add list</button>
+            <button class="btn-primary" (click)="addColumn()">Add column</button>
             <button class="btn-cancel-inline" (click)="isAddingColumn.set(false); newColumnName.set('')">
               <svg lucideX size="20"></svg>
             </button>
@@ -2909,7 +3252,7 @@
       <!-- Status Popover -->
       <div class="trello-popover status-popover" *ngIf="activePopover() === 'status'" (click)="$event.stopPropagation()">
         <div class="popover-header">
-          <span>Select List</span>
+          <span>Select Column</span>
           <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="14"></svg></button>
         </div>
         <div class="popover-body">
@@ -2956,6 +3299,17 @@
             <span>Reject Task</span>
           </button>
         </ng-container>
+
+        <!-- §Tasks2: copy this task, with a few things changed. Offered to
+             anybody who may create a task here — a copy is a new task, and the
+             server applies the same permission and the same approval. -->
+        <button class="modal-action-btn"
+                style="background-color: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe;"
+                (click)="openDuplicateTask()"
+                title="Create a copy of this task">
+          <svg lucideCopy size="14" class="btn-icon-svg"></svg>
+          <span>Duplicate</span>
+        </button>
 
         <!-- Delete, Super Admin only (§PB4). The board archives otherwise. -->
         <button class="modal-action-btn"
@@ -4681,3 +5035,362 @@
   </div>
   </div>
 </div>
+
+
+<!-- Raise a Fix request. Scope is a required choice, not a note in the body:
+     that one answer is what turns an argument about who pays into a decision
+     somebody can actually make.
+
+     Every class here is scope-prefixed and styled in this component. The first
+     version reused modal-backdrop / modal-card, which do not exist in this
+     stylesheet — the markup rendered as unstyled divs at the foot of the page,
+     so the button appeared to do nothing at all. -->
+<div class="scope-backdrop" *ngIf="isScopeModalOpen()" (click)="closeScopeRequest()">
+  <div class="scope-dialog-modern" (click)="$event.stopPropagation()">
+    <!-- Modal Header -->
+    <div class="scope-dialog-head">
+      <div class="dialog-head-left">
+        <div class="dialog-head-icon">
+          <svg lucideWrench size="18"></svg>
+        </div>
+        <div class="dialog-head-titles">
+          <h3>Raise a Request</h3>
+          <p>Submit a requirement or scope question for administrative review</p>
+        </div>
+      </div>
+      <button type="button" class="scope-dialog-close" (click)="closeScopeRequest()" aria-label="Close modal">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="scope-dialog-body">
+      <!-- Title Field -->
+      <div class="scope-field-group">
+        <label class="scope-field-label">
+          Request Title <span class="scope-req-star">*</span>
+        </label>
+        <div class="scope-input-wrapper">
+          <input 
+            type="text" 
+            class="scope-text-input" 
+            [(ngModel)]="scopeForm.title"
+            placeholder="e.g. Client requests data export in Excel format instead of CSV"
+          />
+        </div>
+        <span class="scope-field-help">A concise summary describing the request or change</span>
+      </div>
+
+      <!-- Scope Determination: Interactive Card Selector -->
+      <div class="scope-field-group">
+        <label class="scope-field-label">
+          Scope Classification <span class="scope-req-star">*</span>
+        </label>
+        <div class="scope-type-cards-selector">
+          <!-- Out of Scope Card -->
+          <div 
+            class="scope-selection-card out-of-scope" 
+            [class.selected]="scopeForm.scope === 'OUT_OF_SCOPE'"
+            (click)="setScopeFormType('OUT_OF_SCOPE')"
+          >
+            <div class="selection-card-header">
+              <div class="selection-card-radio">
+                <span class="radio-indicator"></span>
+              </div>
+              <span class="selection-card-tag out">Additional Scope</span>
+            </div>
+            <div class="selection-card-title">
+              <svg lucideAlertCircle size="16"></svg>
+              <span>Out of Scope</span>
+            </div>
+            <p class="selection-card-desc">
+              Extra work, deviation, or addition not covered in the original client contract. May require change-order approval.
+            </p>
+          </div>
+
+          <!-- In Scope Card -->
+          <div 
+            class="scope-selection-card in-scope" 
+            [class.selected]="scopeForm.scope === 'IN_SCOPE'"
+            (click)="setScopeFormType('IN_SCOPE')"
+          >
+            <div class="selection-card-header">
+              <div class="selection-card-radio">
+                <span class="radio-indicator"></span>
+              </div>
+              <span class="selection-card-tag in">Standard Deliverable</span>
+            </div>
+            <div class="selection-card-title">
+              <svg lucideCheckCircle2 size="16"></svg>
+              <span>In Scope</span>
+            </div>
+            <p class="selection-card-desc">
+              Work considered part of the agreed baseline deliverables and standard project commitment.
+            </p>
+          </div>
+        </div>
+        <span class="scope-field-help">Select your initial assessment. Reviewers and project managers will evaluate this upon submission.</span>
+      </div>
+
+      <!-- Detailed Explanation (Quill Rich Text Editor) -->
+      <div class="scope-field-group">
+        <label class="scope-field-label">
+          Detailed Explanation <span class="scope-req-star">*</span>
+        </label>
+        <div class="scope-editor-card quill-wrapper">
+          <div class="quill-container" #scopeQuillContainer></div>
+        </div>
+        <span class="scope-field-help">Provide context, client rationale, technical requirements, and any dependencies.</span>
+      </div>
+
+      <!-- Attachments Dropzone -->
+      <div class="scope-field-group">
+        <label class="scope-field-label">
+          Supporting Documents &amp; Mockups
+        </label>
+        <label class="scope-dropzone">
+          <input type="file" multiple hidden (change)="onScopeFilesPicked($event)" />
+          <div class="dropzone-icon">
+            <svg lucideUploadCloud size="24"></svg>
+          </div>
+          <div class="dropzone-text">
+            <span class="dropzone-primary-text">{{ scopeUploading() ? 'Uploading files…' : 'Click to browse or drop files here' }}</span>
+            <span class="dropzone-sub-text">Specifications, wireframes, emails, or contract screenshots (up to 10MB each)</span>
+          </div>
+        </label>
+
+        <!-- Attached Files List -->
+        <div class="scope-attachments-list" *ngIf="scopeForm.attachments?.length">
+          <div class="scope-attached-item" *ngFor="let a of scopeForm.attachments">
+            <div class="attached-file-info">
+              <svg lucidePaperclip size="14" class="attached-icon"></svg>
+              <span class="attached-name" [title]="a.name">{{ a.name }}</span>
+              <span class="attached-size" *ngIf="a.sizeBytes">{{ formatFileSize(a.sizeBytes) }}</span>
+            </div>
+            <button type="button" class="attached-remove-btn" (click)="removeScopeAttachment(a.url)" title="Remove file">
+              <svg lucideX size="14"></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer Actions -->
+    <div class="scope-dialog-footer">
+      <button type="button" class="scope-footer-btn ghost" (click)="closeScopeRequest()" [disabled]="isSavingScope()">
+        Cancel
+      </button>
+      <button 
+        type="button" 
+        class="scope-footer-btn submit" 
+        (click)="submitScopeRequest()"
+        [disabled]="isSavingScope() || scopeUploading()"
+      >
+        <svg lucideSparkles size="15" *ngIf="!isSavingScope()"></svg>
+        <span>{{ isSavingScope() ? 'Submitting request…' : 'Raise Request' }}</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- The confirm/prompt dialogs DialogService raises. This route is top-level
+     rather than a child of main-layout, so the host that layout renders never
+     reaches this page and every awaited dialog hung unresolved. -->
+<!-- §Tasks2: duplicate, with the few fields worth changing on the copy.
+     Everything else — description, type, phase, labels, checklist structure —
+     comes across untouched. Comments, logged time, attachments and the
+     approval state deliberately do not. -->
+<div class="scope-backdrop" *ngIf="isDuplicateOpen()" (click)="closeDuplicateTask()">
+  <div class="dup-dialog" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="dup-dialog-head">
+      <div class="dup-head-left">
+        <div class="dup-head-icon">
+          <svg lucideCopy size="18"></svg>
+        </div>
+        <div class="dup-head-titles">
+          <h3>Duplicate Task</h3>
+          <p>Create a new task based on this one with custom schedule and assignees</p>
+        </div>
+      </div>
+      <button type="button" class="dup-dialog-close" (click)="closeDuplicateTask()" aria-label="Close dialog">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="dup-dialog-body">
+      <!-- Task Title -->
+      <div class="dup-field-group">
+        <label class="dup-field-label">
+          Task Title <span class="dup-req">*</span>
+        </label>
+        <div class="dup-input-wrapper">
+          <input type="text" class="dup-text-input title-input"
+                 [(ngModel)]="duplicateForm.title"
+                 placeholder="e.g. Copy of Role Gating"
+                 (keyup.enter)="duplicateForm.title.trim() && !isDuplicating() && submitDuplicateTask()">
+        </div>
+      </div>
+
+      <!-- Schedule (Start Date & Due Date) -->
+      <div class="dup-row">
+        <div class="dup-field-group">
+          <label class="dup-field-label">Start Date</label>
+          <div class="dup-input-affix-wrapper">
+            <span class="dup-affix-icon">
+              <svg lucideCalendar size="15"></svg>
+            </span>
+            <input type="date" class="dup-text-input has-icon" [(ngModel)]="duplicateForm.startDate">
+          </div>
+        </div>
+
+        <div class="dup-field-group">
+          <label class="dup-field-label">Due Date</label>
+          <div class="dup-input-affix-wrapper">
+            <span class="dup-affix-icon">
+              <svg lucideCalendar size="15"></svg>
+            </span>
+            <input type="date" class="dup-text-input has-icon" [(ngModel)]="duplicateForm.dueDate">
+          </div>
+        </div>
+      </div>
+
+      <!-- Priority & Estimated Hours -->
+      <div class="dup-row">
+        <div class="dup-field-group">
+          <label class="dup-field-label">Priority</label>
+          <div class="dup-priority-selector">
+            <button type="button"
+                    *ngFor="let p of [
+                      { key: 'LOW', label: 'Low' },
+                      { key: 'MEDIUM', label: 'Medium' },
+                      { key: 'HIGH', label: 'High' },
+                      { key: 'CRITICAL', label: 'Critical' }
+                    ]"
+                    class="dup-priority-pill"
+                    [class.active]="duplicateForm.priority === p.key"
+                    [attr.data-priority]="p.key"
+                    (click)="duplicateForm.priority = p.key">
+              <span class="p-dot"></span>
+              <span class="p-text">{{ p.label }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="dup-field-group">
+          <label class="dup-field-label">Estimated Hours</label>
+          <div class="dup-input-affix-wrapper">
+            <span class="dup-affix-icon">
+              <svg lucideClock size="15"></svg>
+            </span>
+            <input type="number" min="0" step="0.5" class="dup-text-input has-icon has-suffix"
+                   [(ngModel)]="duplicateForm.estimatedHours" placeholder="e.g. 8">
+            <span class="dup-input-suffix">hrs</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Assign to -->
+      <div class="dup-field-group">
+        <div class="dup-field-label-row">
+          <div class="dup-label-with-badge">
+            <label class="dup-field-label">Assign To</label>
+            <span class="dup-badge" *ngIf="duplicateForm.assigneeIds.length > 0">
+              {{ duplicateForm.assigneeIds.length }} selected
+            </span>
+            <span class="dup-badge unassigned" *ngIf="duplicateForm.assigneeIds.length === 0">
+              Unassigned
+            </span>
+          </div>
+          <div class="dup-assignee-actions" *ngIf="projectMembersForPicker().length > 0">
+            <button type="button" class="dup-text-link" *ngIf="duplicateForm.assigneeIds.length > 0"
+                    (click)="clearDuplicateAssignees()">
+              Clear
+            </button>
+            <button type="button" class="dup-text-link" *ngIf="duplicateForm.assigneeIds.length < projectMembersForPicker().length"
+                    (click)="selectAllDuplicateAssignees()">
+              Select all
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter if multiple members -->
+        <div class="dup-member-search" *ngIf="projectMembersForPicker().length > 4">
+          <svg lucideSearch size="13" class="dup-search-icon"></svg>
+          <input type="text" [(ngModel)]="duplicateMemberSearch" placeholder="Filter project members...">
+        </div>
+
+        <div class="dup-members-list-wrapper">
+          <div class="dup-members-grid" *ngIf="filteredDuplicateMembers.length > 0">
+            <div *ngFor="let m of filteredDuplicateMembers"
+                 class="dup-member-card"
+                 [class.selected]="isDuplicateAssigneeSelected(m.id)"
+                 (click)="toggleDuplicateAssignee(m.id)">
+              <div class="dup-member-avatar" [style.background-color]="m.color">
+                <img *ngIf="m.avatarUrl" [src]="m.avatarUrl" [alt]="m.name">
+                <span *ngIf="!m.avatarUrl">{{ m.initials }}</span>
+              </div>
+              <div class="dup-member-info">
+                <span class="dup-member-name" [title]="m.name">{{ m.name }}</span>
+                <span class="dup-member-role" *ngIf="m.role" [title]="m.role">{{ m.role }}</span>
+              </div>
+              <div class="dup-member-checkbox" [class.checked]="isDuplicateAssigneeSelected(m.id)">
+                <svg lucideCheck size="11" *ngIf="isDuplicateAssigneeSelected(m.id)"></svg>
+              </div>
+            </div>
+          </div>
+          <div class="dup-members-empty" *ngIf="filteredDuplicateMembers.length === 0">
+            No matching project members found
+          </div>
+        </div>
+        <span class="dup-field-hint">Left unselected, the copy starts unassigned.</span>
+      </div>
+
+      <!-- Checklists Option -->
+      <div class="dup-toggle-card" (click)="duplicateForm.includeChecklists = !duplicateForm.includeChecklists">
+        <div class="dup-toggle-left">
+          <div class="dup-toggle-icon">
+            <svg lucideCheckSquare size="16"></svg>
+          </div>
+          <div class="dup-toggle-text">
+            <span class="dup-toggle-title">Copy checklists</span>
+            <span class="dup-toggle-desc">Include existing checklist items with progress reset to unchecked</span>
+          </div>
+        </div>
+        <div class="dup-toggle-switch" [class.checked]="duplicateForm.includeChecklists">
+          <span class="dup-toggle-knob"></span>
+        </div>
+      </div>
+
+      <!-- Info Banner: What won't be copied -->
+      <div class="dup-note-box">
+        <div class="dup-note-icon">
+          <svg lucideInfo size="16"></svg>
+        </div>
+        <div class="dup-note-body">
+          <span class="dup-note-title">Copy details</span>
+          <p class="dup-note-text">
+            Comments, logged work time, and attachments are not copied. If this project requires task approval, the copy will start as a pending submission.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions / Footer -->
+    <div class="dup-dialog-actions">
+      <button type="button" class="dup-btn ghost" (click)="closeDuplicateTask()"
+              [disabled]="isDuplicating()">
+        Cancel
+      </button>
+      <button type="button" class="dup-btn primary" (click)="submitDuplicateTask()"
+              [disabled]="isDuplicating() || !duplicateForm.title.trim()">
+        <svg *ngIf="!isDuplicating()" lucideCopy size="15"></svg>
+        <span *ngIf="isDuplicating()" class="dup-btn-spinner"></span>
+        <span>{{ isDuplicating() ? 'Creating copy…' : 'Create copy' }}</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<app-dialog-host></app-dialog-host>

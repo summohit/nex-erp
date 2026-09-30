@@ -22,6 +22,12 @@
         <svg lucideRefreshCw [size]="14" [class.spin-anim]="isLoading()"></svg>
         <span>Refresh</span>
       </button>
+      @if (locationCapabilities()?.canAdd) {
+        <button class="ghost-btn" type="button" (click)="addVisitLocation()">
+          <svg lucideMapPin [size]="15"></svg>
+          <span>Add Visit Location</span>
+        </button>
+      }
       <button class="primary-btn new-request-btn" type="button" (click)="openForm()">
         <svg lucidePlus [size]="16"></svg>
         <span>New request</span>
@@ -264,6 +270,14 @@
     </div>
   }
 </div>
+
+@if (isLocationFormOpen()) {
+  <app-visit-location-form-modal
+    submissionMode="request"
+    (saved)="isLocationFormOpen.set(false)"
+    (closed)="isLocationFormOpen.set(false)">
+  </app-visit-location-form-modal>
+}
 
 @if (isFormOpen()) {
   <app-field-visit-request-form

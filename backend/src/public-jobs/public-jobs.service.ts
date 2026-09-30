@@ -55,7 +55,11 @@ export class PublicJobsService {
         department: true,
         designation: true,
         branch: true
-      }
+      },
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
     });
     return jobs.map(j => this.mapToPublicJob(j));
   }
@@ -86,7 +90,11 @@ export class PublicJobsService {
         department: true,
         designation: true,
         branch: true
-      }
+      },
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
     });
     return jobs.map(j => this.mapToPublicJob(j));
   }

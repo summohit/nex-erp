@@ -64,12 +64,18 @@ export class InterviewsComponent implements OnInit {
     return { total, upcoming, needsReview, completed };
   });
 
+  dateFilter = signal<string>('all');
+  customStartDate = signal<string>('');
+  customEndDate = signal<string>('');
+
   // Filtered interviews
   filteredInterviews = computed(() => {
     const list = this.interviews();
     const tab = this.activeTab();
     const q = this.searchText().toLowerCase().trim();
+    const dateF = this.dateFilter();
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     return list.filter(i => {
       // Tab filter
@@ -80,6 +86,48 @@ export class InterviewsComponent implements OnInit {
       if (tab === 'completed' && !isCompleted) return false;
       if (tab === 'upcoming' && !isScheduledUpcoming) return false;
       if (tab === 'needs-review' && !isNeedsReview) return false;
+
+      // Date Filter
+      if (dateF !== 'all') {
+        const d = new Date(i.scheduledAt);
+        if (dateF === 'today') {
+          if (d < today || d >= new Date(today.getTime() + 86400000)) return false;
+        } else if (dateF === 'this_week') {
+          const day = now.getDay();
+          const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+          const monday = new Date(now.getTime());
+          monday.setDate(diff);
+          monday.setHours(0,0,0,0);
+          const nextMonday = new Date(monday.getTime() + 7 * 86400000);
+          if (d < monday || d >= nextMonday) return false;
+        } else if (dateF === 'this_month') {
+          if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return false;
+        } else if (dateF === 'last_month') {
+          let prevMonth = now.getMonth() - 1;
+          let year = now.getFullYear();
+          if (prevMonth < 0) { prevMonth = 11; year--; }
+          if (d.getMonth() !== prevMonth || d.getFullYear() !== year) return false;
+        } else if (dateF === 'last_30') {
+          const thirtyDaysAgo = new Date(today.getTime() - 30 * 86400000);
+          if (d < thirtyDaysAgo) return false;
+        } else if (dateF === 'last_90') {
+          const ninetyDaysAgo = new Date(today.getTime() - 90 * 86400000);
+          if (d < ninetyDaysAgo) return false;
+        } else if (dateF === 'this_year') {
+          if (d.getFullYear() !== now.getFullYear()) return false;
+        } else if (dateF === 'last_year') {
+          if (d.getFullYear() !== now.getFullYear() - 1) return false;
+        } else if (dateF === 'custom') {
+          const start = this.customStartDate() ? new Date(this.customStartDate()) : null;
+          const end = this.customEndDate() ? new Date(this.customEndDate()) : null;
+          if (start && d < start) return false;
+          if (end) {
+            const endDay = new Date(end.getTime());
+            endDay.setHours(23, 59, 59, 999);
+            if (d > endDay) return false;
+          }
+        }
+      }
 
       // Text search
       if (!q) return true;

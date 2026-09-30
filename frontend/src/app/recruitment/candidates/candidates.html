@@ -41,10 +41,15 @@
       <div class="header-title-group">
         <div class="header-title-row">
           <h1>Candidates (ATS)</h1>
-          <span class="candidates-count-pill">{{ applications().length }} Candidate{{ applications().length === 1 ? '' : 's' }}</span>
-          <span class="filtered-badge" *ngIf="hasToolbarFilters() && filteredApplications().length !== applications().length">
-            {{ filteredApplications().length }} matching
-          </span>
+          <ng-container *ngIf="isLoadingApplications()">
+            <app-skeleton width="95px" height="24px" radius="12px"></app-skeleton>
+          </ng-container>
+          <ng-container *ngIf="!isLoadingApplications()">
+            <span class="candidates-count-pill">{{ applications().length }} Candidate{{ applications().length === 1 ? '' : 's' }}</span>
+            <span class="filtered-badge" *ngIf="hasToolbarFilters() && filteredApplications().length !== applications().length">
+              {{ filteredApplications().length }} matching
+            </span>
+          </ng-container>
         </div>
         <p>Manage, review and transition candidate applications across pipeline stages</p>
       </div>
@@ -107,6 +112,8 @@
             [placeholder]="'All Jobs (' + jobs().length + ')'"
             [value]="selectedJobId()"
             [clearable]="true"
+            [loading]="isLoadingJobs()"
+            loadingText="Loading jobs..."
             (valueChange)="selectedJobId.set($event); onFilterChange()">
             <svg prefix lucideBriefcase size="13.5"></svg>
           </app-searchable-select>
@@ -250,53 +257,126 @@
 
   <!-- KPI WIDGETS -->
   <div class="kpi-row" *ngIf="viewMode() === 'KANBAN'">
-    <div class="kpi-card" *ngFor="let s of STAGES" (click)="scrollToColumn(s.key)">
-      <div class="kpi-icon" [ngClass]="'icon-' + s.tone"><svg lucideInbox size="20"></svg></div>
-      <div class="kpi-details">
-        <div class="kpi-value" [ngClass]="'text-' + s.tone">{{ stageApps(s.key).length }}</div>
-        <div class="kpi-title">{{ s.label }}</div>
+    <!-- Skeleton KPI Cards -->
+    <ng-container *ngIf="isLoadingApplications()">
+      <div class="kpi-card" *ngFor="let s of STAGES" style="pointer-events: none;">
+        <app-skeleton width="38px" height="38px" radius="8px"></app-skeleton>
+        <div class="kpi-details" style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+          <app-skeleton width="36px" height="20px" radius="4px"></app-skeleton>
+          <app-skeleton width="55px" height="11px" radius="3px"></app-skeleton>
+        </div>
       </div>
-    </div>
+    </ng-container>
+
+    <!-- Real KPI Cards -->
+    <ng-container *ngIf="!isLoadingApplications()">
+      <div class="kpi-card" *ngFor="let s of STAGES" (click)="scrollToColumn(s.key)">
+        <div class="kpi-icon" [ngClass]="'icon-' + s.tone"><svg lucideInbox size="20"></svg></div>
+        <div class="kpi-details">
+          <div class="kpi-value" [ngClass]="'text-' + s.tone">{{ stageApps(s.key).length }}</div>
+          <div class="kpi-title">{{ s.label }}</div>
+        </div>
+      </div>
+    </ng-container>
   </div>
 
   <!-- KANBAN VIEW -->
   <div class="kanban-board" *ngIf="viewMode() === 'KANBAN'" cdkDropListGroup #kanbanBoard>
-    <div class="kanban-col" *ngFor="let s of STAGES" [ngClass]="'kanban-col-' + s.tone" [attr.data-stage]="s.key">
-      <div class="col-header">
-        <h3>{{ s.label }} <span>{{ stageApps(s.key).length }}</span></h3>
-      </div>
-      <!-- enterPredicate refuses the drop outright when the candidate has not
-           been through every mandatory stage, so the card never visually lands
-           in a column the server would bounce it out of. -->
-      <div class="col-body" cdkDropList [cdkDropListData]="stageApps(s.key)"
-           [cdkDropListEnterPredicate]="stageDropPredicate(s.key)"
-           (cdkDropListDropped)="drop($event, s.key)">
-        <div class="kanban-card" *ngFor="let item of stageApps(s.key)" cdkDrag [cdkDragData]="item" (click)="openApplication(item)">
-          <div class="card-title">{{item.fullName}}</div>
-          <div class="card-meta">{{item.job?.title}}</div>
-          <!-- The candidate is held here, not moved, until the extra payment
-               is signed off — so the card says which move is waiting. -->
-          <div class="approval-badge" *ngIf="item.approvalStatus === 'PENDING_APPROVAL'">
-            ⚠️ Awaiting approval to move to {{ stageLabel(item.approvalRequestedStage || 'OFFERED') }}
-          </div>
-          <div class="approval-badge is-rejected" *ngIf="item.approvalStatus === 'REJECTED'">
-            ⛔ Extra payment rejected
-          </div>
-          <div class="card-footer-row">
-            <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
-              <svg lucideSparkles size="12"></svg>
-              <span>{{item.aiScore}}% Match</span>
+    <!-- Skeleton Kanban Columns -->
+    <ng-container *ngIf="isLoadingApplications()">
+      <div class="kanban-col" *ngFor="let s of STAGES; let colIdx = index" [ngClass]="'kanban-col-' + s.tone" style="pointer-events: none;">
+        <div class="col-header">
+          <h3 style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <span>{{ s.label }}</span>
+            <app-skeleton width="28px" height="18px" radius="10px"></app-skeleton>
+          </h3>
+        </div>
+        <div class="col-body" style="min-height: 250px;">
+          <ng-container *ngFor="let card of [1, 2, 3]">
+            <div class="kanban-card" *ngIf="card <= (colIdx < 3 ? 3 : (colIdx < 6 ? 2 : 1))" style="cursor: default;">
+              <div style="margin-bottom: 6px;">
+                <app-skeleton [width]="card % 2 === 0 ? '120px' : '150px'" height="16px" radius="4px"></app-skeleton>
+              </div>
+              <div style="margin-bottom: 12px;">
+                <app-skeleton [width]="card % 2 === 0 ? '180px' : '140px'" height="12px" radius="4px"></app-skeleton>
+              </div>
+              <div class="card-footer-row" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                <app-skeleton width="78px" height="20px" radius="10px"></app-skeleton>
+                <app-skeleton width="38px" height="11px" radius="3px"></app-skeleton>
+              </div>
             </div>
-            <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
+          </ng-container>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Actual Kanban Columns -->
+    <ng-container *ngIf="!isLoadingApplications()">
+      <div class="kanban-col" *ngFor="let s of STAGES" [ngClass]="'kanban-col-' + s.tone" [attr.data-stage]="s.key">
+        <div class="col-header">
+          <h3>{{ s.label }} <span>{{ stageApps(s.key).length }}</span></h3>
+        </div>
+        <!-- enterPredicate refuses the drop outright when the candidate has not
+             been through every mandatory stage, so the card never visually lands
+             in a column the server would bounce it out of. -->
+        <div class="col-body" cdkDropList [cdkDropListData]="stageApps(s.key)"
+             [cdkDropListEnterPredicate]="stageDropPredicate(s.key)"
+             (cdkDropListDropped)="drop($event, s.key)">
+          <div class="kanban-card" *ngFor="let item of stageApps(s.key)" cdkDrag [cdkDragData]="item" (click)="openApplication(item)">
+            <div class="card-title">{{item.fullName}}</div>
+            <div class="card-meta">{{item.job?.title}}</div>
+            <!-- The candidate is held here, not moved, until the extra payment
+                 is signed off — so the card says which move is waiting. -->
+            <div class="approval-badge" *ngIf="item.approvalStatus === 'PENDING_APPROVAL'">
+              ⚠️ Awaiting approval to move to {{ stageLabel(item.approvalRequestedStage || 'OFFERED') }}
+            </div>
+            <div class="approval-badge is-rejected" *ngIf="item.approvalStatus === 'REJECTED'">
+              ⛔ Extra payment rejected
+            </div>
+            <div class="card-footer-row">
+              <div class="kanban-ai-badge" *ngIf="item.aiScore !== undefined && item.aiScore !== null" [ngClass]="getScoreClass(item.aiScore)">
+                <svg lucideSparkles size="12"></svg>
+                <span>{{item.aiScore}}% Match</span>
+              </div>
+              <div class="card-meta date" style="margin-top:0;">{{item.createdAt | date:'MMM d'}}</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ng-container>
   </div>
 
   <!-- TABLE VIEW -->
   <div class="table-container" *ngIf="viewMode() === 'TABLE'">
+    <!-- Skeleton Table View -->
+    <div *ngIf="isLoadingApplications()" style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: white; margin-top: 12px;">
+      <div style="display: grid; grid-template-columns: 2fr 1.5fr 1.5fr 1.2fr 1fr 1fr; gap: 16px; padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; align-items: center;">
+        <app-skeleton width="100px" height="12px"></app-skeleton>
+        <app-skeleton width="90px" height="12px"></app-skeleton>
+        <app-skeleton width="80px" height="12px"></app-skeleton>
+        <app-skeleton width="70px" height="12px"></app-skeleton>
+        <app-skeleton width="60px" height="12px"></app-skeleton>
+        <app-skeleton width="50px" height="12px"></app-skeleton>
+      </div>
+      <div *ngFor="let r of [1, 2, 3, 4, 5, 6, 7, 8]" style="display: grid; grid-template-columns: 2fr 1.5fr 1.5fr 1.2fr 1fr 1fr; gap: 16px; padding: 14px 20px; border-bottom: 1px solid #f1f5f9; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <app-skeleton width="34px" height="34px" [circle]="true"></app-skeleton>
+          <div style="display: flex; flex-direction: column; gap: 5px; flex: 1;">
+            <app-skeleton [width]="r % 2 === 0 ? '120px' : '145px'" height="13px" radius="4px"></app-skeleton>
+            <app-skeleton [width]="r % 2 === 0 ? '80px' : '100px'" height="10px" radius="3px"></app-skeleton>
+          </div>
+        </div>
+        <div><app-skeleton width="130px" height="12px" radius="4px"></app-skeleton></div>
+        <div><app-skeleton width="90px" height="22px" radius="6px"></app-skeleton></div>
+        <div><app-skeleton width="75px" height="20px" radius="10px"></app-skeleton></div>
+        <div><app-skeleton width="60px" height="12px" radius="4px"></app-skeleton></div>
+        <div><app-skeleton width="50px" height="12px"></app-skeleton></div>
+      </div>
+    </div>
+
+    <!-- AG Grid Table -->
     <ag-grid-angular
+      *ngIf="!isLoadingApplications()"
       class="ag-theme-quartz custom-ats-grid"
       [theme]="'legacy'"
       [rowData]="filteredApplications()"
@@ -830,13 +910,13 @@
       <div class="interview-form" *ngIf="showInterviewForm()">
         <h5>{{ editInterviewMode() ? 'Edit Interview' : 'New Interview' }}</h5>
         <div class="form-group">
-          <label>Title (e.g. Technical Round)</label>
-          <input type="text" class="form-control" [ngModel]="newInterview().title" (ngModelChange)="newInterview.update(v => ({...v, title: $event}))" placeholder="Technical Round 1">
+          <label>Title <span style="color: #ef4444;">*</span></label>
+          <input type="text" class="form-control" [style.border]="attemptedInterviewSubmit() && !newInterview().title ? '1px solid #ef4444' : ''" [ngModel]="newInterview().title" (ngModelChange)="newInterview.update(v => ({...v, title: $event}))" placeholder="Technical Round 1">
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Date & Time</label>
-            <input type="datetime-local" class="form-control" [min]="minDate" [ngModel]="newInterview().scheduledAt" (ngModelChange)="newInterview.update(v => ({...v, scheduledAt: $event}))">
+            <label>Date & Time <span style="color: #ef4444;">*</span></label>
+            <input type="datetime-local" class="form-control" [style.border]="attemptedInterviewSubmit() && !newInterview().scheduledAt ? '1px solid #ef4444' : ''" [min]="minDate" [ngModel]="newInterview().scheduledAt" (ngModelChange)="newInterview.update(v => ({...v, scheduledAt: $event}))">
           </div>
           <div class="form-group">
             <label>Duration (mins)</label>
@@ -906,11 +986,24 @@
             </div>
 
             <!-- Click Backdrop Overlay -->
-          <select class="form-select" [ngModel]="newInterview().interviewerId" (ngModelChange)="newInterview.update(v => ({...v, interviewerId: +$event}))">
-            <option [value]="null">Select Interviewer</option>
-            <option *ngFor="let emp of employees()" [value]="emp.id">{{emp.firstName}} {{emp.lastName}}</option>
-          </select>
+            <div class="dropdown-backdrop" *ngIf="isEmpDropdownOpen()" (click)="closeEmpDropdown()"></div>
+          </div> <!-- Close custom-emp-dropdown-container -->
+        </div> <!-- Close form-group (Interviewer) -->
+
+        <div class="form-group">
+          <label>Meeting Link <span style="color: #ef4444;">*</span></label>
+          <input type="url" 
+            class="form-control" 
+            [class.border-danger]="attemptedInterviewSubmit() && (!newInterview().locationUrl || !newInterview().locationUrl.trim())"
+            [style.border]="attemptedInterviewSubmit() && (!newInterview().locationUrl || !newInterview().locationUrl.trim()) ? '1px solid #ef4444' : ''"
+            [ngModel]="newInterview().locationUrl" 
+            (ngModelChange)="newInterview.update(v => ({...v, locationUrl: $event}))" 
+            placeholder="https://meet.google.com/...">
+          <small class="error-text" *ngIf="attemptedInterviewSubmit() && (!newInterview().locationUrl || !newInterview().locationUrl.trim())" style="color: #ef4444; font-size: 12px; margin-top: 4px; display: block;">
+            Meeting link is required to schedule an interview.
+          </small>
         </div>
+
         <div class="form-actions">
           <button class="btn-outline" (click)="cancelInterviewForm()">Cancel</button>
           <button class="btn-primary" (click)="submitInterview()" [disabled]="isSubmittingInterview()">
@@ -921,7 +1014,7 @@
 
       <!-- Interviews List -->
       <div class="interviews-list" *ngIf="!showInterviewForm()">
-        <div class="empty-state-sm" *ngIf="interviews().length === 0">
+        <div class="empty-state" *ngIf="interviews().length === 0">
           <p>No interviews scheduled yet.</p>
         </div>
         <div class="interview-card" *ngFor="let interview of interviews()">
@@ -943,17 +1036,18 @@
               <svg lucideUsers size="14"></svg> Interviewer: {{interview.interviewer.firstName}} {{interview.interviewer.lastName}}
             </div>
             <div class="i-row" *ngIf="interview.locationUrl">
-              <svg lucideLink size="14"></svg> <a [href]="interview.locationUrl" target="_blank">Meeting Link</a>
+              <svg lucideLink size="14"></svg> <a [href]="interview.locationUrl.startsWith('http') ? interview.locationUrl : 'https://' + interview.locationUrl" target="_blank">Meeting Link</a>
             </div>
           </div>
           
-          <div class="i-feedback-actions" *ngIf="interview.status !== 'COMPLETED'">
-            <div class="form-group" style="margin-bottom: 0;">
-              <select class="form-select status-select-sm" [ngModel]="interview.status" (ngModelChange)="updateInterviewStatus(interview.id, $event, interview.rating, interview.feedback)">
-                <option value="SCHEDULED">Scheduled</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
+          <div class="i-feedback-actions" *ngIf="interview.status === 'SCHEDULED'">
+            <div class="status-action-group">
+              <button class="status-btn complete" (click)="updateInterviewStatus(interview.id, 'COMPLETED', interview.rating, interview.feedback)">
+                <svg lucideCheckCircle2 size="14"></svg> Mark Completed
+              </button>
+              <button class="status-btn cancel" (click)="updateInterviewStatus(interview.id, 'CANCELLED', interview.rating, interview.feedback)">
+                <svg lucideX size="14"></svg> Cancel
+              </button>
             </div>
           </div>
 

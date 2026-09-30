@@ -183,6 +183,10 @@ export class BudgetRequestsService {
     decision: 'APPROVED' | 'REJECTED',
     reason?: string,
   ) {
+    // An administrator alone. The technical architect's step belongs to task
+    // creation and nowhere else: a budget increase asks whether the company
+    // will spend more, which is not a technical question and not theirs to
+    // weigh in on.
     if (!this.ADMIN_ROLES.includes(role)) {
       throw new ForbiddenException('Only an administrator approves budget requests');
     }

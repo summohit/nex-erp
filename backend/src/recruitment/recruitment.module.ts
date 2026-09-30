@@ -10,9 +10,10 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { PayrollModule } from '../payroll/payroll.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MailModule } from '../mail/mail.module';
+import { EmployeesModule } from '../employees/employees.module';
 
 @Module({
-  imports: [PrismaModule, PayrollModule, NotificationsModule, MailModule, LettersModule],
+  imports: [PrismaModule, PayrollModule, NotificationsModule, MailModule, LettersModule, EmployeesModule],
   controllers: [JobsController, ApplicationsController],
   providers: [JobsService, ApplicationsService, OfferLettersService],
   exports: [ApplicationsService, OfferLettersService]

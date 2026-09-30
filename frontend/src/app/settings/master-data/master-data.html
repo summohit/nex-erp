@@ -405,8 +405,16 @@
   </div>
 </div>
 
+<app-visit-location-form-modal
+  *ngIf="isModalOpen() && activeTab() === 'visit-locations'"
+  submissionMode="direct"
+  [location]="modalMode() === 'edit' ? formData : null"
+  (saved)="loadData(); closeModal()"
+  (closed)="closeModal()">
+</app-visit-location-form-modal>
+
 <!-- Modal -->
-<div class="modal-overlay" *ngIf="isModalOpen()">
+<div class="modal-overlay" *ngIf="isModalOpen() && activeTab() !== 'visit-locations'">
   <div class="modal-content slide-in" [class.modal-wide]="activeTab() === 'shifts'" [class.modal-visit-location]="activeTab() === 'visit-locations'">
     <div class="modal-header">
       <div class="header-titles">
@@ -769,180 +777,15 @@
                     placeholder="What this task covers — becomes the task's own description."></textarea>
         </div>
         <!-- Visit Locations Form Redesign -->
-        <ng-container *ngIf="activeTab() === 'visit-locations'">
-          <div class="form-group full-width">
-            <div class="field-label-row">
-              <label class="field-label-text">
-                <span>Site / Location Name</span>
-                <span class="required-star">*</span>
-              </label>
-            </div>
-            <div class="input-with-icon">
-              <svg lucideMapPin size="15" class="input-prefix-icon"></svg>
-              <input type="text" class="form-control with-icon" [(ngModel)]="formData.name" placeholder="e.g. Acme Tech Hub, Sector 62" required>
-            </div>
-          </div>
+        <!-- The visit-locations form used to live here. It now has its own
+             component, shared with the Field Visits page so a project manager
+             requesting a site and an administrator adding one fill in exactly
+             the same form: see <app-visit-location-form-modal> above.
 
-          <div class="form-group full-width">
-            <div class="field-label-row">
-              <label class="field-label-text">
-                <span>Site Address</span>
-              </label>
-            </div>
-            <input type="text" class="form-control" [(ngModel)]="formData.address" placeholder="e.g. Plot 42, Sector 62, Noida, Uttar Pradesh">
-          </div>
-
-          <div class="form-group full-width">
-            <div class="field-label-row">
-              <label class="field-label-text">
-                <span>Client / Company Association</span>
-                <span class="optional-badge">Optional</span>
-              </label>
-              <span class="label-badge-count" *ngIf="leadContactSelectOptions().length > 0">
-                {{ leadContactSelectOptions().length }} available
-              </span>
-            </div>
-            <app-searchable-select
-              [options]="leadContactSelectOptions()"
-              [value]="formData.leadContactId"
-              [clearable]="true"
-              [fullWidth]="true"
-              placeholder="Not linked to anyone (General / Internal Site)"
-              (valueChange)="formData.leadContactId = $event">
-              <svg prefix lucideBuilding2 size="15"></svg>
-            </app-searchable-select>
-            <small class="form-hint">
-              Optional — link to a client company or contact person, or leave unlinked for supplier sites, data centres, or internal offices.
-            </small>
-          </div>
-
-          <!-- GPS Coordinates & Pin Card -->
-          <div class="gps-pin-card full-width">
-            <div class="gps-card-header">
-              <div class="gps-header-left">
-                <svg lucideNavigation size="15" class="gps-header-icon"></svg>
-                <span class="gps-header-title">GPS Geofence Pin</span>
-                
-                <span class="gps-status-badge error" *ngIf="isPartiallyPinned()">
-                  <svg lucideAlertCircle size="12"></svg>
-                  <span>Both Lat & Lng Required</span>
-                </span>
-                <span class="gps-status-badge empty" *ngIf="!isPinned() && !isPartiallyPinned()">
-                  <span class="gps-status-dot empty"></span>
-                  <span>No Pin (Manual trips)</span>
-                </span>
-              </div>
-
-              <div class="gps-header-actions">
-                <button 
-                  type="button" 
-                  class="btn-gps-action locate" 
-                  (click)="useMyLocation()" 
-                  [disabled]="isLocating()"
-                  title="Detect GPS from current device position">
-                  <svg lucideCrosshair size="13" [class.spinning]="isLocating()"></svg>
-                  <span>{{ isLocating() ? 'Detecting...' : 'Use My GPS' }}</span>
-                </button>
-
-                <button 
-                  *ngIf="formData.latitude || formData.longitude"
-                  type="button" 
-                  class="btn-gps-action clear" 
-                  (click)="clearCoordinates()"
-                  title="Clear coordinates">
-                  <svg lucideX size="13"></svg>
-                  <span>Clear</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="gps-coords-grid">
-              <div class="coord-field">
-                <label class="coord-label">Latitude</label>
-                <div class="coord-input-wrap">
-                  <span class="coord-prefix">LAT</span>
-                  <input 
-                    type="number" 
-                    step="0.000001" 
-                    class="form-control coord-input" 
-                    [(ngModel)]="formData.latitude" 
-                    (ngModelChange)="onCoordInputChanged()"
-                    placeholder="e.g. 28.613939">
-                </div>
-              </div>
-
-              <div class="coord-field">
-                <label class="coord-label">Longitude</label>
-                <div class="coord-input-wrap">
-                  <span class="coord-prefix">LNG</span>
-                  <input 
-                    type="number" 
-                    step="0.000001" 
-                    class="form-control coord-input" 
-                    [(ngModel)]="formData.longitude" 
-                    (ngModelChange)="onCoordInputChanged()"
-                    placeholder="e.g. 77.209021">
-                </div>
-              </div>
-            </div>
-
-            <!-- Free Interactive Map Picker -->
-            <div class="free-map-wrapper">
-              <div class="map-search-bar">
-                <div class="map-search-input-wrap">
-                  <svg lucideSearch size="14" class="search-icon"></svg>
-                  <input 
-                    type="text" 
-                    class="map-search-input" 
-                    [ngModel]="mapSearchText()" 
-                    (ngModelChange)="mapSearchText.set($event)"
-                    (keydown.enter)="$event.preventDefault(); searchMapLocation()"
-                    placeholder="Search place, landmark, or city to place pin...">
-                </div>
-                <button 
-                  type="button" 
-                  class="btn-map-search" 
-                  (click)="searchMapLocation()" 
-                  [disabled]="isSearchingMap()">
-                  <svg lucideMapPin size="13" *ngIf="!isSearchingMap()"></svg>
-                  <svg lucideLoader2 size="13" class="spinning" *ngIf="isSearchingMap()"></svg>
-                  <span>{{ isSearchingMap() ? 'Searching...' : 'Locate' }}</span>
-                </button>
-              </div>
-
-              <div id="free-map-picker" class="free-map-picker"></div>
-
-              <div class="map-footer-hint">
-                <div class="map-hint-left">
-                  <svg lucideInfo size="13"></svg>
-                  <span>Click anywhere on the map or drag the marker to pick coordinates.</span>
-                </div>
-                <a 
-                  *ngIf="isPinned()"
-                  [href]="'https://www.google.com/maps?q=' + formData.latitude + ',' + formData.longitude" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  class="btn-open-gmaps"
-                  title="Open in Google Maps">
-                  <svg lucideExternalLink size="12"></svg>
-                  <span>Google Maps</span>
-                </a>
-              </div>
-            </div>
-
-            <p class="gps-card-help">
-              Coordinates determine automated on-site clock-in geofence validation for visits.
-            </p>
-          </div>
-
-          <div class="form-group full-width">
-            <div class="field-label-row">
-              <label class="field-label-text">Display Order</label>
-            </div>
-            <input type="number" class="form-control" [(ngModel)]="formData.position" min="0" placeholder="0">
-            <small class="form-hint">Lower numbers appear first in the site selector list.</small>
-          </div>
-        </ng-container>
+             What stood here was already unreachable — this modal renders only
+             when activeTab() !== 'visit-locations', and the block inside it was
+             guarded on activeTab() === 'visit-locations'. 174 lines that could
+             never draw, including a second copy of the map picker. -->
 
         <div class="form-group" *ngIf="activeTab() === 'task-types' || activeTab() === 'project-phases' || activeTab() === 'default-project-tasks'">
           <label>Display order</label>

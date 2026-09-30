@@ -111,9 +111,14 @@
                     </div>
                   }
 
-                  @if (filteredProjects().length === 0) {
+                  @if (isLoadingProjects()) {
+                    <div class="select-empty-state select-loading-state">
+                      <svg lucideLoader [size]="16" class="select-spin"></svg>
+                      <p>Loading projects...</p>
+                    </div>
+                  } @else if (filteredProjects().length === 0) {
                     <div class="select-empty-state">
-                      <p>No projects match "{{ projectSearchQuery() }}"</p>
+                      <p>{{ projectSearchQuery() ? 'No projects match "' + projectSearchQuery() + '"' : 'No projects available to you' }}</p>
                     </div>
                   }
                 </div>
@@ -126,10 +131,13 @@
         <div class="field">
           <div class="field-label-split">
             <label><span>Standardized Client Location</span></label>
-            <a href="/settings/master-data?tab=visit-locations" target="_blank" class="manage-locations-link" title="Open Visit Locations in a new tab">
-              <span>Manage Sites</span>
-              <svg lucideExternalLink [size]="11"></svg>
-            </a>
+            @if (canAddVisitLocation()) {
+              <button type="button" class="manage-locations-link" (click)="openAddVisitLocation()"
+                      [title]="isAdmin() ? 'Add a visit location' : 'Request a new visit location — an administrator approves it'">
+                <svg lucidePlus [size]="11"></svg>
+                <span>Add Site</span>
+              </button>
+            }
           </div>
 
           <div class="searchable-select-container">
@@ -799,3 +807,11 @@
     </div>
   </div>
 </div>
+
+@if (isLocationModalOpen()) {
+  <app-visit-location-form-modal
+    [submissionMode]="locationSubmissionMode()"
+    (saved)="onVisitLocationSaved()"
+    (closed)="isLocationModalOpen.set(false)">
+  </app-visit-location-form-modal>
+}

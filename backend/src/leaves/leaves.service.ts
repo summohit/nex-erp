@@ -90,9 +90,13 @@ export class LeavesService {
     });
   }
 
-  async getAllBalances(companyId: number, year: number) {
+  async getAllBalances(companyId: number, year: number, employeeId?: number) {
     return this.prisma.leaveBalance.findMany({
-      where: { employee: { companyId }, year },
+      where: { 
+        employee: { companyId }, 
+        year,
+        ...(employeeId ? { employeeId } : {})
+      },
       include: { 
         employee: { select: { id: true, firstName: true, lastName: true } },
         leaveType: true 
@@ -437,7 +441,18 @@ export class LeavesService {
       // record is gone while everybody else keeps seeing it.
       where: { employee: { companyId }, deletedAt: null },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } } },
+        employee: { 
+          select: { 
+            id: true, 
+            firstName: true, 
+            lastName: true, 
+            avatarUrl: true,
+            employeeCode: true,
+            department: { select: { name: true } },
+            designation: { select: { name: true } },
+            user: { select: { email: true, role: true } }
+          } 
+        },
         leaveType: true,
         approvedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true } } } }
       },
@@ -450,7 +465,18 @@ export class LeavesService {
     return this.prisma.leaveRequest.findMany({
       where: { employee: { companyId }, status: 'PENDING', deletedAt: null },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } } },
+        employee: { 
+          select: { 
+            id: true, 
+            firstName: true, 
+            lastName: true, 
+            avatarUrl: true,
+            employeeCode: true,
+            department: { select: { name: true } },
+            designation: { select: { name: true } },
+            user: { select: { email: true, role: true } }
+          } 
+        },
         leaveType: true,
         approvedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true } } } }
       },
@@ -472,7 +498,18 @@ export class LeavesService {
     return this.prisma.leaveRequest.findMany({
       where: { employeeId: { in: descendantIds }, status: 'PENDING', deletedAt: null },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } } },
+        employee: { 
+          select: { 
+            id: true, 
+            firstName: true, 
+            lastName: true, 
+            avatarUrl: true,
+            employeeCode: true,
+            department: { select: { name: true } },
+            designation: { select: { name: true } },
+            user: { select: { email: true, role: true } }
+          } 
+        },
         leaveType: true,
         approvedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true } } } }
       },

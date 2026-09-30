@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ParseIntPipe, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ParseIntPipe, Query, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { isCompanyAdmin } from '../common/company-roles';
 
 @Controller('master-data')
 @UseGuards(AuthGuard)
@@ -434,6 +435,9 @@ export class MasterDataController {
       leadContactId?: number; position?: number;
     },
   ) {
+    if (!isCompanyAdmin(req.user.role)) {
+      throw new ForbiddenException('Only an administrator can add visit locations directly');
+    }
     if (!data?.name?.trim()) throw new BadRequestException('A location needs a name');
     const existing = await this.prisma.visitLocation.findFirst({
       where: { name: { equals: data.name.trim(), mode: 'insensitive' }, companyId: req.user.companyId },
@@ -462,6 +466,9 @@ export class MasterDataController {
       leadContactId?: number | null; isActive?: boolean; position?: number;
     },
   ) {
+    if (!isCompanyAdmin(req.user.role)) {
+      throw new ForbiddenException('Only an administrator can update visit locations');
+    }
     const updateData: any = {};
     if (data.name !== undefined) {
       if (!data.name.trim()) throw new BadRequestException('A location needs a name');
@@ -482,6 +489,9 @@ export class MasterDataController {
 
   @Delete('visit-locations/:id')
   async deleteVisitLocation(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    if (!isCompanyAdmin(req.user.role)) {
+      throw new ForbiddenException('Only an administrator can remove visit locations');
+    }
     // A location past visits were raised against is the truth about where
     // those people went. Hide it from new trips rather than rewriting that.
     const inUse = await this.prisma.fieldVisitRequest.count({

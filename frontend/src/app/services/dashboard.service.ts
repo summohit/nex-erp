@@ -87,6 +87,7 @@ export interface DashboardPayload {
     myTickets: DashboardTicket[];
     taskStats: { pending: number; overdue: number };
     projectStats: { inProgress: number; overdue: number; total: number };
+    ticketStats: { pending: number; overdue: number };
     weekTimelogs: { days: { date: string; label: string; minutes: number }[]; totalMinutes: number; breakMinutes: number };
     myCalendar: { weekStart: string; weekEnd: string; days: DashboardCalendarDay[]; events: DashboardCalendarEvent[] };
     probation: { nextAppraisalDate: string | null; joiningDate: string | null; employmentCategory: string } | null;

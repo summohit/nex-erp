@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucideMapPin, LucideRoute, LucidePlus, LucideSearch,
@@ -11,6 +11,11 @@ import {
 } from '@lucide/angular';
 import { FieldVisitRequestsService, FieldVisitRequest } from '../../services/field-visit-requests';
 import { FieldVisitRequestFormComponent } from './field-visit-request-form';
+import { VisitLocationFormModalComponent } from '../../shared/components/visit-location-form-modal/visit-location-form-modal';
+import {
+  VisitLocationRequestCapabilities,
+  VisitLocationRequestsService,
+} from '../../services/visit-location-requests.service';
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
@@ -26,7 +31,7 @@ const STATUS_LABELS: Record<string, string> = {
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterModule,
-    FieldVisitRequestFormComponent,
+    FieldVisitRequestFormComponent, VisitLocationFormModalComponent,
     LucideMapPin, LucideRoute, LucidePlus, LucideSearch,
     LucideX, LucideCalendarDays, LucideUsers, LucideBuilding,
     LucideClock, LucideArrowRight, LucideCheckCircle2,
@@ -37,8 +42,12 @@ const STATUS_LABELS: Record<string, string> = {
 })
 export class FieldVisitRequestsPageComponent implements OnInit {
   private api = inject(FieldVisitRequestsService);
+  private locationRequests = inject(VisitLocationRequestsService);
+  private router = inject(Router);
   private toast = inject(HotToastService);
 
+  locationCapabilities = signal<VisitLocationRequestCapabilities | null>(null);
+  isLocationFormOpen = signal(false);
   allRequests = signal<FieldVisitRequest[]>([]);
   isLoading = signal(true);
 
@@ -190,6 +199,22 @@ export class FieldVisitRequestsPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.locationRequests.capabilities().subscribe({
+      next: (capabilities) => this.locationCapabilities.set(capabilities),
+      error: () => this.locationCapabilities.set(null),
+    });
+  }
+
+  addVisitLocation(): void {
+    if (this.locationCapabilities()?.isAdmin) {
+      void this.router.navigate(['/settings/master-data'], {
+        queryParams: { tab: 'visit-locations', open: 'add' },
+      });
+      return;
+    }
+    if (this.locationCapabilities()?.isProjectManager) {
+      this.isLocationFormOpen.set(true);
+    }
   }
 
   load(): void {

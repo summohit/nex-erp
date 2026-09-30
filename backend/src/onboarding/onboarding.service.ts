@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+import { MailService } from '../mail/mail.service';
+
 @Injectable()
 export class OnboardingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private mailService: MailService) {}
 
   // --- Templates (HR view) ---
   async getTemplates(companyId: number) {
@@ -134,7 +136,8 @@ export class OnboardingService {
 
   async completeTask(companyId: number, userId: number, taskId: number) {
     const employee = await this.prisma.employee.findFirst({
-      where: { userId, companyId }
+      where: { userId, companyId },
+      include: { user: true }
     });
     if (!employee) throw new NotFoundException('Employee not found');
 
@@ -163,6 +166,13 @@ export class OnboardingService {
         where: { id: employee.id },
         data: { onboardingStatus: newStatus }
       });
+
+      if (newStatus === 'COMPLETED' && employee.user?.email) {
+        this.mailService.sendOnboardingCompletedEmail(
+          employee.user.email,
+          `${employee.firstName} ${employee.lastName}`
+        ).catch(e => console.error('Failed to send onboarding complete email:', e));
+      }
     }
 
     return { success: true, newStatus };
@@ -173,7 +183,7 @@ export class OnboardingService {
     // First, verify the task belongs to an employee in this company
     const task = await this.prisma.employeeOnboardingTask.findUnique({
       where: { id: taskId },
-      include: { employee: true }
+      include: { employee: { include: { user: true } } }
     });
     
     if (!task || task.employee.companyId !== companyId) {
@@ -209,6 +219,13 @@ export class OnboardingService {
         where: { id: task.employeeId },
         data: { onboardingStatus: newStatus }
       });
+
+      if (newStatus === 'COMPLETED' && task.employee.user?.email) {
+        this.mailService.sendOnboardingCompletedEmail(
+          task.employee.user.email,
+          `${task.employee.firstName} ${task.employee.lastName}`
+        ).catch(e => console.error('Failed to send onboarding complete email:', e));
+      }
     }
 
     return { success: true, newStatus, employeeId: task.employeeId };

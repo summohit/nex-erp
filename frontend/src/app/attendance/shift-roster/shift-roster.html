@@ -40,12 +40,19 @@
         <button class="toggle-btn" [class.active]="viewMode() === 'month'" (click)="setView('month')">Monthly</button>
       </div>
 
-      <div class="filters">
-        <select class="form-control" [ngModel]="filterDepartmentId()"
-                (ngModelChange)="filterDepartmentId.set($event ? +$event : null); load()">
-          <option [ngValue]="null">All Departments</option>
-          <option *ngFor="let d of departments()" [ngValue]="d.id">{{ d.name }}</option>
-        </select>
+      <div class="filters" style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
+        <div style="min-width: 170px;">
+          <app-searchable-select
+            [options]="departmentOptions()"
+            placeholder="All Departments"
+            [clearable]="true"
+            [value]="filterDepartmentId()"
+            (valueChange)="filterDepartmentId.set($event ? +$event : null); load()"
+            [loading]="loadingDepartments()"
+            loadingText="Loading..."
+            [fullWidth]="true">
+          </app-searchable-select>
+        </div>
         <input type="text" class="form-control" placeholder="Search employee…"
                [ngModel]="search()" (ngModelChange)="search.set($event)">
       </div>
@@ -69,7 +76,7 @@
       <thead>
         <tr>
           <th class="emp-col">Employee</th>
-          <th *ngFor="let day of grid().days; trackBy: trackDay"
+          <th *ngFor="let day of displayDays(); trackBy: trackDay"
               class="day-col"
               [class.is-today]="dayLabel(day).isToday"
               [class.is-weekend]="dayLabel(day).isWeekend">
@@ -79,57 +86,80 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let row of visibleRows(); trackBy: trackRow"
-            [class.row-inactive]="row.employee.isActive === false">
-          <td class="emp-col">
-            <div class="emp-cell">
-              <img *ngIf="row.employee.avatarUrl" [src]="row.employee.avatarUrl" class="emp-avatar" alt="">
-              <div *ngIf="!row.employee.avatarUrl" class="emp-avatar emp-initial">{{ row.employee.name.charAt(0) }}</div>
-              <div class="emp-text">
-                <div class="emp-name">
-                  {{ row.employee.name }}
-                  <span class="inactive-badge" *ngIf="row.employee.isActive === false">Inactive</span>
+        <!-- Skeleton Loading Rows -->
+        <ng-container *ngIf="loading()">
+          <tr *ngFor="let r of [1, 2, 3, 4, 5, 6, 7]">
+            <td class="emp-col">
+              <div class="emp-cell">
+                <app-skeleton width="32px" height="32px" [circle]="true"></app-skeleton>
+                <div class="emp-text" style="display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0;">
+                  <app-skeleton [width]="r % 2 === 0 ? '110px' : '135px'" height="13px" radius="4px"></app-skeleton>
+                  <app-skeleton [width]="r % 2 === 0 ? '70px' : '90px'" height="10px" radius="4px"></app-skeleton>
                 </div>
-                <div class="emp-sub">{{ row.employee.designation || row.employee.department || '—' }}</div>
               </div>
-            </div>
-          </td>
+            </td>
+            <td *ngFor="let day of displayDays()" class="day-cell" [class.is-weekend]="dayLabel(day).isWeekend">
+              <div style="padding: 2px;">
+                <app-skeleton width="100%" [height]="viewMode() === 'month' ? '28px' : '46px'" radius="6px"></app-skeleton>
+              </div>
+            </td>
+          </tr>
+        </ng-container>
 
-          <td *ngFor="let cell of row.cells; trackBy: trackCell"
-              class="day-cell"
-              [class.is-weekend]="dayLabel(cell.date).isWeekend"
-              [class.is-today]="dayLabel(cell.date).isToday"
-              [title]="cellTitle(row, cell)"
-              (click)="openCell(row, cell)">
+        <!-- Actual Data Rows -->
+        <ng-container *ngIf="!loading()">
+          <tr *ngFor="let row of visibleRows(); trackBy: trackRow"
+              [class.row-inactive]="row.employee.isActive === false">
+            <td class="emp-col">
+              <div class="emp-cell">
+                <img *ngIf="row.employee.avatarUrl" [src]="row.employee.avatarUrl" class="emp-avatar" alt="">
+                <div *ngIf="!row.employee.avatarUrl" class="emp-avatar emp-initial">{{ row.employee.name.charAt(0) }}</div>
+                <div class="emp-text">
+                  <div class="emp-name">
+                    {{ row.employee.name }}
+                    <span class="inactive-badge" *ngIf="row.employee.isActive === false">Inactive</span>
+                  </div>
+                  <div class="emp-sub">{{ row.employee.designation || row.employee.department || '—' }}</div>
+                </div>
+              </div>
+            </td>
 
-            <div *ngIf="cell.type === 'SHIFT'" class="chip chip-shift"
-                 [class.is-default]="cell.isDefault"
-                 [style.background]="cell.shift?.colorCode || '#2A97D8'">
-              <span class="chip-name">{{ cellLabel(cell) }}</span>
-              <span class="chip-time">{{ cellTime(cell) }}</span>
-              <span *ngIf="cell.onSite" class="chip-onsite" [class.pending]="cell.onSite.approvalStatus === 'PENDING'">
-                {{ cell.onSite.projectName || 'On-site' }}<span *ngIf="cell.onSite.approvalStatus === 'PENDING'"> · pending</span>
-              </span>
-            </div>
+            <td *ngFor="let cell of row.cells; trackBy: trackCell"
+                class="day-cell"
+                [class.is-weekend]="dayLabel(cell.date).isWeekend"
+                [class.is-today]="dayLabel(cell.date).isToday"
+                [title]="cellTitle(row, cell)"
+                (click)="openCell(row, cell)">
 
-            <div *ngIf="cell.type === 'DAY_OFF'" class="chip chip-off" [class.is-default]="cell.isDefault">
-              Day Off
-            </div>
+              <div *ngIf="cell.type === 'SHIFT'" class="chip chip-shift"
+                   [class.is-default]="cell.isDefault"
+                   [style.background]="cell.shift?.colorCode || '#2A97D8'">
+                <span class="chip-name">{{ cellLabel(cell) }}</span>
+                <span class="chip-time">{{ cellTime(cell) }}</span>
+                <span *ngIf="cell.onSite" class="chip-onsite" [class.pending]="cell.onSite.approvalStatus === 'PENDING'">
+                  {{ cell.onSite.projectName || 'On-site' }}<span *ngIf="cell.onSite.approvalStatus === 'PENDING'"> · pending</span>
+                </span>
+              </div>
 
-            <div *ngIf="cell.type === 'LEAVE'" class="chip chip-leave">
-              <span class="chip-name">{{ cell.label }}</span>
-              <span class="chip-time" *ngIf="cell.isHalfDay">Half day</span>
-            </div>
+              <div *ngIf="cell.type === 'DAY_OFF'" class="chip chip-off" [class.is-default]="cell.isDefault">
+                Day Off
+              </div>
 
-            <div *ngIf="cell.type === 'UNASSIGNED'" class="chip chip-empty">+</div>
-          </td>
-        </tr>
+              <div *ngIf="cell.type === 'LEAVE'" class="chip chip-leave">
+                <span class="chip-name">{{ cell.label }}</span>
+                <span class="chip-time" *ngIf="cell.isHalfDay">Half day</span>
+              </div>
 
-        <tr *ngIf="!visibleRows().length">
-          <td [attr.colspan]="grid().days.length + 1" class="empty-state">
-            {{ loading() ? 'Loading roster…' : 'No employees match these filters.' }}
-          </td>
-        </tr>
+              <div *ngIf="cell.type === 'UNASSIGNED'" class="chip chip-empty">+</div>
+            </td>
+          </tr>
+
+          <tr *ngIf="!visibleRows().length">
+            <td [attr.colspan]="displayDays().length + 1" class="empty-state">
+              No employees match these filters.
+            </td>
+          </tr>
+        </ng-container>
       </tbody>
     </table>
   </div>

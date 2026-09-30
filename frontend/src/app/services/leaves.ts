@@ -126,9 +126,10 @@ export class LeavesService {
     return this.http.get<LeaveBalance[]>(`${this.apiUrl}/balances/me`, { params });
   }
 
-  getAllBalances(year?: number) {
+  getAllBalances(year?: number, employeeId?: number) {
     const params: any = {};
     if (year) params.year = year.toString();
+    if (employeeId) params.employeeId = employeeId.toString();
     return this.http.get<LeaveBalance[]>(`${this.apiUrl}/balances`, { params });
   }
 

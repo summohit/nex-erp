@@ -29,6 +29,7 @@ import { QuillModule } from 'ngx-quill';
 type AnnexureGroup = 'EARNINGS' | 'DEDUCTIONS' | 'EMPLOYEE_DEDUCTIONS';
 import { ColDef, AllCommunityModule, ModuleRegistry, RowClassRules, GridOptions, GridApi } from 'ag-grid-community';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
+import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -50,6 +51,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LucideRotateCcw,
     LucideCirclePlus,
     SearchableSelectComponent,
+    SkeletonComponent,
   ],
   templateUrl: './candidates.html',
   styleUrls: ['./candidates.css'],
@@ -65,6 +67,8 @@ export class CandidatesComponent implements OnInit {
   private router = inject(Router);
 
   viewMode = signal<'KANBAN' | 'TABLE'>('KANBAN');
+  isLoadingApplications = signal<boolean>(true);
+  isLoadingJobs = signal<boolean>(false);
   
   jobs = signal<Job[]>([]);
   selectedJobId = signal<number | null>(null);
@@ -512,6 +516,7 @@ export class CandidatesComponent implements OnInit {
   newInterview = signal<any>({});
   editInterviewMode = signal<number | null>(null);
   isSubmittingInterview = signal<boolean>(false);
+  attemptedInterviewSubmit = signal<boolean>(false);
   interviews = signal<any[]>([]);
   minDate = new Date().toISOString().slice(0, 16);
   employees = signal<any[]>([]);
@@ -781,17 +786,33 @@ export class CandidatesComponent implements OnInit {
   }
 
   loadJobs() {
+    this.isLoadingJobs.set(true);
     this.jobsService.getJobs().subscribe({
-      next: (jobs) => this.jobs.set(jobs),
-      error: (err) => console.error('Failed to load jobs', err)
+      next: (jobs) => {
+        this.jobs.set(jobs);
+        this.isLoadingJobs.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load jobs', err);
+        this.isLoadingJobs.set(false);
+      }
     });
   }
 
-  loadApplications() {
+  loadApplications(showSkeleton = true) {
+    if (showSkeleton) {
+      this.isLoadingApplications.set(true);
+    }
     const jobId = this.selectedJobId() || undefined;
     this.candidatesService.getApplications(jobId).subscribe({
-      next: (apps) => this.applications.set(apps),
-      error: (err) => this.toast.error('Failed to load applications')
+      next: (apps) => {
+        this.applications.set(apps);
+        this.isLoadingApplications.set(false);
+      },
+      error: (err) => {
+        this.toast.error('Failed to load applications');
+        this.isLoadingApplications.set(false);
+      }
     });
   }
 
@@ -909,7 +930,7 @@ export class CandidatesComponent implements OnInit {
       const blocked = this.stageBlockReason(movedItem, newStatus);
       if (blocked) {
         this.toast.error(`${movedItem.fullName} cannot move to ${this.stageLabel(newStatus)} — ${blocked.toLowerCase()}.`);
-        this.loadApplications();
+        this.loadApplications(false);
         return;
       }
 
@@ -924,11 +945,11 @@ export class CandidatesComponent implements OnInit {
         this.candidatesService.updateStatus(movedItem.id, newStatus).subscribe({
           next: () => {
             this.toast.success(`Moved ${movedItem.fullName} to ${newStatus}`);
-            this.loadApplications(); 
+            this.loadApplications(false); 
           },
           error: () => {
             this.toast.error('Failed to update status');
-            this.loadApplications(); 
+            this.loadApplications(false); 
           }
         });
       }
@@ -958,7 +979,7 @@ export class CandidatesComponent implements OnInit {
         }
         this.closeSalaryPrompt();
         this.loadPendingApprovals();
-        this.loadApplications();
+        this.loadApplications(false);
         if (this.selectedApp()?.id === updatedApp.id) {
            this.selectedApp.set(updatedApp);
         }
@@ -966,7 +987,7 @@ export class CandidatesComponent implements OnInit {
       error: (err) => {
         this.toast.error(err?.error?.message || 'Failed to update status');
         this.closeSalaryPrompt();
-        this.loadApplications();
+        this.loadApplications(false);
       }
     });
   }
@@ -978,7 +999,7 @@ export class CandidatesComponent implements OnInit {
     this.approvalReasonInput.set('');
     this.joiningDateInput.set('');
     this.addressInput.set('');
-    this.loadApplications(); // Revert kanban UI if canceled
+    this.loadApplications(false); // Revert kanban UI if canceled
   }
 
   submitRejectPrompt() {
@@ -989,7 +1010,7 @@ export class CandidatesComponent implements OnInit {
       next: (updatedApp) => {
         this.toast.success('Application rejected');
         this.closeRejectPrompt();
-        this.loadApplications();
+        this.loadApplications(false);
         if (this.selectedApp()?.id === updatedApp.id) {
           this.selectedApp.set(updatedApp);
         }
@@ -997,7 +1018,7 @@ export class CandidatesComponent implements OnInit {
       error: () => {
         this.toast.error('Failed to reject application');
         this.closeRejectPrompt();
-        this.loadApplications();
+        this.loadApplications(false);
       }
     });
   }
@@ -1006,7 +1027,7 @@ export class CandidatesComponent implements OnInit {
     this.showRejectPrompt.set(false);
     this.pendingRejectId.set(null);
     this.rejectReasonInput.set('');
-    this.loadApplications(); // Revert kanban UI if canceled
+    this.loadApplications(false); // Revert kanban UI if canceled
   }
 
   // --- Detail Drawer ---
@@ -1485,16 +1506,28 @@ export class CandidatesComponent implements OnInit {
   cancelInterviewForm() {
     this.showInterviewForm.set(false);
     this.editInterviewMode.set(null);
-    this.newInterview.set({});
+    this.newInterview.set({
+      title: '',
+      scheduledAt: '',
+      durationMins: 30,
+      interviewerId: undefined,
+      locationUrl: ''
+    });
     this.isSubmittingInterview.set(false);
+    this.attemptedInterviewSubmit.set(false);
   }
 
   submitInterview() {
+    this.attemptedInterviewSubmit.set(true);
     const app = this.selectedApp();
     if (!app) return;
     const data = this.newInterview();
     if (!data.title || !data.scheduledAt) {
       this.toast.error('Title and Date are required');
+      return;
+    }
+    if (!data.locationUrl || !data.locationUrl.trim()) {
+      this.toast.error('Meeting Link is required');
       return;
     }
     
@@ -1580,7 +1613,7 @@ export class CandidatesComponent implements OnInit {
       next: (updatedApp) => {
         this.toast.success('Status updated');
         this.selectedApp.set(updatedApp);
-        this.loadApplications(); // Sync main board
+        this.loadApplications(false); // Sync main board
       },
       error: (err) => this.toast.error(err?.error?.message || 'Failed to update status')
     });
@@ -1593,7 +1626,7 @@ export class CandidatesComponent implements OnInit {
       next: () => {
         this.toast.success('Offer approved');
         this.loadPendingApprovals();
-        this.loadApplications();
+        this.loadApplications(false);
         if (this.selectedApp()?.id === app.id) {
           this.selectedApp.update(a => ({ ...a!, approvalStatus: 'APPROVED' }));
         }
@@ -1609,7 +1642,7 @@ export class CandidatesComponent implements OnInit {
       next: () => {
         this.toast.success('Offer rejected');
         this.loadPendingApprovals();
-        this.loadApplications();
+        this.loadApplications(false);
         if (this.selectedApp()?.id === app.id) {
           this.selectedApp.update(a => ({ ...a!, approvalStatus: 'REJECTED' }));
         }

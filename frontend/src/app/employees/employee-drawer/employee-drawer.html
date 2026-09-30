@@ -51,10 +51,16 @@
 
         <div class="form-group">
           <label>Department <span class="required">*</span></label>
-          <select class="form-control" formControlName="departmentId" [class.error]="form.get('departmentId')?.invalid && form.get('departmentId')?.touched">
-            <option [ngValue]="null" disabled selected>Select Department</option>
-            <option *ngFor="let dept of departments" [ngValue]="dept.id">{{ dept.name }}</option>
-          </select>
+          <app-searchable-select
+            [options]="departments"
+            placeholder="Select Department"
+            [value]="form.get('departmentId')?.value"
+            (valueChange)="form.get('departmentId')?.setValue($event)"
+            [loading]="isLoadingDepartments"
+            loadingText="Loading departments..."
+            [fullWidth]="true"
+            [class.error]="form.get('departmentId')?.invalid && form.get('departmentId')?.touched">
+          </app-searchable-select>
           <div class="error-text" *ngIf="form.get('departmentId')?.invalid && form.get('departmentId')?.touched">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
             Department is required
@@ -63,10 +69,16 @@
 
         <div class="form-group">
           <label>Designation <span class="required">*</span></label>
-          <select class="form-control" formControlName="designationId" [class.error]="form.get('designationId')?.invalid && form.get('designationId')?.touched">
-            <option [ngValue]="null" disabled selected>Select Designation</option>
-            <option *ngFor="let des of filteredDesignations" [ngValue]="des.id">{{ des.name }}</option>
-          </select>
+          <app-searchable-select
+            [options]="filteredDesignations"
+            placeholder="Select Designation"
+            [value]="form.get('designationId')?.value"
+            (valueChange)="form.get('designationId')?.setValue($event)"
+            [loading]="isLoadingDesignations"
+            loadingText="Loading designations..."
+            [fullWidth]="true"
+            [class.error]="form.get('designationId')?.invalid && form.get('designationId')?.touched">
+          </app-searchable-select>
           <div class="error-text" *ngIf="form.get('designationId')?.touched && form.get('designationId')?.errors?.['required']">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
             Designation is required
@@ -98,10 +110,15 @@
 
         <div class="form-group">
           <label>Reporting Manager</label>
-          <select class="form-control" formControlName="managerId">
-            <option [ngValue]="null">No Manager (Top Level)</option>
-            <option *ngFor="let e of employees" [ngValue]="e.id">{{ e.firstName }} {{ e.lastName }}</option>
-          </select>
+          <app-searchable-select
+            [options]="managerOptions"
+            placeholder="No Manager (Top Level)"
+            [value]="form.get('managerId')?.value"
+            (valueChange)="form.get('managerId')?.setValue($event)"
+            [loading]="isLoadingEmployees"
+            loadingText="Loading managers..."
+            [fullWidth]="true">
+          </app-searchable-select>
         </div>
 
         <div class="form-group" *ngIf="!employeeData">

@@ -244,7 +244,7 @@
   background: #94A3B8;
 }
 
-.roster-scroll.is-loading { opacity: 0.55; pointer-events: none; }
+.roster-scroll.is-loading { pointer-events: none; }
 
 .roster-table {
   width: 100%;

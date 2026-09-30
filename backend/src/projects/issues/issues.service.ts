@@ -48,6 +48,9 @@ function sameValue(next: unknown, current: unknown): boolean {
 import { assertWithinAllowedHours, remainingHours, HoursExceeded } from '../../tasks/task-hours';
 import { resolveProjectViewer, taskVisibilityFilter, mayChangeAnyTask, seesEveryTask, PROJECT_ROLE } from '../project-roles';
 import { isSuperAdmin } from '../../common/company-roles';
+import {
+  APPROVAL_STATE, decideApproval, isAwaitingApproval, needsApprovalOnCreate,
+} from '../../approvals/two-step-approval';
 
 @Injectable()
 export class IssuesService {
@@ -70,6 +73,14 @@ export class IssuesService {
         'You do not have permission to create tasks in this project.',
       );
     }
+
+    // §PB8: a task a project manager raises waits for the technical architect
+    // and then an administrator. Decided here, before anything is written, so
+    // the task is created in its final state rather than created and amended.
+    const creator = await resolveProjectViewer(
+      this.prisma as any, companyId, projectId, reporterId, role,
+    );
+    const approvalNeeded = needsApprovalOnCreate(creator);
 
     let columnId = data.columnId;
     if (!columnId) {
@@ -196,6 +207,11 @@ export class IssuesService {
           estimatedHours: data.estimatedHours != null && data.estimatedHours !== ''
             ? Number(data.estimatedHours)
             : null,
+          // §PB8. Null when nobody needs to approve it, which is most tasks and
+          // every task that predates this — null is what the rest of the code
+          // reads as "act on it freely".
+          approvalState: approvalNeeded ? APPROVAL_STATE.PENDING_TECHNICAL : null,
+          approvalRequestedById: approvalNeeded ? reporterId : null,
         },
       });
 
@@ -481,10 +497,403 @@ export class IssuesService {
     }
   }
 
+  /**
+   * Rule on a task waiting for approval (§PB8).
+   *
+   * The technical architect passes it to an administrator; an administrator
+   * settles it outright from either step. Who may do what, and what their
+   * approval means in the state the task is in, is two-step-approval.ts — this
+   * method only records the answer.
+   */
+  async reviewIssueApproval(
+    companyId: number, projectId: number, issueId: number,
+    data: { action: 'APPROVE' | 'REJECT'; reason?: string },
+    actorEmployeeId: number | null, role?: string,
+  ) {
+    const issue = await this.prisma.issue.findFirst({
+      where: { id: issueId, companyId, projectId },
+      select: {
+        id: true, key: true, title: true, approvalState: true,
+        approvalRequestedById: true,
+      },
+    });
+    if (!issue) throw new NotFoundException('Task not found');
+
+    const viewer = await resolveProjectViewer(
+      this.prisma as any, companyId, projectId, actorEmployeeId, role,
+    );
+    const decision = decideApproval(issue.approvalState, viewer);
+    if (!decision.allowed) throw new ForbiddenException(decision.reason);
+
+    const rejecting = data.action === 'REJECT';
+    const reason = data.reason?.trim() || '';
+    // A refusal has to say why. An approval need not: "yes, build it" adds
+    // nothing, whereas a refusal the manager cannot read is a decision they
+    // have no way to answer.
+    if (rejecting && !reason) {
+      throw new BadRequestException('Say why this task is being rejected.');
+    }
+
+    const now = new Date();
+    const updated = await this.prisma.issue.update({
+      where: { id: issueId },
+      data: rejecting
+        ? {
+            approvalState: APPROVAL_STATE.REJECTED,
+            approvalRejectionReason: reason,
+            // Deliberately NOT archived. A rejection is "fix this and come
+            // back", so the task stays on the board where the manager can read
+            // the reason, change it and resubmit. Archiving turned every
+            // refusal into a dead end and made the reason something nobody
+            // would ever go and find. Archiving is now its own action, for the
+            // tasks that genuinely should not come back.
+            ...(decision.step === 'ADMIN'
+              ? { adminApprovedById: actorEmployeeId, adminApprovedAt: now }
+              : { technicalApprovedById: actorEmployeeId, technicalApprovedAt: now }),
+          }
+        : decision.step === 'TECHNICAL'
+          ? {
+              approvalState: decision.next,
+              technicalApprovedById: actorEmployeeId,
+              technicalApprovedAt: now,
+            }
+          : {
+              approvalState: APPROVAL_STATE.APPROVED,
+              adminApprovedById: actorEmployeeId,
+              adminApprovedAt: now,
+              // The bypass settles the technical step as well; recording who
+              // did it keeps the trail honest about which step was skipped.
+              ...(issue.approvalState === APPROVAL_STATE.PENDING_TECHNICAL
+                ? { technicalApprovedById: null, technicalApprovedAt: null }
+                : {}),
+            },
+    });
+
+    await this.prisma.issueActivity.create({
+      data: {
+        action: rejecting ? 'APPROVAL_REJECTED' : 'APPROVAL_GRANTED',
+        issueId,
+        actorId: actorEmployeeId as number,
+      },
+    });
+
+    if (issue.approvalRequestedById && issue.approvalRequestedById !== actorEmployeeId) {
+      await this.notificationsService.notifyEmployees([issue.approvalRequestedById], {
+        companyId,
+        title: rejecting ? 'Task rejected' : 'Task approved',
+        message: rejecting
+          ? `${issue.key} "${issue.title}" needs changes: ${reason}. Edit it and send it back for approval.`
+          : updated.approvalState === APPROVAL_STATE.APPROVED
+            ? `${issue.key} "${issue.title}" is approved and ready to work on.`
+            : `${issue.key} "${issue.title}" passed technical review and is with an administrator.`,
+        type: 'TASK',
+        linkUrl: `/projects/${projectId}`,
+      });
+    }
+
+    return updated;
+  }
+
+  /**
+   * Send a rejected task back for approval, once it has been improved (§PB8).
+   *
+   * The manager who raised it, or anyone who may manage the project. Only from
+   * REJECTED: a task that was never refused has nothing to resubmit, and one
+   * already in a queue would jump its own place.
+   *
+   * It goes back to the start — the technical step — rather than to whoever
+   * refused it. The thing being approved has changed, so the earlier technical
+   * sign-off no longer describes it, and carrying it forward would let a task
+   * reach an administrator on the strength of a review of something else.
+   */
+  async resubmitForApproval(
+    companyId: number, projectId: number, issueId: number,
+    actorEmployeeId: number | null, role?: string,
+  ) {
+    const issue = await this.prisma.issue.findFirst({
+      where: { id: issueId, companyId, projectId },
+      select: { id: true, key: true, title: true, approvalState: true, approvalRequestedById: true },
+    });
+    if (!issue) throw new NotFoundException('Task not found');
+    if (issue.approvalState !== APPROVAL_STATE.REJECTED) {
+      throw new BadRequestException('Only a rejected task can be sent back for approval.');
+    }
+
+    const viewer = await resolveProjectViewer(
+      this.prisma as any, companyId, projectId, actorEmployeeId, role,
+    );
+    const isRaiser = issue.approvalRequestedById != null
+      && issue.approvalRequestedById === actorEmployeeId;
+    if (!isRaiser && !mayChangeAnyTask(viewer)) {
+      throw new ForbiddenException('Only the person who raised this task, or a project manager, can send it back for approval.');
+    }
+
+    // The previous round's signatures are cleared with it. Leaving them would
+    // show an approval of a task that no longer exists in that form.
+    return this.prisma.issue.update({
+      where: { id: issueId },
+      data: {
+        approvalState: APPROVAL_STATE.PENDING_TECHNICAL,
+        approvalRejectionReason: null,
+        technicalApprovedById: null,
+        technicalApprovedAt: null,
+        adminApprovedById: null,
+        adminApprovedAt: null,
+        isArchived: false,
+      },
+    });
+  }
+
+  /**
+   * Archive a task outright instead of sending it back (§PB8).
+   *
+   * The third button. Rejecting says "fix this"; this says "this is not
+   * happening". Kept separate so the destructive one has to be chosen
+   * deliberately rather than being what rejection quietly did.
+   */
+  async archiveFromApproval(
+    companyId: number, projectId: number, issueId: number,
+    data: { reason?: string },
+    actorEmployeeId: number | null, role?: string,
+  ) {
+    const issue = await this.prisma.issue.findFirst({
+      where: { id: issueId, companyId, projectId },
+      select: { id: true, key: true, title: true, approvalState: true, approvalRequestedById: true },
+    });
+    if (!issue) throw new NotFoundException('Task not found');
+
+    const viewer = await resolveProjectViewer(
+      this.prisma as any, companyId, projectId, actorEmployeeId, role,
+    );
+    // Whoever could have ruled on it can also close it down. A task already
+    // settled is archived through the ordinary board action, not this one.
+    if (!decideApproval(issue.approvalState, viewer).allowed) {
+      throw new ForbiddenException('You are not able to rule on this task.');
+    }
+
+    const reason = data.reason?.trim() || '';
+    if (!reason) throw new BadRequestException('Say why this task is being archived.');
+
+    const updated = await this.prisma.issue.update({
+      where: { id: issueId },
+      data: {
+        approvalState: APPROVAL_STATE.REJECTED,
+        approvalRejectionReason: reason,
+        isArchived: true,
+        adminApprovedById: actorEmployeeId,
+        adminApprovedAt: new Date(),
+      },
+    });
+
+    if (issue.approvalRequestedById && issue.approvalRequestedById !== actorEmployeeId) {
+      await this.notificationsService.notifyEmployees([issue.approvalRequestedById], {
+        companyId,
+        title: 'Task archived',
+        message: `${issue.key} "${issue.title}" was archived rather than approved: ${reason}`,
+        type: 'TASK',
+        linkUrl: `/projects/${projectId}`,
+      });
+    }
+
+    return updated;
+  }
+
+  /**
+   * Copy a task, with a few things changed (§Tasks2).
+   *
+   * What comes across is the shape of the work — description, type, phase,
+   * milestone, labels, and the checklist structure with nothing ticked. What
+   * does not is anything that belonged to the original rather than to the
+   * idea: comments, activity, logged time, attachments.
+   *
+   * And crucially, not the approval either. A copy raised by a project manager
+   * goes through approval as a new task, because otherwise "duplicate" is the
+   * documented way around it — copy an approved task, edit it into something
+   * else, and it is live without anybody looking.
+   */
+  async duplicateIssue(
+    companyId: number, projectId: number, issueId: number,
+    overrides: {
+      title?: string; assigneeIds?: number[]; startDate?: string | null;
+      dueDate?: string | null; priority?: string; estimatedHours?: number | null;
+      includeChecklists?: boolean;
+    },
+    reporterId: number, role?: string,
+  ) {
+    const source = await this.prisma.issue.findFirst({
+      where: { id: issueId, companyId, projectId },
+      include: {
+        labels: { select: { labelId: true } },
+        // Neither Checklist nor ChecklistItem carries a position column, so
+        // creation order is the order — which is what the detail view shows.
+        checklists: { include: { items: { orderBy: { id: 'asc' } } }, orderBy: { id: 'asc' } },
+      },
+    });
+    if (!source) throw new NotFoundException('Task not found');
+
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId, companyId },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+
+    // The same gate as creating one from scratch — a copy is a new task.
+    if (!(await canCreateTask(this.prisma as any, companyId, reporterId, role, project))) {
+      throw new ForbiddenException('You do not have permission to create tasks in this project.');
+    }
+
+    const creator = await resolveProjectViewer(
+      this.prisma as any, companyId, projectId, reporterId, role,
+    );
+    const approvalNeeded = needsApprovalOnCreate(creator);
+
+    const title = overrides.title?.trim() || `Copy of ${source.title}`;
+
+    return this.prisma.$transaction(async (tx) => {
+      const { issueSeq } = await tx.project.update({
+        where: { id: projectId },
+        data: { issueSeq: { increment: 1 } },
+        select: { issueSeq: true },
+      });
+
+      // Placed at the end of the source's column rather than beside it: a copy
+      // appearing on top of the original is the easiest way to act on the
+      // wrong one.
+      const last = await tx.issue.findFirst({
+        where: { projectId, columnId: source.columnId },
+        orderBy: { position: 'desc' },
+        select: { position: true },
+      });
+
+      const created = await tx.issue.create({
+        data: {
+          key: `${project.key}-${issueSeq}`,
+          title,
+          description: source.description,
+          type: source.type,
+          priority: overrides.priority ?? source.priority,
+          status: 'TODO',
+          projectId,
+          companyId,
+          columnId: source.columnId,
+          reporterId,
+          position: last ? last.position + 1 : 0,
+          phaseId: source.phaseId,
+          milestoneId: source.milestoneId,
+          taskTypeId: source.taskTypeId,
+          startDate: overrides.startDate ? new Date(overrides.startDate) : null,
+          dueDate: overrides.dueDate ? new Date(overrides.dueDate) : null,
+          estimatedHours: overrides.estimatedHours != null
+            ? Number(overrides.estimatedHours)
+            : source.estimatedHours,
+          approvalState: approvalNeeded ? APPROVAL_STATE.PENDING_TECHNICAL : null,
+          approvalRequestedById: approvalNeeded ? reporterId : null,
+        },
+      });
+
+      if (source.labels.length) {
+        await tx.issueLabel.createMany({
+          data: source.labels.map((l) => ({ issueId: created.id, labelId: l.labelId })),
+          skipDuplicates: true,
+        });
+      }
+
+      const members = overrides.assigneeIds ?? [];
+      if (members.length) {
+        await tx.issueMember.createMany({
+          data: members.map((employeeId) => ({ issueId: created.id, employeeId })),
+          skipDuplicates: true,
+        });
+      }
+
+      // Structure, not state: the list of things to do comes across, none of
+      // them ticked. A copy that arrives half complete is a copy of somebody
+      // else's progress.
+      if (overrides.includeChecklists !== false && source.checklists.length) {
+        for (const list of source.checklists) {
+          const copy = await tx.checklist.create({
+            data: { issueId: created.id, title: list.title },
+          });
+          if (list.items.length) {
+            await tx.checklistItem.createMany({
+              data: list.items.map((item) => ({
+                checklistId: copy.id,
+                title: item.title,
+                // Structure, not state — see above.
+                isCompleted: false,
+              })),
+            });
+          }
+        }
+      }
+
+      await tx.issueActivity.create({
+        data: { action: 'CREATED', issueId: created.id, actorId: reporterId },
+      });
+
+      return created;
+    });
+  }
+
+  /** What is waiting on this person, across the company. */
+  async getPendingApprovals(companyId: number, actorEmployeeId: number | null, role?: string) {
+    const issues = await this.prisma.issue.findMany({
+      where: {
+        companyId,
+        approvalState: {
+          in: [APPROVAL_STATE.PENDING_TECHNICAL, APPROVAL_STATE.PENDING_ADMIN],
+        },
+      },
+      include: {
+        project: { select: { id: true, name: true, key: true } },
+        approvalRequestedBy: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Filtered in code rather than SQL: whether somebody may rule on a task
+    // depends on their role ON THAT PROJECT, which is a per-project lookup.
+    const out: any[] = [];
+    for (const issue of issues) {
+      const viewer = await resolveProjectViewer(
+        this.prisma as any, companyId, issue.projectId, actorEmployeeId, role,
+      );
+      if (decideApproval(issue.approvalState, viewer).allowed) out.push(issue);
+    }
+    return out;
+  }
+
+  /**
+   * A task still going through approval is inert (§PB8).
+   *
+   * The board shows it so the manager can see their own request, but it is not
+   * work yet: nobody moves it, assigns it, logs time against it or archives
+   * it. Enforced here rather than only in the UI, because a locked card that
+   * unlocks by calling the endpoint directly is decoration, and because time
+   * logged against a task that is later rejected is time nobody can account
+   * for.
+   *
+   * Approving and rejecting go through their own path and deliberately do not
+   * call this.
+   */
+  private async assertNotAwaitingApproval(issueId: number, what: string) {
+    const issue = await this.prisma.issue.findUnique({
+      where: { id: issueId },
+      select: { approvalState: true },
+    });
+    if (issue && isAwaitingApproval(issue.approvalState)) {
+      throw new ForbiddenException(
+        `This task is waiting for approval, so it cannot be ${what} yet.`,
+      );
+    }
+  }
+
   async updateIssue(companyId: number, employeeId: number, projectId: number, issueId: number, data: any, role?: string) {
     const oldIssue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!oldIssue) throw new NotFoundException('Issue not found');
 
+    await this.assertNotAwaitingApproval(issueId, 'changed');
     await this.assertMayChange(companyId, projectId, employeeId, role);
 
 
@@ -633,6 +1042,17 @@ export class IssuesService {
     if (data.dueReminder !== undefined) updateData.dueReminder = data.dueReminder;
     if (data.estimatedHours !== undefined) updateData.estimatedHours = data.estimatedHours ? Number(data.estimatedHours) : null;
 
+    // When the task actually finished. Set here rather than at each of the
+    // places that can move a task — a status typed in, a card dragged onto a
+    // Done column — because they all converge on updateData.status, and a rule
+    // applied at three call sites is a rule that will be applied at two.
+    //
+    // Cleared on reopen: "has a completedAt" and "is done" have to stay the
+    // same statement, or a reopened task keeps counting as delivered.
+    if (updateData.status !== undefined && updateData.status !== oldIssue.status) {
+      updateData.completedAt = updateData.status === 'DONE' ? new Date() : null;
+    }
+
     let issue = await this.prisma.issue.update({
       where: { id: issueId },
       data: updateData
@@ -748,6 +1168,7 @@ export class IssuesService {
   }
 
   async toggleArchive(companyId: number, employeeId: number, projectId: number, issueId: number, role?: string) {
+    await this.assertNotAwaitingApproval(issueId, 'archived');
     const oldIssue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!oldIssue) throw new NotFoundException('Issue not found');
 
@@ -981,6 +1402,7 @@ export class IssuesService {
    * drifted apart, and silent success for everybody else.
    */
   async startTimeTracking(companyId: number, userId: number, projectId: number, issueId: number) {
+    await this.assertNotAwaitingApproval(issueId, 'worked on');
     return this.startTimerForEmployee(
       companyId, await this.resolveEmployeeId(companyId, userId), projectId, issueId,
     );
@@ -1067,6 +1489,7 @@ export class IssuesService {
   }
 
   async addManualTimeLog(companyId: number, userId: number, projectId: number, issueId: number, data: { durationMin: number }) {
+    await this.assertNotAwaitingApproval(issueId, 'logged against');
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
     if (!data?.durationMin || data.durationMin <= 0) {
@@ -1118,6 +1541,7 @@ export class IssuesService {
     issueId: number,
     data: { date: string; durationMin: number },
   ) {
+    await this.assertNotAwaitingApproval(issueId, 'logged against');
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
 
@@ -1503,6 +1927,7 @@ export class IssuesService {
   }
 
   async toggleIssueMember(companyId: number, projectId: number, issueId: number, employeeId: number, actorEmployeeId?: number, actorRole?: string) {
+    await this.assertNotAwaitingApproval(issueId, 'assigned');
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
 
@@ -1767,6 +2192,9 @@ export class IssuesService {
       data: {
         columnId: targetColumn.id,
         status: newStatus,
+        // Approving a review is the other way a task reaches DONE; rejecting
+        // sends it back, so the completion is undone with it.
+        completedAt: newStatus === 'DONE' ? new Date() : null,
         rejectionReason: data.action === 'REJECT' ? data.reason : null
       }
     });

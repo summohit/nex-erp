@@ -1,34 +1,100 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
+import { forkJoin } from 'rxjs';
 import {
-  LucideCheck, LucideX, LucideLoader2, LucideClock, LucideChevronDown,
-  LucideChevronRight, LucideAlertTriangle, LucideSearch, LucideFilter,
-  LucideRefreshCw, LucideHistory, LucideCheckCircle2, LucideXCircle,
-  LucideSlidersHorizontal, LucideFolderKanban, LucideUser, LucideFileText,
-  LucideArrowUpDown, LucideCalendar, LucideSparkles, LucideInfo, LucideTimer,
+  LucideCheck,
+  LucideX,
+  LucideLoader2,
+  LucideClock,
+  LucideChevronDown,
+  LucideChevronRight,
+  LucideAlertTriangle,
+  LucideSearch,
+  LucideFilter,
+  LucideRefreshCw,
+  LucideHistory,
+  LucideCheckCircle2,
+  LucideXCircle,
+  LucideSlidersHorizontal,
+  LucideFolderKanban,
+  LucideUser,
+  LucideFileText,
+  LucideArrowUpDown,
+  LucideCalendar,
+  LucideSparkles,
+  LucideInfo,
+  LucideTimer,
   LucideSliders,
+  LucideMapPin,
 } from '@lucide/angular';
 import {
-  TaskHoursRequestsService, TaskHoursRequest, TaskHoursActivity,
+  TaskHoursRequestsService,
+  TaskHoursRequest,
+  TaskHoursActivity,
 } from '../../services/task-hours-requests';
+import { ProjectsService, ScopeRequest } from '../../services/projects';
+import { BudgetRequestsService, BudgetRequest } from '../../services/budget-requests';
+import { DialogService } from '../../shared/services/dialog.service';
+import { DialogHostComponent } from '../../shared/components/dialog-host/dialog-host.component';
+import {
+  VisitLocationRequest,
+  VisitLocationRequestCapabilities,
+  VisitLocationRequestsService,
+} from '../../services/visit-location-requests.service';
 
 export type RequestTabFilter = 'AWAITING' | 'HISTORY' | 'APPROVED' | 'REJECTED' | 'ALL';
+
+/**
+ * The kinds of decision a project throws up.
+ *
+ * Separate tabs rather than one merged stream: the four carry genuinely
+ * different facts — hours carry a baseline and a ceiling, a budget request
+ * carries money, a task approval carries a two-step state, a scope request
+ * carries a scope call and its evidence. Flattening them to a common shape
+ * would hide the thing each decision actually turns on.
+ */
+export type ProjectRequestType = 'HOURS' | 'TASKS' | 'BUDGET' | 'SCOPE' | 'VISIT_LOCATIONS';
 export type RequestSortOption = 'newest' | 'oldest' | 'hours-desc' | 'hours-asc';
 
 @Component({
   selector: 'app-task-hours-requests-tab',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterModule,
-    LucideCheck, LucideX, LucideLoader2, LucideClock, LucideChevronDown,
-    LucideChevronRight, LucideAlertTriangle, LucideSearch, LucideFilter,
-    LucideRefreshCw, LucideHistory, LucideCheckCircle2, LucideXCircle,
-    LucideSlidersHorizontal, LucideFolderKanban, LucideUser, LucideFileText,
-    LucideArrowUpDown, LucideCalendar, LucideSparkles, LucideInfo, LucideTimer,
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    // This route is a child of the main layout, so the dialog host is already
+    // on the page — but importing it here keeps the component self-sufficient
+    // if it is ever mounted standalone, which is exactly the trap project
+    // detail fell into.
+    DialogHostComponent,
+    LucideCheck,
+    LucideX,
+    LucideLoader2,
+    LucideClock,
+    LucideChevronDown,
+    LucideChevronRight,
+    LucideAlertTriangle,
+    LucideSearch,
+    LucideFilter,
+    LucideRefreshCw,
+    LucideHistory,
+    LucideCheckCircle2,
+    LucideXCircle,
+    LucideSlidersHorizontal,
+    LucideFolderKanban,
+    LucideUser,
+    LucideFileText,
+    LucideArrowUpDown,
+    LucideCalendar,
+    LucideSparkles,
+    LucideInfo,
+    LucideTimer,
     LucideSliders,
+    LucideMapPin,
   ],
   templateUrl: './task-hours-requests-tab.html',
   styleUrls: ['./task-hours-requests-tab.css'],
@@ -36,6 +102,22 @@ export type RequestSortOption = 'newest' | 'oldest' | 'hours-desc' | 'hours-asc'
 export class TaskHoursRequestsTabComponent {
   private api = inject(TaskHoursRequestsService);
   private toast = inject(HotToastService);
+
+  private projectsApi = inject(ProjectsService);
+  private budgetApi = inject(BudgetRequestsService);
+  private locationApi = inject(VisitLocationRequestsService);
+  private route = inject(ActivatedRoute);
+  private dialog = inject(DialogService);
+
+  /** Which kind of decision is on screen. */
+  requestType = signal<ProjectRequestType>('HOURS');
+
+  taskApprovals = signal<any[]>([]);
+  budgetRequests = signal<BudgetRequest[]>([]);
+  scopeRequests = signal<ScopeRequest[]>([]);
+  visitLocationRequests = signal<VisitLocationRequest[]>([]);
+  locationCapabilities = signal<VisitLocationRequestCapabilities | null>(null);
+  loadingOthers = signal(false);
 
   /** Raw requests loaded from the server */
   requests = signal<TaskHoursRequest[]>([]);
@@ -64,19 +146,27 @@ export class TaskHoursRequestsTabComponent {
   // ── Metrics & Computed KPI Summaries ───────────────────────────────────────
   openRequests = computed(() => this.requests().filter((r) => r.status === 'REQUESTED'));
   openCount = computed(() => this.openRequests().length);
-  openHours = computed(() => this.openRequests().reduce((sum, r) => sum + (r.requestedHours || 0), 0));
+  openHours = computed(() =>
+    this.openRequests().reduce((sum, r) => sum + (r.requestedHours || 0), 0),
+  );
 
   approvedRequests = computed(() => this.requests().filter((r) => r.status === 'APPROVED'));
   approvedCount = computed(() => this.approvedRequests().length);
-  approvedHours = computed(() => this.approvedRequests().reduce((sum, r) => sum + (r.approvedHours ?? r.requestedHours ?? 0), 0));
+  approvedHours = computed(() =>
+    this.approvedRequests().reduce((sum, r) => sum + (r.approvedHours ?? r.requestedHours ?? 0), 0),
+  );
 
   rejectedRequests = computed(() => this.requests().filter((r) => r.status === 'REJECTED'));
   rejectedCount = computed(() => this.rejectedRequests().length);
-  rejectedHours = computed(() => this.rejectedRequests().reduce((sum, r) => sum + (r.requestedHours || 0), 0));
+  rejectedHours = computed(() =>
+    this.rejectedRequests().reduce((sum, r) => sum + (r.requestedHours || 0), 0),
+  );
 
   historyRequests = computed(() => this.requests().filter((r) => r.status !== 'REQUESTED'));
   historyCount = computed(() => this.historyRequests().length);
-  historyHours = computed(() => this.historyRequests().reduce((sum, r) => sum + (r.requestedHours || 0), 0));
+  historyHours = computed(() =>
+    this.historyRequests().reduce((sum, r) => sum + (r.requestedHours || 0), 0),
+  );
 
   totalCount = computed(() => this.requests().length);
   totalHours = computed(() => this.requests().reduce((sum, r) => sum + (r.requestedHours || 0), 0));
@@ -190,11 +280,22 @@ export class TaskHoursRequestsTabComponent {
 
   constructor() {
     this.load();
+    this.route.queryParamMap.subscribe((params) => {
+      const type = params.get('type');
+      if (!this.isRequestType(type)) return;
+      this.requestType.set(type);
+      if (type !== 'HOURS') this.loadOthers(type);
+    });
+  }
+
+  private isRequestType(value: string | null): value is ProjectRequestType {
+    return (
+      value != null && ['HOURS', 'TASKS', 'BUDGET', 'SCOPE', 'VISIT_LOCATIONS'].includes(value)
+    );
   }
 
   load() {
     this.loading.set(true);
-    // Load all requests across the organization so client-side KPIs and multi-filters are instant
     this.api.listAll({ status: 'ALL' }).subscribe({
       next: (rows) => {
         this.requests.set(rows || []);
@@ -205,6 +306,19 @@ export class TaskHoursRequestsTabComponent {
         this.toast.error(err?.error?.message || 'Could not load additional hours requests');
       },
     });
+  }
+
+  refresh() {
+    const type = this.requestType();
+    type === 'HOURS' ? this.load() : this.loadOthers(type);
+  }
+
+  isCurrentQueueLoading(): boolean {
+    return this.requestType() === 'HOURS' ? this.loading() : this.loadingOthers();
+  }
+
+  currentPendingCount(): number {
+    return this.countFor(this.requestType());
   }
 
   setActiveTab(tab: RequestTabFilter) {
@@ -359,8 +473,14 @@ export class TaskHoursRequestsTabComponent {
 
   getAvatarBg(name: string): string {
     const colors = [
-      '#4F46E5', '#2563EB', '#0D9488', '#059669',
-      '#6b3fd6', '#7e7f80', '#7C3AED', '#6b3fd6'
+      '#4F46E5',
+      '#2563EB',
+      '#0D9488',
+      '#059669',
+      '#6b3fd6',
+      '#7e7f80',
+      '#7C3AED',
+      '#6b3fd6',
     ];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
@@ -372,13 +492,320 @@ export class TaskHoursRequestsTabComponent {
 
   actionLabel(action: string): string {
     switch (action) {
-      case 'CREATED': return 'Request created';
-      case 'SUBMITTED': return 'Request submitted';
-      case 'APPROVED': return 'Request approved';
-      case 'REJECTED': return 'Request declined';
-      case 'HOURS_MODIFIED': return 'Scope adjusted';
-      case 'UPDATED': return 'Request updated';
-      default: return action;
+      case 'CREATED':
+        return 'Request created';
+      case 'SUBMITTED':
+        return 'Request submitted';
+      case 'APPROVED':
+        return 'Request approved';
+      case 'REJECTED':
+        return 'Request declined';
+      case 'HOURS_MODIFIED':
+        return 'Scope adjusted';
+      case 'UPDATED':
+        return 'Request updated';
+      default:
+        return action;
     }
+  }
+
+  // ── The other three kinds of project request ──────────────────────────────
+
+  /** What the hero says, so the page describes whichever queue is open. */
+  readonly TYPE_META: Record<ProjectRequestType, { title: string; blurb: string }> = {
+    HOURS: {
+      title: 'Additional Hours Requests',
+      blurb:
+        'Review effort extension requests from delivery teams, authorize task scope adjustments, and audit historical time allocations.',
+    },
+    TASKS: {
+      title: 'Task Approvals',
+      blurb:
+        'Tasks raised by a project manager, waiting on the technical architect and then an administrator. Until one is approved it sits on the board locked.',
+    },
+    BUDGET: {
+      title: 'Budget Requests',
+      blurb:
+        'Requests to increase a project\u2019s agreed budget or planned hours. An administrator decides; approving moves the money on the project itself.',
+    },
+    SCOPE: {
+      title: 'Scope Requests',
+      blurb:
+        'Raised from a project\u2019s Fix button \u2014 anything needing a decision that is not a task or a budget change, with the requester\u2019s own in-scope or out-of-scope call.',
+    },
+    VISIT_LOCATIONS: {
+      title: 'Visit Location Requests',
+      blurb:
+        'Review new client and site locations proposed by project managers. Approval makes a location immediately available for field visit planning.',
+    },
+  };
+
+  get typeTitle(): string {
+    return this.TYPE_META[this.requestType()].title;
+  }
+  get typeBlurb(): string {
+    return this.TYPE_META[this.requestType()].blurb;
+  }
+
+  setRequestType(type: ProjectRequestType) {
+    if (type === this.requestType()) return;
+    this.requestType.set(type);
+    if (type !== 'HOURS') this.loadOthers(type);
+  }
+
+  /**
+   * Each queue already answers "what may this person act on" server-side, so
+   * the client asks and shows what comes back rather than second-guessing the
+   * viewer's role. An architect gets tasks awaiting technical review; an
+   * administrator gets everything.
+   */
+  loadOthers(type: ProjectRequestType) {
+    this.loadingOthers.set(true);
+    const done = () => this.loadingOthers.set(false);
+
+    if (type === 'TASKS') {
+      this.projectsApi.getPendingTaskApprovals().subscribe({
+        next: (rows) => {
+          this.taskApprovals.set(rows || []);
+          done();
+        },
+        error: () => {
+          this.taskApprovals.set([]);
+          done();
+        },
+      });
+    } else if (type === 'BUDGET') {
+      this.budgetApi.pending().subscribe({
+        next: (rows) => {
+          this.budgetRequests.set(rows || []);
+          done();
+        },
+        error: () => {
+          this.budgetRequests.set([]);
+          done();
+        },
+      });
+    } else if (type === 'SCOPE') {
+      this.projectsApi.getPendingScopeRequests().subscribe({
+        next: (rows) => {
+          this.scopeRequests.set(rows || []);
+          done();
+        },
+        error: () => {
+          this.scopeRequests.set([]);
+          done();
+        },
+      });
+    } else if (type === 'VISIT_LOCATIONS') {
+      forkJoin({
+        capabilities: this.locationApi.capabilities(),
+        requests: this.locationApi.list(),
+      }).subscribe({
+        next: ({ capabilities, requests }) => {
+          this.locationCapabilities.set(capabilities);
+          this.visitLocationRequests.set(requests || []);
+          done();
+        },
+        error: (err) => {
+          this.locationCapabilities.set(null);
+          this.visitLocationRequests.set([]);
+          done();
+          this.toast.error(err?.error?.message || 'Could not load visit location requests');
+        },
+      });
+    }
+  }
+
+  /** How many are waiting, for the badge on each type tab. */
+  countFor(type: ProjectRequestType): number {
+    if (type === 'HOURS') return this.openCount();
+    if (type === 'TASKS') return this.taskApprovals().length;
+    if (type === 'BUDGET') return this.budgetRequests().length;
+    if (type === 'SCOPE') return this.scopeRequests().length;
+    return this.visitLocationRequests().filter((request) => request.status === 'PENDING').length;
+  }
+
+  // ── Task approvals ────────────────────────────────────────────────────────
+
+  approvalStageLabel(issue: any): string {
+    return issue?.approvalState === 'PENDING_TECHNICAL'
+      ? 'Awaiting technical architect'
+      : 'Awaiting administrator';
+  }
+
+  async decideTaskApproval(issue: any, action: 'APPROVE' | 'REJECT') {
+    let reason: string | undefined;
+    if (action === 'REJECT') {
+      const typed = await this.dialog.prompt(
+        `What needs changing on "${issue.title}"? The manager who raised it will see this and can send it back once fixed.`,
+        'Send Task Back',
+        {
+          placeholder: 'e.g. Needs an estimate and a clearer acceptance criterion',
+          confirmLabel: 'Send back',
+          required: true,
+        },
+      );
+      if (!typed || !typed.trim()) return;
+      reason = typed.trim();
+    } else {
+      const ok = await this.dialog.confirm(
+        `Approve "${issue.title}"? It becomes ordinary work the team can pick up.`,
+        'Approve Task',
+        'Approve',
+        'Cancel',
+      );
+      if (!ok) return;
+    }
+
+    this.projectsApi.reviewIssueApproval(issue.projectId, issue.id, action, reason).subscribe({
+      next: () => {
+        this.toast.success(action === 'APPROVE' ? 'Task approved' : 'Sent back to the manager');
+        this.loadOthers('TASKS');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not record that decision'),
+    });
+  }
+
+  /**
+   * §PB8: archive rather than send back. Its own action, and its own button,
+   * because "fix this and return" and "this is not happening" are different
+   * decisions and collapsing them is how rejection quietly became a dead end.
+   */
+  async archiveTaskApproval(issue: any) {
+    const reason = await this.dialog.prompt(
+      `Archive "${issue.title}" instead of sending it back? It will not return for approval, and the manager who raised it will be told why.`,
+      'Archive Task',
+      {
+        placeholder: 'e.g. Duplicate of TSK-19, closing this one',
+        confirmLabel: 'Archive task',
+        required: true,
+      },
+    );
+    if (!reason || !reason.trim()) return;
+
+    this.projectsApi.archiveIssueFromApproval(issue.projectId, issue.id, reason.trim()).subscribe({
+      next: () => {
+        this.toast.success('Task archived');
+        this.loadOthers('TASKS');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not archive that task'),
+    });
+  }
+
+  // ── Budget requests ───────────────────────────────────────────────────────
+
+  async decideBudgetRequest(request: BudgetRequest, decision: 'APPROVED' | 'REJECTED') {
+    let reason: string | undefined;
+    if (decision === 'REJECTED') {
+      const typed = await this.dialog.prompt(
+        `Why is this budget request being rejected?`,
+        'Reject Budget Request',
+        {
+          placeholder: 'e.g. Not this quarter — revisit after the next milestone',
+          confirmLabel: 'Reject request',
+          required: true,
+        },
+      );
+      if (!typed || !typed.trim()) return;
+      reason = typed.trim();
+    } else {
+      const ok = await this.dialog.confirm(
+        'Approving applies the increase to the project immediately. Continue?',
+        'Approve Budget Request',
+        'Approve',
+        'Cancel',
+      );
+      if (!ok) return;
+    }
+
+    this.budgetApi.review(request.id, decision, reason).subscribe({
+      next: () => {
+        this.toast.success(
+          decision === 'APPROVED' ? 'Budget request approved' : 'Budget request rejected',
+        );
+        this.loadOthers('BUDGET');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not record that decision'),
+    });
+  }
+
+  // ── Scope requests ────────────────────────────────────────────────────────
+
+  scopeLabel(scope: string): string {
+    return scope === 'OUT_OF_SCOPE' ? 'Out of scope' : 'In scope';
+  }
+
+  async decideScopeRequest(request: ScopeRequest, decision: 'APPROVED' | 'REJECTED') {
+    let note: string | undefined;
+    if (decision === 'REJECTED') {
+      const typed = await this.dialog.prompt(
+        `Why is "${request.title}" being rejected?`,
+        'Reject Scope Request',
+        {
+          placeholder: 'e.g. Covered by the existing statement of work',
+          confirmLabel: 'Reject request',
+          required: true,
+        },
+      );
+      if (!typed || !typed.trim()) return;
+      note = typed.trim();
+    } else {
+      const ok = await this.dialog.confirm(
+        `Approve "${request.title}"? This formally records the decision.`,
+        'Approve Scope Request',
+        'Approve',
+        'Cancel',
+      );
+      if (!ok) return;
+    }
+
+    this.projectsApi.reviewScopeRequest(request.id, decision, note).subscribe({
+      next: () => {
+        this.toast.success(decision === 'APPROVED' ? 'Request approved' : 'Request rejected');
+        this.loadOthers('SCOPE');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not record that decision'),
+    });
+  }
+
+  async decideVisitLocation(request: VisitLocationRequest, decision: 'APPROVED' | 'REJECTED') {
+    let reason: string | undefined;
+    if (decision === 'REJECTED') {
+      const typed = await this.dialog.prompt(
+        `Why should “${request.name}” not be added as a visit location?`,
+        'Reject Visit Location',
+        {
+          placeholder: 'e.g. This site duplicates an existing client location',
+          confirmLabel: 'Reject request',
+          required: true,
+        },
+      );
+      if (!typed?.trim()) return;
+      reason = typed.trim();
+    } else {
+      const ok = await this.dialog.confirm(
+        `Approve “${request.name}”? It will become available in field visit location selectors immediately.`,
+        'Approve Visit Location',
+        'Approve',
+        'Cancel',
+      );
+      if (!ok) return;
+    }
+
+    this.locationApi.review(request.id, decision, reason).subscribe({
+      next: () => {
+        this.toast.success(
+          decision === 'APPROVED' ? 'Visit location approved' : 'Visit location rejected',
+        );
+        this.loadOthers('VISIT_LOCATIONS');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not record that decision'),
+    });
+  }
+
+  formatFileSize(bytes?: number | null): string {
+    if (!bytes) return '';
+    const kb = bytes / 1024;
+    return kb < 1024 ? `${Math.round(kb)} KB` : `${(kb / 1024).toFixed(1)} MB`;
   }
 }

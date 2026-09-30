@@ -6,6 +6,8 @@ import { LettersService } from '../letters/letters.service';
 import { OfferLettersService } from './offer-letters.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcrypt';
+import { MailService } from '../mail/mail.service';
+import { EmployeesService } from '../employees/employees.service';
 
 /**
  * Where a salary component sits in the annexure.
@@ -40,6 +42,8 @@ export class ApplicationsService {
     private notificationsService: NotificationsService,
     private lettersService: LettersService,
     private offerLettersService: OfferLettersService,
+    private mailService: MailService,
+    private employeesService: EmployeesService,
   ) {}
 
   /**
@@ -488,8 +492,11 @@ export class ApplicationsService {
         }
       });
 
+      const employeeCode = await this.employeesService.generateEmployeeCode(tx, companyId, application.job?.employmentType || 'FULL_TIME');
+
       const employee = await tx.employee.create({
         data: {
+          employeeCode,
           firstName,
           lastName,
           phone: application.phone,
@@ -546,6 +553,12 @@ export class ApplicationsService {
         companyId, newEmployee.id, actorUserId);
     } catch {
       // Onboarding succeeded; letters can be generated manually instead.
+    }
+
+    try {
+      await this.mailService.sendOnboardingInitiatedEmail(application.email, application.fullName);
+    } catch (err) {
+      this.logger.error(`Failed to send initiation email: ${err}`);
     }
 
     return { ...newEmployee, lettersIssued: letters.titles };
@@ -768,15 +781,21 @@ export class ApplicationsService {
     });
   }
 
-  async getMyInterviews(companyId: number, userId: number) {
+  async getMyInterviews(companyId: number, userId: number, role?: string) {
+    const isAdmin = role === 'ADMIN' || role === 'SUPERADMIN' || role === 'HR';
     const employee = await this.prisma.employee.findFirst({
       where: { companyId, userId }
     });
 
-    if (!employee) return [];
+    if (!employee && !isAdmin) return [];
+
+    const whereClause: any = { application: { companyId } };
+    if (!isAdmin) {
+      whereClause.interviewerId = employee!.id;
+    }
 
     return this.prisma.interview.findMany({
-      where: { interviewerId: employee.id, application: { companyId } },
+      where: whereClause,
       include: {
         application: {
           select: {
@@ -796,16 +815,28 @@ export class ApplicationsService {
     });
   }
 
+  private normalizeUrl(url?: string | null): string | null {
+    if (!url) return null;
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    return 'https://' + trimmed;
+  }
+
   async scheduleInterview(applicationId: number, companyId: number, data: any) {
+    if (!data.locationUrl || !data.locationUrl.trim()) {
+      throw new BadRequestException('Meeting link is required');
+    }
+
     const app = await this.findOne(applicationId, companyId);
     const interview = await this.prisma.interview.create({
       data: {
         applicationId: app.id,
         title: data.title,
         scheduledAt: new Date(data.scheduledAt),
-        durationMins: data.durationMins || 30,
+        durationMins: data.durationMins ? parseInt(data.durationMins, 10) : 30,
         interviewerId: data.interviewerId || null,
-        locationUrl: data.locationUrl || null,
+        locationUrl: this.normalizeUrl(data.locationUrl),
         status: 'SCHEDULED'
       },
       include: {
@@ -813,14 +844,14 @@ export class ApplicationsService {
       }
     });
 
-    // Being booked to interview someone is the clearest case of "you have been
-    // given work" in the whole recruitment flow, and it was entirely silent.
+    const when = interview.scheduledAt.toLocaleString('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Asia/Kolkata',
+    });
+
+    // Notify interviewer
     if (interview.interviewerId) {
-      const when = interview.scheduledAt.toLocaleString('en-IN', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZone: 'Asia/Kolkata',
-      });
       await this.notificationsService.notifyEmployees([interview.interviewerId], {
         companyId,
         title: 'Interview Scheduled',
@@ -828,6 +859,18 @@ export class ApplicationsService {
         type: 'ASSIGNMENT',
         linkUrl: '/recruitment/interviews',
       });
+    }
+
+    // Notify candidate
+    if (app.email) {
+      await this.mailService.sendInterviewScheduledEmail(
+        app.email, 
+        app.fullName, 
+        interview.title, 
+        when, 
+        interview.durationMins, 
+        interview.locationUrl!
+      );
     }
 
     return interview;
@@ -848,8 +891,9 @@ export class ApplicationsService {
     if (data.feedback !== undefined) updateData.feedback = data.feedback;
     if (data.title) updateData.title = data.title;
     if (data.scheduledAt) updateData.scheduledAt = new Date(data.scheduledAt);
-    if (data.durationMins) updateData.durationMins = data.durationMins;
-    if (data.locationUrl !== undefined) updateData.locationUrl = data.locationUrl;
+    if (data.durationMins) updateData.durationMins = parseInt(data.durationMins, 10);
+    if (data.locationUrl !== undefined) updateData.locationUrl = this.normalizeUrl(data.locationUrl);
+    if (data.interviewerId !== undefined) updateData.interviewerId = data.interviewerId;
 
     return this.prisma.interview.update({
       where: { id: interviewId },

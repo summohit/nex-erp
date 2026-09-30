@@ -54,43 +54,62 @@
             <!-- Searchable Custom Dropdown with User Avatar -->
             <div class="custom-emp-dropdown-container" *ngIf="isAdmin()" style="margin-right: 4px;">
               <button type="button" class="emp-dropdown-trigger" (click)="toggleEmpDropdown()">
-                <div class="trigger-emp-info" *ngIf="selectedAttendanceEmployee() as emp; else selectMyAttendance">
-                  <img [src]="emp.avatarUrl" alt="Avatar" class="emp-avatar-img" *ngIf="emp.avatarUrl">
-                  <div class="emp-avatar-circle" *ngIf="!emp.avatarUrl">
-                    {{ emp.firstName ? emp.firstName.charAt(0) : '' }}{{ emp.lastName ? emp.lastName.charAt(0) : '' }}
-                  </div>
-                  <div class="emp-text-details">
-                    <span class="emp-name">{{ emp.firstName }} {{ emp.lastName }}</span>
-                    <span class="emp-subtext">{{ emp.department?.name || 'General' }} &bull; {{ emp.designation?.name || 'Staff' }}</span>
+                <!-- Skeleton loader in trigger while employees loading -->
+                <div class="trigger-emp-info" *ngIf="isLoadingEmployees(); else loadedEmpTrigger">
+                  <div class="emp-avatar-circle skeleton-block" style="width: 28px; height: 28px; border-radius: 50%;"></div>
+                  <div class="emp-text-details" style="gap: 4px;">
+                    <span class="skeleton-block skeleton-line" style="width: 85px; height: 12px; margin-bottom: 0;"></span>
+                    <span class="skeleton-block skeleton-line" style="width: 60px; height: 9px; margin-bottom: 0;"></span>
                   </div>
                 </div>
-                <ng-template #selectMyAttendance>
-                  <div class="trigger-emp-info">
-                    <img [src]="authService.currentUser()?.employee?.avatarUrl" alt="Avatar" class="emp-avatar-img" *ngIf="authService.currentUser()?.employee?.avatarUrl">
-                    <div class="emp-avatar-circle" style="background: #2563EB;" *ngIf="!authService.currentUser()?.employee?.avatarUrl">
-                      {{ authService.currentUser()?.firstName ? authService.currentUser()!.firstName!.charAt(0) : '' }}{{ authService.currentUser()?.lastName ? authService.currentUser()!.lastName!.charAt(0) : '' }}
+                <ng-template #loadedEmpTrigger>
+                  <div class="trigger-emp-info" *ngIf="selectedAttendanceEmployee() as emp; else selectMyAttendance">
+                    <img [src]="emp.avatarUrl" alt="Avatar" class="emp-avatar-img" *ngIf="emp.avatarUrl">
+                    <div class="emp-avatar-circle" *ngIf="!emp.avatarUrl">
+                      {{ emp.firstName ? emp.firstName.charAt(0) : '' }}{{ emp.lastName ? emp.lastName.charAt(0) : '' }}
                     </div>
                     <div class="emp-text-details">
-                      <span class="emp-name">My Attendance</span>
-                      <span class="emp-subtext">Logged-in User Profile</span>
+                      <span class="emp-name">{{ emp.firstName }} {{ emp.lastName }}</span>
+                      <span class="emp-subtext">{{ emp.department?.name || 'General' }} &bull; {{ emp.designation?.name || 'Staff' }}</span>
                     </div>
                   </div>
+                  <ng-template #selectMyAttendance>
+                    <div class="trigger-emp-info">
+                      <img [src]="authService.currentUser()?.employee?.avatarUrl" alt="Avatar" class="emp-avatar-img" *ngIf="authService.currentUser()?.employee?.avatarUrl">
+                      <div class="emp-avatar-circle" style="background: #2563EB;" *ngIf="!authService.currentUser()?.employee?.avatarUrl">
+                        {{ authService.currentUser()?.firstName ? authService.currentUser()!.firstName!.charAt(0) : '' }}{{ authService.currentUser()?.lastName ? authService.currentUser()!.lastName!.charAt(0) : '' }}
+                      </div>
+                      <div class="emp-text-details">
+                        <span class="emp-name">My Attendance</span>
+                        <span class="emp-subtext">Logged-in User Profile</span>
+                      </div>
+                    </div>
+                  </ng-template>
                 </ng-template>
-                <svg class="chevron-icon" [class.open]="isEmpDropdownOpen()" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <svg *ngIf="isLoadingEmployees()" lucideLoader2 size="16" class="select-spin" style="margin-left: auto; color: #1373e5;"></svg>
+                <svg *ngIf="!isLoadingEmployees()" class="chevron-icon" [class.open]="isEmpDropdownOpen()" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </button>
 
               <div class="dropdown-backdrop" *ngIf="isEmpDropdownOpen()" (click)="closeEmpDropdown()"></div>
 
               <div class="emp-dropdown-menu" *ngIf="isEmpDropdownOpen()">
-                <div class="search-input-wrapper">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                  <input 
-                    type="text" 
-                    class="search-input" 
-                    placeholder="Search by name, department, designation..." 
-                    [ngModel]="empSearchQuery()" 
-                    (ngModelChange)="empSearchQuery.set($event)"
-                    (click)="$event.stopPropagation()">
+                <div class="search-input-wrapper" [class.is-loading]="isLoadingEmployees()">
+                  <ng-container *ngIf="isLoadingEmployees()">
+                    <div class="search-skeleton-bar" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 3px 0;">
+                      <span class="sk-search-icon"></span>
+                      <span class="sk-search-line"></span>
+                    </div>
+                  </ng-container>
+                  <ng-container *ngIf="!isLoadingEmployees()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input 
+                      type="text" 
+                      class="search-input" 
+                      placeholder="Search by name, department, designation..." 
+                      [ngModel]="empSearchQuery()" 
+                      (ngModelChange)="empSearchQuery.set($event)"
+                      (click)="$event.stopPropagation()">
+                  </ng-container>
                 </div>
 
                 <div class="emp-options-list">
@@ -323,7 +342,32 @@
           <h3>My Balances</h3>
         </div>
         
-        <div class="balances-grid">
+        <!-- Skeleton Loader for Balances -->
+        <div class="balances-grid" *ngIf="isLoadingBalances()">
+          <div class="balance-card" *ngFor="let i of [1, 2, 3]" style="pointer-events: none;">
+            <div class="balance-header">
+              <app-skeleton width="120px" height="16px"></app-skeleton>
+              <app-skeleton width="20px" height="20px" radius="4px"></app-skeleton>
+            </div>
+            <div style="margin-top: 8px;">
+              <app-skeleton width="100px" height="12px"></app-skeleton>
+            </div>
+            <div style="margin-top: 12px; display: flex; align-items: baseline; gap: 6px;">
+              <app-skeleton width="40px" height="28px"></app-skeleton>
+              <app-skeleton width="60px" height="14px"></app-skeleton>
+            </div>
+            <div style="margin-top: 12px;">
+              <app-skeleton width="100%" height="8px" radius="4px"></app-skeleton>
+              <div style="display: flex; justify-content: space-between; margin-top: 6px;">
+                <app-skeleton width="50px" height="12px"></app-skeleton>
+                <app-skeleton width="50px" height="12px"></app-skeleton>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actual Balances -->
+        <div class="balances-grid" *ngIf="!isLoadingBalances()">
           <div class="balance-card" *ngFor="let balance of myBalances()">
             <div class="balance-header">
               <h4 class="balance-type">{{ balance.leaveType.name }}</h4>
@@ -370,7 +414,30 @@
           </button>
         </div>
         
-        <div class="table-container mt-4">
+        <!-- Skeleton Loader for Leave Requests -->
+        <div class="table-container mt-4" *ngIf="isLoadingRequests()">
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+            <!-- Header row -->
+            <div style="display: grid; grid-template-columns: 1.5fr 1.5fr 1fr 1fr; gap: 16px; padding: 14px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <app-skeleton width="60px" height="12px"></app-skeleton>
+              <app-skeleton width="50px" height="12px"></app-skeleton>
+              <app-skeleton width="55px" height="12px"></app-skeleton>
+              <app-skeleton width="60px" height="12px"></app-skeleton>
+            </div>
+            <!-- Data rows -->
+            <div *ngFor="let i of [1, 2, 3, 4, 5]" style="display: grid; grid-template-columns: 1.5fr 1.5fr 1fr 1fr; gap: 16px; padding: 14px 16px; border-bottom: 1px solid #f1f5f9;">
+              <app-skeleton width="110px" height="14px"></app-skeleton>
+              <app-skeleton width="140px" height="14px"></app-skeleton>
+              <div>
+                <app-skeleton width="70px" height="24px" radius="12px"></app-skeleton>
+              </div>
+              <app-skeleton width="60px" height="14px"></app-skeleton>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actual Table -->
+        <div class="table-container mt-4" *ngIf="!isLoadingRequests()">
           <ag-grid-angular
             class="ag-theme-quartz"
             [theme]="'legacy'"
@@ -392,139 +459,230 @@
 
 <!-- Request Leave Modal -->
 <div class="drawer-overlay" *ngIf="isRequestModalOpen()" (click)="closeRequestModal()">
-  <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 500px;">
-    <div class="drawer-header">
-      <h2>Request Leave</h2>
-      <button class="btn-icon" (click)="closeRequestModal()">
+  <div class="drawer-content leave-request-drawer" (click)="$event.stopPropagation()">
+    <div class="drawer-header" style="padding: 22px 28px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h2 style="margin: 0; font-size: 19px; font-weight: 700; color: #0f172a;">{{ editMode() ? 'Edit Leave Request' : 'Request Leave' }}</h2>
+          <span *ngIf="editMode()" style="background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 9999px;">Editing</span>
+        </div>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #64748b;">
+          {{ editMode() ? 'Update your pending leave details below' : 'Select leave type and dates to apply' }}
+        </p>
+      </div>
+      <button class="btn-icon" (click)="closeRequestModal()" title="Close">
         <svg lucideX size="20"></svg>
       </button>
     </div>
 
-    <div class="drawer-body">
-      <!-- HR Unassigned Leave Balances Warning Alert -->
-      <div *ngIf="myBalances().length === 0" style="background-color: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px;">
-        <svg lucideAlertCircle size="20" style="color: #1373e5; flex-shrink: 0; margin-top: 2px;"></svg>
+    <div class="drawer-body" style="padding: 24px 28px;">
+      <!-- Alert: No balances assigned for Myself -->
+      <div *ngIf="!requestForm.onBehalfOfEmployeeId && myBalances().length === 0" 
+           style="background-color: #fef2f2; border: 1px solid #fee2e2; border-left: 4px solid #ef4444; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px;">
+        <svg lucideAlertCircle size="20" style="color: #ef4444; flex-shrink: 0; margin-top: 2px;"></svg>
         <div>
-          <strong style="color: #595a5b; font-size: 14px; display: block; margin-bottom: 2px;">No Leave Balances Assigned</strong>
-          <span style="color: #4e4e4e; font-size: 13px; line-height: 1.4; display: block;">You do not have any active leave types assigned to your profile. Please contact your HR administrator to allocate leave balances.</span>
+          <strong style="color: #991b1b; font-size: 13.5px; display: block; margin-bottom: 2px;">No Leave Balances Assigned</strong>
+          <span style="color: #7f1d1d; font-size: 12.5px; line-height: 1.4; display: block;">You do not have any active leave balances allocated to your profile. Please contact HR to allocate leave balances.</span>
         </div>
       </div>
 
-      <!-- §Att9: apply for somebody else. Only shown to people the server says
-           may do it, and only when raising a new request — editing an existing
-           one never changes whose leave it is. -->
-      <div class="form-group mb-4" *ngIf="canActOnBehalf() === true && !editMode()">
-        <label>Applying for</label>
-        <select class="form-control" [(ngModel)]="requestForm.onBehalfOfEmployeeId">
-          <option [ngValue]="null">Myself</option>
-          <option *ngFor="let emp of onBehalfEmployees()" [ngValue]="emp.id">
-            {{ emp.name }}<span *ngIf="emp.subtitle"> · {{ emp.subtitle }}</span>
-          </option>
-        </select>
-        <!-- Says plainly what is about to happen: this is approved on the spot
-             and the balance moves, which is not what "apply for leave" usually
-             means on this screen. -->
-        <div *ngIf="requestForm.onBehalfOfEmployeeId"
-             style="margin-top: 10px; padding: 10px 12px; background: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; font-size: 12.5px; color: #1e40af; line-height: 1.5;">
-          This will be recorded as <strong>approved</strong> straight away and the days
-          will come off {{ onBehalfName() }}'s balance. The record will show that you raised it.
-          <span *ngIf="requestForm.startDate && requestForm.endDate"> Past dates are allowed here.</span>
+      <!-- Alert: No balances assigned for target employee -->
+      <div *ngIf="requestForm.onBehalfOfEmployeeId && !isLoadingEmployeeBalances() && targetEmployeeBalances() !== null && targetEmployeeBalances()!.length === 0" 
+           style="background-color: #fffbeb; border: 1px solid #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px;">
+        <svg lucideAlertCircle size="20" style="color: #f59e0b; flex-shrink: 0; margin-top: 2px;"></svg>
+        <div>
+          <strong style="color: #92400e; font-size: 13.5px; display: block; margin-bottom: 2px;">No Balances for {{ onBehalfName() }}</strong>
+          <span style="color: #b45309; font-size: 12.5px; line-height: 1.4; display: block;">This employee does not have any active leave balances allocated yet. You can assign balances under the "Manage Balances" tab.</span>
         </div>
       </div>
 
-      <div class="form-group mb-4">
-        <label>Leave Type <span style="color: #919192;">*</span></label>
-        <!-- §Att9: raising it for somebody else, the list comes from the
-             company's leave types rather than the applicant's own balances —
-             an HR user with no allocation of their own would otherwise see an
-             empty dropdown and be unable to file anything for anyone. The
-             balance that matters is the target's, and the server checks it. -->
-        <select *ngIf="requestForm.onBehalfOfEmployeeId" class="form-control"
-                [(ngModel)]="requestForm.leaveTypeId" (ngModelChange)="onLeaveTypeChange()"
-                [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#919192' : ''">
-          <option value="">Select Leave Type...</option>
-          <option *ngFor="let t of leaveTypes()" [value]="t.id">{{ t.name }}</option>
-        </select>
+      <!-- Applying for (Searchable Select) -->
+      <div class="leave-form-group" *ngIf="canActOnBehalf() === true && !editMode()">
+        <label>
+          <span>Applying for</span>
+          <span style="font-size: 11px; font-weight: normal; color: #64748b;">Self or team member</span>
+        </label>
+        <app-searchable-select
+          [options]="applyingForOptions()"
+          placeholder="Select Employee..."
+          [value]="requestForm.onBehalfOfEmployeeId"
+          (valueChange)="onApplyingForChange($event)"
+          [loading]="isLoadingEmployees()"
+          loadingText="Loading employees..."
+          [fullWidth]="true">
+        </app-searchable-select>
 
-        <select *ngIf="!requestForm.onBehalfOfEmployeeId" class="form-control" [(ngModel)]="requestForm.leaveTypeId" (ngModelChange)="onLeaveTypeChange()" [style.border-color]="showFormErrors() && !requestForm.leaveTypeId ? '#919192' : ''" [disabled]="myBalances().length === 0">
-          <option value="">{{ myBalances().length === 0 ? 'No Leave Types Available' : 'Select Leave Type...' }}</option>
-          <option *ngFor="let balance of myBalances()" [value]="balance.leaveType.id">
-            {{ balance.leaveType.name }} ({{ balance.allocated - balance.used }} days available)
-          </option>
-        </select>
-        <div *ngIf="showFormErrors() && !requestForm.leaveTypeId && myBalances().length > 0" style="color: #919192; font-size: 12px; margin-top: 4px;">Leave Type is required</div>
-      </div>
-
-      <div class="grid-2-col mb-4">
-        <div class="form-group">
-          <label>Start Date <span style="color: #919192;">*</span></label>
-          <input type="date" class="form-control" [(ngModel)]="requestForm.startDate" [style.border-color]="showFormErrors() && !requestForm.startDate ? '#919192' : ''">
-          <div *ngIf="showFormErrors() && !requestForm.startDate" style="color: #919192; font-size: 12px; margin-top: 4px;">Start Date is required</div>
-        </div>
-        <div class="form-group">
-          <label>End Date <span style="color: #919192;">*</span></label>
-          <input type="date" class="form-control" [(ngModel)]="requestForm.endDate" [min]="requestForm.startDate" [style.border-color]="showFormErrors() && (!requestForm.endDate || requestForm.endDate < requestForm.startDate) ? '#919192' : ''">
-          <div *ngIf="showFormErrors() && !requestForm.endDate" style="color: #919192; font-size: 12px; margin-top: 4px;">End Date is required</div>
-          <div *ngIf="showFormErrors() && requestForm.endDate && requestForm.endDate < requestForm.startDate" style="color: #919192; font-size: 12px; margin-top: 4px;">Must be >= Start Date</div>
+        <div *ngIf="requestForm.onBehalfOfEmployeeId" class="on-behalf-info-card">
+          <svg lucideAlertCircle size="18" style="color: #3b82f6; flex-shrink: 0; margin-top: 2px;"></svg>
+          <div>
+            This leave will be recorded as <strong>automatically approved</strong> on behalf of <strong>{{ onBehalfName() }}</strong>. Days will be deducted from their balance.
+            <span *ngIf="requestForm.startDate && requestForm.endDate"> Past dates are permitted.</span>
+          </div>
         </div>
       </div>
 
-      <div class="form-group mb-4" *ngIf="requestForm.startDate && requestForm.endDate && requestForm.startDate === requestForm.endDate && selectedLeaveTypeAllowsHalfDay()">
-        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer;">
-          <input type="checkbox" [(ngModel)]="requestForm.isHalfDay" style="width: 16px; height: 16px; cursor: pointer;">
-          Apply as Half-Day
+      <!-- Leave Type (Searchable Select, filtered by employee) -->
+      <div class="leave-form-group">
+        <label>
+          <span>Leave Type <span class="required-star">*</span></span>
+          <span *ngIf="isLoadingEmployeeBalances()" style="font-size: 12px; color: #3b82f6;">Fetching balances...</span>
+          <span *ngIf="!isLoadingEmployeeBalances() && availableLeaveTypeOptions().length > 0" style="font-size: 11px; font-weight: 500; color: #16a34a;">
+            {{ availableLeaveTypeOptions().length }} {{ availableLeaveTypeOptions().length === 1 ? 'type' : 'types' }} available
+          </span>
+        </label>
+
+        <app-searchable-select
+          [options]="availableLeaveTypeOptions()"
+          [placeholder]="availableLeaveTypeOptions().length === 0 && !isLoadingEmployeeBalances() ? 'No Leave Types Available' : 'Select Leave Type...'"
+          [value]="requestForm.leaveTypeId ? +requestForm.leaveTypeId : null"
+          (valueChange)="onLeaveTypeSelected($event)"
+          [disabled]="availableLeaveTypeOptions().length === 0 && !isLoadingEmployeeBalances()"
+          [loading]="isLoadingEmployeeBalances()"
+          loadingText="Fetching leave balances..."
+          [fullWidth]="true">
+        </app-searchable-select>
+
+        <!-- Error message if attempted submit without leave type -->
+        <div *ngIf="showFormErrors() && !requestForm.leaveTypeId" style="color: #ef4444; font-size: 12px; margin-top: 5px; display: flex; align-items: center; gap: 4px;">
+          <svg lucideAlertCircle size="13"></svg>
+          <span>Leave Type is required</span>
+        </div>
+
+        <!-- Selected Leave Type Remaining Days Chip -->
+        <div *ngIf="selectedLeaveTypeBalance() as b" class="balance-info-chip">
+          <svg lucideCheck size="13"></svg>
+          <span><strong>{{ b.allocated - b.used }} days remaining</strong> out of {{ b.allocated }} total</span>
+          <span *ngIf="b.leaveType.allowHalfDay !== false" style="margin-left: 4px; padding-left: 6px; border-left: 1px solid #bbf7d0; color: #047857;">Half-day allowed</span>
+        </div>
+      </div>
+
+      <!-- Date Range (Grid 2-col) -->
+      <div class="grid-2-col" style="gap: 16px; margin-bottom: 22px;">
+        <div class="leave-form-group" style="margin-bottom: 0;">
+          <label>Start Date <span class="required-star">*</span></label>
+          <input type="date" class="leave-form-input" 
+                 [(ngModel)]="requestForm.startDate" 
+                 [class.is-invalid]="showFormErrors() && !requestForm.startDate">
+          <div *ngIf="showFormErrors() && !requestForm.startDate" style="color: #ef4444; font-size: 12px; margin-top: 5px;">
+            Start Date is required
+          </div>
+        </div>
+
+        <div class="leave-form-group" style="margin-bottom: 0;">
+          <label>End Date <span class="required-star">*</span></label>
+          <input type="date" class="leave-form-input" 
+                 [(ngModel)]="requestForm.endDate" 
+                 [min]="requestForm.startDate" 
+                 [class.is-invalid]="showFormErrors() && (!requestForm.endDate || requestForm.endDate < requestForm.startDate)">
+          <div *ngIf="showFormErrors() && !requestForm.endDate" style="color: #ef4444; font-size: 12px; margin-top: 5px;">
+            End Date is required
+          </div>
+          <div *ngIf="showFormErrors() && requestForm.endDate && requestForm.endDate < requestForm.startDate" style="color: #ef4444; font-size: 12px; margin-top: 5px;">
+            Must be on or after Start Date
+          </div>
+        </div>
+      </div>
+
+      <!-- Dynamic Working Days Preview Pill -->
+      <div *ngIf="calculatedWorkingDays() !== null" style="margin-bottom: 22px;">
+        <div class="duration-preview-pill">
+          <svg lucideClock size="15"></svg>
+          <span>
+            <strong>{{ calculatedWorkingDays() }} {{ calculatedWorkingDays() === 1 ? 'Working Day' : 'Working Days' }}</strong> requested
+            <span *ngIf="requestForm.isHalfDay">({{ requestForm.halfDayPeriod === 'AM' ? 'Morning Session' : 'Afternoon Session' }})</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Half-day Selector Card -->
+      <div class="half-day-card" *ngIf="requestForm.startDate && requestForm.endDate && requestForm.startDate === requestForm.endDate && selectedLeaveTypeAllowsHalfDay()">
+        <label class="half-day-toggle">
+          <input type="checkbox" [(ngModel)]="requestForm.isHalfDay" style="width: 17px; height: 17px; cursor: pointer; accent-color: #3b82f6;">
+          <span>Apply as Half-Day</span>
         </label>
         
-        <div *ngIf="requestForm.isHalfDay" style="margin-top: 12px; display: flex; gap: 16px;">
-          <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer; font-size: 14px;">
-            <input type="radio" name="halfDayPeriod" value="AM" [(ngModel)]="requestForm.halfDayPeriod"> Morning (AM)
-          </label>
-          <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer; font-size: 14px;">
-            <input type="radio" name="halfDayPeriod" value="PM" [(ngModel)]="requestForm.halfDayPeriod"> Afternoon (PM)
-          </label>
+        <div *ngIf="requestForm.isHalfDay" class="half-day-periods">
+          <button type="button" class="half-day-period-btn" 
+                  [class.active]="requestForm.halfDayPeriod === 'AM'"
+                  (click)="requestForm.halfDayPeriod = 'AM'">
+            <svg lucideClock size="14"></svg>
+            <span>Morning (AM)</span>
+          </button>
+          <button type="button" class="half-day-period-btn" 
+                  [class.active]="requestForm.halfDayPeriod === 'PM'"
+                  (click)="requestForm.halfDayPeriod = 'PM'">
+            <svg lucideClock size="14"></svg>
+            <span>Afternoon (PM)</span>
+          </button>
         </div>
       </div>
-      <div class="form-group mb-4" *ngIf="requestForm.startDate && requestForm.endDate && requestForm.startDate === requestForm.endDate && !selectedLeaveTypeAllowsHalfDay()" style="padding: 10px 12px; background: #F1F5F9; border-radius: 8px;">
-        <span style="color: #64748B; font-size: 13px;">Half-day leave is not allowed for this leave type.</span>
+
+      <div class="half-day-card" *ngIf="requestForm.startDate && requestForm.endDate && requestForm.startDate === requestForm.endDate && !selectedLeaveTypeAllowsHalfDay()" style="background: #f8fafc; border-color: #e2e8f0;">
+        <span style="color: #64748b; font-size: 12.5px; display: flex; align-items: center; gap: 6px;">
+          <svg lucideAlertCircle size="14"></svg>
+          Half-day leave is not allowed for this leave type.
+        </span>
       </div>
 
-      <div class="form-group mb-4">
+      <!-- Reason Field -->
+      <div class="leave-form-group">
         <label>Reason (Optional)</label>
-        <textarea class="form-control" [(ngModel)]="requestForm.reason" rows="3" placeholder="Additional details..."></textarea>
+        <textarea class="form-control" [(ngModel)]="requestForm.reason" rows="3" 
+                  style="border-radius: 8px; border-color: #e2e8f0; font-size: 13.5px; padding: 10px 12px;"
+                  placeholder="Provide any additional details or notes..."></textarea>
       </div>
 
-      <div class="form-group mb-4">
+      <!-- Attachment Dropzone -->
+      <div class="leave-form-group" style="margin-bottom: 0;">
         <label>Attachment (Optional)</label>
-        <div class="file-drop-area" (click)="fileInput.click()" 
+        
+        <!-- Drop area when no file selected -->
+        <div class="file-drop-area" *ngIf="!selectedFile && !requestForm.attachmentUrl" 
+             (click)="fileInput.click()" 
              (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)"
-             [class.drag-over]="isDragOver()">
+             [class.drag-over]="isDragOver()"
+             style="padding: 24px 16px; border-radius: 10px; background: #f8fafc; border: 2px dashed #cbd5e1;">
           <input type="file" #fileInput (change)="onFileSelected($event)" accept="image/*,.pdf" style="display: none;" />
-          
-          <div class="drop-message" *ngIf="!selectedFile && !requestForm.attachmentUrl">
-            <svg lucideUploadCloud size="24"></svg>
-            <p>Drag & drop or click to upload</p>
+          <div class="drop-message">
+            <svg lucideUploadCloud size="28" style="color: #3b82f6;"></svg>
+            <p style="font-size: 13px; font-weight: 600; color: #334155; margin-top: 4px;">Click or drag file to upload</p>
+            <span style="font-size: 11.5px; color: #94a3b8;">PDF, PNG, JPG up to 10MB</span>
           </div>
-          
-          <div class="drop-message" *ngIf="selectedFile">
-            <svg lucideFile size="24"></svg>
-            <p>{{ selectedFile.name }}</p>
-          </div>
+        </div>
 
-          <div class="drop-message" *ngIf="!selectedFile && requestForm.attachmentUrl && editMode()">
-            <svg lucidePaperclip size="24"></svg>
-            <p>Current attachment uploaded</p>
-            <a [href]="requestForm.attachmentUrl" target="_blank" (click)="$event.stopPropagation()">View File</a>
+        <!-- Selected file card -->
+        <div class="file-selected-card" *ngIf="selectedFile">
+          <div class="file-selected-info">
+            <svg lucideFile size="20" style="color: #16a34a; flex-shrink: 0;"></svg>
+            <span class="file-name-text">{{ selectedFile.name }}</span>
           </div>
+          <button type="button" class="btn-icon" (click)="selectedFile = null" title="Remove attachment" style="color: #dc2626; width: 28px; height: 28px;">
+            <svg lucideTrash2 size="16"></svg>
+          </button>
+        </div>
+
+        <!-- Existing file in edit mode -->
+        <div class="file-selected-card" *ngIf="!selectedFile && requestForm.attachmentUrl && editMode()">
+          <div class="file-selected-info">
+            <svg lucidePaperclip size="20" style="color: #3b82f6; flex-shrink: 0;"></svg>
+            <span class="file-name-text">Existing attachment</span>
+            <a [href]="requestForm.attachmentUrl" target="_blank" style="font-size: 12px; color: #2563eb; text-decoration: underline; margin-left: 6px;">View</a>
+          </div>
+          <button type="button" class="btn-icon" (click)="requestForm.attachmentUrl = ''" title="Remove attachment" style="color: #dc2626; width: 28px; height: 28px;">
+            <svg lucideTrash2 size="16"></svg>
+          </button>
         </div>
       </div>
     </div>
 
-
-    <div class="drawer-footer" style="display: flex; gap: 12px; justify-content: flex-end;">
-      <button class="btn btn-outline" (click)="closeRequestModal()" style="width: max-content;">Cancel</button>
-      <button class="btn btn-primary" (click)="saveLeaveRequest()" [disabled]="isSubmittingRequest() || myBalances().length === 0" style="width: max-content; display: flex; align-items: center; gap: 8px;">
+    <!-- Footer -->
+    <div class="drawer-footer" style="padding: 16px 28px; display: flex; gap: 12px; justify-content: flex-end; align-items: center; border-top: 1px solid #f1f5f9; background: #f8fafc;">
+      <button class="btn btn-outline" (click)="closeRequestModal()" type="button" style="height: 40px; padding: 0 18px; border-radius: 8px;">Cancel</button>
+      <button class="btn btn-primary" (click)="saveLeaveRequest()" 
+              [disabled]="isSubmittingRequest() || (requestForm.onBehalfOfEmployeeId ? (targetEmployeeBalances() !== null && targetEmployeeBalances()!.length === 0) : myBalances().length === 0)" 
+              style="height: 40px; padding: 0 20px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-weight: 600;">
         <span *ngIf="isSubmittingRequest()" class="btn-spinner"></span>
-        {{ isSubmittingRequest() ? 'Submitting...' : 'Submit Request' }}
+        {{ isSubmittingRequest() ? 'Submitting...' : (editMode() ? 'Update Request' : 'Submit Request') }}
       </button>
     </div>
   </div>
@@ -555,7 +713,56 @@
           All
         </button>
       </div>
-      <div class="table-container mt-4">
+      <!-- Skeleton Loader for Leave Approvals -->
+      <div class="table-container mt-4" *ngIf="isLoadingLeaveApprovals()">
+        <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: white;">
+          <!-- Header row -->
+          <div style="display: grid; grid-template-columns: 2fr 1.2fr 1.5fr 1.5fr 1fr 1fr; gap: 16px; padding: 14px 18px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; align-items: center;">
+            <app-skeleton width="80px" height="12px"></app-skeleton>
+            <app-skeleton width="70px" height="12px"></app-skeleton>
+            <app-skeleton width="110px" height="12px"></app-skeleton>
+            <app-skeleton width="60px" height="12px"></app-skeleton>
+            <app-skeleton width="50px" height="12px"></app-skeleton>
+            <app-skeleton width="60px" height="12px"></app-skeleton>
+          </div>
+          <!-- Data rows (6 rows) -->
+          <div *ngFor="let i of [1, 2, 3, 4, 5, 6]" style="display: grid; grid-template-columns: 2fr 1.2fr 1.5fr 1.5fr 1fr 1fr; gap: 16px; padding: 14px 18px; border-bottom: 1px solid #f1f5f9; align-items: center;">
+            <!-- Employee (Avatar circle + name + designation) -->
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <app-skeleton width="38px" height="38px" [circle]="true"></app-skeleton>
+              <div style="display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0;">
+                <app-skeleton [width]="i % 2 === 0 ? '110px' : '135px'" height="13px"></app-skeleton>
+                <app-skeleton [width]="i % 2 === 0 ? '80px' : '100px'" height="10px"></app-skeleton>
+              </div>
+            </div>
+            <!-- Leave Type -->
+            <div>
+              <app-skeleton width="90px" height="22px" radius="6px"></app-skeleton>
+            </div>
+            <!-- Dates & Duration -->
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <app-skeleton width="140px" height="13px"></app-skeleton>
+              <app-skeleton width="80px" height="10px"></app-skeleton>
+            </div>
+            <!-- Reason -->
+            <div>
+              <app-skeleton [width]="i % 2 === 0 ? '120px' : '90px'" height="12px"></app-skeleton>
+            </div>
+            <!-- Status -->
+            <div>
+              <app-skeleton width="70px" height="24px" radius="12px"></app-skeleton>
+            </div>
+            <!-- Actions -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <app-skeleton width="55px" height="28px" radius="6px"></app-skeleton>
+              <app-skeleton width="24px" height="24px" [circle]="true"></app-skeleton>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actual Table when loaded -->
+      <div class="table-container mt-4" *ngIf="!isLoadingLeaveApprovals()">
         <ag-grid-angular
           class="ag-theme-quartz"
           [theme]="'legacy'"
@@ -601,7 +808,47 @@
       <div class="widget-header">
         <h3>Pending Team Leave Approvals</h3>
       </div>
-      <div class="table-container mt-4">
+
+      <!-- Skeleton Loader for Team Approvals -->
+      <div class="table-container mt-4" *ngIf="isLoadingManagerRequests()">
+        <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: white;">
+          <div style="display: grid; grid-template-columns: 2fr 1.2fr 1.5fr 1.5fr 1fr 1fr; gap: 16px; padding: 14px 18px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; align-items: center;">
+            <app-skeleton width="80px" height="12px"></app-skeleton>
+            <app-skeleton width="70px" height="12px"></app-skeleton>
+            <app-skeleton width="110px" height="12px"></app-skeleton>
+            <app-skeleton width="60px" height="12px"></app-skeleton>
+            <app-skeleton width="50px" height="12px"></app-skeleton>
+            <app-skeleton width="60px" height="12px"></app-skeleton>
+          </div>
+          <div *ngFor="let i of [1, 2, 3, 4]" style="display: grid; grid-template-columns: 2fr 1.2fr 1.5fr 1.5fr 1fr 1fr; gap: 16px; padding: 14px 18px; border-bottom: 1px solid #f1f5f9; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <app-skeleton width="38px" height="38px" [circle]="true"></app-skeleton>
+              <div style="display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0;">
+                <app-skeleton [width]="i % 2 === 0 ? '110px' : '135px'" height="13px"></app-skeleton>
+                <app-skeleton [width]="i % 2 === 0 ? '80px' : '100px'" height="10px"></app-skeleton>
+              </div>
+            </div>
+            <div>
+              <app-skeleton width="90px" height="22px" radius="6px"></app-skeleton>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <app-skeleton width="140px" height="13px"></app-skeleton>
+              <app-skeleton width="80px" height="10px"></app-skeleton>
+            </div>
+            <div>
+              <app-skeleton [width]="i % 2 === 0 ? '120px' : '90px'" height="12px"></app-skeleton>
+            </div>
+            <div>
+              <app-skeleton width="70px" height="24px" radius="12px"></app-skeleton>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <app-skeleton width="55px" height="28px" radius="6px"></app-skeleton>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-container mt-4" *ngIf="!isLoadingManagerRequests()">
         <ag-grid-angular
           class="ag-theme-quartz"
           [theme]="'legacy'"
@@ -664,84 +911,153 @@
   </div>
 
   <!-- LEAVE DETAIL MODAL -->
+  <!-- LEAVE DETAIL MODAL WITH USER PROFILE -->
   <div class="drawer-overlay" *ngIf="isLeaveDetailOpen()" (click)="closeLeaveDetail()" style="display: flex; align-items: center; justify-content: center;">
-    <div class="widget-card" (click)="$event.stopPropagation()" style="width: 620px; max-width: 92vw; max-height: 88vh; overflow-y: auto; animation: fadeIn 0.2s;" *ngIf="selectedLeave() as leave">
-      <div class="widget-header">
-        <h3>Leave Details</h3>
-        <button class="btn-icon" (click)="closeLeaveDetail()">
+    <div class="widget-card" (click)="$event.stopPropagation()" style="width: 660px; max-width: 94vw; max-height: 90vh; overflow-y: auto; border-radius: 14px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); animation: fadeIn 0.2s;" *ngIf="selectedLeave() as leave">
+      <div class="widget-header" style="padding-bottom: 16px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #0f172a;">Leave Request & Profile</h3>
+          <p style="margin: 2px 0 0; font-size: 12.5px; color: #64748b;">Review employee profile and leave details</p>
+        </div>
+        <button class="btn-icon" (click)="closeLeaveDetail()" title="Close">
           <svg lucideX size="20"></svg>
         </button>
       </div>
 
-      <div class="modal-body" style="padding: 16px 0;">
-        <div style="display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid #E2E8F0;">
-          <img *ngIf="leave.employee?.avatarUrl" [src]="leave.employee.avatarUrl" class="leave-detail-avatar" alt="" />
-          <div class="avatar-circle-sm" *ngIf="!leave.employee?.avatarUrl">{{ leaveEmployeeInitials(leave) }}</div>
-          <div>
-            <div style="font-size: 15px; font-weight: 600; color: #0F172A;">{{ leaveEmployeeName(leave) }}</div>
-            <div style="font-size: 12px; color: #64748B;">
-              {{ leaveEmployeeSubtitle(leave) }}
-              <span *ngIf="leave.employee?.employeeCode"> · {{ leave.employee.employeeCode }}</span>
+      <div class="modal-body" style="padding: 20px 0;">
+        <!-- Employee Profile Header Card -->
+        <div class="modal-profile-card">
+          <img [src]="leaveEmployeeAvatar(leave)" 
+               class="modal-profile-avatar" 
+               alt="Avatar"
+               (error)="onLeaveAvatarError($event, leave)" />
+          <div class="modal-profile-details">
+            <div class="modal-profile-top">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <h4 class="modal-profile-name">{{ leaveEmployeeName(leave) }}</h4>
+                <span *ngIf="leave.employee?.employeeCode" class="table-emp-code">#{{ leave.employee.employeeCode }}</span>
+                <span *ngIf="leaveEmployeeRole(leave)" class="profile-chip role-chip">{{ leaveEmployeeRole(leave) }}</span>
+              </div>
+              <span class="status-badge" [ngClass]="leave.status.toLowerCase()">{{ leave.status }}</span>
+            </div>
+
+            <div class="modal-profile-meta">
+              <span class="meta-tag" *ngIf="leave.employee?.designation?.name">
+                <svg lucideBriefcase size="13"></svg>
+                <span>{{ leave.employee.designation.name }}</span>
+              </span>
+              <span class="meta-tag" *ngIf="leave.employee?.department?.name">
+                <svg lucideBuilding size="13"></svg>
+                <span>{{ leave.employee.department.name }}</span>
+              </span>
+              <span class="meta-tag" *ngIf="leaveEmployeeEmail(leave)">
+                <svg lucideMail size="13"></svg>
+                <span>{{ leaveEmployeeEmail(leave) }}</span>
+              </span>
             </div>
           </div>
-          <span class="status-badge" [ngClass]="leave.status.toLowerCase()" style="margin-left: auto;">{{ leave.status }}</span>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding-top: 16px;">
+        <!-- Quota & Balance Info Card -->
+        <div class="modal-quota-card" *ngIf="selectedLeaveQuota() as quota">
+          <div class="modal-quota-left">
+            <svg lucideCalendar size="18" style="color: #16a34a; flex-shrink: 0;"></svg>
+            <div>
+              <div class="modal-quota-label">{{ leave.leaveType?.name }} Quota</div>
+              <div class="modal-quota-value">
+                <strong>{{ quota.allocated - quota.used }} days available</strong> out of {{ quota.allocated }} allocated
+              </div>
+            </div>
+          </div>
+          <div class="modal-quota-stat">
+            Requested: {{ leaveDuration(leave) }} {{ leaveDuration(leave) === 1 ? 'day' : 'days' }}
+          </div>
+        </div>
+
+        <!-- Leave Details Grid -->
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;">
           <div>
             <div class="detail-label">Leave Type</div>
-            <div class="detail-value">{{ leave.leaveType?.name || '—' }}</div>
+            <div class="detail-value" style="font-weight: 600; color: #0f172a;">{{ leave.leaveType?.name || '—' }}</div>
           </div>
           <div>
-            <div class="detail-label">Paid</div>
-            <div class="detail-value">{{ leave.leaveType?.isPaid === false ? 'Unpaid' : 'Paid' }}</div>
+            <div class="detail-label">Compensation</div>
+            <div class="detail-value">{{ leave.leaveType?.isPaid === false ? 'Unpaid Leave' : 'Paid Leave' }}</div>
           </div>
           <div>
-            <div class="detail-label">From</div>
+            <div class="detail-label">From Date</div>
             <div class="detail-value">{{ leave.startDate | date: 'EEEE, MMM d, y' }}</div>
           </div>
           <div>
-            <div class="detail-label">To</div>
+            <div class="detail-label">To Date</div>
             <div class="detail-value">{{ leave.endDate | date: 'EEEE, MMM d, y' }}</div>
           </div>
           <div>
-            <div class="detail-label">Duration</div>
-            <div class="detail-value">
+            <div class="detail-label">Total Duration</div>
+            <div class="detail-value" style="font-weight: 600; color: #1e40af;">
               {{ leaveDuration(leave) }} day{{ leaveDuration(leave) === 1 ? '' : 's' }}
-              <span *ngIf="leave.isHalfDay" style="color: #1373e5;">· Half Day ({{ leave.halfDayPeriod || 'AM' }})</span>
+              <span *ngIf="leave.isHalfDay" style="color: #3b82f6;">· Half Day ({{ leave.halfDayPeriod || 'AM' }})</span>
             </div>
           </div>
           <div>
             <div class="detail-label">Applied On</div>
-            <div class="detail-value">{{ leave.createdAt ? (leave.createdAt | date: 'MMM d, y') : '—' }}</div>
+            <div class="detail-value">{{ leave.createdAt ? (leave.createdAt | date: 'MMM d, y, h:mm a') : '—' }}</div>
           </div>
         </div>
 
+        <!-- Reason -->
         <div style="padding-top: 16px;">
-          <div class="detail-label">Reason</div>
-          <div class="detail-value" style="white-space: pre-wrap; background: #F8FAFC; padding: 10px 12px; border-radius: 6px; border: 1px solid #E2E8F0; margin-top: 4px;">{{ leave.reason || 'No reason provided' }}</div>
+          <div class="detail-label">Reason for Absence</div>
+          <div class="detail-value" style="white-space: pre-wrap; background: #ffffff; padding: 12px 14px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 6px; font-size: 13.5px; color: #334155; line-height: 1.5;">
+            {{ leave.reason || 'No reason provided by employee' }}
+          </div>
         </div>
 
+        <!-- Rejection Reason if Rejected -->
         <div style="padding-top: 16px;" *ngIf="leave.status === 'REJECTED' && leave.rejectionReason">
-          <div class="detail-label">Rejection Reason</div>
-          <div class="detail-value" style="white-space: pre-wrap; background: #eff6ff; color: #0f4f9c; padding: 10px 12px; border-radius: 6px; border: 1px solid #dbeafe; margin-top: 4px;">{{ leave.rejectionReason }}</div>
+          <div class="detail-label" style="color: #dc2626;">Rejection Reason</div>
+          <div class="detail-value" style="white-space: pre-wrap; background: #fef2f2; color: #991b1b; padding: 12px 14px; border-radius: 8px; border: 1px solid #fecaca; margin-top: 6px; font-size: 13.5px;">
+            {{ leave.rejectionReason }}
+          </div>
         </div>
 
+        <!-- Approver/Rejecter Info -->
         <div style="padding-top: 16px;" *ngIf="leave.approvedBy || leave.approvedById">
           <div class="detail-label">{{ leave.status === 'REJECTED' ? 'Rejected By' : 'Approved By' }}</div>
-          <div class="detail-value">{{ leave.approvedBy?.employee?.firstName ? (leave.approvedBy.employee.firstName + ' ' + (leave.approvedBy.employee.lastName || '')) : (leave.approvedBy?.email || '—') }}</div>
+          <div class="detail-value" style="font-weight: 500; color: #334155; margin-top: 4px;">
+            {{ leave.approvedBy?.employee?.firstName ? (leave.approvedBy.employee.firstName + ' ' + (leave.approvedBy.employee.lastName || '')) : (leave.approvedBy?.email || '—') }}
+          </div>
         </div>
 
+        <!-- Attachment Link -->
         <div style="padding-top: 16px;" *ngIf="leave.attachmentUrl">
-          <div class="detail-label">Attachment</div>
-          <a [href]="leave.attachmentUrl" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #2563EB; font-weight: 600; text-decoration: none; margin-top: 4px;">
-            <svg lucidePaperclip size="14"></svg> View Attachment
+          <div class="detail-label">Attached Document</div>
+          <a [href]="leave.attachmentUrl" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #2563eb; font-weight: 600; text-decoration: none; margin-top: 6px; padding: 8px 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+            <svg lucidePaperclip size="15"></svg>
+            <span>View Attachment</span>
           </a>
         </div>
       </div>
 
-      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
-        <button class="btn btn-outline" (click)="closeLeaveDetail()" style="width: max-content;">Close</button>
+      <!-- Modal Footer with Quick Approval Actions -->
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding-top: 16px; border-top: 1px solid #f1f5f9;">
+        <button class="btn btn-outline" (click)="closeLeaveDetail()" style="width: max-content; height: 38px;">Close</button>
+        
+        <button *ngIf="leave.status === 'PENDING' && (isAdmin() || isManager())" 
+                class="btn btn-outline" 
+                (click)="closeLeaveDetail(); openRejectModal(leave.id)"
+                style="height: 38px; display: flex; align-items: center; gap: 6px; border-color: #fca5a5; color: #dc2626; background: #fff;">
+          <svg lucideX size="15"></svg>
+          Reject
+        </button>
+        
+        <button *ngIf="leave.status === 'PENDING' && (isAdmin() || isManager())" 
+                class="btn btn-primary" 
+                (click)="closeLeaveDetail(); approveLeaveRequest(leave.id)"
+                style="height: 38px; display: flex; align-items: center; gap: 6px; background: #16a34a; border-color: #16a34a; color: white; font-weight: 600;">
+          <svg lucideCheck size="16"></svg>
+          Approve Leave
+        </button>
       </div>
     </div>
   </div>
@@ -754,49 +1070,115 @@
         <div class="widget-header">
           <div>
             <h3 style="margin: 0; margin-bottom: 4px;">Assign Leave Balance</h3>
+            <p style="margin: 0; font-size: 13px; color: #64748b;">Allocate annual leave quotas to individual employees or bulk assign across the team</p>
           </div>
         </div>
         
         <div class="assign-form-container">
-          <div class="filter-group">
-            <label>Assignment Type</label>
-            <div style="display: flex; align-items: center; height: 38px;">
-              <input type="checkbox" [ngModel]="assignToAll()" (ngModelChange)="assignToAll.set($event)" id="assignAll" class="custom-checkbox" style="margin-right: 12px;">
-              <label for="assignAll" style="margin: 0; font-weight: 500; cursor: pointer;">All Employees</label>
+          <div class="filter-group" style="min-width: 140px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">Scope</label>
+            <div style="display: flex; align-items: center; height: 42px;">
+              <input type="checkbox" [ngModel]="assignToAll()" (ngModelChange)="assignToAll.set($event)" id="assignAll" class="custom-checkbox" style="margin-right: 10px; width: 17px; height: 17px; cursor: pointer; accent-color: #3b82f6;">
+              <label for="assignAll" style="margin: 0; font-weight: 600; font-size: 13.5px; cursor: pointer; color: #1e293b;">All Employees</label>
             </div>
           </div>
           
-          <div class="filter-group" *ngIf="!assignToAll()" style="flex: 1; min-width: 200px;">
-            <label>Employee</label>
-            <select class="form-control" [ngModel]="selectedEmployeeId()" (ngModelChange)="selectedEmployeeId.set($event)">
-              <option value="">Select Employee...</option>
-              <option *ngFor="let emp of employees()" [value]="emp.id">{{ emp.firstName }} {{ emp.lastName }}</option>
-            </select>
+          <!-- Searchable Employee Select -->
+          <div class="filter-group" *ngIf="!assignToAll()" style="flex: 1.5; min-width: 260px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">
+              Employee <span style="color: #ef4444;">*</span>
+            </label>
+            <app-searchable-select
+              [options]="employeeAssignOptions()"
+              placeholder="Search employee by name, ID..."
+              [value]="selectedEmployeeId()"
+              (valueChange)="selectedEmployeeId.set($event ? $event.toString() : '')"
+              [loading]="isLoadingEmployees()"
+              loadingText="Loading employees..."
+              [fullWidth]="true">
+            </app-searchable-select>
           </div>
 
-          <div class="filter-group" style="flex: 1; min-width: 200px;">
-            <label>Leave Type</label>
-            <select class="form-control" [ngModel]="selectedLeaveTypeId()" (ngModelChange)="selectedLeaveTypeId.set($event); onLeaveTypeSelect()">
-              <option value="">Select Leave Type...</option>
-              <option *ngFor="let type of leaveTypes()" [value]="type.id">{{ type.name }}</option>
-            </select>
+          <!-- Searchable Leave Type Select -->
+          <div class="filter-group" style="flex: 1.2; min-width: 220px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">
+              Leave Type <span style="color: #ef4444;">*</span>
+            </label>
+            <app-searchable-select
+              [options]="leaveTypeAssignOptions()"
+              placeholder="Select Leave Type..."
+              [value]="selectedLeaveTypeId()"
+              (valueChange)="onLeaveTypeAssignChange($event)"
+              [loading]="isLoadingBalances()"
+              loadingText="Loading leave types..."
+              [fullWidth]="true">
+            </app-searchable-select>
           </div>
 
-          <div class="filter-group" style="width: 120px;">
-            <label>Allocated Days</label>
-            <input type="number" class="form-control" [ngModel]="allocatedDays()" (ngModelChange)="allocatedDays.set($event)">
+          <div class="filter-group" style="width: 130px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">Allocated Days <span style="color: #ef4444;">*</span></label>
+            <input type="number" class="form-control" [ngModel]="allocatedDays()" (ngModelChange)="allocatedDays.set($event)" min="0" step="0.5" style="height: 42px;">
           </div>
 
-          <div class="filter-group" style="width: 100px;">
-            <label>Year</label>
-            <input type="number" class="form-control" [ngModel]="assignYear()" (ngModelChange)="assignYear.set($event)">
+          <div class="filter-group" style="width: 110px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">Year <span style="color: #ef4444;">*</span></label>
+            <input type="number" class="form-control" [ngModel]="assignYear()" (ngModelChange)="assignYear.set($event)" style="height: 42px;">
           </div>
 
           <div style="flex-shrink: 0;">
-            <button class="btn btn-primary" (click)="submitAssignBalance()" [disabled]="isAssigning()" style="height: 40px; padding: 0 20px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            <button class="btn btn-primary" (click)="submitAssignBalance()" [disabled]="isAssigning()" style="height: 42px; padding: 0 22px; font-weight: 600; display: flex; align-items: center; gap: 8px; border-radius: 8px;">
               <svg lucideCheck [size]="18" *ngIf="!isAssigning()"></svg>
               {{ isAssigning() ? 'Assigning...' : (assignToAll() ? 'Assign to All' : 'Assign Balance') }}
             </button>
+          </div>
+        </div>
+
+        <!-- Selected Employee Profile Card & Current Balances Preview -->
+        <div *ngIf="!assignToAll() && selectedAssignEmployee() as emp" class="assign-employee-profile-card">
+          <div class="profile-card-left">
+            <div class="profile-avatar-container">
+              <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" [alt]="emp.firstName" class="profile-avatar-img">
+              <div *ngIf="!emp.avatarUrl" class="profile-avatar-placeholder">
+                {{ (emp.firstName?.charAt(0) || '') + (emp.lastName?.charAt(0) || '') }}
+              </div>
+            </div>
+            <div class="profile-info-block">
+              <div class="profile-name-line">
+                <h4 class="profile-display-name">{{ emp.firstName }} {{ emp.lastName }}</h4>
+                <span *ngIf="emp.employeeCode" class="profile-chip code-chip">#{{ emp.employeeCode }}</span>
+                <span *ngIf="emp.user?.role" class="profile-chip role-chip">{{ emp.user?.role }}</span>
+              </div>
+              <div class="profile-meta-line">
+                <span *ngIf="emp.designation?.name" class="meta-tag">
+                  <svg lucideBriefcase size="13"></svg>
+                  <span>{{ emp.designation?.name }}</span>
+                </span>
+                <span *ngIf="emp.department?.name" class="meta-tag">
+                  <svg lucideBuilding size="13"></svg>
+                  <span>{{ emp.department?.name }}</span>
+                </span>
+                <span *ngIf="emp.user?.email || emp.email" class="meta-tag">
+                  <svg lucideMail size="13"></svg>
+                  <span>{{ emp.user?.email || emp.email }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-card-right">
+            <div class="balances-summary-title">
+              <span>{{ assignYear() }} Current Leave Balances</span>
+            </div>
+            <div class="balances-badges-list" *ngIf="selectedEmployeeCurrentBalances().length > 0">
+              <div *ngFor="let b of selectedEmployeeCurrentBalances()" class="existing-balance-chip">
+                <span class="type-name">{{ b.leaveType?.name }}:</span>
+                <span class="days-remaining">{{ b.allocated - b.used }} left</span>
+                <span class="days-total">({{ b.allocated }} total)</span>
+              </div>
+            </div>
+            <div class="no-existing-balances" *ngIf="selectedEmployeeCurrentBalances().length === 0">
+              <span>No leave balances assigned for {{ assignYear() }} yet</span>
+            </div>
           </div>
         </div>
       </div>
@@ -807,7 +1189,36 @@
           <h3>Employee Leave Balances</h3>
         </div>
         
-        <div class="table-container mt-4">
+        <!-- Skeleton Loader for Employee Leave Balances -->
+        <div class="table-container mt-4" *ngIf="isLoadingBalances()">
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: white;">
+            <!-- Header row -->
+            <div style="display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr 1.2fr; gap: 16px; padding: 14px 18px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; align-items: center;">
+              <app-skeleton width="90px" height="12px"></app-skeleton>
+              <app-skeleton width="80px" height="12px"></app-skeleton>
+              <app-skeleton width="80px" height="12px"></app-skeleton>
+              <app-skeleton width="80px" height="12px"></app-skeleton>
+              <app-skeleton width="80px" height="12px"></app-skeleton>
+            </div>
+            <!-- Data rows (5 rows) -->
+            <div *ngFor="let i of [1, 2, 3, 4, 5]" style="display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr 1.2fr; gap: 16px; padding: 14px 18px; border-bottom: 1px solid #f1f5f9; align-items: center;">
+              <!-- Employee cell (avatar + name + dept) -->
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <app-skeleton width="34px" height="34px" [circle]="true"></app-skeleton>
+                <div style="display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0;">
+                  <app-skeleton [width]="i % 2 === 0 ? '110px' : '130px'" height="13px"></app-skeleton>
+                  <app-skeleton [width]="i % 2 === 0 ? '70px' : '90px'" height="10px"></app-skeleton>
+                </div>
+              </div>
+              <div><app-skeleton width="60px" height="18px" radius="6px"></app-skeleton></div>
+              <div><app-skeleton width="60px" height="18px" radius="6px"></app-skeleton></div>
+              <div><app-skeleton width="60px" height="18px" radius="6px"></app-skeleton></div>
+              <div><app-skeleton width="60px" height="18px" radius="6px"></app-skeleton></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-container mt-4" *ngIf="!isLoadingBalances()">
           <ag-grid-angular
             class="ag-theme-quartz"
             [theme]="'legacy'"
@@ -909,8 +1320,20 @@
 
   <!-- HOLIDAYS TAB -->
   <div class="tab-content" *ngIf="activeTab() === 'holidays'">
-    <!-- KPI Summary Row -->
-    <div class="kpi-grid mb-4">
+    <!-- KPI Summary Row Skeleton -->
+    <div class="kpi-grid mb-4" *ngIf="isLoadingHolidays()">
+      <div class="kpi-card" *ngFor="let k of [1, 2, 3]">
+        <app-skeleton width="48px" height="48px" radius="12px"></app-skeleton>
+        <div class="kpi-info" style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
+          <app-skeleton width="120px" height="12px"></app-skeleton>
+          <app-skeleton width="60px" height="24px" radius="4px"></app-skeleton>
+          <app-skeleton width="140px" height="11px"></app-skeleton>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI Summary Row Data -->
+    <div class="kpi-grid mb-4" *ngIf="!isLoadingHolidays()">
       <div class="kpi-card">
         <div class="kpi-icon bg-blue">
           <svg lucideCalendar size="20"></svg>
@@ -989,41 +1412,62 @@
 
       <!-- CARDS VIEW -->
       <ng-container *ngIf="holidayViewMode() === 'cards'">
-        <!-- Empty State -->
-        <div *ngIf="filteredHolidays().length === 0" style="text-align: center; padding: 48px 24px; background: #F8FAFC; border-radius: 12px; border: 1px dashed #CBD5E1;">
-          <svg lucideCalendar size="48" style="color: #94A3B8; margin-bottom: 12px;"></svg>
-          <h4 style="margin: 0 0 4px 0; color: #1E293B; font-size: 16px; font-weight: 600;">No Holidays Found for {{ selectedHolidayYear() }}</h4>
-          <p style="margin: 0; color: #64748B; font-size: 13px;">No company holidays have been scheduled for this year yet.</p>
-        </div>
-
-        <!-- Holidays Grid Cards -->
-        <div class="holidays-grid" *ngIf="filteredHolidays().length > 0">
-          <div class="holiday-card" *ngFor="let h of filteredHolidays()" [class.is-past]="getHolidayStatus(h.date).class === 'status-past'" [class.is-today]="getHolidayStatus(h.date).class === 'status-today'">
-            <div class="holiday-date-badge">
-              <span class="badge-day">{{ h.date | date:'dd' }}</span>
-              <span class="badge-month">{{ h.date | date:'MMM' }}</span>
+        <!-- Skeleton Loader for Holiday Cards -->
+        <div class="holidays-grid" *ngIf="isLoadingHolidays()">
+          <div class="holiday-card" *ngFor="let s of [1, 2, 3, 4, 5, 6]" style="pointer-events: none;">
+            <div class="holiday-date-badge" style="background: #f1f5f9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;">
+              <app-skeleton width="28px" height="18px" radius="4px"></app-skeleton>
+              <app-skeleton width="24px" height="10px" radius="3px"></app-skeleton>
             </div>
 
-            <div class="holiday-details">
-              <h4 class="holiday-name">{{ h.name }}</h4>
-              <span class="holiday-weekday">{{ h.date | date:'EEEE, yyyy' }}</span>
+            <div class="holiday-details" style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+              <app-skeleton [width]="s % 2 === 0 ? '140px' : '175px'" height="16px" radius="4px"></app-skeleton>
+              <app-skeleton width="110px" height="12px" radius="4px"></app-skeleton>
             </div>
 
             <div class="holiday-actions">
-              <span class="status-pill" [ngClass]="getHolidayStatus(h.date).class">
-                {{ getHolidayStatus(h.date).label }}
-              </span>
-              <div class="admin-buttons" *ngIf="isAdmin()">
-                <button class="icon-btn-sm" (click)="openEditHolidayModal(h)" title="Edit Holiday">
-                  <svg lucideEdit size="14"></svg>
-                </button>
-                <button class="icon-btn-sm danger" (click)="deleteHoliday(h.id)" title="Delete Holiday">
-                  <svg lucideTrash2 size="14"></svg>
-                </button>
-              </div>
+              <app-skeleton width="72px" height="24px" radius="12px"></app-skeleton>
             </div>
           </div>
         </div>
+
+        <ng-container *ngIf="!isLoadingHolidays()">
+          <!-- Empty State -->
+          <div *ngIf="filteredHolidays().length === 0" style="text-align: center; padding: 48px 24px; background: #F8FAFC; border-radius: 12px; border: 1px dashed #CBD5E1;">
+            <svg lucideCalendar size="48" style="color: #94A3B8; margin-bottom: 12px;"></svg>
+            <h4 style="margin: 0 0 4px 0; color: #1E293B; font-size: 16px; font-weight: 600;">No Holidays Found for {{ selectedHolidayYear() }}</h4>
+            <p style="margin: 0; color: #64748B; font-size: 13px;">No company holidays have been scheduled for this year yet.</p>
+          </div>
+
+          <!-- Holidays Grid Cards -->
+          <div class="holidays-grid" *ngIf="filteredHolidays().length > 0">
+            <div class="holiday-card" *ngFor="let h of filteredHolidays()" [class.is-past]="getHolidayStatus(h.date).class === 'status-past'" [class.is-today]="getHolidayStatus(h.date).class === 'status-today'">
+              <div class="holiday-date-badge">
+                <span class="badge-day">{{ h.date | date:'dd' }}</span>
+                <span class="badge-month">{{ h.date | date:'MMM' }}</span>
+              </div>
+
+              <div class="holiday-details">
+                <h4 class="holiday-name">{{ h.name }}</h4>
+                <span class="holiday-weekday">{{ h.date | date:'EEEE, yyyy' }}</span>
+              </div>
+
+              <div class="holiday-actions">
+                <span class="status-pill" [ngClass]="getHolidayStatus(h.date).class">
+                  {{ getHolidayStatus(h.date).label }}
+                </span>
+                <div class="admin-buttons" *ngIf="isAdmin()">
+                  <button class="icon-btn-sm" (click)="openEditHolidayModal(h)" title="Edit Holiday">
+                    <svg lucideEdit size="14"></svg>
+                  </button>
+                  <button class="icon-btn-sm danger" (click)="deleteHoliday(h.id)" title="Delete Holiday">
+                    <svg lucideTrash2 size="14"></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
       </ng-container>
 
       <!-- CALENDAR VIEW -->

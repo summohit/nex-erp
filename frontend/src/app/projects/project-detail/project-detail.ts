@@ -6,7 +6,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
-import { ProjectsService, ProjectSummary, TimesheetGraph } from '../../services/projects';
+import { ProjectsService, ProjectSummary, TimesheetGraph, ScopeRequest } from '../../services/projects';
+import { UploadService } from '../../services/upload.service';
 import { MilestonesTabComponent } from '../milestones/milestones-tab';
 import { TicketsTabComponent } from '../tickets/tickets-tab';
 import { BudgetRequestsTabComponent } from '../budget-requests/budget-requests-tab';
@@ -15,7 +16,7 @@ import { DiscussionsTabComponent } from '../discussions/discussions-tab';
 import { FieldVisitsService, FieldVisit } from '../../services/field-visits';
 import { 
   LucideLayoutDashboard, LucideKanban,
-  LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare,
+  LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare, LucideWrench,
   LucideZap, LucideSparkles, LucideFilter, LucideStar, LucideShare2, LucideMoreHorizontal,
   LucideInbox, LucideCalendar, LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideChevronsLeft, LucideChevronsRight,
   LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
@@ -28,12 +29,15 @@ import {
   LucidePrinter, LucideTimer, LucideLayoutTemplate, LucideTrendingUp, LucideActivity, LucideArrowRight, LucideListTree,
   LucideFileUp, LucideUpload, LucideUploadCloud,
   LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle,
-  LucideCheckCircle2, LucideBuilding, LucideFolder, LucideBanknote, LucideHistory
+  LucideCheckCircle2, LucideBuilding, LucideFolder, LucideBanknote, LucideHistory,
+  LucideAlertCircle, LucideHelpCircle, LucideArrowUpDown, LucideInfo
 } from '@lucide/angular';
 import { AuthService } from '../../services/auth.service';
 import { SocketService } from '../../services/socket.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { MasterDataService } from '../../services/master-data.service';
+import { DialogService } from '../../shared/services/dialog.service';
+import { DialogHostComponent } from '../../shared/components/dialog-host/dialog-host.component';
 
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -52,7 +56,13 @@ declare var Quill: any;
     TicketsTabComponent, BudgetRequestsTabComponent, DiscussionsTabComponent,
     TaskHoursRequestPanelComponent,
     LucideLayoutDashboard, LucideKanban,
-    LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare,
+    // §PB-Fix: this route is NOT a child of main-layout, so the dialog host
+    // that layout renders is not on the page. DialogService would set its state
+    // and nothing would draw it — leaving every `await dialog.confirm()` hanging
+    // forever, which is exactly how Approve appeared to do nothing at all.
+    // pos.html and quotations.html carry their own host for the same reason.
+    DialogHostComponent,
+    LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare, LucideWrench,
     LucideZap, LucideSparkles, LucideFilter, LucideStar, LucideShare2, LucideMoreHorizontal,
     LucideInbox, LucideCalendar, LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideChevronsLeft, LucideChevronsRight,
     LucideArrowLeft, LucideEdit2, LucidePencil, LucideImage,
@@ -66,7 +76,8 @@ declare var Quill: any;
     LucideMapPin, LucideRuler, LucideNavigation, LucideCamera, LucideCheckCircle, LucideXCircle,
     LucideCheckCircle2, LucideBuilding, LucideFolder, LucideBanknote, LucideHistory,
     AgGridAngular,
-    LucideFileCheck
+    LucideFileCheck,
+    LucideAlertCircle, LucideHelpCircle, LucideArrowUpDown, LucideInfo
   ],
   templateUrl: './project-detail.html',
   styleUrls: ['./project-detail.css'],
@@ -77,6 +88,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   private roles = inject(RoleService);
   private router = inject(Router);
   private projectsService = inject(ProjectsService);
+  private uploadService = inject(UploadService);
   private authService = inject(AuthService);
   private toast = inject(HotToastService);
   private sanitizer = inject(DomSanitizer);
@@ -84,6 +96,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   private fieldVisitsService = inject(FieldVisitsService);
   private http = inject(HttpClient);
   private masterDataService = inject(MasterDataService);
+  private dialog = inject(DialogService);
 
   Math = Math;
   paginationPageSizeSelector = [10, 25, 50, 100];
@@ -1406,7 +1419,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
     const col = this.columns()[0];
     if (!col) {
-      this.toast.error('No lists in board to create task');
+      this.toast.error('No columns in board to create task');
       return;
     }
 
@@ -1807,6 +1820,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         // Counts for the tab strip: three numbers in one call, so the tabs
         // that own their own data can still show a badge without loading it.
         this.loadTabCounts();
+        // Scope & decision requests
+        this.loadScopeRequests();
         // §8: and by the Phase pickers on the task modal and the inline add,
         // both of which render only when there are phases to offer. This was
         // being called after an edit instead of on load, so the list was
@@ -1827,7 +1842,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         // just run. Summary and field visits are the exception — nothing has
         // fetched those yet, so they still need their own call.
         const savedTab = localStorage.getItem('project_active_tab') || 'board';
-        const needsOwnFetch = ['summary', 'reports', 'field-visits', 'archived', 'discussions'].includes(savedTab);
+        const needsOwnFetch = ['summary', 'reports', 'field-visits', 'archived', 'discussions', 'requests'].includes(savedTab);
         this.setProjectTab(savedTab, needsOwnFetch);
       }
     });
@@ -1877,6 +1892,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         break;
       case 'field-visits':
         this.loadFieldVisits();
+        break;
+      case 'requests':
+        this.loadScopeRequests();
         break;
       case 'board':
       case 'list':
@@ -2442,27 +2460,27 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         // Reset form
         this.isAddingColumn.set(false);
         this.newColumnName.set('');
-        this.toast.success('List created');
+        this.toast.success('Column created');
       },
-      error: () => this.toast.error('Failed to create list')
+      error: () => this.toast.error('Failed to create column')
     });
   }
 
   loadArchivedColumns() {
     this.projectsService.getArchivedBoardColumns(this.projectId).subscribe({
       next: (cols) => this.archivedColumns.set(cols),
-      error: () => this.toast.error('Failed to load archived lists')
+      error: () => this.toast.error('Failed to load archived columns')
     });
   }
 
   unarchiveColumn(columnId: number) {
     this.projectsService.unarchiveBoardColumn(this.projectId, columnId).subscribe({
       next: () => {
-        this.toast.success('List unarchived');
+        this.toast.success('Column unarchived');
         this.loadArchivedColumns();
         this.loadBoardAndIssues();
       },
-      error: () => this.toast.error('Failed to unarchive list')
+      error: () => this.toast.error('Failed to unarchive column')
     });
   }
 
@@ -2492,10 +2510,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       next: () => {
         this.columns.update(cols => cols.map(c => c.id === col.id ? { ...c, name: newName } : c));
         this.editingColumnId.set(null);
-        this.toast.success('List renamed');
+        this.toast.success('Column renamed');
       },
       error: (err) => {
-        this.toast.error(err.error?.message || 'Failed to rename list');
+        this.toast.error(err.error?.message || 'Failed to rename column');
         this.editingColumnId.set(null);
       }
     });
@@ -2509,7 +2527,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         );
         this.activeColumnPopoverId.set(null);
       },
-      error: () => this.toast.error('Failed to update list color')
+      error: () => this.toast.error('Failed to update column color')
     });
   }
 
@@ -2517,7 +2535,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     const col = this.columns().find(c => c.id === columnId);
     if (!col) return;
     
-    if (!confirm('Are you sure you want to archive this list? Any cards inside will be moved to the backlog.')) return;
+    if (!confirm('Are you sure you want to archive this column? Any cards inside will be moved to the backlog.')) return;
     
     this.projectsService.deleteBoardColumn(this.projectId, columnId).subscribe({
       next: () => {
@@ -2528,11 +2546,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
           return newMap;
         });
         this.activeColumnPopoverId.set(null);
-        this.toast.success('List archived');
+        this.toast.success('Column archived');
         this.loadBoardAndIssues();
       },
       error: (err) => {
-        this.toast.error(err.error?.message || 'Failed to archive list');
+        this.toast.error(err.error?.message || 'Failed to archive column');
         this.activeColumnPopoverId.set(null);
       }
     });
@@ -2558,7 +2576,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   toggleFilterNoLabels() { this.filterNoLabels.set(!this.filterNoLabels()); }
 
   getColumnName(columnId: string | number | null): string {
-    if (!columnId) return 'Select List';
+    if (!columnId) return 'Select Column';
     const numId = Number(columnId);
     const col = this.columns().find(c => c.id === numId);
     return col ? col.name : 'Unknown';
@@ -2794,7 +2812,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     const columnIds = cols.map(c => c.id);
     this.projectsService.reorderBoardColumns(this.projectId, columnIds).subscribe({
       error: () => {
-        this.toast.error('Failed to reorder lists');
+        this.toast.error('Failed to reorder columns');
         this.loadBoardAndIssues(); // Revert
       }
     });
@@ -2937,6 +2955,496 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     };
     this.isDrawerOpen.set(true);
     setTimeout(() => this.initQuill(), 100);
+  }
+
+  // ── Scope ("Fix") requests ────────────────────────────────────────────────
+
+  @ViewChild('scopeQuillContainer') scopeQuillContainer!: ElementRef;
+  private scopeQuill: any = null;
+
+  scopeRequests = signal<ScopeRequest[]>([]);
+  isScopeLoading = signal(false);
+  isScopeModalOpen = signal(false);
+  isSavingScope = signal(false);
+  scopeUploading = signal(false);
+  scopeForm: {
+    title: string;
+    scope: string;
+    attachments: { url: string; name: string; sizeBytes?: number }[];
+  } = { title: '', scope: 'OUT_OF_SCOPE', attachments: [] };
+
+  // Filter & Search state for Scope Requests
+  scopeSearchQuery = signal<string>('');
+  scopeFilterStatus = signal<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  scopeFilterType = signal<'ALL' | 'OUT_OF_SCOPE' | 'IN_SCOPE'>('ALL');
+  scopeSortOrder = signal<'NEWEST' | 'OLDEST'>('NEWEST');
+
+  // KPI Metrics / Counts
+  pendingScopeCount = computed(() => this.scopeRequests().filter(r => r.status === 'PENDING').length);
+  approvedScopeCount = computed(() => this.scopeRequests().filter(r => r.status === 'APPROVED').length);
+  rejectedScopeCount = computed(() => this.scopeRequests().filter(r => r.status === 'REJECTED').length);
+  outOfScopeCount = computed(() => this.scopeRequests().filter(r => r.scope === 'OUT_OF_SCOPE').length);
+  inScopeCount = computed(() => this.scopeRequests().filter(r => r.scope === 'IN_SCOPE').length);
+
+  // Filtered and Sorted Scope Requests list
+  filteredScopeRequests = computed(() => {
+    let list = [...this.scopeRequests()];
+    const query = this.scopeSearchQuery().trim().toLowerCase();
+    const status = this.scopeFilterStatus();
+    const type = this.scopeFilterType();
+    const sort = this.scopeSortOrder();
+
+    if (status !== 'ALL') {
+      list = list.filter(r => r.status === status);
+    }
+
+    if (type !== 'ALL') {
+      list = list.filter(r => r.scope === type);
+    }
+
+    if (query) {
+      list = list.filter(r => {
+        const titleMatch = r.title?.toLowerCase().includes(query) || false;
+        const bodyMatch = r.body?.toLowerCase().includes(query) || false;
+        const authorName = `${r.raisedBy?.firstName ?? ''} ${r.raisedBy?.lastName ?? ''}`.trim().toLowerCase();
+        const userMatch = authorName.includes(query);
+        const noteMatch = r.decisionNote?.toLowerCase().includes(query) || false;
+        return titleMatch || bodyMatch || userMatch || noteMatch;
+      });
+    }
+
+    list.sort((a, b) => {
+      const timeA = new Date(a.createdAt).getTime() || 0;
+      const timeB = new Date(b.createdAt).getTime() || 0;
+      return sort === 'NEWEST' ? timeB - timeA : timeA - timeB;
+    });
+
+    return list;
+  });
+
+  setScopeStatusFilter(status: 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED') {
+    this.scopeFilterStatus.set(status);
+  }
+
+  setScopeTypeFilter(type: 'ALL' | 'OUT_OF_SCOPE' | 'IN_SCOPE') {
+    this.scopeFilterType.set(type);
+  }
+
+  toggleScopeSortOrder() {
+    this.scopeSortOrder.update(s => s === 'NEWEST' ? 'OLDEST' : 'NEWEST');
+  }
+
+  resetScopeFilters() {
+    this.scopeSearchQuery.set('');
+    this.scopeFilterStatus.set('ALL');
+    this.scopeFilterType.set('ALL');
+    this.scopeSortOrder.set('NEWEST');
+  }
+
+  getScopeUserInitials(user?: { firstName?: string; lastName?: string } | null): string {
+    if (!user) return '?';
+    const f = user.firstName?.[0] ?? '';
+    const l = user.lastName?.[0] ?? '';
+    return (f + l).toUpperCase() || '?';
+  }
+
+  getScopeAvatarColor(name?: string | null): string {
+    if (!name) return '#6366f1';
+    const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f97316', '#10b981', '#06b6d4', '#3b82f6'];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  getScopeRelativeTime(dateStr?: string | null): string {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+    const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (diffSec < 60) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  setScopeFormType(type: 'OUT_OF_SCOPE' | 'IN_SCOPE') {
+    this.scopeForm.scope = type;
+  }
+
+  /** Only an administrator decides these; the server enforces it too. */
+  get canDecideScopeRequests(): boolean {
+    const role = this.currentUser()?.role;
+    return role === 'SUPERADMIN' || role === 'ADMIN';
+  }
+
+  loadScopeRequests() {
+    if (!this.projectId) return;
+    this.isScopeLoading.set(true);
+    this.projectsService.getScopeRequests(this.projectId).subscribe({
+      next: (rows) => {
+        this.scopeRequests.set(rows || []);
+        this.isScopeLoading.set(false);
+      },
+      error: () => {
+        this.scopeRequests.set([]);
+        this.isScopeLoading.set(false);
+      },
+    });
+  }
+
+  openScopeRequest() {
+    this.scopeForm = { title: '', scope: 'OUT_OF_SCOPE', attachments: [] };
+    this.isScopeModalOpen.set(true);
+    // Same retry dance as the description editor: the container does not exist
+    // until the modal has rendered.
+    setTimeout(() => this.initScopeQuill(), 100);
+  }
+
+  closeScopeRequest() {
+    this.isScopeModalOpen.set(false);
+    this.scopeQuill = null;
+  }
+
+  private initScopeQuill(retry = 0) {
+    if (!this.scopeQuillContainer?.nativeElement || typeof Quill === 'undefined') {
+      if (retry < 15) setTimeout(() => this.initScopeQuill(retry + 1), 100);
+      return;
+    }
+    this.scopeQuillContainer.nativeElement.innerHTML = '';
+    this.scopeQuill = new Quill(this.scopeQuillContainer.nativeElement, {
+      theme: 'snow',
+      placeholder: 'What needs deciding, and why?',
+      modules: {
+        toolbar: [
+          [{ header: [1, 2, 3, false] }],
+          ['bold', 'italic', 'underline'],
+          ['link', 'blockquote', 'code-block'],
+          [{ list: 'ordered' }, { list: 'bullet' }],
+          ['clean'],
+        ],
+      },
+    });
+  }
+
+  onScopeFilesPicked(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (!files.length) return;
+
+    this.scopeUploading.set(true);
+    let remaining = files.length;
+
+    for (const file of files) {
+      this.uploadService.uploadFile(file).subscribe({
+        next: (res: any) => {
+          const url = res?.url ?? res?.path ?? null;
+          if (url) {
+            this.scopeForm.attachments = [
+              ...this.scopeForm.attachments,
+              { url, name: file.name, sizeBytes: file.size },
+            ];
+          }
+          if (--remaining === 0) this.scopeUploading.set(false);
+        },
+        error: () => {
+          // Named, not a generic failure: with several files going up at once
+          // "upload failed" does not say which one to try again.
+          this.toast.error(`Could not upload ${file.name}`);
+          if (--remaining === 0) this.scopeUploading.set(false);
+        },
+      });
+    }
+  }
+
+  removeScopeAttachment(url: string) {
+    this.scopeForm.attachments = this.scopeForm.attachments.filter((a) => a.url !== url);
+  }
+
+  submitScopeRequest() {
+    if (!this.projectId || this.isSavingScope()) return;
+
+    const title = this.scopeForm.title.trim();
+    if (!title) { this.toast.error('Give the request a title'); return; }
+
+    const body = this.scopeQuill?.root?.innerHTML ?? '';
+    // Quill leaves this behind when the editor is cleared, so an "empty" body
+    // is not an empty string.
+    if (!body || body === '<p><br></p>') { this.toast.error('Describe what needs deciding'); return; }
+
+    this.isSavingScope.set(true);
+    this.projectsService.createScopeRequest(this.projectId, {
+      title, scope: this.scopeForm.scope, body,
+      attachments: this.scopeForm.attachments,
+    }).subscribe({
+      next: () => {
+        this.isSavingScope.set(false);
+        this.closeScopeRequest();
+        this.toast.success('Request raised — an administrator will decide it');
+        this.loadScopeRequests();
+      },
+      error: (err) => {
+        this.isSavingScope.set(false);
+        this.toast.error(err?.error?.message || 'Could not raise that request');
+      },
+    });
+  }
+
+  async decideScopeRequest(request: ScopeRequest, decision: 'APPROVED' | 'REJECTED') {
+    let note: string | undefined;
+    if (decision === 'REJECTED') {
+      const typed = await this.dialog.prompt(
+        `Why is "${request.title}" being rejected? An explanation will be shared with the team.`,
+        'Reject Scope Request',
+        { placeholder: 'e.g. Requires separate contract amendment or not feasible in current sprint', confirmLabel: 'Reject Request', cancelLabel: 'Cancel', required: true }
+      );
+      if (typed === null || !typed.trim()) return;
+      note = typed.trim();
+    } else {
+      const confirmed = await this.dialog.confirm(
+        `Are you sure you want to approve "${request.title}"? This will formally record the approval.`,
+        'Approve Scope Request',
+        'Approve',
+        'Cancel'
+      );
+      if (!confirmed) return;
+    }
+
+    this.projectsService.reviewScopeRequest(request.id, decision, note).subscribe({
+      next: () => {
+        this.toast.success(decision === 'APPROVED' ? 'Request approved successfully' : 'Request rejected');
+        this.loadScopeRequests();
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not record that decision'),
+    });
+  }
+
+  scopeLabel(scope: string): string {
+    return scope === 'OUT_OF_SCOPE' ? 'Out of scope' : 'In scope';
+  }
+
+  // ── §Tasks2: duplicate a task ─────────────────────────────────────────────
+
+  isDuplicateOpen = signal(false);
+  isDuplicating = signal(false);
+  duplicateForm: {
+    title: string; startDate: string; dueDate: string;
+    priority: string; estimatedHours: number | null;
+    assigneeIds: number[]; includeChecklists: boolean;
+  } = {
+    title: '', startDate: '', dueDate: '',
+    priority: 'MEDIUM', estimatedHours: null,
+    assigneeIds: [], includeChecklists: true,
+  };
+
+  duplicateMemberSearch = signal('');
+
+  /** Who the copy can be assigned to — the project's own members. */
+  projectMembersForPicker(): {
+    id: number;
+    name: string;
+    avatarUrl?: string;
+    initials: string;
+    color: string;
+    role?: string;
+  }[] {
+    const members = this.project()?.members ?? [];
+    return members
+      .map((m: any) => {
+        const e = m.employee ?? m;
+        const id = e.id ?? m.employeeId;
+        const name = `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim() || `Employee ${id}`;
+        return {
+          id,
+          name,
+          avatarUrl: e.avatarUrl,
+          initials: this.getMemberInitials(e),
+          color: this.getMemberColor(e),
+          role: e.designation?.name || m.role || '',
+        };
+      })
+      .filter((m: any) => m.id != null);
+  }
+
+  get filteredDuplicateMembers() {
+    const q = this.duplicateMemberSearch().toLowerCase().trim();
+    const members = this.projectMembersForPicker();
+    if (!q) return members;
+    return members.filter(m =>
+      m.name.toLowerCase().includes(q) ||
+      (m.role && m.role.toLowerCase().includes(q))
+    );
+  }
+
+  isDuplicateAssigneeSelected(id: number): boolean {
+    return this.duplicateForm.assigneeIds.includes(id);
+  }
+
+  toggleDuplicateAssignee(id: number) {
+    if (this.duplicateForm.assigneeIds.includes(id)) {
+      this.duplicateForm.assigneeIds = this.duplicateForm.assigneeIds.filter(x => x !== id);
+    } else {
+      this.duplicateForm.assigneeIds = [...this.duplicateForm.assigneeIds, id];
+    }
+  }
+
+  clearDuplicateAssignees() {
+    this.duplicateForm.assigneeIds = [];
+  }
+
+  selectAllDuplicateAssignees() {
+    this.duplicateForm.assigneeIds = this.projectMembersForPicker().map(m => m.id);
+  }
+
+  openDuplicateTask() {
+    const issue = this.selectedIssue();
+    if (!issue) return;
+
+    this.duplicateMemberSearch.set('');
+    // Dates deliberately blank rather than copied. A duplicate is nearly always
+    // the same work on a new schedule, and carrying the original's dates over
+    // silently creates something already overdue.
+    this.duplicateForm = {
+      title: `Copy of ${issue.title || ''}`.trim(),
+      startDate: '',
+      dueDate: '',
+      priority: issue.priority || 'MEDIUM',
+      estimatedHours: issue.estimatedHours ?? null,
+      assigneeIds: [],
+      includeChecklists: true,
+    };
+    this.isDuplicateOpen.set(true);
+  }
+
+  closeDuplicateTask() {
+    this.isDuplicateOpen.set(false);
+  }
+
+  submitDuplicateTask() {
+    const issue = this.selectedIssue();
+    if (!issue || !this.projectId || this.isDuplicating()) return;
+
+    const title = this.duplicateForm.title.trim();
+    if (!title) { this.toast.error('Give the copy a title'); return; }
+
+    this.isDuplicating.set(true);
+    this.projectsService.duplicateIssue(this.projectId, issue.id, {
+      title,
+      assigneeIds: this.duplicateForm.assigneeIds,
+      startDate: this.duplicateForm.startDate || null,
+      dueDate: this.duplicateForm.dueDate || null,
+      priority: this.duplicateForm.priority,
+      estimatedHours: this.duplicateForm.estimatedHours,
+      includeChecklists: this.duplicateForm.includeChecklists,
+    }).subscribe({
+      next: (created: any) => {
+        this.isDuplicating.set(false);
+        this.closeDuplicateTask();
+        this.toast.success(
+          created?.approvalState
+            ? `${created.key} created — it needs approval before work starts`
+            : `${created?.key || 'Copy'} created`,
+        );
+        this.closeDrawer();
+        this.loadBoardAndIssues();
+      },
+      error: (err) => {
+        this.isDuplicating.set(false);
+        this.toast.error(err?.error?.message || 'Could not duplicate that task');
+      },
+    });
+  }
+
+  // ── §PB8: task approval ───────────────────────────────────────────────────
+
+  /** Waiting on somebody, so visible but not yet work. */
+  isAwaitingApproval(issue: any): boolean {
+    return issue?.approvalState === 'PENDING_TECHNICAL'
+      || issue?.approvalState === 'PENDING_ADMIN';
+  }
+
+  /** What the card says, so a locked task explains itself. */
+  approvalLabel(issue: any): string {
+    if (issue?.approvalState === 'PENDING_TECHNICAL') return 'Awaiting technical approval';
+    if (issue?.approvalState === 'PENDING_ADMIN') return 'Awaiting admin approval';
+    if (issue?.approvalState === 'REJECTED') return 'Rejected';
+    return '';
+  }
+
+  /**
+   * Whether to offer this person the decision.
+   *
+   * Mirrors the server: the architect answers the technical step, an
+   * administrator either step. The server decides for real — this only keeps
+   * buttons off screens where pressing them would 403.
+   */
+  canDecideApproval(issue: any): boolean {
+    if (!this.isAwaitingApproval(issue)) return false;
+    const role = this.currentUser()?.role;
+    if (role === 'SUPERADMIN' || role === 'ADMIN') return true;
+    if (issue.approvalState !== 'PENDING_TECHNICAL') return false;
+    return this.isCurrentUserProjectRole('TECHNICAL_ARCHITECT');
+  }
+
+  private isCurrentUserProjectRole(projectRole: string): boolean {
+    const user = this.currentUser();
+    const p = this.project();
+    if (!user || !p?.members) return false;
+    const empId = user.employeeId ?? user.employee?.id ?? user.id;
+    return p.members.some(
+      (m: any) => (m.employeeId === empId || m.employee?.id === empId) && m.role === projectRole,
+    );
+  }
+
+  /** Refused, and now the manager's move. */
+  isRejectedApproval(issue: any): boolean {
+    return issue?.approvalState === 'REJECTED';
+  }
+
+  /**
+   * §PB8: send a refused task back after changing it.
+   *
+   * Offered to whoever raised it and to anyone who can manage the project —
+   * the server enforces the same, and restarts it at the technical step
+   * because the task being approved is no longer the one that was refused.
+   */
+  async resubmitIssueForApproval(issue: any) {
+    if (!this.projectId) return;
+    const ok = await this.dialog.confirm(
+      `Send "${issue.title}" back for approval? It starts again from technical review.`,
+      'Resubmit for Approval', 'Send for approval', 'Cancel',
+    );
+    if (!ok) return;
+
+    this.projectsService.resubmitIssueForApproval(this.projectId, issue.id).subscribe({
+      next: () => {
+        this.toast.success('Sent back for approval');
+        this.loadBoardAndIssues();
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not resubmit that task'),
+    });
+  }
+
+  decideIssueApproval(issue: any, action: 'APPROVE' | 'REJECT') {
+    if (!this.projectId) return;
+    let reason: string | undefined;
+    if (action === 'REJECT') {
+      const typed = prompt(`Why is "${issue.title}" being rejected?`);
+      if (!typed || !typed.trim()) return;
+      reason = typed.trim();
+    }
+
+    this.projectsService.reviewIssueApproval(this.projectId, issue.id, action, reason).subscribe({
+      next: () => {
+        this.toast.success(action === 'APPROVE' ? 'Task approved' : 'Task rejected');
+        this.loadBoardAndIssues();
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not record that decision'),
+    });
   }
 
   socketSubscriptions: any[] = [];
@@ -3330,6 +3838,41 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
    * with no estimate is unbounded, not a task with zero hours left, so it
    * reads as a dash rather than an alarming red 0.
    */
+  /**
+   * How a task is doing against the hours it was given.
+   *
+   * One helper for the table and the board, so a card and its row cannot
+   * disagree about whether a task is over. `assigned` already includes any
+   * approved additional hours, so "over" means over the raised ceiling, not
+   * over the original estimate — a task whose extension was granted is not
+   * still failing against the number it replaced.
+   */
+  taskBudget(issue: any): {
+    percent: number | null;
+    state: 'none' | 'ok' | 'raised' | 'over';
+    extra: number;
+  } {
+    const { assigned, logged } = this.listTaskHours(issue);
+    const extra = issue?.additionalHours || 0;
+
+    // No estimate means no ceiling to be over. Silence is the honest answer.
+    if (assigned == null || assigned <= 0) return { percent: null, state: 'none', extra };
+
+    const percent = Math.round((logged / assigned) * 100);
+
+    // Over wins over raised: both can be true, and "this has run out" is the
+    // more urgent of the two.
+    if (logged > assigned) return { percent, state: 'over', extra };
+    if (extra > 0) return { percent, state: 'raised', extra };
+    return { percent, state: 'ok', extra };
+  }
+
+  /** The class the board card uses; the table builds its own inline styles. */
+  taskBudgetClass(issue: any): string {
+    const state = this.taskBudget(issue).state;
+    return state === 'over' ? 'budget-over' : state === 'raised' ? 'budget-raised' : '';
+  }
+
   listTaskHours(issue: any): { assigned: number | null; logged: number; remaining: number | null } {
     const loggedMin = (issue?.timeLogs || []).reduce(
       (sum: number, l: any) => sum + (l.durationMin || 0), 0,
@@ -3441,37 +3984,6 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         return `<div style="display: flex; align-items: center; height: 100%;">${membersHtml}</div>`;
       }
     },
-    // §6: where the task came from. Sortable, so every ticket-raised task in
-    // the project can be brought together in one click.
-    {
-      headerName: 'Origin',
-      width: 130,
-      valueGetter: (params: any) => params.data?.projectTicket?.ticketNumber || '',
-      cellRenderer: (params: any) => {
-        const tkt = params.data?.projectTicket;
-        if (!tkt) return '<span style="color:#cbd5e1;">—</span>';
-        const title = String(tkt.title || '').replace(/"/g, '&quot;');
-        return `<span title="From ticket ${tkt.ticketNumber}: ${title}" style="display:inline-block;padding:2px 7px;background:#eff6ff;color:#4f2aa7;border:1px solid #dbeafe;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:0.02em;line-height:16px;">${tkt.ticketNumber}</span>`;
-      },
-    },
-
-    // §8: the delivery phase this task belongs to.
-    {
-      headerName: 'Phase',
-      width: 130,
-      valueGetter: (params: any) => params.data?.phase?.name || '',
-      cellRenderer: (params: any) => {
-        const name = params.data?.phase?.name;
-        if (!name) return '<span style="color:#cbd5e1;">—</span>';
-        // A retired phase still reads as itself, just muted -- the task is
-        // genuinely in it, whatever the phase list now offers.
-        const retired = params.data?.phase?.isActive === false;
-        const bg = retired ? '#f1f5f9' : '#eef2ff';
-        const fg = retired ? '#94a3b8' : '#4338ca';
-        return `<span style="background:${bg};color:${fg};padding:3px 9px;border-radius:9999px;font-size:12px;font-weight:600;">${name}</span>`;
-      },
-    },
-
     // §7: assigned, logged and remaining as three sortable columns rather than
     // one combined cell -- "who is out of hours" is a question you answer by
     // sorting on Remaining, which a single formatted string cannot do.
@@ -3489,17 +4001,33 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       valueGetter: (params: any) => this.listTaskHours(params.data).logged,
       cellRenderer: (params: any) => this.hoursCell(params.value, '#0f766e'),
     },
+    // How much of its hours the task has used. Replaces Remaining: the same
+    // fact, but a share reads across tasks of different sizes — 90% means the
+    // same thing on a 2-hour task and a 40-hour one, where "4h left" does not.
     {
-      headerName: 'Remaining',
-      width: 115,
+      headerName: 'Used',
+      width: 120,
       type: 'numericColumn',
-      valueGetter: (params: any) => this.listTaskHours(params.data).remaining,
+      valueGetter: (params: any) => this.taskBudget(params.data).percent,
       cellRenderer: (params: any) => {
-        const v = params.value;
-        if (v == null) return this.hoursCell(null, '');
-        // Red at zero: the task cannot take more time without an approved
-        // additional-hours request (§3).
-        return this.hoursCell(v, v <= 0 ? '#0f4f9c' : '#047857');
+        const { percent, state, extra } = this.taskBudget(params.data);
+        if (percent == null) return '<span style="color:#cbd5e1;">—</span>';
+
+        // Red: past the ceiling, even the raised one. Orange: the ceiling was
+        // raised to get here. Neither is an error, both are worth seeing.
+        const palette = state === 'over'
+          ? { bg: '#fee2e2', fg: '#b91c1c', bd: '#fecaca' }
+          : state === 'raised'
+            ? { bg: '#ffedd5', fg: '#c2410c', bd: '#fed7aa' }
+            : { bg: '#f1f5f9', fg: '#475569', bd: '#e2e8f0' };
+
+        const tip = state === 'over'
+          ? `Over its hours by ${percent - 100}%`
+          : state === 'raised'
+            ? `${extra}h added by an approved request`
+            : `${percent}% of assigned hours used`;
+
+        return `<span title="${tip}" style="display:inline-block;padding:2px 9px;background:${palette.bg};color:${palette.fg};border:1px solid ${palette.bd};border-radius:9999px;font-size:11.5px;font-weight:700;line-height:17px;">${percent}%</span>`;
       },
     },
 
@@ -5659,8 +6187,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return 'FILE';
   }
 
-  formatFileSize(bytes?: number): string {
-    if (!bytes) return '';
+  formatFileSize(bytes?: number | null): string {
+    if (!bytes || bytes <= 0) return '';
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;

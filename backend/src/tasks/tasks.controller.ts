@@ -40,6 +40,16 @@ export class TasksController {
     });
   }
 
+  /**
+   * §Tasks1: the task leaderboard. Super Admin only, enforced in the service —
+   * a panel hidden by CSS is not a permission.
+   */
+  @Get('top-performers')
+  async topPerformers(@Request() req, @Query('days') days?: string) {
+    const windowDays = days ? Math.min(365, Math.max(7, parseInt(days, 10) || 30)) : 30;
+    return this.tasks.getTopTaskPerformers(req.user.companyId, req.user.role, windowDays);
+  }
+
   @Post()
   async create(@Request() req, @Body() body: any) {
     return this.tasks.createTask(req.user.companyId, req.user.employeeId, req.user.role, body);

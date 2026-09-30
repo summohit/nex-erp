@@ -37,6 +37,7 @@ import {
 
 import { AssetActionCellRendererComponent } from '../shared/components/asset-action-cell-renderer.component';
 import { SearchableSelectComponent, SearchableSelectOption } from '../shared/components/searchable-select/searchable-select.component';
+import { SkeletonComponent } from '../shared/components/skeleton/skeleton.component';
 import { RoleService } from '../services/role.service';
 
 const ADD_NEW_CATEGORY_ID = '__ADD_NEW_CATEGORY__';
@@ -104,7 +105,8 @@ const IT_CATEGORIES = ['LAPTOP', 'DESKTOP', 'MONITOR', 'PRINTER', 'PERIPHERAL', 
     LucideIndianRupee,
     LucideMoreHorizontal,
     LucideSettings,
-    SearchableSelectComponent
+    SearchableSelectComponent,
+    SkeletonComponent
   ],
   providers: [DatePipe],
   templateUrl: './assets.html',
@@ -137,6 +139,9 @@ export class AssetsComponent implements OnInit {
   inventoryItems = signal<InventoryItem[]>([]);
   inventoryAssignments = signal<any[]>([]);
   inventoryLoading = signal<boolean>(false);
+  requestsLoading = signal<boolean>(false);
+  assignmentsLoading = signal<boolean>(false);
+  requestActionLoading = signal<boolean>(false);
 
   readonly maxUploadFiles = 5;
   readonly maxUploadFileSizeMb = 20;
@@ -1114,9 +1119,23 @@ export class AssetsComponent implements OnInit {
   loadAllData() {
     this.loadInventory();
     this.assetService.getAllAssets().subscribe(res => this.assets.set(res));
-    this.assetService.getAssignments().subscribe(res => this.assignments.set(res));
+    
+    this.assignmentsLoading.set(true);
+    this.assetService.getAssignments().subscribe({
+      next: res => this.assignments.set(res),
+      complete: () => this.assignmentsLoading.set(false),
+      error: () => this.assignmentsLoading.set(false)
+    });
+    
     this.assetService.getInventoryAssignments().subscribe(res => this.inventoryAssignments.set(res));
-    this.assetService.getHardwareRequests().subscribe(res => this.requests.set(res));
+    
+    this.requestsLoading.set(true);
+    this.assetService.getHardwareRequests().subscribe({
+      next: res => this.requests.set(res),
+      complete: () => this.requestsLoading.set(false),
+      error: () => this.requestsLoading.set(false)
+    });
+    
     this.employeeService.getEmployeesBasicList().subscribe(res => this.employees.set(res));
     this.assetService.getCategories().subscribe(res => this.customCategories.set(res || []));
   }
@@ -2186,13 +2205,18 @@ export class AssetsComponent implements OnInit {
   }
 
   updateRequestStatus(requestId: number, status: 'APPROVED' | 'REJECTED' | 'FULFILLED', rejectionReason?: string, fulfilledAssetId?: number) {
+    this.requestActionLoading.set(true);
     this.assetService.updateHardwareRequestStatus(requestId, { status, rejectionReason, fulfilledAssetId }).subscribe({
       next: () => {
         this.toast.success(`Request marked as ${status.toLowerCase()}`);
         this.isFulfillModalOpen.set(false);
         this.loadAllData();
+        this.requestActionLoading.set(false);
       },
-      error: (err) => this.toast.error(err.error?.message || 'Failed to update request')
+      error: (err) => {
+        this.toast.error(err.error?.message || 'Failed to update request');
+        this.requestActionLoading.set(false);
+      }
     });
   }
 }

@@ -2668,6 +2668,44 @@
   color: #6366f1;
 }
 
+.ph-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ph-period-toggle {
+  display: inline-flex;
+  padding: 3px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+}
+
+.ph-period-toggle button {
+  border: none;
+  background: transparent;
+  padding: 4px 14px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.ph-period-toggle button.active {
+  background: #ffffff;
+  color: #4f46e5;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.ph-empty {
+  padding: 18px 0 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
 .performers-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));

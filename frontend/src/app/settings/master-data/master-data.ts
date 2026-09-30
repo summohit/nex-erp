@@ -19,6 +19,7 @@ import { ActionCellRendererComponent } from '../../shared/components/action-cell
 import { StatusToggleRendererComponent } from '../../shared/components/status-toggle-renderer.component';
 import { ProjectsService, LeadContactOption } from '../../services/projects';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
+import { VisitLocationFormModalComponent } from '../../shared/components/visit-location-form-modal/visit-location-form-modal';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -58,7 +59,7 @@ export interface BlackoutDate {
     LucideTimer, LucideMoon, AgGridAngular,
     LucideMapPin, LucideBuilding2, LucideCrosshair, LucideExternalLink, LucideAlertCircle, LucideNavigation,
     LucideInfo, LucideLoader2,
-    SearchableSelectComponent
+    SearchableSelectComponent, VisitLocationFormModalComponent
   ],
   templateUrl: './master-data.html',
   styleUrls: ['./master-data.css']
@@ -1445,7 +1446,17 @@ export class MasterDataComponent implements OnInit {
       .join(',');
   }
 
+
   ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      if (params['tab']) {
+        const tab = params['tab'] as Tab;
+        this.activeTab.set(tab);
+        if (tab === 'visit-locations' && params['open'] === 'add') {
+          setTimeout(() => this.openModal('create'));
+        }
+      }
+    });
     this.loadData();
 
     // A `?tab=` beats the default. Read once, synchronously, because the template
@@ -1540,10 +1551,6 @@ export class MasterDataComponent implements OnInit {
       }
     }
     this.isModalOpen.set(true);
-    if (this.activeTab() === 'visit-locations') {
-      this.mapSearchText.set('');
-      this.initFreeMap();
-    }
   }
 
   closeModal() {

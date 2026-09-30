@@ -1880,6 +1880,13 @@
   transition: all 0.15s ease;
 }
 
+.manage-locations-link {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
 .manage-locations-link:hover {
   background: #dbeafe;
   color: #1d4ed8;
@@ -2036,4 +2043,21 @@
 
 .empty-action-link:hover {
   text-decoration: underline;
+}
+
+/* Project picker, while the list is still on its way */
+.select-loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.select-spin {
+  color: #6366f1;
+  animation: selectSpin 0.8s linear infinite;
+}
+
+@keyframes selectSpin {
+  to { transform: rotate(360deg); }
 }

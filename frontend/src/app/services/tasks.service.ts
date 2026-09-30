@@ -119,6 +119,26 @@ export interface LeadOption {
   dealCategory?: string | null;
 }
 
+/** §Tasks1: one person's delivery over the window. */
+export interface TaskPerformer {
+  employeeId: number;
+  name: string;
+  avatarUrl?: string | null;
+  completed: number;
+  onTime: number;
+  withDueDate: number;
+  /** Share of dated tasks delivered by their due date, 0–100. */
+  onTimeRate: number;
+  volumeScore: number;
+  score: number;
+}
+
+export interface TopPerformersResult {
+  performers: TaskPerformer[];
+  windowDays: number;
+  since: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TasksService {
   private http = inject(HttpClient);
@@ -147,6 +167,16 @@ export class TasksService {
     return this.http.get<{ items: MyTask[]; truncated: boolean; scope: TaskScope }>(
       `${this.apiUrl}/my${params.length ? '?' + params.join('&') : ''}`,
     );
+  }
+
+  /**
+   * §Tasks1: who has been delivering well. Super Admin only — the server
+   * refuses anybody else, so a 403 here is expected rather than a bug.
+   */
+  topPerformers(days = 30): Observable<TopPerformersResult> {
+    return this.http.get<TopPerformersResult>(`${this.apiUrl}/top-performers`, {
+      params: { days: String(days) },
+    });
   }
 
   createTask(payload: any): Observable<any> {

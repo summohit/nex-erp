@@ -6362,3 +6362,143 @@
   color: #64748b;
   margin: 8px 2px 0;
 }
+
+/* §PB8: a task the manager raised that is not work yet, and one sent back. */
+.type-pill.type-awaiting {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.type-pill.type-rejected {
+  background: #ffe4e6;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+  cursor: help;
+}
+
+/* ── §Tasks1: top task performers ───────────────────────────────────────── */
+
+.ttp-panel {
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.ttp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.ttp-head h3 {
+  margin: 0 0 3px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ttp-head p {
+  margin: 0;
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+/* Says plainly that not everybody sees this, so nobody quotes it in a meeting
+   at somebody who cannot check it. */
+.ttp-private {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ttp-podium {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.ttp-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.ttp-card.rank-gold   { border-left-color: #eab308; background: #fefce8; }
+.ttp-card.rank-silver { border-left-color: #94a3b8; background: #f8fafc; }
+.ttp-card.rank-bronze { border-left-color: #c2740c; background: #fff7ed; }
+
+.ttp-rank {
+  width: 22px;
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.ttp-card.rank-gold .ttp-rank   { color: #a16207; }
+.ttp-card.rank-silver .ttp-rank { color: #475569; }
+.ttp-card.rank-bronze .ttp-rank { color: #9a3412; }
+
+.ttp-avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e0e7ff;
+  color: #4338ca;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.ttp-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.ttp-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* The name is what gives way when the card is narrow; the numbers are the point. */
+.ttp-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ttp-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.ttp-stat b { color: #0f172a; font-size: 12.5px; }
+
+.ttp-stat.muted { font-style: italic; color: #94a3b8; }
+
+@media (max-width: 640px) {
+  .ttp-head { flex-direction: column; }
+}

@@ -7,6 +7,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CrmService } from '../crm/crm.service';
 import { MyTaskDto, NormalisedStatus, TaskPerson } from './dto/my-task.dto';
 import { canCreateTask } from './task-permissions';
+import { APPROVAL_STATE, needsApprovalOnCreate } from '../approvals/two-step-approval';
+import { rankTaskPerformers, TaskPerformanceInput, TaskPerformer } from './task-performance';
+import { isSuperAdmin } from '../common/company-roles';
+import { resolveProjectViewer } from '../projects/project-roles';
 
 /** Whose tasks a My Tasks request is asking for. 'all' is administrators only. */
 export type TaskScope = 'mine' | 'all';
@@ -304,6 +308,19 @@ export class TasksService {
 
     await this.assertCanCreateTask(companyId, reporterId, role, project);
 
+    // §PB8: the same approval a task raised from the board gets. This is a
+    // second creation path into the same Issue table, so the rule has to be
+    // applied here too — otherwise the Add Task modal is simply a way around
+    // it, and an approval anybody can sidestep is not an approval.
+    //
+    // Only for work that belongs to a real project. A general or lead-linked
+    // task lands in the hidden General project, which has no technical
+    // architect to review it and no delivery for the approval to protect.
+    const creator = await resolveProjectViewer(
+      this.prisma as any, companyId, project.id, reporterId, role,
+    );
+    const approvalNeeded = data.parentKind === 'PROJECT' && needsApprovalOnCreate(creator);
+
     if (data.leadId) {
       const lead = await this.prisma.lead.findFirst({
         where: { id: Number(data.leadId), companyId },
@@ -372,6 +389,8 @@ export class TasksService {
           startDate: data.startDate ? new Date(data.startDate) : null,
           dueDate: data.dueDate ? new Date(data.dueDate) : null,
           estimatedHours: data.estimatedHours != null ? Number(data.estimatedHours) : null,
+          approvalState: approvalNeeded ? APPROVAL_STATE.PENDING_TECHNICAL : null,
+          approvalRequestedById: approvalNeeded ? reporterId : null,
         },
       });
 
@@ -493,6 +512,10 @@ export class TasksService {
       select: {
         id: true, key: true, title: true, status: true, priority: true,
         createdAt: true, startDate: true, dueDate: true, estimatedHours: true,
+        // §PB8: so a manager can see their own task is not work yet, and read
+        // why it came back if it was sent back.
+        approvalState: true,
+        approvalRejectionReason: true,
         project: { select: { id: true, name: true, key: true, isSystem: true } },
         // §17: the task list filters by project code and by milestone, and
         // both are cheap joins the row already half-carries.
@@ -539,6 +562,8 @@ export class TasksService {
         : { kind: 'PROJECT' as const, id: i.project!.id, name: i.project!.name };
 
       return {
+        approvalState: i.approvalState ?? null,
+        approvalRejectionReason: i.approvalRejectionReason ?? null,
         source: general ? 'GENERAL' : 'PROJECT',
         id: i.id,
         refKey: i.key,
@@ -655,4 +680,83 @@ export class TasksService {
       .map((r) => r.dependsOnIssue)
       .filter((i) => !CLOSED_STATUSES.includes(i.status));
   }
+
+  /**
+   * Who has been delivering tasks well, over the last 30 days (§Tasks1).
+   *
+   * Rolling rather than calendar month: on the first of a month a calendar
+   * board is empty, which is the moment it most needs to say something.
+   *
+   * Project work only. General tasks live in the hidden General project and
+   * are mostly small admin, and pre-sales tasks run through their own hours
+   * flow — counting either means whoever files the most trivia wins, which
+   * rewards precisely the wrong thing.
+   */
+  async getTopTaskPerformers(
+    companyId: number, role: string | undefined, windowDays = 30, limit = 3,
+  ): Promise<{ performers: TaskPerformer[]; windowDays: number; since: Date }> {
+    if (!isSuperAdmin(role)) {
+      throw new ForbiddenException('Only a Super Admin can see task performance.');
+    }
+
+    const since = new Date();
+    since.setDate(since.getDate() - windowDays);
+
+    const done = await this.prisma.issue.findMany({
+      where: {
+        companyId,
+        status: 'DONE',
+        completedAt: { gte: since },
+        isArchived: false,
+        // Real delivery only — see the note above.
+        project: { isSystem: false },
+        leadId: null,
+      },
+      select: {
+        completedAt: true,
+        dueDate: true,
+        members: { select: { employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } } } },
+        assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      },
+    });
+
+    // Credited to everybody on the task, not just a single assignee: the board
+    // supports several members and crediting only one would make shared work
+    // invisible for the rest.
+    const byPerson = new Map<number, TaskPerformanceInput>();
+
+    for (const issue of done) {
+      const people = issue.members.length
+        ? issue.members.map((m) => m.employee)
+        : issue.assignee ? [issue.assignee] : [];
+
+      for (const person of people) {
+        if (!person) continue;
+        const row = byPerson.get(person.id) ?? {
+          employeeId: person.id,
+          name: `${person.firstName ?? ''} ${person.lastName ?? ''}`.trim() || `Employee ${person.id}`,
+          avatarUrl: person.avatarUrl ?? null,
+          completed: 0, onTime: 0, withDueDate: 0,
+        };
+
+        row.completed += 1;
+        if (issue.dueDate) {
+          row.withDueDate += 1;
+          // Finished on the due date still counts as on time: a deadline is a
+          // day, not an instant.
+          const due = new Date(issue.dueDate);
+          due.setHours(23, 59, 59, 999);
+          if (issue.completedAt && issue.completedAt <= due) row.onTime += 1;
+        }
+        byPerson.set(person.id, row);
+      }
+    }
+
+    return {
+      performers: rankTaskPerformers([...byPerson.values()], limit),
+      windowDays,
+      since,
+    };
+  }
+
 }

@@ -13,6 +13,7 @@ import {
   LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
   LucideZap, LucideExternalLink, LucideTrophy, LucideAward
 } from '@lucide/angular';
+import { forkJoin } from 'rxjs';
 import { AttendanceService, AttendanceRecord } from '../../services/attendance';
 import { isWeeklyOff } from '../../shared/utils/weekly-offs';
 import { MasterDataService, Department } from '../../services/master-data.service';
@@ -208,6 +209,7 @@ export class AllAttendanceComponent implements OnInit {
     // them change. Bump this version so daysOfMonth (and the grid that derives from
     // it) recompute for the newly selected month instead of reusing the first one.
     this.periodVersion.update(v => v + 1);
+    if (this.performersPeriod() === 'year') this.loadYear();
     this.isLoading.set(true);
     this.attendanceService.getAllEmployeesAttendance({
       month: this.filterMonth,
@@ -316,16 +318,61 @@ export class AllAttendanceComponent implements OnInit {
   // Employee rows for the Monthly Matrix Grid
   employeeGridRows = computed<EmployeeMatrixRow[]>(() => {
     const records = this.records();
-    const allEmps = this.employees();
     const holidays = this.holidays();
     const days = this.daysOfMonth();
-    const q = this.searchQuery().toLowerCase().trim();
+    const recordMap = this.buildRecordMap(records);
+    const emps = this.filteredEmployees(records);
 
+    const statusFilter = this.filterStatus;
+    const dateFilter = this.filterDate;
+
+    let rows: EmployeeMatrixRow[] = emps.map(emp => {
+      const dayCells = this.buildDayCells(emp, days, recordMap, holidays);
+
+      // A date filter narrows the grid to that one day, so the row's tally has
+      // to describe the days on screen — a 1-column grid showing "20/22" is
+      // reporting on columns the viewer cannot see.
+      const visibleCells = dateFilter
+        ? dayCells.filter(d => d.dateStr === dateFilter)
+        : dayCells;
+
+      return {
+        employee: emp,
+        days: visibleCells,
+        totalPresent: visibleCells.filter(d => d.countsPresent).length,
+        totalWorkingDays: visibleCells.filter(d => d.countsWorking).length || 1
+      };
+    });
+
+    // When status filter is active, only show employees who have at least one matching day
+    if (statusFilter) {
+      rows = rows.filter(row => row.days.some(day => this.dayMatchesStatus(day)));
+    }
+
+    // When date filter is active, only show employees who have a record or are active on that date
+    if (dateFilter) {
+      rows = rows.filter(row => row.days.some(day => day.record || !day.isFuture));
+    }
+
+    return rows;
+  });
+
+  private buildRecordMap(records: AttendanceRecord[]): Map<string, AttendanceRecord> {
     const recordMap = new Map<string, AttendanceRecord>();
     records.forEach(r => {
       const dateStr = this.getBackendDateString(r.date);
       recordMap.set(`${r.employeeId}_${dateStr}`, r);
     });
+    return recordMap;
+  }
+
+  /**
+   * The people the filter bar selects — employee, department and search —
+   * with each one's details topped up from their attendance records.
+   */
+  private filteredEmployees(records: AttendanceRecord[]): any[] {
+    const allEmps = this.employees();
+    const q = this.searchQuery().toLowerCase().trim();
 
     const empMap = new Map<number, any>();
     allEmps.forEach(e => empMap.set(e.id, { ...e }));
@@ -363,18 +410,23 @@ export class AllAttendanceComponent implements OnInit {
         return name.includes(q) || dept.includes(q) || desig.includes(q) || code.includes(q);
       });
     }
+    return emps;
+  }
 
-    const statusFilter = this.filterStatus;
-    const dateFilter = this.filterDate;
-
-    let rows: EmployeeMatrixRow[] = emps.map(emp => {
+  /** One employee's status for each of `days`, and whether each day counts. */
+  private buildDayCells(
+    emp: any,
+    days: { dayNumber: number; weekdayStr: string; date: Date; dateStr: string; isFuture: boolean }[],
+    recordMap: Map<string, AttendanceRecord>,
+    holidays: any[],
+  ): DayMatrixStatus[] {
       // This person's own days off, not a hardcoded Saturday and Sunday. Every
       // branch here is "0" — Sunday only — which made every Saturday read as a
       // day off: absences on Saturdays were invisible, and Saturdays worked
       // inflated the present tally without ever entering the denominator.
       const weeklyOffs = emp.branch?.weeklyOffs;
 
-      const dayCells: DayMatrixStatus[] = days.map(day => {
+      return days.map(day => {
         let countsPresent = false;
         let countsWorking = false;
         const key = `${emp.id}_${day.dateStr}`;
@@ -449,42 +501,114 @@ export class AllAttendanceComponent implements OnInit {
           countsWorking
         };
       });
-
-      // A date filter narrows the grid to that one day, so the row's tally has
-      // to describe the days on screen — a 1-column grid showing "20/22" is
-      // reporting on columns the viewer cannot see.
-      const visibleCells = dateFilter
-        ? dayCells.filter(d => d.dateStr === dateFilter)
-        : dayCells;
-
-      return {
-        employee: emp,
-        days: visibleCells,
-        totalPresent: visibleCells.filter(d => d.countsPresent).length,
-        totalWorkingDays: visibleCells.filter(d => d.countsWorking).length || 1
-      };
-    });
-
-    // When status filter is active, only show employees who have at least one matching day
-    if (statusFilter) {
-      rows = rows.filter(row => row.days.some(day => this.dayMatchesStatus(day)));
-    }
-
-    // When date filter is active, only show employees who have a record or are active on that date
-    if (dateFilter) {
-      rows = rows.filter(row => row.days.some(day => day.record || !day.isFuture));
-    }
-
-    return rows;
-  });
+  }
 
   /**
    * §Att6: Top Attendance Performers.
    * Calculates the best attendance records based on total present days,
    * punctuality (fewest late days), and total working days.
    */
-  topPerformers = computed(() => {
-    const rows = this.employeeGridRows();
+  topPerformers = computed(() =>
+    this.performersPeriod() === 'year'
+      ? this.rankPerformers(this.yearGridRows())
+      : this.rankPerformers(this.employeeGridRows())
+  );
+
+  /** Whether Attendance Champions ranks the selected month or the whole year. */
+  performersPeriod = signal<'month' | 'year'>('year');
+  /** Every record of `yearRecordsFor` — only fetched once year mode is picked. */
+  yearRecords = signal<AttendanceRecord[]>([]);
+  yearLoading = signal(false);
+  /** The year + filters `yearRecords` was fetched for, so a repeat pick doesn't refetch. */
+  private yearRecordsFor = '';
+
+  setPerformersPeriod(period: 'month' | 'year') {
+    this.performersPeriod.set(period);
+    if (period === 'year') this.loadYear();
+  }
+
+  /**
+   * The API serves one month per call, so the year is its months fetched side
+   * by side — only up to the current month, since later ones hold nothing yet.
+   */
+  loadYear() {
+    const year = this.filterYear;
+    const key = `${year}|${this.filterEmployeeId ?? ''}|${this.filterDepartmentId ?? ''}`;
+    if (key === this.yearRecordsFor) return;
+    this.yearRecordsFor = key;
+
+    const now = new Date();
+    const lastMonth = year < now.getFullYear() ? 12 : year > now.getFullYear() ? 0 : now.getMonth() + 1;
+    if (lastMonth === 0) {
+      this.yearRecords.set([]);
+      return;
+    }
+
+    this.yearLoading.set(true);
+    const months = Array.from({ length: lastMonth }, (_, i) => i + 1);
+    forkJoin(months.map(month => this.attendanceService.getAllEmployeesAttendance({
+      month,
+      year,
+      employeeId: this.filterEmployeeId || undefined,
+      departmentId: this.filterDepartmentId || undefined
+    }))).subscribe({
+      next: (perMonth) => {
+        // A newer pick may have started while this one was in flight.
+        if (key !== this.yearRecordsFor) return;
+        this.yearRecords.set(perMonth.flatMap(r => r || []));
+        this.yearLoading.set(false);
+      },
+      error: () => {
+        if (key !== this.yearRecordsFor) return;
+        this.yearRecordsFor = '';
+        this.yearLoading.set(false);
+        this.toast.error('Failed to load the year\'s attendance');
+      }
+    });
+  }
+
+  /** Every day of the selected year, Jan 1 to Dec 31. */
+  daysOfYear = computed(() => {
+    this.periodVersion();
+    const year = this.filterYear;
+    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = [];
+    for (let date = new Date(year, 0, 1); date.getFullYear() === year; date = new Date(year, date.getMonth(), date.getDate() + 1)) {
+      days.push({
+        dayNumber: date.getDate(),
+        weekdayStr: weekdays[date.getDay()],
+        date,
+        dateStr: this.getLocalDateString(date),
+        isFuture: date > today
+      });
+    }
+    return days;
+  });
+
+  /**
+   * One row per filtered employee across the whole year. The status and date
+   * filters are left out on purpose: both narrow the grid to a day or a kind of
+   * day, which says nothing about who did best over a year.
+   */
+  yearGridRows = computed<EmployeeMatrixRow[]>(() => {
+    const records = this.yearRecords();
+    const holidays = this.holidays();
+    const days = this.daysOfYear();
+    const recordMap = this.buildRecordMap(records);
+    return this.filteredEmployees(records).map(emp => {
+      const cells = this.buildDayCells(emp, days, recordMap, holidays);
+      return {
+        employee: emp,
+        days: cells,
+        totalPresent: cells.filter(d => d.countsPresent).length,
+        totalWorkingDays: cells.filter(d => d.countsWorking).length || 1
+      };
+    });
+  });
+
+  private rankPerformers(rows: EmployeeMatrixRow[]) {
     if (!rows || rows.length === 0) return [];
     
     // We want employees who have recorded attendance in this period
@@ -548,7 +672,7 @@ export class AllAttendanceComponent implements OnInit {
       meta: rankMeta[idx] || rankMeta[2],
       rankNumber: idx + 1
     }));
-  });
+  }
 
   /**
    * Everything the filter bar narrows EXCEPT the status and flag filters.

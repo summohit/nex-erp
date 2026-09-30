@@ -1,42 +1,114 @@
-<div class="searchable-select" [class.open]="isOpen" [class.disabled]="disabled" [class.full-width]="fullWidth">
+<div class="searchable-select" [class.open]="isOpen" [class.disabled]="disabled" [class.loading]="loading" [class.full-width]="fullWidth">
   <button type="button" class="select-trigger form-control" (click)="toggle()" [disabled]="disabled" style="text-align: left;">
     <div class="select-trigger-content" style="text-align: left; justify-content: flex-start;">
       <ng-content select="[prefix]"></ng-content>
-      <div class="select-text-group" style="text-align: left; align-items: flex-start;">
-        <span class="select-label" [class.placeholder]="isPlaceholder" style="text-align: left;">{{ selectedLabel }}</span>
+
+      <!-- Selected Option Avatar (if present and not placeholder) -->
+      <div *ngIf="!loading && selectedOption && (selectedOption.avatarUrl || selectedOption.avatarText)" class="trigger-avatar">
+        <img *ngIf="selectedOption.avatarUrl" [src]="selectedOption.avatarUrl" alt="" class="trigger-avatar-img" (error)="onImageError(selectedOption)">
+        <div *ngIf="!selectedOption.avatarUrl && selectedOption.avatarText" class="trigger-avatar-text" [style.background-color]="selectedOption.avatarColor || '#3b82f6'">
+          {{ selectedOption.avatarText }}
+        </div>
       </div>
+
+      <div class="select-text-group" style="text-align: left; align-items: flex-start;">
+        <div *ngIf="loading && isPlaceholder" class="select-trigger-skeleton">
+          <span class="select-skeleton-bar"></span>
+        </div>
+        <div *ngIf="!loading || !isPlaceholder" class="trigger-labels-wrap">
+          <span class="select-label" [class.placeholder]="isPlaceholder">{{ selectedLabel }}</span>
+          <span *ngIf="selectedOption?.tag" class="opt-tag" [ngClass]="selectedOption?.tagClass || 'tag-default'">{{ selectedOption?.tag }}</span>
+        </div>
+      </div>
+
+      <!-- Trigger Badge (e.g. 5 days left) if present -->
+      <span *ngIf="!loading && selectedOption?.badge" class="trigger-badge" [ngClass]="'badge-' + (selectedOption?.badgeType || 'neutral')">
+        {{ selectedOption?.badge }}
+      </span>
     </div>
+
     <div class="select-trigger-tail">
+      <svg *ngIf="loading" lucideLoader2 size="14" class="select-spinner select-spin"></svg>
       <button 
-        *ngIf="!isPlaceholder && clearable && !disabled" 
+        *ngIf="!loading && !isPlaceholder && clearable && !disabled" 
         type="button" 
         class="btn-select-clear" 
         (click)="clear($event)" 
         title="Clear selection">
         <svg lucideX size="12"></svg>
       </button>
-      <svg lucideChevronDown size="14" class="select-chevron"></svg>
+      <svg *ngIf="!loading" lucideChevronDown size="14" class="select-chevron"></svg>
     </div>
   </button>
 
   <div class="select-dropdown" *ngIf="isOpen && !disabled">
-    <div class="select-search">
-      <svg lucideSearch size="14"></svg>
-      <input type="text" [(ngModel)]="searchText" placeholder="Search..." autocomplete="off">
+    <!-- Search Bar with Skeleton loader support -->
+    <div class="select-search" [class.is-loading]="loading">
+      <ng-container *ngIf="loading">
+        <div class="search-skeleton-bar">
+          <span class="sk-search-icon"></span>
+          <span class="sk-search-line"></span>
+        </div>
+      </ng-container>
+      <ng-container *ngIf="!loading">
+        <div class="search-input-box">
+          <svg lucideSearch size="14" class="search-icon"></svg>
+          <input type="text" [(ngModel)]="searchText" placeholder="Search..." autocomplete="off">
+          <button *ngIf="searchText" type="button" class="btn-clear-search" (click)="searchText = ''" title="Clear">
+            <svg lucideX size="12"></svg>
+          </button>
+        </div>
+      </ng-container>
     </div>
-    <div class="select-options">
+
+    <!-- Skeleton Option Rows when loading -->
+    <div class="select-options is-loading" *ngIf="loading">
+      <div class="select-skeleton-option" *ngFor="let s of [1, 2, 3, 4]">
+        <div class="sk-opt-title" [style.width]="s % 2 === 0 ? '60%' : '75%'"></div>
+        <div class="sk-opt-sub" [style.width]="s % 2 === 0 ? '40%' : '28%'"></div>
+      </div>
+    </div>
+
+    <!-- Regular options when loaded -->
+    <div class="select-options" *ngIf="!loading">
       <div class="select-option placeholder-opt" *ngIf="clearable" [class.active]="isPlaceholder" (click)="select(null)">
         <span>{{ placeholder }}</span>
       </div>
+      
       <div class="select-option" *ngFor="let opt of filteredOptions" [class.active]="opt.id === value" (click)="select(opt)">
-        <div class="opt-content">
-          <span class="opt-name">{{ opt.name }}</span>
-          <span class="opt-sub" *ngIf="opt.subtitle">{{ opt.subtitle }}</span>
+        <!-- Option Avatar / Initials -->
+        <div class="opt-avatar" *ngIf="opt.avatarUrl || opt.avatarText">
+          <img *ngIf="opt.avatarUrl" [src]="opt.avatarUrl" alt="" class="opt-avatar-img" (error)="onImageError(opt)">
+          <div *ngIf="!opt.avatarUrl && opt.avatarText" class="opt-avatar-text" [style.background-color]="opt.avatarColor || '#3b82f6'">
+            {{ opt.avatarText }}
+          </div>
         </div>
-        <svg *ngIf="opt.id === value" lucideCheck size="14" class="opt-check"></svg>
+
+        <!-- Option Content -->
+        <div class="opt-content">
+          <div class="opt-header-line">
+            <span class="opt-name">{{ opt.name }}</span>
+            <span *ngIf="opt.tag" class="opt-tag" [ngClass]="opt.tagClass || 'tag-default'">{{ opt.tag }}</span>
+          </div>
+          <span class="opt-sub" *ngIf="opt.subtitle">{{ opt.subtitle }}</span>
+          <span class="opt-meta" *ngIf="opt.meta">{{ opt.meta }}</span>
+        </div>
+
+        <!-- Option Tail (Badge + Checkmark) -->
+        <div class="opt-tail">
+          <span *ngIf="opt.badge" class="opt-badge" [ngClass]="'badge-' + (opt.badgeType || 'neutral')">
+            {{ opt.badge }}
+          </span>
+          <svg *ngIf="opt.id === value" lucideCheck size="15" class="opt-check"></svg>
+        </div>
       </div>
-      <div class="select-empty" *ngIf="filteredOptions.length === 0">No matches found</div>
+      
+      <div class="select-empty" *ngIf="filteredOptions.length === 0">
+        <svg lucideSearch size="16" style="margin-bottom: 4px; opacity: 0.5;"></svg>
+        <div>No matching options found</div>
+      </div>
     </div>
   </div>
 </div>
+
 

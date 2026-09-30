@@ -84,6 +84,7 @@ export class DashboardService {
       myTickets,
       taskStats,
       projectStats,
+      ticketStats,
       weekTimelogs,
       myCalendar,
       probation
@@ -98,6 +99,7 @@ export class DashboardService {
       this.getMyTickets(user.companyId, user.employeeId),
       this.getMyTaskStats(user.companyId, user.employeeId),
       this.getMyProjectStats(user.companyId, user.employeeId),
+      this.getMyTicketStats(user.companyId, user.employeeId),
       this.getWeekTimelogs(user.employeeId),
       this.getMyCalendar(user.companyId, user.employeeId),
       this.getProbationInfo(user.employeeId)
@@ -123,6 +125,7 @@ export class DashboardService {
       myTickets,
       taskStats,
       projectStats,
+      ticketStats,
       weekTimelogs,
       myCalendar,
       probation
@@ -368,6 +371,25 @@ export class DashboardService {
     const [pending, overdue] = await Promise.all([
       this.prisma.issue.count({ where: { ...base, status: { notIn: ['DONE', 'CANCELLED'] } } }),
       this.prisma.issue.count({ where: { ...base, status: { notIn: ['DONE', 'CANCELLED'] }, dueDate: { lt: today } } })
+    ]);
+    return { pending, overdue };
+  }
+
+  /**
+   * Counted here rather than from `myTickets`, which is only the latest six —
+   * a count taken from it could never read higher than six.
+   */
+  private async getMyTicketStats(companyId: number, employeeId: number | null) {
+    if (!employeeId) return { pending: 0, overdue: 0 };
+    const today = this.startOfToday();
+    const base = {
+      companyId,
+      OR: [{ reporterId: employeeId }, { assigneeId: employeeId }],
+      status: { in: ['OPEN', 'IN_PROGRESS'] as ('OPEN' | 'IN_PROGRESS')[] }
+    };
+    const [pending, overdue] = await Promise.all([
+      this.prisma.ticket.count({ where: base }),
+      this.prisma.ticket.count({ where: { ...base, dueDate: { lt: today } } })
     ]);
     return { pending, overdue };
   }

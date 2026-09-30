@@ -205,11 +205,6 @@ myLeaveBalanceDays = computed(() => {
     return total % 1 !== 0 ? total.toFixed(1) : String(Math.round(total));
   });
 
-  myOpenTicketsCount = computed(() => {
-    const t = this.dashboard()?.common?.myTickets || [];
-    return t.filter(x => !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(x.status)).length;
-  });
-
   // ---------------- NEW WIDGET HELPERS ----------------
 
   shiftDateFormat(d: string) {

@@ -13,6 +13,7 @@ import { MasterDataService } from '../../services/master-data.service';
 import { ProjectsService } from '../../services/projects';
 import { AuthService } from '../../services/auth.service';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
+import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 
 type ViewMode = 'week' | 'month';
 
@@ -37,7 +38,7 @@ interface OnSiteCtx {
     LucideBadgeCheck, LucideXCircle, LucideBuilding2, LucideMapPin,
     LucideClock, LucideAlertCircle, LucideCheckCircle2, LucideArrowRight,
     LucideBriefcase, LucideInfo, LucideUserCheck, LucideUsers, LucideSearch, LucideCheck,
-    SearchableSelectComponent
+    SearchableSelectComponent, SkeletonComponent
   ],
   templateUrl: './shift-roster.html',
   styleUrls: ['./shift-roster.css'],
@@ -50,10 +51,18 @@ export class ShiftRosterComponent implements OnInit {
   private authService = inject(AuthService);
 
   loading = signal(false);
+  loadingDepartments = signal(false);
   grid = signal<RosterGrid>({ days: [], shifts: [], rows: [] });
   departments = signal<any[]>([]);
   projects = signal<any[]>([]);
   currentUser = this.authService.currentUser;
+
+  departmentOptions = computed<SearchableSelectOption[]>(() => {
+    return this.departments().map(d => ({
+      id: d.id,
+      name: d.name
+    }));
+  });
 
   projectOptions = computed<SearchableSelectOption[]>(() => {
     return this.projects().map(p => ({
@@ -110,7 +119,14 @@ export class ShiftRosterComponent implements OnInit {
   pendingOnsite = signal<any[]>([]);
 
   ngOnInit() {
-    this.masterData.getDepartments().subscribe({ next: (d: any) => this.departments.set(d || []) });
+    this.loadingDepartments.set(true);
+    this.masterData.getDepartments().subscribe({
+      next: (d: any) => {
+        this.departments.set(d || []);
+        this.loadingDepartments.set(false);
+      },
+      error: () => this.loadingDepartments.set(false)
+    });
     this.projectsService.getProjects().subscribe({
       next: (p: any) => this.projects.set(p || []),
       error: () => this.projects.set([]),
@@ -199,6 +215,18 @@ export class ShiftRosterComponent implements OnInit {
       const e = new Date(s); e.setDate(e.getDate() + 6); return e;
     }
     return new Date(s.getFullYear(), s.getMonth() + 1, 0);
+  });
+
+  displayDays = computed(() => {
+    if (this.grid().days && this.grid().days.length > 0) return this.grid().days;
+    const days: string[] = [];
+    const cur = new Date(this.rangeStart());
+    const end = new Date(this.rangeEnd());
+    while (cur <= end) {
+      days.push(this.fmt(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return days;
   });
 
   rangeLabel = computed(() => {

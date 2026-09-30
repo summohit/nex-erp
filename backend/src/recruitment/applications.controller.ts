@@ -21,7 +21,7 @@ export class ApplicationsController {
 
   @Get('my-interviews')
   getMyInterviews(@Request() req) {
-    return this.applicationsService.getMyInterviews(req.user.companyId, req.user.sub);
+    return this.applicationsService.getMyInterviews(req.user.companyId, req.user.sub, req.user.role);
   }
 
   @Get('pending-approvals')

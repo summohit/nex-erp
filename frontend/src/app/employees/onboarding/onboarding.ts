@@ -263,6 +263,8 @@ export class OnboardingComponent implements OnInit {
     const completedCount = this.getCompletedCount(emp.onboardingTasks);
     const totalCount = emp.onboardingTasks.length;
     
+    const previousStatus = emp.onboardingStatus;
+    
     let expectedStatus = emp.onboardingStatus;
     if (completedCount === totalCount && totalCount > 0) {
       expectedStatus = 'COMPLETED';
@@ -281,6 +283,9 @@ export class OnboardingComponent implements OnInit {
 
     this.onboardingService.toggleAdminTask(task.id, newStatus).subscribe({
       next: (res) => {
+        if (res.newStatus === 'COMPLETED' && previousStatus !== 'COMPLETED') {
+           this.toast.success('Employee successfully onboarded!');
+        }
         if (res.newStatus !== emp.onboardingStatus) {
            this.loadBoard();
         }

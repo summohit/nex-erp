@@ -23,7 +23,10 @@ export class JobsService {
           select: { id: true }
         }
       },
-      orderBy: { postedDate: 'desc' },
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
     });
 
     // Auto-close logic

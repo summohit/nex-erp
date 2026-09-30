@@ -1,0 +1,249 @@
+<div class="vlm-overlay" (mousedown)="close()">
+  <section class="vlm-modal" role="dialog" aria-modal="true" aria-labelledby="visit-location-modal-title" (mousedown)="$event.stopPropagation()">
+    <!-- Header -->
+    <header class="vlm-header">
+      <div class="vlm-heading">
+        <div class="vlm-icon-badge">
+          <svg lucideMapPin [size]="20"></svg>
+        </div>
+        <div>
+          <h2 id="visit-location-modal-title">{{ title }}</h2>
+          <p class="vlm-subtitle">{{ subtitle }}</p>
+        </div>
+      </div>
+      <button type="button" class="vlm-close-btn" (click)="close()" aria-label="Close modal">
+        <svg lucideX [size]="18"></svg>
+      </button>
+    </header>
+
+    <!-- Body -->
+    <div class="vlm-body">
+      @if (submissionMode === 'request') {
+        <div class="vlm-approval-banner">
+          <svg lucideInfo [size]="16"></svg>
+          <span>The location becomes available only after an administrator approves it in <strong>Delivery &rarr; Requests</strong>.</span>
+        </div>
+      }
+
+      <!-- Site Name -->
+      <div class="vlm-field vlm-full has-icon">
+        <label for="vlm-name">Site / Location Name <span class="req">*</span></label>
+        <div class="vlm-input-wrap">
+          <svg class="vlm-field-icon" lucideMapPin [size]="16"></svg>
+          <input
+            id="vlm-name"
+            type="text"
+            [(ngModel)]="form.name"
+            placeholder="e.g. Acme Tech Hub, Sector 62"
+          />
+        </div>
+      </div>
+
+      <!-- Site Address -->
+      <div class="vlm-field vlm-full has-icon">
+        <label for="vlm-address">Site Address</label>
+        <div class="vlm-input-wrap">
+          <svg class="vlm-field-icon" lucideBuilding2 [size]="16"></svg>
+          <input
+            id="vlm-address"
+            type="text"
+            [(ngModel)]="form.address"
+            placeholder="e.g. Plot 42, Sector 62, Noida, Uttar Pradesh"
+          />
+        </div>
+      </div>
+
+      <!-- Client / Company Association -->
+      <div class="vlm-field vlm-full">
+        <div class="vlm-label-row">
+          <label>Client / Company Association</label>
+          <span class="vlm-badge-opt">Optional</span>
+        </div>
+        <app-searchable-select
+          [options]="leadContactOptions()"
+          [loading]="isLoadingLeadContacts()"
+          loadingText="Loading clients..."
+          [value]="form.leadContactId ?? null"
+          [clearable]="true"
+          [fullWidth]="true"
+          placeholder="Not linked to anyone (General / Internal Site)"
+          (valueChange)="form.leadContactId = $event">
+          <svg prefix lucideBuilding2 [size]="15"></svg>
+        </app-searchable-select>
+        <span class="vlm-hint">Link the site to a client or leave it unlinked for internal and supplier locations.</span>
+      </div>
+
+      <!-- GPS Geofence & Interactive Map Section -->
+      <section class="vlm-gps-card vlm-full">
+        <div class="vlm-gps-top">
+          <div class="vlm-gps-title-group">
+            <div class="vlm-nav-circle">
+              <svg lucideNavigation [size]="15"></svg>
+            </div>
+            <div>
+              <div class="vlm-gps-title">GPS Geofence Pin</div>
+              <div class="vlm-gps-subtitle">Automated clock-in geofence radius for field visits</div>
+            </div>
+            @if (isPartiallyPinned()) {
+              <span class="vlm-status-pill warn">
+                <svg lucideAlertCircle [size]="12"></svg> Both coords required
+              </span>
+            } @else if (isPinned()) {
+              <span class="vlm-status-pill success">
+                <span class="vlm-live-dot"></span> Pin Set
+              </span>
+            } @else {
+              <span class="vlm-status-pill empty">No Pin</span>
+            }
+          </div>
+
+          <div class="vlm-gps-btn-group">
+            <button
+              type="button"
+              class="vlm-btn-gps locate"
+              (click)="useMyLocation()"
+              [disabled]="isLocating()"
+              title="Detect coordinates from your device position">
+              <svg lucideCrosshair [size]="14"></svg>
+              <span>{{ isLocating() ? 'Detecting…' : 'Use My GPS' }}</span>
+            </button>
+            @if (form.latitude != null || form.longitude != null) {
+              <button
+                type="button"
+                class="vlm-btn-gps clear"
+                (click)="clearCoordinates()"
+                title="Remove current coordinates">
+                <svg lucideX [size]="13"></svg>
+                <span>Clear</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Coordinates Inputs -->
+        <div class="vlm-coords-grid">
+          <div class="vlm-coord-item">
+            <label>Latitude</label>
+            <div class="vlm-coord-input-wrap">
+              <span class="vlm-coord-tag">LAT</span>
+              <input
+                type="number"
+                step="0.000001"
+                [(ngModel)]="form.latitude"
+                (ngModelChange)="onCoordinatesChanged()"
+                placeholder="28.613939"
+              />
+            </div>
+          </div>
+          <div class="vlm-coord-item">
+            <label>Longitude</label>
+            <div class="vlm-coord-input-wrap">
+              <span class="vlm-coord-tag">LNG</span>
+              <input
+                type="number"
+                step="0.000001"
+                [(ngModel)]="form.longitude"
+                (ngModelChange)="onCoordinatesChanged()"
+                placeholder="77.209021"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Address / Landmark Search Bar -->
+        <div class="vlm-map-search-bar">
+          <div class="vlm-search-input-box">
+            <svg lucideSearch [size]="15"></svg>
+            <input
+              type="text"
+              [ngModel]="mapSearchText()"
+              (ngModelChange)="mapSearchText.set($event)"
+              (keydown.enter)="$event.preventDefault(); searchMapLocation()"
+              placeholder="Search place, city, or landmark to place pin…"
+            />
+          </div>
+          <button
+            type="button"
+            class="vlm-btn-search"
+            (click)="searchMapLocation()"
+            [disabled]="isSearchingMap()">
+            @if (isSearchingMap()) {
+              <svg lucideLoader2 class="spin" [size]="14"></svg>
+              <span>Searching…</span>
+            } @else {
+              <svg lucideMapPin [size]="14"></svg>
+              <span>Locate</span>
+            }
+          </button>
+        </div>
+
+        <!-- Interactive Map Container -->
+        <div class="vlm-map-shell">
+          <div #mapContainer class="vlm-map-canvas"></div>
+
+          @if (mapUnavailable()) {
+            <div class="vlm-map-fallback">
+              <!-- If Leaflet is blocked, show a live OpenStreetMap iframe embed -->
+              <iframe
+                title="Map preview"
+                class="vlm-map-iframe"
+                [src]="getFallbackMapUrl()"
+                loading="lazy">
+              </iframe>
+              <div class="vlm-fallback-banner">
+                <svg lucideInfo [size]="14"></svg>
+                <span>Interactive pin preview. You can enter or fine-tune coordinates above.</span>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Map Footer & Helper Link -->
+        <div class="vlm-map-bottom-bar">
+          <div class="vlm-hint-text">
+            <svg lucideInfo [size]="13"></svg>
+            <span>Click map or drag marker to set coordinates</span>
+          </div>
+          @if (isPinned()) {
+            <a
+              class="vlm-gmaps-link"
+              [href]="'https://www.google.com/maps?q=' + form.latitude + ',' + form.longitude"
+              target="_blank"
+              rel="noopener noreferrer">
+              <svg lucideExternalLink [size]="12"></svg>
+              <span>Open in Google Maps</span>
+            </a>
+          }
+        </div>
+      </section>
+
+      <!-- Display Order -->
+      <div class="vlm-field vlm-full">
+        <label for="vlm-pos">Display Order</label>
+        <div class="vlm-input-wrap">
+          <input
+            id="vlm-pos"
+            type="number"
+            min="0"
+            [(ngModel)]="form.position"
+            placeholder="0"
+          />
+        </div>
+        <span class="vlm-hint">Lower numbers appear first in the site selector dropdown.</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="vlm-footer">
+      <button type="button" class="vlm-btn-cancel" (click)="close()" [disabled]="isSaving()">
+        Cancel
+      </button>
+      <button type="button" class="vlm-btn-submit" (click)="save()" [disabled]="isSaving()">
+        @if (isSaving()) {
+          <svg lucideLoader2 class="spin" [size]="15"></svg>
+        }
+        <span>{{ submitLabel }}</span>
+      </button>
+    </footer>
+  </section>
+</div>

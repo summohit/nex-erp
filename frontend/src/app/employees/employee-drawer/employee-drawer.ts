@@ -8,11 +8,12 @@ import { AuthService } from '../../services/auth.service';
 import { Shift } from '../../services/attendance';
 import { HotToastService } from '@ngneat/hot-toast';
 import { LucideX, LucideIndianRupee, LucideLock, LucideInfo } from '@lucide/angular';
+import { SearchableSelectComponent } from '../../shared/components/searchable-select/searchable-select.component';
 
 @Component({
   selector: 'app-employee-drawer',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, LucideX, LucideIndianRupee, LucideLock, LucideInfo],
+  imports: [CommonModule, ReactiveFormsModule, LucideX, LucideIndianRupee, LucideLock, LucideInfo, SearchableSelectComponent],
   templateUrl: './employee-drawer.html',
   styleUrls: ['./employee-drawer.css']
 })
@@ -37,6 +38,14 @@ export class EmployeeDrawerComponent implements OnInit {
   shifts: Shift[] = [];
   employees: any[] = [];
   isSaving = false;
+  isLoadingDepartments = false;
+  isLoadingDesignations = false;
+  isLoadingEmployees = false;
+
+  get managerOptions() {
+    return [{ id: null, name: 'No Manager (Top Level)' }, ...this.employees.map(e => ({ id: e.id, name: `${e.firstName} ${e.lastName}` }))];
+  }
+
 
   constructor() {
     this.form = this.fb.group({
@@ -169,33 +178,49 @@ export class EmployeeDrawerComponent implements OnInit {
   }
 
   loadMasterData() {
-    this.masterDataService.getDepartments(true).subscribe(data => {
-      this.departments = data;
+    this.isLoadingDepartments = true;
+    this.isLoadingDesignations = true;
+    this.isLoadingEmployees = true;
+
+    this.masterDataService.getDepartments(true).subscribe({
+      next: data => {
+        this.departments = data;
+        this.isLoadingDepartments = false;
+      },
+      error: () => this.isLoadingDepartments = false
     });
-    this.masterDataService.getDesignations(true).subscribe(data => {
-      this.designations = data;
-      // Trigger filter if department already selected
-      const currentDept = this.form.get('departmentId')?.value;
-      if (currentDept) {
-        this.filteredDesignations = this.designations.filter(d => d.departmentId === Number(currentDept));
-      }
-      // Re-check PM auto-check in case the drawer opened before designations finished loading
-      const currentDesig = this.form.get('designationId')?.value;
-      if (this.isProjectManagerDesignation(currentDesig)) {
-        this.form.patchValue({ isProjectManager: true });
-      }
+    this.masterDataService.getDesignations(true).subscribe({
+      next: data => {
+        this.designations = data;
+        this.isLoadingDesignations = false;
+        // Trigger filter if department already selected
+        const currentDept = this.form.get('departmentId')?.value;
+        if (currentDept) {
+          this.filteredDesignations = this.designations.filter(d => d.departmentId === Number(currentDept));
+        }
+        // Re-check PM auto-check in case the drawer opened before designations finished loading
+        const currentDesig = this.form.get('designationId')?.value;
+        if (this.isProjectManagerDesignation(currentDesig)) {
+          this.form.patchValue({ isProjectManager: true });
+        }
+      },
+      error: () => this.isLoadingDesignations = false
     });
     this.masterDataService.getBranches().subscribe(data => {
       this.branches = data;
     });
     this.shiftsService.getShifts().subscribe(res => this.shifts = res);
-    this.employeeService.getEmployees().subscribe(data => {
-      // Don't let an employee be their own manager
-      if (this.employeeData?.id) {
-        this.employees = data.filter(e => e.id !== this.employeeData.id);
-      } else {
-        this.employees = data;
-      }
+    this.employeeService.getEmployees().subscribe({
+      next: data => {
+        // Don't let an employee be their own manager
+        if (this.employeeData?.id) {
+          this.employees = data.filter(e => e.id !== this.employeeData.id);
+        } else {
+          this.employees = data;
+        }
+        this.isLoadingEmployees = false;
+      },
+      error: () => this.isLoadingEmployees = false
     });
   }
 

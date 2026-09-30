@@ -81,6 +81,66 @@ export class IssuesController {
     return this.issuesService.deleteIssue(req.user.companyId, projectId, id, req.user.role);
   }
 
+  // §PB8: rule on a task waiting for approval. Separate from ':id/review',
+  // which is the work-completion review and answers a different question.
+  @Post(':id/approval')
+  reviewIssueApproval(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: { action: 'APPROVE' | 'REJECT'; reason?: string },
+  ) {
+    return this.issuesService.reviewIssueApproval(
+      req.user.companyId, projectId, id, data,
+      req.user.employeeId ?? req.user.sub, req.user.role,
+    );
+  }
+
+  /** §Tasks2: copy a task, with a few things changed. */
+  @Post(':id/duplicate')
+  duplicateIssue(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: {
+      title?: string; assigneeIds?: number[]; startDate?: string | null;
+      dueDate?: string | null; priority?: string; estimatedHours?: number | null;
+      includeChecklists?: boolean;
+    },
+  ) {
+    return this.issuesService.duplicateIssue(
+      req.user.companyId, projectId, id, data ?? {},
+      req.user.employeeId ?? req.user.sub, req.user.role,
+    );
+  }
+
+  /** §PB8: the manager sends a rejected task back after changing it. */
+  @Post(':id/approval/resubmit')
+  resubmitForApproval(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.issuesService.resubmitForApproval(
+      req.user.companyId, projectId, id,
+      req.user.employeeId ?? req.user.sub, req.user.role,
+    );
+  }
+
+  /** §PB8: the third button — not happening, rather than fix it. */
+  @Post(':id/approval/archive')
+  archiveFromApproval(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: { reason?: string },
+  ) {
+    return this.issuesService.archiveFromApproval(
+      req.user.companyId, projectId, id, data,
+      req.user.employeeId ?? req.user.sub, req.user.role,
+    );
+  }
+
   @Post(':id/review')
   reviewIssue(
     @Req() req,

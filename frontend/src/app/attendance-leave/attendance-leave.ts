@@ -16,6 +16,8 @@ import { AuthService } from '../services/auth.service';
 import { LeaveActionCellRendererComponent } from '../shared/components/leave-action-cell-renderer.component';
 import { ActionCellRendererComponent } from '../shared/components/action-cell-renderer.component';
 import { forkJoin } from 'rxjs';
+import { SkeletonComponent } from '../shared/components/skeleton/skeleton.component';
+import { SearchableSelectComponent, SearchableSelectOption } from '../shared/components/searchable-select/searchable-select.component';
 import { 
   LucideCheck, 
   LucideStarHalf, 
@@ -35,7 +37,12 @@ import {
   LucideChevronLeft,
   LucideChevronRight,
   LucideClock,
-  LucideFlag
+  LucideFlag,
+  LucideUser,
+  LucideBuilding,
+  LucideBriefcase,
+  LucideMail,
+  LucideLoader2
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -83,7 +90,14 @@ export interface DayStatus {
     LucideChevronLeft,
     LucideChevronRight,
     LucideClock,
-    LucideFlag
+    LucideFlag,
+    SkeletonComponent,
+    SearchableSelectComponent,
+    LucideUser,
+    LucideBuilding,
+    LucideBriefcase,
+    LucideMail,
+    LucideLoader2
   ],
   providers: [DatePipe],
   templateUrl: './attendance-leave.html',
@@ -434,21 +448,35 @@ export class AttendanceLeaveComponent implements OnInit {
       field: 'employee',
       headerName: 'Employee', 
       valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : '',
-      minWidth: 200,
+      minWidth: 230,
       flex: 1.5,
       pinned: 'left',
       cellRenderer: (params: any) => {
         const emp = params.data?.employee;
         if (!emp) return 'N/A';
-        const name = emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
-        const dept = emp.department?.name || 'General';
-        const initial = (emp.firstName || 'E').charAt(0);
+        const name = emp.lastName ? `${emp.firstName} ${emp.lastName}` : (emp.firstName || 'Employee');
+        const dept = emp.department?.name || '';
+        const des = emp.designation?.name || '';
+        const sub = [des, dept].filter(Boolean).join(' · ') || 'General';
+        const codeBadge = emp.employeeCode 
+          ? `<span class="table-emp-code" style="font-size: 10px !important; font-weight: 600 !important; color: #0369a1 !important; background: #e0f2fe !important; border: 1px solid #bae6fd !important; border-radius: 4px !important; padding: 1px 5px !important; flex-shrink: 0 !important; line-height: 1.2 !important;">#${emp.employeeCode}</span>` 
+          : '';
+        const safeName = (name || '').replace(/"/g, '&quot;');
+        const uiAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B82F6&color=fff&size=128&bold=true`;
+        const avatarSrc = emp.avatarUrl || uiAvatarUrl;
         return `
-          <div class="cell-user-avatar-row">
-            <div class="avatar-circle-sm">${initial}</div>
-            <div class="cell-stacked">
-              <div class="cell-title-bold">${name}</div>
-              <div class="user-text-stack text-secondary">${dept}</div>
+          <div class="cell-user-avatar-row cursor-pointer" style="display: flex !important; align-items: center !important; gap: 10px !important; height: 100% !important; min-width: 0 !important; width: 100% !important; cursor: pointer !important;" title="Click to view details">
+            <img src="${avatarSrc}" 
+                 class="table-emp-avatar" 
+                 alt="${safeName}" 
+                 style="width: 38px !important; height: 38px !important; min-width: 38px !important; min-height: 38px !important; max-width: 38px !important; max-height: 38px !important; border-radius: 50% !important; object-fit: cover !important; flex-shrink: 0 !important; border: 1.5px solid #e2e8f0 !important; display: block !important;" 
+                 onerror="this.onerror=null; this.src='${uiAvatarUrl}';" />
+            <div class="cell-stacked" style="min-width: 0 !important; flex: 1 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; justify-content: center !important; line-height: 1.25 !important;">
+              <div class="cell-title-bold" style="display: flex !important; align-items: center !important; gap: 6px !important; min-width: 0 !important;">
+                <span class="emp-name-text" style="font-size: 13px !important; font-weight: 600 !important; color: #0f172a !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;">${name}</span>
+                ${codeBadge}
+              </div>
+              <div class="user-text-stack text-secondary" style="font-size: 11.5px !important; color: #64748B !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 2px !important;">${sub}</div>
             </div>
           </div>
         `;
@@ -548,12 +576,16 @@ export class AttendanceLeaveComponent implements OnInit {
   // Leave balances
   myBalances = signal<LeaveBalance[]>([]);
   myRequests = signal<LeaveRequest[]>([]);
+  isLoadingBalances = signal<boolean>(true);
+  isLoadingRequests = signal<boolean>(true);
   myHistory = signal<AttendanceRecord[]>([]);
   holidays = signal<Holiday[]>([]);
+  isLoadingHolidays = signal<boolean>(true);
 
   // Manage Balances (HR/Admin)
   allBalances = signal<LeaveBalance[]>([]);
   allRequests = signal<LeaveRequest[]>([]);
+  isLoadingLeaveApprovals = signal<boolean>(true);
   approvalStatusFilter = signal<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('PENDING');
   filteredRequests = computed(() => {
     const filter = this.approvalStatusFilter();
@@ -563,16 +595,195 @@ export class AttendanceLeaveComponent implements OnInit {
   });
   pendingCount = computed(() => this.allRequests().filter(r => r.status === 'PENDING').length);
   managerRequests = signal<LeaveRequest[]>([]);
+  isLoadingManagerRequests = signal<boolean>(true);
   employees = signal<Employee[]>([]);
   isLoadingEmployees = signal<boolean>(false);
   leaveTypes = signal<LeaveType[]>([]);
-  
+  targetEmployeeBalances = signal<LeaveBalance[] | null>(null);
+  isLoadingEmployeeBalances = signal<boolean>(false);
+
   // Whether the currently selected leave type allows half-day
   selectedLeaveTypeAllowsHalfDay = computed(() => {
     const id = this.requestForm.leaveTypeId;
     if (!id) return true;
-    const balance = this.myBalances().find(b => b.leaveType?.id === Number(id));
-    return balance ? (balance.leaveType.allowHalfDay !== false) : true;
+    const isBehalf = this.requestForm.onBehalfOfEmployeeId !== null;
+    const balances = isBehalf 
+      ? (this.targetEmployeeBalances() || [])
+      : this.myBalances();
+    const balance = balances.find(b => b.leaveType?.id === Number(id));
+    if (balance) {
+      return balance.leaveType.allowHalfDay !== false;
+    }
+    const lt = this.leaveTypes().find(t => t.id === Number(id));
+    return lt ? (lt.allowHalfDay !== false) : true;
+  });
+
+  getLeaveTypeColor(name: string): string {
+    const n = (name || '').toLowerCase();
+    if (n.includes('sick')) return '#0ea5e9'; // sky blue
+    if (n.includes('casual')) return '#10b981'; // emerald green
+    if (n.includes('earned') || n.includes('privilege') || n.includes('annual')) return '#6366f1'; // indigo
+    if (n.includes('maternity') || n.includes('paternity')) return '#ec4899'; // pink
+    if (n.includes('bereavement')) return '#64748b'; // slate
+    if (n.includes('compensatory') || n.includes('comp')) return '#f59e0b'; // amber
+    if (n.includes('loss') || n.includes('unpaid') || n.includes('lwp')) return '#ef4444'; // red
+    if (n.includes('eid') || n.includes('diwali') || n.includes('holiday') || n.includes('optional')) return '#8b5cf6'; // purple
+    return '#3b82f6';
+  }
+
+  getAvatarBgColor(str?: string): string {
+    if (!str) return '#3b82f6';
+    const colors = ['#3b82f6', '#10b981', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#06b6d4', '#14b8a6'];
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  // Searchable options for "Applying for"
+  applyingForOptions = computed<SearchableSelectOption[]>(() => {
+    const list: SearchableSelectOption[] = [
+      { 
+        id: null, 
+        name: 'Myself', 
+        subtitle: 'Apply for your own account',
+        avatarText: 'ME',
+        avatarColor: '#2563eb',
+        badge: 'Self',
+        badgeType: 'info'
+      }
+    ];
+    for (const emp of this.onBehalfEmployees()) {
+      const initials = emp.name
+        .split(' ')
+        .filter((n: string) => n.length > 0)
+        .map((n: string) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'U';
+      const found = this.employees().find(e => e.id === emp.id);
+      list.push({
+        id: emp.id,
+        name: emp.name,
+        subtitle: emp.subtitle,
+        avatarUrl: found?.avatarUrl || undefined,
+        avatarText: initials,
+        avatarColor: this.getAvatarBgColor(emp.name)
+      });
+    }
+    return list;
+  });
+
+  // Searchable options for "Leave Type", filtered dynamically by selected employee
+  availableLeaveTypeOptions = computed<SearchableSelectOption[]>(() => {
+    const targetBalances = this.targetEmployeeBalances();
+    const myBals = this.myBalances();
+    const allTypes = this.leaveTypes();
+
+    const isBehalf = this.requestForm.onBehalfOfEmployeeId !== null;
+    const balances = isBehalf 
+      ? (targetBalances || [])
+      : myBals;
+
+    return allTypes.map(type => {
+      const b = balances.find(bal => bal.leaveType?.id === type.id);
+      const allocated = b ? b.allocated : 0;
+      const used = b ? b.used : 0;
+      const remaining = allocated - used;
+
+      const initials = type.name
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .split(' ')
+        .filter((w: string) => w.length > 0)
+        .map((w: string) => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'LV';
+
+      const color = this.getLeaveTypeColor(type.name);
+      const isOptional = type.name.toLowerCase().includes('(optional)') || type.name.toLowerCase().includes('optional');
+      const cleanName = type.name.replace(/\(optional\)/gi, '').trim();
+
+      let tag: string | undefined = undefined;
+      let tagClass = 'tag-default';
+      if (!type.isPaid) {
+        tag = 'Unpaid';
+        tagClass = 'tag-amber';
+      } else if (isOptional) {
+        tag = 'Optional';
+        tagClass = 'tag-purple';
+      }
+
+      let badge = '';
+      let badgeType: 'success' | 'warning' | 'danger' | 'info' | 'neutral' = 'neutral';
+      if (remaining > 0) {
+        badge = `${remaining} ${remaining === 1 ? 'day' : 'days'} left`;
+        badgeType = 'success';
+      } else if (remaining === 0) {
+        badge = '0 available';
+        badgeType = 'neutral';
+      } else {
+        badge = `${Math.abs(remaining)} ${Math.abs(remaining) === 1 ? 'day' : 'days'} over`;
+        badgeType = 'danger';
+      }
+
+      const subParts: string[] = [];
+      subParts.push(`${used} used / ${allocated} total`);
+      if (type.allowHalfDay !== false) {
+        subParts.push('Half-day ok');
+      }
+
+      return {
+        id: type.id,
+        name: cleanName,
+        subtitle: subParts.join(' · '),
+        tag,
+        tagClass,
+        badge,
+        badgeType,
+        avatarText: initials,
+        avatarColor: color
+      };
+    });
+  });
+
+  // Computed details of the selected leave type
+  selectedLeaveTypeBalance = computed(() => {
+    const targetBalances = this.targetEmployeeBalances();
+    const myBals = this.myBalances();
+    const allTypes = this.leaveTypes();
+
+    const id = Number(this.requestForm.leaveTypeId);
+    if (!id) return null;
+    const isBehalf = this.requestForm.onBehalfOfEmployeeId !== null;
+    const balances = isBehalf 
+      ? (targetBalances || [])
+      : myBals;
+      
+    const b = balances.find(bal => bal.leaveType?.id === id);
+    if (b) return b;
+    
+    const type = allTypes.find(t => t.id === id);
+    if (type) {
+      return {
+        leaveType: type,
+        allocated: 0,
+        used: 0
+      };
+    }
+    return null;
+  });
+
+  // Dynamically calculated working days for UI preview
+  calculatedWorkingDays = computed(() => {
+    if (!this.requestForm.startDate || !this.requestForm.endDate) return null;
+    if (this.requestForm.endDate < this.requestForm.startDate) return null;
+    if (this.requestForm.isHalfDay) return 0.5;
+    const start = new Date(this.requestForm.startDate);
+    const end = new Date(this.requestForm.endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   });
 
   // Assignment Form State
@@ -582,6 +793,62 @@ export class AttendanceLeaveComponent implements OnInit {
   allocatedDays = signal<number>(0);
   assignYear = signal<number>(new Date().getFullYear());
   isAssigning = signal<boolean>(false);
+
+  // Searchable options for Assign Leave Balance
+  employeeAssignOptions = computed<SearchableSelectOption[]>(() => {
+    return this.employees().map(emp => {
+      const code = emp.employeeCode ? `#${emp.employeeCode}` : '';
+      const des = emp.designation?.name || '';
+      const dept = emp.department?.name ? ` · ${emp.department.name}` : '';
+      const initials = `${emp.firstName?.[0] || ''}${emp.lastName?.[0] || ''}`.toUpperCase() || 'EMP';
+      return {
+        id: emp.id.toString(),
+        name: `${emp.firstName} ${emp.lastName}`.trim(),
+        subtitle: `${des}${dept}`.trim() || emp.email,
+        tag: code || undefined,
+        avatarUrl: emp.avatarUrl || undefined,
+        avatarText: initials,
+        avatarColor: this.getAvatarBgColor(emp.firstName)
+      };
+    });
+  });
+
+  leaveTypeAssignOptions = computed<SearchableSelectOption[]>(() => {
+    return this.leaveTypes().map(type => {
+      const initials = type.name
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .split(' ')
+        .filter((w: string) => w.length > 0)
+        .map((w: string) => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'LV';
+      return {
+        id: type.id.toString(),
+        name: type.name,
+        subtitle: `Default: ${type.defaultDays} days${type.allowHalfDay !== false ? ' · Half-day ok' : ''}`,
+        badge: `${type.defaultDays}d default`,
+        badgeType: 'info',
+        avatarText: initials,
+        avatarColor: this.getLeaveTypeColor(type.name)
+      };
+    });
+  });
+
+  // Selected employee profile data for Assign Balance
+  selectedAssignEmployee = computed(() => {
+    const id = Number(this.selectedEmployeeId());
+    if (!id) return null;
+    return this.employees().find(e => e.id === id) || null;
+  });
+
+  // Current year balances of the selected employee
+  selectedEmployeeCurrentBalances = computed(() => {
+    const id = Number(this.selectedEmployeeId());
+    if (!id) return [];
+    const yr = Number(this.assignYear()) || new Date().getFullYear();
+    return (this.allBalances() || []).filter((b: any) => b.employeeId === id && b.year === yr);
+  });
 
   // Request Leave Form
   isRequestModalOpen = signal<boolean>(false);
@@ -607,7 +874,7 @@ export class AttendanceLeaveComponent implements OnInit {
    * into view, and an administrator must not be told they cannot do something
    * while the check is still running.
    */
-  canActOnBehalf = signal<boolean | null>(null);
+  canActOnBehalf = computed(() => this.isAdmin());
   onBehalfEmployees = signal<{ id: number; name: string; subtitle?: string }[]>([]);
 
   // Regularization State
@@ -827,6 +1094,8 @@ export class AttendanceLeaveComponent implements OnInit {
   // --- Grid and Calendar Logic ---
 
   openRequestModal(request?: LeaveRequest) {
+    this.targetEmployeeBalances.set(null);
+    this.isLoadingEmployeeBalances.set(false);
     if (request) {
       this.editMode.set(true);
       this.selectedRequestId.set(request.id);
@@ -849,6 +1118,34 @@ export class AttendanceLeaveComponent implements OnInit {
     this.isRequestModalOpen.set(true);
   }
 
+  onApplyingForChange(empId: any) {
+    const id = (empId === null || empId === undefined || empId === 'null' || empId === '') ? null : Number(empId);
+    this.requestForm.onBehalfOfEmployeeId = id;
+    this.requestForm.leaveTypeId = ''; // Reset leave type when employee changes
+
+    if (id === null) {
+      this.targetEmployeeBalances.set(null);
+      this.isLoadingEmployeeBalances.set(false);
+    } else {
+      this.isLoadingEmployeeBalances.set(true);
+      this.leavesService.getAllBalances(undefined, id).subscribe({
+        next: (res: any[]) => {
+          this.targetEmployeeBalances.set(res ?? []);
+          this.isLoadingEmployeeBalances.set(false);
+        },
+        error: () => {
+          this.targetEmployeeBalances.set([]);
+          this.isLoadingEmployeeBalances.set(false);
+        }
+      });
+    }
+  }
+
+  onLeaveTypeSelected(typeId: any) {
+    this.requestForm.leaveTypeId = (typeId !== null && typeId !== undefined && typeId !== '') ? String(typeId) : '';
+    this.onLeaveTypeChange();
+  }
+
   onLeaveTypeChange() {
     if (!this.selectedLeaveTypeAllowsHalfDay()) {
       this.requestForm.isHalfDay = false;
@@ -861,6 +1158,8 @@ export class AttendanceLeaveComponent implements OnInit {
     this.editMode.set(false);
     this.selectedRequestId.set(null);
     this.selectedFile = null;
+    this.targetEmployeeBalances.set(null);
+    this.isLoadingEmployeeBalances.set(false);
     this.requestForm = { leaveTypeId: '', startDate: '', endDate: '', reason: '', attachmentUrl: '', isHalfDay: false, halfDayPeriod: 'AM', onBehalfOfEmployeeId: null };
   }
 
@@ -1047,14 +1346,16 @@ export class AttendanceLeaveComponent implements OnInit {
     // person's the moment the leave is being raised for somebody else. Skipped
     // rather than adapted — the server holds the target's real balance and is
     // the only place that can answer it without a second round trip.
-    if (!this.requestForm.onBehalfOfEmployeeId) {
-      const balance = this.myBalances().find(b => b.leaveType.id === Number(this.requestForm.leaveTypeId));
-      if (balance) {
-        const available = balance.allocated - balance.used;
-        if (requestedDays > available) {
-          this.toast.error(`Insufficient balance. You requested ${requestedDays} ${requestedDays === 1 ? 'day' : 'days'} but only have ${available} days available.`);
-          return;
-        }
+    const isBehalf = this.requestForm.onBehalfOfEmployeeId !== null;
+    const currentBalances = isBehalf 
+      ? (this.targetEmployeeBalances() || []) 
+      : this.myBalances();
+    const balance = currentBalances.find(b => b.leaveType.id === Number(this.requestForm.leaveTypeId));
+    if (balance) {
+      const available = balance.allocated - balance.used;
+      if (requestedDays > available) {
+        this.toast.error(`Insufficient balance. ${isBehalf ? 'This employee has' : 'You have'} only ${available} days available, but requested ${requestedDays} ${requestedDays === 1 ? 'day' : 'days'}.`);
+        return;
       }
     }
     
@@ -1155,6 +1456,9 @@ export class AttendanceLeaveComponent implements OnInit {
       if (target.classList.contains('view-reason-link') || target.closest('.view-reason-link')) {
         this.openRejectionReasonModal(params.data.rejectionReason);
       }
+    }
+    if (params.colDef.field === 'employee' && params.data) {
+      this.openLeaveDetail(params.data);
     }
   }
 
@@ -1257,6 +1561,45 @@ export class AttendanceLeaveComponent implements OnInit {
     const me = this.authService.currentUser();
     return me?.employee?.designation?.name || me?.employee?.department?.name || '—';
   }
+
+  leaveEmployeeEmail(leave: any): string {
+    return leave?.employee?.user?.email || leave?.employee?.email || '';
+  }
+
+  leaveEmployeeRole(leave: any): string {
+    return leave?.employee?.user?.role || '';
+  }
+
+  encodeURIComponent = encodeURIComponent;
+
+  leaveEmployeeAvatar(leave: any): string {
+    const name = this.leaveEmployeeName(leave);
+    const uiAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B82F6&color=fff&size=128&bold=true`;
+    return leave?.employee?.avatarUrl || uiAvatar;
+  }
+
+  onLeaveAvatarError(event: any, leave: any) {
+    const name = this.leaveEmployeeName(leave);
+    if (event?.target) {
+      event.target.onerror = null;
+      event.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B82F6&color=fff&size=128&bold=true`;
+    }
+  }
+
+  selectedLeaveQuota = computed(() => {
+    const leave = this.selectedLeave();
+    if (!leave) return null;
+    const empId = leave.employeeId || leave.employee?.id;
+    const ltId = leave.leaveTypeId || leave.leaveType?.id;
+    if (!empId || !ltId) return null;
+    const year = new Date(leave.startDate).getFullYear();
+    const balance = (this.allBalances() || []).find((b: any) => 
+      b.employeeId === empId && 
+      b.leaveTypeId === ltId && 
+      b.year === year
+    );
+    return balance || null;
+  });
 
   openRejectionReasonModal(reason: string) {
     this.currentRejectionReason.set(reason);
@@ -1628,13 +1971,9 @@ export class AttendanceLeaveComponent implements OnInit {
     // §Att9: whether to offer applying on somebody else's behalf. Asked of the
     // server rather than inferred from the role, because a delegate holding no
     // special role may also be allowed.
-    this.leavesService.canActOnBehalf().subscribe({
-      next: (res) => {
-        this.canActOnBehalf.set(!!res?.canActOnBehalf);
-        if (res?.canActOnBehalf) this.loadOnBehalfEmployees();
-      },
-      error: () => this.canActOnBehalf.set(false),
-    });
+    if (this.isAdmin()) {
+      this.loadOnBehalfEmployees();
+    }
 
     this.route.paramMap.subscribe(params => {
       const tab = params.get('tab');
@@ -1690,25 +2029,56 @@ export class AttendanceLeaveComponent implements OnInit {
   loadData() {
     this.attendanceService.getTodayAttendance().subscribe((res: any) => this.todayAttendance.set(res));
     this.loadTimesheetHistory();
-    this.leavesService.getMyBalances().subscribe((res: any) => this.myBalances.set(res));
-    this.leavesService.getMyRequests().subscribe((res: any) => {
-      this.myRequests.set(res);
+    this.isLoadingBalances.set(true);
+    this.isLoadingRequests.set(true);
+    this.leavesService.getMyBalances().subscribe({
+      next: (res: any) => this.myBalances.set(res),
+      complete: () => this.isLoadingBalances.set(false),
+      error: () => this.isLoadingBalances.set(false)
+    });
+    this.leavesService.getMyRequests().subscribe({
+      next: (res: any) => this.myRequests.set(res),
+      complete: () => this.isLoadingRequests.set(false),
+      error: () => this.isLoadingRequests.set(false)
     });
     this.attendanceService.getMyRegularizations().subscribe((res: any) => this.myRegularizations.set(res));
-    this.masterDataService.getHolidays().subscribe((res: any) => {
-      this.holidays.set(res);
-      this.generateGrid();
-    });
+    this.loadHolidays();
 
     this.loadAdminData();
     this.loadManagerData();
     this.loadShifts();
   }
 
+  loadHolidays() {
+    this.isLoadingHolidays.set(true);
+    this.masterDataService.getHolidays().subscribe({
+      next: (res: any) => {
+        this.holidays.set(res);
+        this.generateGrid();
+        this.isLoadingHolidays.set(false);
+      },
+      error: () => this.isLoadingHolidays.set(false)
+    });
+  }
+
   loadAdminData() {
     const year = new Date().getFullYear();
-    this.leavesService.getAllBalances(year).subscribe((res: any) => this.allBalances.set(res));
-    this.leavesService.getRequests().subscribe((res: any) => this.allRequests.set(res));
+    this.isLoadingBalances.set(true);
+    this.leavesService.getAllBalances(year).subscribe({
+      next: (res: any) => {
+        this.allBalances.set(res);
+        this.isLoadingBalances.set(false);
+      },
+      error: () => this.isLoadingBalances.set(false)
+    });
+    this.isLoadingLeaveApprovals.set(true);
+    this.leavesService.getRequests().subscribe({
+      next: (res: any) => {
+        this.allRequests.set(res);
+        this.isLoadingLeaveApprovals.set(false);
+      },
+      error: () => this.isLoadingLeaveApprovals.set(false)
+    });
     this.attendanceService.getPendingRegularizations().subscribe((res: any) => this.pendingRegularizations.set(res));
     this.isLoadingEmployees.set(true);
     this.employeeService.getEmployees().subscribe({
@@ -1719,7 +2089,14 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   loadManagerData() {
-    this.leavesService.getManagerRequests().subscribe((res: any) => this.managerRequests.set(res));
+    this.isLoadingManagerRequests.set(true);
+    this.leavesService.getManagerRequests().subscribe({
+      next: (res: any) => {
+        this.managerRequests.set(res);
+        this.isLoadingManagerRequests.set(false);
+      },
+      error: () => this.isLoadingManagerRequests.set(false)
+    });
   }
 
   onPeriodChange() {
@@ -1982,6 +2359,9 @@ export class AttendanceLeaveComponent implements OnInit {
     if (tab === 'my-shift') {
       this.loadMyShift();
     }
+    if (tab === 'holidays') {
+      this.loadHolidays();
+    }
     this.router.navigate(['/attendance', tab]);
   }
 
@@ -2063,6 +2443,11 @@ export class AttendanceLeaveComponent implements OnInit {
       },
       error: () => this.toast.error('Failed to delete holiday')
     });
+  }
+
+  onLeaveTypeAssignChange(id: any) {
+    this.selectedLeaveTypeId.set(id ? id.toString() : '');
+    this.onLeaveTypeSelect();
   }
 
   onLeaveTypeSelect() {

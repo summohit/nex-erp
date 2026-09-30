@@ -97,6 +97,8 @@ model Company {
   fieldVisits           FieldVisit[]                @relation("CompanyFieldVisits")
   fieldVisitRequests    FieldVisitRequest[]         @relation("CompanyFieldVisitRequests")
   fieldVisitAttendances FieldVisitAttendance[]      @relation("CompanyFieldVisitAttendances")
+  visitLocationRequests VisitLocationRequest[]
+  scopeRequests         ProjectScopeRequest[]
   leadFollowUps         LeadFollowUp[]
   leadContacts          LeadContact[]
   leadFiles             LeadFile[]
@@ -122,8 +124,8 @@ model Company {
   defaultProjectTasks   DefaultProjectTask[]
   notices               Notice[]
   projectBudgetRequests ProjectBudgetRequest[]
-  visitLocations    VisitLocation[]
-  approvalDelegates ApprovalDelegate[]
+  visitLocations        VisitLocation[]
+  approvalDelegates     ApprovalDelegate[]
 }
 
 // Authentication & RBAC
@@ -460,25 +462,33 @@ model Employee {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  emergencyContacts EmergencyContact[]
-  documents         EmployeeDocument[]
-  leaveBalances     LeaveBalance[]
-  leaveEncashments  LeaveEncashment[]
-  appreciations     Appreciation[]
-  leaveRequests     LeaveRequest[]
-  attendances       Attendance[]
+  emergencyContacts             EmergencyContact[]
+  documents                     EmployeeDocument[]
+  leaveBalances                 LeaveBalance[]
+  leaveEncashments              LeaveEncashment[]
+  appreciations                 Appreciation[]
+  leaveRequests                 LeaveRequest[]
+  attendances                   Attendance[]
   /// §Att5: the late clock-outs this person has ruled on.
-  clockOutApprovals Attendance[] @relation("AttendanceClockOutApprover")
-  shiftReminders    ShiftReminderLog[]
-  salaryStructures  SalaryStructure[]
-  payslips          Payslip[]
-  expenseClaims     ExpenseClaim[]
-  assetAssignments  AssetAssignment[]
-  inventoryTxns     InventoryTransaction[]
-  hardwareRequests  HardwareRequest[]
-  interviews        Interview[]
-  skills            EmployeeSkill[]
-  resumeLines       EmployeeResume[]
+  clockOutApprovals             Attendance[]           @relation("AttendanceClockOutApprover")
+  /// §PB8 and the scope requests: what they raised, and what they ruled on.
+  issuesAwaitingTheirApproval   Issue[]                @relation("IssueApprovalRequestedBy")
+  issuesApprovedTechnically     Issue[]                @relation("IssueTechnicalApprover")
+  issuesApprovedAsAdmin         Issue[]                @relation("IssueAdminApprover")
+  scopeRequestsRaised           ProjectScopeRequest[]  @relation("ScopeRequestRaisedBy")
+  scopeRequestsReviewed         ProjectScopeRequest[]  @relation("ScopeRequestReviewedBy")
+  visitLocationRequestsRaised   VisitLocationRequest[] @relation("VisitLocationRequestRaisedBy")
+  visitLocationRequestsReviewed VisitLocationRequest[] @relation("VisitLocationRequestReviewedBy")
+  shiftReminders                ShiftReminderLog[]
+  salaryStructures              SalaryStructure[]
+  payslips                      Payslip[]
+  expenseClaims                 ExpenseClaim[]
+  assetAssignments              AssetAssignment[]
+  inventoryTxns                 InventoryTransaction[]
+  hardwareRequests              HardwareRequest[]
+  interviews                    Interview[]
+  skills                        EmployeeSkill[]
+  resumeLines                   EmployeeResume[]
 
   ledProjects         Project[]                  @relation("ProjectLead")
   projectMembers      ProjectMember[]
@@ -542,19 +552,19 @@ model Employee {
   discussionComments    ProjectDiscussionComment[]    @relation("DiscussionCommentAuthor")
   discussionAttachments ProjectDiscussionAttachment[] @relation("DiscussionAttachmentUploader")
 
-  projectTicketsRaised   ProjectTicket[]            @relation("TicketRaisedBy")
-  projectTicketsProposed ProjectTicket[]            @relation("TicketProposedAssignee")
-  projectTicketsReviewed ProjectTicket[]            @relation("TicketReviewedBy")
-  budgetRequests         ProjectBudgetRequest[]     @relation("BudgetRequestedBy")
-  budgetRequestsReviewed ProjectBudgetRequest[]     @relation("BudgetReviewedBy")
-  taskHoursRequested     TaskHoursRequest[]         @relation("TaskHoursRequestedBy")
-  taskHoursReviewed      TaskHoursRequest[]         @relation("TaskHoursReviewedBy")
-  taskHoursActivities    TaskHoursRequestActivity[]
-  noticesAuthored        Notice[]                   @relation("NoticeAuthor")
+  projectTicketsRaised       ProjectTicket[]            @relation("TicketRaisedBy")
+  projectTicketsProposed     ProjectTicket[]            @relation("TicketProposedAssignee")
+  projectTicketsReviewed     ProjectTicket[]            @relation("TicketReviewedBy")
+  budgetRequests             ProjectBudgetRequest[]     @relation("BudgetRequestedBy")
+  budgetRequestsReviewed     ProjectBudgetRequest[]     @relation("BudgetReviewedBy")
+  taskHoursRequested         TaskHoursRequest[]         @relation("TaskHoursRequestedBy")
+  taskHoursReviewed          TaskHoursRequest[]         @relation("TaskHoursReviewedBy")
+  taskHoursActivities        TaskHoursRequestActivity[]
+  noticesAuthored            Notice[]                   @relation("NoticeAuthor")
+  approvalDelegations        ApprovalDelegate[]         @relation("ApprovalDelegate")
+  approvalDelegationsGranted ApprovalDelegate[]         @relation("ApprovalDelegateGrantedBy")
 
   @@unique([companyId, employeeCode])
-  approvalDelegations   ApprovalDelegate[] @relation("ApprovalDelegate")
-  approvalDelegationsGranted ApprovalDelegate[] @relation("ApprovalDelegateGrantedBy")
 }
 
 model EmergencyContact {
@@ -778,52 +788,52 @@ model LeaveEncashment {
 }
 
 model Attendance {
-  id             Int             @id @default(autoincrement())
-  employeeId     Int
-  employee       Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  date           DateTime        @db.Date
-  clockIn        DateTime?
-  clockOut       DateTime?
-  clockInLat     Float?
-  clockInLng     Float?
-  clockOutLat    Float?
-  clockOutLng    Float?
-  overtimeHours  Float           @default(0)
-  status         String          @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
-  isLate         Boolean         @default(false)
-  isEarlyLeave   Boolean         @default(false)
+  id                   Int             @id @default(autoincrement())
+  employeeId           Int
+  employee             Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date                 DateTime        @db.Date
+  clockIn              DateTime?
+  clockOut             DateTime?
+  clockInLat           Float?
+  clockInLng           Float?
+  clockOutLat          Float?
+  clockOutLng          Float?
+  overtimeHours        Float           @default(0)
+  status               String          @default("PRESENT") // PRESENT, ABSENT, HALF_DAY
+  isLate               Boolean         @default(false)
+  isEarlyLeave         Boolean         @default(false)
   /// The day was never clocked out of — the 23:00 IST sweep closed it. The
   /// clock-out time is a cutoff, not an observation, and its coordinates are
   /// the clock-in's reused because there was no device to ask. Worth saying on
   /// screen: an 11 PM stamp otherwise reads as someone working until 11 PM.
-  autoClockedOut Boolean         @default(false)
+  autoClockedOut       Boolean         @default(false)
   // What the day was judged against, captured at clock-in. Stored rather than
   // re-derived because the roster can be edited afterwards and history must
   // not silently change: a day marked late has to stay explicable.
-  shiftId        Int?
-  shift          Shift?          @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  shiftId              Int?
+  shift                Shift?          @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   // On-site work: which project the day belonged to, and whether the branch
   // geofence was bypassed because the person was rostered away from the office.
-  projectId      Int?
-  project        Project?        @relation("ProjectAttendance", fields: [projectId], references: [id], onDelete: SetNull)
-  isOnsite       Boolean         @default(false)
+  projectId            Int?
+  project              Project?        @relation("ProjectAttendance", fields: [projectId], references: [id], onDelete: SetNull)
+  isOnsite             Boolean         @default(false)
   /// Why this day was closed late. Collected only when someone clocks out of a
   /// PREVIOUS day's session after IST midnight — at that point the clock-out
   /// time bears no relation to when they actually stopped working, and the
   /// record is worthless without an explanation.
-  clockOutReason String?
+  clockOutReason       String?
   /// The shift ended and nobody clocked out, so the sweep said so.
   ///
   /// This is the replacement for closing the session automatically. The day
   /// stays open and honest; this flag is what the reminder is sent from and
   /// what a manager's screen can filter on. Cleared when the session is
   /// finally closed.
-  missedClockOut Boolean         @default(false)
+  missedClockOut       Boolean         @default(false)
   /// Proof attached to a late clock-out (§Att4) — a screenshot, a site photo,
   /// a ticket. Stored beside `clockOutReason` because the two answer the same
   /// question: a typed reason is a claim, this is what backs it up. Optional:
   /// an approver can still accept a reason on its own.
-  clockOutProofUrl String?
+  clockOutProofUrl     String?
   /// Where a late clock-out stands with its approver (§Att5).
   ///
   /// Null on an ordinary day — a session closed on the day it opened needs
@@ -831,15 +841,15 @@ model Attendance {
   /// because at that point the clock-out time is the employee's own account of
   /// a day that has already ended. PENDING days deliberately do not count as
   /// present: an unreviewed claim must not reach payroll as a fact.
-  clockOutApproval     String?    // PENDING, APPROVED, REJECTED
+  clockOutApproval     String? // PENDING, APPROVED, REJECTED
   clockOutApprovedById Int?
-  clockOutApprovedBy   Employee?  @relation("AttendanceClockOutApprover", fields: [clockOutApprovedById], references: [id], onDelete: SetNull)
+  clockOutApprovedBy   Employee?       @relation("AttendanceClockOutApprover", fields: [clockOutApprovedById], references: [id], onDelete: SetNull)
   clockOutApprovedAt   DateTime?
   /// The approver's own words, and the only place a rejection is explained.
   clockOutReviewNote   String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  logs           AttendanceLog[]
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  logs                 AttendanceLog[]
 
   @@unique([employeeId, date])
   /// "Whose session is still open?" runs every minute in the reminder sweep.
@@ -1589,11 +1599,12 @@ model Project {
   documents          ProjectDocument[]
   milestones         ProjectMilestone[]
   analysisRuns       ProjectAnalysisRun[]
-  fieldVisits        FieldVisit[]         @relation("ProjectFieldVisits")
-  fieldVisitRequests FieldVisitRequest[]  @relation("ProjectFieldVisitRequests")
+  fieldVisits        FieldVisit[]          @relation("ProjectFieldVisits")
+  fieldVisitRequests FieldVisitRequest[]   @relation("ProjectFieldVisitRequests")
   expenseClaims      ExpenseClaim[]
   rosterEntries      ShiftRosterEntry[]
-  attendances        Attendance[]         @relation("ProjectAttendance")
+  attendances        Attendance[]          @relation("ProjectAttendance")
+  scopeRequests      ProjectScopeRequest[]
 
   discussions ProjectDiscussion[]
 
@@ -2159,7 +2170,36 @@ model Issue {
   /// and rendered for every row of the task list, and summing the approved
   /// requests each time would put a join on both of those paths. Written only
   /// by the approval, inside the same transaction that marks it approved.
-  additionalHours Float @default(0)
+  additionalHours Float     @default(0)
+  /// When this task actually reached DONE.
+  ///
+  /// `updatedAt` was standing in for this, and it is not the same thing: fixing
+  /// a typo on a finished task bumps updatedAt and makes it look freshly
+  /// completed. Harmless in a "completed this week" tile, wrong in anything
+  /// that ranks people by it.
+  ///
+  /// Null on a task that has never been finished, and cleared again if one is
+  /// reopened — so "has a completedAt" and "is done" stay the same statement.
+  completedAt     DateTime?
+
+  /// §PB8: where this task stands in approval, when it needed any.
+  ///
+  /// Null on every task that predates the feature and on any task raised by
+  /// somebody who does not need approval — and null must keep meaning "fine",
+  /// because treating the existing board as unapproved would freeze all of it.
+  /// PENDING_* tasks are visible but locked: see two-step-approval.ts.
+  approvalState           String? // PENDING_TECHNICAL, PENDING_ADMIN, APPROVED, REJECTED
+  approvalRequestedById   Int?
+  approvalRequestedBy     Employee? @relation("IssueApprovalRequestedBy", fields: [approvalRequestedById], references: [id], onDelete: SetNull)
+  technicalApprovedById   Int?
+  technicalApprovedBy     Employee? @relation("IssueTechnicalApprover", fields: [technicalApprovedById], references: [id], onDelete: SetNull)
+  technicalApprovedAt     DateTime?
+  adminApprovedById       Int?
+  adminApprovedBy         Employee? @relation("IssueAdminApprover", fields: [adminApprovedById], references: [id], onDelete: SetNull)
+  adminApprovedAt         DateTime?
+  /// A refusal has to say why; the person who raised it can only answer one
+  /// they can read.
+  approvalRejectionReason String?   @db.Text
 
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
@@ -2168,7 +2208,7 @@ model Issue {
 
   /// Raised from a site visit, when it was.
   fieldVisitRequestId Int?
-  fieldVisitRequest   FieldVisitRequest? @relation(fields: [fieldVisitRequestId], references: [id])
+  fieldVisitRequest   FieldVisitRequest?      @relation(fields: [fieldVisitRequestId], references: [id])
   /// The reverse of the same fact, for a task that *already* existed and a trip
   /// adopted rather than created. Distinct from the relation above: this task
   /// is still the project's own, and `fieldVisitRequestId` stays null on it.
@@ -2962,33 +3002,34 @@ model Lead {
 // External contact (broker/partner/referrer) who can be selected as the source
 // of a lead via the "Lead Brought By" field, as an alternative to an internal Employee.
 model LeadContact {
-  id                Int               @id @default(autoincrement())
+  id                    Int                    @id @default(autoincrement())
   // e.g. LC0926-001 — same scheme as Lead.leadCode.
-  contactCode       String?           @unique
-  salutation        String?
-  name              String
-  email             String?
-  phone             String?
-  leadSource        String?
-  companyName       String?
-  website           String?
-  mobile            String?
-  officePhoneNumber String?
-  country           String?
-  state             String?
-  city              String?
-  postalCode        String?
-  address           String?           @db.Text
-  addedById         Int?
-  addedBy           Employee?         @relation("LeadContactAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
-  companyId         Int
-  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  leadsBrought      Lead[]
-  notes             LeadContactNote[]
-  projects          Project[]         @relation("ProjectLeadContact")
-  visitLocations    VisitLocation[]
+  contactCode           String?                @unique
+  salutation            String?
+  name                  String
+  email                 String?
+  phone                 String?
+  leadSource            String?
+  companyName           String?
+  website               String?
+  mobile                String?
+  officePhoneNumber     String?
+  country               String?
+  state                 String?
+  city                  String?
+  postalCode            String?
+  address               String?                @db.Text
+  addedById             Int?
+  addedBy               Employee?              @relation("LeadContactAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  companyId             Int
+  company               Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  leadsBrought          Lead[]
+  notes                 LeadContactNote[]
+  projects              Project[]              @relation("ProjectLeadContact")
+  visitLocations        VisitLocation[]
+  visitLocationRequests VisitLocationRequest[]
 }
 
 // A follow-up is a single logged/scheduled interaction on a lead — a running
@@ -3706,6 +3747,10 @@ model ProjectBudgetRequest {
   attachmentUrl    String?
   attachmentName   String?
 
+  /// REQUESTED, then APPROVED or REJECTED. An administrator decides, alone:
+  /// the technical architect's step belongs to task creation and nowhere else,
+  /// because a budget increase asks whether the company will spend more, which
+  /// is not a technical question.
   status          String    @default("REQUESTED")
   reviewedById    Int?
   reviewedBy      Employee? @relation("BudgetReviewedBy", fields: [reviewedById], references: [id])
@@ -3816,39 +3861,98 @@ model TaskHoursRequestActivity {
 /// workflow's approvers, never removes any. The company owner can always
 /// approve, whatever this table says, so a workflow cannot be locked away from
 /// them by an unlucky edit.
+/// Anything about a project somebody needs a decision on, that is not a task
+/// and not a budget increase (§PB-Fix).
+///
+/// Raised from the Fix button on the project. The one thing it always says is
+/// whether the requester believes the work is inside the agreed scope or
+/// outside it — that single answer is what turns an argument about who pays
+/// into a decision somebody can actually make, so it is a required field
+/// rather than a note in the body.
+///
+/// Goes to an administrator, unlike tasks and budget requests: those carry a
+/// technical question an architect is the right person to read first, and this
+/// does not.
+model ProjectScopeRequest {
+  id         Int      @id @default(autoincrement())
+  projectId  Int
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  companyId  Int
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  raisedById Int
+  raisedBy   Employee @relation("ScopeRequestRaisedBy", fields: [raisedById], references: [id])
+
+  title String
+  /// IN_SCOPE or OUT_OF_SCOPE — the requester's own reading, which the
+  /// approver may disagree with.
+  scope String
+  /// Rich text from the editor. Stored as the HTML it was written as; rendered
+  /// through Angular's sanitiser, never with bypassSecurityTrust.
+  body  String @db.Text
+
+  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewedById Int?
+  reviewedBy   Employee? @relation("ScopeRequestReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  /// A refusal has to say why.
+  decisionNote String?   @db.Text
+
+  attachments ProjectScopeRequestAttachment[]
+  createdAt   DateTime                        @default(now())
+  updatedAt   DateTime                        @updatedAt
+
+  @@index([companyId, status])
+  @@index([projectId])
+}
+
+/// A file attached to a scope request. Its own table rather than a single
+/// url/name pair on the request, because "show me what you mean" is usually
+/// more than one screenshot.
+model ProjectScopeRequestAttachment {
+  id        Int                 @id @default(autoincrement())
+  requestId Int
+  request   ProjectScopeRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  url       String
+  name      String
+  sizeBytes Int?
+  createdAt DateTime            @default(now())
+
+  @@index([requestId])
+}
+
 model ApprovalDelegate {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   /// Which queue. One of APPROVAL_WORKFLOW in approvals/approval-workflows.ts —
   /// a string rather than an enum so adding a workflow is a code change and not
   /// a migration.
   workflow    String
   employeeId  Int
-  employee    Employee @relation("ApprovalDelegate", fields: [employeeId], references: [id], onDelete: Cascade)
+  employee    Employee  @relation("ApprovalDelegate", fields: [employeeId], references: [id], onDelete: Cascade)
   /// Who delegated it. SetNull: the delegation outlives the person who granted
   /// it, and losing who granted it must not silently revoke somebody's ability
   /// to approve.
   grantedById Int?
   grantedBy   Employee? @relation("ApprovalDelegateGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
   companyId   Int
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@unique([companyId, workflow, employeeId])
   @@index([companyId, workflow])
 }
 
 model VisitLocation {
-  id        Int      @id @default(autoincrement())
-  name      String
-  address   String?
-  latitude  Float?
-  longitude Float?
+  id               Int                    @id @default(autoincrement())
+  name             String
+  address          String?
+  latitude         Float?
+  longitude        Float?
   /// Soft-disable, as every other master-data table does: a location already
   /// recorded against past visits is the truth about those visits, so it is
   /// hidden from new ones rather than removed from old ones.
-  isActive  Boolean  @default(true)
-  position  Int      @default(0)
+  isActive         Boolean                @default(true)
+  position         Int                    @default(0)
   /// Who the site belongs to, when it belongs to anybody.
   ///
   /// A LeadContact rather than a Client: Project already opens against one, so
@@ -3857,16 +3961,49 @@ model VisitLocation {
   /// person's name rather than a company — which made a Client picker a list
   /// of prospects. LeadContact also carries the address, which a Client row
   /// does not in any usable form.
+  leadContactId    Int?
+  leadContact      LeadContact?           @relation(fields: [leadContactId], references: [id], onDelete: SetNull)
+  companyId        Int
+  company          Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  requests         FieldVisitRequest[]
+  approvalRequests VisitLocationRequest[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+}
+
+model VisitLocationRequest {
+  id        Int     @id @default(autoincrement())
+  name      String
+  address   String?
+  latitude  Float?
+  longitude Float?
+  position  Int     @default(0)
+
   leadContactId Int?
   leadContact   LeadContact? @relation(fields: [leadContactId], references: [id], onDelete: SetNull)
+
+  status          String    @default("PENDING")
+  requestedById   Int
+  requestedBy     Employee  @relation("VisitLocationRequestRaisedBy", fields: [requestedById], references: [id])
+  reviewedById    Int?
+  reviewedBy      Employee? @relation("VisitLocationRequestReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  rejectionReason String?
+
+  visitLocationId Int?
+  visitLocation   VisitLocation? @relation(fields: [visitLocationId], references: [id], onDelete: SetNull)
+
   companyId Int
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  requests  FieldVisitRequest[]
 
-  @@unique([companyId, name])
-  @@index([companyId, isActive])
+  @@index([companyId, status])
+  @@index([requestedById])
+  @@index([leadContactId])
 }
 
 model ProjectPhase {
@@ -4018,9 +4155,9 @@ model FieldVisitRequest {
 
   /// Where the work is. The coordinates are what each day's clock-in is
   /// measured against, so they are required rather than a nicety.
-  location  String
-  latitude  Float
-  longitude Float
+  location        String
+  latitude        Float
+  longitude       Float
   /// The master-data site this was picked from, when it was picked rather than
   /// typed (§PB10). SetNull, and the location/coordinates above stay put: where
   /// somebody actually went is a fact about the trip, and retiring a site from
@@ -4112,9 +4249,9 @@ model FieldVisitRequestTask {
   ///
   /// SetNull rather than Cascade: a task deleted from the board must not take
   /// the trip's line with it. The trip still happened, and still has a scope.
-  issueId Int?
-  issue   Issue? @relation(fields: [issueId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
+  issueId     Int?
+  issue       Issue?            @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now())
 
   @@index([requestId])
   @@index([issueId])

@@ -19,9 +19,14 @@ export class LeavesController {
   }
 
   @Get('balances')
-  getAllBalances(@Request() req, @Query('year') year: string) {
+  getAllBalances(
+    @Request() req,
+    @Query('year') year?: string,
+    @Query('employeeId') employeeId?: string,
+  ) {
     const y = year ? parseInt(year) : new Date().getFullYear();
-    return this.leavesService.getAllBalances(req.user.companyId, y);
+    const empId = employeeId ? parseInt(employeeId) : undefined;
+    return this.leavesService.getAllBalances(req.user.companyId, y, empId);
   }
 
   /** Leave quota report. Non-admins are scoped to themselves by the service. */

@@ -31,7 +31,7 @@ import { getAccessToken } from '../core/token-storage';
 import { RoleService } from '../services/role.service';
 import {
   TasksService, MyTask, TaskCapabilities, TaskType, LeadOption, TaskScope,
-  PreSalesInfo, PreSalesTaskHistoryEntry,
+  PreSalesInfo, PreSalesTaskHistoryEntry, TaskPerformer,
 } from '../services/tasks.service';
 
 /**
@@ -1918,10 +1918,25 @@ export class ProjectsComponent implements OnInit {
     });
   }
 
+  /**
+   * The people a task can be assigned to.
+   *
+   * The basic list, not the full directory. `getEmployees()` is guarded by
+   * `assertDirectoryAccess` on the server, so anybody without the
+   * employees/directory permission — an ordinary team member, for instance —
+   * got a 403, the error went to the console, and the "Assign to" dropdown
+   * simply sat empty with nothing to explain why. Assigning a task is not
+   * reading the HR directory, and basic-list exists precisely for this.
+   */
   loadEmployees() {
-    this.employeeService.getEmployees().subscribe({
+    this.employeeService.getEmployeesBasicList().subscribe({
       next: (res) => this.employees.set(res || []),
-      error: (err) => console.error('Error loading employees', err)
+      error: (err) => {
+        // Surfaced, not only logged: an empty picker with a silent console
+        // error is the failure that wasted the longest here.
+        console.error('Error loading employees', err);
+        this.toast.error('Could not load the team list. Please refresh.');
+      }
     });
   }
 
@@ -2390,6 +2405,45 @@ export class ProjectsComponent implements OnInit {
     });
   }
 
+  // ── §Tasks1: top task performers ─────────────────────────────────────────
+
+  topPerformers = signal<TaskPerformer[]>([]);
+  topPerformersWindow = signal(30);
+
+  /**
+   * Super Admin only. The server refuses anybody else, so this is only about
+   * not asking — and not showing an empty panel to people who will never see
+   * anything in it.
+   */
+  get canSeeTopPerformers(): boolean {
+    return this.authService.currentUser()?.role === 'SUPERADMIN';
+  }
+
+  loadTopPerformers() {
+    if (!this.canSeeTopPerformers) return;
+    this.tasksService.topPerformers(this.topPerformersWindow()).subscribe({
+      next: (res) => this.topPerformers.set(res?.performers || []),
+      // Silent: a missing recognition panel is a far smaller problem than an
+      // error toast over a task list that has otherwise loaded fine.
+      error: () => this.topPerformers.set([]),
+    });
+  }
+
+  /** Gold, silver, bronze — the same ladder the attendance champions use. */
+  performerRankClass(index: number): string {
+    return ['rank-gold', 'rank-silver', 'rank-bronze'][index] ?? 'rank-other';
+  }
+
+  performerInitials(p: TaskPerformer): string {
+    return (p.name || '')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || '?';
+  }
+
   // ── My Tasks ─────────────────────────────────────────────────────────────
 
   myTasksFilter = signal<'all' | 'overdue' | 'due-week' | 'PROJECT' | 'PRE_SALES' | 'GENERAL'>('all');
@@ -2416,6 +2470,8 @@ export class ProjectsComponent implements OnInit {
   private myTasksReloadTimer: any = null;
 
   loadMyTasks() {
+    // §Tasks1: alongside the list, not instead of it. Fails quietly on its own.
+    this.loadTopPerformers();
     this.myTasksLoading.set(true);
     this.tasksService.getMyTasks({
       includeDone: this.myTasksShowDone(),
@@ -3255,11 +3311,27 @@ export class ProjectsComponent implements OnInit {
           ? `<span class="type-pill type-bug" style="margin-left:4px;" title="Blocked by ${this.esc(p.data.blockedBy.map((b: any) => b.refKey).join(', '))}">BLOCKED BY ${p.data.blockedBy.length}</span>`
           : '';
 
+        // §PB8. A task waiting on somebody is not work yet, and one that came
+        // back needs its reason where the manager already is — not behind a
+        // click on a board they may not have open.
+        const state = p.data?.approvalState;
+        let approval = '';
+        if (state === 'PENDING_TECHNICAL' || state === 'PENDING_ADMIN') {
+          const who = state === 'PENDING_TECHNICAL' ? 'technical' : 'admin';
+          approval = `<span class="type-pill type-awaiting" title="This task is locked until it is approved">AWAITING ${who.toUpperCase()} APPROVAL</span>`;
+        } else if (state === 'REJECTED') {
+          const why = p.data?.approvalRejectionReason
+            ? ` title="${this.esc(p.data.approvalRejectionReason)}"`
+            : '';
+          approval = `<span class="type-pill type-rejected"${why}>NEEDS CHANGES</span>`;
+        }
+
         return `
           <div class="cell-ticket-title-wrapper">
             <div class="cell-title-text" title="${this.esc(p.value || '')}">${this.esc(p.value || '')}</div>
             <div class="cell-meta-row">
               <span class="type-pill ${typeBadgeClass}">${typeLabel}</span>
+              ${approval}
               ${blockers}
             </div>
           </div>
