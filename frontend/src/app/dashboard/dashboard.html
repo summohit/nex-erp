@@ -149,6 +149,7 @@
     <!-- COMMON EMPLOYEE KPIS — tasks, tickets and projects lead; the rest follow -->
     <ng-container>
       <app-stat-card
+        [loading]="isLoadingMetrics()"
         label="My Tasks"
         [value]="dashboard()?.common?.taskStats?.pending || 0"
         colorClass="bg-orange"
@@ -159,6 +160,7 @@
       </app-stat-card>
 
       <app-stat-card
+        [loading]="isLoadingMetrics()"
         label="My Tickets"
         [value]="dashboard()?.common?.ticketStats?.pending || 0"
         colorClass="bg-purple"
@@ -169,6 +171,7 @@
       </app-stat-card>
 
       <app-stat-card
+        [loading]="isLoadingMetrics()"
         label="My Projects"
         [value]="dashboard()?.common?.projectStats?.inProgress || 0"
         colorClass="bg-indigo"
@@ -179,6 +182,7 @@
       </app-stat-card>
 
       <app-stat-card
+        [loading]="isLoadingMetrics()"
         label="My Leaves"
         [value]="myLeaveUsedTotal()"
         colorClass="bg-blue"
@@ -189,6 +193,7 @@
       </app-stat-card>
 
       <app-stat-card
+        [loading]="isLoadingMetrics()"
         label="My Attendance"
         [value]="dashboard()?.common?.myAttendanceThisMonth?.presentCount || 0"
         colorClass="bg-emerald"
@@ -201,7 +206,8 @@
 
     <!-- FINANCE KPIS -->
     <ng-container *ngIf="isFinance()">
-      <app-stat-card 
+      <app-stat-card
+        [loading]="isLoadingMetrics()" 
         label="Net Pay (This Month)" 
         [value]="(dashboard()?.finance?.payrollSummary?.totalNetPay || 0) | currency:'INR':'symbol-narrow':'1.0-0'" 
         colorClass="bg-emerald"
@@ -211,7 +217,8 @@
         <svg icon lucideBanknote size="20"></svg>
       </app-stat-card>
 
-      <app-stat-card 
+      <app-stat-card
+        [loading]="isLoadingMetrics()" 
         label="Payslips Processed" 
         [value]="dashboard()?.finance?.payrollSummary?.payslipCount || 0" 
         colorClass="bg-blue"
@@ -221,7 +228,8 @@
         <svg icon lucideFileText size="20"></svg>
       </app-stat-card>
 
-      <app-stat-card 
+      <app-stat-card
+        [loading]="isLoadingMetrics()" 
         label="Pending Expense Claims" 
         [value]="dashboard()?.finance?.pendingExpenseClaims?.count || 0" 
         colorClass="bg-amber"
@@ -231,7 +239,8 @@
         <svg icon lucideReceipt size="20"></svg>
       </app-stat-card>
 
-      <app-stat-card 
+      <app-stat-card
+        [loading]="isLoadingMetrics()" 
         label="Pending Claims Value" 
         [value]="(dashboard()?.finance?.pendingExpenseClaims?.totalAmount || 0) | currency:'INR':'symbol-narrow':'1.0-0'" 
         colorClass="bg-purple"
@@ -244,7 +253,8 @@
 
     <!-- SALES KPIS -->
     <ng-container *ngIf="isSales()">
-      <app-stat-card 
+      <app-stat-card
+        [loading]="isLoadingMetrics()" 
         label="Quotation Approvals" 
         [value]="dashboard()?.sales?.pendingQuotationApprovals || 0" 
         colorClass="bg-amber"
@@ -254,7 +264,8 @@
         <svg icon lucideFileText size="20"></svg>
       </app-stat-card>
 
-      <app-stat-card 
+      <app-stat-card
+        [loading]="isLoadingMetrics()" 
         label="Orders This Month" 
         [value]="dashboard()?.sales?.ordersThisMonth?.count || 0" 
         colorClass="bg-blue"
@@ -264,7 +275,8 @@
         <svg icon lucideShoppingCart size="20"></svg>
       </app-stat-card>
 
-      <app-stat-card 
+      <app-stat-card
+        [loading]="isLoadingMetrics()" 
         label="Order Value (Month)" 
         [value]="(dashboard()?.sales?.ordersThisMonth?.totalValue || 0) | currency:'INR':'symbol-narrow':'1.0-0'" 
         colorClass="bg-emerald"
@@ -274,7 +286,8 @@
         <svg icon lucideTrendingUp size="20"></svg>
       </app-stat-card>
 
-      <app-stat-card 
+      <app-stat-card
+        [loading]="isLoadingMetrics()" 
         label="Leads in Pipeline" 
         [value]="dashboard()?.sales?.leadsPipeline?.recentLeads?.length || 0" 
         colorClass="bg-purple"
@@ -354,7 +367,8 @@
             </table>
           </div>
         </div>
-        <div class="empty-box p-6 text-center" *ngIf="(dashboard()?.finance?.pendingExpenseClaims?.recent?.length || 0) === 0">
+        <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
+        <div class="empty-box p-6 text-center" *ngIf="!isLoadingMetrics() && ((dashboard()?.finance?.pendingExpenseClaims?.recent?.length || 0) === 0)">
           <svg lucideCheckCircle2 size="32" class="text-emerald-500 mb-2"></svg>
           <p style="font-size: 13px; font-weight: 600; color: #1e293b;">No pending claims</p>
           <p style="font-size: 12px; color: #64748b;">All employee expense claims have been audited.</p>
@@ -478,7 +492,8 @@
               </tbody>
             </table>
           </div>
-          <div class="empty-box p-6 text-center" *ngIf="(dashboard()?.common?.myTasks?.length || 0) === 0">
+          <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
+          <div class="empty-box p-6 text-center" *ngIf="!isLoadingMetrics() && ((dashboard()?.common?.myTasks?.length || 0) === 0)">
             <svg lucideCheckCircle2 size="36" class="text-emerald-500 mb-2"></svg>
             <p style="font-size: 14px; font-weight: 700; color: #1e293b;">You are all caught up!</p>
             <p style="font-size: 12px; color: #64748b;">No active tasks currently assigned to you.</p>
@@ -503,11 +518,11 @@
           <div class="card-body">
             <div class="stat-tile-row">
               <div class="stat-tile">
-                <span class="stat-tile-value warn">{{ dashboard()?.common?.taskStats?.pending }}</span>
+                <span class="stat-tile-value warn">{{ isLoadingMetrics() ? '…' : (dashboard()?.common?.taskStats?.pending) }}</span>
                 <span class="stat-tile-label">Pending</span>
               </div>
               <div class="stat-tile">
-                <span class="stat-tile-value danger">{{ dashboard()?.common?.taskStats?.overdue }}</span>
+                <span class="stat-tile-value danger">{{ isLoadingMetrics() ? '…' : (dashboard()?.common?.taskStats?.overdue) }}</span>
                 <span class="stat-tile-label">Overdue</span>
               </div>
             </div>
@@ -529,11 +544,11 @@
           <div class="card-body">
             <div class="stat-tile-row">
               <div class="stat-tile">
-                <span class="stat-tile-value info">{{ dashboard()?.common?.projectStats?.inProgress }}</span>
+                <span class="stat-tile-value info">{{ isLoadingMetrics() ? '…' : (dashboard()?.common?.projectStats?.inProgress) }}</span>
                 <span class="stat-tile-label">In progress</span>
               </div>
               <div class="stat-tile">
-                <span class="stat-tile-value danger">{{ dashboard()?.common?.projectStats?.overdue }}</span>
+                <span class="stat-tile-value danger">{{ isLoadingMetrics() ? '…' : (dashboard()?.common?.projectStats?.overdue) }}</span>
                 <span class="stat-tile-label">Overdue</span>
               </div>
             </div>
@@ -573,7 +588,8 @@
               <span class="appreciation-date">{{ a.givenDate | date:'dd MMM yyyy' }}</span>
             </div>
           </div>
-          <div class="empty-box p-6 text-center" *ngIf="(dashboard()?.common?.appreciations?.length || 0) === 0">
+          <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
+          <div class="empty-box p-6 text-center" *ngIf="!isLoadingMetrics() && ((dashboard()?.common?.appreciations?.length || 0) === 0)">
             <svg lucideTrophy size="32" class="text-amber-400 mb-2"></svg>
             <p style="font-size: 13px; font-weight: 600; color: #64748b;">No record found</p>
             <p style="font-size: 12px; color: #94a3b8;">Appreciations will show up here when awarded.</p>
@@ -611,7 +627,8 @@
               </tbody>
             </table>
           </div>
-          <div class="empty-box p-6 text-center" *ngIf="(dashboard()?.common?.myTickets?.length || 0) === 0">
+          <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
+          <div class="empty-box p-6 text-center" *ngIf="!isLoadingMetrics() && ((dashboard()?.common?.myTickets?.length || 0) === 0)">
             <svg lucideTicket size="32" class="text-slate-400 mb-2"></svg>
             <p style="font-size: 13px; font-weight: 600; color: #64748b;">No record found</p>
             <p style="font-size: 12px; color: #94a3b8;">Tickets you raise will appear here.</p>
@@ -842,7 +859,8 @@
               <span class="balance-value">{{ (b.allocated || 0) - (b.used || 0) }} left</span>
             </div>
           </div>
-          <div class="empty-box p-5 text-center" *ngIf="(dashboard()?.common?.myLeaveBalance?.length || 0) === 0">
+          <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
+          <div class="empty-box p-5 text-center" *ngIf="!isLoadingMetrics() && ((dashboard()?.common?.myLeaveBalance?.length || 0) === 0)">
             <svg lucideCalendar size="30" class="text-slate-400 mb-2"></svg>
             <p style="font-size: 13px; font-weight: 600; color: #64748b;">No record found</p>
             <p style="font-size: 12px; color: #94a3b8;">Your leave balance will appear once allocated.</p>
@@ -963,7 +981,8 @@
             <span class="leave-tag">{{ l.leaveType }}</span>
           </div>
         </div>
-        <div class="empty-box p-5 text-center" *ngIf="(dashboard()?.common?.onLeaveToday?.length || 0) === 0">
+        <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
+        <div class="empty-box p-5 text-center" *ngIf="!isLoadingMetrics() && ((dashboard()?.common?.onLeaveToday?.length || 0) === 0)">
           <svg lucideCheckCircle2 size="30" class="text-emerald-500 mb-2"></svg>
           <p style="font-size: 13px; font-weight: 600; color: #1e293b;">Full team present</p>
           <p style="font-size: 12px; color: #94a3b8;">No one is on approved leave today.</p>
@@ -997,7 +1016,8 @@
             <span class="wfh-tag">{{ w.leaveType }}</span>
           </div>
         </div>
-        <div class="empty-box p-5 text-center" *ngIf="(dashboard()?.common?.onWfhToday?.length || 0) === 0">
+        <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
+        <div class="empty-box p-5 text-center" *ngIf="!isLoadingMetrics() && ((dashboard()?.common?.onWfhToday?.length || 0) === 0)">
           <svg lucideCheckCircle2 size="30" class="text-emerald-500 mb-2"></svg>
           <p style="font-size: 13px; font-weight: 600; color: #1e293b;">All on-site today</p>
           <p style="font-size: 12px; color: #94a3b8;">No approved WFH requests today.</p>
@@ -1030,7 +1050,8 @@
             <span class="anniv-meta">{{ a.years }}-year work anniversary 🎊</span>
           </div>
         </div>
-        <div class="empty-box p-5 text-center" *ngIf="!anyTodayMilestones()">
+        <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
+        <div class="empty-box p-5 text-center" *ngIf="!isLoadingMetrics() && (!anyTodayMilestones())">
           <svg lucideCalendarDays size="30" class="text-slate-400 mb-2"></svg>
           <p style="font-size: 13px; font-weight: 600; color: #64748b;">No record found</p>
           <p style="font-size: 12px; color: #94a3b8;">Nothing is marked for today.</p>

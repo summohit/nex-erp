@@ -59,6 +59,8 @@ model Company {
   letterTemplates       LetterTemplate[]
   generatedLetters      GeneratedLetter[]
   salaryComponents      SalaryComponent[]
+  salaryGrades          SalaryGrade[]
+  salaryTemplate        SalaryTemplate?
   expenseClaims         ExpenseClaim[]
   awardTypes            AwardType[]
   appreciations         Appreciation[]
@@ -370,6 +372,9 @@ model Employee {
   ///
   /// Defaults true; suspended staff are still excluded regardless.
   allowPayrollGenerate Boolean      @default(true)
+  /// EMPLOYEE is graded and paid on the salary template; CONSULTANT is paid on
+  /// a contract (TDS / GST) and stays outside grades and the template.
+  payType              String       @default("EMPLOYEE")
 
   shiftId          Int?
   shift            Shift?  @relation(fields: [shiftId], references: [id], onDelete: SetNull)
@@ -976,6 +981,41 @@ model ShiftRotation {
 }
 
 // Payroll & Expenses
+/// A pay band by monthly gross. An employee's grade is read from their gross,
+/// not stored, so it can never disagree with what they are actually paid.
+model SalaryGrade {
+  id        Int      @id @default(autoincrement())
+  name      String // e.g. "G1"
+  label     String? // e.g. "Support staff"
+  minGross  Float    @default(0) // inclusive
+  maxGross  Float? // inclusive; null = no ceiling
+  position  Int      @default(0)
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+}
+
+/// How a monthly gross splits into components -- one per company.
+model SalaryTemplate {
+  id              Int      @id @default(autoincrement())
+  basicPct        Float    @default(50) // % of gross
+  hraPctOfBasic   Float    @default(40) // % of Basic (50 in metro cities)
+  conveyance      Float    @default(1600) // fixed, monthly
+  medical         Float    @default(1250) // fixed, monthly
+  pfPct           Float    @default(12) // % of Basic
+  pfWageCap       Float?   @default(15000) // PF on Basic up to this; null = on full Basic
+  esiPct          Float    @default(0.75) // % of gross
+  esiGrossLimit   Float    @default(21000) // ESI only at or below this gross
+  professionalTax Float    @default(200) // monthly
+  companyId       Int      @unique
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 model SalaryComponent {
   id               Int               @id @default(autoincrement())
   name             String

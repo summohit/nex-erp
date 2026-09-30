@@ -2874,3 +2874,23 @@
     max-height: 90vh;
   }
 }
+
+/* Shown in place of a widget's empty state until the dashboard answers */
+.widget-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 16px;
+  font-size: 13px;
+  color: #64748b;
+}
+.widget-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: widgetSpin 0.8s linear infinite;
+}
+@keyframes widgetSpin { to { transform: rotate(360deg); } }

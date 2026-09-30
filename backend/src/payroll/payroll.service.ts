@@ -3,6 +3,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from './pdf.service';
 import { EmailService } from './email.service';
 import { countsAsAttended } from '../attendance/clock-out-approval';
+import {
+  DEFAULT_TEMPLATE, LINE_COMPONENT_NAMES, SalaryTemplateRules, TemplateLine,
+  gradeFor, splitGross,
+} from './salary-template';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -111,6 +115,7 @@ export class PayrollService {
   // ==================== 2. SALARY STRUCTURE ====================
 
   async getAllSalaryStructures(companyId: number) {
+    const grades = await this.getSalaryGrades(companyId);
     const employees = await this.prisma.employee.findMany({
       where: { companyId },
       include: {
@@ -139,17 +144,21 @@ export class PayrollService {
       const netSalary = Math.max(0, grossEarnings - totalDeductions);
       const hasStructure = (emp.salaryStructures?.length || 0) > 0 && grossEarnings > 0;
 
+      // Consultants are whoever is marked so, not whoever's title says
+      // "manager" -- that guess filed a Center Manager as a consultant.
+      const isConsultant = emp.payType === 'CONSULTANT';
       let salaryGroup = 'Employee Salary Group';
       const desig = (emp.designation?.name || '').toLowerCase();
-      if (desig.includes('consultant')) {
-        salaryGroup = 'Technical Consultant';
+      if (isConsultant) {
+        salaryGroup = 'Consultant';
       } else if (desig.includes('trainee') || desig.includes('intern')) {
         salaryGroup = 'Trainee Stipend';
-      } else if (desig.includes('operations') || desig.includes('manager')) {
-        salaryGroup = 'Non Technical Consultant Salary';
       } else if (emp.department?.name) {
         salaryGroup = emp.department.name;
       }
+      // Read from the gross rather than stored, so it cannot fall out of step
+      // with what the person is paid. Consultants are not graded.
+      const grade = isConsultant ? null : gradeFor(grossEarnings, grades);
 
       return {
         id: emp.id,
@@ -167,6 +176,8 @@ export class PayrollService {
         joiningDate: emp.joiningDate,
         salaryCycle: 'Monthly',
         salaryGroup,
+        payType: emp.payType,
+        grade: grade ? { id: grade.id, name: grade.name, label: grade.label } : null,
         // Suspension still wins: somebody with no login is off payroll
         // whatever this flag says, and the screen should agree with what
         // generation will actually do.
@@ -226,6 +237,177 @@ export class PayrollService {
       });
     }
 
+    return this.getSalaryStructure(companyId, employeeId);
+  }
+
+  // ==================== 2b. GRADES & TEMPLATE ====================
+
+  async getSalaryGrades(companyId: number) {
+    return this.prisma.salaryGrade.findMany({
+      where: { companyId },
+      orderBy: [{ position: 'asc' }, { minGross: 'asc' }],
+    });
+  }
+
+  /**
+   * Replace the company's grades. Bands must not overlap -- a gross in two
+   * grades would have no answer -- and only the top one may be open-ended.
+   */
+  async saveSalaryGrades(companyId: number, input: { name: string; label?: string | null; minGross: number; maxGross: number | null }[]) {
+    const grades = (input || []).map((g) => ({
+      name: String(g.name || '').trim(),
+      label: g.label ? String(g.label).trim() : null,
+      minGross: Number(g.minGross) || 0,
+      maxGross: g.maxGross == null || (g.maxGross as any) === '' ? null : Number(g.maxGross),
+      position: 0,
+    })).sort((a, b) => a.minGross - b.minGross);
+
+    if (grades.some(g => !g.name)) throw new BadRequestException('Every grade needs a name');
+    if (new Set(grades.map(g => g.name.toLowerCase())).size !== grades.length) {
+      throw new BadRequestException('Grade names must be different');
+    }
+    grades.forEach((g, i) => {
+      if (g.maxGross != null && g.maxGross < g.minGross) {
+        throw new BadRequestException(`${g.name}: the maximum is below the minimum`);
+      }
+      if (g.maxGross == null && i !== grades.length - 1) {
+        throw new BadRequestException(`${g.name}: only the highest grade can have no maximum`);
+      }
+      const next = grades[i + 1];
+      if (next && g.maxGross != null && next.minGross <= g.maxGross) {
+        throw new BadRequestException(`${g.name} and ${next.name} overlap`);
+      }
+      g.position = i + 1;
+    });
+
+    await this.prisma.$transaction([
+      this.prisma.salaryGrade.deleteMany({ where: { companyId } }),
+      this.prisma.salaryGrade.createMany({ data: grades.map(g => ({ ...g, companyId })) }),
+    ]);
+    return this.getSalaryGrades(companyId);
+  }
+
+  async getSalaryTemplate(companyId: number): Promise<SalaryTemplateRules> {
+    const row = await this.prisma.salaryTemplate.findUnique({ where: { companyId } });
+    if (!row) return { ...DEFAULT_TEMPLATE };
+    const { id, companyId: _c, createdAt, updatedAt, ...rules } = row as any;
+    return rules as SalaryTemplateRules;
+  }
+
+  async updateSalaryTemplate(companyId: number, input: Record<string, number | null>) {
+    const next: any = { ...(await this.getSalaryTemplate(companyId)) };
+    for (const key of Object.keys(DEFAULT_TEMPLATE) as (keyof SalaryTemplateRules)[]) {
+      if (!(key in (input || {}))) continue;
+      const v = input[key];
+      if (key === 'pfWageCap' && (v === null || (v as any) === '')) { next.pfWageCap = null; continue; }
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < 0) throw new BadRequestException(`${key} must be a number, 0 or more`);
+      next[key] = n;
+    }
+    if (next.basicPct > 100 || next.basicPct <= 0) throw new BadRequestException('Basic must be between 1% and 100% of gross');
+    if (next.hraPctOfBasic > 100) throw new BadRequestException('HRA cannot be more than 100% of Basic');
+    await this.prisma.salaryTemplate.upsert({
+      where: { companyId },
+      update: next,
+      create: { ...next, companyId },
+    });
+    return this.getSalaryTemplate(companyId);
+  }
+
+  async setPayType(companyId: number, employeeId: number, payType: string) {
+    const type = String(payType || '').toUpperCase();
+    if (type !== 'EMPLOYEE' && type !== 'CONSULTANT') {
+      throw new BadRequestException('Pay type must be EMPLOYEE or CONSULTANT');
+    }
+    const employee = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId } });
+    if (!employee) throw new NotFoundException('Employee not found');
+    return this.prisma.employee.update({
+      where: { id: employeeId },
+      data: { payType: type },
+      select: { id: true, payType: true },
+    });
+  }
+
+  /**
+   * The component each template line lands on: an existing one matched by
+   * name ("HRA", "Travel Allowance"...), or a name to create when the company
+   * has none yet.
+   */
+  private async templateComponents(companyId: number) {
+    const components = await this.prisma.salaryComponent.findMany({ where: { companyId } });
+    const byName = new Map(components.map(c => [c.name.trim().toLowerCase(), c]));
+    const out = {} as Record<TemplateLine, { id: number | null; name: string }>;
+    for (const line of Object.keys(LINE_COMPONENT_NAMES) as TemplateLine[]) {
+      const spec = LINE_COMPONENT_NAMES[line];
+      const hit = spec.aliases.map(a => byName.get(a)).find(Boolean);
+      out[line] = hit ? { id: hit.id, name: hit.name } : { id: null, name: spec.create };
+    }
+    return out;
+  }
+
+  /** What applying the template would set, next to what is there now. Writes nothing. */
+  async previewTemplate(companyId: number, employeeId: number, gross?: number) {
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      include: { salaryStructures: { include: { component: true } } },
+    });
+    if (!employee) throw new NotFoundException('Employee not found');
+    if (employee.payType === 'CONSULTANT') {
+      throw new BadRequestException('Consultants are paid on their contract, not the salary template');
+    }
+
+    const currentGross = employee.salaryStructures
+      .filter(s => s.component?.type === 'EARNING')
+      .reduce((t, s) => t + (s.amount || 0), 0);
+    const g = gross != null && Number.isFinite(gross) && gross > 0 ? gross : currentGross;
+    if (!(g > 0)) throw new BadRequestException('Enter the monthly gross to split');
+
+    const [rules, components, grades] = await Promise.all([
+      this.getSalaryTemplate(companyId), this.templateComponents(companyId), this.getSalaryGrades(companyId),
+    ]);
+    const lines = splitGross(g, rules).map(l => ({ ...l, component: components[l.line] }));
+    const deductions = lines.filter(l => l.type === 'DEDUCTION').reduce((t, l) => t + l.amount, 0);
+    const grade = gradeFor(g, grades);
+
+    return {
+      gross: g,
+      net: Math.round((g - deductions) * 100) / 100,
+      grade: grade ? { id: grade.id, name: grade.name, label: grade.label } : null,
+      lines,
+      current: employee.salaryStructures.map(s => ({
+        componentId: s.componentId, name: s.component?.name, type: s.component?.type, amount: s.amount,
+      })),
+      currentGross,
+    };
+  }
+
+  /**
+   * Replace this person's structure with the template's split. Components the
+   * company lacks are created; lines that come to 0 (no ESI above the limit)
+   * are left out; anything else on the old structure is removed, since the
+   * split is the whole of their pay.
+   */
+  async applyTemplate(companyId: number, employeeId: number, gross: number) {
+    const preview = await this.previewTemplate(companyId, employeeId, gross);
+
+    const ids = new Map<TemplateLine, number>();
+    for (const l of preview.lines) {
+      if (l.component.id != null) { ids.set(l.line, l.component.id); continue; }
+      if (l.amount === 0) continue;
+      const created = await this.prisma.salaryComponent.create({
+        data: { name: l.component.name, type: l.type, isPreDefined: true, companyId },
+      });
+      ids.set(l.line, created.id);
+    }
+
+    const rows = preview.lines
+      .filter(l => l.amount > 0 && ids.has(l.line))
+      .map(l => ({ employeeId, componentId: ids.get(l.line)!, amount: l.amount }));
+
+    await this.prisma.$transaction([
+      this.prisma.salaryStructure.deleteMany({ where: { employeeId } }),
+      this.prisma.salaryStructure.createMany({ data: rows }),
+    ]);
     return this.getSalaryStructure(companyId, employeeId);
   }
 

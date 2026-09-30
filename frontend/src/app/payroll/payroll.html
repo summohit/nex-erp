@@ -1597,6 +1597,11 @@
             </button>
           </div>
 
+          <button class="btn btn-outline-primary" (click)="openGradesModal()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+            Grades &amp; Template
+          </button>
+
           <button class="btn btn-outline-primary" (click)="openComponentModal()">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             Create Custom Salary Component
@@ -1607,7 +1612,78 @@
       <!-- ==================== 1. TABLE VIEW (Default - like Image 1) ==================== -->
       <div class="salary-table-view-container" *ngIf="salaryViewMode() === 'table'">
         
-        <!-- Filter Toolbar (Designation, Department, Status, Search) -->
+        <!-- Grade summary: people and monthly gross per band; interactive cards filter table -->
+        <div class="grade-summary-strip" *ngIf="gradeSummary().bands.length">
+          <!-- All Staff Reset Card -->
+          <div 
+            class="grade-card grade-card-all"
+            [class.active]="salaryTableGradeFilter() === 'ALL'"
+            (click)="salaryTableGradeFilter.set('ALL')">
+            <div class="grade-card-top">
+              <span class="grade-chip grade-chip-all">ALL</span>
+              <span class="grade-range-pill">Entire Team</span>
+              <span class="grade-active-indicator" *ngIf="salaryTableGradeFilter() === 'ALL'">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </div>
+            <div class="grade-card-title">All Employees</div>
+            <div class="grade-card-metrics">
+              <span class="grade-count-chip">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                {{ salaryTableData().length }} staff
+              </span>
+              <span class="grade-gross-chip">₹{{ totalCompanyGross().toLocaleString('en-IN') }}/mo</span>
+            </div>
+          </div>
+
+          <!-- Individual Grade Cards -->
+          <div 
+            class="grade-card" 
+            *ngFor="let b of gradeSummary().bands"
+            [ngClass]="getGradeBadgeClass(b.name)"
+            [class.active]="salaryTableGradeFilter() === b.name"
+            (click)="salaryTableGradeFilter.set(salaryTableGradeFilter() === b.name ? 'ALL' : b.name)">
+            <div class="grade-card-top">
+              <span class="grade-chip">{{ b.name }}</span>
+              <span class="grade-range-pill">{{ b.range }}</span>
+              <span class="grade-active-indicator" *ngIf="salaryTableGradeFilter() === b.name">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </div>
+            <div class="grade-card-title" [title]="b.label || b.name">{{ b.label || 'Standard Grade' }}</div>
+            <div class="grade-card-metrics">
+              <span class="grade-count-chip">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+                {{ b.count }} {{ b.count === 1 ? 'person' : 'people' }}
+              </span>
+              <span class="grade-gross-chip">₹{{ b.gross.toLocaleString('en-IN') }}/mo</span>
+            </div>
+          </div>
+
+          <!-- Consultants Card -->
+          <div 
+            class="grade-card grade-card-consultant"
+            [class.active]="salaryTableGradeFilter() === 'CONSULTANT'"
+            (click)="salaryTableGradeFilter.set(salaryTableGradeFilter() === 'CONSULTANT' ? 'ALL' : 'CONSULTANT')">
+            <div class="grade-card-top">
+              <span class="grade-chip grade-chip-consultant">EXT</span>
+              <span class="grade-range-pill">Contractual</span>
+              <span class="grade-active-indicator" *ngIf="salaryTableGradeFilter() === 'CONSULTANT'">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </div>
+            <div class="grade-card-title">Consultants &amp; Advisory</div>
+            <div class="grade-card-metrics">
+              <span class="grade-count-chip">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                {{ gradeSummary().consultants.count }} {{ gradeSummary().consultants.count === 1 ? 'person' : 'people' }}
+              </span>
+              <span class="grade-gross-chip">₹{{ gradeSummary().consultants.gross.toLocaleString('en-IN') }}/mo</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Toolbar (Designation, Department, Status, Grade, Search) -->
         <div class="salary-filter-toolbar">
           <div class="filter-left-group">
             <!-- Designation Filter -->
@@ -1648,6 +1724,20 @@
                   [clearable]="salaryTableStatusFilter() !== 'ALL'"
                   placeholder="All Status"
                   (valueChange)="salaryTableStatusFilter.set($event || 'ALL')">
+                </app-searchable-select>
+              </div>
+            </div>
+
+            <!-- Grade Filter -->
+            <div class="filter-item">
+              <label>Grade</label>
+              <div class="searchable-select-wrap">
+                <app-searchable-select
+                  [options]="gradeFilterOptions()"
+                  [value]="salaryTableGradeFilter()"
+                  [clearable]="salaryTableGradeFilter() !== 'ALL'"
+                  placeholder="All Grades"
+                  (valueChange)="salaryTableGradeFilter.set($event || 'ALL')">
                 </app-searchable-select>
               </div>
             </div>
@@ -1699,6 +1789,14 @@
                     </span>
                   </div>
                 </th>
+                <th class="th-sortable" (click)="toggleSalarySort('grade')">
+                  <div class="th-content">
+                    <span>Grade</span>
+                    <span class="sort-arrows" [class.active]="salaryTableSortColumn() === 'grade'">
+                      {{ salaryTableSortColumn() === 'grade' ? (salaryTableSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
+                    </span>
+                  </div>
+                </th>
                 <th class="th-sortable" (click)="toggleSalarySort('allowPayroll')">
                   <div class="th-content">
                     <span>Allow Payroll Generate</span>
@@ -1744,6 +1842,11 @@
                     <div class="skeleton-pill skeleton-shimmer" [style.width]="(s % 2 === 0 ? '140px' : '115px')" style="height: 24px; border-radius: 12px;"></div>
                   </td>
 
+                  <!-- Grade Skeleton -->
+                  <td class="td-grade">
+                    <div class="skeleton-pill skeleton-shimmer" style="width: 70px; height: 24px; border-radius: 12px;"></div>
+                  </td>
+
                   <!-- Allow Payroll Generate Skeleton -->
                   <td class="td-allow-payroll">
                     <div class="skeleton-pill skeleton-shimmer" style="width: 68px; height: 32px; border-radius: 6px;"></div>
@@ -1768,7 +1871,7 @@
               <ng-container *ngIf="!isLoadingSalaryTable()">
                 <!-- Empty state -->
                 <tr *ngIf="filteredSalaryRows().length === 0">
-                  <td colspan="6" class="text-center py-5">
+                  <td colspan="7" class="text-center py-5">
                     <div class="empty-table-state">
                       <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                       <p class="mt-2 text-secondary">No employees found matching current filters.</p>
@@ -1821,19 +1924,36 @@
                     </span>
                   </td>
 
+                  <!-- 3b. Grade + pay type -->
+                  <td class="td-grade">
+                    <div class="grade-cell">
+                      <span class="grade-badge" [ngClass]="getGradeBadgeClass(emp.grade?.name)" *ngIf="emp.payType !== 'CONSULTANT' && emp.grade" [title]="emp.grade.label || ''">{{ emp.grade.name }}</span>
+                      <span class="grade-badge grade-badge-none" *ngIf="emp.payType !== 'CONSULTANT' && !emp.grade">—</span>
+                      <span class="grade-badge grade-badge-consultant" *ngIf="emp.payType === 'CONSULTANT'">Consultant</span>
+                      <div class="pay-type-wrapper">
+                        <select class="pay-type-select" [ngModel]="emp.payType || 'EMPLOYEE'"
+                                (ngModelChange)="setPayType(emp, $event)" title="Employee or consultant">
+                          <option value="EMPLOYEE">Employee</option>
+                          <option value="CONSULTANT">Consultant</option>
+                        </select>
+                        <svg class="select-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                      </div>
+                    </div>
+                  </td>
+
                   <!-- 4. Allow Payroll Generate -->
                   <td class="td-allow-payroll">
-                    <div class="inline-select-container">
-                      <select
-                        class="table-inline-select"
-                        [disabled]="emp.user?.status === 'SUSPENDED'"
-                        [ngModel]="emp.allowPayrollGenerate"
-                        (ngModelChange)="setAllowPayroll(emp, $event)">
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                      </select>
-                      <svg class="inline-arrow" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                    </div>
+                    <button 
+                      type="button" 
+                      class="payroll-toggle-pill"
+                      [class.active]="emp.allowPayrollGenerate === 'Yes'"
+                      [class.disabled]="emp.user?.status === 'SUSPENDED'"
+                      [disabled]="emp.user?.status === 'SUSPENDED'"
+                      (click)="setAllowPayroll(emp, emp.allowPayrollGenerate === 'Yes' ? 'No' : 'Yes')"
+                      [title]="emp.allowPayrollGenerate === 'Yes' ? 'Click to pause payroll generation' : 'Click to allow payroll generation'">
+                      <span class="toggle-dot"></span>
+                      <span class="toggle-text">{{ emp.allowPayrollGenerate === 'Yes' ? 'Yes' : 'No' }}</span>
+                    </button>
                   </td>
 
                   <!-- 5. Net Salary (Monthly) -->
@@ -1857,9 +1977,23 @@
 
                   <!-- 6. Action Menu -->
                   <td class="td-action text-center">
-                    <button class="btn-action-more" (click)="openSalaryDrawer(emp)" title="Edit Salary Structure">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
-                    </button>
+                    <div class="row-action-cluster">
+                      <button 
+                        type="button"
+                        class="btn-action-template" 
+                        *ngIf="emp.payType !== 'CONSULTANT'" 
+                        (click)="openApplyTemplate(emp)" 
+                        title="Set salary from template">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                      </button>
+                      <button 
+                        type="button"
+                        class="btn-action-more" 
+                        (click)="openSalaryDrawer(emp)" 
+                        title="Edit Salary Structure">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"></circle><circle cx="12" cy="5" r="1.5"></circle><circle cx="12" cy="19" r="1.5"></circle></svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </ng-container>
@@ -3011,6 +3145,422 @@
 
       <div class="image-viewer-footer" *ngIf="previewImages().length > 1">
         <span class="img-counter">{{ activeImageIndex() + 1 }} of {{ previewImages().length }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ENHANCED MODALS ==================== -->
+
+  <!-- 1. Enhanced "Set Salary From Template" Modal -->
+  <div class="gt-overlay" *ngIf="templateTarget() as emp" (click)="closeApplyTemplate()">
+    <div class="gt-modal gt-template-modal" (click)="$event.stopPropagation()">
+      <div class="modal-accent-stripe"></div>
+
+      <!-- Header -->
+      <div class="gt-header">
+        <div class="template-header-profile">
+          <div class="template-avatar-circle" *ngIf="!emp.avatarUrl">
+            {{ emp.firstName ? emp.firstName.charAt(0) : '' }}{{ emp.lastName ? emp.lastName.charAt(0) : '' }}
+          </div>
+          <img [src]="emp.avatarUrl" *ngIf="emp.avatarUrl" class="template-avatar-img" alt="">
+          <div class="template-emp-info">
+            <div class="template-title-row">
+              <h3>Set Salary From Template</h3>
+              <span class="template-badge">Formula Calculator</span>
+            </div>
+            <p class="template-emp-meta">
+              <strong>{{ emp.firstName }} {{ emp.lastName }}</strong> &bull; 
+              <span>{{ emp.designation?.name || 'Staff' }}</span> &bull; 
+              <span class="text-secondary">{{ emp.department?.name || 'General' }}</span>
+            </p>
+          </div>
+        </div>
+        <button type="button" class="gt-close" (click)="closeApplyTemplate()" title="Close dialog">✕</button>
+      </div>
+
+      <div class="gt-body">
+        <!-- Monthly Gross Input Hero Card -->
+        <div class="template-gross-hero">
+          <div class="gross-input-header">
+            <label for="templateGrossInput" class="gross-input-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              Target Monthly Gross Salary
+            </label>
+            <span class="gross-input-hint">Type gross amount and click Calculate (or Enter)</span>
+          </div>
+          <div class="gross-input-wrap">
+            <span class="currency-prefix">₹</span>
+            <input 
+              id="templateGrossInput"
+              class="gross-num-input" 
+              type="number" 
+              min="1" 
+              placeholder="e.g. 100,000"
+              [(ngModel)]="templateGross"
+              (keyup.enter)="refreshTemplatePreview()" 
+              (blur)="refreshTemplatePreview()">
+            <button 
+              type="button" 
+              class="btn-calc-preview" 
+              (click)="refreshTemplatePreview()"
+              [disabled]="isPreviewingTemplate()">
+              <svg *ngIf="!isPreviewingTemplate()" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <span class="btn-spinner" *ngIf="isPreviewingTemplate()"></span>
+              {{ isPreviewingTemplate() ? 'Calculating…' : 'Calculate' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading Spinner State -->
+        <div class="widget-loading-banner" *ngIf="isPreviewingTemplate()">
+          <span class="widget-spinner"></span>
+          <span>Computing statutory deductions and allowance distributions…</span>
+        </div>
+
+        <!-- Calculated Preview Container -->
+        <ng-container *ngIf="!isPreviewingTemplate() && templatePreview() as p">
+          <!-- Grade & Net Payout Overview Banner -->
+          <div class="template-kpi-banner">
+            <div class="banner-kpi-item">
+              <span class="kpi-micro-label">MATCHED SALARY GRADE</span>
+              <div class="kpi-grade-stack">
+                <span class="grade-pill-tag" [ngClass]="getGradeBadgeClass(p.grade?.name)">
+                  {{ p.grade?.name || 'Standard' }}
+                </span>
+                <span class="grade-title-text">{{ p.grade?.label || 'Standard Band' }}</span>
+              </div>
+            </div>
+
+            <div class="banner-kpi-divider"></div>
+
+            <div class="banner-kpi-item">
+              <span class="kpi-micro-label">TOTAL MONTHLY GROSS</span>
+              <span class="kpi-val-text">₹{{ p.gross.toLocaleString('en-IN') }}</span>
+            </div>
+
+            <div class="banner-kpi-divider"></div>
+
+            <div class="banner-kpi-item banner-kpi-net">
+              <span class="kpi-micro-label">ESTIMATED NET TAKE-HOME</span>
+              <span class="kpi-val-text text-emerald">₹{{ p.net.toLocaleString('en-IN') }}</span>
+            </div>
+          </div>
+
+          <!-- Earnings & Deductions Dual Grid -->
+          <div class="template-dual-grid">
+            <!-- Left: Earnings Card -->
+            <div class="breakdown-card earnings-card">
+              <div class="breakdown-card-head head-earnings">
+                <div class="head-title">
+                  <span class="head-dot dot-green"></span>
+                  <h4>Earnings</h4>
+                </div>
+                <span class="head-total">₹{{ p.gross.toLocaleString('en-IN') }}</span>
+              </div>
+              <div class="breakdown-card-body">
+                <div class="breakdown-row" *ngFor="let l of templateEarnings()">
+                  <div class="breakdown-name-stack">
+                    <span class="comp-title">{{ getTemplateItemDisplay(l).title }}</span>
+                    <span class="comp-subtext">
+                      {{ getTemplateItemDisplay(l).subtitle }}
+                      <span class="badge-new-comp" *ngIf="getTemplateItemDisplay(l).isNew">New</span>
+                    </span>
+                  </div>
+                  <span class="comp-amount text-slate-800">₹{{ l.amount.toLocaleString('en-IN') }}</span>
+                </div>
+              </div>
+              <div class="breakdown-card-foot foot-earnings">
+                <span>Total Monthly Earnings</span>
+                <strong>₹{{ p.gross.toLocaleString('en-IN') }}</strong>
+              </div>
+            </div>
+
+            <!-- Right: Deductions Card -->
+            <div class="breakdown-card deductions-card">
+              <div class="breakdown-card-head head-deductions">
+                <div class="head-title">
+                  <span class="head-dot dot-rose"></span>
+                  <h4>Deductions</h4>
+                </div>
+                <span class="head-total text-rose">- ₹{{ (p.gross - p.net).toLocaleString('en-IN') }}</span>
+              </div>
+              <div class="breakdown-card-body">
+                <div class="breakdown-row" *ngFor="let l of templateDeductions()">
+                  <div class="breakdown-name-stack">
+                    <span class="comp-title">{{ getTemplateItemDisplay(l).title }}</span>
+                    <span class="comp-subtext">
+                      {{ getTemplateItemDisplay(l).subtitle }}
+                      <span class="badge-new-comp" *ngIf="getTemplateItemDisplay(l).isNew">New</span>
+                    </span>
+                  </div>
+                  <span class="comp-amount text-rose">- ₹{{ l.amount.toLocaleString('en-IN') }}</span>
+                </div>
+                <div class="breakdown-empty" *ngIf="templateDeductions().length === 0">
+                  <p class="text-secondary">No statutory deductions applicable for this bracket.</p>
+                </div>
+              </div>
+              <div class="breakdown-card-foot foot-deductions">
+                <span>Total Deductions</span>
+                <strong class="text-rose">- ₹{{ (p.gross - p.net).toLocaleString('en-IN') }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Replacement Warning Notice -->
+          <div class="gt-impact-alert" *ngIf="p.current.length">
+            <div class="alert-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </div>
+            <div class="alert-text">
+              <strong>Salary Reconfiguration Notice:</strong> Applying this template will replace {{ emp.firstName }}'s current {{ p.current.length }} custom components (previous gross ₹{{ p.currentGross.toLocaleString('en-IN') }}) with standardized formula allocations.
+            </div>
+          </div>
+        </ng-container>
+      </div>
+
+      <!-- Footer Actions -->
+      <div class="gt-footer">
+        <button type="button" class="btn btn-outline" (click)="closeApplyTemplate()">Cancel</button>
+        <button 
+          type="button" 
+          class="btn btn-primary btn-apply-template" 
+          [disabled]="!templatePreview() || isApplyingTemplate() || isPreviewingTemplate()" 
+          (click)="confirmApplyTemplate()">
+          <svg *ngIf="!isApplyingTemplate()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          <span class="btn-spinner" *ngIf="isApplyingTemplate()"></span>
+          {{ isApplyingTemplate() ? 'Applying Template…' : 'Apply Salary Template' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Enhanced "Grades & Salary Template" Configuration Modal -->
+  <div class="gt-overlay" *ngIf="isGradesModalOpen()" (click)="isGradesModalOpen.set(false)">
+    <div class="gt-modal gt-config-modal" (click)="$event.stopPropagation()">
+      <div class="modal-accent-stripe"></div>
+
+      <!-- Header -->
+      <div class="gt-header">
+        <div class="config-header-titles">
+          <div class="config-title-row">
+            <div class="config-icon-box">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+            </div>
+            <div>
+              <h3>Salary Grades &amp; Formula Template</h3>
+              <p>Define standardized salary grade bands and configure the automated gross salary distribution formula.</p>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="gt-close" (click)="isGradesModalOpen.set(false)" title="Close dialog">✕</button>
+      </div>
+
+      <div class="gt-body">
+        <!-- Section 1: Grades Table -->
+        <div class="config-section">
+          <div class="section-header-row">
+            <div>
+              <h4 class="section-title">Salary Grade Bands</h4>
+              <p class="section-subtitle">Employee grade is automatically determined by monthly gross salary. Consultants are outside grade bands.</p>
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm btn-add-band" (click)="addGradeRow()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Add Grade Band
+            </button>
+          </div>
+
+          <div class="gt-table-container">
+            <table class="gt-table gt-styled-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Grade</th>
+                  <th>Level / Description</th>
+                  <th style="width: 180px;">From (₹ / mo)</th>
+                  <th style="width: 180px;">To (₹ / mo)</th>
+                  <th style="width: 44px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let g of gradesDraft; let i = index" class="gt-grade-row">
+                  <td>
+                    <div class="input-badge-wrap">
+                      <input class="form-control form-control-sm grade-code-input" [(ngModel)]="g.name" placeholder="G1">
+                    </div>
+                  </td>
+                  <td>
+                    <input class="form-control form-control-sm" [(ngModel)]="g.label" placeholder="e.g. Junior staff / Associate">
+                  </td>
+                  <td>
+                    <div class="currency-input-sm">
+                      <span class="curr-tag">₹</span>
+                      <input class="form-control form-control-sm" type="number" min="0" [(ngModel)]="g.minGross" placeholder="0">
+                    </div>
+                  </td>
+                  <td>
+                    <div class="currency-input-sm">
+                      <span class="curr-tag">₹</span>
+                      <input class="form-control form-control-sm" type="number" min="0" [(ngModel)]="g.maxGross" placeholder="No ceiling">
+                    </div>
+                  </td>
+                  <td class="text-center">
+                    <button type="button" class="gt-remove-btn" (click)="removeGradeRow(i)" title="Remove grade band">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="gt-tip-banner">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span>Tip: Leave "To" empty on the highest grade only for uncapped upper limits. Pay ranges must be contiguous and non-overlapping.</span>
+          </div>
+        </div>
+
+        <!-- Section 2: Salary Template Formula -->
+        <div class="config-section mt-4" *ngIf="templateDraft as t">
+          <div class="section-header-row">
+            <div>
+              <h4 class="section-title">Automated Salary Distribution Formula</h4>
+              <p class="section-subtitle">How a monthly gross is apportioned when applying the standard template. Special Allowance automatically balances the remainder.</p>
+            </div>
+          </div>
+
+          <div class="formula-grid">
+            <!-- Basic Salary -->
+            <div class="formula-card">
+              <div class="formula-card-top">
+                <span class="formula-badge">Primary Earning</span>
+                <span class="formula-type">Statutory</span>
+              </div>
+              <label class="formula-label">Basic Salary</label>
+              <p class="formula-desc">Percentage of monthly gross earnings</p>
+              <div class="formula-input-unit">
+                <input class="form-control" type="number" min="1" max="100" [(ngModel)]="t.basicPct">
+                <span class="unit-tag">% of gross</span>
+              </div>
+            </div>
+
+            <!-- HRA -->
+            <div class="formula-card">
+              <div class="formula-card-top">
+                <span class="formula-badge">Allowance</span>
+                <span class="formula-type">Tax Exempt</span>
+              </div>
+              <label class="formula-label">House Rent Allowance (HRA)</label>
+              <p class="formula-desc">40% for non-metro, 50% for metro cities</p>
+              <div class="formula-input-unit">
+                <input class="form-control" type="number" min="0" max="100" [(ngModel)]="t.hraPctOfBasic">
+                <span class="unit-tag">% of Basic</span>
+              </div>
+            </div>
+
+            <!-- Conveyance -->
+            <div class="formula-card">
+              <div class="formula-card-top">
+                <span class="formula-badge">Allowance</span>
+                <span class="formula-type">Standard</span>
+              </div>
+              <label class="formula-label">Conveyance Allowance</label>
+              <p class="formula-desc">Standard travel reimbursement rate</p>
+              <div class="formula-input-unit">
+                <span class="curr-prefix">₹</span>
+                <input class="form-control" type="number" min="0" [(ngModel)]="t.conveyance">
+                <span class="unit-tag">/ month</span>
+              </div>
+            </div>
+
+            <!-- Medical -->
+            <div class="formula-card">
+              <div class="formula-card-top">
+                <span class="formula-badge">Allowance</span>
+                <span class="formula-type">Healthcare</span>
+              </div>
+              <label class="formula-label">Medical Allowance</label>
+              <p class="formula-desc">Standard medical health reimbursement</p>
+              <div class="formula-input-unit">
+                <span class="curr-prefix">₹</span>
+                <input class="form-control" type="number" min="0" [(ngModel)]="t.medical">
+                <span class="unit-tag">/ month</span>
+              </div>
+            </div>
+
+            <!-- Provident Fund -->
+            <div class="formula-card">
+              <div class="formula-card-top">
+                <span class="formula-badge badge-deduction">Deduction</span>
+                <span class="formula-type">Retirement</span>
+              </div>
+              <label class="formula-label">Provident Fund (PF)</label>
+              <p class="formula-desc">Employee contribution percentage of Basic</p>
+              <div class="formula-input-unit">
+                <input class="form-control" type="number" min="0" [(ngModel)]="t.pfPct">
+                <span class="unit-tag">% of Basic</span>
+              </div>
+              <div class="sub-input-row mt-2">
+                <span class="sub-label">Wage Cap (₹):</span>
+                <input class="form-control form-control-sm" type="number" min="0" [(ngModel)]="t.pfWageCap" placeholder="No cap (full Basic)">
+              </div>
+            </div>
+
+            <!-- ESI -->
+            <div class="formula-card">
+              <div class="formula-card-top">
+                <span class="formula-badge badge-deduction">Deduction</span>
+                <span class="formula-type">Health Scheme</span>
+              </div>
+              <label class="formula-label">Employee State Insurance (ESI)</label>
+              <p class="formula-desc">Applicable for monthly gross within ceiling</p>
+              <div class="formula-input-unit">
+                <input class="form-control" type="number" min="0" step="0.01" [(ngModel)]="t.esiPct">
+                <span class="unit-tag">% of gross</span>
+              </div>
+              <div class="sub-input-row mt-2">
+                <span class="sub-label">Applies up to (₹):</span>
+                <input class="form-control form-control-sm" type="number" min="0" [(ngModel)]="t.esiGrossLimit" placeholder="e.g. 21,000">
+              </div>
+            </div>
+
+            <!-- Professional Tax -->
+            <div class="formula-card">
+              <div class="formula-card-top">
+                <span class="formula-badge badge-deduction">Deduction</span>
+                <span class="formula-type">State Tax</span>
+              </div>
+              <label class="formula-label">Professional Tax (PT)</label>
+              <p class="formula-desc">Monthly state statutory deduction</p>
+              <div class="formula-input-unit">
+                <span class="curr-prefix">₹</span>
+                <input class="form-control" type="number" min="0" [(ngModel)]="t.professionalTax">
+                <span class="unit-tag">/ month</span>
+              </div>
+            </div>
+
+            <!-- Special Allowance Balancing Card -->
+            <div class="formula-card formula-card-special">
+              <div class="formula-card-top">
+                <span class="formula-badge badge-auto">Auto Calculated</span>
+                <span class="formula-type">Dynamic</span>
+              </div>
+              <label class="formula-label">Special Allowance</label>
+              <p class="formula-desc">Automatically balances the remainder to ensure: <br><code>Basic + HRA + Conveyance + Medical + Special = 100% Gross</code></p>
+              <div class="special-balance-chip">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Automated balancing active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Actions -->
+      <div class="gt-footer">
+        <button type="button" class="btn btn-outline" (click)="isGradesModalOpen.set(false)">Cancel</button>
+        <button type="button" class="btn btn-primary" [disabled]="isSavingGrades()" (click)="saveGradesAndTemplate()">
+          <span class="btn-spinner" *ngIf="isSavingGrades()"></span>
+          {{ isSavingGrades() ? 'Saving Configuration…' : 'Save Configuration' }}
+        </button>
       </div>
     </div>
   </div>

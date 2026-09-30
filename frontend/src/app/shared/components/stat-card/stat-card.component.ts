@@ -13,5 +13,7 @@ export class StatCardComponent {
   @Input() value: string | number | null = '';
   @Input() subtitle?: string;
   @Input() badge?: string;
+  /** While the figures are on their way: shimmer rather than a misleading 0. */
+  @Input() loading = false;
   @Input() colorClass: 'bg-blue' | 'bg-indigo' | 'bg-amber' | 'bg-emerald' | 'bg-purple' | 'bg-orange' = 'bg-blue';
 }

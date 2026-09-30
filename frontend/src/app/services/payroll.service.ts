@@ -37,6 +37,46 @@ export interface EmployeeSalaryRow {
   netSalary: number;
   hasStructure: boolean;
   salaryStructures?: SalaryStructureItem[];
+  /** EMPLOYEE is graded and on the template; CONSULTANT is contract pay, outside both. */
+  payType?: 'EMPLOYEE' | 'CONSULTANT';
+  /** Read from the gross by the server; null for consultants and anyone unpaid. */
+  grade?: { id: number; name: string; label?: string | null } | null;
+}
+
+/** A pay band by monthly gross. maxGross null = no ceiling (the top grade). */
+export interface SalaryGrade {
+  id?: number;
+  name: string;
+  label?: string | null;
+  minGross: number;
+  maxGross: number | null;
+}
+
+/** How a monthly gross splits into components. */
+export interface SalaryTemplateRules {
+  basicPct: number;
+  hraPctOfBasic: number;
+  conveyance: number;
+  medical: number;
+  pfPct: number;
+  pfWageCap: number | null;
+  esiPct: number;
+  esiGrossLimit: number;
+  professionalTax: number;
+}
+
+export interface TemplatePreview {
+  gross: number;
+  net: number;
+  grade: { id: number; name: string; label?: string | null } | null;
+  lines: {
+    line: string;
+    type: 'EARNING' | 'DEDUCTION';
+    amount: number;
+    component: { id: number | null; name: string };
+  }[];
+  current: { componentId: number; name?: string; type?: string; amount: number }[];
+  currentGross: number;
 }
 
 export interface PayrollPreviewRow {
@@ -258,6 +298,37 @@ export class PayrollService {
 
   getMyExpenseClaims(): Observable<ExpenseClaim[]> {
     return this.http.get<ExpenseClaim[]>(`${this.apiUrl}/expenses/me`);
+  }
+
+  // ── Grades & salary template ──────────────────────────────────────────────
+
+  getSalaryGrades(): Observable<SalaryGrade[]> {
+    return this.http.get<SalaryGrade[]>(`${this.apiUrl}/grades`);
+  }
+
+  saveSalaryGrades(grades: SalaryGrade[]): Observable<SalaryGrade[]> {
+    return this.http.put<SalaryGrade[]>(`${this.apiUrl}/grades`, grades);
+  }
+
+  getSalaryTemplate(): Observable<SalaryTemplateRules> {
+    return this.http.get<SalaryTemplateRules>(`${this.apiUrl}/template`);
+  }
+
+  updateSalaryTemplate(rules: Partial<SalaryTemplateRules>): Observable<SalaryTemplateRules> {
+    return this.http.put<SalaryTemplateRules>(`${this.apiUrl}/template`, rules);
+  }
+
+  setPayType(employeeId: number, payType: 'EMPLOYEE' | 'CONSULTANT'): Observable<{ id: number; payType: string }> {
+    return this.http.put<{ id: number; payType: string }>(`${this.apiUrl}/structure/${employeeId}/pay-type`, { payType });
+  }
+
+  previewSalaryTemplate(employeeId: number, gross?: number | null): Observable<TemplatePreview> {
+    const qs = gross ? `?gross=${gross}` : '';
+    return this.http.get<TemplatePreview>(`${this.apiUrl}/structure/${employeeId}/template-preview${qs}`);
+  }
+
+  applySalaryTemplate(employeeId: number, gross: number): Observable<SalaryStructureItem[]> {
+    return this.http.post<SalaryStructureItem[]>(`${this.apiUrl}/structure/${employeeId}/apply-template`, { gross });
   }
 
   /** Finance roles, plus anyone on the Expense claims list in Settings → Approvals. */

@@ -121,3 +121,18 @@
 .kpi-card.bg-purple .kpi-icon { background: #faf5ff; color: #9333ea; }
 .kpi-card.bg-purple .kpi-badge { background: #faf5ff; color: #9333ea; border: 1px solid #e9d5ff; }
 
+
+/* Loading shimmer, shown until the dashboard answers */
+.kpi-skeleton {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #eef2f7 25%, #e2e8f0 37%, #eef2f7 63%);
+  background-size: 400% 100%;
+  animation: kpiShimmer 1.2s ease-in-out infinite;
+}
+.kpi-skeleton-value { width: 56px; height: 30px; margin: 4px 0 8px; }
+.kpi-skeleton-sub { width: 90px; height: 12px; margin-top: 6px; }
+@keyframes kpiShimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}

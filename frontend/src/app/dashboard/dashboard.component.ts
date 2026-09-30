@@ -331,7 +331,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.dashboard.set(payload);
         this.pendingApprovals.set(payload.org?.pendingLeaveApprovals || []);
       },
-      error: () => this.toast.error('Failed to load dashboard data'),
+      error: () => {
+        this.toast.error('Failed to load dashboard data');
+        this.isLoadingMetrics.set(false);
+      },
       complete: () => this.isLoadingMetrics.set(false)
     });
   }

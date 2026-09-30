@@ -5,7 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AgGridModule } from 'ag-grid-angular';
 import { ColDef, ValueFormatterParams } from 'ag-grid-community';
 import { HotToastService } from '@ngneat/hot-toast';
-import { PayrollService, Payslip, ExpenseClaim, SalaryComponent, SalaryStructureItem, EmployeeSalaryRow, PayrollPreview } from '../services/payroll.service';
+import { PayrollService, Payslip, ExpenseClaim, SalaryComponent, SalaryStructureItem, EmployeeSalaryRow, PayrollPreview, SalaryGrade, SalaryTemplateRules, TemplatePreview } from '../services/payroll.service';
 import { EmployeeService } from '../services/employee.service';
 import { AuthService } from '../services/auth.service';
 import { ProjectsService } from '../services/projects';
@@ -90,6 +90,22 @@ export class PayrollComponent implements OnInit {
   salaryTableDeptFilter = signal<string>('ALL');
   salaryTableDesigFilter = signal<string>('ALL');
   salaryTableStatusFilter = signal<string>('ALL');
+  /** A grade name, CONSULTANT, UNGRADED, or ALL. */
+  salaryTableGradeFilter = signal<string>('ALL');
+
+  // ── Grades & salary template ──────────────────────────────────────────────
+  salaryGrades = signal<SalaryGrade[]>([]);
+  salaryTemplate = signal<SalaryTemplateRules | null>(null);
+  isGradesModalOpen = signal(false);
+  gradesDraft: SalaryGrade[] = [];
+  templateDraft: SalaryTemplateRules | null = null;
+  isSavingGrades = signal(false);
+  /** The row "Apply template" was opened for, and what it would set. */
+  templateTarget = signal<EmployeeSalaryRow | null>(null);
+  templateGross: number | null = null;
+  templatePreview = signal<TemplatePreview | null>(null);
+  isPreviewingTemplate = signal(false);
+  isApplyingTemplate = signal(false);
   // Joining date, not name: the table opens on the longest-serving staff
   // rather than on whoever is alphabetically first. Clicking a column header
   // still switches it as before.
@@ -581,6 +597,15 @@ export class PayrollComponent implements OnInit {
       rows = rows.filter(e => e.designation?.name === desig);
     }
 
+    const grade = this.salaryTableGradeFilter();
+    if (grade === 'CONSULTANT') {
+      rows = rows.filter(e => e.payType === 'CONSULTANT');
+    } else if (grade === 'UNGRADED') {
+      rows = rows.filter(e => e.payType !== 'CONSULTANT' && !e.grade);
+    } else if (grade !== 'ALL') {
+      rows = rows.filter(e => e.grade?.name === grade);
+    }
+
     if (status === 'CONFIGURED') {
       rows = rows.filter(e => e.hasStructure || (e.netSalary > 0));
     } else if (status === 'NOT_CONFIGURED') {
@@ -630,6 +655,12 @@ export class PayrollComponent implements OnInit {
       } else if (sortCol === 'group') {
         valA = (a.salaryGroup || '').toLowerCase();
         valB = (b.salaryGroup || '').toLowerCase();
+      } else if (sortCol === 'grade') {
+        // Grade order is pay order, so sort by gross; consultants last.
+        valA = a.payType === 'CONSULTANT' ? Infinity : (a.grossEarnings || 0);
+        valB = b.payType === 'CONSULTANT' ? Infinity : (b.grossEarnings || 0);
+        if (valA === valB) return 0;
+        return (valA < valB ? -1 : 1) * dir;
       } else if (sortCol === 'allowPayroll') {
         valA = (a.allowPayrollGenerate || '').toLowerCase();
         valB = (b.allowPayrollGenerate || '').toLowerCase();
@@ -687,6 +718,206 @@ export class PayrollComponent implements OnInit {
     return this.salaryTableData().filter(e => e.hasStructure || (e.netSalary > 0)).length;
   });
 
+  gradeFilterOptions = computed<SearchableSelectOption[]>(() => [
+    { id: 'ALL', name: 'All Grades' },
+    ...this.salaryGrades().map(g => ({ id: g.name, name: g.label ? `${g.name} · ${g.label}` : g.name })),
+    { id: 'UNGRADED', name: 'No salary yet' },
+    { id: 'CONSULTANT', name: 'Consultants' },
+  ]);
+
+  /**
+   * Headcount and payroll per grade, for the strip above the table. Active
+   * people only: someone who has left still has a structure but is not paid.
+   */
+  gradeSummary = computed(() => {
+    const active = this.salaryTableData().filter(e => e.user?.status !== 'SUSPENDED');
+    const bands = this.salaryGrades().map(g => {
+      const people = active.filter(e => e.grade?.name === g.name);
+      return {
+        name: g.name,
+        label: g.label,
+        range: this.gradeRange(g),
+        count: people.length,
+        gross: people.reduce((t, e) => t + (e.grossEarnings || 0), 0),
+      };
+    });
+    const consultants = active.filter(e => e.payType === 'CONSULTANT');
+    return {
+      bands,
+      consultants: { count: consultants.length, gross: consultants.reduce((t, e) => t + (e.grossEarnings || 0), 0) },
+    };
+  });
+
+  gradeRange(g: SalaryGrade): string {
+    const f = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
+    if (g.maxGross == null) return `${f(g.minGross)}+`;
+    return g.minGross > 0 ? `${f(g.minGross)} – ${f(g.maxGross)}` : `up to ${f(g.maxGross)}`;
+  }
+
+  loadGradesAndTemplate() {
+    this.payrollService.getSalaryGrades().subscribe({ next: g => this.salaryGrades.set(g || []), error: () => this.salaryGrades.set([]) });
+    this.payrollService.getSalaryTemplate().subscribe({ next: t => this.salaryTemplate.set(t), error: () => this.salaryTemplate.set(null) });
+  }
+
+  openGradesModal() {
+    this.gradesDraft = this.salaryGrades().map(g => ({ name: g.name, label: g.label ?? '', minGross: g.minGross, maxGross: g.maxGross }));
+    this.templateDraft = this.salaryTemplate() ? { ...this.salaryTemplate()! } : null;
+    this.isGradesModalOpen.set(true);
+  }
+
+  addGradeRow() {
+    const last = this.gradesDraft[this.gradesDraft.length - 1];
+    const min = last ? (last.maxGross ?? last.minGross) + 1 : 0;
+    this.gradesDraft.push({ name: `G${this.gradesDraft.length + 1}`, label: '', minGross: min, maxGross: null });
+  }
+
+  removeGradeRow(i: number) {
+    this.gradesDraft.splice(i, 1);
+  }
+
+  saveGradesAndTemplate() {
+    this.isSavingGrades.set(true);
+    const grades = this.gradesDraft.map(g => ({
+      ...g,
+      maxGross: g.maxGross === null || (g.maxGross as any) === '' ? null : Number(g.maxGross),
+      minGross: Number(g.minGross) || 0,
+    }));
+    this.payrollService.saveSalaryGrades(grades).subscribe({
+      next: (saved) => {
+        this.salaryGrades.set(saved);
+        if (!this.templateDraft) return this.finishGradesSave();
+        this.payrollService.updateSalaryTemplate(this.templateDraft).subscribe({
+          next: (t) => { this.salaryTemplate.set(t); this.finishGradesSave(); },
+          error: (err) => { this.isSavingGrades.set(false); this.toast.error(err.error?.message || 'Could not save the template'); },
+        });
+      },
+      error: (err) => { this.isSavingGrades.set(false); this.toast.error(err.error?.message || 'Could not save the grades'); },
+    });
+  }
+
+  private finishGradesSave() {
+    this.isSavingGrades.set(false);
+    this.isGradesModalOpen.set(false);
+    this.toast.success('Grades and template saved');
+    this.loadSalaryStructuresTable();
+  }
+
+  setPayType(emp: EmployeeSalaryRow, payType: 'EMPLOYEE' | 'CONSULTANT') {
+    if (emp.payType === payType) return;
+    this.payrollService.setPayType(emp.id, payType).subscribe({
+      next: () => {
+        this.toast.success(`${emp.firstName} is now ${payType === 'CONSULTANT' ? 'a consultant' : 'an employee'}`);
+        this.loadSalaryStructuresTable();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Could not change pay type'),
+    });
+  }
+
+  openApplyTemplate(emp: EmployeeSalaryRow) {
+    this.templateTarget.set(emp);
+    this.templateGross = emp.grossEarnings > 0 ? Math.round(emp.grossEarnings) : null;
+    this.templatePreview.set(null);
+    if (this.templateGross) this.refreshTemplatePreview();
+  }
+
+  closeApplyTemplate() {
+    this.templateTarget.set(null);
+    this.templatePreview.set(null);
+  }
+
+  refreshTemplatePreview() {
+    const emp = this.templateTarget();
+    const gross = Number(this.templateGross);
+    if (!emp || !(gross > 0)) { this.templatePreview.set(null); return; }
+    this.isPreviewingTemplate.set(true);
+    this.payrollService.previewSalaryTemplate(emp.id, gross).subscribe({
+      next: (p) => { this.templatePreview.set(p); this.isPreviewingTemplate.set(false); },
+      error: (err) => {
+        this.isPreviewingTemplate.set(false);
+        this.templatePreview.set(null);
+        this.toast.error(err.error?.message || 'Could not work out the split');
+      },
+    });
+  }
+
+  confirmApplyTemplate() {
+    const emp = this.templateTarget();
+    const p = this.templatePreview();
+    if (!emp || !p) return;
+    this.isApplyingTemplate.set(true);
+    this.payrollService.applySalaryTemplate(emp.id, p.gross).subscribe({
+      next: () => {
+        this.isApplyingTemplate.set(false);
+        this.toast.success(`${emp.firstName}'s salary set from the template`);
+        this.closeApplyTemplate();
+        this.loadSalaryStructuresTable();
+        if (this.selectedEmployeeId() === emp.id) this.selectEmployeeForStructure(emp.id, false);
+      },
+      error: (err) => {
+        this.isApplyingTemplate.set(false);
+        this.toast.error(err.error?.message || 'Could not apply the template');
+      },
+    });
+  }
+
+  templateLineLabel(line: string): string {
+    return ({ BASIC: 'Basic', HRA: 'HRA', CONVEYANCE: 'Conveyance', MEDICAL: 'Medical', SPECIAL: 'Special Allowance',
+      PF: 'Provident Fund', ESI: 'ESI', PT: 'Professional Tax' } as Record<string, string>)[line] || line;
+  }
+
+  getTemplateItemDisplay(l: any): { title: string; subtitle: string; isNew: boolean } {
+    const line = l.line;
+    const compName = l.component?.name || '';
+    const isNew = !l.component?.id;
+    let title = compName;
+    let subtitle = '';
+
+    if (line === 'BASIC') {
+      title = compName || 'Basic Salary';
+      subtitle = '50% of monthly gross';
+    } else if (line === 'HRA') {
+      title = compName || 'House Rent Allowance (HRA)';
+      subtitle = '40% of Basic Salary';
+    } else if (line === 'CONVEYANCE') {
+      title = compName || 'Conveyance Allowance';
+      subtitle = 'Standard travel reimbursement';
+    } else if (line === 'MEDICAL') {
+      title = compName || 'Medical Allowance';
+      subtitle = 'Standard healthcare benefit';
+    } else if (line === 'SPECIAL') {
+      title = compName || 'Special Allowance';
+      subtitle = 'Dynamic remainder balance';
+    } else if (line === 'PF') {
+      title = compName || 'Provident Fund (PF)';
+      subtitle = 'Employee statutory contribution';
+    } else if (line === 'ESI') {
+      title = compName || 'ESI Contribution';
+      subtitle = 'Employee state health insurance';
+    } else if (line === 'PT') {
+      title = compName || 'Professional Tax (PT)';
+      subtitle = 'State statutory deduction';
+    } else {
+      title = compName || line;
+    }
+
+    return { title, subtitle, isNew };
+  }
+
+  getGradeBadgeClass(name: string | undefined): string {
+    if (!name) return 'grade-badge-default';
+    const n = name.toUpperCase();
+    if (n === 'G1') return 'grade-badge-g1';
+    if (n === 'G2') return 'grade-badge-g2';
+    if (n === 'G3') return 'grade-badge-g3';
+    if (n === 'G4') return 'grade-badge-g4';
+    if (n === 'G5') return 'grade-badge-g5';
+    if (n.includes('CONSULTANT')) return 'grade-badge-consultant';
+    return 'grade-badge-default';
+  }
+
+  templateEarnings = computed(() => (this.templatePreview()?.lines || []).filter(l => l.type === 'EARNING'));
+  templateDeductions = computed(() => (this.templatePreview()?.lines || []).filter(l => l.type === 'DEDUCTION' && l.amount > 0));
+
   toggleSalarySort(col: string) {
     if (this.salaryTableSortColumn() === col) {
       this.salaryTableSortDirection.update(d => d === 'asc' ? 'desc' : 'asc');
@@ -720,6 +951,8 @@ export class PayrollComponent implements OnInit {
       'Designation',
       'Salary Cycle',
       'Salary Group',
+      'Grade',
+      'Pay Type',
       'Allow Payroll Generate',
       'Gross Earnings (INR)',
       'Total Deductions (INR)',
@@ -738,6 +971,8 @@ export class PayrollComponent implements OnInit {
         `"${r.designation?.name || ''}"`,
         `"${r.salaryCycle || 'Monthly'}"`,
         `"${r.salaryGroup || 'Employee Salary Group'}"`,
+        `"${r.grade?.name || ''}"`,
+        `"${r.payType === 'CONSULTANT' ? 'Consultant' : 'Employee'}"`,
         `"${r.allowPayrollGenerate || 'Yes'}"`,
         r.grossEarnings || 0,
         r.totalDeductions || 0,
@@ -1530,11 +1765,12 @@ export class PayrollComponent implements OnInit {
     this.payrollService.getComponents().subscribe(res => this.components.set(res));
     this.employeeService.getEmployees().subscribe(res => {
       this.employees.set(res);
-      if (res.length > 0 && !this.selectedEmployeeId()) {
+      // Everyone's structure is payroll admins' only (the server refuses the rest).
+      if (this.isAdmin() && res.length > 0 && !this.selectedEmployeeId()) {
         this.selectEmployeeForStructure(res[0].id, false);
       }
     });
-    this.loadSalaryStructuresTable();
+    if (this.isAdmin()) this.loadSalaryStructuresTable();
     this.projectsService.getProjects().subscribe(res => {
       this.projects.set(res);
     });
@@ -1987,6 +2223,7 @@ export class PayrollComponent implements OnInit {
   // Salary Structure Tab
   loadSalaryStructuresTable() {
     this.isLoadingSalaryTable.set(true);
+    this.loadGradesAndTemplate();
     this.payrollService.getAllSalaryStructures().subscribe({
       next: (res) => {
         this.isLoadingSalaryTable.set(false);

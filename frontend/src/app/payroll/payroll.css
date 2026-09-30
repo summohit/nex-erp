@@ -4766,3 +4766,1123 @@
   }
 }
 
+
+/* ── Enhanced Salary Grades & Templates UI ───────────────────────────── */
+
+/* 1. Grade Summary Cards Strip */
+.grade-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.grade-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 13px 15px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  user-select: none;
+}
+
+.grade-card:hover {
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.grade-card.active {
+  border-color: #2563eb;
+  background: #f8faff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14), 0 6px 16px rgba(37, 99, 235, 0.08);
+  transform: translateY(-2px);
+}
+
+.grade-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.grade-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: #eff6ff;
+  color: #1d4ed8;
+  letter-spacing: 0.3px;
+}
+
+.grade-chip-all {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.grade-chip-consultant {
+  background: #faf5ff;
+  color: #7e22ce;
+}
+
+.grade-range-pill {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.grade-active-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #ffffff;
+  margin-left: auto;
+}
+
+.grade-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.35;
+  margin-bottom: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grade-card-metrics {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.grade-count-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.grade-count-chip svg {
+  stroke: #94a3b8;
+}
+
+.grade-gross-chip {
+  font-size: 12px;
+  font-weight: 700;
+  color: #059669;
+}
+
+/* Distinct Card Accent Themes */
+.grade-card.grade-badge-g1 .grade-chip { background: #e0f2fe; color: #0369a1; }
+.grade-card.grade-badge-g2 .grade-chip { background: #dbeafe; color: #1d4ed8; }
+.grade-card.grade-badge-g3 .grade-chip { background: #e0e7ff; color: #4338ca; }
+.grade-card.grade-badge-g4 .grade-chip { background: #ede9fe; color: #6d28d9; }
+.grade-card.grade-badge-g5 .grade-chip { background: #fef3c7; color: #b45309; }
+.grade-card-consultant { background: #fdfcfe; }
+.grade-card-consultant .grade-gross-chip { color: #7e22ce; }
+
+/* 2. Table Column Cells & Interactive Toggles */
+.td-grade {
+  white-space: nowrap;
+}
+
+.grade-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grade-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.2px;
+}
+
+.grade-badge-g1 { background: #e0f2fe; color: #0369a1; }
+.grade-badge-g2 { background: #dbeafe; color: #1d4ed8; }
+.grade-badge-g3 { background: #e0e7ff; color: #4338ca; }
+.grade-badge-g4 { background: #ede9fe; color: #6d28d9; }
+.grade-badge-g5 { background: #fef3c7; color: #b45309; }
+.grade-badge-none { background: #f1f5f9; color: #94a3b8; }
+.grade-badge-consultant { background: #f3e8ff; color: #7e22ce; }
+.grade-badge-default { background: #eff6ff; color: #1d4ed8; }
+
+.pay-type-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pay-type-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  padding: 3px 22px 3px 7px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #475569;
+  background: #ffffff;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.pay-type-select:hover {
+  border-color: #cbd5e1;
+}
+
+.pay-type-select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.select-chevron {
+  position: absolute;
+  right: 6px;
+  pointer-events: none;
+  color: #94a3b8;
+}
+
+/* Allow Payroll Interactive Toggle Pill */
+.payroll-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.payroll-toggle-pill .toggle-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #94a3b8;
+  transition: background-color 0.15s ease;
+}
+
+.payroll-toggle-pill.active {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.payroll-toggle-pill.active .toggle-dot {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
+}
+
+.payroll-toggle-pill:hover:not(.disabled) {
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.payroll-toggle-pill.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Row Action Cluster */
+.row-action-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-action-template {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #059669;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action-template:hover {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+  transform: translateY(-1px);
+}
+
+.btn-action-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action-more:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+  transform: translateY(-1px);
+}
+
+/* 3. Global Modal Overlays & Windows */
+.gt-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: gtFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes gtFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.gt-modal {
+  position: relative;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  overflow: hidden;
+  animation: gtSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes gtSlideUp {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.gt-template-modal {
+  max-width: 660px;
+}
+
+.gt-config-modal {
+  max-width: 860px;
+}
+
+.modal-accent-stripe {
+  height: 4px;
+  width: 100%;
+  background: linear-gradient(90deg, #2563eb, #38bdf8, #818cf8);
+}
+
+/* Modal Headers */
+.gt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.template-header-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.template-avatar-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.template-avatar-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.template-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-title-row h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.template-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.template-emp-meta {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: #475569;
+}
+
+.config-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.config-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.config-title-row h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.config-title-row p {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.gt-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.gt-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Modal Body */
+.gt-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Gross Salary Input Hero Card */
+.template-gross-hero {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.gross-input-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.gross-input-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.gross-input-hint {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.gross-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.currency-prefix {
+  position: absolute;
+  left: 14px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.gross-num-input {
+  flex: 1;
+  height: 44px;
+  padding: 0 14px 0 32px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.gross-num-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.btn-calc-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s, transform 0.15s;
+}
+
+.btn-calc-preview:hover:not(:disabled) {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-calc-preview:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.widget-loading-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  background: #f8fafc;
+  border-radius: 12px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* Template Matched KPI Banner */
+.template-kpi-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 18px;
+}
+
+.banner-kpi-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.kpi-micro-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+
+.kpi-grade-stack {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.grade-pill-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.grade-title-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.kpi-val-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.banner-kpi-divider {
+  width: 1px;
+  height: 28px;
+  background: #e2e8f0;
+}
+
+/* Dual Grid Breakdown */
+.template-dual-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .template-dual-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.breakdown-card {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.breakdown-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.head-earnings {
+  background: #f0fdf4;
+}
+
+.head-deductions {
+  background: #fff1f2;
+}
+
+.head-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.head-title h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.head-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.dot-green { background: #10b981; }
+.dot-rose { background: #f43f5e; }
+
+.head-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.breakdown-card-body {
+  padding: 6px 14px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.breakdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed #f1f5f9;
+}
+
+.breakdown-row:last-child {
+  border-bottom: none;
+}
+
+.breakdown-name-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.comp-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.comp-subtext {
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-new-comp {
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.comp-amount {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.breakdown-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 12.5px;
+}
+
+.foot-earnings {
+  background: #f8fafc;
+}
+
+.foot-deductions {
+  background: #f8fafc;
+}
+
+.gt-impact-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+  color: #92400e;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.gt-impact-alert .alert-icon {
+  flex-shrink: 0;
+  color: #d97706;
+  margin-top: 1px;
+}
+
+/* Configuration Modal Sections */
+.config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.section-subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.btn-add-band {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.gt-table-container {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.gt-styled-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+.gt-styled-table th {
+  background: #f8fafc;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.gt-styled-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.gt-grade-row:last-child td {
+  border-bottom: none;
+}
+
+.gt-grade-row:hover td {
+  background: #fbfcfe;
+}
+
+.grade-code-input {
+  font-weight: 700;
+  text-transform: uppercase;
+  text-align: center;
+  max-width: 75px;
+}
+
+.currency-input-sm {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.currency-input-sm .curr-tag {
+  position: absolute;
+  left: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.currency-input-sm input {
+  padding-left: 22px;
+}
+
+.gt-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gt-remove-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.gt-tip-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #166534;
+}
+
+.gt-tip-banner svg {
+  stroke: #16a34a;
+  flex-shrink: 0;
+}
+
+/* Formula Parameter Cards Grid */
+.formula-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.formula-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s;
+}
+
+.formula-card:hover {
+  border-color: #cbd5e1;
+}
+
+.formula-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.formula-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.formula-badge.badge-deduction {
+  color: #be123c;
+  background: #ffe4e6;
+}
+
+.formula-badge.badge-auto {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.formula-type {
+  font-size: 10.5px;
+  color: #94a3b8;
+}
+
+.formula-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+
+.formula-desc {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0 0 8px 0;
+  line-height: 1.35;
+}
+
+.formula-input-unit {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: auto;
+}
+
+.formula-input-unit input {
+  padding-right: 80px;
+  font-weight: 600;
+}
+
+.formula-input-unit .unit-tag {
+  position: absolute;
+  right: 10px;
+  font-size: 11px;
+  color: #64748b;
+  pointer-events: none;
+  font-weight: 500;
+}
+
+.formula-input-unit .curr-prefix {
+  position: absolute;
+  left: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.formula-input-unit input:has(+ .unit-tag):has(.curr-prefix) {
+  padding-left: 24px;
+}
+
+.sub-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sub-input-row .sub-label {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.formula-card-special {
+  background: #f8fafc;
+  border-style: dashed;
+}
+
+.special-balance-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding: 6px 10px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #065f46;
+}
+
+.special-balance-chip svg {
+  stroke: #10b981;
+}
+
+/* Modal Footer Actions */
+.gt-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.btn-apply-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: gtSpin 0.7s linear infinite;
+}
+
+.widget-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: gtSpin 0.7s linear infinite;
+}
+
+@keyframes gtSpin {
+  to { transform: rotate(360deg); }
+}

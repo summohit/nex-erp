@@ -43,6 +43,10 @@ export class PayrollController {
   }
 
   // ==================== 1. SALARY COMPONENTS ====================
+  //
+  // Components, structures and grades are salary. Every route below was open
+  // to any signed-in user -- anyone could read the whole company's pay, or
+  // rewrite their own. Reading your OWN structure stays open.
 
   @Get('components')
   getSalaryComponents(@Request() req) {
@@ -51,16 +55,19 @@ export class PayrollController {
 
   @Post('components')
   createSalaryComponent(@Request() req, @Body() data: { name: string; type: string; description?: string }) {
+    this.assertPayrollOperator(req, 'manage salary components');
     return this.payrollService.createSalaryComponent(req.user.companyId, data);
   }
 
   @Put('components/:id')
   updateSalaryComponent(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { name?: string; description?: string }) {
+    this.assertPayrollOperator(req, 'manage salary components');
     return this.payrollService.updateSalaryComponent(req.user.companyId, id, data);
   }
 
   @Delete('components/:id')
   deleteSalaryComponent(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    this.assertPayrollOperator(req, 'manage salary components');
     return this.payrollService.deleteSalaryComponent(req.user.companyId, id);
   }
 
@@ -68,6 +75,7 @@ export class PayrollController {
 
   @Get('structures')
   getAllSalaryStructures(@Request() req) {
+    this.assertPayrollOperator(req, "see the company's salaries");
     return this.payrollService.getAllSalaryStructures(req.user.companyId);
   }
 
@@ -77,13 +85,51 @@ export class PayrollController {
     @Param('employeeId', ParseIntPipe) employeeId: number,
     @Body() body: { allow: boolean },
   ) {
+    this.assertPayrollOperator(req, 'take people on or off payroll');
     return this.payrollService.setAllowPayrollGenerate(
       req.user.companyId, employeeId, !!body.allow,
     );
   }
 
+  /** EMPLOYEE (graded, on the template) or CONSULTANT (contract pay, outside both). */
+  @Put('structure/:employeeId/pay-type')
+  setPayType(
+    @Request() req,
+    @Param('employeeId', ParseIntPipe) employeeId: number,
+    @Body() body: { payType: string },
+  ) {
+    this.assertPayrollOperator(req, 'change pay type');
+    return this.payrollService.setPayType(req.user.companyId, employeeId, body.payType);
+  }
+
+  /** What the template would set for this person, without saving anything. */
+  @Get('structure/:employeeId/template-preview')
+  previewTemplate(
+    @Request() req,
+    @Param('employeeId', ParseIntPipe) employeeId: number,
+    @Query('gross') gross?: string,
+  ) {
+    this.assertPayrollOperator(req, 'apply the salary template');
+    return this.payrollService.previewTemplate(req.user.companyId, employeeId, gross != null ? Number(gross) : undefined);
+  }
+
+  /** Replace this person's structure with the template's split of `gross`. */
+  @Post('structure/:employeeId/apply-template')
+  applyTemplate(
+    @Request() req,
+    @Param('employeeId', ParseIntPipe) employeeId: number,
+    @Body() body: { gross: number },
+  ) {
+    this.assertPayrollOperator(req, 'apply the salary template');
+    return this.payrollService.applyTemplate(req.user.companyId, employeeId, Number(body.gross));
+  }
+
   @Get('structure/:employeeId')
   getSalaryStructure(@Request() req, @Param('employeeId', ParseIntPipe) employeeId: number) {
+    const own = this.readerScope(req);
+    if (own !== null && own !== employeeId) {
+      throw new ForbiddenException("You can only see your own salary structure.");
+    }
     return this.payrollService.getSalaryStructure(req.user.companyId, employeeId);
   }
 
@@ -93,7 +139,37 @@ export class PayrollController {
     @Param('employeeId', ParseIntPipe) employeeId: number,
     @Body() items: { componentId: number; amount: number }[]
   ) {
+    this.assertPayrollOperator(req, 'change a salary');
     return this.payrollService.updateSalaryStructure(req.user.companyId, employeeId, items);
+  }
+
+  // ==================== 2b. GRADES & TEMPLATE ====================
+
+  @Get('grades')
+  getSalaryGrades(@Request() req) {
+    this.assertPayrollOperator(req, 'see salary grades');
+    return this.payrollService.getSalaryGrades(req.user.companyId);
+  }
+
+  @Put('grades')
+  saveSalaryGrades(
+    @Request() req,
+    @Body() grades: { name: string; label?: string | null; minGross: number; maxGross: number | null }[],
+  ) {
+    this.assertPayrollOperator(req, 'change salary grades');
+    return this.payrollService.saveSalaryGrades(req.user.companyId, grades);
+  }
+
+  @Get('template')
+  getSalaryTemplate(@Request() req) {
+    this.assertPayrollOperator(req, 'see the salary template');
+    return this.payrollService.getSalaryTemplate(req.user.companyId);
+  }
+
+  @Put('template')
+  updateSalaryTemplate(@Request() req, @Body() rules: Record<string, number | null>) {
+    this.assertPayrollOperator(req, 'change the salary template');
+    return this.payrollService.updateSalaryTemplate(req.user.companyId, rules);
   }
 
   // ==================== 3. PAYSLIPS ====================
