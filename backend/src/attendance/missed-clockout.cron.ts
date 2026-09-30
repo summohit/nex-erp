@@ -94,6 +94,9 @@ export class MissedClockOutCron implements OnModuleInit, OnModuleDestroy {
           // new shift until it is closed", for a shift that had not blocked
           // anything and had no clock-out button that would work.
           logs: { some: { clockOut: null } },
+          // A day that already has its clock-out is closed, whatever a stray
+          // log under it says -- see findOpenSessionBefore.
+          clockOut: null,
           // Only those not already flagged, so the notification goes out once
           // rather than every night for as long as the session stays open.
           missedClockOut: false,

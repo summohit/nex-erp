@@ -380,10 +380,16 @@ export class AttendanceService {
    * What such a row means is "this day is missing a clock-out" -- a record to
    * correct through regularization, not a shift still running. It no longer
    * blocks tomorrow, because there is nothing running to block it with.
+   *
+   * The converse too: an open log under a day that HAS a clock-out is not
+   * running either. Clocking in always clears the parent's clockOut, so a
+   * session NEX opened never sits under one. The import left exactly that --
+   * a closed session plus an identical copy with no clock-out -- and it read
+   * as "Session still open from 19 Feb" months later.
    */
   private async findOpenSessionBefore(employeeId: number, beforeDate: Date) {
     return this.prisma.attendance.findFirst({
-      where: { employeeId, date: { lt: beforeDate }, logs: { some: { clockOut: null } } },
+      where: { employeeId, date: { lt: beforeDate }, clockOut: null, logs: { some: { clockOut: null } } },
       orderBy: { date: 'desc' },
       include: { logs: true },
     });
