@@ -880,7 +880,8 @@ export class PayrollService {
       }
     }
 
-    return this.prisma.payslip.update({
+    const status = data.status || payslip.status;
+    const updated = await this.prisma.payslip.update({
       where: { id },
       data: {
         lossOfPay,
@@ -888,10 +889,15 @@ export class PayrollService {
         totalDeductions,
         expenseAmount,
         netPay,
-        status: data.status || payslip.status
+        status,
+        ...(status === 'PAID' && payslip.status !== 'PAID' && { paidOn: new Date() })
       },
       include: { items: true, employee: true }
     });
+    if (status === 'PAID' && payslip.status !== 'PAID') {
+      await this.markExpenseClaimsPaid(companyId, payslip.month, payslip.year, [payslip.employeeId]);
+    }
+    return updated;
   }
 
   async batchFinalizePayslips(companyId: number, month: number, year: number) {
@@ -907,14 +913,33 @@ export class PayrollService {
   }
 
   async markPayslipsPaid(companyId: number, month: number, year: number) {
-    return this.prisma.payslip.updateMany({
+    const where = { companyId, month: Number(month), year: Number(year), status: 'FINALIZED' };
+    const paying = await this.prisma.payslip.findMany({ where, select: { employeeId: true } });
+    const result = await this.prisma.payslip.updateMany({
+      where,
+      data: { status: 'PAID', paidOn: new Date() }
+    });
+    await this.markExpenseClaimsPaid(companyId, month, year, paying.map(p => p.employeeId));
+    return result;
+  }
+
+  /**
+   * The claims a payslip reimbursed are paid when it is. Payroll already tags
+   * each approved claim with the month it went out in; without this they sat at
+   * APPROVED for ever, so nobody could tell a reimbursed claim from one still
+   * waiting, and a project's paid-expenses figure never moved off zero.
+   */
+  private async markExpenseClaimsPaid(companyId: number, month: number, year: number, employeeIds: number[]) {
+    if (employeeIds.length === 0) return;
+    await this.prisma.expenseClaim.updateMany({
       where: {
         companyId,
+        employeeId: { in: employeeIds },
         month: Number(month),
         year: Number(year),
-        status: 'FINALIZED'
+        status: 'APPROVED'
       },
-      data: { status: 'PAID', paidOn: new Date() }
+      data: { status: 'PAID' }
     });
   }
 
@@ -1071,6 +1096,31 @@ export class PayrollService {
     const claim = await this.prisma.expenseClaim.findFirst({ where: { id, companyId }, include: { employee: true } });
     if (!claim) throw new NotFoundException('Expense claim not found');
 
+    // Where a claim may go from where it is. PAID is the end: money has left,
+    // and turning it back to PENDING or REJECTED rewrote that history. An
+    // approved claim can still be withdrawn -- but only before payroll has put
+    // it on a payslip (payroll stamps month/year when it does); after that the
+    // payslip already carries the amount.
+    const next = String(data.status).toUpperCase();
+    const ALLOWED: Record<string, string[]> = {
+      PENDING: ['APPROVED', 'REJECTED'],
+      REJECTED: ['APPROVED', 'PENDING'],
+      APPROVED: ['PAID', 'REJECTED'],
+      PAID: [],
+    };
+    if (!(ALLOWED[claim.status] || []).includes(next)) {
+      throw new BadRequestException(
+        claim.status === 'PAID'
+          ? 'This claim has been paid and can no longer be changed'
+          : `A ${claim.status.toLowerCase()} claim cannot be marked ${next.toLowerCase()}`
+      );
+    }
+    if (claim.status === 'APPROVED' && next === 'REJECTED' && claim.month != null) {
+      throw new BadRequestException(
+        `This claim is already on the ${claim.month}/${claim.year} payslip. Remove it there before rejecting it.`
+      );
+    }
+
     // Prevent self-approval: check if the approver is the same person who submitted
     if (claim.employee) {
       const approverEmployee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
@@ -1101,6 +1151,15 @@ export class PayrollService {
 
     if (!isOwner && !isPrivileged) {
       throw new BadRequestException('You do not have permission to delete this expense claim');
+    }
+
+    // Approved and paid claims are money owed or money gone; deleting one
+    // erased the only record of it -- and an approved one may already sit on a
+    // payslip. Reject an approved claim instead (while it still can be).
+    if (claim.status !== 'PENDING' && claim.status !== 'REJECTED') {
+      throw new BadRequestException(
+        `A ${claim.status.toLowerCase()} expense claim cannot be deleted`
+      );
     }
 
     return this.prisma.expenseClaim.delete({ where: { id } });
