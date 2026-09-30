@@ -457,6 +457,13 @@ export class PayrollComponent implements OnInit {
     return role === 'ADMIN' || role === 'HR' || role === 'SUPERADMIN' || role === 'FINANCE';
   });
 
+  /**
+   * Who sees the company's claims and may decide them. Not isAdmin(): a
+   * delegate on the Expense claims list can approve without holding a finance
+   * role, and the server is the one that knows who is on that list.
+   */
+  canApproveExpenses = signal<boolean>(false);
+
   companyLogoUrl = computed(() => {
     return this.authService.currentUser()?.company?.logoUrl || '/logo.png';
   });
@@ -2237,7 +2244,7 @@ export class PayrollComponent implements OnInit {
         this.toast.success('Expense claim submitted for approval');
         this.closeExpenseModal();
         this.payrollService.getMyExpenseClaims().subscribe(res => this.myExpenseClaims.set(res));
-        if (this.isAdmin()) {
+        if (this.canApproveExpenses()) {
           this.payrollService.getAllExpenseClaims().subscribe(res => this.expenseClaims.set(res));
         }
       },
@@ -2299,22 +2306,27 @@ export class PayrollComponent implements OnInit {
 
   loadExpenses() {
     this.isLoadingExpenses.set(true);
-    if (this.isAdmin()) {
-      this.payrollService.getAllExpenseClaims().subscribe({
-        next: (res) => {
-          this.expenseClaims.set(res);
-          this.isLoadingExpenses.set(false);
-        },
-        error: () => this.isLoadingExpenses.set(false)
-      });
-    }
+    this.payrollService.canApproveExpenseClaims().subscribe({
+      next: ({ canApprove }) => {
+        this.canApproveExpenses.set(!!canApprove);
+        if (!canApprove) return;
+        this.payrollService.getAllExpenseClaims().subscribe({
+          next: (res) => {
+            this.expenseClaims.set(res);
+            this.isLoadingExpenses.set(false);
+          },
+          error: () => this.isLoadingExpenses.set(false)
+        });
+      },
+      error: () => this.canApproveExpenses.set(false)
+    });
     this.payrollService.getMyExpenseClaims().subscribe({
       next: (res) => {
         this.myExpenseClaims.set(res);
-        if (!this.isAdmin()) this.isLoadingExpenses.set(false);
+        if (!this.canApproveExpenses()) this.isLoadingExpenses.set(false);
       },
       error: () => {
-        if (!this.isAdmin()) this.isLoadingExpenses.set(false);
+        if (!this.canApproveExpenses()) this.isLoadingExpenses.set(false);
       }
     });
   }

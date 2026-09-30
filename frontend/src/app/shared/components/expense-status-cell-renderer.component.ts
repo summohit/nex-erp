@@ -47,25 +47,25 @@ export interface ExpenseStatusCellParams extends ICellRendererParams {
       <mat-menu #statusMenu="matMenu" class="custom-status-menu" panelClass="expense-status-menu-panel">
         <div class="menu-header-label">Update Claim Status</div>
 
-        <button mat-menu-item class="status-menu-item" (click)="setStatus('PENDING')" [class.active-item]="currentStatus === 'PENDING'">
+        <button mat-menu-item class="status-menu-item" *ngIf="offers('PENDING')" (click)="setStatus('PENDING')" [class.active-item]="currentStatus === 'PENDING'">
           <span class="menu-status-dot dot-pending"></span>
           <span class="menu-item-name">Pending Review</span>
           <span class="check-mark" *ngIf="currentStatus === 'PENDING'">✓</span>
         </button>
 
-        <button mat-menu-item class="status-menu-item" (click)="setStatus('APPROVED')" [class.active-item]="currentStatus === 'APPROVED'">
+        <button mat-menu-item class="status-menu-item" *ngIf="offers('APPROVED')" (click)="setStatus('APPROVED')" [class.active-item]="currentStatus === 'APPROVED'">
           <span class="menu-status-dot dot-approved"></span>
           <span class="menu-item-name">Approved</span>
           <span class="check-mark" *ngIf="currentStatus === 'APPROVED'">✓</span>
         </button>
 
-        <button mat-menu-item class="status-menu-item" (click)="rejectClaim()" [class.active-item]="currentStatus === 'REJECTED'">
+        <button mat-menu-item class="status-menu-item" *ngIf="offers('REJECTED')" (click)="rejectClaim()" [class.active-item]="currentStatus === 'REJECTED'">
           <span class="menu-status-dot dot-rejected"></span>
           <span class="menu-item-name">Reject Claim...</span>
           <span class="check-mark" *ngIf="currentStatus === 'REJECTED'">✓</span>
         </button>
 
-        <button mat-menu-item class="status-menu-item" (click)="markPaid()" [class.active-item]="currentStatus === 'PAID'">
+        <button mat-menu-item class="status-menu-item" *ngIf="offers('PAID')" (click)="markPaid()" [class.active-item]="currentStatus === 'PAID'">
           <span class="menu-status-dot dot-paid"></span>
           <span class="menu-item-name">Mark as Paid</span>
           <span class="check-mark" *ngIf="currentStatus === 'PAID'">✓</span>
@@ -181,7 +181,8 @@ export class ExpenseStatusCellRendererComponent implements ICellRendererAngularC
 
   private updateState() {
     this.currentStatus = this.params.value || this.params.data?.status || 'PENDING';
-    this.canEdit = !!this.params.canEdit && !this.params.data?.isSummaryRow;
+    // A paid claim is final, so it reads as a badge rather than a menu.
+    this.canEdit = !!this.params.canEdit && !this.params.data?.isSummaryRow && this.currentStatus !== 'PAID';
 
     if (this.currentStatus === 'APPROVED') {
       this.statusClass = 'status-approved';
@@ -192,6 +193,21 @@ export class ExpenseStatusCellRendererComponent implements ICellRendererAngularC
     } else {
       this.statusClass = 'status-pending';
     }
+  }
+
+  /**
+   * The moves the server allows from here (PayrollService.updateExpenseClaimStatus),
+   * plus the current status so the menu still shows where the claim stands.
+   */
+  private static readonly NEXT: Record<string, string[]> = {
+    PENDING: ['APPROVED', 'REJECTED'],
+    REJECTED: ['APPROVED', 'PENDING'],
+    APPROVED: ['PAID', 'REJECTED'],
+    PAID: [],
+  };
+
+  offers(status: string): boolean {
+    return status === this.currentStatus || (ExpenseStatusCellRendererComponent.NEXT[this.currentStatus] || []).includes(status);
   }
 
   setStatus(status: string) {

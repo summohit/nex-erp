@@ -1,8 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from './pdf.service';
 import { EmailService } from './email.service';
 import { countsAsAttended } from '../attendance/clock-out-approval';
+import { ApprovalsService } from '../approvals/approvals.service';
+import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
+import { NotificationsService } from '../notifications/notifications.service';
+
+/** Roles that rule on expense claims without being put on the list. */
+const EXPENSE_APPROVER_ROLES = ['SUPERADMIN', 'ADMIN', 'HR', 'FINANCE'];
 
 const PREDEFINED_COMPONENTS = [
   { name: 'Basic Salary', type: 'EARNING', description: 'Base component of employee salary' },
@@ -35,7 +41,9 @@ export class PayrollService {
   constructor(
     private prisma: PrismaService,
     private pdfService: PdfService,
-    private emailService: EmailService
+    private emailService: EmailService,
+    private approvals: ApprovalsService,
+    private notifications: NotificationsService,
   ) {}
 
   // ==================== 1. SALARY COMPONENTS ====================
@@ -501,20 +509,10 @@ export class PayrollService {
       
       const presentDays = presentCount + (halfDayCount * 0.5);
 
-      // Fetch approved expense claims for this period
-      const approvedExpenses = await this.prisma.expenseClaim.findMany({
-        where: {
-          employeeId: emp.id,
-          companyId,
-          status: 'APPROVED',
-          OR: [
-            { month: null, year: null },
-            { month: Number(month), year: Number(year) }
-          ]
-        }
-      });
-
-      const expenseAmount = approvedExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+      // Expense claims are reimbursed on their own, not through salary: an
+      // approved claim is paid by finance and marked PAID on the claim itself.
+      // The payslip's expense line stays for manual adjustments only.
+      const expenseAmount = 0;
 
       // Earnings & Deductions from Structure
       let totalEarnings = 0;
@@ -679,12 +677,6 @@ export class PayrollService {
         });
       }
 
-      if (approvedExpenses.length > 0) {
-        await this.prisma.expenseClaim.updateMany({
-          where: { id: { in: approvedExpenses.map(e => e.id) } },
-          data: { month: Number(month), year: Number(year) }
-        });
-      }
     }
 
     return this.getPayslips(companyId, month, year);
@@ -894,9 +886,6 @@ export class PayrollService {
       },
       include: { items: true, employee: true }
     });
-    if (status === 'PAID' && payslip.status !== 'PAID') {
-      await this.markExpenseClaimsPaid(companyId, payslip.month, payslip.year, [payslip.employeeId]);
-    }
     return updated;
   }
 
@@ -914,34 +903,12 @@ export class PayrollService {
 
   async markPayslipsPaid(companyId: number, month: number, year: number) {
     const where = { companyId, month: Number(month), year: Number(year), status: 'FINALIZED' };
-    const paying = await this.prisma.payslip.findMany({ where, select: { employeeId: true } });
-    const result = await this.prisma.payslip.updateMany({
+    return this.prisma.payslip.updateMany({
       where,
       data: { status: 'PAID', paidOn: new Date() }
     });
-    await this.markExpenseClaimsPaid(companyId, month, year, paying.map(p => p.employeeId));
-    return result;
   }
 
-  /**
-   * The claims a payslip reimbursed are paid when it is. Payroll already tags
-   * each approved claim with the month it went out in; without this they sat at
-   * APPROVED for ever, so nobody could tell a reimbursed claim from one still
-   * waiting, and a project's paid-expenses figure never moved off zero.
-   */
-  private async markExpenseClaimsPaid(companyId: number, month: number, year: number, employeeIds: number[]) {
-    if (employeeIds.length === 0) return;
-    await this.prisma.expenseClaim.updateMany({
-      where: {
-        companyId,
-        employeeId: { in: employeeIds },
-        month: Number(month),
-        year: Number(year),
-        status: 'APPROVED'
-      },
-      data: { status: 'PAID' }
-    });
-  }
 
   // ==================== 4. EXPENSE CLAIMS ====================
 
@@ -967,7 +934,7 @@ export class PayrollService {
       }
     }
 
-    return this.prisma.expenseClaim.create({
+    const created = await this.prisma.expenseClaim.create({
       data: {
         employeeId: employee.id,
         companyId,
@@ -984,6 +951,48 @@ export class PayrollService {
         status: 'PENDING'
       }
     });
+
+    const name = `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim() || 'An employee';
+    await this.notifyExpenseApprovers(companyId, userId, {
+      title: 'New expense claim',
+      message: `${name} claimed ₹${amount.toLocaleString('en-IN')} for "${data.title}".`,
+    });
+    return created;
+  }
+
+  /**
+   * Who may approve, reject and pay expense claims: the finance-side roles, plus
+   * anyone a Super Admin has put on the Expense claims list in Settings →
+   * Approvals.
+   */
+  async mayApproveExpenses(companyId: number, userId: number, role?: string | null): Promise<boolean> {
+    if (role && EXPENSE_APPROVER_ROLES.includes(role)) return true;
+    const employee = await this.prisma.employee.findFirst({ where: { userId, companyId }, select: { id: true } });
+    return this.approvals.mayApprove(companyId, APPROVAL_WORKFLOW.EXPENSE_CLAIM, role, employee?.id ?? null);
+  }
+
+  /**
+   * Tell the people who will decide. The delegates first; finance always; and
+   * when neither exists, the company's admins -- a claim must not sit in a
+   * queue nobody is watching. Best-effort: a failed alert never undoes a claim.
+   */
+  private async notifyExpenseApprovers(companyId: number, requesterUserId: number, msg: { title: string; message: string }) {
+    try {
+      const requester = await this.prisma.employee.findFirst({ where: { userId: requesterUserId, companyId }, select: { id: true } });
+      const delegates = await this.approvals.approverEmployeeIds(companyId, APPROVAL_WORKFLOW.EXPENSE_CLAIM);
+      const sent =
+        (await this.notifications.notifyEmployees(delegates, {
+          companyId, ...msg, type: 'ACTION_REQUIRED', linkUrl: '/payroll/expenses', excludeEmployeeId: requester?.id ?? null,
+        })) +
+        (await this.notifications.notifyApprovers({
+          companyId, roles: ['FINANCE'], ...msg, type: 'ACTION_REQUIRED', linkUrl: '/payroll/expenses', excludeUserId: requesterUserId,
+        }));
+      if (sent === 0) {
+        await this.notifications.notifyApprovers({
+          companyId, roles: ['SUPERADMIN', 'ADMIN'], ...msg, type: 'ACTION_REQUIRED', linkUrl: '/payroll/expenses', excludeUserId: requesterUserId,
+        });
+      }
+    } catch { /* the claim is saved; the alert is best-effort */ }
   }
 
 
@@ -1051,7 +1060,12 @@ export class PayrollService {
     };
   }
 
-  async getAllExpenseClaims(companyId: number) {
+  async getAllExpenseClaims(companyId: number, userId: number, role?: string | null) {
+    // Every claim in the company -- amounts, receipts, who spent what. It was
+    // open to any signed-in user; it is the approvers' queue.
+    if (!(await this.mayApproveExpenses(companyId, userId, role))) {
+      throw new ForbiddenException('You are not on the expense claim approval list');
+    }
     return this.prisma.expenseClaim.findMany({
       where: { companyId },
       include: {
@@ -1080,10 +1094,8 @@ export class PayrollService {
   }
 
   async updateExpenseClaimStatus(companyId: number, userId: number, id: number, data: { status: string; rejectionReason?: string }, userRole?: string) {
-    // Only privileged roles can approve/reject expense claims
-    const privilegedRoles = ['SUPERADMIN', 'ADMIN', 'HR', 'FINANCE'];
-    if (!userRole || !privilegedRoles.includes(userRole)) {
-      throw new BadRequestException('You do not have permission to approve or reject expense claims');
+    if (!(await this.mayApproveExpenses(companyId, userId, userRole))) {
+      throw new ForbiddenException('You are not on the expense claim approval list. A Super Admin can add you.');
     }
 
     // Free text in the database, so a typo would otherwise become a status
@@ -1098,9 +1110,7 @@ export class PayrollService {
 
     // Where a claim may go from where it is. PAID is the end: money has left,
     // and turning it back to PENDING or REJECTED rewrote that history. An
-    // approved claim can still be withdrawn -- but only before payroll has put
-    // it on a payslip (payroll stamps month/year when it does); after that the
-    // payslip already carries the amount.
+    // approved claim can still be withdrawn until it is paid.
     const next = String(data.status).toUpperCase();
     const ALLOWED: Record<string, string[]> = {
       PENDING: ['APPROVED', 'REJECTED'],
@@ -1115,11 +1125,6 @@ export class PayrollService {
           : `A ${claim.status.toLowerCase()} claim cannot be marked ${next.toLowerCase()}`
       );
     }
-    if (claim.status === 'APPROVED' && next === 'REJECTED' && claim.month != null) {
-      throw new BadRequestException(
-        `This claim is already on the ${claim.month}/${claim.year} payslip. Remove it there before rejecting it.`
-      );
-    }
 
     // Prevent self-approval: check if the approver is the same person who submitted
     if (claim.employee) {
@@ -1129,14 +1134,28 @@ export class PayrollService {
       }
     }
 
-    return this.prisma.expenseClaim.update({
+    const updated = await this.prisma.expenseClaim.update({
       where: { id },
       data: {
-        status: String(data.status).toUpperCase(),
+        status: next,
         rejectionReason: data.rejectionReason,
         approvedById: userId
       }
     });
+
+    const amount = `₹${claim.amount.toLocaleString('en-IN')}`;
+    const outcome: Record<string, [string, string]> = {
+      APPROVED: ['Expense claim approved', `Your claim "${claim.title}" (${amount}) was approved.`],
+      REJECTED: ['Expense claim rejected', `Your claim "${claim.title}" (${amount}) was rejected${data.rejectionReason ? `: ${data.rejectionReason}` : '.'}`],
+      PAID: ['Expense claim paid', `Your claim "${claim.title}" (${amount}) has been paid.`],
+      PENDING: ['Expense claim reopened', `Your claim "${claim.title}" (${amount}) is back under review.`],
+    };
+    const [title, message] = outcome[next];
+    await this.notifications
+      .notifyEmployees([claim.employeeId], { companyId, title, message, type: 'INFO', linkUrl: '/payroll/expenses' })
+      .catch(() => { /* the decision is saved; the alert is best-effort */ });
+
+    return updated;
   }
 
   async deleteExpenseClaim(companyId: number, id: number, userId: number, userRole?: string) {

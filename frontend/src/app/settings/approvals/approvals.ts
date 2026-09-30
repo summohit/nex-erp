@@ -59,6 +59,7 @@ export class ApprovalSettingsComponent implements OnInit {
     PURCHASE_ORDER: 'A Super Admin can always approve these.',
     TASK: 'A Super Admin can always approve these.',
     LEAVE_ON_BEHALF: 'A Super Admin can always approve these.',
+    EXPENSE_CLAIM: 'Super Admin, Admin, HR and Finance can always approve and pay these.',
   };
 
   ngOnInit(): void {

@@ -1233,8 +1233,8 @@
       </div>
     </div>
 
-    <!-- Admin View: All Company Claims -->
-    <div class="widget-card mb-4" *ngIf="isAdmin()">
+    <!-- Approver View: All Company Claims -->
+    <div class="widget-card mb-4" *ngIf="canApproveExpenses()">
       <!-- Executive KPI Figure Cards Ribbon -->
       <div class="expense-kpi-row mb-4">
         <!-- 1. Total Claims Card -->
@@ -2738,21 +2738,21 @@
         
         <div class="footer-action-group">
           <!-- Reject action -->
-          <button class="btn btn-danger-soft" *ngIf="ex.status !== 'REJECTED' && isAdmin()"
+          <button class="btn btn-danger-soft" *ngIf="(ex.status === 'PENDING' || ex.status === 'APPROVED') && canApproveExpenses()"
                   (click)="openRejectModal(ex.id); closeExpenseDetail()">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
             Reject Claim
           </button>
           
           <!-- Approve action -->
-          <button class="btn btn-success-modern" *ngIf="ex.status !== 'APPROVED' && ex.status !== 'PAID' && isAdmin()"
+          <button class="btn btn-success-modern" *ngIf="(ex.status === 'PENDING' || ex.status === 'REJECTED') && canApproveExpenses()"
                   (click)="updateExpenseStatus(ex.id, 'APPROVED'); closeExpenseDetail()">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
             Approve Claim
           </button>
           
           <!-- Mark Paid action -->
-          <button class="btn btn-primary" *ngIf="ex.status === 'APPROVED' && isAdmin()"
+          <button class="btn btn-primary" *ngIf="ex.status === 'APPROVED' && canApproveExpenses()"
                   (click)="markExpensePaid(ex); closeExpenseDetail()">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><line x1="12" y1="6" x2="12" y2="8"></line><line x1="12" y1="16" x2="12" y2="18"></line></svg>
             Mark as Paid

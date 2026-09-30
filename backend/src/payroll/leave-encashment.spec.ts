@@ -79,7 +79,7 @@ describe('PayrollService — year-end leave encashment', () => {
       expenseClaim: { findMany: jest.fn(async () => []), updateMany: jest.fn(async () => ({ count: 0 })) },
     };
 
-    service = new PayrollService(prisma, {} as any, {} as any);
+    service = new PayrollService(prisma, {} as any, {} as any, {} as any, {} as any);
   });
 
   const run = (month: number, year = 2026) => service.generatePayslips(COMPANY, month, year);

@@ -30,16 +30,16 @@ export interface ExpenseActionCellParams extends ICellRendererParams {
         <button mat-menu-item class="menu-item" (click)="viewReceipt()" *ngIf="params.data?.receiptUrl">
           <span class="menu-text">View Receipt</span>
         </button>
-        <button mat-menu-item class="menu-item text-success" (click)="approve()" *ngIf="params.onApprove && params.data?.status === 'PENDING'">
+        <button mat-menu-item class="menu-item text-success" (click)="approve()" *ngIf="params.onApprove && (params.data?.status === 'PENDING' || params.data?.status === 'REJECTED')">
           <span class="menu-text">Approve</span>
         </button>
-        <button mat-menu-item class="menu-item text-danger" (click)="reject()" *ngIf="params.onReject && params.data?.status === 'PENDING'">
+        <button mat-menu-item class="menu-item text-danger" (click)="reject()" *ngIf="params.onReject && (params.data?.status === 'PENDING' || params.data?.status === 'APPROVED')">
           <span class="menu-text">Reject</span>
         </button>
         <button mat-menu-item class="menu-item text-success" (click)="markPaid()" *ngIf="params.onMarkPaid && params.data?.status === 'APPROVED'">
           <span class="menu-text">Mark Paid</span>
         </button>
-        <button mat-menu-item class="menu-item text-danger" (click)="deleteClaim()" *ngIf="params.onDelete && params.data?.status === 'PENDING'">
+        <button mat-menu-item class="menu-item text-danger" (click)="deleteClaim()" *ngIf="params.onDelete && (params.data?.status === 'PENDING' || params.data?.status === 'REJECTED')">
           <span class="menu-text">Cancel Claim</span>
         </button>
       </mat-menu>

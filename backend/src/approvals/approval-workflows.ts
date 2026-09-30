@@ -19,6 +19,8 @@ export const APPROVAL_WORKFLOW = {
   TASK: 'TASK',
   /** §Att9/§Att10: leave raised or cancelled on somebody else's behalf. */
   LEAVE_ON_BEHALF: 'LEAVE_ON_BEHALF',
+  /** An employee's expense claim, approved and then paid outside payroll. */
+  EXPENSE_CLAIM: 'EXPENSE_CLAIM',
 } as const;
 
 export type ApprovalWorkflow = typeof APPROVAL_WORKFLOW[keyof typeof APPROVAL_WORKFLOW];
@@ -31,6 +33,7 @@ export const APPROVAL_WORKFLOW_LABELS: Record<ApprovalWorkflow, string> = {
   PURCHASE_ORDER: 'Purchase orders',
   TASK: 'Task approvals',
   LEAVE_ON_BEHALF: 'Leave raised on behalf of others',
+  EXPENSE_CLAIM: 'Expense claims',
 };
 
 export function isApprovalWorkflow(value: unknown): value is ApprovalWorkflow {

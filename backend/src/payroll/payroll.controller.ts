@@ -206,9 +206,15 @@ export class PayrollController {
     return this.payrollService.getMyExpenseClaims(req.user.companyId, req.user.sub);
   }
 
+  /** Whether to show the approval queue and its actions at all. */
+  @Get('expenses/can-approve')
+  async canApproveExpenseClaims(@Request() req) {
+    return { canApprove: await this.payrollService.mayApproveExpenses(req.user.companyId, req.user.sub, req.user.role) };
+  }
+
   @Get('expenses')
   getAllExpenseClaims(@Request() req) {
-    return this.payrollService.getAllExpenseClaims(req.user.companyId);
+    return this.payrollService.getAllExpenseClaims(req.user.companyId, req.user.sub, req.user.role);
   }
 
   @Put('expenses/:id/status')

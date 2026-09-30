@@ -71,7 +71,7 @@ describe('PayrollService — the preview agrees with the run', () => {
       },
     };
 
-    service = new PayrollService(prisma, {} as any, {} as any);
+    service = new PayrollService(prisma, {} as any, {} as any, {} as any, {} as any);
   });
 
   /** Loss of pay as the generator wrote it to the slip. */

@@ -260,6 +260,11 @@ export class PayrollService {
     return this.http.get<ExpenseClaim[]>(`${this.apiUrl}/expenses/me`);
   }
 
+  /** Finance roles, plus anyone on the Expense claims list in Settings → Approvals. */
+  canApproveExpenseClaims(): Observable<{ canApprove: boolean }> {
+    return this.http.get<{ canApprove: boolean }>(`${this.apiUrl}/expenses/can-approve`);
+  }
+
   getAllExpenseClaims(): Observable<ExpenseClaim[]> {
     return this.http.get<ExpenseClaim[]>(`${this.apiUrl}/expenses`);
   }
