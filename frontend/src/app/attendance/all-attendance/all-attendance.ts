@@ -437,11 +437,20 @@ export class AllAttendanceComponent implements OnInit {
         let status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Empty' = 'Empty';
         let tooltip = '';
 
-        if (day.isFuture) {
+        if (day.isFuture && holiday) {
+          // An upcoming holiday is known now — show it, rather than an empty
+          // dot that reads like an ordinary working day.
+          status = 'Holiday';
+          tooltip = `${holiday.name || 'Holiday'} (upcoming)`;
+        } else if (day.isFuture) {
           status = 'Empty';
           tooltip = `${day.dayNumber} ${day.weekdayStr} - Upcoming`;
         } else if (record && record.clockIn) {
-          if (record.status === 'HALF_DAY') {
+          if (holiday) {
+            // Worked a holiday (B1): recorded, never late or a half day —
+            // nobody was expected in.
+            status = 'Present';
+          } else if (record.status === 'HALF_DAY') {
             status = 'Half Day';
           } else if (record.isLate) {
             status = 'Late';
@@ -452,11 +461,25 @@ export class AllAttendanceComponent implements OnInit {
           const inTime = this.formatTime(record.clockIn);
           const outTime = record.clockOut ? this.formatTime(record.clockOut) : '...';
           tooltip = `In: ${inTime} · Out: ${outTime}`;
+          if (holiday) tooltip = `Worked on holiday (${holiday.name || 'Holiday'}) · ${tooltip}`;
           if (record.overtimeHours && record.overtimeHours > 0) {
             tooltip += ` · Overtime ${record.overtimeHours}h`;
           }
           if (record.clockOutReason) {
             tooltip += ' · Missed clock out';
+          }
+          // B3: clocked away from the office — where, why, and where it stands.
+          const geo: any = record;
+          if (geo.clockInOutside || geo.clockOutOutside) {
+            const km = (v: number | null) => (v == null ? 'no GPS' : `${Number(v).toFixed(2)} km`);
+            const parts: string[] = [];
+            if (geo.clockInOutside) parts.push(`In ${km(geo.clockInDistanceKm)} away: "${geo.clockInOutsideReason ?? ''}"`);
+            if (geo.clockOutOutside) parts.push(`Out ${km(geo.clockOutDistanceKm)} away: "${geo.clockOutOutsideReason ?? ''}"`);
+            const state = geo.geofenceApproval === 'APPROVED' ? 'Approved'
+              : geo.geofenceApproval === 'REJECTED' ? `Rejected${geo.geofenceReviewNote ? ' — ' + geo.geofenceReviewNote : ''}`
+              : 'Pending approval';
+            const proof = geo.clockInOutsideProofUrl || geo.clockOutOutsideProofUrl ? ' · has attachment' : '';
+            tooltip += ` · Outside office (${state}) · ${parts.join(' · ')}${proof}`;
           }
           if (['Present', 'Late', 'Half Day'].includes(status)) {
             countsPresent = true;
@@ -1090,6 +1113,9 @@ export class AllAttendanceComponent implements OnInit {
     if (status === 'Holiday') {
       return holiday?.name ? `Company holiday — ${holiday.name}` : 'Company holiday';
     }
+    if (holiday && r?.clockIn) {
+      return `Worked on a company holiday — ${holiday.name || 'Holiday'}. Recorded only; no late mark or overtime.`;
+    }
     if (status === 'Day Off') return 'Non-working day on this roster';
     if (status === 'On Leave') return 'Approved leave for this day';
     if (status === 'Absent') return 'No clock-in recorded on a working day';
@@ -1354,6 +1380,12 @@ export class AllAttendanceComponent implements OnInit {
       placement,
       arrowLeft
     });
+  }
+
+  /** Holiday name for a grid day, for the column header. */
+  holidayName(dateStr: string): string | null {
+    const h = this.holidays().find(x => this.getBackendDateString(x.date) === dateStr);
+    return h ? (h.name || 'Holiday') : null;
   }
 
   onCellMouseLeave() {

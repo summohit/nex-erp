@@ -112,6 +112,91 @@
     </div>
   </div>
 
+  <!-- §Att6: Top Performers Recognition (Attendance Champions Leaderboard) -->
+  <div class="top-performers-card" *ngIf="topPerformers().length > 0 || performersPeriod() === 'year'">
+    <div class="performers-header">
+      <div class="ph-left">
+        <div class="ph-icon-box">
+          <svg lucideTrophy [size]="20"></svg>
+        </div>
+        <div>
+          <div class="ph-title-row">
+            <h3>Attendance Champions</h3>
+            <span class="ph-month-badge">{{ performersPeriod() === 'year' ? 'Jan – Dec' : getSelectedMonthLabel() }} {{ filterYear }}</span>
+          </div>
+          <p class="ph-sub">Recognizing employees with the highest consistency, punctuality, and attendance rate</p>
+        </div>
+      </div>
+      <div class="ph-right">
+        <div class="ph-period-toggle" role="group" aria-label="Rank by">
+          <button type="button" [class.active]="performersPeriod() === 'year'" (click)="setPerformersPeriod('year')">Year</button>
+          <button type="button" [class.active]="performersPeriod() === 'month'" (click)="setPerformersPeriod('month')">Month</button>
+        </div>
+        <span class="ph-pill"><svg lucideSparkles [size]="14"></svg> Top 3 Recognition</span>
+      </div>
+    </div>
+
+    <div class="ph-empty" *ngIf="performersPeriod() === 'year' && yearLoading()">Loading {{ filterYear }} attendance…</div>
+    <div class="ph-empty" *ngIf="performersPeriod() === 'year' && !yearLoading() && topPerformers().length === 0">No attendance recorded in {{ filterYear }} for these filters.</div>
+
+    <div class="performers-grid" *ngIf="!(performersPeriod() === 'year' && yearLoading())">
+      <div class="performer-card" *ngFor="let p of topPerformers()" [ngClass]="p.meta.class">
+        <!-- Top Tier Banner / Header -->
+        <div class="p-card-top">
+          <div class="p-rank-pill">
+            <span class="rank-num">#{{ p.rankNumber }}</span>
+            <span class="rank-name">{{ p.meta.title }}</span>
+          </div>
+          <span class="p-tier-badge">{{ p.meta.badge }}</span>
+        </div>
+
+        <!-- Performer Profile -->
+        <div class="p-profile">
+          <div class="p-avatar-wrap">
+            <div class="avatar-circle" *ngIf="!p.emp?.avatarUrl">{{ (p.emp?.firstName || '?')[0] }}{{ (p.emp?.lastName || '')[0] }}</div>
+            <img class="avatar-img" *ngIf="p.emp?.avatarUrl" [src]="p.emp?.avatarUrl" alt="Avatar" />
+            <div class="rank-icon-indicator">
+              <svg *ngIf="p.rankNumber === 1" lucideTrophy [size]="12"></svg>
+              <svg *ngIf="p.rankNumber === 2" lucideAward [size]="12"></svg>
+              <svg *ngIf="p.rankNumber === 3" lucideStar [size]="12"></svg>
+            </div>
+          </div>
+          <div class="p-details">
+            <h4 class="p-name">{{ p.emp?.firstName }} {{ p.emp?.lastName }}</h4>
+            <span class="p-designation">{{ p.emp?.designation?.name || p.emp?.department?.name || 'Staff' }}</span>
+            <span class="p-code" *ngIf="p.emp?.employeeCode">{{ p.emp?.employeeCode }}</span>
+          </div>
+        </div>
+
+        <!-- Metrics Row -->
+        <div class="p-metrics-row">
+          <div class="metric-box">
+            <div class="m-label-row">
+              <svg lucideUserCheck [size]="13"></svg>
+              <span>ATTENDANCE</span>
+            </div>
+            <div class="m-val">{{ p.pct }}%</div>
+            <div class="m-sub">{{ p.presentDays }} / {{ p.workingDays }} days</div>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric-box">
+            <div class="m-label-row">
+              <svg lucideTimer [size]="13"></svg>
+              <span>PUNCTUALITY</span>
+            </div>
+            <div class="m-val" [class.text-green]="p.punctuality >= 90">{{ p.punctuality }}%</div>
+            <div class="m-sub">{{ p.onTimeDays }} on-time</div>
+          </div>
+        </div>
+
+        <!-- Progress / Consistency bar -->
+        <div class="p-progress-track" title="Attendance Rate">
+          <div class="p-progress-fill" [style.width.%]="p.pct"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Sticky Controls Section (Filter Bar + Status Legend) -->
   <div class="sticky-controls-section">
     <!-- Search & Filter Card -->
@@ -408,91 +493,6 @@
   </div>
   </div>
 
-  <!-- §Att6: Top Performers Recognition (Attendance Champions Leaderboard) -->
-  <div class="top-performers-card" *ngIf="topPerformers().length > 0 || performersPeriod() === 'year'">
-    <div class="performers-header">
-      <div class="ph-left">
-        <div class="ph-icon-box">
-          <svg lucideTrophy [size]="20"></svg>
-        </div>
-        <div>
-          <div class="ph-title-row">
-            <h3>Attendance Champions</h3>
-            <span class="ph-month-badge">{{ performersPeriod() === 'year' ? 'Jan – Dec' : getSelectedMonthLabel() }} {{ filterYear }}</span>
-          </div>
-          <p class="ph-sub">Recognizing employees with the highest consistency, punctuality, and attendance rate</p>
-        </div>
-      </div>
-      <div class="ph-right">
-        <div class="ph-period-toggle" role="group" aria-label="Rank by">
-          <button type="button" [class.active]="performersPeriod() === 'year'" (click)="setPerformersPeriod('year')">Year</button>
-          <button type="button" [class.active]="performersPeriod() === 'month'" (click)="setPerformersPeriod('month')">Month</button>
-        </div>
-        <span class="ph-pill"><svg lucideSparkles [size]="14"></svg> Top 3 Recognition</span>
-      </div>
-    </div>
-
-    <div class="ph-empty" *ngIf="performersPeriod() === 'year' && yearLoading()">Loading {{ filterYear }} attendance…</div>
-    <div class="ph-empty" *ngIf="performersPeriod() === 'year' && !yearLoading() && topPerformers().length === 0">No attendance recorded in {{ filterYear }} for these filters.</div>
-
-    <div class="performers-grid" *ngIf="!(performersPeriod() === 'year' && yearLoading())">
-      <div class="performer-card" *ngFor="let p of topPerformers()" [ngClass]="p.meta.class">
-        <!-- Top Tier Banner / Header -->
-        <div class="p-card-top">
-          <div class="p-rank-pill">
-            <span class="rank-num">#{{ p.rankNumber }}</span>
-            <span class="rank-name">{{ p.meta.title }}</span>
-          </div>
-          <span class="p-tier-badge">{{ p.meta.badge }}</span>
-        </div>
-
-        <!-- Performer Profile -->
-        <div class="p-profile">
-          <div class="p-avatar-wrap">
-            <div class="avatar-circle" *ngIf="!p.emp?.avatarUrl">{{ (p.emp?.firstName || '?')[0] }}{{ (p.emp?.lastName || '')[0] }}</div>
-            <img class="avatar-img" *ngIf="p.emp?.avatarUrl" [src]="p.emp?.avatarUrl" alt="Avatar" />
-            <div class="rank-icon-indicator">
-              <svg *ngIf="p.rankNumber === 1" lucideTrophy [size]="12"></svg>
-              <svg *ngIf="p.rankNumber === 2" lucideAward [size]="12"></svg>
-              <svg *ngIf="p.rankNumber === 3" lucideStar [size]="12"></svg>
-            </div>
-          </div>
-          <div class="p-details">
-            <h4 class="p-name">{{ p.emp?.firstName }} {{ p.emp?.lastName }}</h4>
-            <span class="p-designation">{{ p.emp?.designation?.name || p.emp?.department?.name || 'Staff' }}</span>
-            <span class="p-code" *ngIf="p.emp?.employeeCode">{{ p.emp?.employeeCode }}</span>
-          </div>
-        </div>
-
-        <!-- Metrics Row -->
-        <div class="p-metrics-row">
-          <div class="metric-box">
-            <div class="m-label-row">
-              <svg lucideUserCheck [size]="13"></svg>
-              <span>ATTENDANCE</span>
-            </div>
-            <div class="m-val">{{ p.pct }}%</div>
-            <div class="m-sub">{{ p.presentDays }} / {{ p.workingDays }} days</div>
-          </div>
-          <div class="metric-divider"></div>
-          <div class="metric-box">
-            <div class="m-label-row">
-              <svg lucideTimer [size]="13"></svg>
-              <span>PUNCTUALITY</span>
-            </div>
-            <div class="m-val" [class.text-green]="p.punctuality >= 90">{{ p.punctuality }}%</div>
-            <div class="m-sub">{{ p.onTimeDays }} on-time</div>
-          </div>
-        </div>
-
-        <!-- Progress / Consistency bar -->
-        <div class="p-progress-track" title="Attendance Rate">
-          <div class="p-progress-fill" [style.width.%]="p.pct"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Loading State -->
   <div class="loading-state-card" *ngIf="isLoading()">
     <div class="spinner"></div>
@@ -506,10 +506,12 @@
         <thead>
           <tr>
             <th class="col-employee-header sticky-left">EMPLOYEE</th>
-            <th *ngFor="let day of visibleDaysOfMonth()" class="col-day-header" [class.is-weekend]="day.isWeekend">
+            <th *ngFor="let day of visibleDaysOfMonth()" class="col-day-header" [class.is-weekend]="day.isWeekend"
+                [class.is-holiday]="holidayName(day.dateStr)" [title]="holidayName(day.dateStr) || ''">
               <div class="day-header-inner">
                 <span class="day-num">{{ day.dayNumber }}</span>
                 <span class="day-week">{{ day.weekdayStr }}</span>
+                <span class="day-holiday-tag" *ngIf="holidayName(day.dateStr)">HOL</span>
               </div>
             </th>
             <th class="col-total-header sticky-right">TOTAL</th>
@@ -536,9 +538,10 @@
             </td>
 
             <!-- Day Badges (1..31) -->
-            <td *ngFor="let day of row.days" class="col-day-cell" [class.is-weekend]="day.isWeekend">
+            <td *ngFor="let day of row.days" class="col-day-cell" [class.is-weekend]="day.isWeekend"
+                [class.is-holiday]="day.status === 'Holiday'">
               <div class="day-cell-badge"
-                   [class.is-empty]="day.isFuture"
+                   [class.is-empty]="day.isFuture && day.status !== 'Holiday'"
                    (mouseenter)="onCellMouseEnter($event, day)"
                    (mouseleave)="onCellMouseLeave()"
                    (click)="openDayDetails(row.employee, day, day.record)"

@@ -2986,3 +2986,10 @@
   border-radius: 9999px;
   transition: width 0.4s ease;
 }
+
+/* Holidays (B1): the whole column reads as a holiday, upcoming ones included. */
+.col-day-header.is-holiday, .col-day-cell.is-holiday { background: #FFFBEB; }
+.day-holiday-tag {
+  display: block; margin-top: 2px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.05em; color: #B45309;
+}
