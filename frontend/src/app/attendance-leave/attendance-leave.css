@@ -2687,3 +2687,7 @@
 
 
 
+
+/* Team Timeline holidays */
+.timeline-day-header.holiday-col, .timeline-cell.holiday-col { background: #FFFBEB; }
+.timeline-day-header .day-hol { display:block; font-size:9px; font-weight:700; letter-spacing:.05em; color:#B45309; }

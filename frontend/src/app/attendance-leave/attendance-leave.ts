@@ -2617,17 +2617,33 @@ export class AttendanceLeaveComponent implements OnInit {
 
     this.attendanceService.getTeamTimeline(start, end)
       .subscribe({
-        next: (data) => {
-          this.teamTimelineData.set(data);
-          
-          // Extract unique employees
-          const empsMap = new Map<number, any>();
-          data.forEach(item => {
-            if (item.employee && !empsMap.has(item.employee.id)) {
-              empsMap.set(item.employee.id, item.employee);
+        next: (data: any[]) => {
+          // The server answers one entry per EMPLOYEE (with their attendances
+          // and approved leaves); the grid reads one record per DAY carrying
+          // its employee. Reading the employee list as day records found no
+          // `employee` on any of them, so the timeline always came up empty.
+          const records: any[] = [];
+          const emps: any[] = [];
+          for (const e of data || []) {
+            if (!e) continue;
+            const emp = e.employee ?? e;           // tolerate either shape
+            emps.push(emp);
+            for (const a of e.attendances ?? []) records.push({ ...a, employee: emp });
+            for (const l of e.leaveRequests ?? []) {
+              const from = new Date(l.startDate);
+              const to = new Date(l.endDate);
+              for (let d = new Date(from); d <= to; d.setUTCDate(d.getUTCDate() + 1)) {
+                records.push({ date: new Date(d), status: 'LEAVE', employee: emp });
+              }
             }
-          });
-          this.timelineEmployees.set(Array.from(empsMap.values()).sort((a, b) => a.firstName.localeCompare(b.firstName)));
+            if (e.employee && !e.attendances) records.push(e); // already a day record
+          }
+          this.teamTimelineData.set(records);
+          const seen = new Set<number>();
+          this.timelineEmployees.set(
+            emps.filter((x) => x?.id && !seen.has(x.id) && seen.add(x.id))
+              .sort((a, b) => `${a.firstName ?? ''}`.localeCompare(`${b.firstName ?? ''}`)),
+          );
         },
         error: (err) => {
           this.toast.error(err.error?.message || 'Failed to load team timeline');
@@ -2641,7 +2657,9 @@ export class AttendanceLeaveComponent implements OnInit {
     const days = [];
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-      days.push({ date: new Date(d), isWeekend });
+      const key = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      const holiday = this.holidays().find((h: any) => this.getBackendDateString(h.date) === key);
+      days.push({ date: new Date(d), isWeekend, holidayName: holiday?.name ?? null });
     }
     return days;
   });
@@ -2688,9 +2706,18 @@ export class AttendanceLeaveComponent implements OnInit {
       new Date(r.date).toISOString().split('T')[0] === dateStr
     );
     
+    // Company holidays (B1): a day nobody is expected in, worked or not.
+    const holiday = this.holidays().find((h: any) => this.getBackendDateString(h.date) === dateStr);
+    if (holiday && !record?.clockIn && record?.status !== 'LEAVE') {
+      return { type: 'holiday', label: `Holiday — ${holiday.name}` };
+    }
+
     if (record) {
       if (record.status === 'LEAVE') return { type: 'leave', label: 'On Leave' };
       if (record.isHoliday) return { type: 'holiday', label: 'Holiday' };
+      if (holiday && record.clockIn) {
+        return { type: 'present', label: `Worked on holiday (${holiday.name}) — In: ${new Date(record.clockIn).toLocaleTimeString()}` };
+      }
       if (record.status === 'ABSENT') return { type: 'absent', label: 'Absent' };
       if (record.status === 'HALF_DAY') return { type: 'half-day', label: `Half Day (In: ${record.clockIn ? new Date(record.clockIn).toLocaleTimeString() : 'N/A'}, Out: ${record.clockOut ? new Date(record.clockOut).toLocaleTimeString() : 'N/A'})` };
       if (record.status === 'PRESENT') {

@@ -1282,9 +1282,11 @@
           <div class="timeline-header">
             <div class="timeline-employee-col" style="font-weight: 600; color: #64748b; font-size: 13px;">Employee</div>
             <div class="timeline-days">
-              <div class="timeline-day-header" *ngFor="let day of timelineDays()" [class.weekend]="day.isWeekend">
+              <div class="timeline-day-header" *ngFor="let day of timelineDays()" [class.weekend]="day.isWeekend"
+                   [class.holiday-col]="day.holidayName" [title]="day.holidayName || ''">
                 <span class="day-num">{{ day.date | date:'dd' }}</span>
                 <span class="day-name">{{ day.date | date:'EEE' }}</span>
+                <span class="day-hol" *ngIf="day.holidayName">HOL</span>
               </div>
             </div>
           </div>
@@ -1305,6 +1307,7 @@
                 <div class="timeline-cell cursor-pointer hover:bg-gray-100 transition-colors" 
                      *ngFor="let day of timelineDays()" 
                      [class.weekend]="day.isWeekend"
+                     [class.holiday-col]="day.holidayName"
                      (click)="openRescheduleModal(emp, day.date, getTimelineStatus(emp, day.date))">
                   <ng-container *ngIf="getTimelineStatus(emp, day.date) as status">
                     <div class="timeline-status-block {{status.type}}" [title]="status.label"></div>
