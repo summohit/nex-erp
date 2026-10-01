@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as xlsx from 'xlsx';
+import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../prisma/prisma.service';
 import { IssuesService } from './issues/issues.service';
 import { PROJECT_ROLE } from './project-roles';
@@ -111,7 +112,7 @@ export class TaskTransferService {
       ];
     });
 
-    return this.workbook(
+    return await this.workbook(
       [[...TEMPLATE_COLUMNS, ...EXTRA_COLUMNS], ...rows],
       await this.referenceRows(companyId, projectIds),
     );
@@ -125,7 +126,7 @@ export class TaskTransferService {
     const sample = projects.length === 1
       ? [[1, projects[0].name, projects[0].key, '', '', '', '', '', '', '', '', '', '']]
       : [];
-    return this.workbook(
+    return await this.workbook(
       [[...TEMPLATE_COLUMNS], ...sample],
       await this.referenceRows(companyId, projects.map((p) => p.id)),
     );
@@ -222,12 +223,12 @@ export class TaskTransferService {
     const summary = this.summarise(parsed);
     const failed = parsed.filter((r) => r.errors.length);
     const failedFile = failed.length
-      ? this.workbook([
+      ? (await this.workbook([
           [...TEMPLATE_COLUMNS, 'Task ID', 'Errors'],
           ...failed.map((r) => [
             ...TEMPLATE_COLUMNS.map((c) => r.raw[c] ?? ''), r.raw['Task ID'] ?? '', r.errors.join('; '),
           ]),
-        ]).toString('base64')
+        ])).toString('base64')
       : null;
     return { ...summary, failedFile };
   }
@@ -469,23 +470,111 @@ export class TaskTransferService {
       .trim();
   }
 
-  private workbook(main: any[][], reference?: any[][]): Buffer {
-    // Excel refuses any cell over 32,767 characters; one long cell would fail
-    // the whole download, so trim it and say so.
-    const LIMIT = 32000;
-    main = main.map((row) => row.map((v) =>
-      typeof v === 'string' && v.length > LIMIT ? v.slice(0, LIMIT) + ' …[truncated]' : v));
-    const wb = xlsx.utils.book_new();
-    const ws = xlsx.utils.aoa_to_sheet(main);
-    ws['!cols'] = (main[0] || []).map((h: string) =>
-      ({ wch: /Description|Pre-Requisite|Errors/.test(String(h)) ? 40 : /Name|Assign|SME|Dependency/.test(String(h)) ? 26 : 14 }));
-    xlsx.utils.book_append_sheet(wb, ws, 'task');
+  /**
+   * The downloadable workbook, styled to be read by people: a coloured header
+   * (template columns indigo, read-only export columns slate), frozen header
+   * row, filters, zebra rows, wrapped text, status colours and a guide sheet.
+   * Row 1 stays the header, so an exported file imports back unchanged.
+   */
+  private async workbook(main: any[][], reference?: any[][]): Promise<Buffer> {
+    const LIMIT = 32000; // Excel's cell limit is 32,767
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'MIRA';
+    wb.created = new Date();
+
+    const ws = wb.addWorksheet('task', { views: [{ state: 'frozen', ySplit: 1, xSplit: 4 }] });
+    const header = (main[0] || []).map(String);
+    const readOnly = new Set<string>([...EXTRA_COLUMNS, 'Errors']);
+    const widthFor = (h: string) =>
+      /Description|Pre-Requisite|Errors/.test(h) ? 46
+      : /Task Name/.test(h) ? 36
+      : /Project Name|Assign to|SME/.test(h) ? 28
+      : /Dependency|Phase/.test(h) ? 20
+      : /S\.No/.test(h) ? 7
+      : 15;
+    ws.columns = header.map((h) => ({ header: h, key: h, width: widthFor(h) }));
+
+    const border: Partial<ExcelJS.Borders> = {
+      top: { style: 'thin', color: { argb: 'FFE2E8F0' } }, bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      left: { style: 'thin', color: { argb: 'FFE2E8F0' } }, right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    };
+
+    const head = ws.getRow(1);
+    head.height = 30;
+    head.eachCell((cell, col) => {
+      const ro = readOnly.has(header[col - 1]);
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Calibri' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ro ? 'FF475569' : 'FF4338CA' } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      cell.border = border;
+    });
+
+    const statusFill: Record<string, string> = {
+      DONE: 'FFDCFCE7', CLOSED: 'FFDCFCE7', IN_PROGRESS: 'FFDBEAFE', IN_REVIEW: 'FFEDE9FE',
+      REVIEW: 'FFEDE9FE', TODO: 'FFF1F5F9', BLOCKED: 'FFFEE2E2',
+    };
+    const statusFont: Record<string, string> = {
+      DONE: 'FF166534', CLOSED: 'FF166534', IN_PROGRESS: 'FF1D4ED8', IN_REVIEW: 'FF6D28D9',
+      REVIEW: 'FF6D28D9', TODO: 'FF475569', BLOCKED: 'FFB91C1C',
+    };
+    const statusCol = header.indexOf('Status') + 1;
+    const errorsCol = header.indexOf('Errors') + 1;
+
+    main.slice(1).forEach((values, i) => {
+      const row = ws.addRow(values.map((v) =>
+        typeof v === 'string' && v.length > LIMIT ? v.slice(0, LIMIT) + ' …[truncated]' : v));
+      row.height = 22;
+      const zebra = i % 2 === 1;
+      row.eachCell({ includeEmpty: true }, (cell, col) => {
+        if (col > header.length) return;
+        cell.border = border;
+        cell.alignment = { vertical: 'top', wrapText: true,
+          horizontal: /S\.No|Assign Hours|Task ID|Logged Hours|Date/.test(header[col - 1]) ? 'center' : 'left' };
+        cell.font = { size: 10.5, name: 'Calibri', color: { argb: 'FF0F172A' } };
+        if (zebra) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      });
+      if (statusCol > 0) {
+        const c = row.getCell(statusCol);
+        const k = String(c.value ?? '').toUpperCase();
+        if (statusFill[k]) {
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: statusFill[k] } };
+          c.font = { bold: true, size: 10, color: { argb: statusFont[k] } };
+          c.alignment = { vertical: 'top', horizontal: 'center' };
+        }
+      }
+      if (errorsCol > 0) {
+        const c = row.getCell(errorsCol);
+        c.font = { size: 10.5, color: { argb: 'FFB91C1C' } };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF2F2' } };
+      }
+    });
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: header.length } };
+
     if (reference) {
-      const rs = xlsx.utils.aoa_to_sheet(reference);
-      rs['!cols'] = [{ wch: 70 }, { wch: 30 }, { wch: 24 }, { wch: 30 }, { wch: 14 }, { wch: 22 }];
-      xlsx.utils.book_append_sheet(wb, rs, 'Valid values');
+      const rs = wb.addWorksheet('Valid values', { views: [{ showGridLines: false }] });
+      rs.columns = [{ width: 18 }, { width: 34 }, { width: 26 }, { width: 32 }, { width: 15 }, { width: 22 }];
+      for (const r of reference) {
+        const row = rs.addRow(r);
+        const first = String(r[0] ?? '');
+        if (r.length === 1 && /^(How to fill this file|Phases)$/.test(first)) {
+          row.font = { bold: true, size: 13, color: { argb: 'FF4338CA' } };
+          row.height = 24;
+        } else if (r.length > 1 && first === 'Project Code') {
+          row.eachCell((c) => {
+            c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4338CA' } };
+            c.border = border;
+          });
+        } else if (r.length > 1) {
+          row.eachCell((c) => { c.border = border; c.font = { size: 10.5 }; });
+        } else if (first.startsWith('•')) {
+          row.font = { size: 10.5, color: { argb: 'FF334155' } };
+          rs.mergeCells(row.number, 1, row.number, 6);
+        }
+      }
     }
-    return xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+
+    return Buffer.from(await wb.xlsx.writeBuffer());
   }
 
   private day(d?: Date | null): string {

@@ -4228,12 +4228,24 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       }
       this.toast.success('Tasks exported as CSV');
     } else if (format === 'excel') {
-      let tsv = 'ID\tTask\tStatus\tPriority\tDue Date\tCreated At\tUpdated At\n';
-      data.forEach(i => {
-        tsv += `${i.key || ''}\t${(i.title || '').replace(/\t/g, ' ')}\t${i.status || ''}\t${i.priority || ''}\t${i.dueDate || ''}\t${i.createdAt || ''}\t${i.updatedAt || ''}\n`;
+      // The styled server export in the task template layout — the same file
+      // Export / Import produces, so it can be edited and imported back.
+      const params = { projectIds: String(this.projectId), includeDone: '1' };
+      this.http.get(`${environment.apiUrl}/project-tasks/export`, { params, responseType: 'blob' }).subscribe({
+        next: (blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          const slug = (this.project()?.name || `project_${this.projectId}`).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+          a.href = url; a.download = `${slug}-tasks.xlsx`; a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          this.toast.success('Tasks exported as Excel');
+        },
+        error: async (err) => {
+          let msg = 'Could not export tasks';
+          try { msg = JSON.parse(await err.error.text()).message || msg; } catch { /* keep default */ }
+          this.toast.error(msg);
+        },
       });
-      this.downloadFile(tsv, `${fileName}.xls`, 'application/vnd.ms-excel');
-      this.toast.success('Tasks exported as Excel (.xls)');
     } else if (format === 'json') {
       const jsonContent = JSON.stringify(data, null, 2);
       this.downloadFile(jsonContent, `${fileName}.json`, 'application/json');
