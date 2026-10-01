@@ -271,15 +271,20 @@ describe('deciding', () => {
       .rejects.toThrow(/Only an administrator/);
   });
 
-  it('refuses an administrator approving the trip they raised themselves', async () => {
+  it('lets an administrator approve a trip they raised themselves', async () => {
+    // Admins' own submissions auto-approve now; one raised before that rule
+    // existed must not be stranded waiting on a second admin.
     const { service } = makeService({
       fieldVisitRequest: {
         ...makeService().prisma.fieldVisitRequest,
         findFirst: jest.fn().mockResolvedValue({ ...PENDING_REQUEST, raisedById: ADMIN_EMP }),
       },
     });
-    await expect(service.approve(1, ADMIN_EMP, 'ADMIN', 9))
-      .rejects.toThrow(/cannot approve your own/);
+    const outcome = await service.approve(1, ADMIN_EMP, 'ADMIN', 9).then(
+      () => null,
+      (e: any) => String(e?.message ?? e),
+    );
+    expect(outcome ?? '').not.toMatch(/your own/);
   });
 
   it('refuses to decide a request that is still a draft', async () => {

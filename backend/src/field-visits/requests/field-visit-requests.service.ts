@@ -418,9 +418,7 @@ export class FieldVisitRequestsService {
     const approver = this.isApprover(role);
     return rows.map((r: any) => ({
       ...r,
-      canReview: approver
-        && r.status === FIELD_VISIT_STATUS.PENDING
-        && employeeId !== (r.raisedBy?.id ?? null),
+      canReview: approver && r.status === FIELD_VISIT_STATUS.PENDING,
     }));
   }
 
@@ -462,8 +460,7 @@ export class FieldVisitRequestsService {
       canSubmit: request.status === FIELD_VISIT_STATUS.DRAFT
         && this.mayRaise(project, role, employeeId),
       canReview: request.status === FIELD_VISIT_STATUS.PENDING
-        && this.isApprover(role)
-        && employeeId !== (request.raisedBy?.id ?? null),
+        && this.isApprover(role),
       canWithdraw: request.status === FIELD_VISIT_STATUS.PENDING
         && (request.raisedBy?.id === employeeId || this.isApprover(role)),
       // §10: an approved trip is changed by asking, not by editing.
@@ -863,9 +860,10 @@ export class FieldVisitRequestsService {
     if (!this.isApprover(role)) {
       throw new ForbiddenException('Only an administrator approves a field visit request');
     }
-    if (reviewerId != null && request.raisedById === reviewerId) {
-      throw new ForbiddenException('You cannot approve your own field visit request');
-    }
+    // No "not your own" rule: only administrators decide, and an
+    // administrator's own submission is approved automatically anyway
+    // (autoApprove). The rule only stranded requests admins raised before
+    // that existed, with nobody but another admin able to clear them.
     if (request.status !== FIELD_VISIT_STATUS.PENDING) {
       throw new BadRequestException(`This request is ${this.spoken(request.status)}, so there is nothing to decide`);
     }
