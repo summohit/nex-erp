@@ -24,8 +24,8 @@
   <div class="thr-hero-card">
     <div class="thr-hero-left">
       <div class="thr-hero-icon-wrap">
-        <svg *ngIf="requestType() !== 'VISIT_LOCATIONS'" lucideTimer size="28"></svg>
-        <svg *ngIf="requestType() === 'VISIT_LOCATIONS'" lucideMapPin size="28"></svg>
+        <svg *ngIf="requestType() !== 'VISIT_LOCATIONS' && requestType() !== 'FIELD_VISITS'" lucideTimer size="28"></svg>
+        <svg *ngIf="requestType() === 'VISIT_LOCATIONS' || requestType() === 'FIELD_VISITS'" lucideMapPin size="28"></svg>
       </div>
       <div class="thr-hero-text">
         <div class="thr-hero-title-row">
@@ -108,6 +108,18 @@
       <span>Visit Locations</span>
       <span class="prq-type-count" *ngIf="countFor('VISIT_LOCATIONS') > 0">{{
         countFor('VISIT_LOCATIONS')
+      }}</span>
+    </button>
+    <button
+      type="button"
+      class="prq-type-tab"
+      [class.active]="requestType() === 'FIELD_VISITS'"
+      (click)="setRequestType('FIELD_VISITS')"
+    >
+      <svg lucideMapPin size="15"></svg>
+      <span>Field Visits</span>
+      <span class="prq-type-count" *ngIf="countFor('FIELD_VISITS') > 0">{{
+        countFor('FIELD_VISITS')
       }}</span>
     </button>
   </div>
@@ -886,6 +898,58 @@
           <svg lucideX size="14"></svg> Reject
         </button>
         <button type="button" class="prq-btn approve" (click)="decideBudgetRequest(b, 'APPROVED')">
+          <svg lucideCheck size="14"></svg> Approve
+        </button>
+      </div>
+    </article>
+  </ng-container>
+
+  <!-- ── Field visit requests ─────────────────────────────────────────────── -->
+  <ng-container *ngIf="requestType() === 'FIELD_VISITS' && !loadingOthers()">
+    <div class="prq-empty" *ngIf="!fieldVisitRequests().length">
+      <svg lucideCheckCircle2 size="30"></svg>
+      <h3>No field visits waiting</h3>
+      <p>No trip is waiting on your approval.</p>
+    </div>
+
+    <article class="prq-card" *ngFor="let r of fieldVisitRequests()">
+      <div class="prq-card-head">
+        <div class="prq-card-ident">
+          <a class="prq-project" [routerLink]="['/field-visits/requests', r.id]">
+            <svg lucideFolderKanban size="13"></svg>
+            {{ r.requestNumber }} · {{ $any(r.project)?.key ? $any(r.project).key + ' · ' : '' }}{{ r.project.name }}
+          </a>
+        </div>
+        <span class="prq-stage"> <svg lucideClock size="13"></svg> Awaiting administrator </span>
+      </div>
+
+      <div class="prq-figures">
+        <div class="prq-figure">
+          <span class="prq-figure-label">Site</span>
+          <span class="prq-figure-value">{{ r.location }}</span>
+        </div>
+        <div class="prq-figure">
+          <span class="prq-figure-label">Dates</span>
+          <span class="prq-figure-value">{{ r.startDate | date: 'd MMM' }} – {{ r.endDate | date: 'd MMM y' }} ({{ r.visitDays }}d)</span>
+        </div>
+        <div class="prq-figure">
+          <span class="prq-figure-label">Team · Tasks</span>
+          <span class="prq-figure-value">{{ r.members.length }} · {{ r.tasks.length }}</span>
+        </div>
+      </div>
+
+      <div class="prq-meta">
+        <span *ngIf="$any(r).raisedBy">
+          Raised by {{ $any(r).raisedBy.firstName }} {{ $any(r).raisedBy.lastName }}
+        </span>
+        <span *ngIf="$any(r).submittedAt">{{ $any(r).submittedAt | date: 'd MMM y, HH:mm' }}</span>
+      </div>
+
+      <div class="prq-actions">
+        <button type="button" class="prq-btn reject" (click)="decideFieldVisit(r, 'REJECTED')">
+          <svg lucideX size="14"></svg> Reject
+        </button>
+        <button type="button" class="prq-btn approve" (click)="decideFieldVisit(r, 'APPROVED')">
           <svg lucideCheck size="14"></svg> Approve
         </button>
       </div>

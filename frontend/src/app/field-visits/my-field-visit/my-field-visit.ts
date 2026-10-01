@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, HostBinding, Input, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -65,9 +65,23 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
   /** One trip a day is the ordinary case; more than one is shown as a list. */
   day = computed(() => this.days()[0] ?? null);
 
+  /**
+   * Shown as a panel at the top of the Field Visits page rather than as its
+   * own screen: no page header, and nothing at all on a day with no trip.
+   */
+  @Input() embedded = false;
+
+  /** Embedded: nothing on screen until we know whether there is a trip today. */
+  @HostBinding('style.display') get hostDisplay(): string | null {
+    return this.embedded && this.isLoading() ? 'none' : null;
+  }
+
   ngOnInit(): void {
     this.load();
-    this.startWatchingLocation();
+    // Embedded, the GPS starts only once there is a trip to clock — otherwise
+    // every administrator opening Field Visits gets a location prompt for
+    // nothing.
+    if (!this.embedded) this.startWatchingLocation();
   }
 
   ngOnDestroy(): void {
@@ -84,6 +98,7 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
         // the same after a refresh mid-visit.
         this.selectedTaskId.set(current?.issue?.id ?? current?.tasks?.[0]?.id ?? null);
         this.isLoading.set(false);
+        if (this.embedded && current && this.watchId == null) this.startWatchingLocation();
       },
       error: (err) => {
         this.error.set(this.messageOf(err));

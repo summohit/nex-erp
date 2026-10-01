@@ -404,7 +404,7 @@ export class FieldVisitRequestsService {
     filter: { status?: string; projectId?: string | number } = {},
   ) {
     const projectId = Number(filter?.projectId);
-    return this.prisma.fieldVisitRequest.findMany({
+    const rows = await this.prisma.fieldVisitRequest.findMany({
       where: {
         ...this.visibilityWhere(companyId, role, employeeId),
         ...(filter?.status ? { status: filter.status } : {}),
@@ -413,6 +413,15 @@ export class FieldVisitRequestsService {
       orderBy: [{ createdAt: 'desc' }],
       select: this.SELECT,
     });
+    // Same rule as getOne's canReview, per row, so the table can offer
+    // Approve / Reject without opening each request.
+    const approver = this.isApprover(role);
+    return rows.map((r: any) => ({
+      ...r,
+      canReview: approver
+        && r.status === FIELD_VISIT_STATUS.PENDING
+        && employeeId !== (r.raisedBy?.id ?? null),
+    }));
   }
 
   /**
@@ -562,6 +571,9 @@ export class FieldVisitRequestsService {
     // After the commit, never inside it — a push round trip has no business
     // holding a transaction open, and a notification for a request that then
     // rolled back would point at nothing.
+    if (submitting && this.isApprover(role)) {
+      return this.autoApprove(companyId, employeeId, created.id);
+    }
     if (submitting) {
       await this.notifyAwaitingApproval(companyId, created, employeeId);
       await this.notifyMembersNamed(companyId, created, employeeId);
@@ -717,6 +729,9 @@ export class FieldVisitRequestsService {
       return updated;
     });
 
+    if (this.isApprover(role)) {
+      return this.autoApprove(companyId, employeeId, id);
+    }
     await this.notifyAwaitingApproval(companyId, submitted, employeeId);
     await this.notifyMembersNamed(companyId, submitted, employeeId);
     return submitted;
@@ -756,6 +771,26 @@ export class FieldVisitRequestsService {
    */
   async approve(companyId: number, reviewerId: number | null, role: string, id: number) {
     const request = await this.requireDecidable(companyId, reviewerId, role, id);
+    return this.commitApproval(companyId, request, reviewerId);
+  }
+
+  /**
+   * A request an administrator submits is approved on the spot.
+   *
+   * Their submission is already the decision — sending it to another admin
+   * only added a wait. A project manager's request still goes to an
+   * administrator; that is the approval that matters. The activity log says it
+   * was automatic, so nobody reads it as a second person having checked it.
+   */
+  private async autoApprove(companyId: number, adminId: number | null, id: number) {
+    const request = await this.loadForDecision(companyId, id);
+    return this.commitApproval(companyId, request, adminId, 'Auto-approved — raised by an administrator. ');
+  }
+
+  private async commitApproval(
+    companyId: number, request: any, reviewerId: number | null, note = '',
+  ) {
+    const id = request.id;
 
     // The decision and what it commits people to are one write. A trip that
     // was approved but whose tasks and schedule failed to appear is worse than
@@ -777,7 +812,7 @@ export class FieldVisitRequestsService {
       await tx.fieldVisitRequestActivity.create({
         data: {
           requestId: id, action: 'APPROVED',
-          detail: `${request.visitDays} day(s) at ${request.location}`
+          detail: `${note}${request.visitDays} day(s) at ${request.location}`
             + ` — ${result.issues} task(s) assigned, ${result.attendanceDays} attendance day(s) scheduled`,
           actorId: reviewerId as number,
         },

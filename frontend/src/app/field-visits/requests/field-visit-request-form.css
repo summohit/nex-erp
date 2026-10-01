@@ -2061,3 +2061,12 @@
 @keyframes selectSpin {
   to { transform: rotate(360deg); }
 }
+
+/* Project code chip in the project picker — the code is what tells
+   similarly named projects apart. */
+.project-code {
+  display: inline-block; margin-right: 8px; padding: 1px 6px;
+  border-radius: 5px; background: #eef2ff; color: #4338ca;
+  font-size: 11px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap; vertical-align: middle;
+}

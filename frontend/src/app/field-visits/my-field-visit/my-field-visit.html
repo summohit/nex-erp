@@ -1,40 +1,76 @@
 <div class="mfv-page">
-  <!-- Header Card -->
-  <div class="page-header-card">
-    <div class="header-left">
-      <div class="header-icon-box">
-        <svg lucideRoute [size]="22"></svg>
-      </div>
-      <div>
-        <div class="title-with-pill">
-          <h1>My Field Visit</h1>
-          <span class="date-chip">
-            <svg lucideCalendar [size]="13"></svg>
-            {{ today | date:'EEEE, d MMM y' }}
-          </span>
+  @if (embedded) {
+    <!-- Inside Field Visits: the full heading only when there is a trip today -->
+    @if (day()) {
+      <div class="embedded-head">
+        <div class="embedded-title">
+          <svg lucideRoute [size]="16"></svg>
+          <span>Today's field visit</span>
+          <span class="date-chip">{{ today | date:'EEE, d MMM' }}</span>
         </div>
-        <p>Clock in and out from the site. You must be within the approved radius.</p>
+        <div class="gps-status-pill" [class]="'gps-' + gpsStatus().state">
+          <span class="gps-dot"></span>
+          <span class="gps-text">{{ gpsStatus().label }}</span>
+        </div>
+      </div>
+    }
+  } @else {
+    <!-- Header Card -->
+    <div class="page-header-card">
+      <div class="header-left">
+        <div class="header-icon-box">
+          <svg lucideRoute [size]="22"></svg>
+        </div>
+        <div>
+          <div class="title-with-pill">
+            <h1>My Field Visit</h1>
+            <span class="date-chip">
+              <svg lucideCalendar [size]="13"></svg>
+              {{ today | date:'EEEE, d MMM y' }}
+            </span>
+          </div>
+          <p>Clock in and out from the site. You must be within the approved radius.</p>
+        </div>
+      </div>
+  
+      <div class="header-actions">
+        <!-- GPS Status Pill -->
+        <div class="gps-status-pill" [class]="'gps-' + gpsStatus().state">
+          <span class="gps-dot"></span>
+          <span class="gps-text">{{ gpsStatus().label }}</span>
+        </div>
+  
+        <button class="ghost-btn refresh-btn" type="button" (click)="load()" [disabled]="isLoading()" title="Refresh status">
+          <svg lucideRefreshCw [size]="14" [class.spin-anim]="isLoading()"></svg>
+          <span>Refresh</span>
+        </button>
       </div>
     </div>
+  }
 
-    <div class="header-actions">
-      <!-- GPS Status Pill -->
-      <div class="gps-status-pill" [class]="'gps-' + gpsStatus().state">
-        <span class="gps-dot"></span>
-        <span class="gps-text">{{ gpsStatus().label }}</span>
-      </div>
-
-      <button class="ghost-btn refresh-btn" type="button" (click)="load()" [disabled]="isLoading()" title="Refresh status">
-        <svg lucideRefreshCw [size]="14" [class.spin-anim]="isLoading()"></svg>
-        <span>Refresh</span>
-      </button>
-    </div>
-  </div>
-
-  @if (isLoading()) {
+  @if (isLoading() && !embedded) {
     <div class="card loading-card">
       <svg lucideRefreshCw [size]="20" class="spin-anim"></svg>
       <span>Loading today's field visit schedule…</span>
+    </div>
+  } @else if (!day() && embedded) {
+    <!-- No trip today: a slim placeholder, not the full empty-state screen -->
+    <div class="embedded-empty">
+      <div class="ee-icon">
+        <span class="ee-ring"></span>
+        <svg lucideCompass [size]="20"></svg>
+      </div>
+      <div class="ee-text">
+        <strong>No field visit today</strong>
+        <span>You're not on a site trip today. Once a visit you're on is approved, your site, tasks and geofenced clock-in show up right here.</span>
+      </div>
+      <div class="ee-date">
+        <svg lucideCalendar [size]="14"></svg>
+        <div>
+          <span class="ee-day">{{ today | date:'EEEE' }}</span>
+          <span class="ee-full">{{ today | date:'d MMM y' }}</span>
+        </div>
+      </div>
     </div>
   } @else if (!day()) {
     <!-- Empty State: No visit today -->

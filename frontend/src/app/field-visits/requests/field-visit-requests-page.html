@@ -6,8 +6,14 @@
         <svg lucideRoute [size]="24"></svg>
       </div>
       <div>
-        <h1>Field Visit Requests</h1>
-        <p>Coordinate site visits, assign field teams, define client-site tasks, and track approvals.</p>
+        <h1>Field Visits</h1>
+        <p>
+          @if (isCompanyWide()) {
+            All field visits across the company — raise, approve and track them here.
+          } @else {
+            Your field visits and the ones on projects you run.
+          }
+        </p>
       </div>
     </div>
 
@@ -34,6 +40,10 @@
       </button>
     </div>
   </div>
+
+  <!-- Your own trip today, with the geofenced clock. Renders nothing on a
+       day you are not on a visit. -->
+  <app-my-field-visit [embedded]="true" />
 
   <!-- KPI Summary Cards -->
   <div class="kpi-grid">
@@ -259,6 +269,19 @@
                 </span>
               </td>
               <td class="action-col">
+                @if (r.canReview) {
+                  <div class="row-decide">
+                    <button type="button" class="decide-btn approve" [disabled]="deciding() === r.id"
+                            (click)="approveRow(r, $event)" title="Approve this visit">
+                      <svg lucideCheck [size]="13"></svg>
+                      <span>{{ deciding() === r.id ? 'Approving…' : 'Approve' }}</span>
+                    </button>
+                    <button type="button" class="decide-btn reject" [disabled]="deciding() === r.id"
+                            (click)="rejectRow(r, $event)" title="Reject with a reason">
+                      <svg lucideX [size]="13"></svg>
+                    </button>
+                  </div>
+                }
                 <div class="row-arrow">
                   <svg lucideArrowRight [size]="15"></svg>
                 </div>

@@ -56,7 +56,7 @@
               (click)="toggleProjectDropdown()">
               <div class="trigger-left">
                 <svg lucideBuilding [size]="16" class="select-icon"></svg>
-                <span class="selected-text">{{ selectedProject()?.name || 'Select a project…' }}</span>
+                <span class="selected-text">@if (selectedProject()?.key) {<span class="project-code">{{ selectedProject()?.key }}</span>}{{ selectedProject()?.name || 'Select a project…' }}</span>
               </div>
               <div class="trigger-right">
                 @if (selectedProjectId() !== null) {
@@ -74,7 +74,7 @@
                   <svg lucideSearch [size]="14" class="search-icon"></svg>
                   <input
                     type="text"
-                    placeholder="Search projects by name..."
+                    placeholder="Search by project code or name..."
                     [ngModel]="projectSearchQuery()"
                     (ngModelChange)="projectSearchQuery.set($event)"
                     autofocus />
@@ -103,6 +103,7 @@
                       (click)="selectProject(p.id)">
                       <div class="option-content">
                         <svg lucideBuilding [size]="14" class="option-icon"></svg>
+                        @if (p.key) {<span class="project-code">{{ p.key }}</span>}
                         <span class="option-name">{{ p.name }}</span>
                       </div>
                       @if (selectedProjectId() === p.id) {

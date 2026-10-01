@@ -597,7 +597,23 @@
 .action-col {
   width: 36px;
   padding-right: 16px !important;
+  white-space: nowrap;
 }
+
+.action-col:has(.row-decide) { width: auto; }
+.row-decide { display: inline-flex; gap: 6px; margin-right: 8px; vertical-align: middle; }
+.row-decide + .row-arrow { display: inline-flex; vertical-align: middle; }
+.decide-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 28px; padding: 0 10px; border-radius: 7px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  border: 1px solid transparent; transition: background 0.15s ease;
+}
+.decide-btn:disabled { opacity: 0.6; cursor: wait; }
+.decide-btn.approve { background: #16a34a; color: #fff; }
+.decide-btn.approve:hover:not(:disabled) { background: #15803d; }
+.decide-btn.reject { background: #fff; color: #dc2626; border-color: #fecaca; padding: 0 8px; }
+.decide-btn.reject:hover:not(:disabled) { background: #fef2f2; }
 
 .row-arrow {
   color: #cbd5e1;
@@ -668,3 +684,13 @@
   .search-box-wrap { min-width: 0; max-width: none; width: 100%; }
   .filter-select-wrap select { width: 100%; }
 }
+
+/* Keep the whole row — status and the Approve/Reject buttons — on screen:
+   long project and site names truncate instead of pushing the table wide. */
+.fvr-table .project-name,
+.fvr-table .site-text {
+  display: inline-block; max-width: 200px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
+}
+.fvr-table th, .fvr-table td { padding-left: 12px; padding-right: 12px; }
+.fvr-table .status-pill { white-space: nowrap; }

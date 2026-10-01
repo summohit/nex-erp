@@ -97,7 +97,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
   private http = inject(HttpClient);
   private locationRequests = inject(VisitLocationRequestsService);
 
-  projects = signal<{ id: number; name: string }[]>([]);
+  projects = signal<{ id: number; name: string; key: string | null }[]>([]);
   /** Sites the company keeps on file, for the location picker (§PB10). */
   visitLocations = signal<VisitLocation[]>([]);
   selectedVisitLocationId = signal<number | null>(null);
@@ -288,7 +288,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
     this.isLoadingProjects.set(true);
     this.projectsService.getProjects().subscribe({
       next: (rows: any[]) => {
-        this.projects.set((rows || []).map((p) => ({ id: p.id, name: p.name })));
+        this.projects.set((rows || []).map((p) => ({ id: p.id, name: p.name, key: p.key ?? null })));
         this.isLoadingProjects.set(false);
         done();
       },
@@ -444,7 +444,10 @@ export class FieldVisitRequestFormComponent implements OnInit {
     const q = this.projectSearchQuery().trim().toLowerCase();
     const list = this.projects();
     if (!q) return list;
-    return list.filter((p) => p.name.toLowerCase().includes(q));
+    // By code as well as name: several projects share a name pattern
+    // ("F5 uDNS_Phase-11 …") and the code is what tells them apart.
+    return list.filter((p) =>
+      p.name.toLowerCase().includes(q) || (p.key ?? '').toLowerCase().includes(q));
   });
 
   toggleProjectDropdown(): void {

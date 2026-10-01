@@ -44,6 +44,7 @@ import {
   VisitLocationRequestCapabilities,
   VisitLocationRequestsService,
 } from '../../services/visit-location-requests.service';
+import { FieldVisitRequest, FieldVisitRequestsService } from '../../services/field-visit-requests';
 
 export type RequestTabFilter = 'AWAITING' | 'HISTORY' | 'APPROVED' | 'REJECTED' | 'ALL';
 
@@ -56,7 +57,7 @@ export type RequestTabFilter = 'AWAITING' | 'HISTORY' | 'APPROVED' | 'REJECTED' 
  * carries a scope call and its evidence. Flattening them to a common shape
  * would hide the thing each decision actually turns on.
  */
-export type ProjectRequestType = 'HOURS' | 'TASKS' | 'BUDGET' | 'SCOPE' | 'VISIT_LOCATIONS';
+export type ProjectRequestType = 'HOURS' | 'TASKS' | 'BUDGET' | 'SCOPE' | 'VISIT_LOCATIONS' | 'FIELD_VISITS';
 export type RequestSortOption = 'newest' | 'oldest' | 'hours-desc' | 'hours-asc';
 
 @Component({
@@ -106,6 +107,7 @@ export class TaskHoursRequestsTabComponent {
   private projectsApi = inject(ProjectsService);
   private budgetApi = inject(BudgetRequestsService);
   private locationApi = inject(VisitLocationRequestsService);
+  private fieldVisitApi = inject(FieldVisitRequestsService);
   private route = inject(ActivatedRoute);
   private dialog = inject(DialogService);
 
@@ -116,6 +118,8 @@ export class TaskHoursRequestsTabComponent {
   budgetRequests = signal<BudgetRequest[]>([]);
   scopeRequests = signal<ScopeRequest[]>([]);
   visitLocationRequests = signal<VisitLocationRequest[]>([]);
+  /** Field visit requests awaiting a decision this viewer may make. */
+  fieldVisitRequests = signal<FieldVisitRequest[]>([]);
   locationCapabilities = signal<VisitLocationRequestCapabilities | null>(null);
   loadingOthers = signal(false);
 
@@ -280,6 +284,9 @@ export class TaskHoursRequestsTabComponent {
 
   constructor() {
     this.load();
+    // Loaded up front so the tab badge shows how many trips are waiting
+    // before anyone clicks into it.
+    this.loadFieldVisits();
     this.route.queryParamMap.subscribe((params) => {
       const type = params.get('type');
       if (!this.isRequestType(type)) return;
@@ -290,7 +297,7 @@ export class TaskHoursRequestsTabComponent {
 
   private isRequestType(value: string | null): value is ProjectRequestType {
     return (
-      value != null && ['HOURS', 'TASKS', 'BUDGET', 'SCOPE', 'VISIT_LOCATIONS'].includes(value)
+      value != null && ['HOURS', 'TASKS', 'BUDGET', 'SCOPE', 'VISIT_LOCATIONS', 'FIELD_VISITS'].includes(value)
     );
   }
 
@@ -533,6 +540,11 @@ export class TaskHoursRequestsTabComponent {
       blurb:
         'Raised from a project\u2019s Fix button \u2014 anything needing a decision that is not a task or a budget change, with the requester\u2019s own in-scope or out-of-scope call.',
     },
+    FIELD_VISITS: {
+      title: 'Field Visit Requests',
+      blurb:
+        'Trips raised by project managers, waiting on an administrator. Approving assigns the tasks and schedules attendance for everyone on the visit.',
+    },
     VISIT_LOCATIONS: {
       title: 'Visit Location Requests',
       blurb:
@@ -596,6 +608,8 @@ export class TaskHoursRequestsTabComponent {
           done();
         },
       });
+    } else if (type === 'FIELD_VISITS') {
+      this.loadFieldVisits(done);
     } else if (type === 'VISIT_LOCATIONS') {
       forkJoin({
         capabilities: this.locationApi.capabilities(),
@@ -622,6 +636,7 @@ export class TaskHoursRequestsTabComponent {
     if (type === 'TASKS') return this.taskApprovals().length;
     if (type === 'BUDGET') return this.budgetRequests().length;
     if (type === 'SCOPE') return this.scopeRequests().length;
+    if (type === 'FIELD_VISITS') return this.fieldVisitRequests().length;
     return this.visitLocationRequests().filter((request) => request.status === 'PENDING').length;
   }
 
@@ -798,6 +813,59 @@ export class TaskHoursRequestsTabComponent {
           decision === 'APPROVED' ? 'Visit location approved' : 'Visit location rejected',
         );
         this.loadOthers('VISIT_LOCATIONS');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not record that decision'),
+    });
+  }
+
+  // ── Field visits ──────────────────────────────────────────────────────────
+
+  /**
+   * Pending trips this viewer can actually decide. The field visit list is
+   * already scoped server-side; `canReview` drops the viewer's own requests,
+   * which they may not approve.
+   */
+  loadFieldVisits(done?: () => void) {
+    this.fieldVisitApi.list({ status: 'PENDING_APPROVAL' }).subscribe({
+      next: (rows) => {
+        this.fieldVisitRequests.set((rows || []).filter((r) => r.canReview));
+        done?.();
+      },
+      error: () => {
+        this.fieldVisitRequests.set([]);
+        done?.();
+      },
+    });
+  }
+
+  async decideFieldVisit(r: FieldVisitRequest, decision: 'APPROVED' | 'REJECTED') {
+    if (decision === 'REJECTED') {
+      const typed = await this.dialog.prompt(
+        `Why is ${r.requestNumber} (${r.location}) being rejected? The manager who raised it acts on this.`,
+        'Reject Field Visit',
+        { placeholder: 'e.g. Dates clash with the site shutdown', confirmLabel: 'Reject request', required: true },
+      );
+      if (!typed?.trim()) return;
+      this.fieldVisitApi.reject(r.id, typed.trim()).subscribe({
+        next: () => {
+          this.toast.success(`${r.requestNumber} rejected`);
+          this.loadFieldVisits();
+        },
+        error: (err) => this.toast.error(err?.error?.message || 'Could not record that decision'),
+      });
+      return;
+    }
+    const ok = await this.dialog.confirm(
+      `Approve ${r.requestNumber}? ${r.members?.length || 0} person(s) get the tasks and ${r.visitDays} day(s) of field attendance.`,
+      'Approve Field Visit',
+      'Approve',
+      'Cancel',
+    );
+    if (!ok) return;
+    this.fieldVisitApi.approve(r.id).subscribe({
+      next: () => {
+        this.toast.success(`${r.requestNumber} approved — tasks and attendance are assigned`);
+        this.loadFieldVisits();
       },
       error: (err) => this.toast.error(err?.error?.message || 'Could not record that decision'),
     });
