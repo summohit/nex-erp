@@ -1369,9 +1369,17 @@ export class OfferLettersService {
       ? SALARY_TABLE_TOKEN
       : salaryTableHtml;
 
-    const withTable = merged
+    let withTable = merged
       .replace(/{{\s*salaryTable\s*}}/g, tableReplacement)
       .split('##SALARY_TABLE##').join(tableReplacement);
+
+    // A template with no placeholder printed no annexure at all — the live
+    // "Offer Letter" template is one. Same rule as an edited body
+    // (applySalaryTable): a misplaced annexure beats a vanished one.
+    if (withTable === merged) {
+      this.logger.warn('Offer letter template has no salary-table placeholder; appending the annexure at the end.');
+      withTable = `${merged}${tableReplacement}`;
+    }
 
     return { html: withTable, header, footer, salaryTableHtml };
   }
@@ -1496,7 +1504,7 @@ export class OfferLettersService {
       : `<span style="font-size:15px;font-weight:700;color:#0f172a;">${company?.name || ''}</span>`;
 
     return `<div style="width:100%;font-family:Arial,sans-serif;padding:0 10mm;box-sizing:border-box;">
-      <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #ff5500;padding-bottom:7px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:7px;">
         <div>${logo}</div>
         <div style="font-size:8px;color:#9ca3af;text-align:right;letter-spacing:0.04em;">${cfg.tagline || ''}</div>
       </div>

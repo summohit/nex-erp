@@ -299,6 +299,37 @@
     </ng-container>
   </div>
 
+  <!-- MY CALENDAR — directly under the KPIs -->
+  <div class="dashboard-card">
+    <div class="card-header flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="card-icon-badge bg-indigo-tint">
+          <svg lucideCalendarDays size="16"></svg>
+        </div>
+        <div>
+          <h3>My Calendar</h3>
+          <span class="card-header-sub">{{ (dashboard()?.common?.myCalendar?.weekStart | date:'dd MMM') }} – {{ (dashboard()?.common?.myCalendar?.weekEnd | date:'dd MMM yyyy') }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="cal-week-grid">
+        <div class="cal-day-col" *ngFor="let day of dashboard()?.common?.myCalendar?.days" [class.is-today]="day.date === todayKey()">
+          <div class="cal-day-head">
+            <span class="cal-day-label">{{ day.label }}</span>
+            <span class="cal-day-num">{{ day.dayNum }}</span>
+          </div>
+          <div class="cal-day-events">
+            <div class="cal-event" *ngFor="let e of calendarEventsFor(day.date)" [ngClass]="calendarCalendarType(e.type)">
+              <span class="cal-event-title">{{ e.title }}</span>
+              <span class="cal-event-sub" *ngIf="e.subtitle">{{ e.subtitle }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ======================================================================= -->
   <!-- 3. MAIN DASHBOARD CONTENT GRID (Left: Analytics, Right: Punch Hub) -->
   <!-- ======================================================================= -->
@@ -556,47 +587,6 @@
         </div>
       </div>
 
-      <!-- EMPLOYEE APPRECIATIONS -->
-      <div class="dashboard-card">
-        <div class="card-header">
-          <div class="flex items-center gap-2.5">
-            <div class="card-icon-badge bg-amber-tint">
-              <svg lucideAward size="16"></svg>
-            </div>
-            <div>
-              <h3>Employee Appreciations</h3>
-              <span class="card-header-sub">Recent recognition</span>
-            </div>
-          </div>
-          <span class="count-badge-amber" *ngIf="(dashboard()?.common?.appreciations?.length || 0) > 0">{{ dashboard()?.common?.appreciations?.length }}</span>
-        </div>
-        <div class="card-body p-0">
-          <div class="appreciation-scroll" *ngIf="(dashboard()?.common?.appreciations?.length || 0) > 0">
-            <div class="appreciation-card" *ngFor="let a of (dashboard()?.common?.appreciations || []).slice(0, 5)">
-              <div class="people-avatar-wrap">
-                <img *ngIf="a.employee?.avatarUrl" [src]="a.employee?.avatarUrl" [alt]="a.employee?.firstName">
-                <span *ngIf="!a.employee?.avatarUrl" class="people-avatar-fallback">{{ (a.employee?.firstName || '?').charAt(0) }}</span>
-              </div>
-              <div class="appreciation-body">
-                <div class="appreciation-head">
-                  <span class="people-name">{{ a.employee ? (a.employee.firstName + ' ' + a.employee.lastName) : 'Team member' }}</span>
-                  <span class="award-tag" [style.background]="appreciationAwardColor(a.awardColor)"><svg lucideTrophy size="11"></svg>{{ a.awardTitle }}</span>
-                </div>
-                <span class="people-role">{{ a.employee?.designation || 'Team member' }}</span>
-                <p class="appreciation-summary">{{ a.summary }}</p>
-              </div>
-              <span class="appreciation-date">{{ a.givenDate | date:'dd MMM yyyy' }}</span>
-            </div>
-          </div>
-          <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
-          <div class="empty-box p-6 text-center" *ngIf="!isLoadingMetrics() && ((dashboard()?.common?.appreciations?.length || 0) === 0)">
-            <svg lucideTrophy size="32" class="text-amber-400 mb-2"></svg>
-            <p style="font-size: 13px; font-weight: 600; color: #64748b;">No record found</p>
-            <p style="font-size: 12px; color: #94a3b8;">Appreciations will show up here when awarded.</p>
-          </div>
-        </div>
-      </div>
-
       <!-- MY TICKETS -->
       <div class="dashboard-card">
         <div class="card-header flex items-center justify-between">
@@ -636,33 +626,43 @@
         </div>
       </div>
 
-      <!-- MY CALENDAR -->
+      <!-- EMPLOYEE APPRECIATIONS -->
       <div class="dashboard-card">
-        <div class="card-header flex items-center justify-between">
+        <div class="card-header">
           <div class="flex items-center gap-2.5">
-            <div class="card-icon-badge bg-indigo-tint">
-              <svg lucideCalendarDays size="16"></svg>
+            <div class="card-icon-badge bg-amber-tint">
+              <svg lucideAward size="16"></svg>
             </div>
             <div>
-              <h3>My Calendar</h3>
-              <span class="card-header-sub">{{ (dashboard()?.common?.myCalendar?.weekStart | date:'dd MMM') }} – {{ (dashboard()?.common?.myCalendar?.weekEnd | date:'dd MMM yyyy') }}</span>
+              <h3>Employee Appreciations</h3>
+              <span class="card-header-sub">Recent recognition</span>
             </div>
           </div>
+          <span class="count-badge-amber" *ngIf="(dashboard()?.common?.appreciations?.length || 0) > 0">{{ dashboard()?.common?.appreciations?.length }}</span>
         </div>
         <div class="card-body p-0">
-          <div class="cal-week-grid">
-            <div class="cal-day-col" *ngFor="let day of dashboard()?.common?.myCalendar?.days" [class.is-today]="day.date === todayKey()">
-              <div class="cal-day-head">
-                <span class="cal-day-label">{{ day.label }}</span>
-                <span class="cal-day-num">{{ day.dayNum }}</span>
+          <div class="appreciation-scroll" *ngIf="(dashboard()?.common?.appreciations?.length || 0) > 0">
+            <div class="appreciation-card" *ngFor="let a of (dashboard()?.common?.appreciations || []).slice(0, 5)">
+              <div class="people-avatar-wrap">
+                <img *ngIf="a.employee?.avatarUrl" [src]="a.employee?.avatarUrl" [alt]="a.employee?.firstName">
+                <span *ngIf="!a.employee?.avatarUrl" class="people-avatar-fallback">{{ (a.employee?.firstName || '?').charAt(0) }}</span>
               </div>
-              <div class="cal-day-events">
-                <div class="cal-event" *ngFor="let e of calendarEventsFor(day.date)" [ngClass]="calendarCalendarType(e.type)">
-                  <span class="cal-event-title">{{ e.title }}</span>
-                  <span class="cal-event-sub" *ngIf="e.subtitle">{{ e.subtitle }}</span>
+              <div class="appreciation-body">
+                <div class="appreciation-head">
+                  <span class="people-name">{{ a.employee ? (a.employee.firstName + ' ' + a.employee.lastName) : 'Team member' }}</span>
+                  <span class="award-tag" [style.background]="appreciationAwardColor(a.awardColor)"><svg lucideTrophy size="11"></svg>{{ a.awardTitle }}</span>
                 </div>
+                <span class="people-role">{{ a.employee?.designation || 'Team member' }}</span>
+                <p class="appreciation-summary">{{ a.summary }}</p>
               </div>
+              <span class="appreciation-date">{{ a.givenDate | date:'dd MMM yyyy' }}</span>
             </div>
+          </div>
+          <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
+          <div class="empty-box p-6 text-center" *ngIf="!isLoadingMetrics() && ((dashboard()?.common?.appreciations?.length || 0) === 0)">
+            <svg lucideTrophy size="32" class="text-amber-400 mb-2"></svg>
+            <p style="font-size: 13px; font-weight: 600; color: #64748b;">No record found</p>
+            <p style="font-size: 12px; color: #94a3b8;">Appreciations will show up here when awarded.</p>
           </div>
         </div>
       </div>

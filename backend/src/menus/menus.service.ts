@@ -155,11 +155,12 @@ export class MenusService implements OnModuleInit {
             { title: 'Tasks', route: '/tasks', displayOrder: 2 },
             { title: 'Timesheet', route: '/timesheets', displayOrder: 3 },
             // Planned trips: raised, approved, and clocked against the site.
+            // The employee's own trip for today (/field-visits/my) is reached
+            // from a button on this page, not a sidebar row of its own.
             { title: 'Field Visits', route: '/field-visits/requests', displayOrder: 4 },
-            // The employee's own trip for today, where the geofenced clock is.
-            { title: 'My Field Visit', route: '/field-visits/my', displayOrder: 5 },
-            // §4: additional-hours requests across every project.
-            { title: 'Requests', route: '/task-requests', displayOrder: 6 },
+            // §4: additional-hours requests across every project. "Approval"
+            // because what waits here is someone's sign-off, not a ticket.
+            { title: 'Approval Requests', route: '/task-requests', displayOrder: 5 },
           ];
 
           for (const child of deliveryChildren) {
@@ -188,6 +189,15 @@ export class MenusService implements OnModuleInit {
               data: { ...child, parentId: deliveryMenu.id, isActive: true },
             });
             this.logger.log(`Delivery > ${child.title} menu auto-seeded successfully.`);
+          }
+
+          // My Field Visit is off the sidebar; the Field Visits page links to it.
+          const { count: hiddenMyVisit } = await this.prisma.menu.updateMany({
+            where: { route: '/field-visits/my', isActive: true },
+            data: { isActive: false },
+          });
+          if (hiddenMyVisit > 0) {
+            this.logger.log('My Field Visit removed from the sidebar; reached from Field Visits.');
           }
 
           // Client Visits is off the sidebar.

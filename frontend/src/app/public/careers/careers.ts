@@ -131,6 +131,14 @@ export class CareersComponent implements OnInit, OnDestroy {
 
     const win = window as any;
     win.Tawk_API = win.Tawk_API || {};
+    // Bottom-left: the job listing keeps its apply actions on the right, and the
+    // launcher sat on top of them. Must be set before the embed script loads.
+    win.Tawk_API.customStyle = {
+      visibility: {
+        desktop: { position: 'bl', xOffset: 20, yOffset: 20 },
+        mobile: { position: 'bl', xOffset: 10, yOffset: 10 },
+      },
+    };
     win.Tawk_LoadStart = new Date();
 
     const script = document.createElement('script');
