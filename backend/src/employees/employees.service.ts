@@ -550,6 +550,11 @@ export class EmployeesService {
     setText('maritalStatus');
     setText('address');
     setText('about');
+    // A photo is uploaded on its own and only its URL is stored. An inline data:
+    // URL rides along in every employee list — four once made the directory 25 MB.
+    if (typeof data.avatarUrl === 'string' && data.avatarUrl.startsWith('data:')) {
+      throw new BadRequestException('Upload the photo first; only its URL can be saved.');
+    }
     setText('avatarUrl');
 
     // Org links

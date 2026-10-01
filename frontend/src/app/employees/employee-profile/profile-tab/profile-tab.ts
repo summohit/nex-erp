@@ -19,6 +19,8 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { AuthService } from '../../../services/auth.service';
 import { Country, State, City } from 'country-state-city';
 import { getAccessToken } from '../../../core/token-storage';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../../environments/environment';
 
 export interface ResumeLine {
   id: number;
@@ -198,7 +200,8 @@ export class ProfileTabComponent implements OnInit {
     private toast: HotToastService, 
     private router: Router,
     private authService: AuthService,
-    private shiftsService: ShiftsService
+    private shiftsService: ShiftsService,
+    private http: HttpClient
   ) {}
 
   ngOnInit() {
@@ -661,19 +664,31 @@ export class ProfileTabComponent implements OnInit {
   handleAvatarUpload(event: any) {
     if (!this.isOwner) return;
     const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e: any) => {
-        this.formData.avatarUrl = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    // Upload the file and keep only its URL. A data: URL saved here lands in
+    // every employee list response — four photos once made the directory 25 MB.
+    const form = new FormData();
+    form.append('file', file);
+    this.isUploadingAvatar = true;
+    this.http.post<{ url: string }>(`${environment.apiUrl}/upload/image`, form).subscribe({
+      next: (res) => {
+        this.isUploadingAvatar = false;
+        this.formData.avatarUrl = res.url;
+      },
+      error: (err: any) => {
+        this.isUploadingAvatar = false;
+        this.toast.error(err.error?.message || 'Photo upload failed. Use a JPG or PNG under 5 MB.');
+      }
+    });
+    event.target.value = '';
   }
+
+  isUploadingAvatar = false;
 
   isSaving = false;
 
   saveProfile() {
-    if (!this.canSaveProfile || this.isSaving) return;
+    if (!this.canSaveProfile || this.isSaving || this.isUploadingAvatar) return;
 
     if (!this.validateForm()) {
       return;
