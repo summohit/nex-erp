@@ -102,7 +102,7 @@ export class TaskTransferService {
         : [t.assignee?.user?.email].filter(Boolean);
       const logged = (t.timeLogs || []).reduce((s: number, l: any) => s + (l.durationMin || 0), 0) / 60;
       return [
-        i + 1, p.name, p.key, t.title, t.description ?? '', t.phase?.name ?? '',
+        i + 1, p.name, p.key, t.title, this.plainText(t.description), t.phase?.name ?? '',
         t.estimatedHours ?? '', t.prerequisites ?? '',
         (t.blockedBy || []).map((d: any) => d.dependsOnIssue?.key).filter(Boolean).join(', '),
         emails.join(', '), t.sme?.user?.email ?? '',
@@ -451,7 +451,30 @@ export class TaskTransferService {
     ];
   }
 
+  /**
+   * A description for a spreadsheet cell: the board stores rich text (HTML,
+   * sometimes with pasted images inlined as data: URLs), which is unreadable
+   * in Excel and can blow past its 32,767-character cell limit.
+   */
+  private plainText(html?: string | null): string {
+    if (!html) return '';
+    return String(html)
+      .replace(/<img[^>]*>/gi, ' [image] ')
+      .replace(/data:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi, '[image]')
+      .replace(/<(br|\/p|\/div|\/li)\s*\/?>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '• ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
   private workbook(main: any[][], reference?: any[][]): Buffer {
+    // Excel refuses any cell over 32,767 characters; one long cell would fail
+    // the whole download, so trim it and say so.
+    const LIMIT = 32000;
+    main = main.map((row) => row.map((v) =>
+      typeof v === 'string' && v.length > LIMIT ? v.slice(0, LIMIT) + ' …[truncated]' : v));
     const wb = xlsx.utils.book_new();
     const ws = xlsx.utils.aoa_to_sheet(main);
     ws['!cols'] = (main[0] || []).map((h: string) =>

@@ -84,3 +84,23 @@ describe('TaskTransferService preview', () => {
     expect(r.rows[0]).toMatchObject({ ok: true, title: 'Survey' });
   });
 });
+
+describe('TaskTransferService export', () => {
+  it('exports a task whose description is longer than an Excel cell allows', async () => {
+    const huge = '<p>' + 'x'.repeat(40000) + '</p><img src="data:image/png;base64,' + 'A'.repeat(50000) + '">';
+    const prisma: any = {
+      project: { findMany: jest.fn().mockResolvedValue([{ id: 7, name: 'P', key: 'K' }]) },
+      issue: { findMany: jest.fn().mockResolvedValue([{
+        id: 1, key: 'K-1', title: 'T', description: huge, status: 'TODO', estimatedHours: 2,
+        prerequisites: null, startDate: null, dueDate: null, createdAt: new Date(), projectId: 7,
+        phase: null, assignee: null, members: [], sme: null, blockedBy: [], timeLogs: [],
+      }]) },
+      projectPhase: { findMany: jest.fn().mockResolvedValue([]) },
+      projectMember: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const buf = await new TaskTransferService(prisma, {} as any).exportTasks(1, {});
+    const rows: any[] = xlsx.utils.sheet_to_json(xlsx.read(buf).Sheets['task']);
+    expect(rows[0]['Task Description'].length).toBeLessThan(32767);
+    expect(rows[0]['Task Description']).not.toMatch(/<p>|base64/);
+  });
+});
