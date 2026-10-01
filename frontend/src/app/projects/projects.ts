@@ -158,7 +158,7 @@ export class ProjectsComponent implements OnInit {
     { key: 'labels', label: 'Labels' },
     { key: 'attachments', label: 'Attachments' },
     { key: 'evidence', label: 'Evidence' },
-    { key: 'clientVisits', label: 'Client Visits' },
+    { key: 'clientVisits', label: 'Field Visits' },
     { key: 'tickets', label: 'Tickets' },
     { key: 'discussions', label: 'Discussions' },
     { key: 'budgetRequests', label: 'Budget requests' },

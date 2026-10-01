@@ -10925,3 +10925,34 @@ input[type=text], input[type=email], input[type=password] {
   border-color: #fecaca;
   color: #b91c1c;
 }
+
+/* Project › Field Visits: requests + locations (C1, C3) */
+.pfv-section { border:1px solid #e2e8f0; border-radius:14px; padding:16px 18px; margin-bottom:18px; background:#fff; }
+.pfv-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; }
+.pfv-head h3 { margin:0; font-size:15px; font-weight:700; color:#172b4d; }
+.pfv-head p { margin:3px 0 0; font-size:12.5px; color:#64748b; }
+.pfv-new { flex:none; font-size:13px; font-weight:600; color:#4f46e5; text-decoration:none; padding:6px 12px;
+  border:1px solid #c7d2fe; border-radius:8px; background:#eef2ff; }
+.pfv-empty { font-size:13px; color:#94a3b8; padding:6px 0; }
+.pfv-table { display:flex; flex-direction:column; }
+.pfv-row { display:grid; grid-template-columns:96px minmax(140px,1.4fr) 170px 150px 130px 80px; gap:12px; align-items:center;
+  padding:10px 6px; border-top:1px solid #f1f5f9; text-decoration:none; color:#334155; font-size:13px; }
+.pfv-row:hover { background:#f8fafc; }
+.pfv-num { font-family:ui-monospace,Menlo,monospace; font-weight:700; color:#4338ca; font-size:12px; }
+.pfv-site { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; color:#172b4d; }
+.pfv-meta, .pfv-dates { color:#64748b; font-size:12.5px; }
+.pfv-status { justify-self:start; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:999px; background:#f1f5f9; color:#475569; }
+.pfv-st-PENDING_APPROVAL { background:#fef3c7; color:#92400e; }
+.pfv-st-APPROVED { background:#dcfce7; color:#166534; }
+.pfv-st-COMPLETED { background:#e0e7ff; color:#3730a3; }
+.pfv-st-REJECTED { background:#fee2e2; color:#991b1b; }
+.pfv-approve { height:28px; border:none; border-radius:7px; background:#16a34a; color:#fff; font-weight:600; font-size:12px; cursor:pointer; }
+.pfv-locs { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
+.pfv-loc { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #f1f5f9; border-radius:10px; background:#fafbfc; }
+.pfv-loc-main { display:flex; flex-direction:column; min-width:0; flex:1; }
+.pfv-loc-main strong { font-size:13px; color:#172b4d; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pfv-loc-main span { font-size:12px; color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pfv-loc-count { flex:none; font-size:11.5px; color:#475569; font-weight:600; }
+.pfv-loc a { flex:none; font-size:12px; font-weight:600; color:#4f46e5; text-decoration:none; }
+.pfv-log-title { font-size:15px; font-weight:700; color:#172b4d; margin:4px 0 12px; }
+@media (max-width:900px) { .pfv-row { grid-template-columns:1fr 1fr; } }

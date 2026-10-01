@@ -4,7 +4,7 @@
   <div class="page-header-card">
     <div>
       <div class="header-title-row">
-        <h1>{{ isEmployee() ? 'My Client Visits' : 'Client Visits' }}</h1>
+        <h1>{{ isEmployee() ? 'My Field Visit Log' : 'Field Visit Log' }}</h1>
         <span class="live-pill" *ngIf="summary().active > 0">
           <span class="live-dot"></span>{{ summary().active }} out now
         </span>
@@ -152,7 +152,7 @@
     <div *ngIf="!isLoading()">
       <div class="empty-state" *ngIf="filteredVisits().length === 0">
         <svg lucideMapPin [size]="34"></svg>
-        <h3>No client visits</h3>
+        <h3>No field visits</h3>
         <p>
           {{ hasActiveFilters()
               ? 'Nothing matches these filters. Try widening the date range.'

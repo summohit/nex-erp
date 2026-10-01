@@ -2,7 +2,7 @@ import { Component, signal, computed, effect, inject, OnInit, OnDestroy, ViewChi
 import { forkJoin, of } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
@@ -14,6 +14,7 @@ import { BudgetRequestsTabComponent } from '../budget-requests/budget-requests-t
 import { TaskHoursRequestPanelComponent } from '../task-hours-requests/task-hours-request-panel';
 import { DiscussionsTabComponent } from '../discussions/discussions-tab';
 import { FieldVisitsService, FieldVisit } from '../../services/field-visits';
+import { FieldVisitRequestsService, FieldVisitRequest } from '../../services/field-visit-requests';
 import { 
   LucideLayoutDashboard, LucideKanban,
   LucidePlus, LucideX, LucideClock, LucideMessageSquare, LucidePlay, LucideSquare, LucideWrench,
@@ -51,7 +52,7 @@ declare var Quill: any;
 @Component({
   selector: 'app-project-detail',
   standalone: true,
-  imports: [
+  imports: [RouterLink, 
     CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
     TicketsTabComponent, BudgetRequestsTabComponent, DiscussionsTabComponent,
     TaskHoursRequestPanelComponent,
@@ -94,6 +95,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   private sanitizer = inject(DomSanitizer);
   private socketService = inject(SocketService);
   private fieldVisitsService = inject(FieldVisitsService);
+  private fieldVisitRequestsApi = inject(FieldVisitRequestsService);
   private http = inject(HttpClient);
   private masterDataService = inject(MasterDataService);
   private dialog = inject(DialogService);
@@ -581,7 +583,64 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   fieldVisitsLoaded = false;
   selectedFieldVisit = signal<FieldVisit | null>(null);
 
+  // C1: the project's planned trips (FVR-…), alongside the app-logged visits.
+  fvRequests = signal<FieldVisitRequest[]>([]);
+  fvDeciding = signal<number | null>(null);
+
+  /**
+   * C3: the sites this project has visited or planned, from its own requests.
+   * A saved site is shared — the same office can appear on several projects.
+   */
+  fvLocations = computed(() => {
+    const map = new Map<string, { name: string; address: string | null; lat: number | null; lng: number | null;
+      visits: number; lastDate: string | null; saved: boolean }>();
+    for (const r of this.fvRequests() as any[]) {
+      if (r.status === 'CANCELLED' || r.status === 'REJECTED') continue;
+      const loc = r.visitLocation;
+      const key = loc ? `id:${loc.id}` : `txt:${(r.location || '').toLowerCase()}`;
+      const cur = map.get(key) ?? {
+        name: loc?.name || r.location, address: loc?.address ?? null,
+        lat: loc?.latitude ?? r.latitude ?? null, lng: loc?.longitude ?? r.longitude ?? null,
+        visits: 0, lastDate: null, saved: !!loc,
+      };
+      cur.visits++;
+      if (!cur.lastDate || r.startDate > cur.lastDate) cur.lastDate = r.startDate;
+      map.set(key, cur);
+    }
+    return [...map.values()].sort((a, b) => b.visits - a.visits || a.name.localeCompare(b.name));
+  });
+
+  private loadFieldVisitRequests() {
+    this.fieldVisitRequestsApi.list({ projectId: this.projectId }).subscribe({
+      next: (rows) => this.fvRequests.set(rows || []),
+      error: () => this.fvRequests.set([]),
+    });
+  }
+
+  fvStatusLabel(s: string): string {
+    return ({ DRAFT: 'Draft', PENDING_APPROVAL: 'Pending approval', APPROVED: 'Approved',
+      REJECTED: 'Rejected', CANCELLED: 'Cancelled', COMPLETED: 'Completed' } as any)[s] ?? s;
+  }
+
+  approveFvRequest(r: FieldVisitRequest, event: Event) {
+    event.stopPropagation();
+    if (this.fvDeciding()) return;
+    this.fvDeciding.set(r.id);
+    this.fieldVisitRequestsApi.approve(r.id).subscribe({
+      next: () => {
+        this.fvDeciding.set(null);
+        this.toast.success(`${r.requestNumber} approved — tasks are now on the board`);
+        this.loadFieldVisitRequests();
+      },
+      error: (err: any) => {
+        this.fvDeciding.set(null);
+        this.toast.error(err?.error?.message || 'Could not approve');
+      },
+    });
+  }
+
   loadFieldVisits() {
+    this.loadFieldVisitRequests();
     if (this.fieldVisitsLoaded) return;
     this.fieldVisitsLoading.set(true);
     this.fieldVisitsService.getProjectVisits(this.projectId).subscribe({

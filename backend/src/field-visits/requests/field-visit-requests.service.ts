@@ -100,6 +100,9 @@ export class FieldVisitRequestsService {
     pendingChange: true, pendingChangeAt: true,
     submittedAt: true, reviewedAt: true, createdAt: true, updatedAt: true,
     project: { select: { id: true, name: true, key: true, color: true } },
+    // The saved site it was planned against, when there is one — what lets a
+    // project list its locations (one site can serve several projects).
+    visitLocation: { select: { id: true, name: true, address: true, latitude: true, longitude: true } },
     raisedBy: this.PERSON,
     reviewedBy: { select: { id: true, firstName: true, lastName: true } },
     members: { select: { id: true, employee: this.PERSON } },

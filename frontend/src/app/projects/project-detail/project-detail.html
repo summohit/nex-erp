@@ -554,7 +554,7 @@
     <!-- §2: evidence is what is attached to a TASK. Attachments, beside it, is
          the project's own paperwork — the contract, the scope, the proposal. -->
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'evidence'" (click)="setProjectTab('evidence')"><svg lucideFileCheck size="14"></svg> Evidence<span class="tab-count" *ngIf="evidenceCount() > 0">{{ evidenceCount() }}</span></button>
-    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'field-visits'" (click)="setProjectTab('field-visits')"><svg lucideMapPin size="14"></svg> Client Visits<span class="tab-count" *ngIf="fieldVisits().length > 0">{{ fieldVisits().length }}</span></button>
+    <button class="project-tab-btn" [class.active]="activeProjectTab() === 'field-visits'" (click)="setProjectTab('field-visits')"><svg lucideMapPin size="14"></svg> Field Visits<span class="tab-count" *ngIf="fieldVisits().length > 0">{{ fieldVisits().length }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'tickets'" (click)="setProjectTab('tickets')"><svg lucideTicket size="14"></svg> Tickets<span class="tab-count" *ngIf="tabCounts().tickets > 0">{{ tabCounts().tickets }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'discussions'" (click)="setProjectTab('discussions')"><svg lucideMessageSquare size="14"></svg> Discussions<span class="tab-count" *ngIf="tabCounts().discussions > 0">{{ tabCounts().discussions }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'requests'" (click)="setProjectTab('requests')"><svg lucideWrench size="14"></svg> Requests<span class="tab-count" *ngIf="scopeRequests().length > 0">{{ scopeRequests().length }}</span></button>
@@ -2291,17 +2291,58 @@
     <!-- Loading -->
     <div *ngIf="fieldVisitsLoading()" style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-height: 300px; gap: 12px; color: #5e6c84;">
       <svg lucideActivity size="28" style="color: #94a3b8;"></svg>
-      <span style="font-size: 14px;">Loading client visits&hellip;</span>
+      <span style="font-size: 14px;">Loading field visits&hellip;</span>
     </div>
 
+    <!-- C1: planned field visits (FVR) for this project -->
+    <section class="pfv-section" *ngIf="!fieldVisitsLoading()">
+      <div class="pfv-head">
+        <div>
+          <h3>Field visit requests</h3>
+          <p>Trips planned for this project. Approved ones put their tasks on this board for everyone going.</p>
+        </div>
+        <a class="pfv-new" routerLink="/field-visits/requests">+ New request</a>
+      </div>
+      <div class="pfv-empty" *ngIf="!fvRequests().length">No field visits planned for this project yet.</div>
+      <div class="pfv-table" *ngIf="fvRequests().length">
+        <a class="pfv-row" *ngFor="let r of fvRequests()" [routerLink]="['/field-visits/requests', r.id]">
+          <span class="pfv-num">{{ r.requestNumber }}</span>
+          <span class="pfv-site" [title]="r.location">{{ r.location }}</span>
+          <span class="pfv-dates">{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'d MMM y' }}</span>
+          <span class="pfv-meta">{{ r.members.length }} people · {{ r.tasks.length }} tasks</span>
+          <span class="pfv-status" [class]="'pfv-st-' + r.status">{{ fvStatusLabel(r.status) }}</span>
+          <button *ngIf="r.canReview" type="button" class="pfv-approve" [disabled]="fvDeciding() === r.id"
+                  (click)="approveFvRequest(r, $event)">{{ fvDeciding() === r.id ? '…' : 'Approve' }}</button>
+        </a>
+      </div>
+    </section>
+
+    <!-- C3: sites this project has visited or planned (shared sites can appear on several projects) -->
+    <section class="pfv-section" *ngIf="!fieldVisitsLoading() && fvLocations().length">
+      <div class="pfv-head"><div><h3>Locations</h3><p>Sites used by this project's field visits.</p></div></div>
+      <div class="pfv-locs">
+        <div class="pfv-loc" *ngFor="let l of fvLocations()">
+          <div class="pfv-loc-main">
+            <strong>{{ l.name }}</strong>
+            <span>{{ l.address || (l.saved ? 'Saved site' : 'Typed on the request') }}</span>
+          </div>
+          <span class="pfv-loc-count">{{ l.visits }} {{ l.visits === 1 ? 'visit' : 'visits' }}<ng-container *ngIf="l.lastDate"> · last {{ l.lastDate | date:'d MMM' }}</ng-container></span>
+          <a *ngIf="l.lat != null && l.lng != null" target="_blank" rel="noopener"
+             [href]="'https://www.google.com/maps?q=' + l.lat + ',' + l.lng">Map</a>
+        </div>
+      </div>
+    </section>
+
+    <h3 class="pfv-log-title" *ngIf="!fieldVisitsLoading() && fieldVisits().length">Visit log (from the app)</h3>
+
     <!-- Empty State -->
-    <div *ngIf="!fieldVisitsLoading() && fieldVisits().length === 0" style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-height: 400px; padding-bottom: 10vh;">
+    <div *ngIf="!fieldVisitsLoading() && fieldVisits().length === 0 && fvRequests().length === 0" style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-height: 400px; padding-bottom: 10vh;">
       <div style="width: 76px; height: 76px; border-radius: 50%; background: #eff6ff; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
         <svg lucideMapPin size="34" style="color: #93c5fd;"></svg>
       </div>
-      <h2 style="font-size: 20px; font-weight: 600; color: #172b4d; margin-bottom: 8px;">No client visits yet</h2>
+      <h2 style="font-size: 20px; font-weight: 600; color: #172b4d; margin-bottom: 8px;">No field visits yet</h2>
       <p style="font-size: 14px; color: #5e6c84; max-width: 380px; text-align: center;">
-        When a client visit is started for this project from the mobile app, its route, photos and notes will show up here.
+        When a field visit is raised for this project, or started from the mobile app, its route, photos and notes will show up here.
       </p>
     </div>
 
@@ -4916,7 +4957,7 @@
       <div style="width: 30px; height: 30px; border-radius: 8px; background: #eff6ff; display: flex; align-items: center; justify-content: center;">
         <svg lucideMapPin size="16" style="color: #2563eb;"></svg>
       </div>
-      <span style="font-size: 16px; font-weight: 700; color: #172b4d;">Client Visit Details</span>
+      <span style="font-size: 16px; font-weight: 700; color: #172b4d;">Field Visit Details</span>
     </div>
     <button (click)="closeFieldVisitDetail()" style="background: none; border: none; cursor: pointer; color: #6b7280; display: flex; padding: 6px; border-radius: 6px;" class="hover:bg-gray-100">
       <svg lucideX size="18"></svg>
