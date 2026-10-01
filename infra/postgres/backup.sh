@@ -1,6 +1,6 @@
 #!/bin/bash
 # Nightly backup. Cron:  0 2 * * * /var/www/nex-erp/infra/postgres/backup.sh >> /var/log/nex-erp-backup.log 2>&1
-# Keeps 14 local copies. Set RCLONE_REMOTE (e.g. "b2:nex-erp-backups") to also
+# Keeps 14 local copies, and 30 days on RCLONE_REMOTE (e.g. "gdrive:nex-erp-backups")
 # copy off the server — strongly recommended, a backup on the same disk is not a backup.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -15,5 +15,12 @@ echo "$(date) ✔ $FILE ($(du -h "$FILE" | cut -f1))"
 
 ls -1t "$DIR"/nex_erp-*.dump | tail -n +$((KEEP+1)) | xargs -r rm --
 if [ -n "${RCLONE_REMOTE:-}" ]; then
-  rclone copy "$FILE" "$RCLONE_REMOTE" && echo "$(date) ✔ uploaded to $RCLONE_REMOTE"
+  # A failed upload must be loud: the local copy dies with the server.
+  if rclone copy "$FILE" "$RCLONE_REMOTE" 2>/tmp/nex-backup-rclone.err; then
+    echo "$(date) ✔ uploaded to $RCLONE_REMOTE"
+    rclone delete "$RCLONE_REMOTE" --min-age 30d 2>/dev/null || true
+  else
+    echo "$(date) ✘ OFF-SERVER UPLOAD FAILED: $(grep -m1 -E 'CRITICAL|ERROR' /tmp/nex-backup-rclone.err)"
+    exit 2
+  fi
 fi
