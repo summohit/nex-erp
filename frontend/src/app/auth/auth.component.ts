@@ -20,6 +20,7 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { environment } from '../../environments/environment';
 
+import { getAccessToken, getRefreshToken } from '../core/token-storage';
 @Component({
   selector: 'app-auth',
   standalone: true,
@@ -83,6 +84,15 @@ export class AuthComponent implements OnInit {
   }
 
   ngOnInit() {
+    // Already signed in (a remembered session survives closing the browser):
+    // go straight in rather than showing an empty form that looks like being
+    // logged out. If the stored session has expired, the interceptor clears
+    // it on the first request and brings the person back here.
+    if (this.route.snapshot.data['view'] !== 'register' && (getAccessToken() || getRefreshToken())) {
+      this.router.navigateByUrl('/dashboard');
+      return;
+    }
+
     // /login and /signup render this same component; the route decides which view.
     this.route.data.subscribe(data => {
       this.currentView = data['view'] === 'register' ? 'register' : 'login';

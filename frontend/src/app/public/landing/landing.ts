@@ -65,6 +65,7 @@ interface FaqItem {
   category: string;
 }
 
+import { getAccessToken, getRefreshToken } from '../../core/token-storage';
 @Component({
   selector: 'app-landing',
   standalone: true,
@@ -150,7 +151,12 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     return build.version ? `v${build.version} · ${mb}` : mb;
   }
 
-  constructor(private router: Router, private el: ElementRef) {}
+  constructor(private router: Router, private el: ElementRef) {
+    // A remembered, signed-in visitor goes straight to their workspace.
+    if (getAccessToken() || getRefreshToken()) {
+      queueMicrotask(() => this.router.navigateByUrl('/dashboard'));
+    }
+  }
 
   ngAfterViewInit() {
     this.initScrollAnimations();
