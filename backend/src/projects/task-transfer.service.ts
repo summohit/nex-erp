@@ -476,18 +476,19 @@ export class TaskTransferService {
    * row, filters, zebra rows, wrapped text, status colours and a guide sheet.
    * Row 1 stays the header, so an exported file imports back unchanged.
    */
-  private async workbook(main: any[][], reference?: any[][]): Promise<Buffer> {
+  private async workbook(main: any[][], reference?: any[][], sheetName = 'task'): Promise<Buffer> {
     const LIMIT = 32000; // Excel's cell limit is 32,767
     const wb = new ExcelJS.Workbook();
     wb.creator = 'MIRA';
     wb.created = new Date();
 
-    const ws = wb.addWorksheet('task', { views: [{ state: 'frozen', ySplit: 1, xSplit: 4 }] });
+    const ws = wb.addWorksheet(sheetName, { views: [{ state: 'frozen', ySplit: 1, xSplit: sheetName === 'task' ? 4 : 0 }] });
     const header = (main[0] || []).map(String);
     const readOnly = new Set<string>([...EXTRA_COLUMNS, 'Errors']);
     const widthFor = (h: string) =>
       /Description|Pre-Requisite|Errors/.test(h) ? 46
-      : /Task Name/.test(h) ? 36
+      : /Task Name|^Task$/.test(h) ? 44
+      : /Week|Assigned to/.test(h) ? 24
       : /Project Name|Assign to|SME/.test(h) ? 28
       : /Dependency|Phase/.test(h) ? 20
       : /S\.No/.test(h) ? 7
@@ -535,7 +536,7 @@ export class TaskTransferService {
       });
       if (statusCol > 0) {
         const c = row.getCell(statusCol);
-        const k = String(c.value ?? '').toUpperCase();
+        const k = String(c.value ?? '').trim().toUpperCase().replace(/[\s-]+/g, '_');
         if (statusFill[k]) {
           c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: statusFill[k] } };
           c.font = { bold: true, size: 10, color: { argb: statusFont[k] } };
@@ -575,6 +576,16 @@ export class TaskTransferService {
     }
 
     return Buffer.from(await wb.xlsx.writeBuffer());
+  }
+
+  /**
+   * Any table the client has already built (e.g. the roadmap), in the same
+   * styled workbook as task exports. Rows are text the caller could already
+   * see; nothing is read from the database here.
+   */
+  async styledTable(sheetName: string, headers: string[], rows: any[][]): Promise<Buffer> {
+    const clean = (sheetName || 'Sheet').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31);
+    return this.workbook([headers, ...rows.slice(0, 20000)], undefined, clean);
   }
 
   private day(d?: Date | null): string {

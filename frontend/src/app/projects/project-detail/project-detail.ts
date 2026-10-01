@@ -4277,12 +4277,18 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     const fileName = `${(this.project()?.name || 'project').replace(/[^\w-]+/g, '_')}_roadmap`;
 
     if (format === 'excel') {
-      // Tab-separated, which Excel opens natively without a parse dialog.
-      const tsv = [headers.join('\t')]
-        .concat(rows.map((r) => r.map((c) => String(c).replace(/\t/g, ' ')).join('\t')))
-        .join('\n');
-      this.downloadFile(tsv, `${fileName}.xls`, 'application/vnd.ms-excel');
-      this.toast.success('Roadmap exported as Excel (.xls)');
+      // The same styled workbook as task exports (headers, filters, status colours).
+      this.http.post(`${environment.apiUrl}/project-tasks/styled-xlsx`,
+        { sheetName: 'Roadmap', fileName, headers, rows }, { responseType: 'blob' }).subscribe({
+        next: (blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = `${fileName}.xlsx`; a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          this.toast.success('Roadmap exported as Excel');
+        },
+        error: () => this.toast.error('Could not export the roadmap'),
+      });
       return;
     }
 

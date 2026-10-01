@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Controller, ForbiddenException, Get, Post, Query, Req, Res,
+  BadRequestException, Body, Controller, ForbiddenException, Get, Post, Query, Req, Res,
   UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -59,6 +59,17 @@ export class TaskTransferController {
     const employeeId = req.user.employeeId;
     if (!employeeId) throw new ForbiddenException('Your login is not linked to an employee record.');
     return this.transfer.import(req.user.companyId, file.buffer, employeeId, req.user.role, scope);
+  }
+
+  /** Styled .xlsx for a table the page already shows (roadmap export). */
+  @Post('styled-xlsx')
+  async styled(@Res() res, @Body() body: { sheetName?: string; fileName?: string; headers: string[]; rows: any[][] }) {
+    if (!Array.isArray(body?.headers) || !Array.isArray(body?.rows)) {
+      throw new BadRequestException('headers and rows are required');
+    }
+    const buf = await this.transfer.styledTable(body.sheetName || 'Sheet', body.headers.map(String), body.rows);
+    const name = String(body.fileName || 'export').replace(/[^\w.-]+/g, '_').slice(0, 80);
+    this.send(res, buf, name.endsWith('.xlsx') ? name : `${name}.xlsx`);
   }
 
   private ids(text?: string): number[] | undefined {
