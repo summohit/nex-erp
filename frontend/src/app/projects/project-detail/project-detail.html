@@ -561,6 +561,7 @@
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'budget-requests'" (click)="setProjectTab('budget-requests')" *ngIf="canSeeFinancialTabs"><svg lucideTrendingUp size="14"></svg> Budget requests<span class="tab-count" *ngIf="tabCounts().budgetRequests > 0">{{ tabCounts().budgetRequests }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'reports'" (click)="setProjectTab('reports')" *ngIf="canSeeFinancialTabs"><svg lucideBarChart size="14"></svg> Reports</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'archived'" (click)="setProjectTab('archived')"><svg lucideArchive size="14"></svg> Archived work items<span class="tab-count" *ngIf="archivedIssues().length > 0">{{ archivedIssues().length }}</span></button>
+    <button class="project-tab-btn" *ngIf="canManageTask || isAdminUser()" (click)="taskTransferOpen.set(true)" title="Export or import this project's tasks with Excel">⇅ Export / Import</button>
   </div>
 
   <!-- Summary Dashboard Container -->
@@ -3871,6 +3872,24 @@
 
       </div>
 
+      <!-- Pre-Requisite & SME / Govern (from the task import template) -->
+      <div class="tp-extra">
+        <div class="tp-extra-field">
+          <label>Pre-Requisite</label>
+          <textarea rows="2" [(ngModel)]="issueForm.prerequisites" (blur)="savePrerequisites()"
+                    [readonly]="!canManageTask && !isAdminUser()"
+                    placeholder="What must be ready first — hardware, cable, site access…"></textarea>
+        </div>
+        <div class="tp-extra-field">
+          <label>SME / Govern</label>
+          <select [(ngModel)]="issueForm.smeId" (ngModelChange)="saveSme()" [disabled]="!canManageTask && !isAdminUser()">
+            <option [ngValue]="null">— None —</option>
+            <option *ngFor="let o of smeOptions()" [ngValue]="o.id">{{ o.name }} ({{ o.role }})</option>
+          </select>
+          <span class="tp-extra-hint" *ngIf="!smeOptions().length">Add a PM or Technical Architect to this project to choose an SME.</span>
+        </div>
+      </div>
+
       <!-- Time Tracking Section -->
       <div class="modal-time-tracking-section mb-6">
         <div class="section-header time-tracking-header">
@@ -5435,3 +5454,6 @@
 </div>
 
 <app-dialog-host></app-dialog-host>
+
+<app-task-transfer *ngIf="taskTransferOpen()" [projectId]="projectId" [projectName]="project()?.name || ''"
+                   (closed)="taskTransferOpen.set(false)" (imported)="reloadAfterImport()"></app-task-transfer>

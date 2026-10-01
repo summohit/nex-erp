@@ -86,10 +86,11 @@ function getStatusColors(status: string): { bg: string; color: string } {
   return STATUS_COLORS[(status || '').toUpperCase()] || { bg: '#f1f2f4', color: '#44546f' };
 }
 
+import { TaskTransferComponent } from '../shared/components/task-transfer/task-transfer';
 @Component({
   selector: 'app-projects',
   standalone: true,
-  imports: [
+  imports: [TaskTransferComponent, 
     CommonModule, FormsModule, RouterModule, LucidePlus, LucideKanban,
     LucideX, LucideUser, LucideChevronLeft, LucideBrainCircuit,
     LucideCheck, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw,
@@ -1051,6 +1052,8 @@ export class ProjectsComponent implements OnInit {
     'linear-gradient(135deg, #1373e5 0%, #6b3fd6 100%)',
     'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
   ];
+
+  taskTransferOpen = signal(false);
 
   get isAdmin(): boolean {
     const user = this.currentUser();

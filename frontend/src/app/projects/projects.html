@@ -179,8 +179,13 @@
         <svg lucideListChecks size="14" class="tab-icon"></svg>
         My Tasks<ng-container *ngIf="myTasksLoaded()"> ({{ myTasks().length }})</ng-container>
       </button>
+      <!-- Export / import tasks across projects (template project task layout). -->
+      <button *ngIf="isAdmin" class="tab-pill tt-open-btn" (click)="taskTransferOpen.set(true)" title="Export or import tasks with Excel">
+        ⇅ Export / Import tasks
+      </button>
     </div>
   </div>
+  <app-task-transfer *ngIf="taskTransferOpen()" (closed)="taskTransferOpen.set(false)"></app-task-transfer>
 
   <!-- ⭐ Starred Boards Section -->
   <div class="section-container" *ngIf="starredProjects().length > 0 && (activeTab() === 'all' || activeTab() === 'starred')">

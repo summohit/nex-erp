@@ -4,6 +4,8 @@ import { ProjectsService } from './projects.service';
 import { ProjectAiService } from './project-ai.service';
 import { IssuesController } from './issues/issues.controller';
 import { IssuesService } from './issues/issues.service';
+import { TaskTransferService } from './task-transfer.service';
+import { TaskTransferController } from './task-transfer.controller';
 import { BoardsController } from './boards/boards.controller';
 import { BoardsService } from './boards/boards.service';
 import { LabelsController } from './labels/labels.controller';
@@ -33,7 +35,7 @@ import { VisitLocationRequestsService } from './visit-location-requests/visit-lo
 
 @Module({
   imports: [PrismaModule, EventsModule, NotificationsModule, CrmModule],
-  controllers: [ProjectsController, IssuesController, BoardsController, LabelsController, MilestonesController, ProjectTicketsController, BudgetRequestsController, TaskHoursRequestsController, ProjectDiscussionsController, ScopeRequestsController, TaskApprovalsController, VisitLocationRequestsController],
-  providers: [ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, MilestonesService, IssueRemindersCron, ProjectTicketsService, BudgetRequestsService, TaskHoursRequestsService, ProjectDiscussionsService, ScopeRequestsService, VisitLocationRequestsService]
+  controllers: [TaskTransferController, ProjectsController, IssuesController, BoardsController, LabelsController, MilestonesController, ProjectTicketsController, BudgetRequestsController, TaskHoursRequestsController, ProjectDiscussionsController, ScopeRequestsController, TaskApprovalsController, VisitLocationRequestsController],
+  providers: [TaskTransferService, ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, MilestonesService, IssueRemindersCron, ProjectTicketsService, BudgetRequestsService, TaskHoursRequestsService, ProjectDiscussionsService, ScopeRequestsService, VisitLocationRequestsService]
 })
 export class ProjectsModule {}

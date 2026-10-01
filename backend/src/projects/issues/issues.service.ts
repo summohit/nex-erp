@@ -316,6 +316,7 @@ export class IssuesService {
       include: {
         assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         reporter: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        sme: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         labels: { include: { label: true } },
         members: { include: { employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, user: { select: { email: true } }, designation: { select: { name: true } } } } } },
         attachments: { include: { uploader: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
@@ -1041,6 +1042,20 @@ export class IssuesService {
     if (data.recurring !== undefined) updateData.recurring = data.recurring;
     if (data.dueReminder !== undefined) updateData.dueReminder = data.dueReminder;
     if (data.estimatedHours !== undefined) updateData.estimatedHours = data.estimatedHours ? Number(data.estimatedHours) : null;
+    // What must be in hand before starting (hardware, cable, access).
+    if (data.prerequisites !== undefined) updateData.prerequisites = String(data.prerequisites ?? '').trim() || null;
+    // SME / Govern: only the project's PM, technical architect or owner.
+    if (data.smeId !== undefined) {
+      const smeId = data.smeId ? Number(data.smeId) : null;
+      if (smeId) {
+        const proj = await this.prisma.project.findFirst({ where: { id: projectId, companyId }, select: { leadId: true } });
+        const lead = proj?.leadId === smeId || !!(await this.prisma.projectMember.findFirst({
+          where: { projectId, employeeId: smeId, role: { in: ['PROJECT_MANAGER', 'TECHNICAL_ARCHITECT'] } },
+        }));
+        if (!lead) throw new BadRequestException("The SME must be this project's PM or Technical Architect.");
+      }
+      updateData.smeId = smeId;
+    }
 
     // When the task actually finished. Set here rather than at each of the
     // places that can move a task — a status typed in, a card dragged onto a

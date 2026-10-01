@@ -477,6 +477,7 @@ model Employee {
   /// §Att5: the late clock-outs this person has ruled on.
   clockOutApprovals             Attendance[]           @relation("AttendanceClockOutApprover")
   geofenceReviews               Attendance[]           @relation("AttendanceGeofenceReviewer")
+  smeIssues                     Issue[]                @relation("IssueSme")
   /// §PB8 and the scope requests: what they raised, and what they ruled on.
   issuesAwaitingTheirApproval   Issue[]                @relation("IssueApprovalRequestedBy")
   issuesApprovedTechnically     Issue[]                @relation("IssueTechnicalApprover")
@@ -2168,6 +2169,13 @@ model Issue {
   startDate      DateTime?
   dueDate        DateTime?
   estimatedHours Float?
+  /// What has to be in hand before the work can start — hardware, cable,
+  /// site access. Free text, from the task import template's "Pre-Requisite".
+  prerequisites   String?
+  /// SME / Govern: the project manager or technical architect who owns the
+  /// technical call on this task. From the import template's "SME / Govern".
+  smeId           Int?
+  sme             Employee?  @relation("IssueSme", fields: [smeId], references: [id], onDelete: SetNull)
   recurring      String?
   dueReminder    String?
   coverUrl       String?

@@ -10956,3 +10956,13 @@ input[type=text], input[type=email], input[type=password] {
 .pfv-loc a { flex:none; font-size:12px; font-weight:600; color:#4f46e5; text-decoration:none; }
 .pfv-log-title { font-size:15px; font-weight:700; color:#172b4d; margin:4px 0 12px; }
 @media (max-width:900px) { .pfv-row { grid-template-columns:1fr 1fr; } }
+
+/* Task panel: Pre-Requisite & SME */
+.tp-extra { display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin:4px 0 18px; }
+.tp-extra-field { display:flex; flex-direction:column; gap:6px; }
+.tp-extra-field label { font-size:12px; font-weight:700; color:#5e6c84; text-transform:uppercase; letter-spacing:.04em; }
+.tp-extra-field textarea, .tp-extra-field select { width:100%; border:1px solid #dfe1e6; border-radius:8px; padding:8px 10px;
+  font-size:13.5px; color:#172b4d; background:#fff; font-family:inherit; resize:vertical; }
+.tp-extra-field textarea:focus, .tp-extra-field select:focus { outline:none; border-color:#4f46e5; box-shadow:0 0 0 3px rgba(79,70,229,.12); }
+.tp-extra-hint { font-size:11.5px; color:#94a3b8; }
+@media (max-width:700px) { .tp-extra { grid-template-columns:1fr; } }

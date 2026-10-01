@@ -1,0 +1,90 @@
+<div class="tt-backdrop" (click)="closed.emit()">
+  <div class="tt-modal" (click)="$event.stopPropagation()">
+    <header class="tt-head">
+      <div>
+        <h2>Export / Import tasks</h2>
+        <p>{{ projectId ? projectName : 'All projects' }} · template project task layout</p>
+      </div>
+      <button type="button" class="tt-x" (click)="closed.emit()" aria-label="Close">✕</button>
+    </header>
+
+    <nav class="tt-tabs">
+      <button type="button" [class.active]="tab() === 'export'" (click)="tab.set('export')">Export</button>
+      <button type="button" [class.active]="tab() === 'import'" (click)="tab.set('import')">Import</button>
+    </nav>
+
+    <!-- EXPORT -->
+    <section class="tt-body" *ngIf="tab() === 'export'">
+      <div class="tt-card">
+        <h3>Export tasks</h3>
+        <p>Downloads {{ projectId ? "this project's" : 'every project\'s' }} tasks in the template columns, plus Task ID, Key, Status, Logged Hours and Created Date.
+          Edit the file and import it back — rows that keep their <b>Task ID</b> update the task instead of creating a new one.</p>
+        <label class="tt-check"><input type="checkbox" [(ngModel)]="includeDone"> Include done tasks</label>
+        <button type="button" class="tt-primary" [disabled]="busy()" (click)="download('export')">{{ busy() ? 'Preparing…' : 'Download tasks (.xlsx)' }}</button>
+      </div>
+      <div class="tt-card">
+        <h3>Blank template</h3>
+        <p>An empty file with the right columns. Its second sheet lists the valid <b>phases</b> and the <b>people</b> on {{ projectId ? 'this project' : 'each project' }} with their roles.</p>
+        <button type="button" class="tt-secondary" [disabled]="busy()" (click)="download('template')">Download template</button>
+      </div>
+    </section>
+
+    <!-- IMPORT -->
+    <section class="tt-body" *ngIf="tab() === 'import'">
+      <div class="tt-drop" *ngIf="!preview() && !result()">
+        <input id="tt-file" type="file" accept=".xlsx,.xls,.csv" (change)="pick($event)" hidden>
+        <label for="tt-file" class="tt-drop-inner">
+          <strong>{{ busy() ? 'Checking the file…' : 'Choose an Excel file' }}</strong>
+          <span>Nothing is saved yet — you'll see every row checked first.</span>
+        </label>
+        <ul class="tt-rules">
+          <li><b>Assign to</b>: email / employee code / full name of people on that project (several: comma-separated)</li>
+          <li><b>SME / Govern</b>: the project's PM or Technical Architect</li>
+          <li><b>Dependency</b>: S.No of another row, or an existing task key/name</li>
+          <li><b>Dates</b>: DD/MM/YYYY</li>
+        </ul>
+      </div>
+
+      <ng-container *ngIf="preview() as p">
+        <div class="tt-stats">
+          <span class="ok">{{ p.toCreate }} new</span>
+          <span class="upd">{{ p.toUpdate }} update</span>
+          <span class="bad">{{ p.failed }} with errors</span>
+          <label class="tt-check small"><input type="checkbox" [ngModel]="showOnlyProblems()" (ngModelChange)="showOnlyProblems.set($event)"> Only rows with problems</label>
+        </div>
+        <div class="tt-table">
+          <div class="tt-tr tt-th"><span>Row</span><span>Task</span><span>Project</span><span>Will</span><span>Notes</span></div>
+          <div class="tt-tr" *ngFor="let r of visibleRows(p)" [class.bad]="!r.ok">
+            <span>{{ r.row }}</span>
+            <span class="t">{{ r.title || '—' }}</span>
+            <span>{{ r.project || '—' }}</span>
+            <span><i class="pill" [class]="'pill-' + r.action">{{ r.action === 'SKIP' ? 'Skip' : r.action === 'UPDATE' ? 'Update' : 'Create' }}</i></span>
+            <span class="notes">{{ r.errors.concat(r.warnings).join(' · ') || 'OK' }}</span>
+          </div>
+        </div>
+        <footer class="tt-foot">
+          <button type="button" class="tt-secondary" (click)="reset()">Choose another file</button>
+          <button type="button" class="tt-primary" [disabled]="busy() || p.total === p.failed" (click)="confirmImport()">
+            {{ busy() ? 'Importing…' : 'Import ' + (p.total - p.failed) + ' valid row(s)' }}
+          </button>
+        </footer>
+      </ng-container>
+
+      <ng-container *ngIf="result() as r">
+        <div class="tt-done">
+          <h3>Import finished</h3>
+          <p>{{ r.total - r.failed }} of {{ r.total }} row(s) saved. {{ r.failed ? r.failed + ' row(s) were not imported.' : '' }}</p>
+          <div class="tt-tr" *ngFor="let x of r.rows" [class.bad]="!x.ok">
+            <span>{{ x.row }}</span><span class="t">{{ x.taskKey || '' }} {{ x.title }}</span>
+            <span class="notes">{{ x.errors.concat(x.warnings).join(' · ') || (x.action === 'UPDATE' ? 'Updated' : 'Created') }}</span>
+          </div>
+        </div>
+        <footer class="tt-foot">
+          <button type="button" class="tt-secondary" *ngIf="r.failedFile" (click)="downloadFailed()">Download rows to fix</button>
+          <button type="button" class="tt-secondary" (click)="reset()">Import another file</button>
+          <button type="button" class="tt-primary" (click)="closed.emit()">Done</button>
+        </footer>
+      </ng-container>
+    </section>
+  </div>
+</div>

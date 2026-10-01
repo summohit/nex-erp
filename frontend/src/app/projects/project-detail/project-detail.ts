@@ -49,10 +49,11 @@ ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
 
 declare var Quill: any;
 
+import { TaskTransferComponent } from '../../shared/components/task-transfer/task-transfer';
 @Component({
   selector: 'app-project-detail',
   standalone: true,
-  imports: [RouterLink, 
+  imports: [TaskTransferComponent, RouterLink, 
     CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
     TicketsTabComponent, BudgetRequestsTabComponent, DiscussionsTabComponent,
     TaskHoursRequestPanelComponent,
@@ -1372,6 +1373,28 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     .finally(() => this.isTimerLoading.set(false));
   }
 
+  /** PM / technical architect choices for a task's SME (§import template). */
+  smeOptions = computed(() => {
+    const seen = new Set<number>();
+    return [...this.projectManagers(), ...this.projectArchitects()]
+      .map((m: any) => ({
+        id: m.employee?.id ?? m.employeeId,
+        name: `${m.employee?.firstName ?? ''} ${m.employee?.lastName ?? ''}`.trim(),
+        role: m.role === 'PROJECT_MANAGER' ? 'PM' : 'Tech Architect',
+      }))
+      .filter((o) => o.id && !seen.has(o.id) && seen.add(o.id));
+  });
+
+  savePrerequisites() {
+    const v = String(this.issueForm.prerequisites ?? '').trim();
+    if (v === String(this.selectedIssue()?.prerequisites ?? '').trim()) return;
+    this.updateIssueDetails({ prerequisites: v });
+  }
+
+  saveSme() {
+    this.updateIssueDetails({ smeId: this.issueForm.smeId ? Number(this.issueForm.smeId) : null });
+  }
+
   updateEstimatedHours() {
     const val = this.issueForm.estimatedHours !== null && this.issueForm.estimatedHours !== undefined 
       ? Number(this.issueForm.estimatedHours) 
@@ -1771,6 +1794,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     estimatedHours: number | null;
     phaseId?: number | null;
     milestoneId?: number | null;
+    prerequisites?: string;
+    smeId?: number | null;
   } = {
     title: '',
     description: '',
@@ -3522,7 +3547,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       completed: issue.status === 'DONE',
       estimatedHours: issue.estimatedHours || null,
       phaseId: issue.phaseId ?? null,
-      milestoneId: issue.milestoneId ?? null
+      milestoneId: issue.milestoneId ?? null,
+      prerequisites: issue.prerequisites ?? '',
+      smeId: issue.smeId ?? null,
     };
     this.isDrawerOpen.set(true);
     this.loadFeedItems(issue.id);
@@ -4782,6 +4809,18 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
    * project. Hiding these does not enforce anything -- the endpoints do -- it
    * just stops offering an action that would be refused on save.
    */
+  taskTransferOpen = signal(false);
+
+  isAdminUser(): boolean {
+    const r = this.currentUser()?.role;
+    return r === 'SUPERADMIN' || r === 'ADMIN';
+  }
+
+  /** After an import the board and lists are stale; reload the project. */
+  reloadAfterImport() {
+    window.location.reload();
+  }
+
   get canManageTask(): boolean {
     return this.isProjectOwner || this.isCurrentUserPM();
   }
