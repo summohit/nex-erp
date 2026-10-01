@@ -234,7 +234,8 @@
                   <span class="day-num">{{ day.dayNumber }}</span>
                   <span class="day-week">{{ day.weekdayStr }}</span>
                 </div>
-                <div class="day-cell" [class.is-empty]="day.isFuture"
+                <div class="day-cell" [class.is-empty]="day.isFuture && day.status !== 'Holiday'"
+                     [title]="day.status === 'Holiday' ? day.tooltip : ''"
                      (click)="openDayDetailsModal(day)"
                      style="cursor: pointer;"
                      [ngClass]="{
@@ -246,6 +247,8 @@
                        'bg-holiday': day.status === 'Holiday',
                        'bg-day-off': day.status === 'Day Off'
                      }">
+                  <!-- Upcoming holidays show their star too; other future days stay blank. -->
+                  <svg *ngIf="day.isFuture && day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
                   <ng-container *ngIf="!day.isFuture">
                     <svg *ngIf="day.status === 'Present'" lucideCheck class="status-present status-icon"></svg>
                     <svg *ngIf="day.status === 'Half Day'" lucideStarHalf class="status-half-day status-icon"></svg>
@@ -1589,6 +1592,12 @@
             <div class="form-group">
               <label>Maximum check-in allowed in a day <span class="req">*</span></label>
               <input type="number" class="form-control" name="maxCheckIns" [(ngModel)]="shiftForm.maxCheckIns" required min="1">
+            </div>
+            <div class="form-group">
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                <input type="checkbox" name="officeGeofence" [(ngModel)]="shiftForm.officeGeofence" style="margin-top:3px;width:16px;height:16px;">
+                <span>Office geofence (500 m)<small class="hint" style="display:block;">Clock in/out within the office radius, or give a reason for admin review. Office shifts only.</small></span>
+              </label>
             </div>
           </div>
 

@@ -16,6 +16,8 @@ export interface ShiftInput {
   autoClockOutHours?: number;
   maxCheckIns?: number;
   workingDays?: string[] | string;
+  /** B3: geofence clock-in/out to the office (General Shift). */
+  officeGeofence?: boolean;
 }
 
 @Injectable()
@@ -144,6 +146,7 @@ export class ShiftsService {
       autoClockOutHours: d.autoClockOutHours,
       maxCheckIns: d.maxCheckIns,
       workingDays: Array.isArray(d.workingDays) ? d.workingDays.join(',') : d.workingDays,
+      officeGeofence: typeof d.officeGeofence === 'boolean' ? d.officeGeofence : undefined,
     };
   }
 

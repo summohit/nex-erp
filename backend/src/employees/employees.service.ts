@@ -417,7 +417,7 @@ export class EmployeesService {
         user: { select: { email: true, role: true, id: true } },
         department: { select: { name: true } },
         designation: { select: { name: true } },
-        branch: { select: { name: true } },
+        branch: { select: { name: true, weeklyOffs: true } },
         manager: { select: { firstName: true, lastName: true, id: true } },
         emergencyContacts: true,
         documents: true,

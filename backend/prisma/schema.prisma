@@ -476,6 +476,7 @@ model Employee {
   attendances                   Attendance[]
   /// §Att5: the late clock-outs this person has ruled on.
   clockOutApprovals             Attendance[]           @relation("AttendanceClockOutApprover")
+  geofenceReviews               Attendance[]           @relation("AttendanceGeofenceReviewer")
   /// §PB8 and the scope requests: what they raised, and what they ruled on.
   issuesAwaitingTheirApproval   Issue[]                @relation("IssueApprovalRequestedBy")
   issuesApprovedTechnically     Issue[]                @relation("IssueTechnicalApprover")
@@ -852,6 +853,26 @@ model Attendance {
   clockOutApprovedAt   DateTime?
   /// The approver's own words, and the only place a rejection is explained.
   clockOutReviewNote   String?
+  /// Office geofence (B3). A General Shift clock-in or clock-out more than the
+  /// branch radius from the office is allowed, but carries a reason (and
+  /// optionally evidence) and waits on an administrator. Kept apart from the
+  /// late clock-out fields above: that is a different question with its own
+  /// approval.
+  clockInOutside          Boolean   @default(false)
+  clockInDistanceKm       Float?
+  clockInOutsideReason    String?
+  clockInOutsideProofUrl  String?
+  clockOutOutside         Boolean   @default(false)
+  clockOutDistanceKm      Float?
+  clockOutOutsideReason   String?
+  clockOutOutsideProofUrl String?
+  /// PENDING, APPROVED, REJECTED; null when nothing was outside the office.
+  /// A rejection only flags the day: status and hours are left alone.
+  geofenceApproval        String?
+  geofenceReviewedById    Int?
+  geofenceReviewedBy      Employee? @relation("AttendanceGeofenceReviewer", fields: [geofenceReviewedById], references: [id], onDelete: SetNull)
+  geofenceReviewedAt      DateTime?
+  geofenceReviewNote      String?
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   logs                 AttendanceLog[]
@@ -861,6 +882,7 @@ model Attendance {
   @@index([clockOut, date])
   /// The approval queue reads exactly this: one company's PENDING days.
   @@index([clockOutApproval])
+  @@index([geofenceApproval])
 }
 
 model AttendanceLog {
@@ -919,6 +941,10 @@ model Shift {
   maxCheckIns         Int                @default(2) // clock-in/out pairs allowed per day
   // Days the shift operates, e.g. "Monday,Tuesday,...". Null means all seven.
   workingDays         String?
+  // Office geofence (B3): staff on this shift clock in and out within the
+  // branch radius, or give a reason an administrator reviews. Off for on-site,
+  // night and other shifts that are not worked at the office.
+  officeGeofence      Boolean            @default(false)
   companyId           Int
   company             Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employees           Employee[]

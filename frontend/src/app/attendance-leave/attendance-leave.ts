@@ -65,6 +65,8 @@ export interface DayStatus {
   clockOutLng?: number | null;
 }
 
+import { OutsideOfficeAnswer, OutsideOfficeService } from '../shared/services/outside-office.service';
+import { isWeeklyOff } from '../shared/utils/weekly-offs';
 @Component({
   selector: 'app-attendance-leave',
   standalone: true,
@@ -116,6 +118,7 @@ export class AttendanceLeaveComponent implements OnInit {
   private sanitizer = inject(DomSanitizer);
   public authService = inject(AuthService);
   private toast = inject(HotToastService);
+  private outsideOffice = inject(OutsideOfficeService);
   private datePipe = inject(DatePipe);
 
   shiftRosterVisible = signal<boolean>(false);
@@ -975,7 +978,7 @@ export class AttendanceLeaveComponent implements OnInit {
     for (let i = 1; i <= lastDay.getDate(); i++) {
       const cellDate = new Date(year, month, i);
       cellDate.setHours(0,0,0,0);
-      const isWeekend = cellDate.getDay() === 0 || cellDate.getDay() === 6;
+      const isWeekend = this.isOffDay(cellDate);
       const isToday = cellDate.getTime() === today.getTime();
 
       const isHoliday = allHolidays.find(h => {
@@ -1967,7 +1970,27 @@ export class AttendanceLeaveComponent implements OnInit {
   currentTime = signal<Date>(new Date());
   private timerInterval: any;
 
+  /**
+   * The employee's branch weekly offs (e.g. "0,6:even" = Sundays plus 2nd and
+   * 4th Saturday). Null until loaded, when Saturday+Sunday is assumed as before.
+   */
+  myWeeklyOffs = signal<string | null>(null);
+
+  private isOffDay(date: Date): boolean {
+    const rule = this.myWeeklyOffs();
+    if (rule === null) return date.getDay() === 0 || date.getDay() === 6;
+    return isWeeklyOff(date, rule);
+  }
+
   ngOnInit() {
+    this.employeeService.getMyProfile().subscribe({
+      next: (p: any) => {
+        this.myWeeklyOffs.set(p?.branch ? (p.branch.weeklyOffs ?? '') : null);
+        this.generateGrid();
+      },
+      error: () => {},
+    });
+
     // §Att9: whether to offer applying on somebody else's behalf. Asked of the
     // server rather than inferred from the role, because a delegate holding no
     // special role may also be allowed.
@@ -2175,7 +2198,8 @@ export class AttendanceLeaveComponent implements OnInit {
       const dateString = this.getLocalDateString(date);
       const isFuture = date > today;
       const dayOfWeek = date.getDay();
-      const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+      // The branch's weekly offs — e.g. only the 2nd and 4th Saturday.
+      const isWeekend = this.isOffDay(date);
       
       const weekdayStr = weekdays[dayOfWeek];
 
@@ -2188,7 +2212,16 @@ export class AttendanceLeaveComponent implements OnInit {
       let clockOutLat: number | null = null;
       let clockOutLng: number | null = null;
 
-      if (isFuture) {
+      const upcomingHoliday = isFuture
+        ? hols.find(h => this.getBackendDateString(h.date) === dateString)
+        : undefined;
+
+      if (upcomingHoliday) {
+        // An upcoming holiday is already known — show it instead of a blank
+        // day that reads like an ordinary working day.
+        status = 'Holiday';
+        tooltip = `${upcomingHoliday.name} (upcoming)`;
+      } else if (isFuture) {
         status = 'Empty';
       } else {
         // Find if holiday
@@ -2227,7 +2260,9 @@ export class AttendanceLeaveComponent implements OnInit {
              // If it's today and they are clocked in, they might just be working right now.
           }
 
-          if (isHalfDay) status = 'Half Day';
+          // A holiday worked is recorded, never late or a half day (B1).
+          if (holiday) status = 'Present';
+          else if (isHalfDay) status = 'Half Day';
           else if (isLate) status = 'Late';
           else status = 'Present';
 
@@ -2238,6 +2273,7 @@ export class AttendanceLeaveComponent implements OnInit {
             locText = ` 📍 ${log.clockInLat.toFixed(5)}, ${log.clockInLng.toFixed(5)}`;
           }
           tooltip = `In: ${inStr} - Out: ${outStr}${locText} (Click for details)`;
+          if (holiday) tooltip = `Worked on holiday (${holiday.name}) · ${tooltip}`;
           
           clockInStr = inStr;
           clockOutStr = log.clockOut ? outStr : '';
@@ -2296,7 +2332,7 @@ export class AttendanceLeaveComponent implements OnInit {
     let totalP = 0;
     for (const d of newGrid) {
       if (!d.isFuture) {
-        const isWeekend = d.date.getDay() === 0 || d.date.getDay() === 6;
+        const isWeekend = this.isOffDay(d.date);
         const isHol = d.status === 'Holiday';
         const worked = ['Present', 'Late', 'Half Day'].includes(d.status);
 
@@ -2526,29 +2562,43 @@ export class AttendanceLeaveComponent implements OnInit {
         (position) => {
           this.executeClockAction(action, position.coords.latitude, position.coords.longitude);
         },
-        (error) => {
-          this.toast.error('Location access is required to clock in/out. Please enable location access and try again.');
-          this.isClocking.set(false);
-        }
+        // No location: the server decides — an office (General Shift) day
+        // answers with the reason box, any other shift clocks as normal.
+        () => this.executeClockAction(action),
       );
     } else {
-      this.toast.error('Location access is required to clock in/out. Your browser does not support location access.');
-      this.isClocking.set(false);
+      this.executeClockAction(action);
     }
   }
 
-  private executeClockAction(action: 'clockIn' | 'clockOut', lat?: number, lng?: number) {
-    const sub = action === 'clockIn' 
-      ? this.attendanceService.clockIn(lat, lng) 
-      : this.attendanceService.clockOut(lat, lng);
+  private executeClockAction(
+    action: 'clockIn' | 'clockOut', lat?: number, lng?: number,
+    outside?: OutsideOfficeAnswer,
+  ) {
+    const sub = action === 'clockIn'
+      ? this.attendanceService.clockIn(lat, lng, outside?.reason, outside?.proofUrl)
+      : this.attendanceService.clockOut(lat, lng, undefined, undefined, outside?.reason, outside?.proofUrl);
 
     sub.subscribe({
       next: (res) => {
-        this.toast.success(`Successfully ${action === 'clockIn' ? 'Clocked In' : 'Clocked Out'}!`);
+        this.toast.success(
+          `Successfully ${action === 'clockIn' ? 'Clocked In' : 'Clocked Out'}!`
+            + (outside ? ' Sent for admin review (outside office).' : ''),
+        );
         this.todayAttendance.set(res);
         this.isClocking.set(false);
       },
       error: (err) => {
+        // B3: outside the office radius — ask why, then clock again with it.
+        if (this.outsideOffice.isOutsideOffice(err)) {
+          this.isClocking.set(false);
+          void this.outsideOffice.ask(err).then((ans) => {
+            if (!ans) return;
+            this.isClocking.set(true);
+            this.executeClockAction(action, lat, lng, ans);
+          });
+          return;
+        }
         this.toast.error(err.error?.message || 'Failed to clock action');
         this.isClocking.set(false);
       }

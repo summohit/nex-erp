@@ -91,6 +91,7 @@ describe('an unclosed session from a previous day', () => {
         update: jest.fn(async ({ data }: any) => ({ id: 5, ...data, logs: [] })),
       },
       attendanceLog: { create: jest.fn(async () => ({})), update: jest.fn(async () => ({})) },
+      holiday: { findFirst: jest.fn(async () => null) },
       // Every clock-in now asks whether the day belongs to an approved field
       // visit, which is clocked from its own screen against the site's radius.
       // Nobody here is on one.

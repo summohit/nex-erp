@@ -17,6 +17,7 @@ import {
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { DialogService } from '../../shared/services/dialog.service';
+import { OutsideOfficeAnswer, OutsideOfficeService } from '../../shared/services/outside-office.service';
 import { UploadService } from '../../services/upload.service';
 import { PushNotificationsService } from '../../services/push-notifications.service';
 
@@ -46,6 +47,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private ticketService = inject(TicketService);
   private toast = inject(HotToastService);
   private dialog = inject(DialogService);
+  private outsideOffice = inject(OutsideOfficeService);
   private uploadService = inject(UploadService);
   private push = inject(PushNotificationsService);
   notificationsService = inject(NotificationsService);
@@ -223,15 +225,21 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private static readonly OPEN_PREVIOUS_SESSION = 'OPEN_PREVIOUS_SESSION';
   private static readonly LATE_REASON_REQUIRED = 'LATE_CLOCK_OUT_REASON_REQUIRED';
 
-  private executeClock(action: 'clockIn' | 'clockOut', reason?: string, proofUrl?: string) {
+  private executeClock(
+    action: 'clockIn' | 'clockOut', reason?: string, proofUrl?: string,
+    outside?: OutsideOfficeAnswer,
+  ) {
     const proceed = (lat?: number, lng?: number) => {
       const sub = action === 'clockIn'
-        ? this.attendanceService.clockIn(lat, lng)
-        : this.attendanceService.clockOut(lat, lng, reason, proofUrl);
+        ? this.attendanceService.clockIn(lat, lng, outside?.reason, outside?.proofUrl)
+        : this.attendanceService.clockOut(lat, lng, reason, proofUrl, outside?.reason, outside?.proofUrl);
 
       sub.subscribe({
         next: () => {
-          this.toast.success(action === 'clockIn' ? 'Clocked in successfully' : 'Clocked out successfully');
+          this.toast.success(
+            (action === 'clockIn' ? 'Clocked in successfully' : 'Clocked out successfully')
+              + (outside ? ' — sent for admin review (outside office)' : ''),
+          );
           this.checkTodayAttendance();
           this.isClocking.set(false);
         },
@@ -255,6 +263,18 @@ export class HeaderComponent implements OnInit, OnDestroy {
             return;
           }
 
+          // B3: outside the office radius on a General Shift day. Ask why,
+          // then send the same clock again with the answer.
+          if (this.outsideOffice.isOutsideOffice(err)) {
+            this.isClocking.set(false);
+            void this.outsideOffice.ask(err).then((ans) => {
+              if (!ans) return;
+              this.isClocking.set(true);
+              this.executeClock(action, reason, proofUrl, ans);
+            });
+            return;
+          }
+
           this.toast.error(body.message || `Failed to ${action === 'clockIn' ? 'clock in' : 'clock out'}`);
           this.isClocking.set(false);
         }
@@ -264,14 +284,12 @@ export class HeaderComponent implements OnInit, OnDestroy {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => proceed(position.coords.latitude, position.coords.longitude),
-        (error) => {
-          this.toast.error('Location access is required to clock in/out. Please enable location access and try again.');
-          this.isClocking.set(false);
-        }
+        // No location: let the server decide. An office (General Shift) day
+        // answers with the reason box; any other shift clocks as normal.
+        () => proceed(undefined, undefined),
       );
     } else {
-      this.toast.error('Location access is required to clock in/out. Your browser does not support location access.');
-      this.isClocking.set(false);
+      proceed(undefined, undefined);
     }
   }
 

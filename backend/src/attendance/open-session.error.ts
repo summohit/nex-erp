@@ -49,3 +49,31 @@ export class LateClockOutError extends BadRequestException {
     });
   }
 }
+
+/**
+ * A General Shift clock-in or clock-out outside the office radius (B3).
+ *
+ * Not a refusal: the client shows a reason box (with an optional attachment)
+ * and sends the same request again with `outsideReason`, which is accepted and
+ * left for an administrator to review.
+ */
+export class OutsideOfficeError extends BadRequestException {
+  static readonly CODE = 'OUTSIDE_OFFICE_REASON_REQUIRED';
+
+  constructor(direction: 'in' | 'out', branchName: string, distanceKm: number | null, radiusM: number) {
+    const where = distanceKm == null
+      ? 'Your location could not be read'
+      : `You're ${distanceKm.toFixed(2)} km from ${branchName}`;
+    super({
+      statusCode: 400,
+      code: OutsideOfficeError.CODE,
+      direction,
+      distanceKm,
+      radiusM,
+      branchName,
+      message: `${where}, outside the ${radiusM} m office radius. `
+        + `Give a reason to clock ${direction} — an administrator will review it.`,
+      error: 'Bad Request',
+    });
+  }
+}

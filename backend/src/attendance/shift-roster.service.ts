@@ -41,6 +41,7 @@ export interface StandingShift {
   bufferTimeMinutes: number;
   workingDays: string | null;
   halfDayTime?: string | null;
+  officeGeofence?: boolean;
 }
 
 /** One roster row, as much of it as the resolution rule reads. */
@@ -61,6 +62,8 @@ export interface EffectiveShift {
     name: string;
     bufferTimeMinutes: number;
     halfDayTime?: string | null;
+    /** Whether this shift is worked at the office and so geofenced (B3). */
+    officeGeofence?: boolean;
   } | null;
   startTime: string | null;
   endTime: string | null;
@@ -82,6 +85,7 @@ function toKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+import { isBranchWeeklyOff } from '../common/weekly-offs';
 @Injectable()
 export class ShiftRosterService {
   constructor(
@@ -118,6 +122,7 @@ export class ShiftRosterService {
         department: { select: { id: true, name: true } },
         designation: { select: { name: true } },
         shift: true,
+        branch: { select: { weeklyOffs: true } },
         user: { select: { status: true } },
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
@@ -209,7 +214,11 @@ export class ShiftRosterService {
         if (emp.shift) {
           const dayName = DAY_NAMES[new Date(`${day}T00:00:00Z`).getUTCDay()];
           const works = !emp.shift.workingDays || emp.shift.workingDays.split(',').includes(dayName);
-          if (!works) return { date: day, type: 'DAY_OFF', isDefault: true };
+          // The branch's weekly offs too, e.g. 2nd and 4th Saturday. A shift
+          // rostered on such a day (above) still wins — that is how someone
+          // is put to work on an off Saturday.
+          const branchOff = !!emp.branch && isBranchWeeklyOff(new Date(`${day}T00:00:00Z`), emp.branch.weeklyOffs);
+          if (!works || branchOff) return { date: day, type: 'DAY_OFF', isDefault: true };
           return { date: day, type: 'SHIFT', isDefault: true, shift: this.shiftBrief(emp.shift) };
         }
         return { date: day, type: 'UNASSIGNED' };
@@ -244,20 +253,26 @@ export class ShiftRosterService {
     employeeId: number,
     date: Date,
     standingShift?: StandingShift | null,
+    /** The employee's branch weekly offs; looked up when not passed. Null = no branch. */
+    branchWeeklyOffs?: string | null,
   ): Promise<EffectiveShift> {
-    const standing =
-      standingShift !== undefined
-        ? standingShift
-        : await this.prisma.employee
-            .findUnique({ where: { id: employeeId }, select: { shift: true } })
-            .then(e => e?.shift ?? null);
+    let standing = standingShift;
+    let weeklyOffs = branchWeeklyOffs;
+    if (standing === undefined || weeklyOffs === undefined) {
+      const emp = await this.prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { shift: true, branch: { select: { weeklyOffs: true } } },
+      });
+      if (standing === undefined) standing = emp?.shift ?? null;
+      if (weeklyOffs === undefined) weeklyOffs = emp?.branch ? emp.branch.weeklyOffs ?? '' : null;
+    }
 
     const entry = await this.prisma.shiftRosterEntry.findUnique({
       where: { employeeId_date: { employeeId, date } },
       include: { shift: true },
     });
 
-    return ShiftRosterService.resolveEffectiveShift(entry, standing, date);
+    return ShiftRosterService.resolveEffectiveShift(entry, standing ?? null, date, weeklyOffs);
   }
 
   /**
@@ -280,7 +295,7 @@ export class ShiftRosterService {
     const [employees, entries] = await Promise.all([
       this.prisma.employee.findMany({
         where: { id: { in: employeeIds } },
-        select: { id: true, shift: true },
+        select: { id: true, shift: true, branch: { select: { weeklyOffs: true } } },
       }),
       this.prisma.shiftRosterEntry.findMany({
         where: { employeeId: { in: employeeIds }, date },
@@ -289,6 +304,9 @@ export class ShiftRosterService {
     ]);
 
     const standingByEmployee = new Map(employees.map(e => [e.id, e.shift ?? null]));
+    const offsByEmployee = new Map(
+      employees.map(e => [e.id, e.branch ? e.branch.weeklyOffs ?? '' : null] as const),
+    );
     const entryByEmployee = new Map(entries.map(e => [e.employeeId, e]));
 
     for (const employeeId of employeeIds) {
@@ -298,6 +316,7 @@ export class ShiftRosterService {
           entryByEmployee.get(employeeId) ?? null,
           standingByEmployee.get(employeeId) ?? null,
           date,
+          offsByEmployee.get(employeeId) ?? null,
         ),
       );
     }
@@ -314,11 +333,14 @@ export class ShiftRosterService {
     entry: RosterEntryForResolution | null,
     standing: StandingShift | null,
     date: Date,
+    /** Branch weekly offs (e.g. "0,6:even"); null/undefined = no branch rule. */
+    branchWeeklyOffs?: string | null,
   ): EffectiveShift {
     const fromStanding = (): EffectiveShift => {
       if (!standing) return { source: 'NONE', shift: null, startTime: null, endTime: null, isDayOff: false, onsite: null };
       const dayName = DAY_NAMES[date.getUTCDay()];
-      const works = !standing.workingDays || standing.workingDays.split(',').includes(dayName);
+      const works = (!standing.workingDays || standing.workingDays.split(',').includes(dayName))
+        && !(branchWeeklyOffs != null && isBranchWeeklyOff(date, branchWeeklyOffs));
       return {
         source: 'STANDING',
         shift: {
@@ -326,6 +348,7 @@ export class ShiftRosterService {
           name: standing.name,
           bufferTimeMinutes: standing.bufferTimeMinutes,
           halfDayTime: standing.halfDayTime ?? null,
+          officeGeofence: standing.officeGeofence ?? false,
         },
         startTime: standing.startTime,
         endTime: standing.endTime,
@@ -358,6 +381,7 @@ export class ShiftRosterService {
         name: shift.name,
         bufferTimeMinutes: shift.bufferTimeMinutes,
         halfDayTime: shift.halfDayTime ?? null,
+        officeGeofence: shift.officeGeofence ?? false,
       },
       // The entry's own window wins; the shift's is the fallback.
       startTime: entry.startTime ?? shift.startTime,

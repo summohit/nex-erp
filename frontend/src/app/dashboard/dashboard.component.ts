@@ -23,6 +23,7 @@ import {
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 
+import { OutsideOfficeAnswer, OutsideOfficeService } from '../shared/services/outside-office.service';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -137,6 +138,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private leavesService = inject(LeavesService);
   private dashboardService = inject(DashboardService);
   private toast = inject(HotToastService);
+  private outsideOffice = inject(OutsideOfficeService);
 
   user = signal<any>(null);
   onboardingStatus = signal<string>('COMPLETED');
@@ -404,7 +406,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.executeClockAction(action, position.coords.latitude, position.coords.longitude);
         },
         (error) => {
-          this.toast.error('Location access denied. Clocking in without location.');
           this.executeClockAction(action);
         }
       );
@@ -413,18 +414,34 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  private executeClockAction(action: 'clockIn' | 'clockOut', lat?: number, lng?: number) {
+  private executeClockAction(
+    action: 'clockIn' | 'clockOut', lat?: number, lng?: number,
+    outside?: OutsideOfficeAnswer,
+  ) {
     const sub = action === 'clockIn'
-      ? this.attendanceService.clockIn(lat, lng)
-      : this.attendanceService.clockOut(lat, lng);
+      ? this.attendanceService.clockIn(lat, lng, outside?.reason, outside?.proofUrl)
+      : this.attendanceService.clockOut(lat, lng, undefined, undefined, outside?.reason, outside?.proofUrl);
 
     sub.subscribe({
       next: (res) => {
-        this.toast.success(`Successfully ${action === 'clockIn' ? 'Clocked In' : 'Clocked Out'}!`);
+        this.toast.success(
+          `Successfully ${action === 'clockIn' ? 'Clocked In' : 'Clocked Out'}!`
+            + (outside ? ' Sent for admin review (outside office).' : ''),
+        );
         this.todayAttendance.set(res);
         this.isClocking.set(false);
       },
       error: (err) => {
+        // B3: outside the office radius — ask why, then clock again with it.
+        if (this.outsideOffice.isOutsideOffice(err)) {
+          this.isClocking.set(false);
+          void this.outsideOffice.ask(err).then((ans) => {
+            if (!ans) return;
+            this.isClocking.set(true);
+            this.executeClockAction(action, lat, lng, ans);
+          });
+          return;
+        }
         this.toast.error(err.error?.message || 'Failed to clock action');
         this.isClocking.set(false);
       }

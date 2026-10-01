@@ -680,6 +680,16 @@
               </div>
 
               <div class="form-group">
+                <label class="geofence-toggle" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                  <input type="checkbox" [(ngModel)]="formData.officeGeofence" style="margin-top:3px;width:16px;height:16px;">
+                  <span>
+                    <strong>Office geofence (500 m)</strong>
+                    <span class="help-text" style="display:block;">Staff on this shift must clock in and out within the branch radius. Outside it they give a reason, which an administrator reviews. Turn on for office shifts (General Shift) only.</span>
+                  </span>
+                </label>
+              </div>
+
+              <div class="form-group">
                 <label>Auto Clock-out Limit</label>
                 <div class="input-unit-wrapper">
                   <input type="number" class="form-control" [(ngModel)]="formData.autoClockOutHours" min="0" max="24" step="0.5" placeholder="0">
@@ -742,6 +752,50 @@
         <div class="form-group" *ngIf="activeTab() === 'branches'">
           <label>Geofence Radius (meters)</label>
           <input type="number" class="form-control" [(ngModel)]="formData.geofenceRadius" placeholder="e.g. 500">
+        </div>
+        <!-- B3: the office pin the 500 m clock-in/out check measures from. -->
+        <div class="form-group full-width" *ngIf="activeTab() === 'branches'">
+          <div class="loc-card">
+            <div class="loc-head">
+              <div class="loc-icon"><svg lucideMapPin [size]="16"></svg></div>
+              <div class="loc-title">
+                <strong>Office location</strong>
+                <span>The point the {{ formData.geofenceRadius || 500 }} m clock-in / clock-out check is measured from</span>
+              </div>
+              <span class="loc-status" [class.set]="formData.latitude != null && formData.longitude != null">
+                {{ formData.latitude != null && formData.longitude != null ? 'Pin set' : 'No pin · check off' }}
+              </span>
+            </div>
+
+            <div class="loc-row">
+              <input type="text" class="form-control loc-paste"
+                     placeholder="Paste from Google Maps, e.g. 28.5355, 77.3910"
+                     (paste)="pasteBranchCoords($event)" (change)="parseBranchCoords($any($event.target).value)">
+              <button type="button" class="loc-btn" (click)="useMyLocationForBranch()">
+                <svg lucideCrosshair [size]="15"></svg>
+                <span>Use my location</span>
+              </button>
+            </div>
+
+            <div class="loc-grid">
+              <label class="loc-field">
+                <span>Latitude</span>
+                <input type="number" step="any" class="form-control" [(ngModel)]="formData.latitude" placeholder="28.535500">
+              </label>
+              <label class="loc-field">
+                <span>Longitude</span>
+                <input type="number" step="any" class="form-control" [(ngModel)]="formData.longitude" placeholder="77.391000">
+              </label>
+            </div>
+
+            <div class="loc-foot">
+              <span>In Google Maps, right-click the office and click the numbers to copy them. Use “my location” only while at the office.</span>
+              <a *ngIf="formData.latitude != null && formData.longitude != null" target="_blank" rel="noopener"
+                 [href]="'https://www.google.com/maps?q=' + formData.latitude + ',' + formData.longitude">
+                <svg lucideExternalLink [size]="13"></svg> Check on map
+              </a>
+            </div>
+          </div>
         </div>
         <div class="form-group full-width" *ngIf="activeTab() === 'branches'">
           <label>Allowed IPs</label>

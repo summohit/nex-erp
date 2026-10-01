@@ -1553,6 +1553,45 @@ export class MasterDataComponent implements OnInit {
     this.isModalOpen.set(true);
   }
 
+  /** "28.5355, 77.3910" (as Google Maps copies it) → the branch's lat/lng. */
+  parseBranchCoords(text: string): void {
+    const m = String(text ?? '').match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+    if (!m) {
+      if (String(text ?? '').trim()) this.toast.error('Could not read that — paste it as "latitude, longitude".');
+      return;
+    }
+    const lat = Number(m[1]);
+    const lng = Number(m[2]);
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      this.toast.error('Those numbers are not a valid latitude/longitude.');
+      return;
+    }
+    this.formData.latitude = lat;
+    this.formData.longitude = lng;
+  }
+
+  pasteBranchCoords(event: ClipboardEvent): void {
+    const text = event.clipboardData?.getData('text') ?? '';
+    setTimeout(() => this.parseBranchCoords(text));
+  }
+
+  /** Set the pin from where this device is — handy when filling it in at the office. */
+  useMyLocationForBranch(): void {
+    if (!navigator.geolocation) {
+      this.toast.error('This browser cannot report its location.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        this.formData.latitude = Number(pos.coords.latitude.toFixed(6));
+        this.formData.longitude = Number(pos.coords.longitude.toFixed(6));
+        this.toast.success('Location filled in — only do this while at the office.');
+      },
+      () => this.toast.error('Location access was denied.'),
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  }
+
   closeModal() {
     this.isModalOpen.set(false);
     if (this.leafletMap) {

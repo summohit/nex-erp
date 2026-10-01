@@ -48,6 +48,7 @@ describe('the ordinary clock on a field visit day', () => {
         update: jest.fn(async ({ data }: any) => ({ id: 5, ...data, logs: [] })),
       },
       attendanceLog: { create: jest.fn(async () => ({})), update: jest.fn(async () => ({})) },
+      holiday: { findFirst: jest.fn(async () => null) },
       fieldVisitAttendance: { findFirst: jest.fn().mockResolvedValue(FIELD_VISIT_DAY) },
     };
     // The roster says on-site, exactly as approval left it.
@@ -112,7 +113,7 @@ describe('the ordinary clock on a field visit day', () => {
     prisma.fieldVisitAttendance.findFirst.mockResolvedValue(null);
     roster.getEffectiveShift.mockResolvedValue({
       source: 'STANDING',
-      shift: { id: 1, name: 'General', bufferTimeMinutes: 15 },
+      shift: { id: 1, name: 'General', bufferTimeMinutes: 15, officeGeofence: true },
       startTime: '09:30', endTime: '18:30', isDayOff: false, onsite: null,
     });
 
@@ -123,6 +124,6 @@ describe('the ordinary clock on a field visit day', () => {
 
     // And with the office IP, by the geofence behind it.
     await expect(service.clockIn(99, { ...SOFA, ipAddress: '10.0.0.1' }))
-      .rejects.toThrow(/outside the .* clock-in radius/);
+      .rejects.toThrow(/outside the .* office radius/);
   });
 });

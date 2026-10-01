@@ -1068,3 +1068,26 @@
     justify-content: center;
   }
 }
+
+/* B3: out-of-office review */
+.geo-section { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:18px 20px; margin-bottom:20px; }
+.geo-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+.geo-head h2 { margin:0; font-size:16px; font-weight:700; color:#0f172a; }
+.geo-head p { margin:4px 0 0; font-size:13px; color:#64748b; }
+.geo-count { flex:none; background:#fef3c7; color:#92400e; font-weight:700; font-size:12px; padding:4px 10px; border-radius:999px; }
+.geo-empty { font-size:13px; color:#64748b; padding:8px 0; }
+.geo-card { display:grid; grid-template-columns:minmax(160px,1fr) minmax(170px,1fr) 2fr auto; gap:14px; align-items:center;
+  padding:12px 0; border-top:1px solid #f1f5f9; }
+.geo-who { display:flex; flex-direction:column; }
+.geo-who strong { font-size:14px; color:#0f172a; }
+.geo-who span, .geo-dist { font-size:12px; color:#64748b; }
+.geo-day { display:flex; flex-direction:column; }
+.geo-date { font-size:13px; font-weight:600; color:#334155; }
+.geo-reasons p { margin:0 0 4px; font-size:13px; color:#334155; }
+.geo-reasons a { margin-left:6px; font-size:12px; color:#4f46e5; }
+.geo-actions { display:flex; gap:8px; }
+.geo-btn { height:32px; padding:0 14px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; border:1px solid transparent; }
+.geo-btn:disabled { opacity:.6; cursor:wait; }
+.geo-btn.approve { background:#16a34a; color:#fff; }
+.geo-btn.reject { background:#fff; color:#dc2626; border-color:#fecaca; }
+@media (max-width: 900px) { .geo-card { grid-template-columns:1fr; } }

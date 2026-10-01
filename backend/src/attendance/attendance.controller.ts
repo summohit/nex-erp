@@ -32,19 +32,44 @@ export class AttendanceController {
   }
 
   @Post('clock-in')
-  clockIn(@Request() req, @Body() data: { lat?: number, lng?: number }) {
+  clockIn(@Request() req, @Body() data: { lat?: number, lng?: number, outsideReason?: string, outsideProofUrl?: string }) {
     const ipAddress = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.ip;
     return this.attendanceService.clockIn(req.user.sub, { ...data, ipAddress });
   }
 
   @Post('clock-out')
-  clockOut(@Request() req, @Body() data: { lat?: number, lng?: number, reason?: string, proofUrl?: string }) {
+  clockOut(@Request() req, @Body() data: {
+    lat?: number, lng?: number, reason?: string, proofUrl?: string,
+    outsideReason?: string, outsideProofUrl?: string,
+  }) {
     return this.attendanceService.clockOut(req.user.sub, data);
   }
 
   // §Att5: the late clock-out queue. Guarded in the service rather than with a
   // roles decorator, because who may approve is partly a database question —
   // the delegates a Super Admin has named — and not only a role.
+  // B3: clock-ins / clock-outs made outside the office radius.
+  @Get('geofence/pending')
+  getPendingGeofence(@Request() req) {
+    return this.attendanceService.getPendingGeofence(req.user.companyId, req.user.role);
+  }
+
+  @Get('geofence/can-approve')
+  canApproveGeofence(@Request() req) {
+    return { canApprove: this.attendanceService.mayApproveGeofence(req.user.role) };
+  }
+
+  @Post('geofence/:id/review')
+  reviewGeofence(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: { action: 'APPROVE' | 'REJECT'; note?: string },
+  ) {
+    return this.attendanceService.reviewGeofence(
+      req.user.companyId, id, data, req.user.role, req.user.employeeId ?? null,
+    );
+  }
+
   @Get('clock-out/pending')
   getPendingClockOuts(@Request() req) {
     return this.attendanceService.getPendingClockOuts(

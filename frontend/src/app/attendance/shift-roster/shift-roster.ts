@@ -118,7 +118,28 @@ export class ShiftRosterComponent implements OnInit {
   approvalsOpen = signal(false);
   pendingOnsite = signal<any[]>([]);
 
+  /**
+   * Company holidays by day (YYYY-MM-DD → name). A holiday overrides the
+   * rostered shift on screen — nobody is expected in, whatever the roster says.
+   */
+  holidays = signal<Map<string, string>>(new Map());
+
+  holidayOn(day: string): string | null {
+    return this.holidays().get(day) ?? null;
+  }
+
   ngOnInit() {
+    this.masterData.getHolidays().subscribe({
+      next: (rows: any) => {
+        const map = new Map<string, string>();
+        for (const h of rows || []) {
+          // Stored as the day at UTC midnight, so the first ten characters are the day.
+          if (h?.date) map.set(String(h.date).slice(0, 10), h.name || 'Holiday');
+        }
+        this.holidays.set(map);
+      },
+      error: () => this.holidays.set(new Map()),
+    });
     this.loadingDepartments.set(true);
     this.masterData.getDepartments().subscribe({
       next: (d: any) => {
@@ -538,10 +559,55 @@ export class ShiftRosterComponent implements OnInit {
 
   // ── bulk ────────────────────────────────────────────────────────────────
   bulkEmpSearch = signal('');
+  /** Department chip in the bulk modal; '' = everyone. */
+  bulkDept = signal('');
+  /** Right pane: everyone in the department, or only who is ticked. */
+  bulkView = signal<'all' | 'selected'>('all');
+
+  /** Everyone in the chosen department (or all), for the "All users" tab. */
+  bulkDeptTotal = computed(() => {
+    const dept = this.bulkDept();
+    return dept
+      ? this.visibleRows().filter(r => (r.employee.department || 'No department') === dept).length
+      : this.visibleRows().length;
+  });
+
+  /** How many ticked in a department, for the left pane. */
+  selectedInDept(name: string): number {
+    const sel = this.bulkSelection();
+    return this.visibleRows().filter(r =>
+      (r.employee.department || 'No department') === name && sel.has(r.employee.id)).length;
+  }
+
+  /** Department chips with head-counts, from the people on the roster. */
+  bulkDeptChips = computed(() => {
+    const counts = new Map<string, number>();
+    for (const r of this.visibleRows()) {
+      const d = r.employee.department || 'No department';
+      counts.set(d, (counts.get(d) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, count]) => ({ name, count }));
+  });
+
+  /** "12 people × 7 days" for the footer, so the reach is clear before applying. */
+  get bulkSummary(): string {
+    const people = this.bulkSelection().size;
+    const days = this.bulkDayCount;
+    if (!people || !days) return '';
+    return `${people} ${people === 1 ? 'person' : 'people'} × ${days} ${days === 1 ? 'day' : 'days'}`
+      + ` · up to ${people * days} roster entries`;
+  }
 
   filteredBulkRows = computed(() => {
     const q = this.bulkEmpSearch().toLowerCase().trim();
-    const rows = this.visibleRows();
+    const dept = this.bulkDept();
+    let rows = this.visibleRows();
+    if (this.bulkView() === 'selected') {
+      const sel = this.bulkSelection();
+      rows = rows.filter(r => sel.has(r.employee.id));
+    }
+    if (dept) rows = rows.filter(r => (r.employee.department || 'No department') === dept);
     if (!q) return rows;
     return rows.filter(r =>
       r.employee.name.toLowerCase().includes(q) ||
@@ -591,6 +657,8 @@ export class ShiftRosterComponent implements OnInit {
       overwriteExisting: true,
     };
     this.bulkEmpSearch.set('');
+    this.bulkDept.set('');
+    this.bulkView.set('all');
     this.bulkSelection.set(new Set());
     this.bulkOpen.set(true);
   }

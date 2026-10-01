@@ -117,8 +117,9 @@ export class AttendanceService {
     });
   }
 
-  clockIn(lat?: number, lng?: number) {
-    return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-in`, { lat, lng });
+  /** `outsideReason` answers OUTSIDE_OFFICE_REASON_REQUIRED (B3). */
+  clockIn(lat?: number, lng?: number, outsideReason?: string, outsideProofUrl?: string) {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-in`, { lat, lng, outsideReason, outsideProofUrl });
   }
 
   /**
@@ -126,8 +127,26 @@ export class AttendanceService {
    * belongs to a previous IST day. The server decides; the client sends it in
    * response to a LATE_CLOCK_OUT_REASON_REQUIRED refusal.
    */
-  clockOut(lat?: number, lng?: number, reason?: string, proofUrl?: string) {
-    return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-out`, { lat, lng, reason, proofUrl });
+  clockOut(
+    lat?: number, lng?: number, reason?: string, proofUrl?: string,
+    outsideReason?: string, outsideProofUrl?: string,
+  ) {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-out`, {
+      lat, lng, reason, proofUrl, outsideReason, outsideProofUrl,
+    });
+  }
+
+  // B3: clock-ins / clock-outs made outside the office radius.
+  getPendingGeofence(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/geofence/pending`);
+  }
+
+  canApproveGeofence(): Observable<{ canApprove: boolean }> {
+    return this.http.get<{ canApprove: boolean }>(`${this.apiUrl}/geofence/can-approve`);
+  }
+
+  reviewGeofence(id: number, action: 'APPROVE' | 'REJECT', note?: string) {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/geofence/${id}/review`, { action, note });
   }
 
   // §Att5: the late clock-out queue.

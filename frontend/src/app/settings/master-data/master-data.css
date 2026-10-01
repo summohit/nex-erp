@@ -2755,3 +2755,28 @@ input:checked + .slider:before {
   font-size: 12px !important;
   font-style: italic !important;
 }
+
+/* Branch office location (B3) */
+.loc-card { border:1px solid #e2e8f0; border-radius:14px; padding:14px 16px; background:linear-gradient(180deg,#fafbff,#ffffff); }
+.loc-head { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.loc-icon { width:34px; height:34px; border-radius:10px; flex:none; display:flex; align-items:center; justify-content:center;
+  background:#eef2ff; color:#4f46e5; }
+.loc-title { display:flex; flex-direction:column; flex:1; min-width:0; }
+.loc-title strong { font-size:14px; color:#0f172a; }
+.loc-title span { font-size:12px; color:#64748b; }
+.loc-status { flex:none; font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:999px;
+  background:#fef3c7; color:#92400e; }
+.loc-status.set { background:#dcfce7; color:#166534; }
+.loc-row { display:flex; gap:10px; }
+.loc-paste { flex:1; min-width:0; }
+.loc-btn { flex:none; display:inline-flex; align-items:center; gap:6px; height:42px; padding:0 14px;
+  border-radius:10px; border:1px solid #c7d2fe; background:#eef2ff; color:#4338ca; font-weight:600; font-size:13px; cursor:pointer;
+  transition:background .15s ease; }
+.loc-btn:hover { background:#e0e7ff; }
+.loc-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+.loc-field { display:flex; flex-direction:column; gap:4px; margin:0; }
+.loc-field > span { font-size:12px; font-weight:600; color:#475569; }
+.loc-foot { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-top:10px;
+  font-size:12px; color:#64748b; line-height:1.45; }
+.loc-foot a { flex:none; display:inline-flex; align-items:center; gap:4px; color:#4f46e5; font-weight:600; text-decoration:none; }
+@media (max-width:600px) { .loc-row, .loc-foot { flex-direction:column; } .loc-grid { grid-template-columns:1fr; } }

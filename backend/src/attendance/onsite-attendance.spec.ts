@@ -46,6 +46,7 @@ describe('clockIn / clockOut on an on-site day', () => {
         update: jest.fn(async ({ data }: any) => ({ id: 5, ...data, logs: [] })),
       },
       attendanceLog: { create: jest.fn(async () => ({})), update: jest.fn(async () => ({})) },
+      holiday: { findFirst: jest.fn(async () => null) },
       // Every clock-in now asks whether the day belongs to an approved field
       // visit, which is clocked from its own screen against the site's radius.
       // Nobody here is on one.
@@ -66,7 +67,7 @@ describe('clockIn / clockOut on an on-site day', () => {
   const officeDay = () =>
     roster.getEffectiveShift.mockResolvedValue({
       source: 'STANDING',
-      shift: { id: 1, name: 'General Shift', bufferTimeMinutes: 15 },
+      shift: { id: 1, name: 'General Shift', bufferTimeMinutes: 15, officeGeofence: true },
       startTime: '09:30', endTime: '18:30', isDayOff: false, onsite: null,
     });
 
@@ -93,7 +94,39 @@ describe('clockIn / clockOut on an on-site day', () => {
     // check that has to catch this, so the IP rule cannot mask it.
     await expect(
       service.clockIn(99, { ...SITE, ipAddress: '10.0.0.1' }),
-    ).rejects.toThrow(/clock-in radius/i);
+    ).rejects.toThrow(/office radius/i);
+  });
+
+  it('accepts an outside-office clock-in once a reason is given, and queues it', async () => {
+    officeDay();
+    jest.useFakeTimers().setSystemTime(ist(9, 25));
+
+    await service.clockIn(99, { ...SITE, ipAddress: '10.0.0.1', outsideReason: 'Client meeting' });
+
+    const data = prisma.attendance.create.mock.calls[0][0].data;
+    expect(data.clockInOutside).toBe(true);
+    expect(data.clockInOutsideReason).toBe('Client meeting');
+    expect(data.geofenceApproval).toBe('PENDING');
+    expect(data.clockInDistanceKm).toBeGreaterThan(10);
+  });
+
+  it('asks for a reason when there is no location reading at all', async () => {
+    officeDay();
+    jest.useFakeTimers().setSystemTime(ist(9, 25));
+
+    await expect(service.clockIn(99, { ipAddress: '10.0.0.1' })).rejects.toThrow(/could not be read/i);
+  });
+
+  it('does not geofence a shift that is not an office shift (e.g. Night Shift)', async () => {
+    roster.getEffectiveShift.mockResolvedValue({
+      source: 'STANDING',
+      shift: { id: 3, name: 'Night Shift', bufferTimeMinutes: 15, officeGeofence: false },
+      startTime: '21:30', endTime: '06:30', isDayOff: false, onsite: null,
+    });
+    jest.useFakeTimers().setSystemTime(ist(21, 25));
+
+    await service.clockIn(99, { ...SITE, ipAddress: '10.0.0.1' });
+    expect(prisma.attendance.create.mock.calls[0][0].data.clockInOutside).toBeUndefined();
   });
 
   it('skips the branch IP allow-list on an on-site day', async () => {

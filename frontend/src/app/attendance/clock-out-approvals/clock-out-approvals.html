@@ -1,5 +1,41 @@
 <div class="coa-page page-container">
 
+  <!-- ── B3: Out-of-office clock-ins / clock-outs (General Shift, 500 m) ──── -->
+  <section class="geo-section" *ngIf="geoCanApprove()">
+    <div class="geo-head">
+      <div>
+        <h2>Out-of-office clock-ins &amp; clock-outs</h2>
+        <p>General Shift staff who clocked more than the office radius away. Approving accepts it; rejecting only flags the day.</p>
+      </div>
+      <span class="geo-count">{{ geoRows().length }} pending</span>
+    </div>
+
+    <div class="geo-empty" *ngIf="!geoRows().length">Nothing waiting — everyone clocked from the office.</div>
+
+    <article class="geo-card" *ngFor="let r of geoRows()">
+      <div class="geo-who">
+        <strong>{{ employeeName(r) }}</strong>
+        <span>{{ r.employee?.designation || r.employee?.department?.name || '' }}</span>
+      </div>
+      <div class="geo-day">
+        <span class="geo-date">{{ formatDate(r.date) }}</span>
+        <span class="geo-dist">{{ geoSummary(r) }}</span>
+      </div>
+      <div class="geo-reasons">
+        <p *ngIf="r.clockInOutsideReason"><b>Clock-in:</b> {{ r.clockInOutsideReason }}
+          <a *ngIf="r.clockInOutsideProofUrl" [href]="r.clockInOutsideProofUrl" target="_blank" rel="noopener">View attachment</a></p>
+        <p *ngIf="r.clockOutOutsideReason"><b>Clock-out:</b> {{ r.clockOutOutsideReason }}
+          <a *ngIf="r.clockOutOutsideProofUrl" [href]="r.clockOutOutsideProofUrl" target="_blank" rel="noopener">View attachment</a></p>
+      </div>
+      <div class="geo-actions">
+        <button type="button" class="geo-btn reject" [disabled]="geoBusyId() === r.id" (click)="decideGeofence(r, 'REJECT')">Reject</button>
+        <button type="button" class="geo-btn approve" [disabled]="geoBusyId() === r.id" (click)="decideGeofence(r, 'APPROVE')">
+          {{ geoBusyId() === r.id ? 'Saving…' : 'Approve' }}
+        </button>
+      </div>
+    </article>
+  </section>
+
   <!-- ── 1. Access Check In Flight ─────────────────────────────────────────── -->
   <div class="coa-status-card coa-checking" *ngIf="canApprove() === null">
     <div class="coa-spin-wrapper">

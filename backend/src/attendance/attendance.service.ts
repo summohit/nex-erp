@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { istDateKey, istTimeInstant } from '../common/timezone.util';
-import { LateClockOutError, OpenSessionError } from './open-session.error';
+import { LateClockOutError, OpenSessionError, OutsideOfficeError } from './open-session.error';
 import { haversineKm } from '../common/geo.util';
 import { FIELD_VISIT_STATUS } from '../field-visits/field-visit-status';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -11,7 +11,7 @@ import { CLOCK_OUT_APPROVAL } from './clock-out-approval';
 import { isHalfDayStart } from './half-day-rule';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
-import { isHrAdmin } from '../common/company-roles';
+import { isCompanyAdmin, isHrAdmin } from '../common/company-roles';
 
 /**
  * What the field visit clock tells attendance about the day it is clocking.
@@ -196,9 +196,26 @@ export class AttendanceService {
    * screen, which has already measured the person against the approved site.
    * Nothing else may set it — see `assertNotOnFieldVisit` below.
    */
+  /**
+   * Whether the company has a holiday on this attendance day.
+   *
+   * Keyed on the day the shift STARTS (the attendance date), so a night shift
+   * beginning on a holiday evening is the holiday's, and one that runs into a
+   * holiday morning is not.
+   */
+  async isHoliday(companyId: number, day: Date): Promise<boolean> {
+    const start = new Date(day);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    const hit = await this.prisma.holiday.findFirst({
+      where: { companyId, date: { gte: start, lt: end } },
+      select: { id: true },
+    });
+    return !!hit;
+  }
+
   async clockIn(
     userId: number,
-    data: { lat?: number, lng?: number, ipAddress?: string },
+    data: { lat?: number, lng?: number, ipAddress?: string, outsideReason?: string, outsideProofUrl?: string },
     options?: { fieldVisit?: FieldVisitClockContext },
   ) {
     const employee = await this.prisma.employee.findUnique({ 
@@ -213,7 +230,9 @@ export class AttendanceService {
     // What the roster says about today — an on-site assignment, a rostered
     // shift, or (the usual case) nothing, in which case the standing shift
     // still applies exactly as before.
-    const effective = await this.roster.getEffectiveShift(employee.id, todayKey, employee.shift);
+    const effective = await this.roster.getEffectiveShift(
+      employee.id, todayKey, employee.shift, employee.branch ? employee.branch.weeklyOffs ?? '' : null,
+    );
 
     // A day on an approved field visit is clocked from the field visit screen,
     // which measures the person against the site's own 500m radius. Coming in
@@ -241,24 +260,11 @@ export class AttendanceService {
         }
       }
 
-      // 2. Geofencing Check — only enforced once an admin has actually set the
-      // branch's coordinates; branches without them behave as before (no check).
-      // Also skipped on-site, for the same reason: someone rostered to a client
-      // site is by definition outside the branch radius, and enforcing it would
-      // make an on-site day impossible to clock at all.
-      if (!onsite && branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
-        if (data.lat == null || data.lng == null) {
-          throw new BadRequestException('Location is required to clock in at this branch.');
-        }
-        const distanceKm = haversineKm(branch.latitude, branch.longitude, data.lat, data.lng);
-        const radiusKm = branch.geofenceRadius / 1000;
-        if (distanceKm > radiusKm) {
-          throw new BadRequestException(
-            `You're ${distanceKm.toFixed(2)}km from ${branch.name}, outside the ${radiusKm.toFixed(2)}km clock-in radius.`,
-          );
-        }
-      }
     }
+
+    // 2. Office geofence (B3) — see officeCheck.
+    const office = await this.officeCheck(employee, effective, onsite, data);
+    const outsideIn = this.outsideFields('in', office, data);
 
     // Nothing may start while something earlier is still running.
     //
@@ -290,7 +296,11 @@ export class AttendanceService {
     // The window comes from the roster when one is set for today, which is how
     // an on-site stint with its own hours stops reading as three hours late.
     const buffer = effective.shift?.bufferTimeMinutes ?? 0;
-    if (effective.startTime) {
+    // Working a holiday is recorded and nothing more (B1): no late mark and no
+    // half day, because nobody was expected in.
+    // A weekly off (e.g. 2nd Saturday) is treated the same way: worked, recorded, never late.
+    const onHoliday = await this.isHoliday(employee.companyId, todayKey) || effective.isDayOff;
+    if (effective.startTime && !onHoliday) {
       // Shift times ("09:00") are IST wall-clock, not server-local — istTimeInstant
       // resolves them to the correct real-world instant regardless of what
       // timezone this server's OS happens to be configured with.
@@ -323,6 +333,7 @@ export class AttendanceService {
           shiftId: effective.shift?.id ?? null,
           projectId: effective.onsite?.projectId ?? options?.fieldVisit?.projectId ?? null,
           isOnsite: onsite,
+          ...outsideIn,
         },
         include: { logs: true }
       });
@@ -352,9 +363,76 @@ export class AttendanceService {
         shiftId: existing.shiftId ?? effective.shift?.id ?? null,
         projectId: existing.projectId ?? effective.onsite?.projectId ?? null,
         isOnsite: existing.isOnsite || onsite,
+        // A later clock-in outside the office re-opens the review; one inside
+        // leaves an earlier outside clock-in (and its decision) as it was.
+        ...(existing.clockInOutside ? {} : outsideIn),
       },
       include: { logs: true }
     }).then(r => this.withTotalHours(r));
+  }
+
+  /**
+   * The office geofence (B3).
+   *
+   * Applies only when the day's shift is an office shift (Shift.officeGeofence,
+   * i.e. General Shift) and the day is not on-site or a field visit. Within the
+   * branch radius is ordinary; outside it — or with no location at all — is
+   * allowed but must carry a reason, and is then reviewed by an administrator.
+   *
+   * The pin is the employee's branch, or the company's first branch with
+   * coordinates for someone with no branch set. No coordinates anywhere means
+   * no check, exactly as before.
+   */
+  private async officeCheck(
+    employee: { companyId: number; branch?: any },
+    effective: EffectiveShift,
+    exempt: boolean,
+    data: { lat?: number; lng?: number },
+  ): Promise<{ outside: boolean; distanceKm: number | null; branchName: string; radiusM: number } | null> {
+    if (exempt || !effective.shift?.officeGeofence) return null;
+
+    const hasPin = (b: any) => b && b.latitude != null && b.longitude != null && b.geofenceRadius;
+    const branch = hasPin(employee.branch)
+      ? employee.branch
+      : await this.prisma.branch.findFirst({
+          where: { companyId: employee.companyId, latitude: { not: null }, longitude: { not: null } },
+          orderBy: { id: 'asc' },
+        });
+    if (!hasPin(branch)) return null;
+
+    const radiusM = branch.geofenceRadius as number;
+    if (data.lat == null || data.lng == null) {
+      // No reading is not a pass: the reason is what explains it.
+      return { outside: true, distanceKm: null, branchName: branch.name, radiusM };
+    }
+    const distanceKm = haversineKm(branch.latitude, branch.longitude, data.lat, data.lng);
+    return { outside: distanceKm * 1000 > radiusM, distanceKm, branchName: branch.name, radiusM };
+  }
+
+  /** The Attendance fields one outside-office clock writes, or none. */
+  private outsideFields(
+    direction: 'in' | 'out',
+    office: { outside: boolean; distanceKm: number | null; branchName: string; radiusM: number } | null,
+    data: { outsideReason?: string; outsideProofUrl?: string },
+  ): Record<string, any> {
+    if (!office?.outside) return {};
+    const reason = String(data.outsideReason ?? '').trim();
+    if (!reason) {
+      throw new OutsideOfficeError(direction, office.branchName, office.distanceKm, office.radiusM);
+    }
+    const proof = String(data.outsideProofUrl ?? '').trim() || null;
+    const km = office.distanceKm == null ? null : Math.round(office.distanceKm * 100) / 100;
+    return {
+      ...(direction === 'in'
+        ? { clockInOutside: true, clockInDistanceKm: km, clockInOutsideReason: reason, clockInOutsideProofUrl: proof }
+        : { clockOutOutside: true, clockOutDistanceKm: km, clockOutOutsideReason: reason, clockOutOutsideProofUrl: proof }),
+      // Every new outside clock needs a decision, even if an earlier one today
+      // was already approved.
+      geofenceApproval: 'PENDING',
+      geofenceReviewedById: null,
+      geofenceReviewedAt: null,
+      geofenceReviewNote: null,
+    };
   }
 
   /**
@@ -414,7 +492,10 @@ export class AttendanceService {
    */
   async clockOut(
     userId: number,
-    data: { lat?: number, lng?: number, reason?: string, proofUrl?: string },
+    data: {
+      lat?: number, lng?: number, reason?: string, proofUrl?: string,
+      outsideReason?: string, outsideProofUrl?: string,
+    },
     options?: { fieldVisit?: FieldVisitClockContext },
   ) {
     const employee = await this.prisma.employee.findUnique({
@@ -466,26 +547,17 @@ export class AttendanceService {
       throw new LateClockOutError(existing.date);
     }
 
-    const effective = await this.roster.getEffectiveShift(employee.id, existing.date, employee.shift);
+    const effective = await this.roster.getEffectiveShift(
+      employee.id, existing.date, employee.shift, employee.branch ? employee.branch.weeklyOffs ?? '' : null,
+    );
 
-    const branch = employee.branch;
-    // Geofence, on the same on-site exemption as clock-in — and skipped
-    // entirely for a previous day. Someone closing Monday's session at one in
-    // the morning is at home, and enforcing the office radius would leave the
-    // session permanently unclosable, which is the one outcome worse than an
-    // imprecise location.
-    if (!isPreviousDay && !effective.onsite && !options?.fieldVisit && branch && branch.latitude != null && branch.longitude != null && branch.geofenceRadius) {
-      if (data.lat == null || data.lng == null) {
-        throw new BadRequestException('Location is required to clock out at this branch.');
-      }
-      const distanceKm = haversineKm(branch.latitude, branch.longitude, data.lat, data.lng);
-      const radiusKm = branch.geofenceRadius / 1000;
-      if (distanceKm > radiusKm) {
-        throw new BadRequestException(
-          `You're ${distanceKm.toFixed(2)}km from ${branch.name}, outside the ${radiusKm.toFixed(2)}km clock-out radius.`,
-        );
-      }
-    }
+    // Office geofence (B3), on the same on-site exemption as clock-in — and
+    // skipped entirely for a previous day. Someone closing Monday's session at
+    // one in the morning is at home; that case has its own reason flow above.
+    const officeOut = await this.officeCheck(
+      employee, effective, isPreviousDay || !!effective.onsite || !!options?.fieldVisit, data,
+    );
+    const outsideOut = this.outsideFields('out', officeOut, data);
 
     let isEarlyLeave = false;
     let status = 'PRESENT';
@@ -496,7 +568,8 @@ export class AttendanceService {
     // paying overtime on it would reward forgetting; leaving the day at PRESENT
     // with a reason attached is the honest record, and regularization is how
     // the real hours get corrected.
-    if (!isPreviousDay && effective.endTime) {
+    const onHoliday = await this.isHoliday(employee.companyId, existing.date) || effective.isDayOff;
+    if (!isPreviousDay && effective.endTime && !onHoliday) {
       // Same IST-fixed resolution as clockIn — see the comment there.
       const expectedEnd = istTimeInstant(now, effective.endTime);
 
@@ -536,6 +609,7 @@ export class AttendanceService {
         status,
         overtimeHours,
         autoClockedOut: false,
+        ...outsideOut,
         // The reason is the permanent record that this day's clock-out time is
         // a closure rather than an observation. `missedClockOut` is the live
         // "still open and overdue" state and is spent the moment it closes.
@@ -690,6 +764,90 @@ export class AttendanceService {
       message: rejecting
         ? `Your clock-out for ${record.date.toISOString().slice(0, 10)} was rejected: ${note}`
         : `Your clock-out for ${record.date.toISOString().slice(0, 10)} was approved.`,
+      type: 'ATTENDANCE',
+      linkUrl: '/attendance/my',
+      excludeEmployeeId: approverEmployeeId ?? null,
+    });
+
+    return this.withTotalHours(updated);
+  }
+
+  // ── Office geofence approvals (B3) ───────────────────────────────────────
+  //
+  // Super Admins and Admins rule on clock-ins and clock-outs made outside the
+  // office radius. A rejection only flags the day — status, hours and pay are
+  // left exactly as recorded; what to do about it is HR's call.
+
+  mayApproveGeofence(role?: string | null): boolean {
+    return isCompanyAdmin(role);
+  }
+
+  async getPendingGeofence(companyId: number, role?: string | null) {
+    if (!this.mayApproveGeofence(role)) {
+      throw new ForbiddenException('Only an administrator reviews out-of-office clock-ins and clock-outs.');
+    }
+    return this.prisma.attendance.findMany({
+      where: { geofenceApproval: 'PENDING', employee: { companyId } },
+      include: {
+        employee: {
+          select: {
+            id: true, firstName: true, lastName: true, avatarUrl: true,
+            employeeCode: true, designation: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+        shift: { select: { id: true, name: true, startTime: true, endTime: true } },
+      },
+      orderBy: { date: 'asc' },
+    });
+  }
+
+  async reviewGeofence(
+    companyId: number,
+    attendanceId: number,
+    data: { action: 'APPROVE' | 'REJECT'; note?: string },
+    role?: string | null,
+    approverEmployeeId?: number | null,
+  ) {
+    if (!this.mayApproveGeofence(role)) {
+      throw new ForbiddenException('Only an administrator reviews out-of-office clock-ins and clock-outs.');
+    }
+    const record = await this.prisma.attendance.findFirst({
+      where: { id: attendanceId, employee: { companyId } },
+    });
+    if (!record) throw new BadRequestException('Attendance record not found');
+    if (record.geofenceApproval !== 'PENDING') {
+      throw new BadRequestException(
+        `This has already been ${String(record.geofenceApproval ?? 'settled').toLowerCase()}.`,
+      );
+    }
+    // Two administrators exist to check each other; nobody clears their own.
+    if (approverEmployeeId != null && record.employeeId === approverEmployeeId) {
+      throw new ForbiddenException('Another administrator has to review your own out-of-office clock.');
+    }
+
+    const rejecting = data.action === 'REJECT';
+    const note = data.note?.trim() || '';
+    if (rejecting && !note) throw new BadRequestException('A rejection has to say why.');
+
+    const updated = await this.prisma.attendance.update({
+      where: { id: record.id },
+      data: {
+        geofenceApproval: rejecting ? 'REJECTED' : 'APPROVED',
+        geofenceReviewedById: approverEmployeeId ?? null,
+        geofenceReviewedAt: new Date(),
+        geofenceReviewNote: note || null,
+      },
+      include: { logs: true },
+    });
+
+    const day = record.date.toISOString().slice(0, 10);
+    await this.notificationsService.notifyEmployees([record.employeeId], {
+      companyId,
+      title: rejecting ? 'Out-of-office clock rejected' : 'Out-of-office clock approved',
+      message: rejecting
+        ? `Your clock-in/out away from the office on ${day} was rejected: ${note}`
+        : `Your clock-in/out away from the office on ${day} was approved.`,
       type: 'ATTENDANCE',
       linkUrl: '/attendance/my',
       excludeEmployeeId: approverEmployeeId ?? null,

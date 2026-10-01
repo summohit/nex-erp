@@ -96,6 +96,11 @@ export class EmployeeService {
 
   // --- Profile Extensions ---
 
+  /** The signed-in employee's own profile (includes branch weekly offs). */
+  getMyProfile() {
+    return this.http.get<any>(`${this.apiUrl}/me/profile`);
+  }
+
   getProfile(id: number | string): Observable<any> {
     const token = getAccessToken();
     return this.http.get<any>(`${this.apiUrl}/${id}/profile`, {

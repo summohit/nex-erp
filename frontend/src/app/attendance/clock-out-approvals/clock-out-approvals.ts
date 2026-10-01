@@ -56,7 +56,62 @@ export class ClockOutApprovalsComponent implements OnInit {
   recentCount = computed(() => this.rows().filter(r => !this.isStale(r)).length);
   proofCount = computed(() => this.rows().filter(r => !!r.clockOutProofUrl).length);
 
+  // ── B3: clock-ins / clock-outs outside the office radius ─────────────────
+  geoCanApprove = signal(false);
+  geoRows = signal<any[]>([]);
+  geoBusyId = signal<number | null>(null);
+
+  loadGeofence(): void {
+    this.attendanceService.getPendingGeofence().subscribe({
+      next: (rows) => this.geoRows.set(rows || []),
+      error: () => this.geoRows.set([]),
+    });
+  }
+
+  /** "In 2.31 km away · Out 0.40 km away", for the card. */
+  geoSummary(row: any): string {
+    const part = (label: string, outside: boolean, km: number | null) =>
+      outside ? `${label} ${km == null ? 'no GPS' : km.toFixed(2) + ' km away'}` : '';
+    return [part('In', row.clockInOutside, row.clockInDistanceKm), part('Out', row.clockOutOutside, row.clockOutDistanceKm)]
+      .filter(Boolean).join(' · ');
+  }
+
+  async decideGeofence(row: any, action: 'APPROVE' | 'REJECT'): Promise<void> {
+    if (this.geoBusyId() !== null) return;
+    let note: string | undefined;
+    if (action === 'REJECT') {
+      const typed = await this.dialog.prompt(
+        `Rejecting ${this.employeeName(row)}'s out-of-office clock on ${this.formatDate(row.date)}. `
+          + 'The day stays as recorded and is flagged; tell them why — they will see this.',
+        'Reason for rejection',
+        { placeholder: 'e.g. No client visit was scheduled that day', confirmLabel: 'Reject', required: true },
+      );
+      if (!typed?.trim()) return;
+      note = typed.trim();
+    }
+    this.geoBusyId.set(row.id);
+    this.attendanceService.reviewGeofence(row.id, action, note).subscribe({
+      next: () => {
+        this.geoRows.update((rs) => rs.filter((r) => r.id !== row.id));
+        this.geoBusyId.set(null);
+        this.toast.success(action === 'APPROVE' ? 'Approved' : 'Rejected — the day is flagged');
+      },
+      error: (err) => {
+        this.geoBusyId.set(null);
+        this.toast.error(err?.error?.message || 'Could not record that decision');
+        this.loadGeofence();
+      },
+    });
+  }
+
   ngOnInit(): void {
+    this.attendanceService.canApproveGeofence().subscribe({
+      next: (res) => {
+        this.geoCanApprove.set(!!res?.canApprove);
+        if (res?.canApprove) this.loadGeofence();
+      },
+      error: () => this.geoCanApprove.set(false),
+    });
     this.attendanceService.canApproveClockOuts().subscribe({
       next: (res) => {
         this.canApprove.set(!!res?.canApprove);
