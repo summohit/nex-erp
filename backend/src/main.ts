@@ -31,7 +31,13 @@ async function bootstrap() {
   // whole company as if it were one client.
   app.set('trust proxy', 1);
 
-  app.enableCors({ origin: 'http://localhost:4200' });
+  // mira.ces-pl.com is the address; nex.ces-pl.com redirects to it but its
+  // /api stays live for installed mobile apps, and a tab still open on nex
+  // during the switch calls mira's API cross-origin.
+  app.enableCors({
+    origin: ['http://localhost:4200', 'https://mira.ces-pl.com', 'https://nex.ces-pl.com'],
+    credentials: true,
+  });
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 

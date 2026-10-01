@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore';
 
 // In a real app, this should come from a .env file
 // Using the deployed backend URL or local IP depending on environment
-export const API_URL = 'https://nex.ces-pl.com/api';
+export const API_URL = 'https://mira.ces-pl.com/api';
 
 /**
  * How long an ordinary request may wait before it is treated as lost.

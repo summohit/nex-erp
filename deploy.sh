@@ -134,7 +134,7 @@ echo "╔═══════════════════════�
 echo "║     🚀  NEX ERP Deployment Script       ║"
 echo "╠══════════════════════════════════════════╣"
 echo "║  Server: $SERVER_IP              ║"
-echo "║  Domain: nex.ces-pl.com                  ║"
+echo "║  Domain: mira.ces-pl.com                 ║"
 echo "╚══════════════════════════════════════════╝"
 
 # Check for sshpass
@@ -173,6 +173,6 @@ esac
 echo ""
 echo "══════════════════════════════════════"
 echo "  ✅  Deployment Complete!"
-echo "  🌐  https://nex.ces-pl.com"
+echo "  🌐  https://mira.ces-pl.com"
 echo "══════════════════════════════════════"
 echo ""

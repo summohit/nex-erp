@@ -47,7 +47,7 @@ export class NotificationsService {
   private toast = inject(HotToastService);
 
   private socket: Socket | null = null;
-  private baseUrl = 'https://nex.ces-pl.com'; // Fallback to production URL or window origin
+  private baseUrl = 'https://mira.ces-pl.com'; // Fallback to production URL or window origin
 
   notifications = signal<NotificationItem[]>([]);
   unreadCount = signal<number>(0);
