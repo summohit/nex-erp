@@ -2,15 +2,10 @@ import { AttendanceService } from './attendance.service';
 import { ShiftRosterService } from './shift-roster.service';
 
 /**
- * The office clock-in is the bypass, and this is the test that holds it shut.
- *
- * Approving a field visit writes a roster entry marking the day on-site, and
- * an on-site day is exempt from the branch IP check and the branch geofence —
- * by design, since a client site is nowhere near the office. Left alone, that
- * exemption means anyone on a field visit could clock the day from their sofa
- * through the ordinary attendance screen, and the 500m rule would be
- * decorative. So the ordinary clock refuses a field visit day outright and
- * sends them to the screen that measures them.
+ * A field visit day may be clocked from the ordinary attendance screen
+ * (TKT-029). Late and half-day are measured against the visit's own hours,
+ * which the approval wrote onto the roster, and the visit's day record is
+ * kept in step with where the person actually was.
  */
 describe('the ordinary clock on a field visit day', () => {
   const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -24,7 +19,7 @@ describe('the ordinary clock on a field visit day', () => {
   const SOFA = { lat: 28.4595, lng: 77.0266, ipAddress: '49.36.1.1' };
 
   const FIELD_VISIT_DAY = {
-    request: { requestNumber: 'FVR-0009', location: 'Client Site – Delhi' },
+    id: 7, request: { latitude: 28.6, longitude: 77.2 },
   };
 
   let prisma: any;
@@ -49,7 +44,10 @@ describe('the ordinary clock on a field visit day', () => {
       },
       attendanceLog: { create: jest.fn(async () => ({})), update: jest.fn(async () => ({})) },
       holiday: { findFirst: jest.fn(async () => null) },
-      fieldVisitAttendance: { findFirst: jest.fn().mockResolvedValue(FIELD_VISIT_DAY) },
+      fieldVisitAttendance: {
+        findFirst: jest.fn().mockResolvedValue(FIELD_VISIT_DAY),
+        update: jest.fn(async () => ({})),
+      },
     };
     // The roster says on-site, exactly as approval left it.
     roster = {
@@ -65,22 +63,33 @@ describe('the ordinary clock on a field visit day', () => {
 
   afterEach(() => jest.useRealTimers());
 
-  it('refuses an office clock-in from 40km away, and says where to go instead', async () => {
-    await expect(service.clockIn(99, SOFA)).rejects.toThrow(
-      /You are on field visit FVR-0009 at Client Site – Delhi today\. Clock in from the Field Visit screen/,
-    );
-    expect(prisma.attendance.create).not.toHaveBeenCalled();
+  it('lets the ordinary clock-in through, late against the visit hours, and opens the visit day', async () => {
+    // 10:00 against a 09:00 visit start with a 10 minute buffer.
+    await service.clockIn(99, SOFA);
+
+    const written = prisma.attendance.create.mock.calls[0][0].data;
+    expect(written.isLate).toBe(true);
+    expect(written.isOnsite).toBe(true);
+    expect(written.projectId).toBe(3);
+
+    const visit = prisma.fieldVisitAttendance.update.mock.calls[0][0];
+    expect(visit.where).toEqual({ id: 7 });
+    expect(visit.data.status).toBe('IN_PROGRESS');
+    expect(visit.data.clockInDistanceKm).toBeGreaterThan(10);
   });
 
-  it('refuses the office clock-out the same way', async () => {
-    await expect(service.clockOut(99, SOFA)).rejects.toThrow(/Clock out from the Field Visit screen/);
+  it('is not late when clocking in within the visit start', async () => {
+    jest.setSystemTime(ist(9, 5));
+    await service.clockIn(99, SOFA);
+    expect(prisma.attendance.create.mock.calls[0][0].data.isLate).toBe(false);
   });
 
-  it('only asks about the day being clocked', async () => {
-    await expect(service.clockIn(99, SOFA)).rejects.toThrow();
+  it('only looks at the day being clocked that has not been opened yet', async () => {
+    await service.clockIn(99, SOFA);
     expect(prisma.fieldVisitAttendance.findFirst.mock.calls[0][0].where).toMatchObject({
       employeeId: 10,
       visitDate: new Date(Date.UTC(2026, 8, 24)),
+      clockInTime: null,
       request: { status: 'APPROVED' },
     });
   });

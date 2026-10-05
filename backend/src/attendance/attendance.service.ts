@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { istDateKey, istTimeInstant } from '../common/timezone.util';
 import { LateClockOutError, OpenSessionError, OutsideOfficeError } from './open-session.error';
 import { haversineKm } from '../common/geo.util';
-import { FIELD_VISIT_STATUS } from '../field-visits/field-visit-status';
+import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY } from '../field-visits/field-visit-status';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShiftRosterService, EffectiveShift } from './shift-roster.service';
 import { ShiftPeriod, resolvePeriod, datesInRange } from './shift-period-summary';
@@ -16,7 +16,7 @@ import { isCompanyAdmin, isHrAdmin } from '../common/company-roles';
 /**
  * What the field visit clock tells attendance about the day it is clocking.
  * Its presence is also the assertion that the site geofence has already been
- * applied — see `assertNotOnFieldVisit`.
+ * applied.
  */
 export interface FieldVisitClockContext {
   requestId: number;
@@ -163,38 +163,9 @@ export class AttendanceService {
   }
 
   /**
-   * Refuse the office clock when the day belongs to an approved field visit.
-   *
-   * Not a formality. The roster entry that approval writes marks the day
-   * on-site, and an on-site day skips both the branch IP check and the branch
-   * geofence — so without this, walking in through the ordinary clock-in is a
-   * way to clock a field visit day from anywhere at all, which is exactly what
-   * the 500m rule exists to prevent. Sending them to the field visit screen
-   * also gets the day recorded against the task they were there to do.
-   */
-  private async assertNotOnFieldVisit(
-    employeeId: number, dateKey: Date, direction: 'in' | 'out',
-  ): Promise<void> {
-    const day = await this.prisma.fieldVisitAttendance.findFirst({
-      where: {
-        employeeId,
-        visitDate: dateKey,
-        request: { status: FIELD_VISIT_STATUS.APPROVED },
-      },
-      select: { request: { select: { requestNumber: true, location: true } } },
-    });
-    if (!day) return;
-
-    throw new BadRequestException(
-      `You are on field visit ${day.request.requestNumber} at ${day.request.location} today.`
-      + ` Clock ${direction} from the Field Visit screen so your site attendance is recorded.`,
-    );
-  }
-
-  /**
    * `options.fieldVisit` marks a clock-in that came through the field visit
    * screen, which has already measured the person against the approved site.
-   * Nothing else may set it — see `assertNotOnFieldVisit` below.
+   * Nothing else may set it.
    */
   /**
    * Whether the company has a holiday on this attendance day.
@@ -234,14 +205,19 @@ export class AttendanceService {
       employee.id, todayKey, employee.shift, employee.branch ? employee.branch.weeklyOffs ?? '' : null,
     );
 
-    // A day on an approved field visit is clocked from the field visit screen,
-    // which measures the person against the site's own 500m radius. Coming in
-    // here instead would skip that check entirely, because the roster entry the
-    // approval wrote marks the day on-site and on-site days are exempt from the
-    // branch geofence — so the office clock-in is the bypass, and this closes it.
-    if (!options?.fieldVisit) {
-      await this.assertNotOnFieldVisit(employee.id, todayKey, 'in');
-    }
+    // A field visit day may also be clocked from here (TKT-029). Late and
+    // half-day are still measured against the visit's own hours, because the
+    // roster entry the approval wrote carries them. The visit's day record is
+    // opened alongside, with how far from the site they were.
+    const unopenedVisitDay = options?.fieldVisit ? null : await this.prisma.fieldVisitAttendance.findFirst({
+      where: {
+        employeeId: employee.id,
+        visitDate: todayKey,
+        clockInTime: null,
+        request: { status: FIELD_VISIT_STATUS.APPROVED },
+      },
+      select: { id: true, request: { select: { latitude: true, longitude: true } } },
+    });
 
     // On-site either because the roster says so, or because this came through
     // the field visit screen — which is on-site by definition, and says so even
@@ -336,6 +312,22 @@ export class AttendanceService {
           ...outsideIn,
         },
         include: { logs: true }
+      });
+    }
+
+    if (unopenedVisitDay) {
+      const hasFix = Number.isFinite(data?.lat) && Number.isFinite(data?.lng);
+      await this.prisma.fieldVisitAttendance.update({
+        where: { id: unopenedVisitDay.id },
+        data: {
+          clockInTime: now,
+          clockInLat: data?.lat ?? null,
+          clockInLng: data?.lng ?? null,
+          clockInDistanceKm: hasFix
+            ? haversineKm(unopenedVisitDay.request.latitude, unopenedVisitDay.request.longitude, data.lat!, data.lng!)
+            : null,
+          status: FIELD_VISIT_DAY.IN_PROGRESS,
+        },
       });
     }
 
@@ -507,11 +499,20 @@ export class AttendanceService {
     const now = new Date();
     const todayKey = istDateKey(now);
 
-    // Same reasoning as clock-in: the way out of a field visit day is measured
-    // against the site, not the office.
-    if (!options?.fieldVisit) {
-      await this.assertNotOnFieldVisit(employee.id, todayKey, 'out');
-    }
+    // Clock-out is never refused for a field visit day (TKT-029). People
+    // leave the site and then remember to clock out, and refusing them left
+    // the day open with no way to close it. An open field visit day is closed
+    // alongside, with where they actually were recorded against the site.
+    const openVisitDay = options?.fieldVisit ? null : await this.prisma.fieldVisitAttendance.findFirst({
+      where: {
+        employeeId: employee.id,
+        visitDate: todayKey,
+        clockInTime: { not: null },
+        clockOutTime: null,
+        request: { status: FIELD_VISIT_STATUS.APPROVED },
+      },
+      select: { id: true, request: { select: { latitude: true, longitude: true } } },
+    });
 
     let existing = await this.prisma.attendance.findUnique({
       where: { employeeId_date: { employeeId: employee.id, date: todayKey } },
@@ -598,6 +599,22 @@ export class AttendanceService {
         autoClockedOut: false
       }
     });
+
+    if (openVisitDay) {
+      const hasFix = Number.isFinite(data?.lat) && Number.isFinite(data?.lng);
+      await this.prisma.fieldVisitAttendance.update({
+        where: { id: openVisitDay.id },
+        data: {
+          clockOutTime: now,
+          clockOutLat: data?.lat ?? null,
+          clockOutLng: data?.lng ?? null,
+          clockOutDistanceKm: hasFix
+            ? haversineKm(openVisitDay.request.latitude, openVisitDay.request.longitude, data.lat!, data.lng!)
+            : null,
+          status: FIELD_VISIT_DAY.COMPLETED,
+        },
+      });
+    }
 
     return this.prisma.attendance.update({
       where: { id: existing.id },
@@ -1045,6 +1062,12 @@ export class AttendanceService {
             user: { select: { email: true, role: true } },
           },
         },
+        project: {
+          select: { id: true, name: true, key: true },
+        },
+        shift: {
+          select: { id: true, name: true, startTime: true, endTime: true },
+        },
         logs: {
           orderBy: { clockIn: 'asc' },
         },
@@ -1052,7 +1075,64 @@ export class AttendanceService {
       orderBy: [{ date: 'desc' }, { employeeId: 'asc' }],
     });
 
-    return records;
+    const fieldVisits = await this.prisma.fieldVisitAttendance.findMany({
+      where: {
+        companyId,
+        visitDate: { gte: startDate, lte: endDate },
+        request: { status: { in: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] } },
+      },
+      include: {
+        request: {
+          select: {
+            id: true,
+            requestNumber: true,
+            location: true,
+            startTime: true,
+            endTime: true,
+            project: { select: { id: true, name: true, key: true } },
+          },
+        },
+      },
+    });
+
+    const fvByEmpDate = new Map<string, typeof fieldVisits[0]>();
+    for (const fv of fieldVisits) {
+      const dKey = fv.visitDate.toISOString().slice(0, 10);
+      fvByEmpDate.set(`${fv.employeeId}_${dKey}`, fv);
+    }
+
+    const enhancedRecords = records.map((r) => {
+      const dKey = r.date.toISOString().slice(0, 10);
+      const fv = fvByEmpDate.get(`${r.employeeId}_${dKey}`);
+      if (fv) {
+        return {
+          ...r,
+          fieldVisit: {
+            requestId: fv.request.id,
+            requestNumber: fv.request.requestNumber,
+            location: fv.request.location,
+            startTime: fv.request.startTime,
+            endTime: fv.request.endTime,
+            projectName: fv.request.project?.name,
+            projectKey: fv.request.project?.key,
+            status: fv.status,
+          },
+        };
+      }
+      if (r.isOnsite) {
+        return {
+          ...r,
+          fieldVisit: {
+            location: 'On-site',
+            projectName: r.project?.name,
+            projectKey: r.project?.key,
+          },
+        };
+      }
+      return r;
+    });
+
+    return enhancedRecords;
   }
   /**
    * Attendance grouped by shift, for a week or a month (§Att7).
