@@ -2933,6 +2933,22 @@ export class ProjectsComponent implements OnInit {
    * Where a row goes depends on what it actually is, and the server already
    * decided — see MyTaskDto.link. Routing rules per source in one place.
    */
+  /**
+   * The project or deal a task belongs to, under its title — a link to it.
+   * General tasks have no page of their own, so theirs is plain text.
+   */
+  private parentLinkHtml(task: any): string {
+    const parent = task?.parent;
+    if (!parent?.name) return '';
+    const url = parent.kind === 'PROJECT' ? `/projects/${parent.id}`
+      : parent.kind === 'LEAD' ? `/crm/leads/${parent.id}`
+      : null;
+    const name = this.esc(parent.name);
+    return url
+      ? `<a class="cell-parent-link" data-act="open-parent" data-url="${url}" title="Open ${name}">${name}</a>`
+      : `<span class="cell-parent-link plain">${name}</span>`;
+  }
+
   onMyTaskRowClicked(event: any) {
     const task: MyTask = event?.data;
     if (!task) return;
@@ -2942,6 +2958,14 @@ export class ProjectsComponent implements OnInit {
     // click on the row itself falls through to navigation.
     const hit = (event.event?.target as HTMLElement | undefined)?.closest?.('[data-act]') as HTMLElement | null;
     const act = hit?.getAttribute('data-act');
+
+    // The project (or deal) name under the title goes there, not to the task.
+    if (act === 'open-parent') {
+      const url = hit!.getAttribute('data-url');
+      if (url) this.router.navigateByUrl(url);
+      return;
+    }
+
     if (act) {
       if (act === 'board-status') { this.openMyTasksStatusMenu(task, hit); return; }
       if (act === 'status') this.openPreSalesStatus(task, hit!.getAttribute('data-status') || 'WORKING');
@@ -3463,6 +3487,7 @@ export class ProjectsComponent implements OnInit {
         return `
           <div class="cell-ticket-title-wrapper">
             <div class="cell-title-text" title="${this.esc(p.value || '')}">${this.esc(p.value || '')}</div>
+            ${this.parentLinkHtml(p.data)}
             <div class="cell-meta-row">
               <span class="type-pill ${typeBadgeClass}">${typeLabel}</span>
               ${approval}
@@ -3527,14 +3552,6 @@ export class ProjectsComponent implements OnInit {
         else if (val === 'GENERAL') { cls = 'platform-both'; label = 'GENERAL'; }
         return `<span class="platform-tag ${cls}">${label}</span>`;
       },
-    },
-    {
-      colId: 'belongsTo',
-      headerName: 'BELONGS TO',
-      width: 170,
-      minWidth: 150,
-      valueGetter: (p: any) => p.data?.parent?.name ?? '—',
-      cellRenderer: (p: any) => `<span class="dept-cell" title="${this.esc(p.value)}">${this.esc(p.value || '—')}</span>`,
     },
     {
       field: 'priority',
