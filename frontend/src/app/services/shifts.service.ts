@@ -132,6 +132,8 @@ export interface RosterCell {
   isDefault?: boolean;
   entryId?: number;
   note?: string | null;
+  /** True when the cell is an approved field visit on site. */
+  isFieldVisit?: boolean;
   /** Present when the roster entry carries on-site location/approval info. */
   onSite?: RosterOnSiteInfo;
 }

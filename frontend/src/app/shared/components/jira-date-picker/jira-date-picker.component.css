@@ -1,0 +1,508 @@
+:host {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.jira-datepicker-container {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  user-select: none;
+  width: 100%;
+}
+
+.jira-datepicker-container.is-inline {
+  display: block;
+  width: 100%;
+}
+
+/* ── Trigger Input Button ── */
+.jira-datepicker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+  height: 36px;
+  padding: 0 10px;
+  background-color: #ffffff;
+  border: 1.5px solid #dcdfe4;
+  border-radius: 6px;
+  color: #172b4d;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.size-sm .jira-datepicker-trigger {
+  height: 30px;
+  min-width: 120px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.jira-datepicker-trigger:hover:not(.disabled) {
+  background-color: #f7f8f9;
+  border-color: #8590a2;
+}
+
+.jira-datepicker-trigger.active {
+  background-color: #ffffff;
+  border-color: #0c66e4;
+  box-shadow: 0 0 0 2px rgba(12, 102, 228, 0.2);
+}
+
+.jira-datepicker-trigger.disabled {
+  background-color: #f1f2f4;
+  border-color: #e2e4e8;
+  color: #8c9bab;
+  cursor: not-allowed;
+}
+
+/* Overdue and Due Today trigger variations */
+.jira-datepicker-trigger.is-overdue {
+  border-color: #fca5a5;
+  background-color: #fef2f2;
+}
+
+.jira-datepicker-trigger.is-overdue:hover:not(.disabled) {
+  border-color: #ef4444;
+  background-color: #fee2e2;
+}
+
+.jira-datepicker-trigger.is-due-today {
+  border-color: #fde68a;
+  background-color: #fffbeb;
+}
+
+.trigger-icon-calendar {
+  color: #626f86;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.trigger-icon-calendar.icon-overdue {
+  color: #ef4444;
+}
+
+.jira-datepicker-trigger.active .trigger-icon-calendar:not(.icon-overdue) {
+  color: #0c66e4;
+}
+
+.trigger-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.trigger-label.is-placeholder {
+  color: #626f86;
+  font-weight: 400;
+}
+
+.trigger-label.text-overdue {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+/* Status badge in trigger */
+.jira-status-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.jira-status-pill.overdue {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+.jira-status-pill.today {
+  background-color: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.trigger-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn-trigger-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: #626f86;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.btn-trigger-clear:hover {
+  background-color: #dcdfe4;
+  color: #172b4d;
+}
+
+.trigger-chevron {
+  display: flex;
+  align-items: center;
+  color: #626f86;
+  transition: transform 0.15s ease;
+}
+
+.trigger-chevron.chevron-open {
+  transform: rotate(180deg);
+}
+
+/* ── Dropdown / Popover Panel ── */
+.jira-datepicker-dropdown {
+  position: absolute;
+  z-index: 10005;
+  width: 276px;
+  background-color: #ffffff;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px -2px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
+  padding: 10px;
+  box-sizing: border-box;
+  animation: jiraDropdownFadeIn 0.15s cubic-bezier(0, 0, 0.2, 1);
+}
+
+@keyframes jiraDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.jira-datepicker-dropdown.is-inline-panel {
+  position: static;
+  width: 100%;
+  max-width: 300px;
+  box-shadow: none;
+  border: 1px solid #dcdfe4;
+  animation: none;
+  margin: 0 auto;
+}
+
+/* ── Calendar Header ── */
+.jira-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+
+.btn-cal-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #44546f;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.btn-cal-chevron:hover {
+  background-color: #ebecf0;
+  color: #172b4d;
+}
+
+.btn-month-year-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #172b4d;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.btn-month-year-select:hover {
+  background-color: #ebecf0;
+}
+
+.title-chevron {
+  color: #626f86;
+  transition: transform 0.15s ease;
+}
+
+.title-chevron.rotate-180 {
+  transform: rotate(180deg);
+}
+
+/* ── Weekday Headers ── */
+.jira-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.weekday-col {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #626f86;
+  letter-spacing: 0.4px;
+  padding: 4px 0;
+}
+
+/* ── 42 Days Grid ── */
+.jira-cal-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.cal-day-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #172b4d;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.cal-day-cell span {
+  pointer-events: none;
+}
+
+.cal-day-cell:hover:not(.is-disabled):not(.is-selected) {
+  background-color: #ebecf0;
+}
+
+.cal-day-cell.other-month {
+  color: #8c9bab;
+}
+
+.cal-day-cell.other-month:hover:not(.is-disabled):not(.is-selected) {
+  background-color: #f1f2f4;
+  color: #44546f;
+}
+
+/* Range highlighting between start and due date */
+.cal-day-cell.in-range:not(.is-selected) {
+  background-color: #eff6ff !important;
+  color: #1d4ed8;
+  border-radius: 0;
+  font-weight: 600;
+}
+
+/* Today styling */
+.cal-day-cell.is-today span {
+  font-weight: 700;
+  position: relative;
+}
+
+.cal-day-cell.is-today:not(.is-selected) {
+  color: #0c66e4;
+  font-weight: 700;
+}
+
+.cal-day-cell.is-today:not(.is-selected)::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: #0c66e4;
+}
+
+/* Selected Date */
+.cal-day-cell.is-selected {
+  background-color: #0c66e4 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  border-radius: 6px !important;
+}
+
+.cal-day-cell.is-selected:hover {
+  background-color: #0055cc !important;
+}
+
+/* Disabled Date (fails minDate or maxDate) */
+.cal-day-cell.is-disabled {
+  color: #cbd5e1 !important;
+  cursor: not-allowed !important;
+  background: transparent !important;
+  opacity: 0.45;
+  text-decoration: line-through;
+  pointer-events: none;
+}
+
+/* ── Month & Year Picker Grid ── */
+.jira-year-month-panel {
+  padding: 6px 0;
+  animation: jiraDropdownFadeIn 0.12s ease;
+}
+
+.year-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+.year-display {
+  font-size: 15px;
+  font-weight: 700;
+  color: #172b4d;
+}
+
+.months-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.btn-month-pill {
+  padding: 8px 4px;
+  background-color: #f7f8f9;
+  border: 1px solid #dcdfe4;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #172b4d;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.btn-month-pill:hover {
+  background-color: #ebecf0;
+}
+
+.btn-month-pill.selected {
+  background-color: #0c66e4;
+  border-color: #0c66e4;
+  color: #ffffff;
+}
+
+/* ── Time Row ── */
+.jira-cal-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px;
+  margin-bottom: 6px;
+  border-top: 1px solid #f1f2f4;
+}
+
+.time-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #626f86;
+}
+
+.jira-cal-time-select {
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #172b4d;
+  border: 1px solid #dcdfe4;
+  border-radius: 4px;
+  background-color: #ffffff;
+  outline: none;
+  cursor: pointer;
+}
+
+.jira-cal-time-select:focus {
+  border-color: #0c66e4;
+}
+
+/* ── Footer Bar ── */
+.jira-cal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid #efeff2;
+}
+
+.btn-cal-today {
+  background: transparent;
+  border: none;
+  color: #0c66e4;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.btn-cal-today:hover:not(:disabled) {
+  background-color: #e9f2ff;
+}
+
+.btn-cal-today:disabled {
+  color: #94a3b8;
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-cal-clear {
+  background: transparent;
+  border: none;
+  color: #626f86;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.btn-cal-clear:hover {
+  background-color: #ebecf0;
+  color: #de350b;
+}

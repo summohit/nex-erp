@@ -131,10 +131,11 @@ export class FieldVisitClockService {
         isArchived: false,
         OR: [
           { fieldVisitRequestId: requestId, assigneeId: employeeId },
-          // Either end of the relationship counts. The trip's own insert adds a
-          // membership, but somebody already the assignee of this task was
-          // never going to gain one, and they are plainly somebody who can be
-          // doing it.
+          // Only the visit's tasks that are this person's own — assignee or
+          // member, as the board has it. Approval no longer adds everyone
+          // going to every task, so a colleague's task on the same trip is
+          // not offered; the PM adds someone to it on the board if they are
+          // genuinely working it.
           ...(adopted.length
             ? [{
                 id: { in: adopted },

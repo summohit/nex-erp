@@ -316,13 +316,29 @@
 
       <!-- Card Body Content with Read More Toggle -->
       <div class="nb-body-wrap">
-        <p class="nb-card-body" [class.collapsed]="isLongBody(n.body) && !isExpanded(n.id)">
-          {{ n.body }}
-        </p>
+        <div class="nb-card-body nb-rich" [class.collapsed]="isLongBody(n.body) && !isExpanded(n.id)"
+             [innerHTML]="bodyHtml(n.body)"></div>
         <button type="button" class="nb-btn-expand" *ngIf="isLongBody(n.body)" (click)="toggleExpand(n.id)">
           <span>{{ isExpanded(n.id) ? 'Show less' : 'Read full notice' }}</span>
           <svg *ngIf="!isExpanded(n.id)" lucideChevronDown size="14"></svg>
           <svg *ngIf="isExpanded(n.id)" lucideChevronUp size="14"></svg>
+        </button>
+      </div>
+
+      <!-- Audience & who has seen it — for whoever posts -->
+      <div class="nb-audience-row" *ngIf="canPost()">
+        <span class="nb-audience-chip" [title]="audienceSummary(n.audience)">
+          <svg lucideUsers size="13"></svg>
+          <span>{{ audienceSummary(n.audience) }}</span>
+        </span>
+        <button type="button" class="nb-views-btn" (click)="openViews(n)">
+          <svg lucideEye size="13"></svg>
+          @if (n._count?.recipients) {
+            <span>Viewed by {{ n._count?.reads }} of {{ n._count?.recipients }}</span>
+            <span class="nb-views-bar"><span [style.width.%]="viewedPercent(n)"></span></span>
+          } @else {
+            <span>Who has seen it</span>
+          }
         </button>
       </div>
 
@@ -438,14 +454,149 @@
           </div>
         </div>
 
+        <!-- Audience -->
+        <div class="nb-form-group">
+          <label class="nb-form-label">
+            <svg lucideUsers size="13"></svg>
+            <span>Send To</span>
+          </label>
+
+          @if (editingId()) {
+            <div class="nb-audience-fixed">
+              <span>{{ audienceSummary(editingAudience()) }}</span>
+              <span class="nb-form-hint">Recipients are fixed once a notice is posted.</span>
+            </div>
+          } @else {
+            <div class="nb-audience-toggle" role="radiogroup">
+              <button type="button" role="radio" [class.active]="audienceMode() === 'ALL'"
+                      [attr.aria-checked]="audienceMode() === 'ALL'" (click)="audienceMode.set('ALL')">Everybody</button>
+              <button type="button" role="radio" [class.active]="audienceMode() === 'SELECTED'"
+                      [attr.aria-checked]="audienceMode() === 'SELECTED'" (click)="audienceMode.set('SELECTED')">Selected departments, roles or people</button>
+            </div>
+
+            @if (audienceMode() === 'SELECTED') {
+              @if (!audienceOptions()) {
+                <div class="nb-audience-loading"><svg lucideLoader2 size="14" class="nb-spinning"></svg> Loading…</div>
+              } @else {
+                <div class="nb-audience-picker">
+                  <div class="nb-audience-block">
+                    <span class="nb-audience-head">Departments</span>
+                    <div class="nb-chip-wrap">
+                      @for (d of audienceOptions()!.departments; track d.id) {
+                        <button type="button" class="nb-pick-chip" [class.on]="pickedDepartments().has(d.id)"
+                                (click)="toggleDepartment(d.id)">{{ d.name }}</button>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="nb-audience-block">
+                    <span class="nb-audience-head">Roles</span>
+                    <div class="nb-chip-wrap">
+                      @for (r of audienceOptions()!.roles; track r) {
+                        <button type="button" class="nb-pick-chip" [class.on]="pickedRoles().has(r)"
+                                (click)="toggleRole(r)">{{ roleLabel(r) }}</button>
+                      }
+                    </div>
+                  </div>
+
+                  @if (designationGroups().length) {
+                    <div class="nb-audience-block">
+                      <span class="nb-audience-head">Designations</span>
+                      <div class="nb-chip-wrap nb-chip-scroll">
+                        @for (g of designationGroups(); track g.name) {
+                          <button type="button" class="nb-pick-chip" [class.on]="isDesignationGroupOn(g.ids)"
+                                  (click)="toggleDesignationGroup(g.ids)">{{ g.name }}</button>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  @if (groupMatches().length || pickedDepartments().size || pickedRoles().size || pickedDesignations().size) {
+                    <div class="nb-audience-block">
+                      <div class="nb-match-head">
+                        <span class="nb-audience-head">Matching people · {{ tickedMatchCount() }} of {{ groupMatches().length }} ticked</span>
+                        @if (groupMatches().length) {
+                          <span class="nb-match-actions">
+                            <button type="button" (click)="setAllMatches(true)">Tick all</button>
+                            <button type="button" (click)="setAllMatches(false)">Untick all</button>
+                          </span>
+                        }
+                      </div>
+                      @if (!groupMatches().length) {
+                        <p class="nb-form-hint">
+                          Nobody matches all of these at once — each kind you pick (department, role, designation) narrows the others.
+                          @if (emptyHint()) { <br />Try it {{ emptyHint() }}. }
+                        </p>
+                      } @else {
+                        @if (groupMatches().length > 8) {
+                          <input type="text" class="nb-form-input nb-match-search" placeholder="Filter these people…"
+                                 [ngModel]="matchQuery()" (ngModelChange)="matchQuery.set($event)" />
+                        }
+                        <div class="nb-match-list">
+                          @for (p of visibleMatches(); track p.userId) {
+                            <label class="nb-match-row" [class.off]="!isTicked(p.userId)">
+                              <input type="checkbox" [checked]="isTicked(p.userId)" (change)="toggleMatch(p.userId)" />
+                              <span class="nb-person-name">{{ p.name }}</span>
+                              <span class="nb-person-sub">{{ p.designation || roleLabel(p.role) }}@if (departmentName(p.departmentId)) { · {{ departmentName(p.departmentId) }} }</span>
+                            </label>
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+
+                  <div class="nb-audience-block">
+                    <span class="nb-audience-head">Add people by name</span>
+                    <div class="nb-person-search">
+                      <input type="text" class="nb-form-input" placeholder="Search by name or email…"
+                             [ngModel]="personQuery()" (ngModelChange)="personQuery.set($event)" />
+                      @if (personMatches().length) {
+                        <div class="nb-person-results">
+                          @for (p of personMatches(); track p.userId) {
+                            <button type="button" (click)="addPerson(p.userId)">
+                              <span class="nb-person-name">{{ p.name }}</span>
+                              <span class="nb-person-sub">{{ p.designation || roleLabel(p.role) }} · {{ p.email }}</span>
+                            </button>
+                          }
+                        </div>
+                      }
+                    </div>
+                    @if (pickedPeople().length) {
+                      <div class="nb-chip-wrap">
+                        @for (p of pickedPeople(); track p.userId) {
+                          <span class="nb-pick-chip on">
+                            {{ p.name }}
+                            <button type="button" class="nb-chip-x" (click)="removePerson(p.userId)" title="Remove">
+                              <svg lucideX size="11"></svg>
+                            </button>
+                          </span>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            }
+
+            <span class="nb-recipient-count" [class.none]="!recipientCount()">
+              <svg lucideUsers size="13"></svg>
+              Reaches {{ recipientCount() }} {{ recipientCount() === 1 ? 'person' : 'people' }}
+              @if (audienceMode() === 'SELECTED' && pickSummary()) { <span class="nb-form-hint">— {{ pickSummary() }}</span> }
+            </span>
+          }
+        </div>
+
         <!-- Notice Body -->
         <div class="nb-form-group">
           <label class="nb-form-label">Announcement Content <span class="req">*</span></label>
-          <textarea rows="6"
-                    class="nb-form-textarea"
-                    [(ngModel)]="form.body"
-                    placeholder="Write clearly what everybody needs to know. Line breaks and formatting are preserved."></textarea>
-          <span class="nb-form-hint">Tip: Keep it concise and include key instructions or dates.</span>
+          <quill-editor
+            class="nb-quill"
+            [(ngModel)]="form.body"
+            [modules]="quillModules"
+            [styles]="{ 'min-height': '180px' }"
+            placeholder="Write clearly what everybody needs to know.">
+          </quill-editor>
+          <span class="nb-form-hint">Headings, lists, links and tables are kept exactly as you format them.</span>
         </div>
 
         <!-- Date Scheduling -->
@@ -520,10 +671,10 @@
           <div class="nb-email-card-text">
             <span class="nb-email-title">
               <svg lucideMail size="14"></svg>
-              <span>Broadcast email to all company members</span>
+              <span>{{ editingId() ? 'Email recipients' : 'Email it to the ' + recipientCount() + ' recipients' }}</span>
             </span>
             <span class="nb-email-desc">
-              Sends an immediate notification email containing this announcement to all active accounts.
+              Sends this announcement by email to everybody it is addressed to.
             </span>
           </div>
         </label>
@@ -540,6 +691,62 @@
       </div>
     </div>
   </div>
+
+  <!-- Who has seen it -->
+  @if (viewsFor(); as vn) {
+    <div class="nb-modal-backdrop" (click)="closeViews()">
+      <div class="nb-views-dialog" (click)="$event.stopPropagation()">
+        <div class="nb-views-header">
+          <div>
+            <h3>Who has seen it</h3>
+            <p>{{ vn.title }}</p>
+          </div>
+          <button type="button" class="nb-btn-close" (click)="closeViews()" title="Close">
+            <svg lucideX size="18"></svg>
+          </button>
+        </div>
+
+        @if (viewsLoading()) {
+          <div class="nb-audience-loading"><svg lucideLoader2 size="16" class="nb-spinning"></svg> Loading…</div>
+        } @else if (views(); as v) {
+          <div class="nb-views-stats">
+            <div><strong>{{ v.total }}</strong><span>Recipients</span></div>
+            <div class="ok"><strong>{{ v.viewedCount }}</strong><span>Viewed</span></div>
+            <div class="wait"><strong>{{ v.pendingCount }}</strong><span>Not viewed</span></div>
+          </div>
+          <p class="nb-views-to">Sent to: {{ audienceSummary(v.audience) }}</p>
+
+          <div class="nb-views-tabs">
+            <button type="button" [class.active]="viewsTab() === 'PENDING'" (click)="viewsTab.set('PENDING')">
+              Not viewed ({{ v.pendingCount }})
+            </button>
+            <button type="button" [class.active]="viewsTab() === 'VIEWED'" (click)="viewsTab.set('VIEWED')">
+              Viewed ({{ v.viewedCount }})
+            </button>
+          </div>
+
+          <div class="nb-views-list">
+            @for (p of (viewsTab() === 'VIEWED' ? v.viewed : v.pending); track p.userId) {
+              <div class="nb-viewer">
+                <div class="nb-viewer-avatar" [style.background]="getAvatarBg(p.name, '')">
+                  @if (p.avatarUrl) { <img [src]="p.avatarUrl" alt="" /> } @else { {{ getInitials(p.name.split(' ')[0], p.name.split(' ')[1]) }} }
+                </div>
+                <div class="nb-viewer-meta">
+                  <span class="nb-viewer-name">{{ p.name }}</span>
+                  <span class="nb-viewer-sub">{{ p.department || '—' }} · {{ roleLabel(p.role) }}</span>
+                </div>
+                <span class="nb-viewer-when" [class.pending]="!p.viewed">
+                  {{ p.viewed ? (p.viewedAt | date: 'd MMM, h:mm a') : 'Not viewed' }}
+                </span>
+              </div>
+            } @empty {
+              <p class="nb-views-empty">{{ viewsTab() === 'VIEWED' ? 'Nobody has opened it yet.' : 'Everybody has seen it.' }}</p>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
 
   <!-- Custom In-App Retire Confirmation Modal -->
   <div class="nb-modal-backdrop" *ngIf="retiringNotice()" (click)="closeRetireModal()">

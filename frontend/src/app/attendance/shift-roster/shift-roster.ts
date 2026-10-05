@@ -318,6 +318,7 @@ export class ShiftRosterComponent implements OnInit {
 
   /** Month view has ~31 columns, so it falls back to the short code. */
   cellLabel(cell: RosterCell): string {
+    if (cell.isFieldVisit) return 'Field Visit';
     const s = cell.shift;
     if (!s) return '';
     return this.viewMode() === 'month' ? (s.shortCode || s.name) : s.name;
@@ -339,6 +340,12 @@ export class ShiftRosterComponent implements OnInit {
     if (cell.type === 'LEAVE') return `${who}: ${cell.label}${cell.isHalfDay ? ' (half day)' : ''}`;
     if (cell.type === 'DAY_OFF') return `${who}: day off${cell.isDefault ? ' (shift does not run this day)' : ''}`;
     if (cell.type === 'SHIFT') {
+      if (cell.isFieldVisit) {
+        let t = `${who}: 📍 Field Visit (${cell.note || 'On-site'}) · ${this.cellTime(cell)}`;
+        if (cell.onSite?.projectName) t += ` · Project: ${cell.onSite.projectName}`;
+        if (cell.onSite?.address) t += ` @ ${cell.onSite.address}`;
+        return t;
+      }
       let t = `${who}: ${cell.shift?.name} ${this.cellTime(cell)}${cell.isDefault ? ' (default shift)' : ''}`;
       if (cell.onSite) {
         if (cell.onSite.startTime && cell.onSite.endTime) {

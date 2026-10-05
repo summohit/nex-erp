@@ -447,6 +447,12 @@
     <!-- Action Toolbar Card -->
     <div class="card actions-card">
       <div class="actions-left">
+        @if (request()!.canEdit) {
+          <button class="ghost-btn change-btn" type="button" [disabled]="isWorking()" (click)="isEditing.set(true)">
+            <svg lucidePencil [size]="15"></svg>
+            Edit request
+          </button>
+        }
         @if (request()!.canSubmit) {
           <button class="primary-btn submit-btn" type="button" [disabled]="isWorking()" (click)="submit()">
             <svg lucideSend [size]="16"></svg>
@@ -476,7 +482,7 @@
             Request a change
           </button>
         }
-        @if (request()!.status === 'DRAFT' || request()!.status === 'PENDING_APPROVAL' || request()!.status === 'APPROVED') {
+        @if (isCompanyWide() && (request()!.status === 'DRAFT' || request()!.status === 'PENDING_APPROVAL' || request()!.status === 'APPROVED')) {
           <button class="ghost-btn danger-outline" type="button" [disabled]="isWorking()" (click)="cancel()">
             <svg lucideBan [size]="15"></svg>
             Cancel visit
@@ -564,6 +570,15 @@
     </div>
   }
 </div>
+
+@if (isEditing() && request()) {
+  <app-field-visit-request-form
+    [request]="request()"
+    mode="edit"
+    (saved)="onEdited()"
+    (closed)="isEditing.set(false)">
+  </app-field-visit-request-form>
+}
 
 @if (isChanging() && request()) {
   <app-field-visit-request-form

@@ -26,13 +26,19 @@
   <!-- Status Quick Actions Bar -->
   <!-- Reporter confirmation: the fix is done, close it off -->
   <div class="status-actions-bar reporter-bar" *ngIf="canCloseAsReporter()">
-    <div class="actions-label">
-      <svg lucideCheckCircle2 [size]="14"></svg>
-      <span>Resolved — is this fixed for you?</span>
+    <div class="reporter-verify-text">
+      <span class="reporter-verify-title">
+        <svg lucideCheckCircle2 [size]="15"></svg>
+        Resolved — please verify the fix
+      </span>
+      <span class="reporter-verify-sub">
+        If the issue is fixed on your side, close the ticket. If it is still happening, reply in the discussion below and the team will pick it up again.
+      </span>
     </div>
     <div class="action-buttons-group">
-      <button class="btn-status-action btn-status-closed" (click)="closeAsReporter()">
-        <span>Yes, close this ticket</span>
+      <button class="btn-status-action btn-verify-close" (click)="closeAsReporter()" [disabled]="closingAsReporter">
+        <svg lucideCheck [size]="14"></svg>
+        <span>{{ closingAsReporter ? 'Closing…' : 'Verify & Close Ticket' }}</span>
       </button>
     </div>
   </div>
@@ -316,11 +322,11 @@
 
             <!-- Comment Body -->
             <ng-container *ngIf="item.isComment">
-              <div *ngIf="editingCommentId !== item.id" class="comment-body-text">
-                {{ item.body }}
-              </div>
+              <div *ngIf="editingCommentId !== item.id" class="comment-body-text rich-text"
+                   [innerHTML]="commentHtml(item.body)"></div>
               <div *ngIf="editingCommentId === item.id" class="inline-edit-box">
-                <textarea class="edit-textarea" [(ngModel)]="editCommentBody" rows="2"></textarea>
+                <quill-editor class="comment-quill" [(ngModel)]="editCommentBody"
+                              [modules]="commentQuillModules" [styles]="{ 'min-height': '70px' }"></quill-editor>
                 <div class="edit-actions-row">
                   <button class="btn-primary-sm" (click)="saveEditComment(item)">Save</button>
                   <button class="btn-secondary-sm" (click)="editingCommentId=null">Cancel</button>
@@ -350,18 +356,19 @@
 
       <!-- Add Comment Composer -->
       <div class="comment-composer-box">
-        <textarea
-          class="composer-textarea"
+        <quill-editor
+          class="comment-quill"
           [(ngModel)]="commentBody"
-          placeholder="Leave a message or status update…"
-          rows="3">
-        </textarea>
+          [modules]="commentQuillModules"
+          [styles]="{ 'min-height': '90px' }"
+          placeholder="Leave a message or status update…">
+        </quill-editor>
         <div class="composer-footer">
           <label class="btn-attach" title="Attach an image">
             <svg lucideImagePlus [size]="14"></svg>
             <input type="file" (change)="onAttachmentPicked($event)" accept="image/*" hidden />
           </label>
-          <button class="btn-send-comment" (click)="submitComment()" [disabled]="submittingComment || !commentBody.trim()">
+          <button class="btn-send-comment" (click)="submitComment()" [disabled]="submittingComment || !hasText(commentBody)">
             <svg lucideSend [size]="14"></svg>
             <span>{{ submittingComment ? 'Posting…' : 'Send' }}</span>
           </button>

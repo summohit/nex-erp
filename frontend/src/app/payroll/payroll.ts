@@ -23,6 +23,7 @@ import {
   LucideX
 } from '@lucide/angular';
 import { MatMenuModule } from '@angular/material/menu';
+import { ExpenseReceiptCellRendererComponent } from '../shared/components/expense-receipt-cell-renderer.component';
 
 @Component({
   selector: 'app-payroll',
@@ -37,7 +38,8 @@ import { MatMenuModule } from '@angular/material/menu';
     MatMenuModule,
     SearchableSelectComponent,
     ExpenseStatusCellRendererComponent,
-    ExpenseActionCellRendererComponent
+    ExpenseActionCellRendererComponent,
+    ExpenseReceiptCellRendererComponent
   ],
   templateUrl: './payroll.html',
   styleUrls: ['./payroll.css']
@@ -177,7 +179,15 @@ export class PayrollComponent implements OnInit {
     const files: FileList = event.target.files;
     if (!files || files.length === 0) return;
 
+    // Receipts, invoices and travel sheets. The picker already filters, but
+    // drag-and-drop does not go through it.
+    const allowed = /\.(png|jpe?g|gif|webp|pdf|xlsx?|csv)$/i;
+
     Array.from(files).forEach(file => {
+      if (!allowed.test(file.name)) {
+        this.toast.error(`${file.name}: only images, PDF and Excel (XLS, XLSX, CSV) files can be attached`);
+        return;
+      }
       if (file.size > 5 * 1024 * 1024) {
         this.toast.error('File size should not exceed 5MB');
         return;
@@ -1556,44 +1566,11 @@ export class PayrollComponent implements OnInit {
     {
       field: 'receiptUrl',
       headerName: 'Receipts',
-      flex: 1.1,
-      minWidth: 130,
-      cellRenderer: (params: any) => {
-        if (params.data?.isSummaryRow) return '';
-        let imgs: string[] = [];
-        if (params.value) {
-          try {
-            imgs = typeof params.value === 'string' && params.value.startsWith('[') ? JSON.parse(params.value) : [params.value];
-          } catch (e) { imgs = [params.value]; }
-        }
-        if (!imgs || imgs.length === 0 || !imgs[0]) return '<span style="color: #94A3B8; font-size: 12px;">No receipt</span>';
-        const first = imgs[0];
-        // A thumbnail only where there is something to thumbnail; a document
-        // badge otherwise, instead of the broken image this used to draw.
-        const thumb = this.isImageUrl(first)
-          ? `<img src="${first}" class="receipt-thumb-sm" alt="" />`
-          : `<span class="receipt-doc-badge">${this.isPdfUrl(first) ? 'PDF' : 'FILE'}</span>`;
-        const label = imgs.length > 1
-          ? `${imgs.length} receipts`
-          : (this.isImageUrl(first) ? 'View receipt' : 'Open document');
-        return `
-          <div class="cell-user-avatar-row" style="cursor: pointer;" title="${first}">
-            ${thumb}
-            <span style="font-size: 11px; font-weight: 600; color: #2563EB;">${label}</span>
-          </div>
-        `;
-      },
-      onCellClicked: (params: any) => {
-        let imgs: string[] = [];
-        if (params.value) {
-          try {
-            imgs = typeof params.value === 'string' && params.value.startsWith('[') ? JSON.parse(params.value) : [params.value];
-          } catch (e) { imgs = [params.value]; }
-        }
-        if (imgs && imgs.length > 0 && imgs[0]) {
-          // Routes by type: the lightbox cannot render a PDF.
-          this.openReceipt(imgs, 0);
-        }
+      flex: 1.15,
+      minWidth: 140,
+      cellRenderer: ExpenseReceiptCellRendererComponent,
+      cellRendererParams: {
+        onOpenReceipt: (urls: string[], index: number) => this.openReceipt(urls, index)
       }
     },
     {
@@ -1669,41 +1646,11 @@ export class PayrollComponent implements OnInit {
     {
       field: 'receiptUrl',
       headerName: 'Receipts',
-      flex: 1.1,
-      minWidth: 130,
-      cellRenderer: (params: any) => {
-        if (params.data?.isSummaryRow) return '';
-        let imgs: string[] = [];
-        if (params.value) {
-          try {
-            imgs = typeof params.value === 'string' && params.value.startsWith('[') ? JSON.parse(params.value) : [params.value];
-          } catch (e) { imgs = [params.value]; }
-        }
-        if (!imgs || imgs.length === 0 || !imgs[0]) return '<span style="color: #94A3B8; font-size: 12px;">No receipt</span>';
-        const first = imgs[0];
-        const thumb = this.isImageUrl(first)
-          ? `<img src="${first}" class="receipt-thumb-sm" alt="" />`
-          : `<span class="receipt-doc-badge">${this.isPdfUrl(first) ? 'PDF' : 'FILE'}</span>`;
-        const label = imgs.length > 1
-          ? `${imgs.length} receipts`
-          : (this.isImageUrl(first) ? 'View receipt' : 'Open document');
-        return `
-          <div class="cell-user-avatar-row" style="cursor: pointer;" title="${first}">
-            ${thumb}
-            <span style="font-size: 11px; font-weight: 600; color: #2563EB;">${label}</span>
-          </div>
-        `;
-      },
-      onCellClicked: (params: any) => {
-        let imgs: string[] = [];
-        if (params.value) {
-          try {
-            imgs = typeof params.value === 'string' && params.value.startsWith('[') ? JSON.parse(params.value) : [params.value];
-          } catch (e) { imgs = [params.value]; }
-        }
-        if (imgs && imgs.length > 0 && imgs[0]) {
-          this.openReceipt(imgs, 0);
-        }
+      flex: 1.15,
+      minWidth: 140,
+      cellRenderer: ExpenseReceiptCellRendererComponent,
+      cellRendererParams: {
+        onOpenReceipt: (urls: string[], index: number) => this.openReceipt(urls, index)
       }
     },
     {
@@ -2642,6 +2589,11 @@ export class PayrollComponent implements OnInit {
 
   isPdfUrl(url: string): boolean {
     return /\.pdf(\?|#|$)/i.test(String(url || ''));
+  }
+
+  /** Travel sheets: Excel or CSV. Opened in a tab like any other document. */
+  isSpreadsheetUrl(url: string): boolean {
+    return /\.(xlsx?|csv)(\?|#|$)/i.test(String(url || ''));
   }
 
   /** Images go to the lightbox; everything else opens in a new tab. */

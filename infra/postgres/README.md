@@ -49,3 +49,7 @@ Then connect DBeaver/pgAdmin/TablePlus to `localhost:5433`.
 
 ## 6. After a week of stable running
 Pause or delete the Supabase project.
+
+## Access for other developers
+See [TAILSCALE.md](TAILSCALE.md) — per-person connection strings over Tailscale,
+no tunnel, nothing exposed publicly.

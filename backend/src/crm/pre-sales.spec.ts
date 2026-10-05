@@ -380,6 +380,16 @@ describe('CrmService — pre-sales', () => {
         .rejects.toThrow(/not on this deal/);
     });
 
+    // The hours budget is checked against the estimate, so a task with none
+    // would spend nothing and could never be refused for being over.
+    it.each([
+      ['no duration', { durationHours: undefined, durationMinutes: undefined }],
+      ['a zero duration', { durationHours: 0, durationMinutes: 0 }],
+    ])('refuses %s', async (_label, patch) => {
+      await expect(service.createPreSalesTask(COMPANY, LEAD, ADMIN, { ...task, ...patch }))
+        .rejects.toThrow(/estimated duration/i);
+    });
+
     it('stores the duration in minutes, not as text', async () => {
       const out: any = await service.createPreSalesTask(COMPANY, LEAD, ADMIN, task);
       expect(out.estimatedMinutes).toBe(150);

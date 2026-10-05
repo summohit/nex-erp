@@ -1473,7 +1473,7 @@
       </div>
 
       <!-- AG Grid for Admin Expense Claims -->
-      <div *ngIf="!isLoadingExpenses()" style="width: 100%; height: 640px;" class="mt-3 grid-wrapper">
+      <div *ngIf="!isLoadingExpenses()" style="width: 100%; height: 640px;" class="mt-3 grid-wrapper desktop-claims-grid">
         <ag-grid-angular
           class="ag-theme-quartz"
           [theme]="'legacy'"
@@ -1490,6 +1490,47 @@
           (cellClicked)="onExpenseRowClicked($event)">
         </ag-grid-angular>
       </div>
+
+      <!-- Mobile Cards for Admin Expense Claims -->
+      <div class="mobile-claims-list mt-3" *ngIf="!isLoadingExpenses() && filteredExpenseClaims().length > 0">
+        <div class="mobile-claim-card" *ngFor="let ex of filteredExpenseClaims()" (click)="openExpenseDetail(ex)">
+          <div class="mcc-top">
+            <div class="mcc-info">
+              <span class="mcc-title">{{ ex.title || 'Expense Claim' }}</span>
+              <div class="mcc-sub-row">
+                <span class="cat-badge cat-laptop">{{ ex.category || 'OTHER' }}</span>
+                <span class="mcc-vendor" *ngIf="ex.employee">{{ ex.employee.firstName }} {{ ex.employee.lastName || '' }}</span>
+                <span class="mcc-vendor" *ngIf="ex.purchasedFrom">· {{ ex.purchasedFrom }}</span>
+              </div>
+            </div>
+            <div class="mcc-amount">₹{{ (ex.amount || 0).toLocaleString('en-IN') }}</div>
+          </div>
+          <div class="mcc-bottom">
+            <div class="mcc-meta">
+              <span class="mcc-date" *ngIf="ex.purchaseDate">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                {{ ex.purchaseDate | date:'dd MMM yyyy' }}
+              </span>
+              <span class="mcc-receipt-chip" *ngIf="expenseReceipts(ex).length > 0" (click)="$event.stopPropagation(); openReceipt(expenseReceipts(ex), 0)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                {{ expenseReceipts(ex).length }} {{ expenseReceipts(ex).length === 1 ? 'receipt' : 'receipts' }}
+              </span>
+            </div>
+            <div class="mcc-actions-area">
+              <span class="status-round"
+                    [class.status-approved]="ex.status === 'APPROVED'"
+                    [class.status-pending]="ex.status === 'PENDING' || !ex.status"
+                    [class.status-rejected]="ex.status === 'REJECTED'"
+                    [class.status-paid]="ex.status === 'PAID'">
+                <span class="status-dot"></span>{{ ex.status || 'PENDING' }}
+              </span>
+              <span class="mcc-chevron">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Employee View: My Submitted Claims -->
@@ -1499,7 +1540,7 @@
       </div>
       
       <!-- Skeleton Loading Table for Employee Expense Claims -->
-      <div *ngIf="isLoadingExpenses()" class="salary-table-container mt-3" style="border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; background: #FFFFFF; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);">
+      <div *ngIf="isLoadingExpenses()" class="salary-table-container mt-3" style="border: 1px solid #E2E8F0; border-radius: 12px; overflow-x: auto; background: #FFFFFF; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);">
         <table class="salary-data-table">
           <thead>
             <tr>
@@ -1544,7 +1585,7 @@
       </div>
 
       <!-- AG Grid for Employee Expense Claims -->
-      <div style="width: 100%; height: 400px;" class="mt-3 grid-wrapper" *ngIf="!isLoadingExpenses() && myExpenseClaims().length > 0; else noExpenses">
+      <div style="width: 100%; height: 400px;" class="mt-3 grid-wrapper desktop-claims-grid" *ngIf="!isLoadingExpenses() && myExpenseClaims().length > 0; else noExpenses">
         <ag-grid-angular
           class="ag-theme-quartz"
           [theme]="'legacy'"
@@ -1556,6 +1597,46 @@
           [headerHeight]="48"
           (cellClicked)="onExpenseRowClicked($event)">
         </ag-grid-angular>
+      </div>
+
+      <!-- Mobile Cards for Employee Expense Claims -->
+      <div class="mobile-claims-list mt-3" *ngIf="!isLoadingExpenses() && myExpenseClaims().length > 0">
+        <div class="mobile-claim-card" *ngFor="let ex of myExpenseClaims()" (click)="openExpenseDetail(ex)">
+          <div class="mcc-top">
+            <div class="mcc-info">
+              <span class="mcc-title">{{ ex.title || 'Expense Claim' }}</span>
+              <div class="mcc-sub-row">
+                <span class="cat-badge cat-laptop">{{ ex.category || 'OTHER' }}</span>
+                <span class="mcc-vendor" *ngIf="ex.purchasedFrom">Vendor: {{ ex.purchasedFrom }}</span>
+              </div>
+            </div>
+            <div class="mcc-amount">₹{{ (ex.amount || 0).toLocaleString('en-IN') }}</div>
+          </div>
+          <div class="mcc-bottom">
+            <div class="mcc-meta">
+              <span class="mcc-date" *ngIf="ex.purchaseDate">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                {{ ex.purchaseDate | date:'dd MMM yyyy' }}
+              </span>
+              <span class="mcc-receipt-chip" *ngIf="expenseReceipts(ex).length > 0" (click)="$event.stopPropagation(); openReceipt(expenseReceipts(ex), 0)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                {{ expenseReceipts(ex).length }} {{ expenseReceipts(ex).length === 1 ? 'receipt' : 'receipts' }}
+              </span>
+            </div>
+            <div class="mcc-actions-area">
+              <span class="status-round"
+                    [class.status-approved]="ex.status === 'APPROVED'"
+                    [class.status-pending]="ex.status === 'PENDING' || !ex.status"
+                    [class.status-rejected]="ex.status === 'REJECTED'"
+                    [class.status-paid]="ex.status === 'PAID'">
+                <span class="status-dot"></span>{{ ex.status || 'PENDING' }}
+              </span>
+              <span class="mcc-chevron">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <ng-template #noExpenses>
@@ -2417,7 +2498,7 @@
             <input type="number" class="form-control" [(ngModel)]="expenseForm.amount" name="amount" required min="1" max="100000">
             <small class="text-muted">Max claim limit is ₹1,00,000 per expense.</small>
           </div>
-          <div class="row mb-3" style="display: flex; gap: 12px;">
+          <div class="row mb-3 form-row-2col" style="display: flex; gap: 12px;">
             <div class="form-group" style="flex: 1;">
               <label>Purchase Date <span class="required">*</span></label>
               <input type="date" class="form-control" [(ngModel)]="expenseForm.purchaseDate" name="purchaseDate" required>
@@ -2427,7 +2508,7 @@
               <input type="text" class="form-control" [(ngModel)]="expenseForm.purchasedFrom" name="purchasedFrom" placeholder="e.g. Acme Corp / Amazon">
             </div>
           </div>
-          <div class="row mb-3" style="display: flex; gap: 12px;">
+          <div class="row mb-3 form-row-2col" style="display: flex; gap: 12px;">
             <div class="form-group" style="flex: 1;">
               <label>Project</label>
               <app-searchable-select
@@ -2439,20 +2520,22 @@
             </div>
           </div>
           <div class="form-group mb-3">
-            <label class="form-label">Upload Receipts / Invoices (Images/PDFs)</label>
+            <label class="form-label">Upload Receipts / Invoices / Travel Sheets</label>
             <div class="dropzone-area">
-              <input type="file" multiple class="dropzone-input" (change)="onExpenseFilesSelected($event)" accept="image/*,.pdf">
+              <input type="file" multiple class="dropzone-input" (change)="onExpenseFilesSelected($event)" accept="image/*,.pdf,.xls,.xlsx,.csv">
               <div class="dropzone-placeholder">
                 <svg lucideUploadCloud size="28" class="dropzone-icon"></svg>
                 <span class="dropzone-title">Click or drag receipt files to upload</span>
-                <span class="dropzone-subtitle">Supports JPG, PNG, PDF up to 5MB each</span>
+                <span class="dropzone-subtitle">Supports JPG, PNG, PDF and Excel (XLS, XLSX, CSV) up to 5MB each</span>
               </div>
             </div>
 
             <!-- Preview Thumbnail Chips -->
             <div class="multi-images-preview mt-2" *ngIf="expenseForm.receipts.length > 0">
               <div *ngFor="let url of expenseForm.receipts; let i = index" class="image-preview-card">
-                <img [src]="url" alt="Receipt preview" class="preview-thumb" (click)="openImageViewer(expenseForm.receipts, i)">
+                <img *ngIf="isImageUrl(url)" [src]="url" alt="Receipt preview" class="preview-thumb" (click)="openImageViewer(expenseForm.receipts, i)">
+                <a *ngIf="!isImageUrl(url)" [href]="url" target="_blank" rel="noopener" class="preview-thumb preview-doc-chip"
+                   [title]="url">{{ isSpreadsheetUrl(url) ? 'XLS' : (isPdfUrl(url) ? 'PDF' : 'FILE') }}</a>
                 <button type="button" class="btn-remove-thumb" (click)="removeExpenseReceipt(i)">
                   <svg lucideX size="14"></svg>
                 </button>
@@ -2848,10 +2931,10 @@
               <div *ngIf="!isImageUrl(r)" class="receipt-doc-tile" (click)="openReceipt(expenseReceipts(ex), i)">
                 <div class="doc-icon-container" [class.doc-pdf]="isPdfUrl(r)">
                   <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                  <span class="doc-format-badge">{{ isPdfUrl(r) ? 'PDF' : 'DOC' }}</span>
+                  <span class="doc-format-badge">{{ isPdfUrl(r) ? 'PDF' : (isSpreadsheetUrl(r) ? 'XLS' : 'DOC') }}</span>
                 </div>
                 <div class="doc-details">
-                  <span class="doc-title">{{ isPdfUrl(r) ? 'Tax Invoice / Receipt' : 'Attachment Document' }}</span>
+                  <span class="doc-title">{{ isPdfUrl(r) ? 'Tax Invoice / Receipt' : (isSpreadsheetUrl(r) ? 'Excel Sheet' : 'Attachment Document') }}</span>
                   <span class="doc-action-link">Open in New Tab ↗</span>
                 </div>
               </div>

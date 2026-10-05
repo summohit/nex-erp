@@ -617,7 +617,7 @@
           </div>
           <div class="my-tasks-title-text">
             <div class="my-tasks-title-row">
-              <h2 class="my-tasks-title">{{ myTasksScope() === 'all' ? 'All Tasks' : 'My Tasks' }}</h2>
+              <h2 class="my-tasks-title">{{ myTasksScope() === 'all' ? 'All Tasks' : myTasksScope() === 'created' ? 'Tasks I Created' : 'My Tasks' }}</h2>
               <span class="my-tasks-count-pill" *ngIf="myTasksCount() > 0">
                 {{ myTasksCount() }} Task{{ myTasksCount() === 1 ? '' : 's' }}
               </span>
@@ -636,13 +636,20 @@
         <div class="my-tasks-card-actions">
           <!-- Administrators only. Without this an admin with nothing assigned
                to them saw an empty screen while the company had open work. -->
-          <div class="scope-switch" *ngIf="taskCapabilities().isAdmin">
+          <!-- 'Created by me' is for anyone who hands out work — without it a PM
+               who assigns a task to someone else can never see it again. -->
+          <div class="scope-switch" *ngIf="taskCapabilities().canCreateTask || taskCapabilities().isAdmin">
             <button type="button" class="scope-switch-btn" [class.active]="myTasksScope() === 'mine'"
                     (click)="setMyTasksScope('mine')">
               <svg lucideUser size="13"></svg>
               <span>Assigned to me</span>
             </button>
-            <button type="button" class="scope-switch-btn" [class.active]="myTasksScope() === 'all'"
+            <button type="button" class="scope-switch-btn" [class.active]="myTasksScope() === 'created'"
+                    (click)="setMyTasksScope('created')">
+              <svg lucideCheckSquare size="13"></svg>
+              <span>Created by me</span>
+            </button>
+            <button type="button" *ngIf="taskCapabilities().isAdmin" class="scope-switch-btn" [class.active]="myTasksScope() === 'all'"
                     (click)="setMyTasksScope('all')">
               <svg lucideUsers size="13"></svg>
               <span>Everyone</span>
@@ -1387,7 +1394,10 @@
     <!-- Task Title -->
     <div class="form-group">
       <label class="form-label">Task Title <span class="req">*</span></label>
-      <input type="text" class="enhanced-input" [(ngModel)]="taskForm.title" placeholder="What needs doing? (e.g. Prepare client architecture presentation)" />
+      <input type="text" class="enhanced-input" [class.has-error]="taskError('title')"
+             [(ngModel)]="taskForm.title" (ngModelChange)="revalidateTask()"
+             placeholder="What needs doing? (e.g. Prepare client architecture presentation)" />
+      <span class="field-error" *ngIf="taskError('title') as m">{{ m }}</span>
     </div>
 
     <!-- Description -->
@@ -1400,18 +1410,22 @@
     <div class="form-group">
       <label class="form-label">Belongs to</label>
       <div class="task-parent-segmented-bar" [class.locked]="editingPreSalesTaskId()">
-        <button type="button" class="segmented-pill-btn" [class.active]="taskForm.parentKind === 'GENERAL'"
-                (click)="taskForm.parentKind = 'GENERAL'; closeAllTaskDropdowns()">
+        <!-- Not offered to someone who cannot raise one. Being a project manager
+             covers only your own projects, and a tab that is there to be refused
+             on submit is a trap. -->
+        <button type="button" class="segmented-pill-btn" *ngIf="canPickGeneral"
+                [class.active]="taskForm.parentKind === 'GENERAL'"
+                (click)="setParentKind('GENERAL')">
           <svg lucideLayers size="14"></svg>
           <span>General</span>
         </button>
         <button type="button" class="segmented-pill-btn" [class.active]="taskForm.parentKind === 'PROJECT'"
-                (click)="taskForm.parentKind = 'PROJECT'; closeAllTaskDropdowns()">
+                (click)="setParentKind('PROJECT')">
           <svg lucideFolder size="14"></svg>
           <span>Project Board</span>
         </button>
         <button type="button" class="segmented-pill-btn" [class.active]="taskForm.parentKind === 'LEAD'"
-                (click)="taskForm.parentKind = 'LEAD'; closeAllTaskDropdowns()">
+                (click)="setParentKind('LEAD')">
           <svg lucideBriefcase size="14"></svg>
           <span>Pre-sales Deal</span>
         </button>
@@ -1422,8 +1436,12 @@
     <div class="context-selection-box" *ngIf="taskForm.parentKind === 'PROJECT'">
       <div class="form-group mb-0">
         <label class="form-label">Choose Project Board <span class="req">*</span></label>
+        <small class="form-hint" *ngIf="!canPickGeneral && filteredModalProjects().length === 0 && !taskProjectSearch()">
+          You are not an owner or project manager on any project, so there is nowhere to raise a task.
+          Ask an administrator to enable task creation for your department.
+        </small>
         <div class="searchable-select-container">
-          <button type="button" class="custom-select-trigger"
+          <button type="button" class="custom-select-trigger" [class.has-error]="taskError('project')"
                   [class.active]="taskProjectDropdownOpen()"
                   (click)="taskProjectDropdownOpen.set(!taskProjectDropdownOpen()); taskLeadDropdownOpen.set(false); taskTypeDropdownOpen.set(false); taskPriorityDropdownOpen.set(false); taskAssigneeDropdownOpen.set(false); $event.stopPropagation()">
             <div class="custom-select-value" *ngIf="getSelectedProject() as p">
@@ -1461,6 +1479,7 @@
             </div>
           </div>
         </div>
+        <span class="field-error" *ngIf="taskError('project') as m">{{ m }}</span>
       </div>
     </div>
 
@@ -1469,7 +1488,7 @@
       <div class="form-group mb-0">
         <label class="form-label">Select Pre-Sales Deal / Lead <span class="req">*</span></label>
         <div class="searchable-select-container">
-          <button type="button" class="custom-select-trigger"
+          <button type="button" class="custom-select-trigger" [class.has-error]="taskError('lead')"
                   [class.active]="taskLeadDropdownOpen()"
                   (click)="taskLeadDropdownOpen.set(!taskLeadDropdownOpen()); taskProjectDropdownOpen.set(false); taskTypeDropdownOpen.set(false); taskPriorityDropdownOpen.set(false); taskAssigneeDropdownOpen.set(false); $event.stopPropagation()">
             <div class="custom-select-value" *ngIf="getSelectedLead() as l">
@@ -1530,6 +1549,7 @@
             </div>
           </div>
         </div>
+        <span class="field-error" *ngIf="taskError('lead') as m">{{ m }}</span>
         <div class="context-hint" *ngIf="!isPreSalesTarget">
           <svg lucideCheckCircle2 size="12" style="color: #1373e5; flex-shrink: 0;"></svg>
           <span>Links this task directly to the deal's tracking records in Pre-Sales.</span>
@@ -1577,10 +1597,13 @@
     <!-- §8: the delivery phase this task belongs to. Its own row above Task
          Type rather than squeezed beside it, because the two-column grid below
          is already full and phase is asked on every task. -->
-    <div class="form-group">
-      <label class="form-label">Project Phase</label>
+    <!-- Project work only. A phase is a stage of a project's delivery; a general
+         task or a pre-sales deal has no delivery to be in a stage of, and asking
+         for one there was the field people could not make sense of. -->
+    <div class="form-group" *ngIf="taskForm.parentKind === 'PROJECT'">
+      <label class="form-label">Project Phase <span class="req" *ngIf="projectPhases().length">*</span></label>
       <div class="searchable-select-container">
-        <button type="button" class="custom-select-trigger"
+        <button type="button" class="custom-select-trigger" [class.has-error]="taskError('phase')"
                 [class.active]="phaseDropdownOpen()"
                 (click)="phaseDropdownOpen.set(!phaseDropdownOpen()); taskTypeDropdownOpen.set(false); taskProjectDropdownOpen.set(false); taskLeadDropdownOpen.set(false); taskPriorityDropdownOpen.set(false); taskAssigneeDropdownOpen.set(false); $event.stopPropagation()">
           <span class="custom-select-value font-medium" *ngIf="getSelectedPhase() as p">{{ p.name }}</span>
@@ -1608,6 +1631,7 @@
             </div>
           </div>
         </div>
+        <span class="field-error" *ngIf="taskError('phase') as m">{{ m }}</span>
       </div>
     </div>
 
@@ -1688,13 +1712,21 @@
 
     <!-- Timeline & Hours (3 cols) -->
     <div class="task-form-grid-3">
+      <!-- min/max stop the picker offering an impossible range at all; the
+           messages are for the case where somebody types one in. -->
       <div class="form-group" *ngIf="!isPreSalesTarget">
-        <label class="form-label">Start Date</label>
-        <input type="date" class="enhanced-input" [(ngModel)]="taskForm.startDate" />
+        <label class="form-label">Start Date <span class="req">*</span></label>
+        <input type="date" class="enhanced-input" [class.has-error]="taskError('startDate')"
+               [attr.max]="taskForm.dueDate || null"
+               [(ngModel)]="taskForm.startDate" (ngModelChange)="revalidateTask()" />
+        <span class="field-error" *ngIf="taskError('startDate') as m">{{ m }}</span>
       </div>
       <div class="form-group">
-        <label class="form-label">{{ isPreSalesTarget ? 'Scheduled Date' : 'Due Date' }}</label>
-        <input type="date" class="enhanced-input" [(ngModel)]="taskForm.dueDate" />
+        <label class="form-label">{{ isPreSalesTarget ? 'Scheduled Date' : 'Due Date' }} <span class="req" *ngIf="!isPreSalesTarget">*</span></label>
+        <input type="date" class="enhanced-input" [class.has-error]="taskError('dueDate')"
+               [attr.min]="taskForm.startDate || null"
+               [(ngModel)]="taskForm.dueDate" (ngModelChange)="revalidateTask()" />
+        <span class="field-error" *ngIf="taskError('dueDate') as m">{{ m }}</span>
       </div>
       <!-- A call or a site visit happens at a time, not on a day. -->
       <div class="form-group" *ngIf="isPreSalesTarget">
@@ -1702,8 +1734,10 @@
         <input type="time" class="enhanced-input" [(ngModel)]="taskForm.dueTime" />
       </div>
       <div class="form-group">
-        <label class="form-label">Estimated Hours</label>
-        <input type="number" min="0" step="0.5" class="enhanced-input" [(ngModel)]="taskForm.estimatedHours" placeholder="e.g. 8" />
+        <label class="form-label">Estimated Hours <span class="req">*</span></label>
+        <input type="number" min="0.5" step="0.5" class="enhanced-input" [class.has-error]="taskError('hours')"
+               [(ngModel)]="taskForm.estimatedHours" (ngModelChange)="revalidateTask()" placeholder="e.g. 8" />
+        <span class="field-error" *ngIf="taskError('hours') as m">{{ m }}</span>
         <small class="form-hint" *ngIf="isPreSalesTarget">Counts against this person's hours allocation on the deal.</small>
       </div>
     </div>
@@ -1716,6 +1750,7 @@
           <span class="req" *ngIf="isPreSalesTarget">*</span>
           <span class="optional" *ngIf="!isPreSalesTarget">(optional)</span>
         </label>
+        <span class="field-error" style="margin:0 0 0 8px;" *ngIf="taskError('assignee') as m">{{ m }}</span>
         <span class="assignee-count-badge" *ngIf="taskForm.assigneeIds.length > 0 && !isPreSalesTarget">
           {{ taskForm.assigneeIds.length }} assigned
         </span>

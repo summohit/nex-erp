@@ -28,6 +28,15 @@ export class FieldVisitRequestsController {
     );
   }
 
+  /** Declared before `:id`, which would otherwise swallow it. */
+  @Get('general-tasks')
+  generalTasks(@Req() req, @Query('employeeIds') employeeIds?: string) {
+    return this.requests.generalTasks(
+      req.user.companyId,
+      String(employeeIds ?? '').split(',').filter(Boolean).map(Number),
+    );
+  }
+
   @Get(':id')
   getOne(@Req() req, @Param('id', ParseIntPipe) id: number) {
     return this.requests.getOne(
@@ -46,6 +55,17 @@ export class FieldVisitRequestsController {
   create(@Req() req, @Body() body: FieldVisitRequestInput) {
     return this.requests.create(
       req.user.companyId, req.user.employeeId ?? null, req.user.role, body,
+    );
+  }
+
+  @Post('bulk/status')
+  bulkChangeStatus(
+    @Req() req,
+    @Body() body: { ids: number[]; status: string; reason?: string; overrideDayOff?: boolean },
+  ) {
+    return this.requests.bulkChangeStatus(
+      req.user.companyId, req.user.employeeId ?? null, req.user.role, body?.ids ?? [], body?.status, body?.reason,
+      { overrideDayOff: body?.overrideDayOff === true },
     );
   }
 
@@ -68,9 +88,14 @@ export class FieldVisitRequestsController {
   }
 
   @Post(':id/approve')
-  approve(@Req() req, @Param('id', ParseIntPipe) id: number) {
+  approve(
+    @Req() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { overrideDayOff?: boolean } = {},
+  ) {
     return this.requests.approve(
       req.user.companyId, req.user.employeeId ?? null, req.user.role, id,
+      { overrideDayOff: body?.overrideDayOff === true },
     );
   }
 
@@ -137,6 +162,25 @@ export class FieldVisitRequestsController {
   ) {
     return this.requests.cancel(
       req.user.companyId, req.user.employeeId ?? null, req.user.role, id, body?.reason,
+    );
+  }
+
+  @Post(':id/complete')
+  complete(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.requests.complete(
+      req.user.companyId, req.user.employeeId ?? null, req.user.role, id,
+    );
+  }
+
+  @Post(':id/status')
+  changeStatus(
+    @Req() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: string; reason?: string; overrideDayOff?: boolean },
+  ) {
+    return this.requests.changeStatus(
+      req.user.companyId, req.user.employeeId ?? null, req.user.role, id, body.status, body?.reason,
+      { overrideDayOff: body?.overrideDayOff === true },
     );
   }
 }

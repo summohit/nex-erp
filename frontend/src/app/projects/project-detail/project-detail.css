@@ -3387,9 +3387,125 @@ svg[lucide], svg[class*=lucide] {
   border-color: #0c66e4;
 }
 
-/* Dates Popover Styling */
+/* Dates Popover & Attached Field Styling (Jira-style) */
+.modal-attached-date-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jira-dates-panel {
+  width: 320px;
+}
+
+.jira-dates-summary-banner {
+  display: flex;
+  align-items: center;
+  background: #f4f5f7;
+  border: 1px solid #e2e5e9;
+  border-radius: 6px;
+  padding: 8px 10px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.jira-dates-summary-banner.is-invalid-range {
+  background: #fff1f0;
+  border-color: #ffa39e;
+}
+
+.jira-dates-summary-banner .summary-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.jira-dates-summary-banner.is-invalid-range .summary-text {
+  color: #cf1322;
+}
+
+.dates-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jira-field-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #44546f;
+}
+
+.jira-quick-presets {
+  background: #fafbfc;
+  border: 1px solid #ebecf0;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.quick-presets-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #626f86;
+  letter-spacing: 0.3px;
+}
+
+.preset-chip {
+  background: #ffffff;
+  border: 1px solid #dcdfe4;
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #172b4d;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.preset-chip:hover {
+  background: #0c66e4;
+  color: #ffffff;
+  border-color: #0c66e4;
+}
+
+.preset-chip:active {
+  transform: scale(0.96);
+}
+
+.btn-jira-clear-dates {
+  background: transparent;
+  border: none;
+  color: #de350b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background-color 0.12s ease;
+}
+
+.btn-jira-clear-dates:hover {
+  background: #ffebe6;
+}
+
+.btn-jira-done {
+  background: #0c66e4;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.btn-jira-done:hover {
+  background: #0055cc;
+}
+
 .dates-popover {
-  width: 304px;
+  width: 320px;
 }
 
 .calendar-nav-header {
@@ -10966,3 +11082,157 @@ input[type=text], input[type=email], input[type=password] {
 .tp-extra-field textarea:focus, .tp-extra-field select:focus { outline:none; border-color:#4f46e5; box-shadow:0 0 0 3px rgba(79,70,229,.12); }
 .tp-extra-hint { font-size:11.5px; color:#94a3b8; }
 @media (max-width:700px) { .tp-extra { grid-template-columns:1fr; } }
+
+/* ==========================================================================
+   Required Fields & Validation Enhancements
+   ========================================================================== */
+
+.required-star {
+  color: #ef4444 !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  margin-left: 2px !important;
+  display: inline-block !important;
+  vertical-align: baseline !important;
+  line-height: 1 !important;
+}
+
+/* Enhanced Create Task Button */
+.btn-create-task-primary {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  background: linear-gradient(135deg, #0c66e4 0%, #0052cc 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 7px 16px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 5px rgba(12, 102, 228, 0.35) !important;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  white-space: nowrap !important;
+  letter-spacing: 0.2px !important;
+  line-height: 1.4 !important;
+  outline: none !important;
+}
+
+.btn-create-task-primary:hover {
+  background: linear-gradient(135deg, #0052cc 0%, #0747a6 100%) !important;
+  box-shadow: 0 4px 12px rgba(12, 102, 228, 0.45) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-create-task-primary:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 1px 3px rgba(12, 102, 228, 0.3) !important;
+}
+
+.btn-create-task-primary svg {
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+  flex-shrink: 0 !important;
+}
+
+/* Inline Field Validation Error States */
+.has-field-error {
+  border: 1.5px solid #ef4444 !important;
+  background-color: #fff8f8 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+  border-radius: 6px !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+
+.has-field-error-border {
+  border: 1.5px solid #ef4444 !important;
+  background-color: #fff8f8 !important;
+  border-radius: 8px !important;
+  padding: 6px 8px !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+
+.has-quill-error {
+  border: 1.5px solid #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+  border-radius: 6px !important;
+}
+
+.field-error-message {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  color: #ef4444 !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  margin-top: 4px !important;
+  animation: fadeInError 0.2s ease-in-out !important;
+}
+
+.field-error-message svg {
+  color: #ef4444 !important;
+  stroke: #ef4444 !important;
+  flex-shrink: 0 !important;
+}
+
+@keyframes fadeInError {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scroll target attention pulse animation */
+@keyframes fieldAttentionPulse {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.02); }
+  50% { transform: scale(0.99); }
+  75% { transform: scale(1.01); }
+  100% { transform: scale(1); }
+}
+
+.field-attention-pulse {
+  animation: fieldAttentionPulse 400ms ease-in-out !important;
+}
+
+/* ── Tasks Table: Awaiting & Rejected Approval Row Styling ──────────── */
+.ag-theme-quartz .ag-row.row-awaiting-approval,
+.ag-theme-quartz .ag-row.row-awaiting-approval .ag-cell {
+  background-color: #fef3c7 !important;
+}
+
+.ag-theme-quartz .ag-row.row-awaiting-approval:hover,
+.ag-theme-quartz .ag-row.row-awaiting-approval:hover .ag-cell {
+  background-color: #fde68a !important;
+}
+
+.ag-theme-quartz .ag-row.row-awaiting-approval,
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-row.row-awaiting-approval,
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-row.row-awaiting-approval .ag-cell:first-child,
+.ag-theme-quartz .ag-row.row-awaiting-approval > .ag-cell:first-child {
+  border-left: 4px solid #f59e0b !important;
+}
+
+.ag-theme-quartz .ag-row.row-rejected-approval,
+.ag-theme-quartz .ag-row.row-rejected-approval .ag-cell {
+  background-color: #fff1f2 !important;
+}
+
+.ag-theme-quartz .ag-row.row-rejected-approval:hover,
+.ag-theme-quartz .ag-row.row-rejected-approval:hover .ag-cell {
+  background-color: #fee2e2 !important;
+}
+
+.ag-theme-quartz .ag-row.row-rejected-approval,
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-row.row-rejected-approval,
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-row.row-rejected-approval .ag-cell:first-child,
+.ag-theme-quartz .ag-row.row-rejected-approval > .ag-cell:first-child {
+  border-left: 4px solid #f43f5e !important;
+}
+

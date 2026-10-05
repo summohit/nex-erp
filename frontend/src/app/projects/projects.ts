@@ -267,7 +267,7 @@ export class ProjectsComponent implements OnInit {
     })()
   );
   /** Answered by the server so the department rule has one authority. */
-  taskCapabilities = signal<TaskCapabilities>({ canCreateTask: false, canCreateGeneral: false, isAdmin: false });
+  taskCapabilities = signal<TaskCapabilities>({ canCreateTask: false, canCreateGeneral: false, canCreateAnywhere: false, isAdmin: false });
   pmDropdownOpen = signal(false);
   pmSearchQuery = signal<string>('');
 
@@ -2047,10 +2047,45 @@ export class ProjectsComponent implements OnInit {
   presalesDeals = computed(() => this.leadOptions().filter((l) => l.flow === 'PRE_SALES'));
   salesLeads = computed(() => this.leadOptions().filter((l) => l.flow !== 'PRE_SALES'));
 
+  /**
+   * May this person raise a task in this particular project?
+   *
+   * Mirrors canCreateTask on the server: an administrator or a department
+   * flagged for task creation may raise one anywhere, anybody else only in a
+   * project they own or manage. Without this a project manager was offered
+   * every project in the company and told "no" on submit for all but theirs.
+   * The server still decides — this only stops the form offering what it will
+   * refuse.
+   */
+  canRaiseInProject(p: any): boolean {
+    // "Anywhere" is the admin / flagged-department rule — not the general-task
+    // one, which project managers also hold but which grants no other project.
+    if (this.taskCapabilities().canCreateAnywhere ?? this.taskCapabilities().isAdmin) return true;
+    const me = this.currentUser()?.employeeId;
+    if (!me) return false;
+    return (
+      p.leadId === me ||
+      (p.members ?? []).some((m: any) => m.employeeId === me && m.role === 'PROJECT_MANAGER')
+    );
+  }
+
+  /**
+   * Whether a general task can be raised at all.
+   *
+   * Separate from the Add Task button on purpose: being a project manager shows
+   * the button but grants nothing outside your own projects, and the form used
+   * to open on General regardless and only the server said no, after everything
+   * had been typed in.
+   */
+  get canPickGeneral(): boolean {
+    return this.taskCapabilities().canCreateGeneral;
+  }
+
   filteredModalProjects = computed(() => {
     const q = this.taskProjectSearch().toLowerCase().trim();
-    if (!q) return this.projects();
-    return this.projects().filter((p) =>
+    const raisable = this.projects().filter((p) => this.canRaiseInProject(p));
+    if (!q) return raisable;
+    return raisable.filter((p) =>
       (p.name || '').toLowerCase().includes(q) ||
       (p.key || '').toLowerCase().includes(q)
     );
@@ -2069,6 +2104,9 @@ export class ProjectsComponent implements OnInit {
   });
 
   filteredModalSalesLeads = computed(() => {
+    // A task on an ordinary sales lead is a general task underneath, so it needs
+    // the same permission. Pre-sales deals do not — they have their own rule.
+    if (!this.taskCapabilities().canCreateGeneral) return [];
     const q = this.taskLeadSearch().toLowerCase().trim();
     const leads = this.salesLeads();
     if (!q) return leads;
@@ -2092,7 +2130,10 @@ export class ProjectsComponent implements OnInit {
     return {
       title: '',
       description: '',
-      parentKind: 'GENERAL' as 'PROJECT' | 'LEAD' | 'GENERAL',
+      // Open on a tab the person can actually use. A project manager cannot
+      // raise a general task, and a form that opens there and refuses on submit
+      // makes the first thing they see a dead end.
+      parentKind: (this.taskCapabilities().canCreateGeneral ? 'GENERAL' : 'PROJECT') as 'PROJECT' | 'LEAD' | 'GENERAL',
       projectId: null as number | null,
       leadId: null as number | null,
       taskTypeId: null as number | null,
@@ -2127,6 +2168,8 @@ export class ProjectsComponent implements OnInit {
     this.isAttachmentDragOver.set(false);
     this.editingPreSalesTaskId.set(null);
     this.preSalesInfo.set(null);
+    this.taskSubmitted = false;
+    this.taskErrors.set({});
     this.isCreateTaskOpen.set(true);
     this.ensureTaskPickerData();
   }
@@ -2167,6 +2210,7 @@ export class ProjectsComponent implements OnInit {
     if (this.isPreSalesTarget) {
       this.taskForm.assigneeIds = current.includes(employeeId) ? [] : [employeeId];
       this.taskAssigneeDropdownOpen.set(false);
+      this.revalidateTask();
       return;
     }
     this.taskForm.assigneeIds = current.includes(employeeId)
@@ -2231,6 +2275,7 @@ export class ProjectsComponent implements OnInit {
     this.taskForm.phaseId = id;
     this.phaseDropdownOpen.set(false);
     this.phaseSearch = '';
+    this.revalidateTask();
   }
 
 
@@ -2252,12 +2297,14 @@ export class ProjectsComponent implements OnInit {
   selectTaskProject(id: number) {
     this.taskForm.projectId = id;
     this.taskProjectDropdownOpen.set(false);
+    this.revalidateTask();
   }
 
   selectTaskLead(id: number) {
     const changed = this.taskForm.leadId !== id;
     this.taskForm.leadId = id;
     this.taskLeadDropdownOpen.set(false);
+    this.revalidateTask();
     if (!changed) return;
 
     // A pre-sales task may only go to someone on that deal's team, so the
@@ -2357,17 +2404,88 @@ export class ProjectsComponent implements OnInit {
     return (parts.length > 1 ? parts.pop()! : 'FILE').toUpperCase();
   }
 
+  // ── Validation ───────────────────────────────────────────────────────────
+
+  /** Field → message. Empty means the form is good to send. */
+  taskErrors = signal<Record<string, string>>({});
+  /** Errors only appear after a first attempt, so an empty form is not shouting. */
+  taskSubmitted = false;
+
+  taskError(field: string): string {
+    return this.taskSubmitted ? (this.taskErrors()[field] ?? '') : '';
+  }
+
+  /**
+   * Everything wrong with the form, in one pass.
+   *
+   * Mirrors the server (TasksService.assertValidSchedule and the phase rule) so
+   * a mistake is caught beside the field it is about rather than as a toast
+   * after submitting. The server remains the authority — the mobile app and
+   * anything else calling the API never goes through this.
+   */
+  private validateTaskForm(): Record<string, string> {
+    const f = this.taskForm;
+    const e: Record<string, string> = {};
+    const preSales = this.isPreSalesTarget;
+
+    if (!f.title?.trim()) e['title'] = 'Give the task a title.';
+
+    if (f.parentKind === 'PROJECT' && !f.projectId) e['project'] = 'Choose a project.';
+    if (f.parentKind === 'LEAD' && !f.leadId) e['lead'] = 'Choose a pre-sales deal.';
+
+    // A phase is a stage of a project's delivery, so it is asked for project
+    // tasks only — and only when the company has phases at all, as the server does.
+    if (
+      f.parentKind === 'PROJECT' && !f.phaseId &&
+      this.projectPhases().some((ph: any) => ph.isActive)
+    ) {
+      e['phase'] = 'Choose the project phase.';
+    }
+
+    // Both dates for ordinary work. A pre-sales task has a single scheduled
+    // moment and no start, so only its range check applies.
+    if (!preSales) {
+      if (!f.startDate) e['startDate'] = 'Choose a start date.';
+      if (!f.dueDate) e['dueDate'] = 'Choose a due date.';
+    }
+    // 'YYYY-MM-DD' strings sort the same as the dates they name.
+    if (f.startDate && f.dueDate && f.dueDate < f.startDate) {
+      e['dueDate'] = 'The due date cannot be before the start date.';
+    }
+
+    const hours = Number(f.estimatedHours);
+    if (f.estimatedHours == null || f.estimatedHours === '' || !Number.isFinite(hours) || hours <= 0) {
+      e['hours'] = 'Enter the estimated hours — it must be more than 0.';
+    }
+
+    if (preSales && !(f.assigneeIds as number[])[0]) {
+      e['assignee'] = 'Choose the pre-sales specialist this task is for.';
+    }
+    return e;
+  }
+
+  /** Re-check live once the person has tried to submit, so errors clear as they fix them. */
+  revalidateTask() {
+    if (this.taskSubmitted) this.taskErrors.set(this.validateTaskForm());
+  }
+
+  setParentKind(kind: 'GENERAL' | 'PROJECT' | 'LEAD') {
+    this.taskForm.parentKind = kind;
+    this.closeAllTaskDropdowns();
+    this.revalidateTask();
+  }
+
   saveTask() {
-    if (!this.taskForm.title?.trim()) {
-      this.toast.error('Give the task a title.');
-      return;
-    }
-    if (this.taskForm.parentKind === 'PROJECT' && !this.taskForm.projectId) {
-      this.toast.error('Choose a project.');
-      return;
-    }
-    if (this.taskForm.parentKind === 'LEAD' && !this.taskForm.leadId) {
-      this.toast.error('Choose a pre-sales deal or lead.');
+    this.taskSubmitted = true;
+    const errors = this.validateTaskForm();
+    this.taskErrors.set(errors);
+    if (Object.keys(errors).length) {
+      this.toast.error('Please fix the highlighted fields.');
+      // Bring the first problem into view — the form is taller than the modal.
+      setTimeout(() => {
+        document.querySelector('.task-modal-card .has-error')
+          ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
       return;
     }
 
@@ -2386,7 +2504,10 @@ export class ProjectsComponent implements OnInit {
       projectId: this.taskForm.parentKind === 'PROJECT' ? Number(this.taskForm.projectId) : undefined,
       leadId: this.taskForm.parentKind === 'LEAD' ? Number(this.taskForm.leadId) : undefined,
       taskTypeId: this.taskForm.taskTypeId ? Number(this.taskForm.taskTypeId) : undefined,
-      phaseId: this.taskForm.phaseId ? Number(this.taskForm.phaseId) : undefined,
+      // Only project work has a phase; a stale value left from a tab the person
+      // has since switched away from must not ride along.
+      phaseId: this.taskForm.parentKind === 'PROJECT' && this.taskForm.phaseId
+        ? Number(this.taskForm.phaseId) : undefined,
       priority: this.taskForm.priority,
       startDate: this.taskForm.startDate || undefined,
       dueDate: this.taskForm.dueDate || undefined,
@@ -2398,7 +2519,10 @@ export class ProjectsComponent implements OnInit {
       next: (created: any) => {
         this.isSavingTask.set(false);
         this.isCreateTaskOpen.set(false);
-        this.toast.success(`${created?.key || 'Task'} created`);
+        const waiting = created?.approvalState === 'PENDING_ADMIN' || created?.approvalState === 'PENDING_TECHNICAL';
+        this.toast.success(waiting
+          ? `${created?.key || 'Task'} created and sent for ${created.approvalState === 'PENDING_ADMIN' ? 'admin' : 'technical'} approval`
+          : `${created?.key || 'Task'} created`);
         this.loadMyTasks();
       },
       error: (err) => {
@@ -2986,6 +3110,8 @@ export class ProjectsComponent implements OnInit {
     this.taskForm.taskTypeId = matchedType?.id ?? null;
 
     this.editingPreSalesTaskId.set(task.id);
+    this.taskSubmitted = false;
+    this.taskErrors.set({});
     this.assigneeSearch.set('');
     this.closeAllTaskDropdowns();
     this.isCreateTaskOpen.set(true);
@@ -3275,6 +3401,11 @@ export class ProjectsComponent implements OnInit {
 
   /** Tints each row by status so the queue is scannable at a glance, exactly like CRM tickets. */
   myTasksRowClassRules = {
+    // Waiting for approval, or sent back, outranks the status colour: it is
+    // why the task cannot be worked yet.
+    'row-awaiting-approval': (p: any) =>
+      p.data?.approvalState === 'PENDING_TECHNICAL' || p.data?.approvalState === 'PENDING_ADMIN',
+    'row-needs-changes': (p: any) => p.data?.approvalState === 'REJECTED',
     // The row a pre-sales assignment notification pointed at.
     'row-linked': (p: any) =>
       p.data?.source === 'PRE_SALES' && p.data?.id === this.highlightedPreSalesTaskId,
@@ -3340,6 +3471,46 @@ export class ProjectsComponent implements OnInit {
           </div>
         `;
       },
+    },
+    {
+      field: 'assignee',
+      headerName: 'ASSIGNEE',
+      width: 155,
+      minWidth: 155,
+      sortable: false,
+      cellRenderer: (p: any) => {
+        const assignees: any[] = p.data?.assignees || [];
+        if (!assignees.length) {
+          return `<div class="user-cell unassigned"><span class="avatar-circle neutral">?</span><span class="user-name-text">Unassigned</span></div>`;
+        }
+        if (assignees.length === 1) {
+          const a = assignees[0];
+          const name = `${a.firstName || ''} ${a.lastName || ''}`.trim();
+          const initials = ((a.firstName?.[0] || '') + (a.lastName?.[0] || '')).toUpperCase() || '?';
+          const avatarHtml = a.avatarUrl
+            ? `<img class="avatar-img" src="${this.esc(a.avatarUrl)}" alt="" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span class="avatar-circle" style="display:none;">${initials}</span>`
+            : `<span class="avatar-circle">${initials}</span>`;
+          return `
+            <div class="user-cell" title="${this.esc(name)}">
+              ${avatarHtml}
+              <div class="user-info">
+                <span class="user-name-text">${this.esc(name)}</span>
+              </div>
+            </div>
+          `;
+        }
+        const visible = assignees.slice(0, 3);
+        const extra = assignees.length - 3;
+        const stack = visible.map((a, i) => {
+          const ml = i === 0 ? '0' : '-8px';
+          const initials = ((a.firstName?.[0] || '') + (a.lastName?.[0] || '')).toUpperCase() || '?';
+          return a.avatarUrl
+            ? `<img class="avatar-img" src="${this.esc(a.avatarUrl)}" style="margin-left:${ml};z-index:${3-i};" alt="" />`
+            : `<span class="avatar-circle" style="margin-left:${ml};z-index:${3-i};">${initials}</span>`;
+        }).join('');
+        const extraTag = extra > 0 ? `<span class="avatar-circle neutral" style="margin-left:-6px;font-size:9px;">+${extra}</span>` : '';
+        return `<div class="user-cell"><div style="display:flex;align-items:center;">${stack}${extraTag}</div></div>`;
+      }
     },
     {
       field: 'source',
@@ -3426,46 +3597,6 @@ export class ProjectsComponent implements OnInit {
         }
         return `<span style="color: #475569; font-size: 12.5px; font-weight: 500;">${str}</span>`;
       },
-    },
-    {
-      field: 'assignee',
-      headerName: 'ASSIGNEE',
-      width: 155,
-      minWidth: 155,
-      sortable: false,
-      cellRenderer: (p: any) => {
-        const assignees: any[] = p.data?.assignees || [];
-        if (!assignees.length) {
-          return `<div class="user-cell unassigned"><span class="avatar-circle neutral">?</span><span class="user-name-text">Unassigned</span></div>`;
-        }
-        if (assignees.length === 1) {
-          const a = assignees[0];
-          const name = `${a.firstName || ''} ${a.lastName || ''}`.trim();
-          const initials = ((a.firstName?.[0] || '') + (a.lastName?.[0] || '')).toUpperCase() || '?';
-          const avatarHtml = a.avatarUrl
-            ? `<img class="avatar-img" src="${this.esc(a.avatarUrl)}" alt="" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span class="avatar-circle" style="display:none;">${initials}</span>`
-            : `<span class="avatar-circle">${initials}</span>`;
-          return `
-            <div class="user-cell" title="${this.esc(name)}">
-              ${avatarHtml}
-              <div class="user-info">
-                <span class="user-name-text">${this.esc(name)}</span>
-              </div>
-            </div>
-          `;
-        }
-        const visible = assignees.slice(0, 3);
-        const extra = assignees.length - 3;
-        const stack = visible.map((a, i) => {
-          const ml = i === 0 ? '0' : '-8px';
-          const initials = ((a.firstName?.[0] || '') + (a.lastName?.[0] || '')).toUpperCase() || '?';
-          return a.avatarUrl
-            ? `<img class="avatar-img" src="${this.esc(a.avatarUrl)}" style="margin-left:${ml};z-index:${3-i};" alt="" />`
-            : `<span class="avatar-circle" style="margin-left:${ml};z-index:${3-i};">${initials}</span>`;
-        }).join('');
-        const extraTag = extra > 0 ? `<span class="avatar-circle neutral" style="margin-left:-6px;font-size:9px;">+${extra}</span>` : '';
-        return `<div class="user-cell"><div style="display:flex;align-items:center;">${stack}${extraTag}</div></div>`;
-      }
     },
     {
       headerName: 'ACTIONS',

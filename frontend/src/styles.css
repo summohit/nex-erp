@@ -658,6 +658,33 @@ button.btn-outline:hover,
   align-items: center;
 }
 
+.receipt-thumb-sm {
+  width: 28px !important;
+  height: 28px !important;
+  max-width: 28px !important;
+  max-height: 28px !important;
+  min-width: 28px !important;
+  border-radius: 6px !important;
+  object-fit: cover !important;
+  border: 1px solid #CBD5E1 !important;
+  display: block !important;
+}
+
+.receipt-doc-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 6px !important;
+  border: 1px solid #FCA5A5 !important;
+  background: #FEF2F2 !important;
+  color: #B91C1C !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em !important;
+}
+
 /* Pinned / Sticky Column Dividers & Borders */
 .ag-theme-quartz .ag-pinned-left-header,
 .ag-theme-quartz .ag-pinned-left-cols-container,
@@ -1503,8 +1530,42 @@ body.nav-scroll-lock {
 }
 
 .ag-theme-quartz .ag-row.row-status-rejected {
-  border-left-color: #1373e5 !important;
-  background-color: #eff6ff !important;
+  border-left-color: #f43f5e !important;
+  background-color: #fff1f2 !important;
+}
+
+.ag-theme-quartz .ag-row.row-awaiting-approval,
+.ag-theme-quartz .ag-row.row-awaiting-approval .ag-cell {
+  background-color: #fef3c7 !important;
+}
+
+.ag-theme-quartz .ag-row.row-awaiting-approval:hover,
+.ag-theme-quartz .ag-row.row-awaiting-approval:hover .ag-cell {
+  background-color: #fde68a !important;
+}
+
+.ag-theme-quartz .ag-row.row-awaiting-approval,
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-row.row-awaiting-approval,
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-row.row-awaiting-approval .ag-cell:first-child,
+.ag-theme-quartz .ag-row.row-awaiting-approval > .ag-cell:first-child {
+  border-left: 4px solid #f59e0b !important;
+}
+
+.ag-theme-quartz .ag-row.row-rejected-approval,
+.ag-theme-quartz .ag-row.row-rejected-approval .ag-cell {
+  background-color: #fff1f2 !important;
+}
+
+.ag-theme-quartz .ag-row.row-rejected-approval:hover,
+.ag-theme-quartz .ag-row.row-rejected-approval:hover .ag-cell {
+  background-color: #fee2e2 !important;
+}
+
+.ag-theme-quartz .ag-row.row-rejected-approval,
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-row.row-rejected-approval,
+.ag-theme-quartz .ag-pinned-left-cols-container .ag-row.row-rejected-approval .ag-cell:first-child,
+.ag-theme-quartz .ag-row.row-rejected-approval > .ag-cell:first-child {
+  border-left: 4px solid #f43f5e !important;
 }
 
 .ag-theme-quartz .ag-row.ag-row-hover,

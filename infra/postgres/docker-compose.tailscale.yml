@@ -1,0 +1,16 @@
+# Adds a second listener for Postgres on the VPS's Tailscale address, so people
+# on the tailnet connect with a plain connection string — no SSH tunnel — while
+# the database stays invisible to the public internet.
+#
+# Used ON TOP of docker-compose.yml, never instead of it:
+#   docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
+#
+# TAILSCALE_IP comes from .env (`tailscale ip -4` on the VPS). Binding to that
+# exact address, not 0.0.0.0, is what keeps this private: Docker publishes ports
+# by writing iptables rules directly, which bypasses ufw, so a 0.0.0.0 binding
+# would be public even with the firewall on.
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5433:5432"
+      - "${TAILSCALE_IP:?Set TAILSCALE_IP in .env (run: tailscale ip -4)}:5433:5432"

@@ -134,6 +134,7 @@ model Company {
 model User {
   /// Notices this person has dismissed from their dashboard.
   noticeReads              NoticeRead[]
+  noticeRecipients         NoticeRecipient[]          @relation("NoticeRecipients")
   id                       Int                        @id @default(autoincrement())
   email                    String                     @unique
   password                 String
@@ -164,6 +165,33 @@ model User {
   twoFactor                UserTwoFactor?
   twoFactorBackupCodes     TwoFactorBackupCode[]
   deviceTokens             DeviceToken[]
+}
+
+/// One compensatory day off, earned by working a non-working day on a trip.
+///
+/// A ledger rather than a bare increment on LeaveBalance: re-approving a trip
+/// must not credit the same day twice, cancelling it or moving its dates must
+/// take back exactly what it gave, and "where did this Comp-Off day come from"
+/// should have an answer.
+model CompOffCredit {
+  id                  Int       @id @default(autoincrement())
+  companyId           Int
+  employeeId          Int
+  employee            Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId         Int
+  leaveType           LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  fieldVisitRequestId Int
+  /// The non-working day that was worked.
+  date                DateTime  @db.Date
+  /// HOLIDAY | WEEK_OFF | DAY_OFF
+  reason              String
+  days                Float     @default(1)
+  /// The balance year it was credited to — the year of `date`.
+  year                Int
+  createdAt           DateTime  @default(now())
+
+  @@unique([fieldVisitRequestId, employeeId, date])
+  @@index([employeeId])
 }
 
 /// One push destination: a browser, or an installation of the mobile app.
@@ -487,6 +515,7 @@ model Employee {
   visitLocationRequestsRaised   VisitLocationRequest[] @relation("VisitLocationRequestRaisedBy")
   visitLocationRequestsReviewed VisitLocationRequest[] @relation("VisitLocationRequestReviewedBy")
   shiftReminders                ShiftReminderLog[]
+  compOffCredits                CompOffCredit[]
   salaryStructures              SalaryStructure[]
   payslips                      Payslip[]
   expenseClaims                 ExpenseClaim[]
@@ -680,9 +709,15 @@ model LeaveType {
   /// DEPRECATED — see carryForward.
   carryForwardLimit Int     @default(0)
 
-  companyId     Int
-  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  leaveBalances LeaveBalance[]
+  /// The leave type compensatory days off are credited to. Found by this flag,
+  /// not by a name like "Comp-Off", so a rename cannot break crediting. One per
+  /// company; created on first use if nobody has set one up.
+  isCompOff         Boolean @default(false)
+
+  companyId      Int
+  company        Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  compOffCredits CompOffCredit[]
+  leaveBalances  LeaveBalance[]
   leaveRequests LeaveRequest[]
   encashments   LeaveEncashment[]
   createdAt     DateTime          @default(now())
@@ -4155,6 +4190,12 @@ model Notice {
 
   reads       NoticeRead[]
   attachments NoticeAttachment[]
+  recipients  NoticeRecipient[]
+
+  /// Who it was addressed to, as the sender picked it:
+  /// { departmentIds: [], roles: [], userIds: [] }. Null means everybody.
+  /// Kept for display; NoticeRecipient is who it actually went to.
+  audience    Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4174,6 +4215,24 @@ model NoticeRead {
   userId   Int
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   readAt   DateTime @default(now())
+
+  @@unique([noticeId, userId])
+  @@index([userId])
+}
+
+/// One person a notice was addressed to, resolved when it was posted.
+///
+/// Stored rather than worked out on each read, so the list of who was told
+/// stays true after someone changes department or role. A notice with no rows
+/// here predates targeting and went to everybody.
+model NoticeRecipient {
+  id       Int    @id @default(autoincrement())
+  noticeId Int
+  notice   Notice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  userId   Int
+  user     User   @relation("NoticeRecipients", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 
   @@unique([noticeId, userId])
   @@index([userId])

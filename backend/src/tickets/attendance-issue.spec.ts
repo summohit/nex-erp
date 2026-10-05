@@ -204,9 +204,26 @@ describe('TicketsService — attendance issues', () => {
 
     const read = (user: any) => service.findOne(COMPANY, 5, user);
 
-    it.each([['SUPERADMIN'], ['ADMIN'], ['MANAGER']])('%s can read it', async (role) => {
+    it.each([['SUPERADMIN'], ['ADMIN']])('%s can read it', async (role) => {
       await expect(read({ role, employeeId: 88 })).resolves.toBeDefined();
     });
+
+    it('a manager outside the ticket team cannot, unless involved', async () => {
+      await expect(read({ role: 'MANAGER', employeeId: 88 })).rejects.toThrow('Ticket not found');
+    });
+
+    it.each([['Engineering'], ['software development ']])('someone in %s can read it', async (name) => {
+      prisma.employee.findUnique = jest.fn(async () => ({ department: { name } }));
+      await expect(read({ role: 'EMPLOYEE', employeeId: 88 })).resolves.toBeDefined();
+    });
+
+    // Matched exactly: these used to slip in on a keyword.
+    it.each([['IT Support'], ['Training & Development'], ['Information Technology (IT)']])(
+      'someone in %s cannot, unless involved', async (name) => {
+        prisma.employee.findUnique = jest.fn(async () => ({ department: { name } }));
+        await expect(read({ role: 'EMPLOYEE', employeeId: 88 })).rejects.toThrow('Ticket not found');
+      },
+    );
 
     it('someone in engineering can read it, as the list already allowed', async () => {
       prisma.employee.findUnique = jest.fn(async () => ({ department: { name: 'Software Development' } }));

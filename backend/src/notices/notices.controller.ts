@@ -28,8 +28,20 @@ export class NoticesController {
    */
   @Get()
   async list(@Req() req) {
-    const notices = await this.notices.list(req.user.companyId, req.user.role);
+    const notices = await this.notices.list(req.user.companyId, req.user.role, req.user.sub);
     return { notices, canPost: this.notices.canPost(req.user.role) };
+  }
+
+  /** Departments, roles and people a notice can be addressed to. */
+  @Get('audience-options')
+  audienceOptions(@Req() req) {
+    return this.notices.audienceOptions(req.user.companyId, req.user.role);
+  }
+
+  /** Who has and has not seen a notice, for whoever may post. */
+  @Get(':id/views')
+  views(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.notices.views(req.user.companyId, req.user.role, id);
   }
 
   @Post()

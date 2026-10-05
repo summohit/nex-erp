@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output, inject, signal, computed, HostListener } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject, signal, computed, effect, untracked, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -46,10 +46,15 @@ interface ProjectTaskOption {
   /** Issue members, so a shared task counts as being a person's task. */
   memberIds: number[];
   memberNames: string[];
+  /** PENDING_TECHNICAL / PENDING_ADMIN while the task itself awaits approval. */
+  approvalState?: string | null;
 }
 
 /** Statuses that mean the work is finished, or abandoned, and not a thing to send anyone to do. */
 const CLOSED_TASK_STATUSES = new Set(['DONE', 'CANCELLED', 'ARCHIVED']);
+
+/** The only statuses a general visit may pick from. */
+const GENERAL_TASK_STATUSES = new Set(['TODO', 'IN_PROGRESS']);
 
 /** What the form is being opened for. */
 export type FieldVisitFormMode = 'create' | 'edit' | 'modify';
@@ -111,6 +116,150 @@ export class FieldVisitRequestFormComponent implements OnInit {
   isSaving = signal(false);
   error = signal<string | null>(null);
   loadError = signal<string | null>(null);
+  showValidationErrors = signal<boolean>(false);
+
+  private readonly requiredFieldOrder: { id: string; field: string; label: string }[] = [
+    { id: 'field-fvr-project', field: 'project', label: 'Project' },
+    { id: 'field-fvr-location', field: 'location', label: 'Site Name & Address' },
+    { id: 'field-fvr-coordinates', field: 'coordinates', label: 'GPS Coordinates' },
+    { id: 'field-fvr-start-date', field: 'startDate', label: 'Start Date' },
+    { id: 'field-fvr-end-date', field: 'endDate', label: 'End Date' },
+    { id: 'field-fvr-start-time', field: 'startTime', label: 'Expected Clock-in' },
+    { id: 'field-fvr-end-time', field: 'endTime', label: 'Expected Clock-out' },
+    { id: 'field-fvr-members', field: 'members', label: 'Who is going (Field team)' },
+    { id: 'field-fvr-tasks', field: 'tasks', label: 'Site Tasks & Scope' },
+  ];
+
+  isFieldInvalid(field: string): boolean {
+    switch (field) {
+      case 'project':
+        return this.visitType() === 'PROJECT' && !(this.selectedProjectId() ?? this.form.projectId);
+      case 'location':
+        return !this.form.location || !this.form.location.trim();
+      case 'coordinates': {
+        if (
+          this.form.latitude == null ||
+          this.form.longitude == null ||
+          this.form.latitude === ('' as any) ||
+          this.form.longitude === ('' as any)
+        ) {
+          return true;
+        }
+        const lat = Number(this.form.latitude);
+        const lng = Number(this.form.longitude);
+        return (
+          isNaN(lat) ||
+          isNaN(lng) ||
+          (lat === 0 && lng === 0)
+        );
+      }
+      case 'startDate':
+        return !this.form.startDate || isNaN(Date.parse(`${this.form.startDate}T00:00:00Z`));
+      case 'endDate': {
+        if (!this.form.endDate || isNaN(Date.parse(`${this.form.endDate}T00:00:00Z`))) return true;
+        if (this.form.startDate) {
+          const from = Date.parse(`${this.form.startDate}T00:00:00Z`);
+          const to = Date.parse(`${this.form.endDate}T00:00:00Z`);
+          if (!isNaN(from) && !isNaN(to) && to < from) return true;
+        }
+        return false;
+      }
+      case 'startTime':
+        return !this.form.startTime || !this.form.startTime.trim();
+      case 'endTime': {
+        if (!this.form.endTime || !this.form.endTime.trim()) return true;
+        if (this.form.startTime && this.form.endTime <= this.form.startTime) return true;
+        return false;
+      }
+      case 'members':
+        return this.selectedEmployeeIds().length === 0;
+      case 'tasks':
+        return (
+          this.form.tasks.length === 0 ||
+          !this.form.tasks.some((t) => (t.name && t.name.trim()) || t.issueId != null)
+        );
+      default:
+        return false;
+    }
+  }
+
+  endDateErrorMessage(): string {
+    if (!this.form.endDate) return 'End date is required';
+    if (this.form.startDate) {
+      const from = Date.parse(`${this.form.startDate}T00:00:00Z`);
+      const to = Date.parse(`${this.form.endDate}T00:00:00Z`);
+      if (to < from) return 'End date cannot be before start date';
+    }
+    return 'Invalid end date';
+  }
+
+  endTimeErrorMessage(): string {
+    if (!this.form.endTime) return 'Expected clock-out time is required';
+    if (this.form.startTime && this.form.endTime <= this.form.startTime) {
+      return 'Clock-out time must be after clock-in time';
+    }
+    return 'Invalid clock-out time';
+  }
+
+  validateForm(): boolean {
+    const invalidItem = this.requiredFieldOrder.find((item) => this.isFieldInvalid(item.field));
+    if (!invalidItem) {
+      return true;
+    }
+
+    this.showValidationErrors.set(true);
+    this.toast.error(`Please complete the required field: ${invalidItem.label}`);
+    this.scrollToField(invalidItem.id);
+    return false;
+  }
+
+  scrollToField(elementId: string): void {
+    setTimeout(() => {
+      const targetEl = document.getElementById(elementId);
+      if (!targetEl) return;
+
+      const modalBody =
+        (targetEl.closest('.modal-body') as HTMLElement | null) ||
+        (document.querySelector('.modal-body') as HTMLElement | null);
+
+      if (modalBody) {
+        const bodyRect = modalBody.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+        const targetOffsetTop = targetRect.top - bodyRect.top + modalBody.scrollTop;
+        modalBody.scrollTo({
+          top: Math.max(0, targetOffsetTop - 24),
+          behavior: 'smooth',
+        });
+      }
+
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      targetEl.classList.remove('field-attention-pulse');
+      void targetEl.offsetWidth;
+      targetEl.classList.add('field-attention-pulse');
+
+      const innerTrigger = targetEl.querySelector<HTMLElement>(
+        '.searchable-select-trigger, input, textarea, .member-picker-grid, .scope-trigger',
+      );
+      if (innerTrigger) {
+        innerTrigger.classList.remove('field-attention-pulse');
+        void innerTrigger.offsetWidth;
+        innerTrigger.classList.add('field-attention-pulse');
+      }
+
+      setTimeout(() => {
+        targetEl.classList.remove('field-attention-pulse');
+        if (innerTrigger) innerTrigger.classList.remove('field-attention-pulse');
+      }, 2000);
+
+      const focusable = targetEl.querySelector<HTMLElement>(
+        'input:not([type="hidden"]), select, button:not([disabled]), textarea',
+      );
+      if (focusable) {
+        focusable.focus();
+      }
+    }, 100);
+  }
 
   isAdmin = this.roleService.isAdmin;
 
@@ -146,6 +295,92 @@ export class FieldVisitRequestFormComponent implements OnInit {
   isLoadingLists = signal(false);
   /** The project picker shows a loader, not "no projects", until this is false. */
   isLoadingProjects = signal(true);
+
+  /**
+   * PROJECT is the original flow. GENERAL belongs to no project: the people
+   * are picked first, and the scope is their own To Do / In Progress general
+   * tasks rather than a project's board.
+   */
+  visitType = signal<'PROJECT' | 'GENERAL'>('PROJECT');
+
+  setVisitType(type: 'PROJECT' | 'GENERAL'): void {
+    if (this.visitType() === type) return;
+    this.visitType.set(type);
+    // The two kinds pick tasks from different places, so nothing picked
+    // carries across.
+    this.form.tasks = [];
+    this.projectTasks.set([]);
+    this.tasksError.set(null);
+    this.tasksLoadedFor = null;
+    if (type === 'GENERAL') {
+      this.selectedProjectId.set(null);
+      this.form.projectId = null;
+      this.isProjectDropdownOpen.set(false);
+      this.showAllProjectTasks.set(false);
+      this.loadGeneralTasks(this.selectedEmployeeIds());
+    } else {
+      this.showAllProjectTasks.set(true);
+    }
+  }
+
+  /** A general visit's task list follows whoever is picked to go. */
+  private generalTasksFollowPeople = effect(() => {
+    const people = this.selectedEmployeeIds();
+    if (untracked(() => this.visitType()) !== 'GENERAL') return;
+    untracked(() => this.loadGeneralTasks(people));
+  });
+
+  private generalLoadSeq = 0;
+
+  loadGeneralTasks(employeeIds: number[]): void {
+    const seq = ++this.generalLoadSeq;
+    this.tasksError.set(null);
+    if (!employeeIds.length) {
+      this.projectTasks.set([]);
+      this.isLoadingTasks.set(false);
+      this.form.tasks = [];
+      return;
+    }
+    this.isLoadingTasks.set(true);
+    this.api.getGeneralTasks(employeeIds).subscribe({
+      next: (rows) => {
+        if (seq !== this.generalLoadSeq) return;
+        this.isLoadingTasks.set(false);
+        const options = (rows || []).map((i: any) => this.toTaskOption(i));
+        this.projectTasks.set(options);
+        // A task belonging only to someone just taken off the trip goes with them.
+        const open = new Set(options.map((o) => o.id));
+        this.form.tasks = this.form.tasks.filter((t) => t.issueId != null && open.has(t.issueId));
+      },
+      error: (err) => {
+        if (seq !== this.generalLoadSeq) return;
+        this.isLoadingTasks.set(false);
+        this.projectTasks.set([]);
+        this.tasksError.set(`Could not load their general tasks: ${this.messageOf(err)}.`);
+      },
+    });
+  }
+
+  private toTaskOption(i: any): ProjectTaskOption {
+    return {
+      id: i.id,
+      key: i.key,
+      title: i.title,
+      status: i.status,
+      priority: i.priority,
+      dueDate: i.dueDate ?? null,
+      assigneeId: i.assigneeId ?? null,
+      approvalState: i.approvalState ?? null,
+      assigneeName: i.assignee
+        ? `${i.assignee.firstName ?? ''} ${i.assignee.lastName ?? ''}`.trim()
+        : null,
+      assigneeAvatarUrl: i.assignee?.avatarUrl ?? null,
+      memberIds: (i.members ?? []).map((m: any) => m.employeeId ?? m.employee?.id).filter((id: any) => id != null),
+      memberNames: (i.members ?? [])
+        .map((m: any) => `${m.employee?.firstName ?? ''} ${m.employee?.lastName ?? ''}`.trim())
+        .filter((n: string) => n.length > 0),
+    };
+  }
 
   // Searchable Project select state
   selectedProjectId = signal<number | null>(null);
@@ -218,8 +453,12 @@ export class FieldVisitRequestFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    if (this.request?.project?.isSystem) {
+      this.visitType.set('GENERAL');
+      this.showAllProjectTasks.set(false);
+    }
     if (this.request) {
-      this.selectedProjectId.set(this.request.project.id);
+      if (this.visitType() === 'PROJECT') this.selectedProjectId.set(this.request.project.id);
       this.selectedVisitLocationId.set((this.request as any).visitLocationId ?? null);
       this.selectedEmployeeIds.set(this.request.members.map((m) => m.employee.id));
       this.form = {
@@ -255,7 +494,9 @@ export class FieldVisitRequestFormComponent implements OnInit {
     // The trip's own board, so the picker can show what is already picked as
     // picked and offer everything else. Started after the request has been read
     // into the form, or the first render would come back emptied.
-    if (this.selectedProjectId()) this.loadProjectTasks(this.selectedProjectId()!);
+    if (this.visitType() === 'PROJECT' && this.selectedProjectId()) {
+      this.loadProjectTasks(this.selectedProjectId()!);
+    }
   }
 
   /** The projects and people the form picks from. */
@@ -494,23 +735,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
     this.projectsService.getIssues(projectId).subscribe({
       next: (rows: any[]) => {
         this.isLoadingTasks.set(false);
-        this.projectTasks.set((rows || []).map((i: any) => ({
-          id: i.id,
-          key: i.key,
-          title: i.title,
-          status: i.status,
-          priority: i.priority,
-          dueDate: i.dueDate ?? null,
-          assigneeId: i.assigneeId ?? null,
-          assigneeName: i.assignee
-            ? `${i.assignee.firstName ?? ''} ${i.assignee.lastName ?? ''}`.trim()
-            : null,
-          assigneeAvatarUrl: i.assignee?.avatarUrl ?? null,
-          memberIds: (i.members ?? []).map((m: any) => m.employeeId ?? m.employee?.id).filter((id: any) => id != null),
-          memberNames: (i.members ?? [])
-            .map((m: any) => `${m.employee?.firstName ?? ''} ${m.employee?.lastName ?? ''}`.trim())
-            .filter((n: string) => n.length > 0),
-        })));
+        this.projectTasks.set((rows || []).map((i: any) => this.toTaskOption(i)));
       },
       error: (err) => {
         this.isLoadingTasks.set(false);
@@ -534,27 +759,45 @@ export class FieldVisitRequestFormComponent implements OnInit {
    * has already closed helps nobody. And what is already picked, which is
    * dropped so the list only ever offers something that changes the trip.
    */
-  filteredProjectTasks = computed(() => {
+  /**
+   * The tasks still offered, picked ones excluded. A plain method, not a
+   * computed: the picks live in form.tasks, which is not a signal, so a
+   * computed never saw a pick and kept offering what was already chosen.
+   */
+  filteredProjectTasks(): ProjectTaskOption[] {
     const q = this.taskSearchQuery().trim().toLowerCase();
     const people = this.selectedEmployeeIds();
     const picked = this.form.tasks.map((t) => t.issueId).filter((id): id is number => id != null);
     const showAll = this.showAllProjectTasks();
 
-    const isClosed = (t: ProjectTaskOption) => CLOSED_TASK_STATUSES.has(t.status);
+    const general = this.visitType() === 'GENERAL';
+    // General visits only take work that is still to be done or under way.
+    const isClosed = (t: ProjectTaskOption) => general
+      ? !GENERAL_TASK_STATUSES.has(t.status)
+      : CLOSED_TASK_STATUSES.has(t.status);
     const isTheirs = (t: ProjectTaskOption) =>
       (t.assigneeId != null && people.includes(t.assigneeId))
       || t.memberIds.some((id) => people.includes(id));
 
     return this.projectTasks()
-      .filter((t) => showAll || isTheirs(t) || (t.assigneeId == null && t.memberIds.length === 0))
+      .filter((t) => showAll || isTheirs(t) || (!general && t.assigneeId == null && t.memberIds.length === 0))
       .filter((t) => !isClosed(t) || picked.includes(t.id))
       .filter((t) => !picked.includes(t.id))
       .filter((t) => !q || t.title.toLowerCase().includes(q) || t.key.toLowerCase().includes(q))
       .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
-  });
+  }
 
   /** Why the list is short, so an empty one does not read as "nothing to do". */
-  projectTaskFilterNote = computed(() => {
+  /** Why the list is empty or short. A method for the same reason as above. */
+  projectTaskFilterNote(): string {
+    if (this.visitType() === 'GENERAL') {
+      if (this.isLoadingTasks()) return 'Loading their general tasks…';
+      if (!this.selectedEmployeeIds().length) return 'Pick who is going in Step 3 to see their general tasks.';
+      if (!this.filteredProjectTasks().length && !this.taskSearchQuery()) {
+        return 'None of the people going has a general task in To Do or In Progress.';
+      }
+      return '';
+    }
     if (this.isLoadingTasks()) return 'Loading this project\'s tasks…';
     if (!this.projectTasks().length) return 'This project has no tasks on its board yet.';
     if (this.showAllProjectTasks()) return '';
@@ -565,11 +808,59 @@ export class FieldVisitRequestFormComponent implements OnInit {
       return 'No open task belongs to the people going. Show all project tasks, or add the scope by hand.';
     }
     return '';
-  });
+  }
 
   toggleTaskDropdown(): void {
     this.isTaskDropdownOpen.update((v) => !v);
     if (this.isTaskDropdownOpen()) this.taskSearchQuery.set('');
+  }
+
+  /** Whether a task (by id) is still waiting for its own approval. */
+  isTaskAwaitingApproval(issueId: number | null | undefined): boolean {
+    if (issueId == null) return false;
+    const state = this.projectTasks().find((t) => t.id === issueId)?.approvalState;
+    return state === 'PENDING_TECHNICAL' || state === 'PENDING_ADMIN';
+  }
+
+  /**
+   * Who a picked task belongs to among the people going: its assignee or
+   * members who are on this visit. Empty means nobody going owns it, so
+   * nobody can clock in against it (field visit clock-in offers each person
+   * only their own tasks).
+   */
+  taskOwnersGoing(issueId: number | null | undefined): string[] {
+    if (issueId == null) return [];
+    const t = this.projectTasks().find((o) => o.id === issueId);
+    if (!t) return [];
+    const going = new Set(this.selectedEmployeeIds());
+    const names: string[] = [];
+    if (t.assigneeId != null && going.has(t.assigneeId) && t.assigneeName) names.push(t.assigneeName);
+    t.memberIds.forEach((id, i) => {
+      if (going.has(id) && id !== t.assigneeId && t.memberNames[i]) names.push(t.memberNames[i]);
+    });
+    return names;
+  }
+
+  /** The task's owner on the board, whoever it is, for display. */
+  taskOwnerLabel(issueId: number | null | undefined): string {
+    const going = this.taskOwnersGoing(issueId);
+    if (going.length) return going.join(', ');
+    const t = issueId == null ? undefined : this.projectTasks().find((o) => o.id === issueId);
+    return t?.assigneeName || 'Unassigned';
+  }
+
+  /** Picked board tasks that nobody going owns. */
+  pickedNotOwnedByAnyoneGoing(): { key: string; name: string; owner: string }[] {
+    return this.form.tasks
+      .filter((t) => t.issueId != null && !this.taskOwnersGoing(t.issueId).length)
+      .map((t) => ({ key: t.key ?? '', name: t.name, owner: this.taskOwnerLabel(t.issueId) }));
+  }
+
+  /** Picked tasks still awaiting approval, for the warning under Step 4. */
+  pickedAwaitingApproval(): { key: string; name: string }[] {
+    return this.form.tasks
+      .filter((t) => this.isTaskAwaitingApproval(t.issueId))
+      .map((t) => ({ key: t.key ?? '', name: t.name }));
   }
 
   toggleTaskOption(option: ProjectTaskOption): void {
@@ -831,7 +1122,10 @@ export class FieldVisitRequestFormComponent implements OnInit {
 
   private payload(submit: boolean): FieldVisitRequestInput {
     return {
-      projectId: Number(this.selectedProjectId() ?? this.form.projectId),
+      visitType: this.visitType(),
+      projectId: this.visitType() === 'GENERAL'
+        ? undefined
+        : Number(this.selectedProjectId() ?? this.form.projectId),
       location: this.form.location.trim(),
       visitLocationId: this.form.visitLocationId ?? undefined,
       latitude: Number(this.form.latitude),
@@ -862,6 +1156,9 @@ export class FieldVisitRequestFormComponent implements OnInit {
   proposeChange(): void {
     const id = this.request?.id;
     if (!id) return;
+    if (!this.validateForm()) {
+      return;
+    }
     this.error.set(null);
     this.isSaving.set(true);
 
@@ -879,16 +1176,17 @@ export class FieldVisitRequestFormComponent implements OnInit {
   }
 
   save(submit: boolean): void {
-    // The server derives the day count itself and rejects a range it cannot
-    // make sense of. Catching it here costs a round trip less and says which
-    // field is wrong while the person is still looking at it.
-    if (!this.visitDays()) {
-      const message = !this.form.startDate || !this.form.endDate
-        ? 'Pick a start and end date for the visit.'
-        : 'The end date is before the start date, so the visit has no duration.';
-      this.toast.error(message);
-      this.error.set(message);
-      return;
+    if (submit) {
+      if (!this.validateForm()) {
+        return;
+      }
+    } else {
+      if (this.isFieldInvalid('project')) {
+        this.showValidationErrors.set(true);
+        this.toast.error('Please select a project before saving a draft');
+        this.scrollToField('field-fvr-project');
+        return;
+      }
     }
 
     this.error.set(null);

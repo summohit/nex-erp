@@ -70,7 +70,7 @@ export interface MyTask {
 }
 
 /** Whose tasks the list is showing. 'all' is offered to administrators only. */
-export type TaskScope = 'mine' | 'all';
+export type TaskScope = 'mine' | 'all' | 'created';
 
 /** One active member of a deal's pre-sales team — who a task may be given to. */
 export interface PreSalesTeamMember {
@@ -97,7 +97,10 @@ export interface PreSalesTaskHistoryEntry {
 
 export interface TaskCapabilities {
   canCreateTask: boolean;
+  /** General tasks: administrators and project managers only. */
   canCreateGeneral: boolean;
+  /** Raise a task in any project: admin, or a department flagged in Master Data. */
+  canCreateAnywhere?: boolean;
   isAdmin: boolean;
 }
 
@@ -163,7 +166,7 @@ export class TasksService {
     const params: string[] = [];
     if (opts.includeReported) params.push('includeReported=true');
     if (opts.includeDone) params.push('includeDone=true');
-    if (opts.scope === 'all') params.push('scope=all');
+    if (opts.scope && opts.scope !== 'mine') params.push(`scope=${opts.scope}`);
     return this.http.get<{ items: MyTask[]; truncated: boolean; scope: TaskScope }>(
       `${this.apiUrl}/my${params.length ? '?' + params.join('&') : ''}`,
     );

@@ -379,7 +379,7 @@ export class CrmService {
   async getMyPreSalesTasks(
     companyId: number,
     employeeId: number,
-    opts: { includeDone?: boolean; take?: number; everyone?: boolean; isAdmin?: boolean } = {},
+    opts: { includeDone?: boolean; take?: number; everyone?: boolean; isAdmin?: boolean; createdBy?: boolean } = {},
   ): Promise<any[]> {
     const tasks = await this.prisma.preSalesTask.findMany({
       where: {
@@ -387,7 +387,8 @@ export class CrmService {
         // `everyone` is the administrator's company-wide view. The caller is
         // responsible for having checked the role — this method is not a
         // permission boundary, it is the CRM's shaping of the rows.
-        ...(opts.everyone ? {} : { assignedToId: employeeId }),
+        // createdBy: the pre-sales tasks this person raised, for the 'created' view.
+        ...(opts.everyone ? {} : opts.createdBy ? { assignedById: employeeId } : { assignedToId: employeeId }),
         ...(opts.includeDone ? {} : { status: { not: 'COMPLETED' } }),
       },
       select: {
@@ -2888,6 +2889,13 @@ export class CrmService {
     if (!title) throw new BadRequestException('Give the task a title.');
 
     const estimatedMinutes = this.parseDurationMinutes(data);
+    // Required, like every other task: the member's hours budget below is
+    // checked against this, so a task with no estimate is a task that spends
+    // nothing and can never be refused for being over — which is the one case
+    // the budget exists to catch. parseDurationMinutes returns null for zero.
+    if (!estimatedMinutes) {
+      throw new BadRequestException('Enter the estimated duration — it must be greater than zero.');
+    }
     const scheduledAt = this.parseScheduledAt(data);
 
     // The member is engaged for a fixed number of hours; the tasks raised for

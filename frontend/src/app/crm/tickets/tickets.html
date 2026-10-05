@@ -32,7 +32,7 @@
 
   <!-- KPI / Stats Row — skeleton mirrors the real card shape so nothing jumps -->
   <div class="stats-row" *ngIf="!stats">
-    <div class="stat-card skeleton-card" *ngFor="let i of [1,2,3,4,5]">
+    <div class="stat-card skeleton-card" *ngFor="let i of [1,2,3,4,5,6]">
       <app-skeleton width="44px" height="44px" radius="12px"></app-skeleton>
       <div class="stat-info">
         <app-skeleton width="72px" height="10px"></app-skeleton>
@@ -100,6 +100,18 @@
         <span class="stat-label">Closed</span>
         <div class="stat-value">{{ stats.closed }}</div>
         <span class="stat-subtext">Confirmed & signed off</span>
+      </div>
+    </div>
+
+    <!-- Rejected -->
+    <div class="stat-card stat-rose" [class.active-card]="filterStatus === 'REJECTED'" (click)="toggleStatusCard('REJECTED')" title="Click to filter Rejected tickets">
+      <div class="stat-icon-wrapper">
+        <svg lucideXCircle [size]="22"></svg>
+      </div>
+      <div class="stat-info">
+        <span class="stat-label">Rejected</span>
+        <div class="stat-value">{{ stats.rejected ?? 0 }}</div>
+        <span class="stat-subtext">Declined or closed</span>
       </div>
     </div>
   </div>
@@ -407,9 +419,18 @@
       <!-- Filter Dropdowns Group -->
       <div class="filter-dropdowns-group">
 
-        <!-- Date Filter -->
+        <!-- Date Type Filter -->
+        <div class="month-filter-wrapper date-type-wrapper">
+          <select class="form-select month-select" [(ngModel)]="filterDateField" (change)="loadTickets()" title="Filter by Created Date, Resolved Date, or Closed Date">
+            <option value="created">Created Date</option>
+            <option value="resolved">Resolved Date</option>
+            <option value="closed">Closed Date</option>
+          </select>
+        </div>
+
+        <!-- Date Range Filter -->
         <div class="month-filter-wrapper">
-          <select class="form-select month-select" [(ngModel)]="filterMonth" (change)="loadTickets()">
+          <select class="form-select month-select" [(ngModel)]="filterMonth" (change)="loadTickets()" title="Select date range">
             <option value="all">All Dates</option>
             <option value="today">Today</option>
             <option value="this_week">This Week</option>
@@ -672,8 +693,8 @@
         [columnDefs]="columnDefs"
         [defaultColDef]="defaultColDef"
         [rowClassRules]="rowClassRules"
-        [rowHeight]="48"
-        [headerHeight]="38"
+        [rowHeight]="52"
+        [headerHeight]="40"
         [pagination]="true"
         [paginationPageSize]="25"
         [animateRows]="true"

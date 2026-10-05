@@ -1,5 +1,5 @@
 import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
-import { NoticesService, Notice } from '../services/notices';
+import { NoticesService, Notice, noticeBodyHtml, noticeBodyText } from '../services/notices';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../services/auth.service';
@@ -24,6 +24,7 @@ import {
 import { HotToastService } from '@ngneat/hot-toast';
 
 import { OutsideOfficeAnswer, OutsideOfficeService } from '../shared/services/outside-office.service';
+import { GeolocationService } from '../shared/services/geolocation.service';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -49,6 +50,8 @@ import { OutsideOfficeAnswer, OutsideOfficeService } from '../shared/services/ou
 export class DashboardComponent implements OnInit, OnDestroy {
   // ── Notice board ────────────────────────────────────────────────────────
   private noticesService = inject(NoticesService);
+  readonly noticeHtml = noticeBodyHtml;
+  readonly noticeText = noticeBodyText;
 
   notices = signal<Notice[]>([]);
   /** The one being shown in the popup, or null. */
@@ -60,11 +63,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.noticesService.forDashboard().subscribe({
       next: (list) => {
         this.notices.set(list || []);
-        // Only HIGH priority interrupts. Everything else waits to be noticed
-        // in the list -- a popup for every routine announcement is a popup
-        // people learn to dismiss without reading.
-        const urgent = (list || []).find((n) => !n.isRead && n.priority === 'HIGH');
-        if (urgent) this.activeNotice.set(urgent);
+        // HIGH priority opens by itself from the app-wide popup
+        // (NoticePopupComponent), on whichever page the person is on. Here
+        // they wait in the list to be clicked.
       },
       // Silent: a dashboard that loads without its notices is better than one
       // that greets people with an error.
@@ -139,6 +140,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private dashboardService = inject(DashboardService);
   private toast = inject(HotToastService);
   private outsideOffice = inject(OutsideOfficeService);
+  private geo = inject(GeolocationService);
 
   user = signal<any>(null);
   onboardingStatus = signal<string>('COMPLETED');
@@ -400,18 +402,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const attendance = this.todayAttendance();
     const action = (!attendance || !attendance.clockIn) ? 'clockIn' : 'clockOut';
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          this.executeClockAction(action, position.coords.latitude, position.coords.longitude);
-        },
-        (error) => {
-          this.executeClockAction(action);
-        }
-      );
-    } else {
-      this.executeClockAction(action);
-    }
+    // Bounded, retried and explained rather than a bare getCurrentPosition
+    // whose error branch clocked in with no location — see GeolocationService.
+    void this.geo.locateForClock().then(({ lat, lng }) => this.executeClockAction(action, lat, lng));
   }
 
   private executeClockAction(

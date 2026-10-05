@@ -1,9 +1,11 @@
 import { Injectable, signal } from '@angular/core';
 
 export type DialogVariant = 'success' | 'error' | 'confirm' | 'prompt';
+export type DialogTone = 'primary' | 'danger' | 'warning' | 'success';
 
 export interface DialogState {
   variant: DialogVariant;
+  tone?: DialogTone;
   title: string;
   message: string;
   confirmLabel: string;
@@ -27,21 +29,33 @@ export interface DialogState {
 export class DialogService {
   state = signal<DialogState | null>(null);
 
-  confirm(message: string, title = 'Are you sure?', confirmLabel = 'Confirm', cancelLabel = 'Cancel'): Promise<boolean> {
+  getTone(state: DialogState | null): DialogTone {
+    if (!state) return 'primary';
+    if (state.tone) return state.tone;
+    if (state.variant === 'success') return 'success';
+    if (state.variant === 'error') return 'danger';
+    const text = `${state.title} ${state.confirmLabel}`.toLowerCase();
+    if (/reject|delete|remove|decline|discard|cancel ticket/.test(text)) return 'danger';
+    if (/resolve|approve|complete/.test(text)) return 'success';
+    if (state.variant === 'confirm') return 'warning';
+    return 'primary';
+  }
+
+  confirm(message: string, title = 'Are you sure?', confirmLabel = 'Confirm', cancelLabel = 'Cancel', tone?: DialogTone): Promise<boolean> {
     return new Promise(resolve => {
-      this.state.set({ variant: 'confirm', title, message, confirmLabel, cancelLabel, resolve });
+      this.state.set({ variant: 'confirm', tone, title, message, confirmLabel, cancelLabel, resolve });
     });
   }
 
   success(message: string, title = 'Success'): Promise<void> {
     return new Promise(resolve => {
-      this.state.set({ variant: 'success', title, message, confirmLabel: 'OK', resolve: () => resolve() });
+      this.state.set({ variant: 'success', tone: 'success', title, message, confirmLabel: 'OK', resolve: () => resolve() });
     });
   }
 
   error(message: string, title = 'Something went wrong'): Promise<void> {
     return new Promise(resolve => {
-      this.state.set({ variant: 'error', title, message, confirmLabel: 'OK', resolve: () => resolve() });
+      this.state.set({ variant: 'error', tone: 'danger', title, message, confirmLabel: 'OK', resolve: () => resolve() });
     });
   }
 
@@ -56,12 +70,13 @@ export class DialogService {
   prompt(
     message: string,
     title = 'Please explain',
-    opts: { placeholder?: string; confirmLabel?: string; cancelLabel?: string; required?: boolean } = {},
+    opts: { placeholder?: string; confirmLabel?: string; cancelLabel?: string; required?: boolean; tone?: DialogTone } = {},
   ): Promise<string | null> {
     return new Promise(resolve => {
       this.promptValue = '';
       this.state.set({
         variant: 'prompt',
+        tone: opts.tone,
         title,
         message,
         confirmLabel: opts.confirmLabel ?? 'Submit',
@@ -104,6 +119,7 @@ export class DialogService {
       accept?: string;
       attachmentLabel?: string;
       attachmentHint?: string;
+      tone?: DialogTone;
     } = {},
   ): Promise<{ text: string; file: File | null } | null> {
     return new Promise(resolve => {
@@ -111,6 +127,7 @@ export class DialogService {
       this.promptFile = null;
       this.state.set({
         variant: 'prompt',
+        tone: opts.tone,
         title,
         message,
         confirmLabel: opts.confirmLabel ?? 'Submit',

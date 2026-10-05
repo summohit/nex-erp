@@ -16,6 +16,8 @@ import {
   FieldVisitRequestsService, FieldVisitRequest, FieldVisitActivity,
 } from '../../services/field-visit-requests';
 import { FieldVisitRequestFormComponent } from './field-visit-request-form';
+import { RoleService } from '../../services/role.service';
+import { DialogService } from '../../shared/services/dialog.service';
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
@@ -57,6 +59,8 @@ export class FieldVisitRequestDetailComponent implements OnInit {
   private router = inject(Router);
   private sanitizer = inject(DomSanitizer);
   private toast = inject(HotToastService);
+  private dialog = inject(DialogService);
+  readonly isCompanyWide = inject(RoleService).isAdmin;
 
   request = signal<FieldVisitRequest | null>(null);
   timeline = signal<FieldVisitActivity[]>([]);
@@ -68,6 +72,12 @@ export class FieldVisitRequestDetailComponent implements OnInit {
 
   /** §10: the change form, and turning a proposed change down. */
   isChanging = signal(false);
+  /**
+   * Editing a draft. The server has always sent `canEdit` and the form has
+   * always had an 'edit' mode, but nothing on this page opened it — so a
+   * request withdrawn to draft could not actually be changed.
+   */
+  isEditing = signal(false);
   isRejectingChange = signal(false);
   changeRejectionReason = '';
 
@@ -185,8 +195,42 @@ export class FieldVisitRequestDetailComponent implements OnInit {
     this.run(this.api.submit(this.id), 'Sent for approval');
   }
 
-  approve(): void {
-    this.run(this.api.approve(this.id), 'Approved — tasks and attendance are assigned');
+  /**
+   * Approve, offering to override rostered days off if that is all that stands
+   * in the way.
+   *
+   * The server refuses by default and names the people and days; when every
+   * clash is a day off (code ROSTER_DAY_OFF_CLASH) the approver may choose to
+   * roster them on site anyway. Another project's site is never offered — that
+   * needs that roster changed first.
+   */
+  approve(overrideDayOff = false): void {
+    this.isWorking.set(true);
+    this.api.approve(this.id, overrideDayOff ? { overrideDayOff: true } : {}).subscribe({
+      next: () => {
+        this.isWorking.set(false);
+        this.toast.success(
+          overrideDayOff
+            ? 'Approved — rostered on site over the days off; tasks and attendance are assigned'
+            : 'Approved — tasks and attendance are assigned',
+        );
+        this.load();
+      },
+      error: async (err: any) => {
+        this.isWorking.set(false);
+        if (!overrideDayOff && err?.error?.code === 'ROSTER_DAY_OFF_CLASH') {
+          const ok = await this.dialog.confirm(
+            this.messageOf(err),
+            'This trip falls on rostered days off',
+            'Approve and override days off',
+            'Cancel',
+          );
+          if (ok) this.approve(true);
+          return;
+        }
+        this.toast.error(this.messageOf(err), { duration: 9000 });
+      },
+    });
   }
 
   reject(): void {
@@ -213,6 +257,11 @@ export class FieldVisitRequestDetailComponent implements OnInit {
 
   onChangeProposed(): void {
     this.isChanging.set(false);
+    this.load();
+  }
+
+  onEdited(): void {
+    this.isEditing.set(false);
     this.load();
   }
 

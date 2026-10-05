@@ -2993,3 +2993,55 @@
   display: block; margin-top: 2px;
   font-size: 9px; font-weight: 700; letter-spacing: 0.05em; color: #B45309;
 }
+
+/* ── Field Visit Indicators ────────────────────────────────────────────── */
+.flag-badge.field-visit-flag {
+  background: #eef2ff !important;
+  color: #4338ca !important;
+  border: 1px solid #c7d2fe !important;
+  font-weight: 700 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.flag-badge.field-visit-flag svg {
+  color: #4f46e5;
+}
+
+.day-fv-pin {
+  font-size: 11px;
+  line-height: 1;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+}
+
+.cell-tooltip-field-visit {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+  color: #3730a3;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.cell-tooltip-field-visit strong {
+  color: #312e81;
+}
+
+.cell-tooltip-field-visit .fv-tip-sub {
+  color: #4338ca;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.cell-tooltip-field-visit .fv-tip-time {
+  color: #6366f1;
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 1px;
+}

@@ -211,10 +211,74 @@
       }
     </div>
   } @else {
+    <!-- Floating / Sticky Bulk Actions Bar -->
+    @if (selectedCount() > 0 && isCompanyWide()) {
+      <div class="bulk-actions-bar">
+        <div class="bulk-info">
+          <span class="bulk-count-badge">{{ selectedCount() }}</span>
+          <span class="bulk-label">{{ selectedCount() === 1 ? 'visit selected' : 'visits selected' }}</span>
+          @if (hasPastSelected()) {
+            <span class="bulk-past-notice" title="Selected visits include trips with past dates">
+              <svg lucideAlertTriangle [size]="13"></svg>
+              <span>Includes past visits</span>
+            </span>
+          }
+        </div>
+
+        <div class="bulk-btns">
+          <button type="button" class="btn-bulk-action btn-bulk-approve" [disabled]="isBulkLoading()" (click)="bulkApprove()">
+            <svg lucideCheck [size]="14"></svg>
+            <span>Approve ({{ selectedCount() }})</span>
+          </button>
+
+          <button type="button" class="btn-bulk-action btn-bulk-complete" [disabled]="isBulkLoading()" (click)="bulkMarkCompleted()" title="Mark past finished trips as completed">
+            <svg lucideCheckCircle2 [size]="14"></svg>
+            <span>Mark Completed</span>
+          </button>
+
+          <button type="button" class="btn-bulk-action btn-bulk-reject" [disabled]="isBulkLoading()" (click)="bulkReject()">
+            <svg lucideX [size]="14"></svg>
+            <span>Reject</span>
+          </button>
+
+          <button type="button" class="btn-bulk-action btn-bulk-cancel" [disabled]="isBulkLoading()" (click)="bulkCancel()">
+            <span>Cancel</span>
+          </button>
+
+          <div class="bulk-status-select-wrap">
+            <select (change)="onBulkStatusSelect($event)" [disabled]="isBulkLoading()">
+              <option value="" disabled selected>Change status to...</option>
+              <option value="APPROVED">Set to Approved</option>
+              <option value="COMPLETED">Set to Completed</option>
+              <option value="PENDING_APPROVAL">Set to Pending</option>
+              <option value="REJECTED">Set to Rejected</option>
+              <option value="CANCELLED">Set to Cancelled</option>
+            </select>
+            <svg lucideChevronDown [size]="13" class="select-chevron"></svg>
+          </div>
+
+          <button type="button" class="btn-bulk-clear" (click)="clearSelection()" title="Clear selection">
+            <svg lucideX [size]="14"></svg>
+            <span>Clear</span>
+          </button>
+        </div>
+      </div>
+    }
+
     <div class="card table-card">
       <table class="fvr-table">
         <thead>
           <tr>
+            @if (isCompanyWide()) {
+            <th class="select-col">
+              <input type="checkbox"
+                     class="row-checkbox"
+                     [checked]="isAllSelected()"
+                     [indeterminate]="isPartiallySelected()"
+                     (change)="toggleSelectAll($event)"
+                     title="Select all">
+            </th>
+            }
             <th>Request</th>
             <th>Project</th>
             <th>Site Location</th>
@@ -228,7 +292,15 @@
         </thead>
         <tbody>
           @for (r of filteredRequests(); track r.id) {
-            <tr [routerLink]="['/field-visits/requests', r.id]" class="clickable-row">
+            <tr [routerLink]="['/field-visits/requests', r.id]" class="clickable-row" [class.row-selected]="selectedIds().has(r.id)">
+              @if (isCompanyWide()) {
+              <td class="select-col" (click)="$event.stopPropagation()">
+                <input type="checkbox"
+                       class="row-checkbox"
+                       [checked]="selectedIds().has(r.id)"
+                       (change)="toggleSelect(r.id, $event)">
+              </td>
+              }
               <td class="req-cell">
                 <span class="request-tag">{{ r.requestNumber }}</span>
               </td>
@@ -248,6 +320,11 @@
                 <div class="date-info">
                   <svg lucideCalendarDays [size]="13" class="cell-icon"></svg>
                   <span>{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'d MMM y' }}</span>
+                  @if (isPastVisit(r)) {
+                    <span class="past-visit-tag" [class.past-overdue]="r.status === 'PENDING_APPROVAL'" [title]="r.status === 'PENDING_APPROVAL' ? 'Trip date has passed without approval' : 'Previous/past visit'">
+                      {{ r.status === 'PENDING_APPROVAL' ? 'Past date' : 'Past' }}
+                    </span>
+                  }
                 </div>
               </td>
               <td class="num">
@@ -262,26 +339,41 @@
               <td class="num">
                 <span class="badge-num tasks-badge" title="{{ r.tasks.length }} tasks">{{ r.tasks.length }}</span>
               </td>
-              <td>
-                <span class="status-pill" [class]="'st-' + r.status">
-                  <span class="status-dot"></span>
-                  {{ label(r.status) }}
-                </span>
+              <td class="status-cell" (click)="$event.stopPropagation()">
+                <div class="status-dropdown-wrap">
+                  <button type="button" 
+                          class="status-dropdown-btn status-pill" 
+                          [class]="'st-' + r.status"
+                          [disabled]="deciding() === r.id || !isCompanyWide()"
+                          (click)="isCompanyWide() && toggleStatusMenu(r, $event)"
+                          [title]="isCompanyWide() ? 'Click to change status' : label(r.status)">
+                    <span class="status-dot"></span>
+                    <span>{{ label(r.status) }}</span>
+                    @if (isCompanyWide()) {
+                      <svg lucideChevronDown [size]="12" class="status-chevron" [class.rotated]="activeStatusMenuId() === r.id"></svg>
+                    }
+                  </button>
+
+                  @if (isCompanyWide() && activeStatusMenuId() === r.id) {
+                    <div class="status-menu-popover" (click)="$event.stopPropagation()">
+                      <div class="status-menu-header">Change Status</div>
+                      @for (opt of statusOptions; track opt.status) {
+                        <button type="button" 
+                                class="status-menu-item"
+                                [class.selected]="r.status === opt.status"
+                                (click)="onSelectStatus(r, opt.status, $event)">
+                          <span class="status-dot" [style.background-color]="opt.color"></span>
+                          <span class="status-item-label">{{ opt.label }}</span>
+                          @if (r.status === opt.status) {
+                            <svg lucideCheck [size]="13" class="item-check-icon"></svg>
+                          }
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
               </td>
               <td class="action-col">
-                @if (r.canReview) {
-                  <div class="row-decide">
-                    <button type="button" class="decide-btn approve" [disabled]="deciding() === r.id"
-                            (click)="approveRow(r, $event)" title="Approve this visit">
-                      <svg lucideCheck [size]="13"></svg>
-                      <span>{{ deciding() === r.id ? 'Approving…' : 'Approve' }}</span>
-                    </button>
-                    <button type="button" class="decide-btn reject" [disabled]="deciding() === r.id"
-                            (click)="rejectRow(r, $event)" title="Reject with a reason">
-                      <svg lucideX [size]="13"></svg>
-                    </button>
-                  </div>
-                }
                 <div class="row-arrow">
                   <svg lucideArrowRight [size]="15"></svg>
                 </div>

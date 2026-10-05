@@ -982,6 +982,7 @@ export class PayrollService {
           select: {
             firstName: true,
             lastName: true,
+            employeeCode: true,
             department: { select: { name: true } },
             designation: { select: { name: true } }
           }

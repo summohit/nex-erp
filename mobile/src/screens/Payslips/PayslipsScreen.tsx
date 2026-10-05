@@ -9,6 +9,8 @@ import {
   Modal,
   ScrollView,
   StatusBar,
+  Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppScreen from '../../components/AppScreen';
@@ -16,11 +18,7 @@ import {
   FileText,
   ChevronRight,
   X,
-  TrendingUp,
-  TrendingDown,
-  Calendar,
-  Briefcase,
-  DollarSign,
+  Download,
 } from 'lucide-react-native';
 import { payrollService, Payslip, PayslipItem } from '../../api/payrollService';
 
@@ -47,31 +45,82 @@ function StatusBadge({ status }: { status: Payslip['status'] }) {
   );
 }
 
-function SectionRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+/**
+ * "One Lakh Twenty Nine Thousand Three Hundred and Sixty Eight Rupees Only" —
+ * Indian grouping (lakh, crore), same wording as the web payslip.
+ */
+function amountInWords(amount: number): string {
+  const n = Math.floor(Math.abs(amount || 0));
+  if (n === 0) return 'Zero Rupees Only';
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+    'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const under100 = (v: number): string =>
+    v < 20 ? ones[v] : `${tens[Math.floor(v / 10)]}${v % 10 ? ' ' + ones[v % 10] : ''}`;
+  const under1000 = (v: number): string => {
+    const h = Math.floor(v / 100);
+    const r = v % 100;
+    return [h ? `${ones[h]} Hundred` : '', r ? (h ? 'and ' : '') + under100(r) : '']
+      .filter(Boolean).join(' ');
+  };
+  const parts: string[] = [];
+  const crore = Math.floor(n / 10000000);
+  const lakh = Math.floor((n % 10000000) / 100000);
+  const thousand = Math.floor((n % 100000) / 1000);
+  const rest = n % 1000;
+  if (crore) parts.push(`${under1000(crore)} Crore`);
+  if (lakh) parts.push(`${under100(lakh)} Lakh`);
+  if (thousand) parts.push(`${under100(thousand)} Thousand`);
+  if (rest) parts.push(under1000(rest));
+  return `${parts.join(' ')} Rupees Only`;
+}
+
+function InfoCell({ label, value }: { label: string; value?: string | number | null }) {
   return (
-    <View style={styles.detailRow}>
-      <Text style={[styles.detailLabel, bold && styles.detailLabelBold]}>{label}</Text>
-      <Text style={[styles.detailValue, bold && styles.detailValueBold]}>{value}</Text>
+    <View style={styles.infoCell}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value === null || value === undefined || value === '' ? '—' : String(value)}</Text>
     </View>
   );
 }
 
 function PayslipDetail({ payslip, onClose }: { payslip: Payslip; onClose: () => void }) {
-  const earnings  = payslip.items.filter(i => i.type === 'EARNING');
+  const earnings   = payslip.items.filter(i => i.type === 'EARNING');
   const deductions = payslip.items.filter(i => i.type === 'DEDUCTION');
-  const expenses  = payslip.items.filter(i => i.type === 'EXPENSE');
+  const expenses   = payslip.items.filter(i => i.type === 'EXPENSE');
   const name = `${payslip.employee.firstName} ${payslip.employee.lastName}`;
+  const monthName = MONTH_NAMES[payslip.month - 1];
+  const [downloading, setDownloading] = useState(false);
+
+  const onDownload = async () => {
+    setDownloading(true);
+    try {
+      await payrollService.downloadPayslipPdf(
+        payslip.id,
+        `${payslip.employee.firstName}-${monthName}-${payslip.year}.pdf`,
+      );
+    } catch (e: any) {
+      Alert.alert('Download failed', e?.message || 'Could not download the payslip.');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={styles.modalContainer} edges={['top']}>
+      <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>
         <StatusBar barStyle="dark-content" />
 
-        {/* Modal header */}
         <View style={styles.modalHeader}>
-          <View>
-            <Text style={styles.modalTitle}>{MONTH_NAMES[payslip.month - 1]} {payslip.year}</Text>
-            <Text style={styles.modalSubtitle}>Payslip</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.modalTitle}>Payslip for {monthName} {payslip.year}</Text>
+            <View style={styles.modalSubRow}>
+              <Text style={styles.modalSubtitle} numberOfLines={1}>
+                {name}{payslip.employee.designation ? ` · ${payslip.employee.designation.name}` : ''}
+              </Text>
+              <StatusBadge status={payslip.status} />
+            </View>
           </View>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
             <X size={18} color="#475569" />
@@ -79,105 +128,86 @@ function PayslipDetail({ payslip, onClose }: { payslip: Payslip; onClose: () => 
         </View>
 
         <ScrollView contentContainerStyle={styles.detailScroll} showsVerticalScrollIndicator={false}>
+          <Image source={require('../../assets/ces_logo.png')} style={styles.logo} resizeMode="contain" />
 
-          {/* Employee info */}
-          <View style={styles.card}>
-            <View style={styles.empRow}>
-              <View style={styles.empAvatar}>
-                <Text style={styles.empAvatarText}>{payslip.employee.firstName[0]}{payslip.employee.lastName[0]}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.empName}>{name}</Text>
-                {payslip.employee.designation && (
-                  <Text style={styles.empMeta}>{payslip.employee.designation.name}</Text>
-                )}
-                {payslip.employee.department && (
-                  <Text style={styles.empMeta}>{payslip.employee.department.name}</Text>
-                )}
-              </View>
-              <StatusBadge status={payslip.status} />
+          <View style={styles.infoBox}>
+            <InfoCell label="Employee Name" value={name} />
+            <InfoCell label="Employee ID" value={payslip.employee.employeeCode} />
+            <InfoCell label="Designation" value={payslip.employee.designation?.name} />
+            <InfoCell label="Department" value={payslip.employee.department?.name} />
+            <InfoCell label="Working Days" value={payslip.workingDays} />
+            <InfoCell label="Present Days" value={payslip.presentDays} />
+            <InfoCell label="Absent Days" value={payslip.absentDays} />
+            {payslip.halfDays > 0 && <InfoCell label="Half Days" value={payslip.halfDays} />}
+          </View>
+
+          <View style={styles.table}>
+            <View style={styles.tableHead}>
+              <Text style={styles.tableHeadText}>Earnings</Text>
+              <Text style={styles.tableHeadText}>Amount (₹)</Text>
             </View>
-            {payslip.paidOn && (
-              <View style={styles.paidOnRow}>
-                <Calendar size={13} color="#64748B" />
-                <Text style={styles.paidOnText}>Paid on {new Date(payslip.paidOn).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+            {earnings.map(renderItem)}
+            <View style={[styles.tableRow, styles.tableTotalRow]}>
+              <Text style={styles.tableTotalLabel}>Total Gross Earnings</Text>
+              <Text style={styles.tableTotalValue}>{fmt(payslip.totalEarnings)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.table}>
+            <View style={styles.tableHead}>
+              <Text style={styles.tableHeadText}>Deductions</Text>
+              <Text style={styles.tableHeadText}>Amount (₹)</Text>
+            </View>
+            {deductions.map(renderItem)}
+            {payslip.lossOfPay > 0 && (
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Loss of Pay (LOP)</Text>
+                <Text style={styles.tableValue}>{fmt(payslip.lossOfPay)}</Text>
               </View>
             )}
-          </View>
-
-          {/* Attendance */}
-          <View style={styles.card}>
-            <View style={styles.cardTitleRow}>
-              <Briefcase size={15} color="#1373e5" />
-              <Text style={styles.cardTitle}>Attendance</Text>
-            </View>
-            <View style={styles.attGrid}>
-              {[
-                { label: 'Working Days', value: String(payslip.workingDays) },
-                { label: 'Present',       value: String(payslip.presentDays) },
-                { label: 'Absent',        value: String(payslip.absentDays) },
-                { label: 'Half Days',     value: String(payslip.halfDays) },
-              ].map(item => (
-                <View key={item.label} style={styles.attCell}>
-                  <Text style={styles.attValue}>{item.value}</Text>
-                  <Text style={styles.attLabel}>{item.label}</Text>
-                </View>
-              ))}
+            <View style={[styles.tableRow, styles.tableTotalRow]}>
+              <Text style={styles.tableTotalLabel}>Total Deductions</Text>
+              <Text style={styles.tableTotalValue}>{fmt(payslip.totalDeductions)}</Text>
             </View>
           </View>
 
-          {/* Earnings */}
-          {earnings.length > 0 && (
-            <View style={styles.card}>
-              <View style={styles.cardTitleRow}>
-                <TrendingUp size={15} color="#10B981" />
-                <Text style={styles.cardTitle}>Earnings</Text>
-              </View>
-              {earnings.map(renderItem)}
-              <View style={styles.divider} />
-              <SectionRow label="Total Earnings" value={fmt(payslip.totalEarnings)} bold />
-            </View>
-          )}
-
-          {/* Deductions */}
-          {(deductions.length > 0 || payslip.lossOfPay > 0) && (
-            <View style={styles.card}>
-              <View style={styles.cardTitleRow}>
-                <TrendingDown size={15} color="#1373e5" />
-                <Text style={styles.cardTitle}>Deductions</Text>
-              </View>
-              {deductions.map(renderItem)}
-              {payslip.lossOfPay > 0 && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Loss of Pay</Text>
-                  <Text style={[styles.detailValue, { color: '#1373e5' }]}>{fmt(payslip.lossOfPay)}</Text>
-                </View>
-              )}
-              <View style={styles.divider} />
-              <SectionRow label="Total Deductions" value={fmt(payslip.totalDeductions)} bold />
-            </View>
-          )}
-
-          {/* Expenses */}
           {expenses.length > 0 && (
-            <View style={styles.card}>
-              <View style={styles.cardTitleRow}>
-                <DollarSign size={15} color="#8B5CF6" />
-                <Text style={styles.cardTitle}>Expense Reimbursements</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHead}>
+                <Text style={styles.tableHeadText}>Expense Reimbursements</Text>
+                <Text style={styles.tableHeadText}>Amount (₹)</Text>
               </View>
               {expenses.map(renderItem)}
-              <View style={styles.divider} />
-              <SectionRow label="Total Expenses" value={fmt(payslip.expenseAmount)} bold />
+              <View style={[styles.tableRow, styles.tableTotalRow]}>
+                <Text style={styles.tableTotalLabel}>Total Expenses</Text>
+                <Text style={styles.tableTotalValue}>{fmt(payslip.expenseAmount)}</Text>
+              </View>
             </View>
           )}
 
-          {/* Net Pay */}
-          <View style={[styles.card, styles.netPayCard]}>
-            <Text style={styles.netPayLabel}>Net Pay</Text>
+          <View style={styles.netPayCard}>
+            <Text style={styles.netPayLabel}>Net Salary Payable (Take Home)</Text>
             <Text style={styles.netPayValue}>{fmt(payslip.netPay)}</Text>
+            <Text style={styles.netPayWords}>{amountInWords(payslip.netPay)}</Text>
           </View>
-
         </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.footerClose} onPress={onClose} activeOpacity={0.7}>
+            <Text style={styles.footerCloseText}>Close</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.footerDownload, downloading && { opacity: 0.7 }]}
+            onPress={onDownload}
+            disabled={downloading}
+            activeOpacity={0.8}
+          >
+            {downloading
+              ? <ActivityIndicator size="small" color="#FFFFFF" />
+              : <Download size={17} color="#FFFFFF" />}
+            <Text style={styles.footerDownloadText}>{downloading ? 'Downloading…' : 'Download PDF'}</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     </Modal>
   );
@@ -185,9 +215,9 @@ function PayslipDetail({ payslip, onClose }: { payslip: Payslip; onClose: () => 
 
 function renderItem(item: PayslipItem) {
   return (
-    <View key={item.id} style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{item.componentName}</Text>
-      <Text style={styles.detailValue}>{fmt(item.amount)}</Text>
+    <View key={item.id} style={styles.tableRow}>
+      <Text style={styles.tableLabel}>{item.componentName}</Text>
+      <Text style={styles.tableValue}>{fmt(item.amount)}</Text>
     </View>
   );
 }
@@ -497,7 +527,13 @@ const styles = StyleSheet.create({
   modalSubtitle: {
     fontSize: 12,
     color: '#64748B',
-    marginTop: 1,
+    flexShrink: 1,
+  },
+  modalSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 3,
   },
   closeBtn: {
     width: 36,
@@ -512,125 +548,158 @@ const styles = StyleSheet.create({
   detailScroll: {
     padding: 16,
   },
-  cardTitleRow: {
+  logo: {
+    width: 130,
+    height: 44,
+    marginBottom: 14,
+  },
+  infoBox: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    flexWrap: 'wrap',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    marginBottom: 14,
+  },
+  infoCell: {
+    width: '50%',
+    paddingRight: 8,
     marginBottom: 12,
   },
-  cardTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  empRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  empAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#1373e5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  empAvatarText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  empName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  empMeta: {
-    fontSize: 12,
+  infoLabel: {
+    fontSize: 10,
+    fontWeight: '600',
     color: '#64748B',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
     marginTop: 2,
   },
-  paidOnRow: {
+  table: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  tableHead: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  tableHeadText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 5,
-    marginTop: 12,
-    paddingTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
-  paidOnText: {
-    fontSize: 12,
-    color: '#64748B',
-  },
-  attGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  attCell: {
+  tableLabel: {
+    fontSize: 14,
+    color: '#1E293B',
     flex: 1,
-    minWidth: '40%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    padding: 12,
-    alignItems: 'center',
+    paddingRight: 8,
   },
-  attValue: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  attLabel: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 7,
-  },
-  detailLabel: {
-    fontSize: 13,
-    color: '#64748B',
-    flex: 1,
-  },
-  detailLabelBold: {
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-  detailValue: {
-    fontSize: 13,
+  tableValue: {
+    fontSize: 14,
     color: '#0F172A',
     fontWeight: '500',
   },
-  detailValueBold: {
-    fontWeight: '700',
+  tableTotalRow: {
+    backgroundColor: '#F8FAFC',
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
-    marginVertical: 6,
+  tableTotalLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    flex: 1,
+  },
+  tableTotalValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   netPayCard: {
-    backgroundColor: '#1373e5',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 8,
   },
   netPayLabel: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#CBD5E1',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   netPayValue: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: '800',
+    color: '#34D399',
+    marginTop: 6,
+  },
+  netPayWords: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    color: '#E2E8F0',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  footer: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  footerClose: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  footerCloseText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  footerDownload: {
+    flex: 2,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#1373e5',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  footerDownloadText: {
+    fontSize: 15,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
 });

@@ -1,0 +1,74 @@
+<!-- A high-priority notice, over whatever page the person is on. -->
+<div class="notice-modal-overlay" *ngIf="active() as n" (click)="dismiss(n)">
+  <div class="notice-modal" (click)="$event.stopPropagation()">
+    <div class="notice-modal-head">
+      <div class="notice-modal-top-bar">
+        <span class="dash-p-badge" [class]="'p-' + n.priority.toLowerCase()">
+          <svg *ngIf="n.priority === 'HIGH'" lucideAlertTriangle size="12"></svg>
+          <svg *ngIf="n.priority === 'NORMAL'" lucideBell size="12"></svg>
+          <svg *ngIf="n.priority === 'LOW'" lucideFileText size="12"></svg>
+          <span>{{ n.priority === 'HIGH' ? 'Urgent Announcement' : (n.priority === 'NORMAL' ? 'Company Notice' : 'Informational') }}</span>
+        </span>
+        <button type="button" class="notice-modal-close" (click)="dismiss(n)" title="Close">
+          <svg lucideX size="16"></svg>
+        </button>
+      </div>
+
+      <h2>{{ n.title }}</h2>
+
+      <div class="notice-modal-author-row">
+        <img *ngIf="n.createdBy?.avatarUrl" [src]="n.createdBy?.avatarUrl"
+             [alt]="n.createdBy?.firstName" class="dash-notice-avatar-img">
+        <div *ngIf="!n.createdBy?.avatarUrl" class="dash-notice-avatar" [style.background]="getAvatarBg(n.createdBy?.firstName, n.createdBy?.lastName)">
+          {{ getInitials(n.createdBy?.firstName, n.createdBy?.lastName) }}
+        </div>
+        <div class="notice-modal-author-meta">
+          <span class="notice-modal-author-name">
+            {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'CES Tech Administration' }}
+          </span>
+          <span class="notice-modal-meta">
+            {{ n.publishedAt | date:'MMMM d, y' }}
+            <ng-container *ngIf="n.expiresAt"> · Valid until {{ n.expiresAt | date:'mediumDate' }}</ng-container>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notice Body -->
+    <div class="notice-modal-body notice-rich" [innerHTML]="noticeHtml(n.body)"></div>
+
+    <!-- Attachments if any -->
+    <div class="notice-modal-attachments" *ngIf="n.attachments && n.attachments.length > 0">
+      <span class="notice-modal-att-title">
+        <svg lucidePaperclip size="13"></svg>
+        Attached Documents ({{ n.attachments.length }})
+      </span>
+      <div class="notice-modal-att-grid">
+        <a *ngFor="let a of n.attachments" [href]="a.fileUrl" target="_blank" rel="noopener" class="notice-modal-att-card">
+          <div class="att-icon-box" [class]="'att-' + getFileType(a.fileName)">
+            <svg *ngIf="getFileType(a.fileName) === 'pdf'" lucideFileText size="15"></svg>
+            <svg *ngIf="getFileType(a.fileName) === 'image'" lucideImage size="15"></svg>
+            <svg *ngIf="getFileType(a.fileName) === 'spreadsheet'" lucideFileSpreadsheet size="15"></svg>
+            <svg *ngIf="getFileType(a.fileName) === 'doc' || getFileType(a.fileName) === 'other'" lucideFile size="15"></svg>
+          </div>
+          <div class="att-info">
+            <span class="att-name" [title]="a.fileName">{{ a.fileName }}</span>
+            <span class="att-size" *ngIf="a.fileSize">{{ fileSize(a.fileSize) }}</span>
+          </div>
+          <svg lucideExternalLink size="13" class="att-arrow"></svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="notice-modal-actions">
+      <a routerLink="/notices" (click)="dismiss(n)" class="notice-modal-all-link">
+        <span>Go to Notice Board</span>
+        <svg lucideChevronRight size="14"></svg>
+      </a>
+      <button type="button" class="notice-dismiss-btn" (click)="dismiss(n)">
+        <svg lucideCheck size="15"></svg>
+        <span>Got it</span>
+      </button>
+    </div>
+  </div>
+</div>

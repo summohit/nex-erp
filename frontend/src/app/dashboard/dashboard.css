@@ -2451,9 +2451,22 @@
   font-size: 14.5px;
   line-height: 1.65;
   color: #334155;
-  white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* The notice's editor HTML. innerHTML content is outside view encapsulation. */
+.notice-rich ::ng-deep p { margin: 0 0 6px; }
+.notice-rich ::ng-deep h1 { font-size: 20px; margin: 10px 0 6px; }
+.notice-rich ::ng-deep h2 { font-size: 17px; margin: 10px 0 6px; }
+.notice-rich ::ng-deep h3 { font-size: 15px; margin: 8px 0 4px; }
+.notice-rich ::ng-deep ol, .notice-rich ::ng-deep ul { margin: 0 0 6px; padding-left: 22px; }
+.notice-rich ::ng-deep li[data-list="bullet"] { list-style-type: disc; }
+.notice-rich ::ng-deep li[data-list="ordered"] { list-style-type: decimal; }
+.notice-rich ::ng-deep li > .ql-ui { display: none; }
+.notice-rich ::ng-deep blockquote { margin: 6px 0; padding: 4px 12px; border-left: 3px solid #cbd5e1; color: #475569; }
+.notice-rich ::ng-deep a { color: #2563eb; text-decoration: underline; }
+.notice-rich ::ng-deep table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+.notice-rich ::ng-deep td, .notice-rich ::ng-deep th { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; }
 
 /* Attachments in Modal */
 .notice-modal-attachments {

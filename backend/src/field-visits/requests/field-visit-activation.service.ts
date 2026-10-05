@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { FIELD_VISIT_DAY, OPEN_VISIT_DAYS } from '../field-visit-status';
+import { ShiftRosterService } from '../../attendance/shift-roster.service';
 
 /**
  * A Prisma client inside a transaction.
@@ -38,7 +39,11 @@ export interface ActivationResult {
   issues: number;
   attendanceDays: number;
   rosterEntries: number;
+  /** Comp-Off days newly credited for non-working days on the trip. */
+  compOffDays?: number;
 }
+
+type CompOffReason = 'HOLIDAY' | 'WEEK_OFF' | 'DAY_OFF';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -85,15 +90,177 @@ export class FieldVisitActivationService {
 
   async activate(
     tx: Tx, request: ActivationRequest, actorId: number | null,
+    /**
+     * overrideDayOff: the approver has been shown which rostered days off the
+     * trip lands on and chosen to roster the person on site anyway. Never set
+     * implicitly — see writeRoster.
+     */
+    opts: { overrideDayOff?: boolean } = {},
   ): Promise<ActivationResult> {
     const days = this.daysOf(request);
     const employeeIds = request.members.map((m) => m.employeeId);
 
-    const rosterEntries = await this.writeRoster(tx, request, days, employeeIds);
+    // Read BEFORE the roster is written: writing it is what turns a day off
+    // into an on-site day, after which there is no telling it was ever off.
+    const nonWorking = await this.nonWorkingDays(tx, request, days, employeeIds);
+
+    const rosterEntries = await this.writeRoster(tx, request, days, employeeIds, opts);
     const attendanceDays = await this.writeAttendance(tx, request, days, employeeIds);
     const issues = await this.writeTasks(tx, request, employeeIds);
+    const compOffDays = await this.syncCompOff(tx, request, days, employeeIds, nonWorking);
 
-    return { issues, attendanceDays, rosterEntries };
+    return { issues, attendanceDays, rosterEntries, compOffDays };
+  }
+
+  // ─── Comp-Off ──────────────────────────────────────────────────────────────
+
+  /**
+   * Which trip days are not working days for whom, and why.
+   *
+   * A company holiday first; then an explicit rostered day off (the case the
+   * approver has just chosen to override); then a day the person's shift does
+   * not work — a weekend, usually. Resolved through the same rule clock-in uses,
+   * so "week off" means what it means everywhere else.
+   */
+  private async nonWorkingDays(
+    tx: Tx, request: ActivationRequest, days: Date[], employeeIds: number[],
+  ): Promise<Map<string, CompOffReason>> {
+    const out = new Map<string, CompOffReason>();
+    if (!employeeIds.length || !days.length) return out;
+    const note = this.rosterNote(request.requestNumber);
+
+    const [holidays, entries, employees] = await Promise.all([
+      tx.holiday.findMany({
+        where: { companyId: request.companyId, date: { gte: request.startDate, lte: request.endDate } },
+        select: { date: true },
+      }),
+      tx.shiftRosterEntry.findMany({
+        where: {
+          companyId: request.companyId,
+          employeeId: { in: employeeIds },
+          date: { gte: request.startDate, lte: request.endDate },
+        },
+        include: { shift: true },
+      }),
+      tx.employee.findMany({
+        where: { id: { in: employeeIds } },
+        select: { id: true, shift: true },
+      }),
+    ]);
+
+    const holiday = new Set<string>(holidays.map((h: any) => this.key(new Date(h.date))));
+    const standing = new Map<number, any>(employees.map((e: any) => [e.id, e.shift ?? null]));
+    const entryAt = new Map<string, any>(
+      entries.map((e: any) => [`${e.employeeId}|${this.key(new Date(e.date))}`, e]),
+    );
+
+    for (const employeeId of employeeIds) {
+      for (const date of days) {
+        const k = `${employeeId}|${this.key(date)}`;
+        if (holiday.has(this.key(date))) { out.set(k, 'HOLIDAY'); continue; }
+
+        let entry = entryAt.get(k) ?? null;
+        // This trip's own row from an earlier approval says nothing about
+        // whether the day was off — it is the trip. Judge by the shift instead.
+        if (entry?.note === note) entry = null;
+        if (entry?.isDayOff) { out.set(k, 'DAY_OFF'); continue; }
+
+        const effective = ShiftRosterService.resolveEffectiveShift(
+          entry, standing.get(employeeId) ?? null, date,
+        );
+        if (effective.isDayOff) out.set(k, 'WEEK_OFF');
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Make the trip's Comp-Off credits match the trip.
+   *
+   * Adds a day for each non-working day not yet credited, and takes back the
+   * credits for days or people the trip no longer covers. Never removes a credit
+   * for a day still inside the trip: on re-approval the roster already shows the
+   * trip on that day, so whether it was originally off can no longer be read —
+   * the ledger is the record of that.
+   */
+  private async syncCompOff(
+    tx: Tx, request: ActivationRequest, days: Date[], employeeIds: number[],
+    nonWorking: Map<string, CompOffReason>,
+  ): Promise<number> {
+    const existing = await tx.compOffCredit.findMany({
+      where: { fieldVisitRequestId: request.id },
+    });
+    const have = new Set<string>(existing.map((c: any) => `${c.employeeId}|${this.key(new Date(c.date))}`));
+    const covered = new Set<string>();
+    for (const e of employeeIds) for (const d of days) covered.add(`${e}|${this.key(d)}`);
+
+    const stale = existing.filter((c: any) => !covered.has(`${c.employeeId}|${this.key(new Date(c.date))}`));
+    await this.reverseCredits(tx, stale);
+
+    const toAdd = [...nonWorking.entries()].filter(([k]) => !have.has(k));
+    if (!toAdd.length) return 0;
+
+    const leaveTypeId = await this.compOffLeaveType(tx, request.companyId);
+    for (const [k, reason] of toAdd) {
+      const [employeeIdText, day] = k.split('|');
+      const employeeId = Number(employeeIdText);
+      const date = new Date(`${day}T00:00:00.000Z`);
+      const year = date.getUTCFullYear();
+
+      await tx.compOffCredit.create({
+        data: {
+          companyId: request.companyId, employeeId, leaveTypeId,
+          fieldVisitRequestId: request.id, date, reason, days: 1, year,
+        },
+      });
+      await tx.leaveBalance.upsert({
+        where: { employeeId_leaveTypeId_year: { employeeId, leaveTypeId, year } },
+        update: { allocated: { increment: 1 } },
+        create: { employeeId, leaveTypeId, year, allocated: 1, used: 0 },
+      });
+    }
+    return toAdd.length;
+  }
+
+  /**
+   * Take back credits, and the balance they added.
+   *
+   * The balance can end up below what has been used if the day was already
+   * taken — that is left visible rather than hidden, because the trip it was
+   * earned on no longer happened.
+   */
+  private async reverseCredits(tx: Tx, credits: any[]): Promise<number> {
+    for (const c of credits) {
+      await tx.compOffCredit.delete({ where: { id: c.id } });
+      await tx.leaveBalance.updateMany({
+        where: { employeeId: c.employeeId, leaveTypeId: c.leaveTypeId, year: c.year },
+        data: { allocated: { decrement: c.days ?? 1 } },
+      });
+    }
+    return credits.length;
+  }
+
+  /** The company's Comp-Off leave type — flagged, or created on first use. */
+  private async compOffLeaveType(tx: Tx, companyId: number): Promise<number> {
+    const found = await tx.leaveType.findFirst({
+      where: { companyId, isCompOff: true },
+      select: { id: true },
+    });
+    if (found) return found.id;
+    const created = await tx.leaveType.create({
+      data: {
+        name: 'Comp-Off',
+        description: 'Compensatory day off, earned by working a holiday, week off or rostered day off.',
+        defaultDays: 0,
+        accrualFrequency: 'NONE',
+        accrualAmount: 0,
+        isPaid: true,
+        isCompOff: true,
+        companyId,
+      },
+      select: { id: true },
+    });
+    return created.id;
   }
 
   // ─── The attendance schedule ───────────────────────────────────────────────
@@ -158,6 +325,7 @@ export class FieldVisitActivationService {
    */
   private async writeRoster(
     tx: Tx, request: ActivationRequest, days: Date[], employeeIds: number[],
+    opts: { overrideDayOff?: boolean } = {},
   ): Promise<number> {
     const existing = await tx.shiftRosterEntry.findMany({
       where: {
@@ -181,7 +349,10 @@ export class FieldVisitActivationService {
         const entry = byCell.get(`${employeeId}|${this.key(date)}`);
         if (!entry) continue;
         if (entry.isDayOff) {
-          clashes.push({ employeeId, date, why: 'is rostered off' });
+          // Overridable, but only when the approver has explicitly said so
+          // after being shown the days. Working someone on their day off is a
+          // decision; it must not be a side effect of clicking Approve.
+          if (!opts.overrideDayOff) clashes.push({ employeeId, date, why: 'is rostered off' });
         } else if (entry.projectId && entry.projectId !== request.projectId) {
           clashes.push({ employeeId, date, why: 'is already on site for another project' });
         }
@@ -252,11 +423,21 @@ export class FieldVisitActivationService {
       (c) => `${name.get(c.employeeId)} ${c.why} on ${this.key(c.date)}`,
     );
     const rest = clashes.length - shown.length;
-    throw new BadRequestException(
-      `The roster disagrees with this trip: ${shown.join('; ')}`
-      + `${rest > 0 ? ` (and ${rest} more)` : ''}.`
-      + ' Sort the roster out, or send the request back for the dates to be changed.',
-    );
+    // Only days off can be overridden from the approval. Being on site for
+    // another project cannot: that would pull the person off someone else's
+    // work, and needs that roster changed first.
+    const onlyDaysOff = clashes.every((c) => c.why === 'is rostered off');
+    throw new BadRequestException({
+      statusCode: 400,
+      error: 'Bad Request',
+      code: onlyDaysOff ? 'ROSTER_DAY_OFF_CLASH' : 'ROSTER_CLASH',
+      message:
+        `The roster disagrees with this trip: ${shown.join('; ')}`
+        + `${rest > 0 ? ` (and ${rest} more)` : ''}.`
+        + (onlyDaysOff
+          ? ' You can approve anyway and roster them on site for those days, or send the request back for the dates to be changed.'
+          : ' Sort the roster out, or send the request back for the dates to be changed.'),
+    });
   }
 
   // ─── The tasks ─────────────────────────────────────────────────────────────
@@ -395,17 +576,18 @@ export class FieldVisitActivationService {
   }
 
   /**
-   * Put the adopted tasks in front of everyone going, without touching the
-   * tasks themselves.
+   * The tasks picked off the board, as the trip's work — without touching who
+   * they belong to.
    *
-   * Returns how many people were newly put on one, which is what the approval
-   * reports as assigned work — a trip that adopted four tasks for three people
-   * did assign twelve things, and reporting "0" would read as nothing having
-   * happened.
+   * This used to make everyone going a member of every adopted task, so that
+   * any of them could clock in against any of it. That put each person on the
+   * others' tasks: three people and eight tasks became twenty-four
+   * memberships, and everyone's My Tasks filled with their colleagues' work.
+   * Each task now stays with the people the board already gives it, and the
+   * field visit clock offers a person only the visit's tasks that are theirs.
    *
-   * Marked with the request id rather than created blind, so the trip can take
-   * back exactly what it put on later without touching a membership somebody
-   * added by hand on the board.
+   * Returns how many of the adopted tasks belong to someone going, which is
+   * what the approval reports as assigned work.
    */
   private async attachLinkedTasks(
     tx: Tx, request: ActivationRequest,
@@ -414,26 +596,24 @@ export class FieldVisitActivationService {
     const issueIds = tasks
       .map((t) => t.issueId)
       .filter((id): id is number => Number.isInteger(id));
-    if (!issueIds.length) return 0;
+    if (!issueIds.length || !employeeIds.length) return 0;
 
-    const rows = employeeIds.flatMap((employeeId) =>
-      issueIds.map((issueId) => ({
-        issueId,
-        employeeId,
-        // A person already on the task by hand is left exactly as it is; the
-        // composite key means the insert below is skipped for them anyway, and
-        // writing the marker here is what lets a later cancel leave them be.
-        fieldVisitRequestId: request.id,
-      })),
-    );
-    if (!rows.length) return 0;
-
-    const { count } = await tx.issueMember.createMany({ data: rows, skipDuplicates: true });
-    return count;
+    return tx.issue.count({
+      where: {
+        id: { in: issueIds },
+        OR: [
+          { assigneeId: { in: employeeIds } },
+          { members: { some: { employeeId: { in: employeeIds } } } },
+        ],
+      },
+    });
   }
 
   /**
-   * Take back the memberships this trip added.
+   * Take back the memberships an earlier version of approval added.
+   *
+   * Nothing adds them any more (see attachLinkedTasks), but trips approved
+   * before that still have them; cancelling one clears them as before.
    *
    * Scoped by the marker rather than by "who is on this task", because the two
    * are not the same set: somebody assigned on the board before the trip was
@@ -506,6 +686,10 @@ export class FieldVisitActivationService {
     // the trip. What the trip owes them is undone instead: everybody it put on
     // them comes off again.
     const released = await this.releaseLinkedTasks(tx, request);
+
+    // A trip that is called off earned nothing.
+    const credits = await tx.compOffCredit.findMany({ where: { fieldVisitRequestId: request.id } });
+    await this.reverseCredits(tx, credits);
 
     return {
       attendanceDays: attendance.count,

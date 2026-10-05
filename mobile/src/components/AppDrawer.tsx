@@ -238,6 +238,9 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   '/assets/requests': { screen: 'HardwareRequests' },
   '/assets/hardware-requests': { screen: 'HardwareRequests' },
   '/field-visits': { screen: 'FieldVisit' },
+  // The server grants every role '/field-visits/my' (see menus.service.ts),
+  // so this is the route that actually arrives for most people.
+  '/field-visits/my': { screen: 'FieldVisit' },
   '/employees/me/profile': { screen: 'Profile' },
   '/settings/security': { screen: 'Security' },
   '/attendance/holidays': { screen: 'Attendance', params: { initialTab: 'holidays' } },

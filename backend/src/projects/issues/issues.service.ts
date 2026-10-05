@@ -207,6 +207,8 @@ export class IssuesService {
           estimatedHours: data.estimatedHours != null && data.estimatedHours !== ''
             ? Number(data.estimatedHours)
             : null,
+          prerequisites: data.prerequisites ? String(data.prerequisites).trim() : null,
+          smeId: data.smeId ? Number(data.smeId) : null,
           // §PB8. Null when nobody needs to approve it, which is most tasks and
           // every task that predates this — null is what the rest of the code
           // reads as "act on it freely".
@@ -847,10 +849,61 @@ export class IssuesService {
       include: {
         project: { select: { id: true, name: true, key: true } },
         approvalRequestedBy: {
-          select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            user: { select: { email: true } },
+            designation: { select: { name: true } },
+            department: { select: { name: true } },
+          },
         },
+        assignee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            user: { select: { email: true } },
+            designation: { select: { name: true } },
+            department: { select: { name: true } },
+          },
+        },
+        members: {
+          include: {
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                avatarUrl: true,
+                user: { select: { email: true } },
+                designation: { select: { name: true } },
+              },
+            },
+          },
+        },
+        attachments: true,
+        checklists: {
+          include: { items: true },
+        },
+        phase: { select: { id: true, name: true } },
+        milestone: { select: { id: true, name: true } },
+        column: { select: { id: true, name: true } },
+        sme: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            designation: { select: { name: true } },
+          },
+        },
+        children: { select: { id: true, key: true, title: true, status: true } },
       },
-      orderBy: { createdAt: 'asc' },
+      // Newest first: what has just come in is what an approver is looking for.
+      orderBy: { createdAt: 'desc' },
     });
 
     // Filtered in code rather than SQL: whether somebody may rule on a task

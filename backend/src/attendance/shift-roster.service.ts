@@ -190,9 +190,11 @@ export class ShiftRosterService {
         const entry = entryBy.get(key);
         if (entry) {
           if (entry.isDayOff) return { date: day, type: 'DAY_OFF', entryId: entry.id, note: entry.note };
-          if (entry.shift) {
+          const resolvedShift = entry.shift || emp.shift;
+          if (resolvedShift) {
+            const isFieldVisit = !!(entry.note && (entry.note.startsWith('Field visit') || entry.note.toLowerCase().includes('field visit')));
             const onSite =
-              entry.projectId || entry.address || entry.onsiteApprovalStatus !== 'NONE'
+              entry.projectId || entry.address || entry.onsiteApprovalStatus !== 'NONE' || isFieldVisit
                 ? {
                     projectId: entry.projectId as number | null,
                     projectName: entry.project?.name || null,
@@ -203,8 +205,16 @@ export class ShiftRosterService {
                   }
                 : undefined;
             return {
-              date: day, type: 'SHIFT', entryId: entry.id, note: entry.note,
-              shift: this.shiftBrief(entry.shift),
+              date: day,
+              type: 'SHIFT',
+              entryId: entry.id,
+              note: entry.note,
+              isFieldVisit,
+              shift: {
+                ...this.shiftBrief(resolvedShift),
+                startTime: entry.startTime || resolvedShift.startTime,
+                endTime: entry.endTime || resolvedShift.endTime,
+              },
               onSite,
             };
           }

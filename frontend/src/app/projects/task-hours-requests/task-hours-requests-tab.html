@@ -805,8 +805,8 @@
     <article class="prq-card" *ngFor="let t of taskApprovals()">
       <div class="prq-card-head">
         <div class="prq-card-ident">
-          <span class="prq-key">{{ t.key }}</span>
-          <span class="prq-project" *ngIf="t.project">
+          <span class="prq-key clickable" (click)="openTaskDetails(t)" title="View complete task details">{{ t.key }}</span>
+          <span class="prq-project" *ngIf="t.project" [routerLink]="['/projects', t.projectId || t.project?.id]" title="Open project">
             <svg lucideFolderKanban size="13"></svg> {{ t.project.name }}
           </span>
         </div>
@@ -815,7 +815,7 @@
         </span>
       </div>
 
-      <h4 class="prq-title">{{ t.title }}</h4>
+      <h4 class="prq-title clickable" (click)="openTaskDetails(t)" title="View complete task details">{{ t.title }}</h4>
 
       <div class="prq-meta">
         <span *ngIf="t.approvalRequestedBy">
@@ -828,12 +828,15 @@
 
       <!-- Three decisions, not two. Reject sends it back to be improved;
            Archive is the one that ends it, so it sits apart and reads plainly
-           as the destructive choice. -->
+           as the destructive choice. Plus View Details button on the left. -->
       <div class="prq-actions">
+        <button type="button" class="prq-btn view-details" (click)="openTaskDetails(t)" title="See complete task details">
+          <svg lucideEye size="14"></svg> View Details
+        </button>
+        <span class="prq-actions-gap"></span>
         <button type="button" class="prq-btn archive" (click)="archiveTaskApproval(t)">
           <svg lucideXCircle size="14"></svg> Archive
         </button>
-        <span class="prq-actions-gap"></span>
         <button type="button" class="prq-btn reject" (click)="decideTaskApproval(t, 'REJECT')">
           <svg lucideX size="14"></svg> Reject
         </button>
@@ -946,6 +949,10 @@
       </div>
 
       <div class="prq-actions">
+        <button type="button" class="prq-btn view-details" (click)="openVisitDetails(r)" title="See the complete field visit request">
+          <svg lucideEye size="14"></svg> View Details
+        </button>
+        <span class="prq-footer-spacer"></span>
         <button type="button" class="prq-btn reject" (click)="decideFieldVisit(r, 'REJECTED')">
           <svg lucideX size="14"></svg> Reject
         </button>
@@ -1117,6 +1124,424 @@
       </div>
     </article>
   </ng-container>
+
+  <!-- ── Task Details Modal / Drawer (§Complete Task Inspection) ────────────── -->
+  <div class="prq-modal-backdrop" *ngIf="viewingTask()" (click)="closeTaskDetails()">
+    <div class="prq-task-modal" (click)="$event.stopPropagation()">
+      <!-- Header -->
+      <div class="prq-modal-header">
+        <div class="prq-modal-header-left">
+          <span class="prq-key-pill">{{ viewingTask().key }}</span>
+          <span class="prq-stage-pill" [class.admin]="viewingTask().approvalState === 'PENDING_ADMIN'" [class.technical]="viewingTask().approvalState === 'PENDING_TECHNICAL'">
+            <span class="stage-pulse-dot"></span>
+            {{ approvalStageLabel(viewingTask()) }}
+          </span>
+          <a [routerLink]="['/projects', viewingTask().projectId || viewingTask().project?.id]" 
+             [queryParams]="{ task: viewingTask().id }" 
+             target="_blank" 
+             class="prq-board-link-btn" 
+             title="Open task in Project Board">
+            <svg lucideExternalLink size="13"></svg>
+            <span>Open on Board</span>
+          </a>
+        </div>
+        <button type="button" class="prq-modal-close-btn" (click)="closeTaskDetails()" title="Close">
+          <svg lucideX size="18"></svg>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="prq-modal-body">
+        <!-- Title & Status Header -->
+        <div class="prq-title-section">
+          <h2 class="prq-modal-title">{{ viewingTask().title }}</h2>
+        </div>
+
+        <!-- Raised By User Profile Banner -->
+        <div class="prq-modal-profile-banner">
+          <div class="prq-profile-card" *ngIf="viewingTask().approvalRequestedBy as raiser">
+            <div class="prq-profile-avatar-wrap">
+              <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)" class="prq-profile-avatar-img" />
+              <div *ngIf="!raiser.avatarUrl" class="prq-profile-avatar-fallback">
+                {{ getInitials(fullName(raiser)) }}
+              </div>
+              <span class="prq-online-dot"></span>
+            </div>
+            <div class="prq-profile-info">
+              <div class="prq-profile-header-row">
+                <span class="prq-profile-label">Raised By</span>
+                <span class="prq-profile-badge" *ngIf="raiser.designation?.name">{{ raiser.designation?.name }}</span>
+              </div>
+              <div class="prq-profile-name">
+                {{ raiser.firstName }} {{ raiser.lastName }}
+              </div>
+              <div class="prq-profile-sub" *ngIf="raiser.department?.name || raiser.user?.email || raiser.email">
+                <span *ngIf="raiser.department?.name">{{ raiser.department?.name }}</span>
+                <span class="prq-sub-dot" *ngIf="raiser.department?.name && (raiser.user?.email || raiser.email)">·</span>
+                <span *ngIf="raiser.user?.email || raiser.email" class="prq-profile-email">{{ raiser.user?.email || raiser.email }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Project & Date Badges -->
+          <div class="prq-project-date-cluster">
+            <div class="prq-meta-pill project-pill" *ngIf="viewingTask().project">
+              <svg lucideFolderKanban size="14" class="text-blue-600"></svg>
+              <span class="project-name">{{ viewingTask().project.name }}</span>
+            </div>
+            <div class="prq-meta-pill date-pill">
+              <svg lucideCalendar size="13"></svg>
+              <span>{{ viewingTask().createdAt | date: 'd MMM y, HH:mm' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overview Attribute Grid -->
+        <div class="prq-attributes-grid">
+          <div class="prq-attr-card">
+            <div class="attr-header">
+              <svg lucideSliders size="12" class="attr-icon"></svg>
+              <span class="attr-label">Priority</span>
+            </div>
+            <span class="attr-val">
+              <span class="priority-pill" [ngClass]="getPriorityBadgeClass(viewingTask().priority)">
+                <span class="priority-dot" [style.background-color]="getPriorityColor(viewingTask().priority)"></span>
+                {{ getPriorityLabel(viewingTask().priority) }}
+              </span>
+            </span>
+          </div>
+
+          <div class="prq-attr-card">
+            <div class="attr-header">
+              <svg lucideLayers size="12" class="attr-icon"></svg>
+              <span class="attr-label">Type</span>
+            </div>
+            <span class="attr-val">
+              <span class="type-pill">{{ viewingTask().type || 'TASK' }}</span>
+            </span>
+          </div>
+
+          <div class="prq-attr-card">
+            <div class="attr-header">
+              <svg lucideTimer size="12" class="attr-icon text-indigo-500"></svg>
+              <span class="attr-label">Estimated Hours</span>
+            </div>
+            <span class="attr-val font-semibold">
+              {{ viewingTask().estimatedHours ? (viewingTask().estimatedHours + ' hrs') : 'None' }}
+            </span>
+          </div>
+
+          <div class="prq-attr-card">
+            <div class="attr-header">
+              <svg lucideCalendar size="12" class="attr-icon text-emerald-600"></svg>
+              <span class="attr-label">Start Date</span>
+            </div>
+            <span class="attr-val">
+              {{ (viewingTask().startDate | date: 'd MMM y') || 'None' }}
+            </span>
+          </div>
+
+          <div class="prq-attr-card">
+            <div class="attr-header">
+              <svg lucideCalendar size="12" class="attr-icon text-rose-500"></svg>
+              <span class="attr-label">Due Date</span>
+            </div>
+            <span class="attr-val">
+              {{ (viewingTask().dueDate | date: 'd MMM y') || 'None' }}
+            </span>
+          </div>
+
+          <div class="prq-attr-card" *ngIf="viewingTask().column">
+            <div class="attr-header">
+              <svg lucideFolderKanban size="12" class="attr-icon text-blue-500"></svg>
+              <span class="attr-label">Column / Status</span>
+            </div>
+            <span class="attr-val font-medium">
+              {{ viewingTask().column?.name || viewingTask().status }}
+            </span>
+          </div>
+
+          <div class="prq-attr-card" *ngIf="viewingTask().phase">
+            <div class="attr-header">
+              <svg lucideSparkles size="12" class="attr-icon text-amber-500"></svg>
+              <span class="attr-label">Phase</span>
+            </div>
+            <span class="attr-val">{{ viewingTask().phase?.name }}</span>
+          </div>
+
+          <div class="prq-attr-card" *ngIf="viewingTask().milestone">
+            <div class="attr-header">
+              <svg lucideCheckCircle2 size="12" class="attr-icon text-purple-500"></svg>
+              <span class="attr-label">Milestone</span>
+            </div>
+            <span class="attr-val">{{ viewingTask().milestone?.name }}</span>
+          </div>
+
+          <div class="prq-attr-card" *ngIf="viewingTask().sme">
+            <div class="attr-header">
+              <svg lucideUser size="12" class="attr-icon text-cyan-600"></svg>
+              <span class="attr-label">SME / Govern</span>
+            </div>
+            <span class="attr-val font-medium">
+              {{ viewingTask().sme?.firstName }} {{ viewingTask().sme?.lastName }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Assigned Team Section with Real User Profiles -->
+        <div class="prq-section" *ngIf="viewingTask().assignee || (viewingTask().members && viewingTask().members.length > 0)">
+          <div class="prq-section-header">
+            <h3 class="prq-section-title">
+              <svg lucideUsers size="15" class="text-blue-600"></svg> 
+              Assigned Team 
+              <span class="prq-count-bubble">{{ (viewingTask().assignee ? 1 : 0) + getFilteredMembers(viewingTask()).length }}</span>
+            </h3>
+          </div>
+
+          <div class="prq-team-cards-grid">
+            <!-- Lead Assignee Card -->
+            <div class="prq-user-card assignee" *ngIf="viewingTask().assignee as ass">
+              <div class="prq-user-avatar-wrap">
+                <img *ngIf="ass.avatarUrl" [src]="ass.avatarUrl" [alt]="fullName(ass)" class="prq-user-avatar-img" />
+                <span *ngIf="!ass.avatarUrl" class="prq-user-avatar-fallback bg-indigo">
+                  {{ getInitials(fullName(ass)) }}
+                </span>
+              </div>
+              <div class="prq-user-details">
+                <div class="prq-user-name-row">
+                  <span class="prq-user-fullname">{{ ass.firstName }} {{ ass.lastName }}</span>
+                  <span class="prq-role-tag assignee">Assignee</span>
+                </div>
+                <div class="prq-user-sub" *ngIf="ass.designation?.name || ass.email">
+                  {{ ass.designation?.name || ass.email }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Collaborators / Other Members (Deduplicated) -->
+            <div class="prq-user-card member" *ngFor="let m of getFilteredMembers(viewingTask())">
+              <div class="prq-user-avatar-wrap" *ngIf="m.employee as emp">
+                <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" [alt]="fullName(emp)" class="prq-user-avatar-img" />
+                <span *ngIf="!emp.avatarUrl" class="prq-user-avatar-fallback bg-slate">
+                  {{ getInitials(fullName(emp)) }}
+                </span>
+              </div>
+              <div class="prq-user-details" *ngIf="m.employee as emp">
+                <div class="prq-user-name-row">
+                  <span class="prq-user-fullname">{{ emp.firstName }} {{ emp.lastName }}</span>
+                  <span class="prq-role-tag member">Member</span>
+                </div>
+                <div class="prq-user-sub" *ngIf="emp.designation?.name || emp.email">
+                  {{ emp.designation?.name || emp.email }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prerequisites -->
+        <div class="prq-section prq-prereq-section" *ngIf="viewingTask().prerequisites">
+          <h3 class="prq-section-title"><svg lucideAlertTriangle size="15" class="text-amber-500"></svg> Pre-Requisites</h3>
+          <div class="prq-prereq-box">
+            {{ viewingTask().prerequisites }}
+          </div>
+        </div>
+
+        <!-- Description Section -->
+        <div class="prq-section">
+          <h3 class="prq-section-title"><svg lucideFileText size="15" class="text-blue-600"></svg> Description</h3>
+          <div class="prq-description-box" *ngIf="viewingTask().description" [innerHTML]="viewingTask().description"></div>
+          <div class="prq-description-empty" *ngIf="!viewingTask().description">
+            <svg lucideFileText size="18" class="text-slate-300"></svg>
+            <span>No description provided for this task.</span>
+          </div>
+        </div>
+
+        <!-- Checklists / Acceptance Criteria -->
+        <div class="prq-section" *ngIf="viewingTask().checklists && viewingTask().checklists.length > 0">
+          <h3 class="prq-section-title"><svg lucideCheckSquare size="15"></svg> Checklists & Criteria</h3>
+          <div class="prq-checklist-group" *ngFor="let cl of viewingTask().checklists">
+            <div class="checklist-title font-semibold text-gray-800 text-xs uppercase mb-1">{{ cl.title }}</div>
+            <div class="checklist-item-row" *ngFor="let item of cl.items">
+              <input type="checkbox" [checked]="item.isCompleted" disabled class="mr-2 rounded">
+              <span [class.line-through]="item.isCompleted" [class.text-gray-400]="item.isCompleted">{{ item.title }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtasks / Children -->
+        <div class="prq-section" *ngIf="viewingTask().children && viewingTask().children.length > 0">
+          <h3 class="prq-section-title"><svg lucideLayers size="15"></svg> Sub-Tasks ({{ viewingTask().children.length }})</h3>
+          <div class="prq-subtasks-list">
+            <div class="subtask-row" *ngFor="let ch of viewingTask().children">
+              <span class="subtask-key">{{ ch.key }}</span>
+              <span class="subtask-title">{{ ch.title }}</span>
+              <span class="subtask-status">{{ ch.status }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attachments / Files -->
+        <div class="prq-section" *ngIf="viewingTask().attachments && viewingTask().attachments.length > 0">
+          <h3 class="prq-section-title"><svg lucidePaperclip size="15"></svg> Attachments & Files ({{ viewingTask().attachments.length }})</h3>
+          <div class="prq-attachments-grid">
+            <a *ngFor="let att of viewingTask().attachments" [href]="att.fileUrl" target="_blank" class="prq-attachment-card">
+              <svg lucideFileText size="16" class="text-blue-500"></svg>
+              <span class="att-name" [title]="att.fileName">{{ att.fileName }}</span>
+              <svg lucideExternalLink size="12" class="text-gray-400 ml-auto"></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer Actions -->
+      <div class="prq-modal-footer">
+        <button type="button" class="prq-btn btn-secondary" (click)="closeTaskDetails()">
+          Close
+        </button>
+        <div class="prq-footer-spacer"></div>
+        <button type="button" class="prq-btn archive" (click)="archiveFromModal(viewingTask())">
+          <svg lucideXCircle size="14"></svg> Archive
+        </button>
+        <button type="button" class="prq-btn reject" (click)="decideFromModal(viewingTask(), 'REJECT')">
+          <svg lucideX size="14"></svg> Reject
+        </button>
+        <button type="button" class="prq-btn approve" (click)="decideFromModal(viewingTask(), 'APPROVE')">
+          <svg lucideCheck size="14"></svg> Approve
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Field visit details -->
+  <div class="prq-modal-backdrop" *ngIf="viewingVisit() as v" (click)="closeVisitDetails()">
+    <div class="prq-task-modal" (click)="$event.stopPropagation()">
+      <div class="prq-modal-header">
+        <div class="prq-modal-header-left">
+          <span class="prq-key-pill">{{ v.requestNumber }}</span>
+          <span class="prq-stage-pill admin"><span class="stage-pulse-dot"></span> Awaiting administrator</span>
+          <span class="fv-type-pill" [class.general]="isGeneralVisit(v)">{{ isGeneralVisit(v) ? 'General visit' : 'Project visit' }}</span>
+          <a [routerLink]="['/field-visits/requests', v.id]" target="_blank" class="prq-board-link-btn" title="Open the full request page">
+            <svg lucideExternalLink size="13"></svg>
+            <span>Open full page</span>
+          </a>
+        </div>
+        <button type="button" class="prq-modal-close-btn" (click)="closeVisitDetails()" title="Close">
+          <svg lucideX size="18"></svg>
+        </button>
+      </div>
+
+      <div class="prq-modal-body">
+        <div class="prq-title-section">
+          <h2 class="prq-modal-title">{{ isGeneralVisit(v) ? 'General field visit' : (v.project?.key ? v.project.key + ' · ' : '') + v.project?.name }}</h2>
+        </div>
+
+        <div class="prq-modal-profile-banner">
+          <div class="prq-profile-card" *ngIf="v.raisedBy as raiser">
+            <div class="prq-profile-avatar-wrap">
+              <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)" class="prq-profile-avatar-img" />
+              <div *ngIf="!raiser.avatarUrl" class="prq-profile-avatar-fallback">{{ getInitials(fullName(raiser)) }}</div>
+            </div>
+            <div class="prq-profile-info">
+              <div class="prq-profile-header-row">
+                <span class="prq-profile-label">Raised By</span>
+                <span class="prq-profile-badge" *ngIf="raiser.designation?.name">{{ raiser.designation?.name }}</span>
+              </div>
+              <div class="prq-profile-name">{{ raiser.firstName }} {{ raiser.lastName }}</div>
+              <div class="prq-profile-sub" *ngIf="raiser.department?.name || raiser.user?.email">
+                <span *ngIf="raiser.department?.name">{{ raiser.department?.name }}</span>
+                <span class="prq-sub-dot" *ngIf="raiser.department?.name && raiser.user?.email">·</span>
+                <span *ngIf="raiser.user?.email" class="prq-profile-email">{{ raiser.user?.email }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="prq-project-date-cluster">
+            <div class="prq-meta-pill date-pill" *ngIf="v.submittedAt">
+              <svg lucideCalendar size="13"></svg>
+              <span>Submitted {{ v.submittedAt | date: 'd MMM y, HH:mm' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="fv-detail-grid">
+          <div class="fv-detail-card wide">
+            <span class="fv-detail-label"><svg lucideMapPin size="12"></svg> Site</span>
+            <span class="fv-detail-value">{{ v.location }}</span>
+            <span class="fv-detail-sub">Clock-in allowed within {{ v.geofenceRadiusM || 500 }} m of the site</span>
+          </div>
+          <div class="fv-detail-card">
+            <span class="fv-detail-label"><svg lucideCalendar size="12"></svg> Dates</span>
+            <span class="fv-detail-value">{{ v.startDate | date: 'd MMM' }} – {{ v.endDate | date: 'd MMM y' }}</span>
+            <span class="fv-detail-sub">{{ v.visitDays }} {{ v.visitDays === 1 ? 'day' : 'days' }}</span>
+          </div>
+          <div class="fv-detail-card">
+            <span class="fv-detail-label"><svg lucideClock size="12"></svg> Daily hours</span>
+            <span class="fv-detail-value">{{ clockLabel(v.startTime) }} – {{ clockLabel(v.endTime) }}</span>
+            <span class="fv-detail-sub">Late and overtime are measured against these</span>
+          </div>
+        </div>
+
+        <div class="fv-detail-section">
+          <h3 class="fv-detail-heading">Who is going <span class="fv-count">{{ v.members.length }}</span></h3>
+          <div class="fv-people">
+            <div class="fv-person" *ngFor="let m of v.members">
+              <img *ngIf="m.employee.avatarUrl" [src]="m.employee.avatarUrl" alt="" class="fv-person-avatar" />
+              <div *ngIf="!m.employee.avatarUrl" class="fv-person-avatar fallback">{{ getInitials(fullName(m.employee)) }}</div>
+              <div class="fv-person-text">
+                <span class="fv-person-name">{{ m.employee.firstName }} {{ m.employee.lastName }}</span>
+                <span class="fv-person-sub">{{ m.employee.designation?.name || m.employee.department?.name || '' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="fv-detail-section">
+          <h3 class="fv-detail-heading">Tasks &amp; scope <span class="fv-count">{{ v.tasks.length }}</span></h3>
+          <div class="fv-task" *ngFor="let t of v.tasks; let i = index">
+            <span class="fv-task-num">{{ i + 1 }}</span>
+            <span class="fv-task-key" *ngIf="t.issue?.key">{{ t.issue?.key }}</span>
+            <span class="fv-task-key new" *ngIf="!t.issueId">New</span>
+            <div class="fv-task-text">
+              <span class="fv-task-name">{{ t.issue?.title || t.name }}</span>
+              <span class="fv-task-sub">
+                <ng-container *ngIf="t.issue">
+                  {{ t.issue.assignee ? (t.issue.assignee.firstName + ' ' + t.issue.assignee.lastName) : 'Unassigned' }}
+                  · {{ (t.issue.status || '').replace('_', ' ') | titlecase }}
+                </ng-container>
+                <ng-container *ngIf="!t.issue">A task is created for each person going when approved</ng-container>
+              </span>
+            </div>
+            <span class="fv-task-awaiting" *ngIf="t.issue?.approvalState === 'PENDING_ADMIN' || t.issue?.approvalState === 'PENDING_TECHNICAL'">Awaiting approval</span>
+          </div>
+        </div>
+
+        <div class="fv-detail-section" *ngIf="v.remarks">
+          <h3 class="fv-detail-heading">Remarks &amp; briefing notes</h3>
+          <p class="fv-remarks">{{ v.remarks }}</p>
+        </div>
+
+        <div class="fv-detail-section" *ngIf="v.attachments?.length">
+          <h3 class="fv-detail-heading">Attachments <span class="fv-count">{{ v.attachments.length }}</span></h3>
+          <div class="fv-files">
+            <a class="fv-file" *ngFor="let a of v.attachments" [href]="a.fileUrl" target="_blank" rel="noopener">
+              <svg lucidePaperclip size="13"></svg> {{ a.fileName }}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="prq-modal-footer">
+        <button type="button" class="prq-btn btn-secondary" (click)="closeVisitDetails()">Close</button>
+        <div class="prq-footer-spacer"></div>
+        <button type="button" class="prq-btn reject" (click)="decideVisitFromModal(v, 'REJECTED')">
+          <svg lucideX size="14"></svg> Reject
+        </button>
+        <button type="button" class="prq-btn approve" (click)="decideVisitFromModal(v, 'APPROVED')">
+          <svg lucideCheck size="14"></svg> Approve
+        </button>
+      </div>
+    </div>
+  </div>
 
   <app-dialog-host></app-dialog-host>
 </div>

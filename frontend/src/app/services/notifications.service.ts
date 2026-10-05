@@ -1,3 +1,4 @@
+import { Subject } from 'rxjs';
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { io, Socket } from 'socket.io-client';
@@ -50,6 +51,8 @@ export class NotificationsService {
   private baseUrl = 'https://mira.ces-pl.com'; // Fallback to production URL or window origin
 
   notifications = signal<NotificationItem[]>([]);
+  /** A notice has just been posted to this person. Its popup decides what to show. */
+  readonly noticePosted = new Subject<{ id: number }>();
   unreadCount = signal<number>(0);
 
   constructor() {
@@ -89,6 +92,8 @@ export class NotificationsService {
     this.socket.on('connect', () => {
       console.log('⚡ Connected to MIRA Real-Time Notification Socket');
     });
+
+    this.socket.on('notice', (n: { id: number }) => this.noticePosted.next(n));
 
     this.socket.on('notification', (newNotif: NotificationItem) => {
       this.notifications.update(list => [newNotif, ...list]);

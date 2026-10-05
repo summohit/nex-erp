@@ -564,7 +564,8 @@
                   <svg *ngIf="day.status === 'On Leave'" lucidePlane class="status-leave status-icon"></svg>
                   <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
                   <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
-                  <span *ngIf="day.record?.clockInLat" class="day-location-pin" title="GPS location logged">📍</span>
+                  <span *ngIf="day.record?.fieldVisit || day.record?.isOnsite" class="day-fv-pin" title="Field Visit on site">🚗</span>
+                  <span *ngIf="day.record?.clockInLat && !day.record?.fieldVisit && !day.record?.isOnsite" class="day-location-pin" title="GPS location logged">📍</span>
                   <svg *ngIf="day.record?.overtimeHours" lucideZap class="day-corner-symbol day-ot-symbol status-overtime" title="Overtime"></svg>
                   <svg *ngIf="day.record?.clockOutReason" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" title="Missed clock out"></svg>
                 </ng-container>
@@ -630,6 +631,11 @@
       </div>
       <div class="cell-tooltip-detail cell-tooltip-missed" *ngIf="tip.day.record?.clockOutReason">
         ⏱ Missed clock-out: "{{ tip.day.record?.clockOutReason }}"
+      </div>
+      <div class="cell-tooltip-field-visit" *ngIf="tip.day.record?.fieldVisit as fv">
+        🚗 <strong>Field Visit:</strong> {{ fv.requestNumber || 'On-site' }}
+        <div class="fv-tip-sub" *ngIf="fv.location">{{ fv.location }}</div>
+        <div class="fv-tip-time" *ngIf="fv.startTime && fv.endTime">Expected: {{ fv.startTime }} – {{ fv.endTime }}</div>
       </div>
     </div>
     <div class="cell-tooltip-reason" *ngIf="tip.day.reason">
@@ -739,16 +745,20 @@
             <!-- Flags -->
             <td>
               <div class="flags-group">
+                <span class="flag-badge field-visit-flag" *ngIf="r.fieldVisit || r.isOnsite"
+                      [title]="r.fieldVisit ? ('Field Visit ' + (r.fieldVisit?.requestNumber || '') + ' at ' + (r.fieldVisit?.location || 'site') + (r.fieldVisit?.startTime ? ' (' + r.fieldVisit?.startTime + ' - ' + r.fieldVisit?.endTime + ')' : '')) : 'On-site Field Visit'">
+                  <svg lucideRoute [size]="11"></svg> Field Visit{{ r.fieldVisit?.requestNumber ? (': ' + r.fieldVisit?.requestNumber) : '' }}
+                </span>
                 <span class="flag-badge late" *ngIf="r.isLate">
                   <svg lucideAlertTriangle [size]="11"></svg> Late
                 </span>
                 <span class="flag-badge early" *ngIf="r.isEarlyLeave">
                   <svg lucideDoorOpen [size]="11"></svg> Early Leave
                 </span>
-                <span class="flag-badge on-time" *ngIf="r.status === 'PRESENT' && !r.isLate && !r.isEarlyLeave">
+                <span class="flag-badge on-time" *ngIf="r.status === 'PRESENT' && !r.isLate && !r.isEarlyLeave && !r.fieldVisit && !r.isOnsite">
                   <svg lucideCheckCircle2 [size]="11"></svg> On Time
                 </span>
-                <span class="flag-badge empty-dash" *ngIf="!r.isLate && !r.isEarlyLeave && r.status !== 'PRESENT'">—</span>
+                <span class="flag-badge empty-dash" *ngIf="!r.isLate && !r.isEarlyLeave && r.status !== 'PRESENT' && !r.fieldVisit && !r.isOnsite">—</span>
               </div>
             </td>
 

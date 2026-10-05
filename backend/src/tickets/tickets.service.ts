@@ -1,3 +1,4 @@
+import { cleanRichHtml, hasRichText, richTextToPlain } from '../common/rich-text';
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -16,6 +17,13 @@ const DEV_DEPT_KEYWORDS = [
   'it support',
   'tech',
 ];
+
+/**
+ * The departments that work tickets and so see all of them. Exact names, not
+ * keywords: "contains" let IT Support and Training & Development in too.
+ * Routing a new ticket to a team (DEV_DEPT_KEYWORDS) is a separate question.
+ */
+const TICKET_TEAM_DEPARTMENTS = ['software development', 'engineering'];
 
 const EMPLOYEE_SELECT = {
   id: true,
@@ -261,7 +269,11 @@ export class TicketsService {
         select: { user: { select: { email: true } } }
       });
       if (newAssignee?.user?.email) {
-        this.mailService.sendTicketAssignedEmail(newAssignee.user.email, ticket.ticketNumber, ticket.title).catch(console.error);
+        this.mailService.sendTicketAssignedEmail(newAssignee.user.email, ticket.ticketNumber, ticket.title, {
+          ticketId: ticket.id,
+          priority: (ticket as any).priority,
+          reporterName: TicketsService.ticketActorName((ticket as any).reporter),
+        }).catch(console.error);
       }
 
       await this.notifyTicketParticipants([Number(assigneeId)], reporterId, companyId, {
@@ -307,14 +319,13 @@ export class TicketsService {
   // ─── LIST ──────────────────────────────────────────────────────────────────
 
   private canSeeAllTickets(role?: string): boolean {
-    return ['SUPERADMIN', 'ADMIN', 'MANAGER'].includes(role ?? '');
+    return ['SUPERADMIN', 'ADMIN'].includes(role ?? '');
   }
 
   /**
-   * Who may read any attendance issue. Deliberately narrower than
-   * canSeeAllTickets: MANAGER is not on it, because a manager reading
-   * complaints raised against their own team is the situation this is meant to
-   * avoid.
+   * Who may read any attendance issue. Not the ticket team, and not MANAGER:
+   * a manager reading complaints raised against their own team is the
+   * situation this is meant to avoid.
    */
   private canHandleAttendanceIssues(role?: string): boolean {
     return ['SUPERADMIN', 'ADMIN', 'HR'].includes(role ?? '');
@@ -326,8 +337,8 @@ export class TicketsService {
       where: { id: employeeId },
       select: { department: { select: { name: true } } },
     });
-    const name = emp?.department?.name?.toLowerCase() ?? '';
-    return DEV_DEPT_KEYWORDS.some((k) => name.includes(k));
+    const name = emp?.department?.name?.trim().toLowerCase() ?? '';
+    return TICKET_TEAM_DEPARTMENTS.includes(name);
   }
 
   /**
@@ -361,9 +372,10 @@ export class TicketsService {
     const where: any = { companyId };
 
     const privileged = this.canSeeAllTickets(user.role) || (await this.isEngineeringDept(user.employeeId));
-    if (!privileged && user.employeeId) {
-      where.reporterId = user.employeeId;
-    }
+    // Everyone else sees what they raised and what is assigned to them.
+    const ownOnly = !privileged && user.employeeId
+      ? { OR: [{ reporterId: user.employeeId }, { assigneeId: user.employeeId }] }
+      : null;
 
     // Attendance issues are personnel matters. The blanket visibility that the
     // engineering department enjoys over every other ticket must not extend to
@@ -380,6 +392,7 @@ export class TicketsService {
         ...(mine.length ? [{ AND: [{ type: TicketsService.ATTENDANCE_TYPE as any }, { OR: mine }] }] : []),
       ];
     }
+    if (ownOnly) where.AND = [ownOnly];
 
     // "Department" means the one the ticket was raised BY — the owning team is
     // always software development, so filtering on it would be meaningless.
@@ -410,9 +423,33 @@ export class TicketsService {
     }
 
     if (filters.fromDate || filters.toDate) {
-      where.createdAt = {};
-      if (filters.fromDate) where.createdAt.gte = new Date(filters.fromDate);
-      if (filters.toDate) where.createdAt.lte = new Date(filters.toDate);
+      const dateRange: any = {};
+      if (filters.fromDate) dateRange.gte = new Date(filters.fromDate);
+      if (filters.toDate) dateRange.lte = new Date(filters.toDate);
+
+      const target = filters.dateField || (filters.status === 'RESOLVED' ? 'resolvedAt' : (filters.status === 'CLOSED' ? 'closedAt' : 'createdAt'));
+
+      if (target === 'resolvedAt') {
+        if (!where.AND) where.AND = [];
+        else if (!Array.isArray(where.AND)) where.AND = [where.AND];
+        where.AND.push({
+          OR: [
+            { resolvedAt: dateRange },
+            { AND: [{ resolvedAt: null }, { status: 'RESOLVED' }, { updatedAt: dateRange }] }
+          ]
+        });
+      } else if (target === 'closedAt') {
+        if (!where.AND) where.AND = [];
+        else if (!Array.isArray(where.AND)) where.AND = [where.AND];
+        where.AND.push({
+          OR: [
+            { closedAt: dateRange },
+            { AND: [{ closedAt: null }, { status: { in: ['CLOSED', 'REJECTED'] } }, { updatedAt: dateRange }] }
+          ]
+        });
+      } else {
+        where.createdAt = dateRange;
+      }
     }
 
     if (filters.dueDateFrom || filters.dueDateTo) {
@@ -426,6 +463,12 @@ export class TicketsService {
       where.status = { notIn: ['RESOLVED', 'CLOSED'] };
     }
 
+    const orderBy: any = (filters.status === 'RESOLVED' || filters.dateField === 'resolvedAt')
+      ? [{ resolvedAt: 'desc' }, { createdAt: 'desc' }]
+      : (filters.status === 'CLOSED' || filters.dateField === 'closedAt')
+      ? [{ closedAt: 'desc' }, { createdAt: 'desc' }]
+      : [{ createdAt: 'desc' }];
+
     return this.prisma.ticket.findMany({
       where,
       include: {
@@ -434,7 +477,7 @@ export class TicketsService {
         department: { select: { id: true, name: true } },
         _count: { select: { comments: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy,
     });
   }
 
@@ -443,14 +486,17 @@ export class TicketsService {
   async getStats(companyId: number, user: { role?: string; employeeId?: number | null; departmentId?: number | null }) {
     const where: any = { companyId };
     const privileged = this.canSeeAllTickets(user.role) || (await this.isEngineeringDept(user.employeeId));
-    if (!privileged && user.employeeId) where.reporterId = user.employeeId;
+    if (!privileged && user.employeeId) {
+      where.OR = [{ reporterId: user.employeeId }, { assigneeId: user.employeeId }];
+    }
 
-    const [total, open, inProgress, resolved, closed] = await Promise.all([
+    const [total, open, inProgress, resolved, closed, rejected] = await Promise.all([
       this.prisma.ticket.count({ where }),
       this.prisma.ticket.count({ where: { ...where, status: 'OPEN' } }),
       this.prisma.ticket.count({ where: { ...where, status: 'IN_PROGRESS' } }),
       this.prisma.ticket.count({ where: { ...where, status: 'RESOLVED' } }),
       this.prisma.ticket.count({ where: { ...where, status: 'CLOSED' } }),
+      this.prisma.ticket.count({ where: { ...where, status: 'REJECTED' } }),
     ]);
 
     const byDepartment = await this.prisma.ticket.groupBy({
@@ -472,6 +518,7 @@ export class TicketsService {
       inProgress,
       resolved,
       closed,
+      rejected,
       byDepartment: byDepartment.map((r) => ({
         departmentId: r.departmentId,
         departmentName: deptMap[r.departmentId] ?? 'Unknown',
@@ -521,7 +568,7 @@ export class TicketsService {
     if (!ticket) throw new NotFoundException('Ticket not found');
 
     // Access. findAll scopes the list — non-privileged callers see only what
-    // they reported — but this method took no caller at all, so the id alone
+    // they reported or are assigned — but this method took no caller at all, so the id alone
     // was enough to read any ticket in the company: its description, comments,
     // attachments and time entries. That made the list scoping decorative.
     //
@@ -624,6 +671,27 @@ export class TicketsService {
       }
     }
 
+    // Resolving or rejecting needs a reason — and, optionally, evidence.
+    //
+    // Both end the conversation for whoever raised the ticket, and a status
+    // change with no explanation leaves them asking "how?" or "why?" with
+    // nobody to answer. Required here, not only in the form, so no screen and
+    // no API caller can close a ticket out silently.
+    const closing = (data.status === 'RESOLVED' || data.status === 'REJECTED') && data.status !== ticket.status;
+    const statusReason = String(data.statusReason ?? '').trim();
+    const statusAttachment =
+      data.statusAttachment?.fileUrl ? data.statusAttachment as { fileName?: string; fileUrl: string; fileSize?: number } : null;
+    if (closing && !statusReason) {
+      throw new BadRequestException(
+        data.status === 'RESOLVED'
+          ? 'Describe how this ticket was resolved.'
+          : 'Say why this ticket is being rejected.',
+      );
+    }
+    // Not ticket columns — strip them before anything treats them as such.
+    delete data.statusReason;
+    delete data.statusAttachment;
+
     const updateData: any = {};
 
     // Reassignment stays within the ticket's own department — except when that
@@ -671,7 +739,9 @@ export class TicketsService {
     if (data.departmentId !== undefined) updateData.departmentId = Number(data.departmentId);
 
     if (data.status === 'RESOLVED' && ticket.status !== 'RESOLVED') updateData.resolvedAt = new Date();
+    if (data.status && data.status !== 'RESOLVED' && ticket.status === 'RESOLVED') updateData.resolvedAt = null;
     if ((data.status === 'CLOSED' || data.status === 'REJECTED') && !['CLOSED', 'REJECTED'].includes(ticket.status)) updateData.closedAt = new Date();
+    if (data.status && !['CLOSED', 'REJECTED'].includes(data.status) && ['CLOSED', 'REJECTED'].includes(ticket.status)) updateData.closedAt = null;
 
     const [updated] = await this.prisma.$transaction([
       this.prisma.ticket.update({
@@ -680,6 +750,36 @@ export class TicketsService {
         include: { reporter: { select: EMPLOYEE_SELECT }, assignee: { select: EMPLOYEE_SELECT }, department: true },
       }),
       ...activities.map((a) => this.prisma.ticketActivity.create({ data: a })),
+      // The reason lands in the ticket's discussion, where the reporter reads
+      // it, and the evidence among its attachments — in the same write as the
+      // status, so a ticket is never resolved without its explanation.
+      ...(closing
+        ? [
+            this.prisma.ticketComment.create({
+              data: {
+                ticketId: id,
+                authorId: actorId,
+                body: `${data.status === 'RESOLVED' ? 'Resolved' : 'Rejected'}: ${statusReason}`,
+              },
+            }),
+          ]
+        : []),
+      ...(closing && statusAttachment
+        ? [
+            this.prisma.ticketAttachment.create({
+              data: {
+                ticketId: id,
+                fileName: statusAttachment.fileName || 'attachment',
+                fileUrl: statusAttachment.fileUrl,
+                fileSize: statusAttachment.fileSize ?? null,
+                uploadedById: actorId,
+              },
+            }),
+            this.prisma.ticketActivity.create({
+              data: { ticketId: id, actorId, action: 'ATTACHMENT_ADDED', newValue: statusAttachment.fileName || 'attachment' },
+            }),
+          ]
+        : []),
     ]);
 
     if (data.assigneeId && String(ticket.assigneeId) !== String(data.assigneeId)) {
@@ -688,7 +788,15 @@ export class TicketsService {
         select: { user: { select: { email: true } } }
       });
       if (newAssignee?.user?.email) {
-        this.mailService.sendTicketAssignedEmail(newAssignee.user.email, updated.ticketNumber, updated.title).catch(console.error);
+        const assigner = await this.prisma.employee.findFirst({
+          where: { id: actorId }, select: { firstName: true, lastName: true },
+        });
+        this.mailService.sendTicketAssignedEmail(newAssignee.user.email, updated.ticketNumber, updated.title, {
+          ticketId: updated.id,
+          priority: updated.priority,
+          reporterName: TicketsService.ticketActorName(updated.reporter),
+          assignedBy: TicketsService.ticketActorName(assigner),
+        }).catch(console.error);
       }
 
       await this.notifyTicketParticipants([Number(data.assigneeId)], actorId, companyId, {
@@ -696,6 +804,26 @@ export class TicketsService {
         message: `${updated.ticketNumber}: ${updated.title}`,
         type: 'ASSIGNMENT',
       });
+    }
+
+    // The timer follows the status: picking a ticket up starts the mover's
+    // timer, and finishing it stops everybody's. Never fatal — the status
+    // change has already been saved.
+    let timer: { started?: boolean; stoppedOnOtherTickets?: string[]; stopped?: number } | undefined;
+    if (data.status !== undefined && data.status !== ticket.status) {
+      try {
+        timer = await this.timerFollowsStatus(companyId, id, actorId, data.status);
+      } catch (err) {
+        console.error(`Ticket ${updated.ticketNumber}: timer did not follow the status`, err);
+      }
+    }
+
+    if (data.status !== undefined && data.status !== ticket.status) {
+      // Not awaited: a mail server having a bad afternoon must not fail the
+      // status change that has already been saved.
+      this.emailStatusChange(ticket, updated, actorId, data.status, statusReason).catch((err) =>
+        console.error(`Ticket ${updated.ticketNumber}: status email failed`, err),
+      );
     }
 
     // Status moves are what the reporter is actually waiting on. RESOLVED is
@@ -724,7 +852,7 @@ export class TicketsService {
       }
     }
 
-    return updated;
+    return timer ? { ...updated, timer } : updated;
   }
 
   // ─── DELETE ────────────────────────────────────────────────────────────────
@@ -744,7 +872,15 @@ export class TicketsService {
 
   // ─── COMMENTS ──────────────────────────────────────────────────────────────
 
-  async addComment(companyId: number, ticketId: number, authorId: number, body: string) {
+  /** A comment is editor HTML; cleaned, and refused if it says nothing. */
+  private cleanComment(body: string): string {
+    const clean = cleanRichHtml(body || '');
+    if (!hasRichText(clean)) throw new BadRequestException('A comment needs some text');
+    return clean;
+  }
+
+  async addComment(companyId: number, ticketId: number, authorId: number, rawBody: string) {
+    const body = this.cleanComment(rawBody);
     // Needs the participants, not just existence — a reply is pointless if the
     // other side is never told about it.
     const ticket = await this.prisma.ticket.findFirst({
@@ -764,7 +900,8 @@ export class TicketsService {
     ]);
 
     const author = TicketsService.ticketActorName(comment.author);
-    const excerpt = body.length > 80 ? `${body.slice(0, 80).trimEnd()}…` : body;
+    const plain = richTextToPlain(body);
+    const excerpt = plain.length > 80 ? `${plain.slice(0, 80).trimEnd()}…` : plain;
     await this.notifyTicketParticipants(
       [ticket.reporterId, ticket.assigneeId],
       authorId,
@@ -786,7 +923,7 @@ export class TicketsService {
     if (comment.authorId !== authorId) throw new ForbiddenException('Cannot edit another user\'s comment');
     return this.prisma.ticketComment.update({
       where: { id: commentId },
-      data: { body },
+      data: { body: this.cleanComment(body) },
       include: { author: { select: EMPLOYEE_SELECT } },
     });
   }
@@ -823,6 +960,60 @@ export class TicketsService {
       type: payload.type,
       linkUrl: payload.linkUrl ?? '/crm/tickets',
     });
+  }
+
+  /**
+   * Email whoever a status change is for.
+   *
+   * Resolved and Rejected go to the person who raised the ticket — Resolved
+   * asks them to verify the fix and close it. Closed goes to both sides, and a
+   * reopen to whoever is working it. Never to the person who made the change.
+   */
+  private async emailStatusChange(
+    before: { status: string; reporterId: number | null; assigneeId: number | null },
+    updated: any,
+    actorId: number,
+    status: string,
+    reason: string,
+  ) {
+    const reopened = status === 'OPEN' && ['RESOLVED', 'CLOSED', 'REJECTED'].includes(before.status);
+    const kind =
+      status === 'RESOLVED' ? 'RESOLVED'
+      : status === 'REJECTED' ? 'REJECTED'
+      : status === 'CLOSED' ? 'CLOSED'
+      : reopened ? 'REOPENED'
+      : null;
+    if (!kind) return;
+
+    const to =
+      kind === 'RESOLVED' || kind === 'REJECTED' ? [updated.reporterId]
+      : kind === 'CLOSED' ? [updated.reporterId, updated.assigneeId]
+      : [updated.assigneeId];
+    const ids = [...new Set(to.filter((x): x is number => !!x && x !== actorId))];
+    if (!ids.length) return;
+
+    const [people, actor] = await Promise.all([
+      this.prisma.employee.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, firstName: true, user: { select: { email: true } } },
+      }),
+      this.prisma.employee.findFirst({ where: { id: actorId }, select: { firstName: true, lastName: true } }),
+    ]);
+
+    for (const p of people) {
+      if (!p.user?.email) continue;
+      await this.mailService.sendTicketEmail(p.user.email, {
+        kind,
+        ticketId: updated.id,
+        ticketNumber: updated.ticketNumber,
+        ticketTitle: updated.title,
+        priority: updated.priority,
+        reporterName: TicketsService.ticketActorName(updated.reporter),
+        actorName: TicketsService.ticketActorName(actor),
+        note: kind === 'RESOLVED' || kind === 'REJECTED' ? richTextToPlain(reason) || null : null,
+        recipientName: p.firstName,
+      });
+    }
   }
 
   private static ticketActorName(actor?: { firstName?: string | null; lastName?: string | null } | null): string {
@@ -897,6 +1088,42 @@ export class TicketsService {
     // Returned so the client can say which ticket it took the timer off,
     // rather than silently moving it.
     return { ...entry, stoppedOnOtherTickets: stopped };
+  }
+
+  /**
+   * In Progress starts the mover's timer here (which, as with Start, stops
+   * their timer on any other ticket). Resolved, Rejected or Closed stops every
+   * timer still running on this ticket, with its real duration.
+   */
+  async timerFollowsStatus(companyId: number, ticketId: number, actorId: number | null, status: string) {
+    if (status === 'IN_PROGRESS' && actorId) {
+      const running = await this.prisma.ticketTimeEntry.findFirst({
+        where: { ticketId, userId: actorId, endTime: null }, select: { id: true },
+      });
+      if (running) return { started: false };
+      const res = await this.startTimer(companyId, ticketId, actorId);
+      return { started: true, stoppedOnOtherTickets: res.stoppedOnOtherTickets };
+    }
+
+    if (['RESOLVED', 'REJECTED', 'CLOSED'].includes(status)) {
+      const open = await this.prisma.ticketTimeEntry.findMany({
+        where: { ticketId, endTime: null }, select: { id: true, startTime: true, notes: true },
+      });
+      const now = new Date();
+      const note = `Stopped automatically when the ticket was marked ${status.toLowerCase()}`;
+      for (const e of open) {
+        await this.prisma.ticketTimeEntry.update({
+          where: { id: e.id },
+          data: {
+            endTime: now,
+            duration: Math.max(0, Math.floor((now.getTime() - e.startTime.getTime()) / 1000)),
+            notes: e.notes ?? note,
+          },
+        });
+      }
+      return { stopped: open.length };
+    }
+    return undefined;
   }
 
   async stopTimer(companyId: number, ticketId: number, userId: number, notes?: string) {

@@ -198,9 +198,12 @@
 }
 
 .required-star {
-  color: #ef4444;
-  font-size: 13px;
-  font-weight: 700;
+  color: #ef4444 !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  margin-left: 2px !important;
+  display: inline-block;
+  vertical-align: baseline;
 }
 
 .field input[type="text"],
@@ -2070,3 +2073,165 @@
   font-size: 11px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   white-space: nowrap; vertical-align: middle;
 }
+
+/* ── Field Validation & Error States ─────────────────────────────────────── */
+.has-field-error,
+input.has-field-error,
+textarea.has-field-error,
+.searchable-select-trigger.has-field-error,
+.input-with-icon.has-field-error input,
+.input-with-icon.has-field-error,
+.member-picker-grid.has-field-error,
+.scope-trigger.has-field-error {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18) !important;
+}
+
+.field.has-field-error > label,
+.field.has-field-error > label span:first-child,
+.field.has-field-error > .field-label-split label {
+  color: #dc2626 !important;
+}
+
+.form-section.has-field-error .section-title {
+  color: #dc2626 !important;
+}
+
+.form-section.has-field-error .section-tag {
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+  border-color: #fca5a5 !important;
+}
+
+.input-with-icon.has-field-error .field-icon {
+  color: #ef4444 !important;
+}
+
+.field-error-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626;
+  margin-top: 6px;
+  animation: fadeInFieldError 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.field-error-message svg {
+  flex-shrink: 0;
+  color: #dc2626;
+}
+
+.members-error-message,
+.tasks-error-message {
+  padding: 8px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+@keyframes fadeInFieldError {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Attention pulse when scrolled to an invalid field */
+.field-attention-pulse {
+  animation: fieldAttentionPulse 1.8s cubic-bezier(0.25, 1, 0.5, 1) !important;
+  border-radius: 12px !important;
+}
+
+@keyframes fieldAttentionPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    background-color: rgba(254, 226, 226, 0.5);
+  }
+  25% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0.35);
+    background-color: rgba(254, 226, 226, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.2);
+    background-color: rgba(254, 226, 226, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    background-color: transparent;
+  }
+}
+
+
+/* Project / General visit type */
+.visit-type-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  background: var(--bg-secondary, #f9fafb);
+}
+.visit-type-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+.visit-type-option.active {
+  background: var(--bg-primary, #fff);
+  color: var(--primary, #4f46e5);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.visit-type-option:disabled { cursor: not-allowed; opacity: 0.7; }
+.visit-type-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* A picked task that is itself still awaiting approval */
+.awaiting-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.awaiting-alert {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-left: 4px solid #f59e0b;
+  color: #78350f;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* Whose task a picked one is, among the people going */
+.scope-chip-owner { margin-left: 4px; font-size: 11.5px; font-weight: 600; color: #475569; white-space: nowrap; }
+.scope-chip-owner.not-going { color: #b91c1c; }
+.not-going-alert { background: #fef2f2; border-color: #fecaca; border-left-color: #ef4444; color: #7f1d1d; }

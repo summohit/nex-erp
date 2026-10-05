@@ -17,6 +17,7 @@ import {
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { DialogService } from '../../shared/services/dialog.service';
+import { GeolocationService } from '../../shared/services/geolocation.service';
 import { OutsideOfficeAnswer, OutsideOfficeService } from '../../shared/services/outside-office.service';
 import { UploadService } from '../../services/upload.service';
 import { PushNotificationsService } from '../../services/push-notifications.service';
@@ -47,6 +48,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private ticketService = inject(TicketService);
   private toast = inject(HotToastService);
   private dialog = inject(DialogService);
+  private geo = inject(GeolocationService);
   private outsideOffice = inject(OutsideOfficeService);
   private uploadService = inject(UploadService);
   private push = inject(PushNotificationsService);
@@ -281,16 +283,12 @@ export class HeaderComponent implements OnInit, OnDestroy {
       });
     };
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => proceed(position.coords.latitude, position.coords.longitude),
-        // No location: let the server decide. An office (General Shift) day
-        // answers with the reason box; any other shift clocks as normal.
-        () => proceed(undefined, undefined),
-      );
-    } else {
-      proceed(undefined, undefined);
-    }
+    // Bounded, retried, and explained — see GeolocationService for why a bare
+    // getCurrentPosition hangs or silently drops the location in Safari. Still
+    // lets the person continue without one, in which case the server decides:
+    // an office (General Shift) day answers with the reason box, any other
+    // shift clocks as normal.
+    void this.geo.locateForClock().then(({ lat, lng }) => proceed(lat, lng));
   }
 
   /**

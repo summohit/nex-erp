@@ -43,6 +43,18 @@ export interface AttendanceRecord {
   clockOutReviewNote?: string | null;
   /** Live "session still open and overdue" flag; cleared once the day closes. */
   missedClockOut?: boolean;
+  isOnsite?: boolean;
+  project?: { id: number; name: string; key?: string } | null;
+  fieldVisit?: {
+    requestId?: number;
+    requestNumber?: string;
+    location?: string;
+    startTime?: string;
+    endTime?: string;
+    projectName?: string;
+    projectKey?: string;
+    status?: string;
+  } | null;
   employeeId: number;
   employee?: any;
   logs?: any[];

@@ -25,6 +25,8 @@ export interface FieldVisitRequestTask {
     title: string;
     status: string;
     priority: string;
+    approvalState?: string | null;
+    assignee?: { id: number; firstName: string; lastName: string } | null;
   } | null;
 }
 
@@ -73,7 +75,8 @@ export interface FieldVisitRequest {
   submittedAt?: string | null;
   reviewedAt?: string | null;
   createdAt: string;
-  project: { id: number; name: string; key?: string | null; color?: string | null };
+  /** `isSystem` marks a general visit, filed under the hidden General project. */
+  project: { id: number; name: string; key?: string | null; color?: string | null; isSystem?: boolean };
   raisedBy: FieldVisitPerson;
   reviewedBy?: { id: number; firstName: string; lastName: string } | null;
   members: { id: number; employee: FieldVisitPerson }[];
@@ -120,7 +123,9 @@ export interface FieldVisitActivity {
 }
 
 export interface FieldVisitRequestInput {
-  projectId: number;
+  /** GENERAL visits belong to no project; their scope is the people's general tasks. */
+  visitType?: 'PROJECT' | 'GENERAL';
+  projectId?: number;
   location: string;
   /** The saved site this was picked from, when it was (§PB10). */
   visitLocationId?: number;
@@ -173,8 +178,9 @@ export class FieldVisitRequestsService {
     return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/submit`, {});
   }
 
-  approve(id: number) {
-    return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/approve`, {});
+  /** overrideDayOff: roster the people on site over their rostered days off. */
+  approve(id: number, opts: { overrideDayOff?: boolean } = {}) {
+    return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/approve`, opts);
   }
 
   reject(id: number, reason: string) {
@@ -192,6 +198,13 @@ export class FieldVisitRequestsService {
    * The whole request goes, not a patch — the approver rules on what the trip
    * would become.
    */
+  /** Open (To Do / In Progress) general tasks assigned to any of these people. */
+  getGeneralTasks(employeeIds: number[]) {
+    return this.http.get<any[]>(`${this.apiUrl}/general-tasks`, {
+      params: { employeeIds: employeeIds.join(',') },
+    });
+  }
+
   requestModification(id: number, body: FieldVisitRequestInput) {
     return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/request-modification`, body);
   }
@@ -206,5 +219,19 @@ export class FieldVisitRequestsService {
 
   cancel(id: number, reason?: string) {
     return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/cancel`, { reason });
+  }
+
+  complete(id: number) {
+    return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/complete`, {});
+  }
+
+  changeStatus(id: number, status: string, reason?: string, opts: { overrideDayOff?: boolean } = {}) {
+    return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/status`, { status, reason, ...opts });
+  }
+
+  bulkChangeStatus(ids: number[], status: string, reason?: string, opts: { overrideDayOff?: boolean } = {}) {
+    return this.http.post<Array<{ id: number; success: boolean; error?: string; code?: string }>>(
+      `${this.apiUrl}/bulk/status`, { ids, status, reason, ...opts },
+    );
   }
 }

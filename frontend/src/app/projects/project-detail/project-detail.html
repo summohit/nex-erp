@@ -1135,6 +1135,8 @@
         [theme]="'legacy'"
         [rowData]="filteredListIssues()"
         [columnDefs]="listGridColDefs"
+        [rowClassRules]="listGridRowClassRules"
+        [getRowStyle]="listGridGetRowStyle"
         (cellClicked)="onListGridCellClicked($event)"
         (gridReady)="onListGridReady($event)"
         [pagination]="true"
@@ -2794,7 +2796,7 @@
                 <button class="btn-icon-tiny" (click)="activeColumnPopoverId.set(null)"><svg lucideX size="14"></svg></button>
               </div>
               <div class="popover-body list-actions-body">
-                <button class="list-action-btn" *ngIf="canAddTasks" (click)="issueForm.columnId = col.id; inlineCardTitle.set(''); addingCardColumnId.set(col.id); activeColumnPopoverId.set(null)">Add card</button>
+                <button class="list-action-btn" *ngIf="canAddTasks" (click)="openCreateIssue(col.id); activeColumnPopoverId.set(null)">Add card</button>
                 <div class="list-action-divider"></div>
                 
                 <div class="popover-subtitle-row">
@@ -3067,7 +3069,7 @@
           <div class="inline-add-actions">
             <button type="button" class="btn-add-card-submit" (click)="submitInlineCard(col.id)">
               <svg lucidePlus size="14"></svg>
-              Add card
+              Add task details
             </button>
             <button type="button" class="btn-cancel-inline" title="Cancel" (click)="cancelInlineAdd()">
               <svg lucideX size="18"></svg>
@@ -3079,7 +3081,7 @@
         <div class="trello-column-footer" *ngIf="canAddTasks && (!addingCardColumnId() || addingCardColumnId() !== col.id)">
           <button class="btn-ghost"
                   [style.color]="col.color && col.color !== '#8590a2' && col.color !== '#6b7280' ? '#ffffff' : '#44546f'"
-                  (click)="issueForm.columnId = col.id; inlineCardTitle.set(''); addingCardColumnId.set(col.id)">
+                  (click)="openCreateIssue(col.id)">
             <svg lucidePlus size="16"></svg>
             Add a card
           </button>
@@ -3308,6 +3310,14 @@
     </div>
     
     <div class="modal-header-right">
+      <button class="btn-create-task-primary"
+              *ngIf="!selectedIssue()"
+              (click)="saveIssue()"
+              type="button"
+              title="Create new task">
+        <svg lucidePlus size="15"></svg>
+        <span>Create Task</span>
+      </button>
       <button class="modal-icon-btn" (click)="closeDrawer()" title="Close"><svg lucideX size="18"></svg></button>
     </div>
   </div>
@@ -3317,13 +3327,29 @@
     <div class="modal-main-col">
       
       <!-- Card Title Row -->
-      <div class="modal-title-row">
-        <button class="custom-title-checkbox" [class.completed]="issueForm.completed" (click)="issueForm.completed = !issueForm.completed" type="button" title="Toggle complete">
-          <span class="checkbox-inner">
-            <svg *ngIf="issueForm.completed" lucideCheck size="14"></svg>
-          </span>
-        </button>
-        <input type="text" class="modal-title-input" [(ngModel)]="issueForm.title" (keyup.enter)="!selectedIssue() && saveIssue()" placeholder="Card Title" [readOnly]="!canManageTask">
+      <div class="card-title-container" id="task-field-title">
+        <div class="section-label-subtitle mb-1.5" *ngIf="!selectedIssue()">
+          Card Title <span class="required-star">*</span>
+        </div>
+        <div class="modal-title-row" [style.margin-bottom]="showValidationErrors() && isFieldInvalid('title') ? '6px' : '18px'">
+          <button class="custom-title-checkbox" [class.completed]="issueForm.completed" (click)="issueForm.completed = !issueForm.completed" type="button" title="Toggle complete">
+            <span class="checkbox-inner">
+              <svg *ngIf="issueForm.completed" lucideCheck size="14"></svg>
+            </span>
+          </button>
+          <input type="text" 
+                 class="modal-title-input" 
+                 [class.has-field-error]="showValidationErrors() && isFieldInvalid('title')"
+                 [(ngModel)]="issueForm.title" 
+                 (blur)="selectedIssue() ? saveTitle() : null" 
+                 (keyup.enter)="selectedIssue() ? saveTitle() : saveIssue()" 
+                 placeholder="Card Title" 
+                 [readOnly]="!canManageTask">
+        </div>
+        <div class="field-error-message mb-3" style="margin-left: 38px;" *ngIf="showValidationErrors() && isFieldInvalid('title')">
+          <svg lucideAlertCircle size="13"></svg>
+          <span>Card title is required</span>
+        </div>
       </div>
 
       <!-- Action Buttons Row -->
@@ -3550,7 +3576,7 @@
         <div class="popover-container">
           <button class="modal-action-btn" *ngIf="canManageTask || !selectedIssue()" (click)="togglePopover('members')">
             <svg lucideUsers size="14" class="btn-icon-svg"></svg>
-            <span>Members</span>
+            <span>Members <span class="required-star">*</span></span>
           </button>
 
           <div class="trello-popover members-popover" *ngIf="activePopover() === 'members'" (click)="$event.stopPropagation()">
@@ -3667,8 +3693,8 @@
       <!-- Attached Task Properties & Attributes Row -->
       <div class="modal-meta-attached-row flex flex-wrap gap-4 my-3" *ngIf="(currentIssueMembers().length > 0) || (selectedIssue()?.labels && selectedIssue()?.labels.length > 0) || selectedIssue()?.dueDate || selectedIssue()?.startDate || issueForm.priority || selectedIssue()?.priority || allPhases().length > 0 || projectMilestones().length > 0 || !canManageTask">
         <!-- Members Section -->
-        <div class="modal-attached-members-section" *ngIf="(currentIssueMembers().length > 0) || canManageTask || !selectedIssue()">
-          <div class="section-label-subtitle">Members</div>
+        <div class="modal-attached-members-section" id="task-field-members" [class.has-field-error-border]="showValidationErrors() && isFieldInvalid('members')">
+          <div class="section-label-subtitle">Members <span class="required-star">*</span></div>
           <div class="attached-members-flex-row flex items-center gap-1">
             <ng-container *ngIf="currentIssueMembers().length > 0">
               <div class="attached-member-avatar" 
@@ -3693,19 +3719,48 @@
               <svg lucidePlus size="16"></svg>
             </button>
           </div>
+          <div class="field-error-message mt-1" *ngIf="showValidationErrors() && isFieldInvalid('members')">
+            <svg lucideAlertCircle size="13"></svg>
+            <span>At least 1 member is required</span>
+          </div>
+        </div>
+
+        <!-- Start Date Section -->
+        <div class="modal-attached-date-section" id="task-field-start-date" [class.has-field-error-border]="showValidationErrors() && isFieldInvalid('startDate')">
+          <div class="section-label-subtitle">Start date <span class="required-star">*</span></div>
+          <jira-date-picker
+            [value]="selectedIssue() ? selectedIssue()?.startDate : issueForm.startDate"
+            [rangeStart]="selectedIssue() ? selectedIssue()?.startDate : issueForm.startDate"
+            [rangeEnd]="selectedIssue() ? selectedIssue()?.dueDate : issueForm.dueDate"
+            (dateChange)="updateIssueStartDate($event)"
+            [disabled]="!canManageTask && !!selectedIssue()"
+            placeholder="Select start date"
+            size="sm">
+          </jira-date-picker>
+          <div class="field-error-message mt-1" *ngIf="showValidationErrors() && isFieldInvalid('startDate')">
+            <svg lucideAlertCircle size="13"></svg>
+            <span>Start date is required</span>
+          </div>
         </div>
 
         <!-- Due Date Section -->
-        <div class="modal-attached-duedate-section" *ngIf="selectedIssue()?.dueDate || selectedIssue()?.startDate">
-          <div class="section-label-subtitle">Due date</div>
-          <button class="attached-duedate-btn" type="button"
-                  [class.is-readonly]="!canManageTask"
-                  (click)="canManageTask && togglePopover('dates', $event)">
-            <svg lucideCalendar size="14" class="duedate-icon"></svg>
-            <span>{{ formatDisplayDueDate(selectedIssue()) }}</span>
-            <svg lucideRepeat size="14" *ngIf="selectedIssue()?.recurring && selectedIssue()?.recurring !== 'Never'" class="ml-1"></svg>
-            <svg lucideChevronDown size="13" class="ml-1" *ngIf="canManageTask"></svg>
-          </button>
+        <div class="modal-attached-date-section" id="task-field-due-date" [class.has-field-error-border]="showValidationErrors() && isFieldInvalid('dueDate')">
+          <div class="section-label-subtitle">Due date <span class="required-star">*</span></div>
+          <jira-date-picker
+            [value]="selectedIssue() ? selectedIssue()?.dueDate : issueForm.dueDate"
+            [minDate]="selectedIssue() ? selectedIssue()?.startDate : issueForm.startDate"
+            [rangeStart]="selectedIssue() ? selectedIssue()?.startDate : issueForm.startDate"
+            [rangeEnd]="selectedIssue() ? selectedIssue()?.dueDate : issueForm.dueDate"
+            [isDueDate]="true"
+            (dateChange)="updateIssueDueDate($event)"
+            [disabled]="!canManageTask && !!selectedIssue()"
+            placeholder="Select due date"
+            size="sm">
+          </jira-date-picker>
+          <div class="field-error-message mt-1" *ngIf="showValidationErrors() && isFieldInvalid('dueDate')">
+            <svg lucideAlertCircle size="13"></svg>
+            <span>{{ getDueDateErrorMessage() }}</span>
+          </div>
         </div>
 
         <!-- Priority Section -->
@@ -3874,31 +3929,42 @@
 
       <!-- Pre-Requisite & SME / Govern (from the task import template) -->
       <div class="tp-extra">
-        <div class="tp-extra-field">
-          <label>Pre-Requisite</label>
+        <div class="tp-extra-field" id="task-field-prerequisites">
+          <label>Pre-Requisite <span class="required-star">*</span></label>
           <textarea rows="2" [(ngModel)]="issueForm.prerequisites" (blur)="savePrerequisites()"
+                    [class.has-field-error]="showValidationErrors() && isFieldInvalid('prerequisites')"
                     [readonly]="!canManageTask && !isAdminUser()"
                     placeholder="What must be ready first — hardware, cable, site access…"></textarea>
+          <div class="field-error-message" *ngIf="showValidationErrors() && isFieldInvalid('prerequisites')">
+            <svg lucideAlertCircle size="13"></svg>
+            <span>Pre-requisite is required</span>
+          </div>
         </div>
-        <div class="tp-extra-field">
-          <label>SME / Govern</label>
-          <select [(ngModel)]="issueForm.smeId" (ngModelChange)="saveSme()" [disabled]="!canManageTask && !isAdminUser()">
-            <option [ngValue]="null">— None —</option>
+        <div class="tp-extra-field" id="task-field-sme">
+          <label>SME / Govern <span class="required-star">*</span></label>
+          <select [(ngModel)]="issueForm.smeId" (ngModelChange)="saveSme()" 
+                  [class.has-field-error]="showValidationErrors() && isFieldInvalid('smeId')"
+                  [disabled]="!canManageTask && !isAdminUser()">
+            <option [ngValue]="null" disabled>— Select SME / PM * —</option>
             <option *ngFor="let o of smeOptions()" [ngValue]="o.id">{{ o.name }} ({{ o.role }})</option>
           </select>
+          <div class="field-error-message" *ngIf="showValidationErrors() && isFieldInvalid('smeId')">
+            <svg lucideAlertCircle size="13"></svg>
+            <span>SME / Govern is required (select PM or Tech Architect)</span>
+          </div>
           <span class="tp-extra-hint" *ngIf="!smeOptions().length">Add a PM or Technical Architect to this project to choose an SME.</span>
         </div>
       </div>
 
       <!-- Time Tracking Section -->
-      <div class="modal-time-tracking-section mb-6">
+      <div class="modal-time-tracking-section mb-6" id="task-field-estimated-hours">
         <div class="section-header time-tracking-header">
           <div class="tt-header-left">
             <div class="tt-header-icon-badge">
               <svg lucideClock size="16"></svg>
             </div>
             <div class="tt-header-title-group">
-              <h3 class="tt-header-title">Time Tracking</h3>
+              <h3 class="tt-header-title">Time Tracking <span class="required-star">*</span></h3>
               <span class="tt-header-subtitle">Estimates & spent time</span>
             </div>
           </div>
@@ -3930,17 +3996,18 @@
               <!-- Metric 1: Estimated -->
               <div class="tt-metric-col">
                 <div class="tt-metric-header">
-                  <span class="tt-metric-label">Estimated</span>
+                  <span class="tt-metric-label">Estimated <span class="required-star">*</span></span>
                   <span class="tt-metric-sub">Budget</span>
                 </div>
                 <!-- §3: the assigned hours are management's to set. An employee
                      who can retype this never needs to request more, so for
                      them it reads as a figure, not a field. The server refuses
                      the change either way. -->
-                <ng-container *ngIf="canAssignHours; else estimateReadOnly">
-                  <div class="tt-input-group">
+                <ng-container *ngIf="canAssignHours || !selectedIssue(); else estimateReadOnly">
+                  <div class="tt-input-group" [class.has-field-error]="showValidationErrors() && isFieldInvalid('estimatedHours')">
                     <input type="number" 
                            class="tt-hour-input" 
+                           [class.has-field-error]="showValidationErrors() && isFieldInvalid('estimatedHours')"
                            [(ngModel)]="issueForm.estimatedHours" 
                            (change)="updateEstimatedHours()"
                            (blur)="updateEstimatedHours()"
@@ -3948,6 +4015,10 @@
                            min="0"
                            step="0.5">
                     <span class="tt-input-unit">hrs</span>
+                  </div>
+                  <div class="field-error-message mt-1" *ngIf="showValidationErrors() && isFieldInvalid('estimatedHours')">
+                    <svg lucideAlertCircle size="13"></svg>
+                    <span>Estimated hours is required (&gt; 0)</span>
                   </div>
                   <!-- Quick Estimate Presets -->
                   <div class="tt-quick-chips">
@@ -4186,10 +4257,10 @@
         [issueId]="selectedIssue().id" />
 
       <!-- Description Section -->
-      <div class="modal-description-section mb-4">
+      <div class="modal-description-section mb-4" id="task-field-description">
         <div class="section-header">
           <svg lucideAlignLeft size="20" class="header-icon"></svg>
-          <h3>Description</h3>
+          <h3>Description <span class="required-star">*</span></h3>
           <button class="btn-edit-desc" *ngIf="canManageTask && !isEditingDescription() && issueForm.description" (click)="startDescriptionEdit()">Edit</button>
         </div>
 
@@ -4202,21 +4273,33 @@
                empty description, where the Edit button is not rendered at all
                and clicking this box is the only way in -- so a PM could not
                write a first description. -->
-          <div class="description-preview-box" *ngIf="!isEditingDescription()" [style.cursor]="canManageTask ? 'pointer' : 'default'" (click)="canManageTask && startDescriptionEdit()">
+          <div class="description-preview-box" *ngIf="!isEditingDescription()" [style.cursor]="canManageTask ? 'pointer' : 'default'" (click)="canManageTask && startDescriptionEdit()" [class.has-field-error]="showValidationErrors() && isFieldInvalid('description')">
             <div *ngIf="issueForm.description" [innerHTML]="getSafeHtml(issueForm.description)" class="desc-content-html"></div>
             <div *ngIf="!issueForm.description" class="desc-placeholder-text">
               Add a more detailed description...
             </div>
           </div>
+          <div class="field-error-message mt-2" *ngIf="!isEditingDescription() && showValidationErrors() && isFieldInvalid('description')">
+            <svg lucideAlertCircle size="13"></svg>
+            <span>Description is required</span>
+          </div>
 
           <!-- State 2: Expanded Quill Rich Text Editor (2nd Screenshot) — management only -->
-          <div class="description-editor-container" *ngIf="isEditingDescription() && canManageTask">
-            <div class="quill-wrapper focus-blue-border">
+          <div class="description-editor-container" *ngIf="isEditingDescription() && (canManageTask || !selectedIssue())">
+            <div class="quill-wrapper focus-blue-border" [class.has-quill-error]="showValidationErrors() && isFieldInvalid('description')">
               <div class="quill-container" #quillContainer></div>
             </div>
             
+            <div class="field-error-message mt-2" *ngIf="showValidationErrors() && isFieldInvalid('description')">
+              <svg lucideAlertCircle size="13"></svg>
+              <span>Description is required</span>
+            </div>
+
             <div class="description-action-bar">
-              <button class="btn-trello-save" (click)="saveIssue()" type="button">Save</button>
+              <button [class]="selectedIssue() ? 'btn-trello-save' : 'btn-create-task-primary'" (click)="saveIssue()" type="button">
+                <svg *ngIf="!selectedIssue()" lucidePlus size="14"></svg>
+                <span>{{ selectedIssue() ? 'Save' : 'Create Task' }}</span>
+              </button>
               <button class="btn-trello-cancel" (click)="cancelDescriptionEdit()" type="button">Cancel</button>
               <button class="btn-trello-cancel" (click)="clearDescription()" type="button">Clear</button>
             </div>
@@ -4598,141 +4681,75 @@
   </div>
 </div>
 
-<!-- Dates Popover (Moved to root to escape modal overflow) -->
-<div class="trello-popover dates-popover" *ngIf="activePopover() === 'dates'" 
+<!-- Dates Popover (Jira-style) -->
+<div class="trello-popover dates-popover jira-dates-panel" *ngIf="activePopover() === 'dates'" 
      (click)="$event.stopPropagation()"
      [style.position]="'fixed'"
      [style.left.px]="popoverPosition()?.x"
      [style.top.px]="popoverPosition()?.y"
-     [style.max-height.px]="popoverPosition()?.maxHeight"
-     style="z-index: 10000; margin-top: 0; overflow-y: auto;">
+     style="z-index: 10000; margin-top: 0; width: 320px; overflow: visible;">
   <div class="popover-header">
     <span>Dates</span>
     <button class="btn-icon-tiny" (click)="closePopover()"><svg lucideX size="16"></svg></button>
   </div>
   
   <div class="popover-body p-3">
-    <!-- Calendar Navigation Header -->
-    <div class="calendar-nav-header flex items-center justify-between mb-3">
-      <div class="nav-btn-group flex gap-1">
-        <button class="btn-cal-nav" (click)="prevYear()" type="button" title="Previous Year"><svg lucideChevronsLeft size="14"></svg></button>
-        <button class="btn-cal-nav" (click)="prevMonth()" type="button" title="Previous Month"><svg lucideChevronLeft size="14"></svg></button>
-      </div>
-      <div class="calendar-month-title">{{ calendarMonthYearTitle }}</div>
-      <div class="nav-btn-group flex gap-1">
-        <button class="btn-cal-nav" (click)="nextMonth()" type="button" title="Next Month"><svg lucideChevronRight size="14"></svg></button>
-        <button class="btn-cal-nav" (click)="nextYear()" type="button" title="Next Year"><svg lucideChevronsRight size="14"></svg></button>
-      </div>
-    </div>
-
-    <!-- Weekday Headers (Mon - Sun) -->
-    <div class="calendar-weekdays-row mb-2">
-      <div>Mon</div>
-      <div>Tue</div>
-      <div>Wed</div>
-      <div>Thu</div>
-      <div>Fri</div>
-      <div>Sat</div>
-      <div>Sun</div>
-    </div>
-
-    <!-- Calendar Days Grid (7 columns) -->
-    <div class="calendar-days-grid" (mouseleave)="clearCalendarHover()">
-      <button type="button" 
-              class="cal-day-cell" 
-              *ngFor="let cell of calendarDaysGrid" 
-              [class.muted]="!cell.isCurrentMonth"
-              [class.today]="cell.isToday"
-              [class.start-date]="cell.isStart"
-              [class.due-date]="cell.isDue"
-              [class.in-range]="cell.isInRange"
-              [class.preview-range]="cell.isPreview"
-              (mouseenter)="onCalendarHover(cell)"
-              (click)="selectCalendarDate(cell)">
-        <span>{{ cell.dayNumber }}</span>
-      </button>
-    </div>
-
-    <!-- What the two clicks have added up to, in words. -->
-    <div class="range-readout mb-4">
-      <span class="range-summary">{{ rangeSummary }}</span>
-      <span class="range-hint" *ngIf="awaitingRangeEnd">Now pick the end</span>
+    <!-- Range Summary Banner -->
+    <div class="jira-dates-summary-banner mb-3" [class.is-invalid-range]="isRangeInvalid">
+      <svg *ngIf="!isRangeInvalid" lucideCalendar size="14" class="text-indigo-600 mr-2 flex-shrink-0"></svg>
+      <svg *ngIf="isRangeInvalid" lucideAlertCircle size="14" class="text-rose-600 mr-2 flex-shrink-0"></svg>
+      <span class="summary-text font-medium text-xs" [class.text-rose-700]="isRangeInvalid" [class.text-gray-700]="!isRangeInvalid">{{ rangeSummary }}</span>
     </div>
 
     <!-- Start Date Section -->
-    <div class="dates-form-section mb-3">
-      <label class="dates-section-label mb-1">Start date</label>
-      <div class="flex items-center gap-2">
-        <input type="checkbox" class="label-checkbox" [(ngModel)]="datesForm.enableStartDate">
-        <input type="text" class="label-search-input" style="width: 140px;" [(ngModel)]="datesForm.startDateStr" [disabled]="!datesForm.enableStartDate" placeholder="DD/MM/YYYY" (blur)="normaliseDateInput('start')">
+    <div class="dates-form-group mb-3">
+      <label class="jira-field-label mb-1">Start date <span class="required-star">*</span></label>
+      <jira-date-picker
+        [value]="selectedIssue() ? selectedIssue()?.startDate : issueForm.startDate"
+        [rangeStart]="selectedIssue() ? selectedIssue()?.startDate : issueForm.startDate"
+        [rangeEnd]="selectedIssue() ? selectedIssue()?.dueDate : issueForm.dueDate"
+        (dateChange)="updateIssueStartDate($event)"
+        [disabled]="!canManageTask && !!selectedIssue()"
+        placeholder="Select start date">
+      </jira-date-picker>
+    </div>
+
+    <!-- Due Date Section -->
+    <div class="dates-form-group mb-3">
+      <label class="jira-field-label mb-1">Due date <span class="required-star">*</span></label>
+      <jira-date-picker
+        [value]="selectedIssue() ? selectedIssue()?.dueDate : issueForm.dueDate"
+        [minDate]="selectedIssue() ? selectedIssue()?.startDate : issueForm.startDate"
+        [rangeStart]="selectedIssue() ? selectedIssue()?.startDate : issueForm.startDate"
+        [rangeEnd]="selectedIssue() ? selectedIssue()?.dueDate : issueForm.dueDate"
+        [isDueDate]="true"
+        (dateChange)="updateIssueDueDate($event)"
+        [disabled]="!canManageTask && !!selectedIssue()"
+        placeholder="Select due date">
+      </jira-date-picker>
+    </div>
+
+    <!-- Quick Due Date Presets -->
+    <div class="jira-quick-presets mb-3" *ngIf="canManageTask || !selectedIssue()">
+      <div class="quick-presets-title mb-1.5">Quick Due Date</div>
+      <div class="quick-presets-chips flex flex-wrap gap-1.5">
+        <button type="button" class="preset-chip" (click)="setQuickDueDate('today')">Today</button>
+        <button type="button" class="preset-chip" (click)="setQuickDueDate('tomorrow')">Tomorrow</button>
+        <button type="button" class="preset-chip" (click)="setQuickDueDate('this-friday')">This Friday</button>
+        <button type="button" class="preset-chip" (click)="setQuickDueDate('next-week')">Next Monday</button>
+        <button type="button" class="preset-chip" (click)="setQuickDueDate('plus-1-week')">+1 Week</button>
       </div>
     </div>
 
-    <!-- Due Date & Time Section -->
-    <div class="dates-form-section mb-3">
-      <label class="dates-section-label mb-1">Due date</label>
-      <div class="flex items-center gap-2">
-        <input type="checkbox" class="label-checkbox" [(ngModel)]="datesForm.enableDueDate">
-        <input type="text" class="label-search-input" style="width: 140px;" [(ngModel)]="datesForm.dueDateStr" [disabled]="!datesForm.enableDueDate" placeholder="DD/MM/YYYY" (blur)="normaliseDateInput('due')">
-        
-        <!-- Time Picker Input / Select -->
-        <div class="relative flex-1">
-          <button type="button" class="trello-select-btn" [disabled]="!datesForm.enableDueDate" (click)="showTimeDropdown.set(!showTimeDropdown())">
-            <span>{{ datesForm.dueTimeStr }}</span>
-            <svg lucideChevronDown size="14"></svg>
-          </button>
-
-          <!-- Scrollable Time Dropdown -->
-          <div class="custom-select-dropdown time-dropdown" *ngIf="showTimeDropdown() && datesForm.enableDueDate">
-            <div class="dropdown-item" *ngFor="let t of timeOptions" (click)="datesForm.dueTimeStr = t; showTimeDropdown.set(false)" [class.selected]="datesForm.dueTimeStr === t">
-              {{ t }}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Recurring Section -->
-    <div class="dates-form-section mb-3">
-      <label class="dates-section-label mb-1">Recurring</label>
-      <div class="relative">
-        <button type="button" class="trello-select-btn" (click)="showRecurringDropdown.set(!showRecurringDropdown())">
-          <span>{{ datesForm.recurring }}</span>
-          <svg lucideChevronDown size="14"></svg>
-        </button>
-
-        <div class="custom-select-dropdown" *ngIf="showRecurringDropdown()">
-          <div class="dropdown-item" *ngFor="let opt of recurringOptions" (click)="datesForm.recurring = opt; showRecurringDropdown.set(false)" [class.selected]="datesForm.recurring === opt">
-            {{ opt }}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Reminder Section -->
-    <div class="dates-form-section mb-3">
-      <label class="dates-section-label mb-1">Set due date reminder</label>
-      <div class="relative">
-        <button type="button" class="trello-select-btn" (click)="showReminderDropdown.set(!showReminderDropdown())">
-          <span>{{ datesForm.dueReminder || '1 Day before' }}</span>
-          <svg lucideChevronDown size="14"></svg>
-        </button>
-
-        <div class="custom-select-dropdown" *ngIf="showReminderDropdown()">
-          <div class="dropdown-item" *ngFor="let opt of reminderOptions" (click)="datesForm.dueReminder = opt; showReminderDropdown.set(false)" [class.selected]="datesForm.dueReminder === opt">
-            {{ opt }}
-          </div>
-        </div>
-      </div>
-      <div class="dates-caption-text mt-1.5">
-        Reminders will be sent to all members and watchers of this card.
-      </div>
-    </div>
-
-    <!-- Action Footer Buttons -->
-    <div class="dates-footer-actions flex flex-col gap-2 mt-4">
-      <button class="btn-dates-save" (click)="saveDates()" type="button">Save</button>
-      <button class="btn-dates-remove" (click)="removeDates()" type="button">Remove</button>
+    <!-- Action Footer -->
+    <div class="dates-panel-footer flex justify-between items-center pt-2 mt-2 border-t border-gray-100">
+      <button type="button" class="btn-jira-clear-dates" (click)="clearAllIssueDates()" *ngIf="(canManageTask || !selectedIssue()) && (selectedIssue()?.startDate || selectedIssue()?.dueDate || issueForm.startDate || issueForm.dueDate)">
+        Clear all dates
+      </button>
+      <div class="flex-1"></div>
+      <button type="button" class="btn-jira-done" (click)="closePopover()">
+        Done
+      </button>
     </div>
   </div>
 </div>

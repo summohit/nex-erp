@@ -252,7 +252,9 @@ describe('deciding', () => {
     // Inside the transaction, with the transaction's own client — an approval
     // whose fan-out is not part of the same write can commit a trip nobody
     // was actually assigned to.
-    expect(activation.activate).toHaveBeenCalledWith(prisma, expect.objectContaining({ id: 9 }), ADMIN_EMP);
+    expect(activation.activate).toHaveBeenCalledWith(
+      prisma, expect.objectContaining({ id: 9 }), ADMIN_EMP, { overrideDayOff: false },
+    );
     expect(prisma.fieldVisitRequestActivity.create.mock.calls[0][0].data.detail)
       .toContain('12 task(s) assigned, 9 attendance day(s) scheduled');
     expect(notifications.notifyEmployees.mock.calls[0][1].message)

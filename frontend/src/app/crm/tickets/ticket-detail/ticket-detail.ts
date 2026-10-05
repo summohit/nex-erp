@@ -12,6 +12,8 @@ import {
 } from '@lucide/angular';
 import { TicketService, Ticket, TicketComment, TicketEmployee, TicketPermissions } from '../../../services/ticket.service';
 import { AuthService } from '../../../services/auth.service';
+import { DialogService } from '../../../shared/services/dialog.service';
+import { firstValueFrom } from 'rxjs';
 
 /** One row of the merged comment + activity feed. */
 interface TimelineItem {
@@ -35,6 +37,9 @@ interface TimelineItem {
 /** The minimum a comment action needs — satisfied by both TicketComment and TimelineItem. */
 type CommentRef = { id: number; authorId?: number; body?: string };
 
+import { QuillModule } from 'ngx-quill';
+import { noticeBodyHtml, noticeBodyText } from '../../../services/notices';
+
 @Component({
   selector: 'app-ticket-detail',
   standalone: true,
@@ -45,7 +50,7 @@ type CommentRef = { id: number; authorId?: number; body?: string };
     LucideAlertCircle, LucideCheckCircle2, LucideFlame,
     LucideMessageSquare, LucideArrowRight, LucideHistory,
     LucideSparkles, LucideCopy, LucideCalendar, LucideSearch,
-    LucideChevronDown, LucideImage, LucideImagePlus
+    LucideChevronDown, LucideImage, LucideImagePlus, QuillModule,
   ],
   templateUrl: './ticket-detail.html',
   styleUrls: ['./ticket-detail.css'],
@@ -60,8 +65,31 @@ export class TicketDetailComponent implements OnInit {
   private ticketService = inject(TicketService);
   private authService = inject(AuthService);
   private toast = inject(HotToastService);
+  private dialog = inject(DialogService);
 
   commentBody = '';
+
+  /** The same toolbar as the ticket description, kept short for a reply. */
+  readonly commentQuillModules = {
+    toolbar: [
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['blockquote', 'code-block', 'link'],
+      ['clean'],
+    ],
+  };
+
+  /**
+   * A comment as HTML. Comments from before the editor are plain text and
+   * keep their line breaks; the same rule notices use.
+   */
+  commentHtml(body?: string | null): string {
+    return noticeBodyHtml(body ?? '');
+  }
+
+  hasText(html?: string | null): boolean {
+    return !!noticeBodyText(html ?? '');
+  }
   submittingComment = false;
   editingCommentId: number | null = null;
   editCommentBody = '';
@@ -93,9 +121,9 @@ export class TicketDetailComponent implements OnInit {
   };
 
   readonly priorityDotColors: Record<string, string> = {
-    CRITICAL: '#1373e5',
-    HIGH: '#1373e5',
-    MEDIUM: '#6b3fd6',
+    CRITICAL: '#ef4444',
+    HIGH: '#f97316',
+    MEDIUM: '#3b82f6',
     LOW: '#64748b',
   };
 
@@ -296,21 +324,74 @@ export class TicketDetailComponent implements OnInit {
     return this.statusOptions.filter(s => this.formatLabel(s).toLowerCase().includes(q) || s.toLowerCase().includes(q));
   }
 
-  changeStatus(status: string) {
+  async changeStatus(status: string) {
     if (!status) return;
     this.showAdminStatusDropdown = false;
-    this.ticketService.updateTicket(this.ticket.id, { status: status as any }).subscribe({
+
+    // Resolving or rejecting ends the ticket for whoever raised it, so it asks
+    // how or why first — the server refuses either without a reason. The answer
+    // lands in History & Discussion; an attachment, if given, in Attachments.
+    let extra: { statusReason?: string; statusAttachment?: { fileName: string; fileUrl: string; fileSize: number } } = {};
+    if ((status === 'RESOLVED' || status === 'REJECTED') && status !== this.ticket.status) {
+      const resolving = status === 'RESOLVED';
+      const answer = await this.dialog.promptWithAttachment(
+        resolving
+          ? 'Describe how this ticket was resolved. It is added to the ticket\'s discussion, so whoever raised it can see what was done.'
+          : 'Say why this ticket is being rejected. It is added to the ticket\'s discussion, so whoever raised it knows why.',
+        resolving ? `Resolve ${this.ticket.ticketNumber}` : `Reject ${this.ticket.ticketNumber}`,
+        {
+          placeholder: resolving
+            ? 'e.g. Delivered and configured the SD-WAN router on site; link is up.'
+            : 'e.g. Duplicate of TKT-019, which is already being handled.',
+          confirmLabel: resolving ? 'Mark resolved' : 'Reject ticket',
+          required: true,
+          attachmentLabel: 'Attach a file (optional)',
+          attachmentHint: resolving ? 'A screenshot, report or delivery proof.' : 'Anything that supports the decision.',
+          tone: resolving ? 'success' : 'danger',
+        },
+      );
+      if (!answer?.text?.trim()) return;
+      extra.statusReason = answer.text.trim();
+
+      if (answer.file) {
+        try {
+          const up = await firstValueFrom(this.ticketService.uploadImage(answer.file));
+          extra.statusAttachment = { fileName: answer.file.name, fileUrl: up.url, fileSize: answer.file.size };
+        } catch (err: any) {
+          const goOn = await this.dialog.confirm(
+            err?.error?.message || 'The attachment could not be uploaded.',
+            'Attachment failed',
+            `${resolving ? 'Resolve' : 'Reject'} without it`,
+            'Cancel',
+          );
+          if (!goOn) return;
+        }
+      }
+    }
+
+    this.ticketService.updateTicket(this.ticket.id, { status: status as any, ...extra } as any).subscribe({
       next: (t) => {
         this.ticket = { ...this.ticket, ...t };
         this.ticketUpdated.emit(this.ticket);
-        this.toast.success(`Status updated to ${this.formatLabel(status)}`);
+        const timer = (t as any)?.timer;
+        this.toast.success(
+          `Status updated to ${this.formatLabel(status)}`
+          + (timer?.started ? ' — timer started' : '')
+          + (timer?.stopped ? ' — timer stopped' : ''),
+        );
+        if (timer?.stoppedOnOtherTickets?.length) {
+          this.toast.info(`Timer moved here — stopped on ${timer.stoppedOnOtherTickets.join(', ')}.`);
+        }
+        // The server may have started or stopped the timer, and written the
+        // reason and file alongside the status: reload so all of it shows.
+        this.refreshTicket();
       },
-      error: () => this.toast.error('Failed to update status'),
+      error: (err) => this.toast.error(err?.error?.message || 'Failed to update status'),
     });
   }
 
   submitComment() {
-    if (!this.commentBody.trim()) return;
+    if (!this.hasText(this.commentBody)) return;
     this.submittingComment = true;
     this.ticketService.addComment(this.ticket.id, this.commentBody.trim()).subscribe({
       next: (c) => {
@@ -328,11 +409,11 @@ export class TicketDetailComponent implements OnInit {
 
   startEditComment(comment: CommentRef) {
     this.editingCommentId = comment.id;
-    this.editCommentBody = comment.body ?? '';
+    this.editCommentBody = this.commentHtml(comment.body);
   }
 
   saveEditComment(comment: CommentRef) {
-    if (!this.editCommentBody.trim()) return;
+    if (!this.hasText(this.editCommentBody)) return;
     this.ticketService.updateComment(this.ticket.id, comment.id, this.editCommentBody.trim()).subscribe({
       next: (updated) => {
         this.ticket = {
@@ -404,14 +485,22 @@ export class TicketDetailComponent implements OnInit {
     return !this.canManage() && this.isReporter() && this.ticket.status === 'RESOLVED';
   }
 
+  closingAsReporter = false;
+
   closeAsReporter() {
+    if (this.closingAsReporter) return;
+    this.closingAsReporter = true;
     this.ticketService.updateTicket(this.ticket.id, { status: 'CLOSED' as any }).subscribe({
       next: (t) => {
+        this.closingAsReporter = false;
         this.ticket = { ...this.ticket, ...t };
         this.ticketUpdated.emit(this.ticket);
-        this.toast.success('Ticket closed — thanks for confirming!');
+        this.toast.success('Ticket verified and closed. Thank you for confirming.');
       },
-      error: (err) => this.toast.error(err?.error?.message || 'Failed to close ticket'),
+      error: (err) => {
+        this.closingAsReporter = false;
+        this.toast.error(err?.error?.message || 'Failed to close ticket');
+      },
     });
   }
 

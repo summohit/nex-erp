@@ -20,6 +20,10 @@ import { formatElapsed } from '../../utils/haversine';
 import { navigateTo } from '../../navigation/navigationUtils';
 import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
 import LateClockOutModal from '../../components/LateClockOutModal';
+import {
+  fetchHomeSections, HomeSectionsData, HomeTask,
+  MyTasksSection, MyTicketsSection, AppreciationsSection,
+} from './HomeSections';
 import { CLOCK_ERROR, clockRefusal } from '../../api/attendanceService';
 import {
   Clock,
@@ -212,9 +216,29 @@ export default function DashboardScreen() {
     }
   };
 
+  // My Tasks / My Tickets / Appreciations — the same order as the web dashboard.
+  const [homeSections, setHomeSections] = useState<HomeSectionsData>({ myTasks: [], myTickets: [], appreciations: [] });
+  const [homeSectionsLoading, setHomeSectionsLoading] = useState(true);
+  const loadHomeSections = async () => {
+    try {
+      setHomeSections(await fetchHomeSections());
+    } catch {
+      // Leave whatever was shown; the rest of the home screen still works.
+    } finally {
+      setHomeSectionsLoading(false);
+    }
+  };
+  useEffect(() => { loadHomeSections(); }, []);
+
+  const openTask = (task: HomeTask) => {
+    const projectId = task.projectId ?? task.project?.id;
+    if (!projectId) return;
+    navigation.navigate('ProjectDetail', { projectId, projectName: task.project?.name });
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchDashboardData();
+    await Promise.all([fetchDashboardData(), loadHomeSections()]);
     setRefreshing(false);
   };
 
@@ -582,7 +606,14 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* 3. EXECUTIVE BENTO CARDS (LEAVE & PROJECTS) */}
+            {/* 3. MY TASKS — first of Tasks → Projects → Tickets → Appreciations */}
+            <MyTasksSection
+              tasks={homeSections.myTasks}
+              loading={homeSectionsLoading}
+              onOpenTask={openTask}
+            />
+
+            {/* 3b. EXECUTIVE BENTO CARDS (LEAVE & PROJECTS) */}
             <View style={styles.sectionHeadingRow}>
               <Text style={styles.sectionHeading}>Overview</Text>
               <TouchableOpacity activeOpacity={0.7} onPress={() => safeNavigate('Projects')}>
@@ -652,6 +683,19 @@ export default function DashboardScreen() {
                 <Text style={styles.bentoFooterNote}>{completedProjectsCount} completed</Text>
               </TouchableOpacity>
             </View>
+
+            {/* 3c. MY TICKETS */}
+            <MyTicketsSection
+              tickets={homeSections.myTickets}
+              loading={homeSectionsLoading}
+              onViewAll={() => safeNavigate('Tickets')}
+            />
+
+            {/* 3d. EMPLOYEE APPRECIATIONS */}
+            <AppreciationsSection
+              items={homeSections.appreciations}
+              loading={homeSectionsLoading}
+            />
 
             {/* 4. WORKING HOURS / ATTENDANCE RHYTHM CHART */}
             <View style={styles.chartCard}>

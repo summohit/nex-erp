@@ -11,7 +11,8 @@ import {
   LucideLayers, LucideEye, LucideMapPin, LucideInbox,
   LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
   LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
-  LucideZap, LucideExternalLink, LucideTrophy, LucideAward
+  LucideZap, LucideExternalLink, LucideTrophy, LucideAward,
+  LucideRoute
 } from '@lucide/angular';
 import { forkJoin } from 'rxjs';
 import { AttendanceService, AttendanceRecord } from '../../services/attendance';
@@ -57,7 +58,8 @@ export interface EmployeeMatrixRow {
     LucideLayers, LucideEye, LucideMapPin, LucideInbox,
     LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
     LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
-    LucideZap, LucideExternalLink, LucideTrophy, LucideAward
+    LucideZap, LucideExternalLink, LucideTrophy, LucideAward,
+    LucideRoute
   ],
   templateUrl: './all-attendance.html',
   styleUrls: ['./all-attendance.css']
@@ -1122,6 +1124,12 @@ export class AllAttendanceComponent implements OnInit {
     if (!r) return '';
 
     const parts: string[] = [];
+    if (r.fieldVisit) {
+      const fv = r.fieldVisit;
+      parts.push(`Field Visit ${fv.requestNumber || ''} at ${fv.location || 'site'}${fv.startTime && fv.endTime ? ` (${fv.startTime} - ${fv.endTime})` : ''}`);
+    } else if (r.isOnsite) {
+      parts.push('On-site work');
+    }
     if (status === 'Half Day') {
       parts.push(
         r.totalHours

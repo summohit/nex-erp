@@ -119,7 +119,7 @@
 
         <h4 class="dash-notice-card-title">{{ n.title }}</h4>
 
-        <p class="dash-notice-card-snippet">{{ n.body }}</p>
+        <p class="dash-notice-card-snippet">{{ noticeText(n.body) }}</p>
 
         <div class="dash-notice-card-footer">
           <div class="dash-notice-author">
@@ -146,7 +146,7 @@
   <!-- ======================================================================= -->
   <div class="kpi-grid" *ngIf="user()">
 
-    <!-- COMMON EMPLOYEE KPIS — tasks, tickets and projects lead; the rest follow -->
+    <!-- COMMON EMPLOYEE KPIS — tasks, projects and tickets lead; the rest follow -->
     <ng-container>
       <app-stat-card
         [loading]="isLoadingMetrics()"
@@ -161,17 +161,6 @@
 
       <app-stat-card
         [loading]="isLoadingMetrics()"
-        label="My Tickets"
-        [value]="dashboard()?.common?.ticketStats?.pending || 0"
-        colorClass="bg-purple"
-        badge="Pending"
-        [subtitle]="(dashboard()?.common?.ticketStats?.overdue || 0) + ' overdue'"
-      >
-        <svg icon lucideTicket size="20"></svg>
-      </app-stat-card>
-
-      <app-stat-card
-        [loading]="isLoadingMetrics()"
         label="My Projects"
         [value]="dashboard()?.common?.projectStats?.inProgress || 0"
         colorClass="bg-indigo"
@@ -179,6 +168,17 @@
         [subtitle]="(dashboard()?.common?.projectStats?.overdue || 0) + ' overdue'"
       >
         <svg icon lucideFolderKanban size="20"></svg>
+      </app-stat-card>
+
+      <app-stat-card
+        [loading]="isLoadingMetrics()"
+        label="My Tickets"
+        [value]="dashboard()?.common?.ticketStats?.pending || 0"
+        colorClass="bg-purple"
+        badge="Pending"
+        [subtitle]="(dashboard()?.common?.ticketStats?.overdue || 0) + ' overdue'"
+      >
+        <svg icon lucideTicket size="20"></svg>
       </app-stat-card>
 
       <app-stat-card
@@ -337,155 +337,6 @@
 
     <!-- LEFT COLUMN: Charts & Operations -->
     <div class="main-left-col">
-
-      <!-- HR: Celebrations -->
-      <div class="dashboard-card" *ngIf="isHR() && ((dashboard()?.org?.celebrations?.birthdays?.length || 0) + (dashboard()?.org?.celebrations?.anniversaries?.length || 0)) > 0">
-        <div class="card-header">
-          <div class="flex items-center gap-2.5">
-            <div class="card-icon-badge bg-pink-tint">
-              <svg lucidePartyPopper size="16"></svg>
-            </div>
-            <div>
-              <h3>Upcoming Celebrations</h3>
-              <span class="card-header-sub">Birthdays &amp; work anniversaries</span>
-            </div>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="celebration-list">
-            <div class="celebration-item" *ngFor="let b of (dashboard()?.org?.celebrations?.birthdays || []).slice(0, 5)">
-              <div class="celeb-icon-wrap"><svg lucideCake size="16" class="text-pink-500"></svg></div>
-              <span class="celeb-name">{{ b.firstName }} {{ b.lastName }}</span>
-              <span class="celeb-when">{{ b.inDays === 0 ? 'Today 🎉' : 'in ' + b.inDays + ' days' }}</span>
-            </div>
-            <div class="celebration-item" *ngFor="let a of (dashboard()?.org?.celebrations?.anniversaries || []).slice(0, 5)">
-              <div class="celeb-icon-wrap"><svg lucideGift size="16" class="text-purple-500"></svg></div>
-              <span class="celeb-name">{{ a.firstName }} {{ a.lastName }}</span>
-              <span class="celeb-when">{{ a.years }}-year anniversary {{ a.inDays === 0 ? 'today 🎊' : 'in ' + a.inDays + ' days' }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Finance: Pending Expense Claims Table -->
-      <div class="dashboard-card" *ngIf="isFinance()">
-        <div class="card-header flex items-center justify-between">
-          <div class="flex items-center gap-2.5">
-            <div class="card-icon-badge bg-amber-tint">
-              <svg lucideReceipt size="16"></svg>
-            </div>
-            <div>
-              <h3>Pending Expense Claims</h3>
-              <span class="card-header-sub">Awaiting review</span>
-            </div>
-          </div>
-          <a routerLink="/payroll/expenses" class="btn-table-action">
-            <span>View All</span>
-            <svg lucideArrowRight size="13"></svg>
-          </a>
-        </div>
-        <div class="card-body p-0" *ngIf="(dashboard()?.finance?.pendingExpenseClaims?.recent?.length || 0) > 0">
-          <div class="dashboard-table-container">
-            <table class="dashboard-table">
-              <thead><tr><th>Employee</th><th>Category</th><th>Amount</th></tr></thead>
-              <tbody>
-                <tr *ngFor="let claim of (dashboard()?.finance?.pendingExpenseClaims?.recent || []).slice(0, 5)">
-                  <td><span class="font-semibold">{{ claim.employee?.firstName }} {{ claim.employee?.lastName }}</span></td>
-                  <td><span class="badge-subtle">{{ claim.category }}</span></td>
-                  <td><span class="font-bold text-slate-900">{{ claim.amount | currency:'INR':'symbol-narrow':'1.0-0' }}</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
-        <div class="empty-box p-6 text-center" *ngIf="!isLoadingMetrics() && ((dashboard()?.finance?.pendingExpenseClaims?.recent?.length || 0) === 0)">
-          <svg lucideCheckCircle2 size="32" class="text-emerald-500 mb-2"></svg>
-          <p style="font-size: 13px; font-weight: 600; color: #1e293b;">No pending claims</p>
-          <p style="font-size: 12px; color: #64748b;">All employee expense claims have been audited.</p>
-        </div>
-      </div>
-
-      <!-- Sales: Recent Orders Table -->
-      <div class="dashboard-card" *ngIf="isSales() && (dashboard()?.sales?.recentOrders?.length || 0) > 0">
-        <div class="card-header flex items-center justify-between">
-          <div class="flex items-center gap-2.5">
-            <div class="card-icon-badge bg-blue-tint">
-              <svg lucideShoppingCart size="16"></svg>
-            </div>
-            <div>
-              <h3>Recent Orders</h3>
-              <span class="card-header-sub">Latest commercial transactions</span>
-            </div>
-          </div>
-          <a routerLink="/sales/orders" class="btn-table-action">
-            <span>View All</span>
-            <svg lucideArrowRight size="13"></svg>
-          </a>
-        </div>
-        <div class="card-body p-0">
-          <div class="dashboard-table-container">
-            <table class="dashboard-table">
-              <thead><tr><th>Order #</th><th>Client</th><th>Value</th><th>Status</th></tr></thead>
-              <tbody>
-                <tr *ngFor="let order of (dashboard()?.sales?.recentOrders || []).slice(0, 5)">
-                  <td><span class="font-semibold">{{ order.orderNumber }}</span></td>
-                  <td>{{ order.client?.name || '—' }}</td>
-                  <td><span class="font-bold">{{ order.total | currency:'INR':'symbol-narrow':'1.0-0' }}</span></td>
-                  <td><span class="status-pill" [ngClass]="order.status.toLowerCase()">{{ order.status }}</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Org: Pending Leave Approvals Queue -->
-      <div class="dashboard-card" *ngIf="showOrgWidgets() && pendingApprovals().length > 0">
-        <div class="card-header flex items-center justify-between">
-          <div class="flex items-center gap-2.5">
-            <div class="card-icon-badge bg-amber-tint">
-              <svg lucideAlertCircle size="16"></svg>
-            </div>
-            <div>
-              <h3>Pending Leave Approvals Queue</h3>
-              <span class="card-header-sub">Action required from manager or HR</span>
-            </div>
-          </div>
-          <span class="count-badge-amber">{{ pendingApprovals().length }} pending</span>
-        </div>
-        <div class="card-body p-0">
-          <div class="dashboard-table-container">
-            <table class="dashboard-table">
-              <thead>
-                <tr><th>Employee</th><th>Leave Type</th><th>Dates</th><th>Status</th><th style="text-align: right;">Actions</th></tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let req of pendingApprovals().slice(0, 5)">
-                  <td>
-                    <span class="font-semibold">{{ req.employee?.firstName }} {{ req.employee?.lastName }}</span>
-                  </td>
-                  <td><span class="badge-subtle">{{ req.leaveType?.name }}</span></td>
-                  <td>{{ req.startDate | date:'shortDate' }} – {{ req.endDate | date:'shortDate' }}</td>
-                  <td><span class="status-pill" [ngClass]="req.status.toLowerCase()">{{ req.status }}</span></td>
-                  <td style="text-align: right;">
-                    <div class="action-btn-group">
-                      <button class="btn-approve-sm" (click)="approveLeave(req.id)" title="Approve Request">
-                        <svg lucideCheck size="13"></svg>
-                        <span>Approve</span>
-                      </button>
-                      <button class="btn-reject-sm" (click)="rejectLeave(req.id)" title="Reject Request">
-                        <svg lucideX size="13"></svg>
-                        <span>Reject</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
 
       <!-- My Priority Tasks -->
       <div class="dashboard-card">
@@ -663,6 +514,155 @@
             <svg lucideTrophy size="32" class="text-amber-400 mb-2"></svg>
             <p style="font-size: 13px; font-weight: 600; color: #64748b;">No record found</p>
             <p style="font-size: 12px; color: #94a3b8;">Appreciations will show up here when awarded.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- HR: Celebrations -->
+      <div class="dashboard-card" *ngIf="isHR() && ((dashboard()?.org?.celebrations?.birthdays?.length || 0) + (dashboard()?.org?.celebrations?.anniversaries?.length || 0)) > 0">
+        <div class="card-header">
+          <div class="flex items-center gap-2.5">
+            <div class="card-icon-badge bg-pink-tint">
+              <svg lucidePartyPopper size="16"></svg>
+            </div>
+            <div>
+              <h3>Upcoming Celebrations</h3>
+              <span class="card-header-sub">Birthdays &amp; work anniversaries</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="celebration-list">
+            <div class="celebration-item" *ngFor="let b of (dashboard()?.org?.celebrations?.birthdays || []).slice(0, 5)">
+              <div class="celeb-icon-wrap"><svg lucideCake size="16" class="text-pink-500"></svg></div>
+              <span class="celeb-name">{{ b.firstName }} {{ b.lastName }}</span>
+              <span class="celeb-when">{{ b.inDays === 0 ? 'Today 🎉' : 'in ' + b.inDays + ' days' }}</span>
+            </div>
+            <div class="celebration-item" *ngFor="let a of (dashboard()?.org?.celebrations?.anniversaries || []).slice(0, 5)">
+              <div class="celeb-icon-wrap"><svg lucideGift size="16" class="text-purple-500"></svg></div>
+              <span class="celeb-name">{{ a.firstName }} {{ a.lastName }}</span>
+              <span class="celeb-when">{{ a.years }}-year anniversary {{ a.inDays === 0 ? 'today 🎊' : 'in ' + a.inDays + ' days' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Finance: Pending Expense Claims Table -->
+      <div class="dashboard-card" *ngIf="isFinance()">
+        <div class="card-header flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="card-icon-badge bg-amber-tint">
+              <svg lucideReceipt size="16"></svg>
+            </div>
+            <div>
+              <h3>Pending Expense Claims</h3>
+              <span class="card-header-sub">Awaiting review</span>
+            </div>
+          </div>
+          <a routerLink="/payroll/expenses" class="btn-table-action">
+            <span>View All</span>
+            <svg lucideArrowRight size="13"></svg>
+          </a>
+        </div>
+        <div class="card-body p-0" *ngIf="(dashboard()?.finance?.pendingExpenseClaims?.recent?.length || 0) > 0">
+          <div class="dashboard-table-container">
+            <table class="dashboard-table">
+              <thead><tr><th>Employee</th><th>Category</th><th>Amount</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let claim of (dashboard()?.finance?.pendingExpenseClaims?.recent || []).slice(0, 5)">
+                  <td><span class="font-semibold">{{ claim.employee?.firstName }} {{ claim.employee?.lastName }}</span></td>
+                  <td><span class="badge-subtle">{{ claim.category }}</span></td>
+                  <td><span class="font-bold text-slate-900">{{ claim.amount | currency:'INR':'symbol-narrow':'1.0-0' }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
+        <div class="empty-box p-6 text-center" *ngIf="!isLoadingMetrics() && ((dashboard()?.finance?.pendingExpenseClaims?.recent?.length || 0) === 0)">
+          <svg lucideCheckCircle2 size="32" class="text-emerald-500 mb-2"></svg>
+          <p style="font-size: 13px; font-weight: 600; color: #1e293b;">No pending claims</p>
+          <p style="font-size: 12px; color: #64748b;">All employee expense claims have been audited.</p>
+        </div>
+      </div>
+
+      <!-- Sales: Recent Orders Table -->
+      <div class="dashboard-card" *ngIf="isSales() && (dashboard()?.sales?.recentOrders?.length || 0) > 0">
+        <div class="card-header flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="card-icon-badge bg-blue-tint">
+              <svg lucideShoppingCart size="16"></svg>
+            </div>
+            <div>
+              <h3>Recent Orders</h3>
+              <span class="card-header-sub">Latest commercial transactions</span>
+            </div>
+          </div>
+          <a routerLink="/sales/orders" class="btn-table-action">
+            <span>View All</span>
+            <svg lucideArrowRight size="13"></svg>
+          </a>
+        </div>
+        <div class="card-body p-0">
+          <div class="dashboard-table-container">
+            <table class="dashboard-table">
+              <thead><tr><th>Order #</th><th>Client</th><th>Value</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let order of (dashboard()?.sales?.recentOrders || []).slice(0, 5)">
+                  <td><span class="font-semibold">{{ order.orderNumber }}</span></td>
+                  <td>{{ order.client?.name || '—' }}</td>
+                  <td><span class="font-bold">{{ order.total | currency:'INR':'symbol-narrow':'1.0-0' }}</span></td>
+                  <td><span class="status-pill" [ngClass]="order.status.toLowerCase()">{{ order.status }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Org: Pending Leave Approvals Queue -->
+      <div class="dashboard-card" *ngIf="showOrgWidgets() && pendingApprovals().length > 0">
+        <div class="card-header flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="card-icon-badge bg-amber-tint">
+              <svg lucideAlertCircle size="16"></svg>
+            </div>
+            <div>
+              <h3>Pending Leave Approvals Queue</h3>
+              <span class="card-header-sub">Action required from manager or HR</span>
+            </div>
+          </div>
+          <span class="count-badge-amber">{{ pendingApprovals().length }} pending</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="dashboard-table-container">
+            <table class="dashboard-table">
+              <thead>
+                <tr><th>Employee</th><th>Leave Type</th><th>Dates</th><th>Status</th><th style="text-align: right;">Actions</th></tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let req of pendingApprovals().slice(0, 5)">
+                  <td>
+                    <span class="font-semibold">{{ req.employee?.firstName }} {{ req.employee?.lastName }}</span>
+                  </td>
+                  <td><span class="badge-subtle">{{ req.leaveType?.name }}</span></td>
+                  <td>{{ req.startDate | date:'shortDate' }} – {{ req.endDate | date:'shortDate' }}</td>
+                  <td><span class="status-pill" [ngClass]="req.status.toLowerCase()">{{ req.status }}</span></td>
+                  <td style="text-align: right;">
+                    <div class="action-btn-group">
+                      <button class="btn-approve-sm" (click)="approveLeave(req.id)" title="Approve Request">
+                        <svg lucideCheck size="13"></svg>
+                        <span>Approve</span>
+                      </button>
+                      <button class="btn-reject-sm" (click)="rejectLeave(req.id)" title="Reject Request">
+                        <svg lucideX size="13"></svg>
+                        <span>Reject</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1198,7 +1198,7 @@
     </div>
 
     <!-- Notice Body -->
-    <div class="notice-modal-body">{{ n.body }}</div>
+    <div class="notice-modal-body notice-rich" [innerHTML]="noticeHtml(n.body)"></div>
 
     <!-- Attachments if any -->
     <div class="notice-modal-attachments" *ngIf="n.attachments && n.attachments.length > 0">

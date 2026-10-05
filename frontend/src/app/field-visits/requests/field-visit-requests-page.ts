@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -8,10 +8,12 @@ import {
   LucideX, LucideCalendarDays, LucideUsers, LucideBuilding,
   LucideClock, LucideArrowRight, LucideCheckCircle2,
   LucideRotateCcw, LucideRefreshCw, LucideFilter, LucideCheck,
+  LucideChevronDown, LucideAlertTriangle,
 } from '@lucide/angular';
 import { FieldVisitRequestsService, FieldVisitRequest } from '../../services/field-visit-requests';
 import { FieldVisitRequestFormComponent } from './field-visit-request-form';
 import { MyFieldVisitComponent } from '../my-field-visit/my-field-visit';
+import { DialogService } from '../../shared/services/dialog.service';
 import { RoleService } from '../../services/role.service';
 import { VisitLocationFormModalComponent } from '../../shared/components/visit-location-form-modal/visit-location-form-modal';
 import {
@@ -38,6 +40,7 @@ const STATUS_LABELS: Record<string, string> = {
     LucideX, LucideCalendarDays, LucideUsers, LucideBuilding,
     LucideClock, LucideArrowRight, LucideCheckCircle2,
     LucideRotateCcw, LucideRefreshCw, LucideFilter, LucideCheck,
+    LucideChevronDown, LucideAlertTriangle,
   ],
   templateUrl: './field-visit-requests-page.html',
   styleUrls: ['./field-visit-requests-page.css'],
@@ -47,6 +50,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
   private locationRequests = inject(VisitLocationRequestsService);
   private router = inject(Router);
   private toast = inject(HotToastService);
+  private dialog = inject(DialogService);
   /** Admins see every company visit; everyone else their own trips and projects. */
   readonly isCompanyWide = inject(RoleService).isAdmin;
 
@@ -61,6 +65,43 @@ export class FieldVisitRequestsPageComponent implements OnInit {
   selectedProjectId = signal<number | null>(null);
   selectedEmployeeId = signal<number | null>(null);
   dateRangeFilter = signal<string>('');
+
+  // Multi-selection
+  selectedIds = signal<Set<number>>(new Set());
+
+  selectedRequests = computed(() => {
+    const ids = this.selectedIds();
+    return this.filteredRequests().filter((r) => ids.has(r.id));
+  });
+
+  selectedCount = computed(() => this.selectedIds().size);
+
+  isAllSelected = computed(() => {
+    const rows = this.filteredRequests();
+    return rows.length > 0 && rows.every((r) => this.selectedIds().has(r.id));
+  });
+
+  isPartiallySelected = computed(() => {
+    const size = this.selectedIds().size;
+    const len = this.filteredRequests().length;
+    return size > 0 && size < len;
+  });
+
+  hasPastSelected = computed(() => {
+    return this.selectedRequests().some((r) => this.isPastVisit(r));
+  });
+
+  // Status dropdown popover state
+  activeStatusMenuId = signal<number | null>(null);
+  isBulkLoading = signal(false);
+
+  statusOptions = [
+    { status: 'APPROVED', label: 'Approved', color: '#16a34a' },
+    { status: 'COMPLETED', label: 'Completed', color: '#4f46e5' },
+    { status: 'PENDING_APPROVAL', label: 'Pending approval', color: '#d97706' },
+    { status: 'REJECTED', label: 'Rejected', color: '#dc2626' },
+    { status: 'CANCELLED', label: 'Cancelled', color: '#94a3b8' },
+  ];
 
   isFormOpen = signal(false);
   editing = signal<FieldVisitRequest | null>(null);
@@ -265,22 +306,351 @@ export class FieldVisitRequestsPageComponent implements OnInit {
     return STATUS_LABELS[status] ?? status;
   }
 
+  isPastVisit(r: FieldVisitRequest): boolean {
+    const today = this.localDay(new Date());
+    const end = this.localDay(r.endDate);
+    return end < today;
+  }
+
+  toggleSelectAll(event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    if (checked) {
+      const all = new Set(this.filteredRequests().map((r) => r.id));
+      this.selectedIds.set(all);
+    } else {
+      this.selectedIds.set(new Set());
+    }
+  }
+
+  toggleSelect(id: number, event: Event): void {
+    event.stopPropagation();
+    this.selectedIds.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    this.activeStatusMenuId.set(null);
+  }
+
+  toggleStatusMenu(r: FieldVisitRequest, event: Event): void {
+    event.stopPropagation();
+    this.activeStatusMenuId.update((curr) => (curr === r.id ? null : r.id));
+  }
+
+  onSelectStatus(r: FieldVisitRequest, targetStatus: string, event: Event): void {
+    event.stopPropagation();
+    this.activeStatusMenuId.set(null);
+    if (r.status === targetStatus || this.deciding()) return;
+
+    if (targetStatus === 'APPROVED') {
+      if (this.isPastVisit(r)) {
+        const ok = window.confirm(
+          `This visit ended in the past (${r.startDate.slice(0, 10)} to ${r.endDate.slice(0, 10)}).\n\nApproving will retroactively authorize the field visit and schedule historical attendance.\n\nDo you want to proceed?`
+        );
+        if (!ok) return;
+      }
+      this.approveViaStatus(r);
+      return;
+    }
+
+    if (targetStatus === 'REJECTED') {
+      const reason = window.prompt(`Reject ${r.requestNumber}? Give the reason — the manager acts on it:`)?.trim();
+      if (!reason) return;
+      this.deciding.set(r.id);
+      this.api.reject(r.id, reason).subscribe({
+        next: () => {
+          this.deciding.set(null);
+          this.toast.success(`${r.requestNumber} rejected`);
+          this.load();
+        },
+        error: (err) => {
+          this.deciding.set(null);
+          this.toast.error(this.messageOf(err));
+        },
+      });
+      return;
+    }
+
+    if (targetStatus === 'CANCELLED') {
+      const reason = window.prompt(`Cancel ${r.requestNumber}? Optional reason:`)?.trim();
+      this.deciding.set(r.id);
+      this.api.cancel(r.id, reason || undefined).subscribe({
+        next: () => {
+          this.deciding.set(null);
+          this.toast.success(`${r.requestNumber} cancelled`);
+          this.load();
+        },
+        error: (err) => {
+          this.deciding.set(null);
+          this.toast.error(this.messageOf(err));
+        },
+      });
+      return;
+    }
+
+    if (targetStatus === 'COMPLETED') {
+      this.deciding.set(r.id);
+      this.api.complete(r.id).subscribe({
+        next: () => {
+          this.deciding.set(null);
+          this.toast.success(`${r.requestNumber} marked as completed`);
+          this.load();
+        },
+        error: (err) => {
+          this.deciding.set(null);
+          this.toast.error(this.messageOf(err));
+        },
+      });
+      return;
+    }
+
+    if (targetStatus === 'PENDING_APPROVAL') {
+      this.deciding.set(r.id);
+      this.api.changeStatus(r.id, 'PENDING_APPROVAL').subscribe({
+        next: () => {
+          this.deciding.set(null);
+          this.toast.success(`${r.requestNumber} moved to pending approval`);
+          this.load();
+        },
+        error: (err) => {
+          this.deciding.set(null);
+          this.toast.error(this.messageOf(err));
+        },
+      });
+      return;
+    }
+  }
+
+  /**
+   * The status dropdown's "Approved". Goes through the status endpoint (it also
+   * handles drafts and re-approvals) but offers the same choice as the detail
+   * page when rostered days off are all that is in the way.
+   */
+  private approveViaStatus(r: FieldVisitRequest, overrideDayOff = false): void {
+    this.deciding.set(r.id);
+    this.api.changeStatus(r.id, 'APPROVED', undefined, overrideDayOff ? { overrideDayOff: true } : {}).subscribe({
+      next: () => {
+        this.deciding.set(null);
+        this.toast.success(`${r.requestNumber} approved`);
+        this.load();
+      },
+      error: async (err) => {
+        this.deciding.set(null);
+        if (!overrideDayOff && err?.error?.code === 'ROSTER_DAY_OFF_CLASH') {
+          const ok = await this.dialog.confirm(
+            this.messageOf(err),
+            `${r.requestNumber} falls on rostered days off`,
+            'Approve and override days off',
+            'Cancel',
+          );
+          if (ok) this.approveViaStatus(r, true);
+          return;
+        }
+        this.toast.error(this.messageOf(err));
+      },
+    });
+  }
+
+  bulkApprove(): void {
+    const ids = Array.from(this.selectedIds());
+    if (!ids.length || this.isBulkLoading()) return;
+
+    if (this.hasPastSelected()) {
+      const ok = window.confirm(
+        `Some of the ${ids.length} selected visits are in the past. Approving will retroactively authorize them and record past attendance. Continue?`
+      );
+      if (!ok) return;
+    }
+
+    this.runBulkApprove(ids, false);
+  }
+
+  /**
+   * Approve a selection, then deal with what did not go through.
+   *
+   * Previously the reasons were dropped — "0 of 1 visits approved" and nothing
+   * else. Now visits stopped only by rostered days off are offered the override
+   * in one go, and anything else that failed is reported with its reason.
+   */
+  private runBulkApprove(ids: number[], overrideDayOff: boolean): void {
+    this.isBulkLoading.set(true);
+    this.api.bulkChangeStatus(ids, 'APPROVED', undefined, overrideDayOff ? { overrideDayOff: true } : {}).subscribe({
+      next: async (results) => {
+        this.isBulkLoading.set(false);
+        const ok = results.filter((r) => r.success).length;
+        const dayOff = results.filter((r) => !r.success && r.code === 'ROSTER_DAY_OFF_CLASH');
+        const other = results.filter((r) => !r.success && r.code !== 'ROSTER_DAY_OFF_CLASH');
+
+        if (ok) this.toast.success(`${ok} of ${results.length} visits approved`);
+        for (const f of other) this.toast.error(f.error || 'Could not approve', { duration: 9000 });
+        this.load();
+
+        if (dayOff.length && !overrideDayOff) {
+          const details = dayOff.map((f) => f.error).join(' ');
+          const go = await this.dialog.confirm(
+            details,
+            `${dayOff.length} visit${dayOff.length > 1 ? 's fall' : ' falls'} on rostered days off`,
+            'Approve and override days off',
+            'Cancel',
+          );
+          if (go) { this.runBulkApprove(dayOff.map((f) => f.id), true); return; }
+        }
+        this.clearSelection();
+      },
+      error: (err) => {
+        this.isBulkLoading.set(false);
+        this.toast.error(this.messageOf(err));
+      },
+    });
+  }
+
+  bulkMarkCompleted(): void {
+    const ids = Array.from(this.selectedIds());
+    if (!ids.length || this.isBulkLoading()) return;
+
+    this.isBulkLoading.set(true);
+    this.api.bulkChangeStatus(ids, 'COMPLETED').subscribe({
+      next: (results) => {
+        this.isBulkLoading.set(false);
+        const successes = results.filter((r) => r.success).length;
+        this.toast.success(`${successes} of ${ids.length} visits marked as completed`);
+        this.clearSelection();
+        this.load();
+      },
+      error: (err) => {
+        this.isBulkLoading.set(false);
+        this.toast.error(this.messageOf(err));
+      },
+    });
+  }
+
+  bulkReject(): void {
+    const ids = Array.from(this.selectedIds());
+    if (!ids.length || this.isBulkLoading()) return;
+
+    const reason = window.prompt(`Give a reason for rejecting the ${ids.length} selected visit(s):`)?.trim();
+    if (!reason) return;
+
+    this.isBulkLoading.set(true);
+    this.api.bulkChangeStatus(ids, 'REJECTED', reason).subscribe({
+      next: (results) => {
+        this.isBulkLoading.set(false);
+        const successes = results.filter((r) => r.success).length;
+        this.toast.success(`${successes} of ${ids.length} visits rejected`);
+        this.clearSelection();
+        this.load();
+      },
+      error: (err) => {
+        this.isBulkLoading.set(false);
+        this.toast.error(this.messageOf(err));
+      },
+    });
+  }
+
+  bulkCancel(): void {
+    const ids = Array.from(this.selectedIds());
+    if (!ids.length || this.isBulkLoading()) return;
+
+    const reason = window.prompt(`Optional reason for cancelling the ${ids.length} selected visit(s):`)?.trim();
+
+    this.isBulkLoading.set(true);
+    this.api.bulkChangeStatus(ids, 'CANCELLED', reason || undefined).subscribe({
+      next: (results) => {
+        this.isBulkLoading.set(false);
+        const successes = results.filter((r) => r.success).length;
+        this.toast.success(`${successes} of ${ids.length} visits cancelled`);
+        this.clearSelection();
+        this.load();
+      },
+      error: (err) => {
+        this.isBulkLoading.set(false);
+        this.toast.error(this.messageOf(err));
+      },
+    });
+  }
+
+  onBulkStatusSelect(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    const targetStatus = select.value;
+    select.value = '';
+    if (!targetStatus) return;
+
+    const ids = Array.from(this.selectedIds());
+    if (!ids.length) return;
+
+    if (targetStatus === 'APPROVED') {
+      this.bulkApprove();
+      return;
+    }
+    if (targetStatus === 'COMPLETED') {
+      this.bulkMarkCompleted();
+      return;
+    }
+    if (targetStatus === 'REJECTED') {
+      this.bulkReject();
+      return;
+    }
+    if (targetStatus === 'CANCELLED') {
+      this.bulkCancel();
+      return;
+    }
+
+    this.isBulkLoading.set(true);
+    this.api.bulkChangeStatus(ids, targetStatus).subscribe({
+      next: (results) => {
+        this.isBulkLoading.set(false);
+        const successes = results.filter((r) => r.success).length;
+        this.toast.success(`${successes} of ${ids.length} visits updated to ${this.label(targetStatus)}`);
+        this.clearSelection();
+        this.load();
+      },
+      error: (err) => {
+        this.isBulkLoading.set(false);
+        this.toast.error(this.messageOf(err));
+      },
+    });
+  }
+
   /** Request id currently being approved/rejected from the table. */
   deciding = signal<number | null>(null);
 
   /** Approve straight from the table (the row itself still opens the detail). */
-  approveRow(r: FieldVisitRequest, event: Event): void {
-    event.stopPropagation();
+  approveRow(r: FieldVisitRequest, event?: Event, overrideDayOff = false): void {
+    event?.stopPropagation();
     if (this.deciding()) return;
     this.deciding.set(r.id);
-    this.api.approve(r.id).subscribe({
+    this.api.approve(r.id, overrideDayOff ? { overrideDayOff: true } : {}).subscribe({
       next: () => {
         this.deciding.set(null);
         this.toast.success(`${r.requestNumber} approved — tasks and attendance are assigned`);
         this.load();
       },
-      error: (err) => {
+      error: async (err) => {
         this.deciding.set(null);
+        // Same offer as the detail page: if rostered days off are the only
+        // thing in the way, the approver may choose to roster them on site.
+        if (!overrideDayOff && err?.error?.code === 'ROSTER_DAY_OFF_CLASH') {
+          const ok = await this.dialog.confirm(
+            this.messageOf(err),
+            `${r.requestNumber} falls on rostered days off`,
+            'Approve and override days off',
+            'Cancel',
+          );
+          if (ok) this.approveRow(r, undefined, true);
+          return;
+        }
         this.toast.error(this.messageOf(err));
       },
     });

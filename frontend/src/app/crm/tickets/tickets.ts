@@ -12,7 +12,8 @@ import {
   LucideCheckCircle2, LucideFlame, LucideEye, LucideUser,
   LucideInbox, LucideCheck, LucideSlidersHorizontal, LucideSparkles,
   LucideLaptop, LucideSmartphone, LucideHelpCircle, LucideClock,
-  LucideImagePlus, LucideTrash2, LucideLoader2, LucideInfo
+  LucideImagePlus, LucideTrash2, LucideLoader2, LucideInfo,
+  LucideXCircle
 } from '@lucide/angular';
 import { QuillModule } from 'ngx-quill';
 import { TicketService, Ticket, TicketStats, NewTicketAttachment, TicketPermissions } from '../../services/ticket.service';
@@ -38,6 +39,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LucideInbox, LucideCheck, LucideSlidersHorizontal, LucideSparkles,
     LucideLaptop, LucideSmartphone, LucideHelpCircle, LucideClock,
     LucideImagePlus, LucideTrash2, LucideLoader2, LucideInfo,
+    LucideXCircle,
     TicketDetailComponent, ChartCardComponent, SkeletonComponent,
   ],
   templateUrl: './tickets.html',
@@ -69,7 +71,8 @@ export class TicketsComponent implements OnInit {
   filterStatus = '';
   filterPriority = '';
   filterPlatform = '';
-  filterMonth = 'all'; // all, 1_month, 3_months, 6_months
+  filterMonth = 'all'; // all, today, this_week, last_month, etc.
+  filterDateField: 'created' | 'resolved' | 'closed' = 'created';
   filterDeadline = 'all'; // all, overdue, today, this_week, next_week
   searchTerm = '';
   
@@ -206,9 +209,9 @@ export class TicketsComponent implements OnInit {
   };
 
   readonly priorityDotColors: Record<string, string> = {
-    CRITICAL: '#1373e5',
-    HIGH: '#1373e5',
-    MEDIUM: '#6b3fd6',
+    CRITICAL: '#ef4444',
+    HIGH: '#f97316',
+    MEDIUM: '#3b82f6',
     LOW: '#64748b',
   };
 
@@ -224,22 +227,15 @@ export class TicketsComponent implements OnInit {
     {
       field: 'ticketNumber',
       headerName: 'TICKET ID',
-      width: 115,
-      pinned: 'left',
+      width: 110,
+      minWidth: 105,
       cellRenderer: (p: any) => `<span class="ticket-num-badge">${p.value}</span>`,
     },
     {
       field: 'title',
       headerName: 'TITLE & TYPE',
-      // sizeColumnsToFit() distributes the grid's width by ratio, so flex: 2
-      // handed this column every spare pixel and squeezed the rest below the
-      // width they declare — which is what truncated their headers. The cap is
-      // what gives that width back. A title longer than the cap ellipsises
-      // (the cell is nowrap, and a 48px row has no room for a second line),
-      // so the renderer carries a title attribute for the full text.
       flex: 1,
-      minWidth: 220,
-      maxWidth: 360,
+      minWidth: 260,
       cellRenderer: (p: any) => {
         const typeKey = p.data?.type || 'BUG';
         const typeLabel = typeKey.replace(/_/g, ' ');
@@ -258,19 +254,17 @@ export class TicketsComponent implements OnInit {
       field: 'platform',
       headerName: 'PLATFORM',
       width: 95,
-      minWidth: 95,
+      minWidth: 90,
       cellRenderer: (p: any) => {
         const val = p.value || 'WEB';
         return `<span class="platform-tag platform-${val.toLowerCase()}">${val}</span>`;
       },
     },
     {
-      // Which department the issue came FROM. Every ticket is worked by the dev
-      // team, so the owning department says nothing — the raising one does.
       colId: 'raisedByDept',
-      headerName: 'RAISED BY DEPT',
-      width: 150,
-      minWidth: 150,
+      headerName: 'DEPARTMENT',
+      width: 140,
+      minWidth: 125,
       valueGetter: (p: any) =>
         p.data?.raisedByDepartment?.name ?? p.data?.reporter?.department?.name ?? '—',
       cellRenderer: (p: any) => `<span class="dept-pill">${this.escapeHtml(p.value)}</span>`,
@@ -278,7 +272,7 @@ export class TicketsComponent implements OnInit {
     {
       field: 'priority',
       headerName: 'PRIORITY',
-      width: 110,
+      width: 115,
       minWidth: 110,
       cellRenderer: (p: any) => {
         const cls = this.priorityColors[p.value] ?? 'priority-low';
@@ -289,7 +283,7 @@ export class TicketsComponent implements OnInit {
     {
       field: 'status',
       headerName: 'STATUS',
-      width: 120,
+      width: 125,
       minWidth: 120,
       cellRenderer: (p: any) => {
         const cls = this.statusColors[p.value] ?? 'status-closed';
@@ -301,7 +295,7 @@ export class TicketsComponent implements OnInit {
       field: 'assignee',
       headerName: 'ASSIGNEE',
       width: 155,
-      minWidth: 155,
+      minWidth: 140,
       cellRenderer: (p: any) => {
         const a = p.data?.assignee;
         if (!a) {
@@ -324,8 +318,8 @@ export class TicketsComponent implements OnInit {
     {
       field: 'reporter',
       headerName: 'RAISED BY',
-      width: 175,
-      minWidth: 175,
+      width: 165,
+      minWidth: 150,
       cellRenderer: (p: any) => {
         const r = p.data?.reporter;
         if (!r) return `<span class="text-muted">—</span>`;
@@ -333,12 +327,13 @@ export class TicketsComponent implements OnInit {
         const avatarHtml = r.avatarUrl
           ? `<img class="avatar-img" src="${this.escapeHtml(r.avatarUrl)}" alt="" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span class="avatar-circle reporter-avatar" style="display:none;">${initials}</span>`
           : `<span class="avatar-circle reporter-avatar">${initials}</span>`;
+        const dept = r.department?.name ? `<span class="user-sub-text">${this.escapeHtml(r.department.name)}</span>` : '';
         return `
           <div class="user-cell">
             ${avatarHtml}
             <div class="user-info">
               <span class="user-name-text">${this.escapeHtml(r.firstName)} ${this.escapeHtml(r.lastName)}</span>
-              <span class="user-sub-text">${this.escapeHtml(r.department?.name ?? '—')}</span>
+              ${dept}
             </div>
           </div>
         `;
@@ -348,7 +343,7 @@ export class TicketsComponent implements OnInit {
       field: 'dueDate',
       headerName: 'DEADLINE',
       width: 110,
-      minWidth: 110,
+      minWidth: 105,
       valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
       cellRenderer: (p: any) => {
         if (!p.value) return '—';
@@ -356,7 +351,7 @@ export class TicketsComponent implements OnInit {
         const today = new Date();
         const str = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         if (date < today && p.data?.status !== 'RESOLVED' && p.data?.status !== 'CLOSED') {
-          return `<span style="color: #1373e5; font-weight: 600;">${str}</span>`;
+          return `<span style="color: #dc2626; font-weight: 600;">${str}</span>`;
         }
         return str;
       }
@@ -365,15 +360,43 @@ export class TicketsComponent implements OnInit {
       field: 'createdAt',
       headerName: 'CREATED',
       width: 110,
-      minWidth: 110,
+      minWidth: 105,
       valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+      cellRenderer: (p: any) => {
+        if (!p.value) return '—';
+        const d = new Date(p.value);
+        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        return `<span title="Created on ${dateStr} at ${timeStr}">${dateStr}</span>`;
+      }
+    },
+    {
+      field: 'resolvedAt',
+      headerName: 'RESOLVED',
+      width: 115,
+      minWidth: 105,
+      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+      cellRenderer: (p: any) => {
+        if (!p.value) return '<span class="text-muted">—</span>';
+        const d = new Date(p.value);
+        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        return `<span class="resolved-date-cell" style="color: #059669; font-weight: 600;" title="Resolved on ${dateStr} at ${timeStr}">${dateStr}</span>`;
+      }
     },
     {
       field: 'closedAt',
       headerName: 'CLOSED',
-      width: 110,
-      minWidth: 110,
+      width: 105,
+      minWidth: 100,
       valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+      cellRenderer: (p: any) => {
+        if (!p.value) return '<span class="text-muted">—</span>';
+        const d = new Date(p.value);
+        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        return `<span title="Closed on ${dateStr} at ${timeStr}">${dateStr}</span>`;
+      }
     },
     {
       headerName: 'ACTIONS',
@@ -408,6 +431,14 @@ export class TicketsComponent implements OnInit {
     // knows the date but nothing about tickets. Opening the form here keeps one
     // copy of it, with its evidence rule and HR routing intact.
     const params = this.route.snapshot.queryParamMap;
+
+    // A ticket email's button links straight to its ticket.
+    const linked = Number(params.get('ticket'));
+    if (Number.isInteger(linked) && linked > 0) {
+      this.openTicketDetail(linked);
+      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+    }
+
     if (params.get('report') === 'attendance') {
       this.openAttendanceIssue(params.get('date'));
       // Cleared so a refresh, or going back, does not reopen the form.
@@ -501,6 +532,9 @@ export class TicketsComponent implements OnInit {
       }
       if (fromDate) filters['fromDate'] = fromDate.toISOString();
       if (toDate) filters['toDate'] = toDate.toISOString();
+      if (this.filterDateField) {
+        filters['dateField'] = this.filterDateField === 'resolved' ? 'resolvedAt' : (this.filterDateField === 'closed' ? 'closedAt' : 'createdAt');
+      }
     }
 
     if (this.filterDeadline && this.filterDeadline !== 'all') {
@@ -542,9 +576,6 @@ export class TicketsComponent implements OnInit {
       next: (t) => {
         this.tickets = t;
         this.isLoading = false;
-        // The grid is display:none behind the skeleton, so it can lay out at
-        // zero width. Re-measure once it is visible again.
-        setTimeout(() => this.gridApi?.sizeColumnsToFit());
         if (this.searchTerm) {
           setTimeout(() => this.onSearch(), 50);
         }
@@ -594,7 +625,7 @@ export class TicketsComponent implements OnInit {
     IN_PROGRESS: '#767677',
     RESOLVED: '#0ca30c',
     CLOSED: '#64748b',
-    REJECTED: '#858586',
+    REJECTED: '#e11d48',
   };
 
   private readonly priorityPalette: Record<string, string> = {
@@ -704,8 +735,16 @@ export class TicketsComponent implements OnInit {
   toggleStatusCard(status: string) {
     if (this.filterStatus === status) {
       this.filterStatus = '';
+      this.filterDateField = 'created';
     } else {
       this.filterStatus = status;
+      if (status === 'RESOLVED') {
+        this.filterDateField = 'resolved';
+      } else if (status === 'CLOSED') {
+        this.filterDateField = 'closed';
+      } else {
+        this.filterDateField = 'created';
+      }
     }
     this.loadTickets();
   }
@@ -845,6 +884,13 @@ export class TicketsComponent implements OnInit {
   selectStatusFilter(status: string) {
     this.filterStatus = status || '';
     this.showStatusDropdown = false;
+    if (status === 'RESOLVED') {
+      this.filterDateField = 'resolved';
+    } else if (status === 'CLOSED') {
+      this.filterDateField = 'closed';
+    } else {
+      this.filterDateField = 'created';
+    }
     this.loadTickets();
   }
 
@@ -900,9 +946,10 @@ export class TicketsComponent implements OnInit {
     }
 
     if (this.filterMonth && this.filterMonth !== 'all') {
+      const fieldName = this.filterDateField === 'resolved' ? 'Resolved' : (this.filterDateField === 'closed' ? 'Closed' : 'Created');
       chips.push({
         key: 'date',
-        label: `Date: ${this.formatLabel(this.filterMonth)}`,
+        label: `Date (${fieldName}): ${this.formatLabel(this.filterMonth)}`,
         clear: () => { this.filterMonth = 'all'; this.loadTickets(); },
       });
     }
@@ -968,6 +1015,7 @@ export class TicketsComponent implements OnInit {
     this.filterPriority = '';
     this.filterPlatform = '';
     this.filterMonth = 'all';
+    this.filterDateField = 'created';
     this.filterDeadline = 'all';
     this.searchTerm = '';
     this.gridApi?.setGridOption('quickFilterText', '');

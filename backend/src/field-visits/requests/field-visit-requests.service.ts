@@ -5,7 +5,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { FieldVisitActivationService } from './field-visit-activation.service';
-import { FIELD_VISIT_STATUS } from '../field-visit-status';
+import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY } from '../field-visit-status';
 import { CompanyRole, isCompanyAdmin } from '../../common/company-roles';
 
 /**
@@ -19,12 +19,25 @@ import { CompanyRole, isCompanyAdmin } from '../../common/company-roles';
 const APPROVER_ROLES: CompanyRole[] = ['SUPERADMIN', 'ADMIN'];
 
 // Re-exported so callers that already import it from here keep working.
-export { FIELD_VISIT_STATUS };
+export { FIELD_VISIT_STATUS, FIELD_VISIT_DAY };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Statuses a general task may be in to be put on a visit. Narrower than the
+ * project picker's "not closed": a general visit exists to get someone's
+ * outstanding work done, so review and finished work are not on offer.
+ */
+const GENERAL_TASK_STATUSES = ['TODO', 'IN_PROGRESS'];
+
 export interface FieldVisitRequestInput {
-  projectId: number;
+  /**
+   * PROJECT (the default) is raised against `projectId`. GENERAL belongs to no
+   * project: it is filed under the company's hidden General project, and its
+   * scope is the people's own open general tasks.
+   */
+  visitType?: 'PROJECT' | 'GENERAL';
+  projectId?: number;
   location: string;
   /** The saved site this was picked from, when it was picked (§PB10). */
   visitLocationId?: number | null;
@@ -99,7 +112,7 @@ export class FieldVisitRequestsService {
     status: true, rejectionReason: true,
     pendingChange: true, pendingChangeAt: true,
     submittedAt: true, reviewedAt: true, createdAt: true, updatedAt: true,
-    project: { select: { id: true, name: true, key: true, color: true } },
+    project: { select: { id: true, name: true, key: true, color: true, isSystem: true } },
     // The saved site it was planned against, when there is one — what lets a
     // project list its locations (one site can serve several projects).
     visitLocation: { select: { id: true, name: true, address: true, latitude: true, longitude: true } },
@@ -112,7 +125,12 @@ export class FieldVisitRequestsService {
         // Enough to render the line as the task it points at, rather than as a
         // remembered title: key and status are what tell somebody the work
         // picked from the board is the same work the board still shows.
-        issue: { select: { id: true, key: true, title: true, status: true, priority: true } },
+        issue: {
+          select: {
+            id: true, key: true, title: true, status: true, priority: true, approvalState: true,
+            assignee: { select: { id: true, firstName: true, lastName: true } },
+          },
+        },
       },
       orderBy: { position: 'asc' as const },
     },
@@ -171,16 +189,21 @@ export class FieldVisitRequestsService {
     return Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1;
   }
 
-  private async loadProject(companyId: number, projectId: unknown) {
+  private async loadProject(companyId: number, projectId: unknown, general = false) {
     const project = await this.prisma.project.findFirst({
-      where: { id: Number(projectId), companyId },
+      where: general ? { companyId, isSystem: true } : { id: Number(projectId), companyId, isSystem: false },
       select: {
         id: true, name: true, key: true, leadId: true,
         members: { select: { employeeId: true, role: true } },
       },
     });
-    if (!project) throw new NotFoundException('Project not found');
-    return project;
+    if (!project) {
+      // The General project is created with the first general task, so its
+      // absence means there is nothing a general visit could pick.
+      if (general) throw new BadRequestException('There are no general tasks yet — create one before raising a general visit');
+      throw new NotFoundException('Project not found');
+    }
+    return { ...project, isGeneral: general };
   }
 
   /**
@@ -202,6 +225,7 @@ export class FieldVisitRequestsService {
    */
   private async normalizeTasks(
     companyId: number, projectId: number, raw: FieldVisitRequestInput['tasks'],
+    general?: { employeeIds: number[] },
   ) {
     const wanted = (raw ?? [])
       .map((t) => ({ task: t, issueId: t?.issueId == null ? null : Number(t.issueId) }))
@@ -210,11 +234,20 @@ export class FieldVisitRequestsService {
     const issueIds = [...new Set(
       wanted.map((r) => r.issueId).filter((id): id is number => Number.isInteger(id)),
     )];
+    // A general visit's scope is only ever picked, never typed: there is no
+    // project board for approval to mint a described task onto.
+    if (general && wanted.some((r) => r.issueId == null)) {
+      throw new BadRequestException('A general visit is made of the people\'s own general tasks — pick them from the list');
+    }
+
     const linked = new Map<number, { key: string; title: string; isArchived: boolean }>();
     if (issueIds.length) {
       const found = await this.prisma.issue.findMany({
         where: { id: { in: issueIds }, companyId, projectId },
-        select: { id: true, key: true, title: true, isArchived: true },
+        select: {
+          id: true, key: true, title: true, isArchived: true, status: true, assigneeId: true,
+          members: { select: { employeeId: true } },
+        },
       });
       if (found.length !== issueIds.length) {
         throw new BadRequestException(
@@ -226,6 +259,19 @@ export class FieldVisitRequestsService {
           throw new BadRequestException(
             `${issue.key} ${issue.title} has been archived. Restore it before putting it on a visit.`,
           );
+        }
+        if (general) {
+          if (!GENERAL_TASK_STATUSES.includes(issue.status)) {
+            throw new BadRequestException(
+              `${issue.key} ${issue.title} is not To Do or In Progress, so it cannot go on a general visit`,
+            );
+          }
+          const owners = [issue.assigneeId, ...issue.members.map((m) => m.employeeId)];
+          if (!owners.some((id) => id != null && general.employeeIds.includes(id))) {
+            throw new BadRequestException(
+              `${issue.key} ${issue.title} is not assigned to anyone going on this visit`,
+            );
+          }
         }
         linked.set(issue.id, issue);
       }
@@ -277,7 +323,8 @@ export class FieldVisitRequestsService {
    * visit" with two answers.
    */
   private async normalize(companyId: number, data: FieldVisitRequestInput) {
-    const project = await this.loadProject(companyId, data?.projectId);
+    const general = data?.visitType === 'GENERAL';
+    const project = await this.loadProject(companyId, data?.projectId, general);
 
     const location = String(data?.location ?? '').trim();
     if (!location) {
@@ -330,7 +377,9 @@ export class FieldVisitRequestsService {
       throw new BadRequestException('One of the selected people is not an employee of this company');
     }
 
-    const tasks = await this.normalizeTasks(companyId, project.id, data?.tasks);
+    const tasks = await this.normalizeTasks(
+      companyId, project.id, data?.tasks, general ? { employeeIds } : undefined,
+    );
     if (tasks.length === 0) {
       throw new BadRequestException('Add at least one task — after approval these are what each person is assigned');
     }
@@ -455,13 +504,17 @@ export class FieldVisitRequestsService {
     });
     if (!request) throw new NotFoundException('Field visit request not found');
 
-    const project = await this.loadProject(companyId, request.project.id);
+    const project = await this.loadProject(companyId, request.project.id, request.project.isSystem);
+    // A general visit has no project manager, so the person who raised it
+    // stands in for one.
+    const mayRaise = this.mayRaise(project, role, employeeId)
+      || (project.isGeneral && request.raisedBy?.id === employeeId);
     return {
       ...request,
       canEdit: request.status === FIELD_VISIT_STATUS.DRAFT
-        && this.mayRaise(project, role, employeeId),
+        && mayRaise,
       canSubmit: request.status === FIELD_VISIT_STATUS.DRAFT
-        && this.mayRaise(project, role, employeeId),
+        && mayRaise,
       canReview: request.status === FIELD_VISIT_STATUS.PENDING
         && this.isApprover(role),
       canWithdraw: request.status === FIELD_VISIT_STATUS.PENDING
@@ -469,9 +522,44 @@ export class FieldVisitRequestsService {
       // §10: an approved trip is changed by asking, not by editing.
       canRequestChange: request.status === FIELD_VISIT_STATUS.APPROVED
         && !request.pendingChange
-        && this.mayRaise(project, role, employeeId),
+        && mayRaise,
       canReviewChange: !!request.pendingChange && this.isApprover(role),
     };
+  }
+
+  /**
+   * The general tasks a general visit can carry: those assigned to (or shared
+   * with) any of the people going, still To Do or In Progress. Shaped like a
+   * project's issue list so the form's task picker reads both the same way.
+   */
+  async generalTasks(companyId: number, employeeIds: number[]) {
+    const ids = [...new Set(employeeIds.filter(Number.isInteger))];
+    if (!ids.length) return [];
+    return this.prisma.issue.findMany({
+      where: {
+        companyId,
+        isArchived: false,
+        project: { isSystem: true },
+        status: { in: GENERAL_TASK_STATUSES },
+        OR: [
+          { assigneeId: { in: ids } },
+          { members: { some: { employeeId: { in: ids } } } },
+        ],
+      },
+      select: {
+        id: true, key: true, title: true, status: true, priority: true, dueDate: true,
+        assigneeId: true, approvalState: true,
+        assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        members: {
+          select: {
+            employeeId: true,
+            employee: { select: { id: true, firstName: true, lastName: true } },
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 500,
+    });
   }
 
   /** The §11 audit trail: who created, approved, rejected or cancelled it. */
@@ -514,7 +602,9 @@ export class FieldVisitRequestsService {
     const { project, fields, employeeIds, tasks, attachments } =
       await this.normalize(companyId, data);
 
-    if (!this.mayRaise(project, role, employeeId)) {
+    // A general visit has no project manager to ask, so anyone may raise one;
+    // it still goes to an administrator for approval like every other trip.
+    if (!project.isGeneral && !this.mayRaise(project, role, employeeId)) {
       throw new ForbiddenException('Only the project manager raises a field visit for this project');
     }
     if (employeeId == null) {
@@ -694,7 +784,7 @@ export class FieldVisitRequestsService {
         startDate: true, endDate: true, visitDays: true,
         startTime: true, endTime: true,
         pendingChange: true,
-        project: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true, isSystem: true } },
         members: { select: { employeeId: true } },
         tasks: {
           select: { id: true, name: true, description: true, position: true, issueId: true },
@@ -708,7 +798,7 @@ export class FieldVisitRequestsService {
 
   async submit(companyId: number, employeeId: number | null, role: string, id: number) {
     const request = await this.loadForDecision(companyId, id);
-    const project = await this.loadProject(companyId, request.project.id);
+    const project = await this.loadProject(companyId, request.project.id, request.project.isSystem);
 
     if (!this.mayRaise(project, role, employeeId) && request.raisedById !== employeeId) {
       throw new ForbiddenException('You cannot submit this field visit request');
@@ -769,9 +859,12 @@ export class FieldVisitRequestsService {
    * approval. The same rule the additional-hours flow applies to its own
    * requester.
    */
-  async approve(companyId: number, reviewerId: number | null, role: string, id: number) {
+  async approve(
+    companyId: number, reviewerId: number | null, role: string, id: number,
+    opts: { overrideDayOff?: boolean } = {},
+  ) {
     const request = await this.requireDecidable(companyId, reviewerId, role, id);
-    return this.commitApproval(companyId, request, reviewerId);
+    return this.commitApproval(companyId, request, reviewerId, '', opts);
   }
 
   /**
@@ -789,6 +882,7 @@ export class FieldVisitRequestsService {
 
   private async commitApproval(
     companyId: number, request: any, reviewerId: number | null, note = '',
+    opts: { overrideDayOff?: boolean } = {},
   ) {
     const id = request.id;
 
@@ -807,7 +901,9 @@ export class FieldVisitRequestsService {
         select: this.SELECT,
       });
 
-      const result = await this.activation.activate(tx, request as any, reviewerId);
+      const result = await this.activation.activate(tx, request as any, reviewerId, {
+        overrideDayOff: opts.overrideDayOff === true,
+      });
 
       await tx.fieldVisitRequestActivity.create({
         data: {
@@ -886,9 +982,8 @@ export class FieldVisitRequestsService {
   ) {
     const request = await this.loadForDecision(companyId, id);
 
-    const mine = request.raisedById === employeeId;
-    if (!mine && !this.isApprover(role)) {
-      throw new ForbiddenException('Only the person who raised this, or an administrator, can cancel it');
+    if (!this.isApprover(role)) {
+      throw new ForbiddenException('Only an administrator can cancel a field visit request');
     }
     const finished: string[] = [
       FIELD_VISIT_STATUS.CANCELLED, FIELD_VISIT_STATUS.REJECTED, FIELD_VISIT_STATUS.COMPLETED,
@@ -940,6 +1035,169 @@ export class FieldVisitRequestsService {
       );
     }
     return cancelled;
+  }
+
+  async complete(
+    companyId: number, employeeId: number | null, role: string, id: number,
+  ) {
+    const request = await this.loadForDecision(companyId, id);
+    if (!this.isApprover(role)) {
+      throw new ForbiddenException('Only an administrator can mark a field visit as completed');
+    }
+    if (request.status !== FIELD_VISIT_STATUS.APPROVED) {
+      throw new BadRequestException(`Only an approved trip can be completed; this request is ${this.spoken(request.status)}`);
+    }
+
+    const completed = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.fieldVisitRequest.update({
+        where: { id },
+        data: { status: FIELD_VISIT_STATUS.COMPLETED },
+        select: this.SELECT,
+      });
+
+      // Update remaining unclocked scheduled days to completed
+      await tx.fieldVisitAttendance.updateMany({
+        where: { requestId: id, status: FIELD_VISIT_DAY.SCHEDULED },
+        data: { status: FIELD_VISIT_DAY.COMPLETED },
+      });
+
+      await tx.fieldVisitRequestActivity.create({
+        data: {
+          requestId: id,
+          action: 'COMPLETED',
+          detail: 'Marked as completed',
+          oldValue: request.status,
+          newValue: FIELD_VISIT_STATUS.COMPLETED,
+          actorId: employeeId as number,
+        },
+      });
+
+      return updated;
+    });
+
+    return completed;
+  }
+
+  async changeStatus(
+    companyId: number, employeeId: number | null, role: string,
+    id: number, targetStatus: string, reason?: string,
+    opts: { overrideDayOff?: boolean } = {},
+  ) {
+    const request = await this.loadForDecision(companyId, id);
+    if (request.status === targetStatus) {
+      return request;
+    }
+
+    if (targetStatus === FIELD_VISIT_STATUS.APPROVED) {
+      if (request.status === FIELD_VISIT_STATUS.PENDING) {
+        return this.approve(companyId, employeeId, role, id, opts);
+      }
+      if (request.status === FIELD_VISIT_STATUS.DRAFT) {
+        await this.submit(companyId, employeeId, role, id);
+        return this.approve(companyId, employeeId, role, id, opts);
+      }
+      if (this.isApprover(role)) {
+        return this.commitApproval(companyId, request, employeeId, 'Approved by administrator. ', opts);
+      }
+    }
+
+    if (targetStatus === FIELD_VISIT_STATUS.REJECTED) {
+      if (request.status === FIELD_VISIT_STATUS.PENDING) {
+        return this.reject(companyId, employeeId, role, id, reason || 'Rejected');
+      }
+      if (this.isApprover(role)) {
+        return this.prisma.$transaction(async (tx) => {
+          if (request.status === FIELD_VISIT_STATUS.APPROVED) {
+            await this.activation.deactivate(tx, request as any, employeeId);
+          }
+          const updated = await tx.fieldVisitRequest.update({
+            where: { id },
+            data: { status: FIELD_VISIT_STATUS.REJECTED, rejectionReason: reason || 'Rejected' },
+            select: this.SELECT,
+          });
+          await tx.fieldVisitRequestActivity.create({
+            data: {
+              requestId: id, action: 'REJECTED', detail: reason || 'Rejected',
+              oldValue: request.status, newValue: FIELD_VISIT_STATUS.REJECTED,
+              actorId: employeeId as number,
+            },
+          });
+          return updated;
+        });
+      }
+    }
+
+    if (targetStatus === FIELD_VISIT_STATUS.CANCELLED) {
+      return this.cancel(companyId, employeeId, role, id, reason);
+    }
+
+    if (targetStatus === FIELD_VISIT_STATUS.COMPLETED) {
+      if (request.status === FIELD_VISIT_STATUS.APPROVED) {
+        return this.complete(companyId, employeeId, role, id);
+      }
+      if (this.isApprover(role)) {
+        if (request.status !== FIELD_VISIT_STATUS.APPROVED) {
+          await this.commitApproval(companyId, request, employeeId, 'Approved and marked completed. ');
+        }
+        return this.complete(companyId, employeeId, role, id);
+      }
+    }
+
+    if (targetStatus === FIELD_VISIT_STATUS.PENDING) {
+      if (request.status === FIELD_VISIT_STATUS.DRAFT) {
+        return this.submit(companyId, employeeId, role, id);
+      }
+      if (this.isApprover(role)) {
+        return this.prisma.$transaction(async (tx) => {
+          if (request.status === FIELD_VISIT_STATUS.APPROVED) {
+            await this.activation.deactivate(tx, request as any, employeeId);
+          }
+          const updated = await tx.fieldVisitRequest.update({
+            where: { id },
+            data: { status: FIELD_VISIT_STATUS.PENDING, rejectionReason: null },
+            select: this.SELECT,
+          });
+          await tx.fieldVisitRequestActivity.create({
+            data: {
+              requestId: id, action: 'STATUS_CHANGED', detail: 'Reopened to Pending Approval',
+              oldValue: request.status, newValue: FIELD_VISIT_STATUS.PENDING,
+              actorId: employeeId as number,
+            },
+          });
+          return updated;
+        });
+      }
+    }
+
+    if (targetStatus === FIELD_VISIT_STATUS.DRAFT) {
+      return this.withdraw(companyId, employeeId, role, id);
+    }
+
+    throw new BadRequestException(`Cannot change status from ${request.status} to ${targetStatus}`);
+  }
+
+  async bulkChangeStatus(
+    companyId: number, employeeId: number | null, role: string,
+    ids: number[], targetStatus: string, reason?: string,
+    opts: { overrideDayOff?: boolean } = {},
+  ) {
+    const results: Array<{ id: number; success: boolean; error?: string; code?: string }> = [];
+    for (const id of ids) {
+      try {
+        await this.changeStatus(companyId, employeeId, role, id, targetStatus, reason, opts);
+        results.push({ id, success: true });
+      } catch (err: any) {
+        // The code travels with the message so the list can offer the same
+        // "approve over the days off" choice the detail page does.
+        const body = typeof err?.getResponse === 'function' ? err.getResponse() : null;
+        results.push({
+          id, success: false,
+          error: (typeof body === 'object' && body?.message) || err?.message || 'Failed',
+          code: typeof body === 'object' ? body?.code : undefined,
+        });
+      }
+    }
+    return results;
   }
 
   private spoken(status: string): string {

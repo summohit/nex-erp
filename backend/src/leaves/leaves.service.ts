@@ -1,3 +1,4 @@
+import { isBranchWeeklyOff } from '../common/weekly-offs';
 import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -954,29 +955,27 @@ export class LeavesService {
     return updated;
   }
 
+  /**
+   * Working days between two dates, inclusive, for this branch.
+   *
+   * Weekly offs go through the same rule attendance and the roster use, so
+   * "6:even" means only the 2nd and 4th Saturdays — not every Saturday, which
+   * is how a leave on a working 1st Saturday came out as zero days. Days are
+   * walked by calendar date in UTC, the way leave dates and holidays are
+   * stored, so the server's own timezone cannot shift a day.
+   */
   private calculateWorkingDays(start: Date, end: Date, weeklyOffsStr: string, isHalfDay: boolean, holidayDates?: Set<string>): number {
-    const offDays = new Set<number>();
-    if (weeklyOffsStr) {
-      weeklyOffsStr.split(',').forEach(p => {
-        const parts = p.trim().split(':');
-        if (parts[0]) offDays.add(parseInt(parts[0], 10));
-      });
-    } else {
-      offDays.add(0); // Default to Sunday
-    }
+    const dayOf = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    const current = dayOf(start);
+    const last = dayOf(end);
 
     let count = 0;
-    const current = new Date(start);
-    current.setHours(0,0,0,0);
-    const last = new Date(end);
-    last.setHours(0,0,0,0);
-
     while (current <= last) {
       const dateStr = current.toISOString().split('T')[0];
-      if (!offDays.has(current.getDay()) && !(holidayDates && holidayDates.has(dateStr))) {
+      if (!isBranchWeeklyOff(current, weeklyOffsStr) && !(holidayDates && holidayDates.has(dateStr))) {
         count++;
       }
-      current.setDate(current.getDate() + 1);
+      current.setUTCDate(current.getUTCDate() + 1);
     }
 
     return isHalfDay ? (count > 0 ? 0.5 : 0) : count;

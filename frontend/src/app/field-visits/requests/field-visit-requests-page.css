@@ -694,3 +694,337 @@
 }
 .fvr-table th, .fvr-table td { padding-left: 12px; padding-right: 12px; }
 .fvr-table .status-pill { white-space: nowrap; }
+
+/* ── Selection Column & Checkboxes ───────────────────────────────────────── */
+.select-col {
+  width: 36px;
+  text-align: center;
+  padding-left: 14px !important;
+  padding-right: 6px !important;
+}
+
+.row-checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid #cbd5e1;
+  cursor: pointer;
+  accent-color: #4f46e5;
+  vertical-align: middle;
+}
+
+.clickable-row.row-selected {
+  background-color: #f5f3ff !important;
+}
+
+/* ── Past Visit Tag ──────────────────────────────────────────────────────── */
+.past-visit-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-left: 4px;
+}
+
+.past-visit-tag.past-overdue {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+/* ── Status Dropdown Menu ────────────────────────────────────────────────── */
+.status-cell {
+  position: relative;
+}
+
+.status-dropdown-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.status-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.status-dropdown-btn:hover:not(:disabled) {
+  filter: brightness(0.96);
+  transform: translateY(-0.5px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.status-chevron {
+  color: inherit;
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+}
+
+.status-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+.status-menu-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 170px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  z-index: 100;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: popoverFadeIn 0.15s ease-out;
+}
+
+@keyframes popoverFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.status-menu-header {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  padding: 4px 8px 6px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 2px;
+}
+
+.status-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.12s ease;
+}
+
+.status-menu-item:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.status-menu-item.selected {
+  background: #f1f5f9;
+  font-weight: 700;
+}
+
+.status-menu-item .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.status-menu-item .status-item-label {
+  flex: 1;
+}
+
+.status-menu-item .item-check-icon {
+  color: #4f46e5;
+}
+
+/* ── Floating Bulk Actions Bar ───────────────────────────────────────────── */
+.bulk-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: #1e1b4b;
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  box-shadow: 0 10px 25px -5px rgba(30, 27, 75, 0.35), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  animation: slideDownBulk 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDownBulk {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.bulk-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bulk-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #4f46e5;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bulk-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e0e7ff;
+}
+
+.bulk-past-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.bulk-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-bulk-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-bulk-action:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.btn-bulk-approve {
+  background: #16a34a;
+  color: #ffffff;
+}
+.btn-bulk-approve:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.btn-bulk-complete {
+  background: #4f46e5;
+  color: #ffffff;
+}
+.btn-bulk-complete:hover:not(:disabled) {
+  background: #4338ca;
+}
+
+.btn-bulk-reject {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.btn-bulk-reject:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ffffff;
+}
+
+.btn-bulk-cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.btn-bulk-cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.bulk-status-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.bulk-status-select-wrap select {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 6px 26px 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.bulk-status-select-wrap select:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.bulk-status-select-wrap select option {
+  background: #1e1b4b;
+  color: #ffffff;
+}
+
+.bulk-status-select-wrap .select-chevron {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+  color: #cbd5e1;
+}
+
+.btn-bulk-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: #a5b4fc;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: color 0.12s ease;
+}
+
+.btn-bulk-clear:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+

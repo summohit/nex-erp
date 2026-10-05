@@ -66,6 +66,7 @@
       </span>
       <span class="legend-chip chip-neutral">Day Off</span>
       <span class="legend-chip chip-leave-legend">On Leave</span>
+      <span class="legend-chip chip-field-visit-legend">📍 Field Visit</span>
       <span class="legend-chip chip-pending-legend" *ngIf="pendingOnsite().length > 0">⏳ On-site — pending approval</span>
       <span class="legend-note">Faded cells are the employee's standing shift, not a rostered one.</span>
     </div>
@@ -145,11 +146,15 @@
               <ng-container *ngIf="!holidayOn(cell.date) || cell.type === 'LEAVE'">
               <div *ngIf="cell.type === 'SHIFT'" class="chip chip-shift"
                    [class.is-default]="cell.isDefault"
-                   [style.background]="cell.shift?.colorCode || '#2A97D8'">
-                <span class="chip-name">{{ cellLabel(cell) }}</span>
+                   [class.is-field-visit]="cell.isFieldVisit"
+                   [style.background]="cell.isFieldVisit ? '#4f46e5' : (cell.shift?.colorCode || '#2A97D8')">
+                <span class="chip-name">
+                  <span *ngIf="cell.isFieldVisit" class="fv-tag">📍</span>
+                  {{ cellLabel(cell) }}
+                </span>
                 <span class="chip-time">{{ cellTime(cell) }}</span>
-                <span *ngIf="cell.onSite" class="chip-onsite" [class.pending]="cell.onSite.approvalStatus === 'PENDING'">
-                  {{ cell.onSite.projectName || 'On-site' }}<span *ngIf="cell.onSite.approvalStatus === 'PENDING'"> · pending</span>
+                <span *ngIf="cell.onSite" class="chip-onsite" [class.fv-onsite]="cell.isFieldVisit" [class.pending]="cell.onSite.approvalStatus === 'PENDING'">
+                  {{ cell.onSite.projectName || (cell.isFieldVisit ? (cell.note || 'On-site') : 'On-site') }}<span *ngIf="cell.onSite.approvalStatus === 'PENDING'"> · pending</span>
                 </span>
               </div>
 

@@ -66,6 +66,7 @@ export interface DayStatus {
 }
 
 import { OutsideOfficeAnswer, OutsideOfficeService } from '../shared/services/outside-office.service';
+import { GeolocationService } from '../shared/services/geolocation.service';
 import { isWeeklyOff } from '../shared/utils/weekly-offs';
 @Component({
   selector: 'app-attendance-leave',
@@ -119,6 +120,7 @@ export class AttendanceLeaveComponent implements OnInit {
   public authService = inject(AuthService);
   private toast = inject(HotToastService);
   private outsideOffice = inject(OutsideOfficeService);
+  private geo = inject(GeolocationService);
   private datePipe = inject(DatePipe);
 
   shiftRosterVisible = signal<boolean>(false);
@@ -720,7 +722,13 @@ export class AttendanceLeaveComponent implements OnInit {
 
       let badge = '';
       let badgeType: 'success' | 'warning' | 'danger' | 'info' | 'neutral' = 'neutral';
-      if (remaining > 0) {
+      // Unpaid leave does not run out: it is time off without pay, approved
+      // like any other request. Its "balance" is not a limit, so it is not
+      // shown as one.
+      if (!type.isPaid) {
+        badge = 'No limit';
+        badgeType = 'info';
+      } else if (remaining > 0) {
         badge = `${remaining} ${remaining === 1 ? 'day' : 'days'} left`;
         badgeType = 'success';
       } else if (remaining === 0) {
@@ -732,7 +740,7 @@ export class AttendanceLeaveComponent implements OnInit {
       }
 
       const subParts: string[] = [];
-      subParts.push(`${used} used / ${allocated} total`);
+      subParts.push(type.isPaid ? `${used} used / ${allocated} total` : `${used} used this year · deducted from pay`);
       if (type.allowHalfDay !== false) {
         subParts.push('Half-day ok');
       }
@@ -1354,7 +1362,11 @@ export class AttendanceLeaveComponent implements OnInit {
       ? (this.targetEmployeeBalances() || []) 
       : this.myBalances();
     const balance = currentBalances.find(b => b.leaveType.id === Number(this.requestForm.leaveTypeId));
-    if (balance) {
+    // Unpaid leave (Loss of Pay) has no limit, for everyone: it still needs
+    // approval and is deducted from pay, but a balance cannot refuse it.
+    const leaveType = this.leaveTypes().find((t: any) => t.id === Number(this.requestForm.leaveTypeId));
+    const isUnpaid = leaveType?.isPaid === false || balance?.leaveType?.isPaid === false;
+    if (balance && !isUnpaid) {
       const available = balance.allocated - balance.used;
       if (requestedDays > available) {
         this.toast.error(`Insufficient balance. ${isBehalf ? 'This employee has' : 'You have'} only ${available} days available, but requested ${requestedDays} ${requestedDays === 1 ? 'day' : 'days'}.`);
@@ -2238,27 +2250,14 @@ export class AttendanceLeaveComponent implements OnInit {
         const log = logs.find(l => this.getBackendDateString(l.date) === dateString);
 
         if (log && log.clockIn) {
-          // Check for Late or Half day (simplistic logic)
           const clockInDate = new Date(log.clockIn);
-          const clockInHour = clockInDate.getHours();
-          const clockInMin = clockInDate.getMinutes();
 
-          // 10:15 AM logic (15m buffer)
-          let isLate = false;
-          if (clockInHour > 10 || (clockInHour === 10 && clockInMin > 15)) {
-            isLate = true;
-          }
-
-          let isHalfDay = false;
-          if (log.clockOut) {
-            const outDate = new Date(log.clockOut);
-            const durationMs = outDate.getTime() - clockInDate.getTime();
-            const hours = durationMs / (1000 * 60 * 60);
-            if (hours < 5) isHalfDay = true; // Less than 5 hours is half day
-          } else {
-             // If they haven't clocked out yet and it's not today, treat as half day or something? Let's leave as is for now.
-             // If it's today and they are clocked in, they might just be working right now.
-          }
+          // The server's verdict, as the admin view shows it. It measured the
+          // day against the right shift or field visit, and an admin may have
+          // corrected it since — recomputing here from fixed hours disagreed
+          // with both.
+          const isHalfDay = log.status === 'HALF_DAY';
+          const isLate = !!log.isLate;
 
           // A holiday worked is recorded, never late or a half day (B1).
           if (holiday) status = 'Present';
@@ -2557,18 +2556,11 @@ export class AttendanceLeaveComponent implements OnInit {
     const attendance = this.todayAttendance();
     const action = (!attendance || !attendance.clockIn) ? 'clockIn' : 'clockOut';
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          this.executeClockAction(action, position.coords.latitude, position.coords.longitude);
-        },
-        // No location: the server decides — an office (General Shift) day
-        // answers with the reason box, any other shift clocks as normal.
-        () => this.executeClockAction(action),
-      );
-    } else {
-      this.executeClockAction(action);
-    }
+    // Bounded, retried and explained — see GeolocationService. Continuing
+    // without a location is still possible, and then the server decides: an
+    // office (General Shift) day answers with the reason box, any other shift
+    // clocks as normal.
+    void this.geo.locateForClock().then(({ lat, lng }) => this.executeClockAction(action, lat, lng));
   }
 
   private executeClockAction(

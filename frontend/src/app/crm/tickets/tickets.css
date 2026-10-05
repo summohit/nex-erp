@@ -938,23 +938,23 @@
 
 ::ng-deep .priority-critical,
 .priority-critical {
-  background: #eff6ff;
-  color: #0f4f9c;
-  border: 1px solid #dbeafe;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
 ::ng-deep .priority-high,
 .priority-high {
-  background: #eff6ff;
-  color: #0f4f9c;
-  border: 1px solid #dbeafe;
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
 }
 
 ::ng-deep .priority-medium,
 .priority-medium {
-  background: #f3efff;
-  color: #4f2aa7;
-  border: 1px solid #f3efff;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
 }
 
 ::ng-deep .priority-low,
@@ -1002,12 +1002,12 @@
 
 ::ng-deep .status-in-progress,
 .status-in-progress {
-  background: #f3efff;
-  color: #4f2aa7;
-  border: 1px solid #e0d7ff;
+  background: #f5f3ff;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
 }
 ::ng-deep .status-in-progress .status-indicator-dot,
-.status-in-progress .status-indicator-dot { background: #6b3fd6; }
+.status-in-progress .status-indicator-dot { background: #8b5cf6; }
 
 ::ng-deep .status-resolved,
 .status-resolved {
@@ -1029,17 +1029,27 @@
 
 ::ng-deep .status-rejected,
 .status-rejected {
-  background: #eff6ff;
-  color: #0f4f9c;
-  border: 1px solid #dbeafe;
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
 }
 ::ng-deep .status-rejected .status-indicator-dot,
-.status-rejected .status-indicator-dot { background: #1373e5; }
+.status-rejected .status-indicator-dot { background: #e11d48; }
 
 ::ng-deep .user-cell {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+::ng-deep .user-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 ::ng-deep .avatar-img {
@@ -1080,12 +1090,25 @@
 }
 
 ::ng-deep .user-name-text {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   color: #1e293b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+::ng-deep .user-sub-text {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  margin-top: 1px;
 }
 
 ::ng-deep .unassigned .user-name-text {
@@ -1097,12 +1120,12 @@
 ::ng-deep .btn-grid-action {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  color: #475569;
-  border-radius: 5px;
+  gap: 5px;
+  padding: 5px 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  border-radius: 6px;
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
@@ -1110,9 +1133,10 @@
 }
 
 ::ng-deep .btn-grid-action:hover {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: #2563eb;
+  border-color: #2563eb;
   color: #ffffff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2);
 }
 
 /* AG-Grid Custom Theming */
@@ -1120,7 +1144,7 @@
   --ag-font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --ag-font-size: 12.5px;
   --ag-header-background-color: #f8fafc;
-  --ag-header-foreground-color: #64748b;
+  --ag-header-foreground-color: #475569;
   --ag-border-color: #f1f5f9;
   --ag-row-hover-color: #f8faff;
   --ag-selected-row-background-color: #eff6ff;
@@ -1128,11 +1152,16 @@
   --ag-grid-size: 4px;
 }
 
+::ng-deep .ag-theme-quartz .ag-header {
+  border-bottom: 1.5px solid #e2e8f0 !important;
+  background-color: #f8fafc !important;
+}
+
 ::ng-deep .ag-theme-quartz .ag-header-cell-label {
   font-weight: 700;
   font-size: 10.5px;
   letter-spacing: 0.5px;
-  color: #64748b;
+  color: #475569;
   text-transform: uppercase;
 }
 
@@ -1141,6 +1170,17 @@
   align-items: center;
   padding-left: 10px;
   padding-right: 10px;
+}
+
+::ng-deep .ag-theme-quartz .ag-pinned-right-header,
+::ng-deep .ag-theme-quartz .ag-pinned-right-cols-container {
+  border-left: 1px solid #e2e8f0 !important;
+  box-shadow: -3px 0 8px rgba(15, 23, 42, 0.04) !important;
+  z-index: 2 !important;
+}
+
+::ng-deep .ag-theme-quartz .ag-pinned-right-cols-container .ag-cell {
+  background-color: var(--ag-background-color, #ffffff) !important;
 }
 
 ::ng-deep .ag-theme-quartz .ag-row {
@@ -2352,6 +2392,16 @@ label {
   background: #f8fafc;
 }
 
+/* Rejected KPI card */
+.stat-rose .stat-icon-wrapper {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+.stat-rose.active-card {
+  border-color: #f43f5e;
+  background: #fff1f2;
+}
+
 /* ═══════════════════════════════════════════
    STATUS ROW HIGHLIGHTING
    AG Grid renders its own DOM, so these must pierce encapsulation.
@@ -2385,8 +2435,8 @@ label {
 }
 
 .table-container ::ng-deep .ag-row.row-status-rejected {
-  border-left-color: #1373e5;
-  background-color: #eff6ff;
+  border-left-color: #f43f5e;
+  background-color: #fff9fa;
 }
 
 /* Hover must still win over the status tint. */

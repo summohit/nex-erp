@@ -50,10 +50,11 @@ ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
 declare var Quill: any;
 
 import { TaskTransferComponent } from '../../shared/components/task-transfer/task-transfer';
+import { JiraDatePickerComponent } from '../../shared/components/jira-date-picker';
 @Component({
   selector: 'app-project-detail',
   standalone: true,
-  imports: [TaskTransferComponent, RouterLink, 
+  imports: [TaskTransferComponent, JiraDatePickerComponent, RouterLink, 
     CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
     TicketsTabComponent, BudgetRequestsTabComponent, DiscussionsTabComponent,
     TaskHoursRequestPanelComponent,
@@ -692,6 +693,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     { value: 'IN_REVIEW', label: 'In Review', color: '#9333ea' },
     { value: 'DONE', label: 'Completed', color: '#16a34a' },
     { value: 'ARCHIVED', label: 'Archived', color: '#94a3b8' },
+    { value: 'AWAITING_APPROVAL', label: 'Awaiting Approval', color: '#f59e0b' },
+    { value: 'REJECTED', label: 'Needs Changes (Rejected)', color: '#e11d48' },
   ];
 
   filteredListIssues = computed(() => {
@@ -731,9 +734,16 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       if (statuses.includes('ARCHIVED')) {
         issues = issues.concat(this.archivedIssues());
       }
-      issues = issues.filter(i =>
-        i.isArchived ? statuses.includes('ARCHIVED') : statuses.includes(i.status),
-      );
+      issues = issues.filter(i => {
+        if (statuses.includes('AWAITING_APPROVAL') && this.isAwaitingApproval(i)) {
+          return true;
+        }
+        if (statuses.includes('REJECTED') && this.isRejectedApproval(i)) {
+          return true;
+        }
+        if (i.isArchived) return statuses.includes('ARCHIVED');
+        return statuses.includes(i.status);
+      });
     }
 
     if (this.listFilterPriorities().length > 0) {
@@ -1279,7 +1289,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         const current = this.selectedIssue();
         this.selectedIssue.set({ ...current, ...payload });
       },
-      error: () => this.toast.error('Failed to update issue')
+      error: (err) => this.toast.error(err?.error?.message || 'Failed to update issue')
     });
   }
 
@@ -1385,26 +1395,172 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       .filter((o) => o.id && !seen.has(o.id) && seen.add(o.id));
   });
 
+  getDefaultProjectPmId(): number | null {
+    const pmFromOptions = this.smeOptions().find(o => o.role === 'PM');
+    if (pmFromOptions?.id) return pmFromOptions.id;
+
+    const pms = this.projectManagers();
+    if (pms.length > 0) {
+      const pmId = pms[0].employee?.id ?? pms[0].employeeId;
+      if (pmId) return pmId;
+    }
+
+    const p = this.project();
+    if (p?.leadId) {
+      const leadOpt = this.smeOptions().find(o => o.id === p.leadId);
+      if (leadOpt) return leadOpt.id;
+    }
+
+    if (this.smeOptions().length > 0) {
+      return this.smeOptions()[0].id;
+    }
+
+    return null;
+  }
+
+  showValidationErrors = signal<boolean>(false);
+
+  isFieldInvalid(field: 'title' | 'members' | 'startDate' | 'dueDate' | 'prerequisites' | 'smeId' | 'estimatedHours' | 'description'): boolean {
+    switch (field) {
+      case 'title':
+        return !this.issueForm.title || !this.issueForm.title.trim();
+      case 'members':
+        return this.draftMembers().length === 0;
+      case 'startDate':
+        return !this.issueForm.startDate;
+      case 'dueDate':
+        if (!this.issueForm.dueDate) return true;
+        if (this.issueForm.startDate && new Date(this.issueForm.dueDate) < new Date(this.issueForm.startDate)) return true;
+        return false;
+      case 'prerequisites':
+        return !this.issueForm.prerequisites || !this.issueForm.prerequisites.trim();
+      case 'smeId':
+        return !this.issueForm.smeId;
+      case 'estimatedHours':
+        return this.issueForm.estimatedHours === null || this.issueForm.estimatedHours === undefined || Number(this.issueForm.estimatedHours) <= 0;
+      case 'description': {
+        const text = this.getDescriptionPlainText();
+        return !text;
+      }
+      default:
+        return false;
+    }
+  }
+
+  getDescriptionPlainText(): string {
+    if (this.quillInstance) {
+      const html = this.quillInstance.root.innerHTML;
+      this.issueForm.description = (html === '<p><br></p>') ? '' : html;
+    }
+    return this.issueForm.description
+      ? this.issueForm.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+      : '';
+  }
+
+  getDueDateErrorMessage(): string {
+    if (!this.issueForm.dueDate) return 'Due date is required';
+    if (this.issueForm.startDate && new Date(this.issueForm.dueDate) < new Date(this.issueForm.startDate)) {
+      return 'Due date cannot be before start date';
+    }
+    return 'Due date is required';
+  }
+
+  scrollToField(fieldId: string) {
+    setTimeout(() => {
+      const el = document.getElementById(fieldId);
+      if (!el) return;
+
+      // 1. Smooth scroll element into view within the modal body
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+
+      // 2. Direct scroll adjustment on .trello-modal-body to guarantee scroll
+      const modalBody = document.querySelector('.trello-modal-body');
+      if (modalBody) {
+        const bodyRect = modalBody.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const relativeTop = elRect.top - bodyRect.top + modalBody.scrollTop;
+        const targetScroll = Math.max(0, relativeTop - (bodyRect.height / 3));
+        modalBody.scrollTo({ top: targetScroll, behavior: 'smooth' });
+      }
+
+      // 3. Trigger attention pulse animation
+      el.classList.remove('field-attention-pulse');
+      void el.offsetWidth; // trigger reflow
+      el.classList.add('field-attention-pulse');
+
+      // 4. Focus target input or editor
+      if (fieldId === 'task-field-description') {
+        if (this.quillInstance) {
+          this.quillInstance.focus();
+        } else {
+          this.startDescriptionEdit();
+          setTimeout(() => this.quillInstance?.focus(), 150);
+        }
+      } else {
+        const focusable = el.matches('input:not([type="checkbox"]), textarea, select')
+          ? (el as HTMLElement)
+          : el.querySelector<HTMLElement>('input:not([type="checkbox"]), textarea, select, .jira-date-picker-trigger, button');
+        if (focusable) {
+          setTimeout(() => focusable.focus(), 250);
+        }
+      }
+    }, 60);
+  }
+
+  saveTitle() {
+    const issue = this.selectedIssue();
+    if (!issue) return;
+    const title = (this.issueForm.title || '').trim();
+    if (!title) {
+      this.toast.error('Card title is required');
+      this.issueForm.title = issue.title;
+      return;
+    }
+    if (title === issue.title) return;
+    this.issueForm.title = title;
+    this.updateIssueDetails({ title });
+  }
+
   savePrerequisites() {
+    if (!this.selectedIssue()) return;
     const v = String(this.issueForm.prerequisites ?? '').trim();
+    if (!v) {
+      this.toast.error('Pre-Requisite is required');
+      this.issueForm.prerequisites = this.selectedIssue()?.prerequisites || '';
+      return;
+    }
     if (v === String(this.selectedIssue()?.prerequisites ?? '').trim()) return;
     this.updateIssueDetails({ prerequisites: v });
   }
 
   saveSme() {
-    this.updateIssueDetails({ smeId: this.issueForm.smeId ? Number(this.issueForm.smeId) : null });
+    if (!this.selectedIssue()) return;
+    if (!this.issueForm.smeId) {
+      this.toast.error('SME / Govern is required');
+      this.issueForm.smeId = this.selectedIssue()?.smeId || null;
+      return;
+    }
+    this.updateIssueDetails({ smeId: Number(this.issueForm.smeId) });
   }
 
   updateEstimatedHours() {
+    if (!this.selectedIssue()) return;
     const val = this.issueForm.estimatedHours !== null && this.issueForm.estimatedHours !== undefined 
       ? Number(this.issueForm.estimatedHours) 
       : 0;
+    if (val <= 0) {
+      this.toast.error('Estimated Hours (Time Tracking) is required and must be greater than 0');
+      this.issueForm.estimatedHours = this.selectedIssue()?.estimatedHours || null;
+      return;
+    }
     this.updateIssueDetails({ estimatedHours: val });
   }
 
   setEstimatePreset(hours: number) {
     this.issueForm.estimatedHours = hours;
-    this.updateIssueDetails({ estimatedHours: hours });
+    if (this.selectedIssue()) {
+      this.updateIssueDetails({ estimatedHours: hours });
+    }
   }
 
   setTimeLogPreset(hours: number, minutes: number) {
@@ -1796,6 +1952,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     milestoneId?: number | null;
     prerequisites?: string;
     smeId?: number | null;
+    startDate?: string | null;
+    dueDate?: string | null;
   } = {
     title: '',
     description: '',
@@ -1805,7 +1963,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     completed: false,
     estimatedHours: null as number | null,
     phaseId: null as number | null,
-    milestoneId: null as number | null
+    milestoneId: null as number | null,
+    startDate: null as string | null,
+    dueDate: null as string | null
   };
   commentText = '';
   
@@ -2974,35 +3134,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   submitInlineCard(columnId: number) {
     const title = this.inlineCardTitle().trim();
-    if (!title) return;
+    const hours = this.inlineCardHours();
+    const phaseId = this.inlineCardPhaseId();
 
-    const payload = {
-      title,
-      columnId,
-      type: 'TASK',
-      priority: 'MEDIUM',
-      // §3: the hours the card is assigned, asked for right here. Without it
-      // every card added from the board is unestimated, and an unestimated
-      // task is unbounded -- so the ceiling would never apply to it.
-      estimatedHours: this.inlineCardHours() != null && this.inlineCardHours() !== ''
-        ? Number(this.inlineCardHours())
-        : null,
-      // §8: the delivery phase, chosen right here so a card added from the
-      // board is not stranded without one.
-      phaseId: this.inlineCardPhaseId() ?? null,
-    };
-
-    this.projectsService.createIssue(this.projectId, payload).subscribe({
-      next: () => {
-        this.toast.success('Card added');
-        this.cancelInlineAdd();
-        this.loadBoardAndIssues();
-      },
-      // Report what the server said: a card refused for want of a phase, or
-      // for hours past the ceiling, is a sentence the user can act on, where
-      // "Failed to add card" is a dead end.
-      error: (err) => this.toast.error(err?.error?.message || 'Failed to add card')
-    });
+    this.cancelInlineAdd();
+    this.openCreateIssue(columnId, title, hours, phaseId);
+    this.toast.info('Please complete all required fields to create the task');
   }
 
   comments = signal<any[]>([]);
@@ -3018,24 +3155,31 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   isEditingDescription = signal(false);
 
-  openCreateIssue(columnId?: number) {
+  openCreateIssue(columnId?: number, initialTitle?: string, initialHours?: any, initialPhaseId?: number | null) {
     this.selectedIssue.set(null);
     this.draftMembers.set([]);
     this.loadingMemberIds.set(new Set());
     this.comments.set([]);
     this.checklists.set([]);
     this.isEditingDescription.set(true);
-    const defaultPhaseId = this.allPhases().length > 0 ? this.allPhases()[0].id : null;
+    this.showValidationErrors.set(false);
+    const defaultPhaseId = initialPhaseId !== undefined ? initialPhaseId : (this.allPhases().length > 0 ? this.allPhases()[0].id : null);
+    const defaultSmeId = this.getDefaultProjectPmId();
+    const parsedHours = (initialHours !== null && initialHours !== undefined && initialHours !== '') ? Number(initialHours) : null;
     this.issueForm = {
-      title: '',
+      title: initialTitle || '',
       description: '',
       type: 'TASK',
       priority: 'MEDIUM',
       columnId: columnId || (this.columns().length > 0 ? this.columns()[0].id : null),
       completed: false,
-      estimatedHours: null,
+      estimatedHours: parsedHours,
       phaseId: defaultPhaseId,
-      milestoneId: null
+      milestoneId: null,
+      prerequisites: '',
+      smeId: defaultSmeId,
+      startDate: null,
+      dueDate: null
     };
     this.isDrawerOpen.set(true);
     setTimeout(() => this.initQuill(), 100);
@@ -3550,6 +3694,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       milestoneId: issue.milestoneId ?? null,
       prerequisites: issue.prerequisites ?? '',
       smeId: issue.smeId ?? null,
+      startDate: issue.startDate ?? null,
+      dueDate: issue.dueDate ?? null,
     };
     this.isDrawerOpen.set(true);
     this.loadFeedItems(issue.id);
@@ -3590,6 +3736,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.draftMembers.set([]);
     this.loadingMemberIds.set(new Set());
     this.isEditingDescription.set(false);
+    this.showValidationErrors.set(false);
     this.quillInstance = null;
     this.closePopover();
   }
@@ -3986,20 +4133,56 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return `<span style="font-size:13px;font-weight:600;color:${color};">${value}h</span>`;
   }
 
+  listGridRowClassRules = {
+    'row-awaiting-approval': (params: any) => this.isAwaitingApproval(params.data),
+    'row-rejected-approval': (params: any) => this.isRejectedApproval(params.data),
+  };
+
+  listGridGetRowStyle = (params: any) => {
+    if (this.isAwaitingApproval(params.data)) {
+      return { 'background-color': '#fef3c7' };
+    }
+    if (this.isRejectedApproval(params.data)) {
+      return { 'background-color': '#fff1f2' };
+    }
+    return undefined;
+  };
+
   listGridColDefs: ColDef[] = [
     { field: 'key', headerName: 'ID', width: 160, pinned: 'left' },
     { field: 'title', headerName: 'Task', minWidth: 200, flex: 1, filter: true },
     { 
       headerName: 'Status', 
-      width: 150,
-      // One column where there used to be two: a board list is a workflow
-      // step (each column carries its status), so "List" and "Status" said
-      // the same thing. Archived rows read as their own state.
+      // Wide enough for the badge plus the approval buttons beside it.
+      width: 260,
       valueGetter: (params: any) => {
         const i = params.data;
+        if (this.isAwaitingApproval(i)) return i.approvalState;
+        if (this.isRejectedApproval(i)) return 'REJECTED';
         return i?.isArchived ? 'ARCHIVED' : (i?.status || 'TODO');
       },
       cellRenderer: (params: any) => {
+        const i = params.data;
+        if (this.isAwaitingApproval(i)) {
+          const tip = this.approvalLabel(i) || 'Awaiting approval';
+          return `<span style="background-color: #ffffff; color: #b45309; border: 1px solid #fcd34d; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; line-height: 16px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; box-shadow: 0 1px 2px rgba(180,83,9,0.06);" title="${tip}">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background-color: #d97706; flex-shrink: 0;"></span>
+            Pending Approval
+          </span>${this.canDecideApproval(i) ? `
+          <span style="display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle;">
+            <button type="button" data-approval="REJECT" title="Reject this task"
+              style="border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; border-radius: 6px; padding: 1px 8px; font-size: 11px; font-weight: 600; line-height: 18px; cursor: pointer;">Reject</button>
+            <button type="button" data-approval="APPROVE" title="Approve this task"
+              style="border: 1px solid #bbf7d0; background: #f0fdf4; color: #15803d; border-radius: 6px; padding: 1px 8px; font-size: 11px; font-weight: 600; line-height: 18px; cursor: pointer;">Approve</button>
+          </span>` : ''}`;
+        }
+        if (this.isRejectedApproval(i)) {
+          const tip = i.approvalRejectionReason || 'Needs changes';
+          return `<span style="background-color: #ffffff; color: #be123c; border: 1px solid #fecdd3; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; line-height: 16px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; box-shadow: 0 1px 2px rgba(190,18,60,0.06);" title="${tip}">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background-color: #e11d48; flex-shrink: 0;"></span>
+            Needs Changes
+          </span>`;
+        }
         const val = params.value || 'TODO';
         let label = val.replace('_', ' ');
         let color = '#64748b'; let bg = '#f1f5f9';
@@ -4008,7 +4191,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         else if (val === 'IN_PROGRESS') { label = 'In Progress'; color = '#2563eb'; bg = '#dbeafe'; }
         else if (val === 'IN_REVIEW') { label = 'In Review'; color = '#9333ea'; bg = '#f3e8ff'; }
         else if (val === 'ARCHIVED') { label = 'Archived'; color = '#94a3b8'; bg = '#f1f5f9'; }
-        return `<span style="background-color: ${bg}; color: ${color}; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;">${label}</span>`;
+        return `<span style="background-color: ${bg}; color: ${color}; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; line-height: 16px; display: inline-block; white-space: nowrap;">${label}</span>`;
       }
     },
     { 
@@ -4035,15 +4218,17 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         const issue = params.data;
         if (!issue) return '';
         
+        // Each person once. The assignee is usually also a member, which used
+        // to put the same face in the cell twice.
         const allMembers: any[] = [];
-        if (issue.assignee) {
-          allMembers.push(issue.assignee);
-        }
-        if (issue.members && issue.members.length > 0) {
-          issue.members.forEach((m: any) => {
-            if (m.employee) allMembers.push(m.employee);
-          });
-        }
+        const seen = new Set<number>();
+        const add = (emp: any) => {
+          if (!emp || seen.has(emp.id)) return;
+          seen.add(emp.id);
+          allMembers.push(emp);
+        };
+        add(issue.assignee);
+        (issue.members || []).forEach((m: any) => add(m.employee));
         
         if (allMembers.length === 0) {
           return '<span style="color: #94a3b8; font-size: 12px;">Unassigned</span>';
@@ -4197,6 +4382,15 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     const url = hit?.getAttribute('data-att-url');
     if (url) {
       window.open(url, '_blank', 'noopener');
+      return;
+    }
+
+    // Approve / Reject beside a pending task's status — the same decision
+    // the board's card offers, without opening the task.
+    const decision = (event.event?.target as HTMLElement | undefined)
+      ?.closest?.('[data-approval]')?.getAttribute('data-approval');
+    if ((decision === 'APPROVE' || decision === 'REJECT') && event.data) {
+      if (this.canDecideApproval(event.data)) this.decideIssueApproval(event.data, decision);
       return;
     }
 
@@ -5574,20 +5768,205 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** "25 Sep – 27 Sep · 3 days", so the range reads back in words. */
+  get isRangeInvalid(): boolean {
+    const issue = this.selectedIssue();
+    const startStr = issue ? issue.startDate : this.issueForm.startDate;
+    const dueStr = issue ? issue.dueDate : this.issueForm.dueDate;
+    if (startStr && dueStr) {
+      const s = new Date(startStr);
+      const d = new Date(dueStr);
+      return !isNaN(s.getTime()) && !isNaN(d.getTime()) && s.getTime() > d.getTime();
+    }
+    return false;
+  }
+
+  /** "25 Sep – 27 Sep · 3 days", with relative deadline readout and range validation */
   get rangeSummary(): string {
-    const startObj = this.datesForm.enableStartDate ? this.parseDDMMYYYY(this.datesForm.startDateStr) : null;
-    const dueObj = this.datesForm.enableDueDate ? this.parseDDMMYYYY(this.datesForm.dueDateStr) : null;
+    const issue = this.selectedIssue();
+    const startStr = issue ? issue.startDate : this.issueForm.startDate;
+    const dueStr = issue ? issue.dueDate : this.issueForm.dueDate;
+    const startObj = startStr ? new Date(startStr) : null;
+    const dueObj = dueStr ? new Date(dueStr) : null;
     const short = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
-    if (startObj && dueObj) {
-      if (this.isSameDay(startObj, dueObj)) return `${short(startObj)} · 1 day`;
+    if (startObj && dueObj && !isNaN(startObj.getTime()) && !isNaN(dueObj.getTime())) {
+      if (startObj.getTime() > dueObj.getTime()) {
+        return 'End date must be on or after start date';
+      }
+      if (this.isSameDay(startObj, dueObj)) return `${short(startObj)} · Same day (1 day)`;
       const days = Math.round((dueObj.getTime() - startObj.getTime()) / 86400000) + 1;
-      return `${short(startObj)} – ${short(dueObj)} · ${days} days`;
+      return `${short(startObj)} – ${short(dueObj)} · ${days} ${days === 1 ? 'day' : 'days'}`;
     }
-    if (dueObj) return `Due ${short(dueObj)}`;
-    if (startObj) return `Starts ${short(startObj)}`;
-    return 'No dates set';
+    if (dueObj && !isNaN(dueObj.getTime())) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueNorm = new Date(dueObj);
+      dueNorm.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((dueNorm.getTime() - today.getTime()) / 86400000);
+      let relative = '';
+      if (diffDays === 0) relative = ' (Today)';
+      else if (diffDays === 1) relative = ' (Tomorrow)';
+      else if (diffDays === -1) relative = ' (Yesterday · Overdue)';
+      else if (diffDays < -1) relative = ` (${Math.abs(diffDays)}d overdue)`;
+      else if (diffDays > 1) relative = ` (in ${diffDays} days)`;
+      return `Due ${short(dueObj)}${relative}`;
+    }
+    if (startObj && !isNaN(startObj.getTime())) return `Starts ${short(startObj)}`;
+    return 'No dates scheduled';
+  }
+
+  updateIssueStartDate(dateStr: string | null) {
+    const issue = this.selectedIssue();
+    if (!issue) {
+      this.issueForm.startDate = dateStr;
+      // Auto-adjust dueDate if new startDate is after existing dueDate
+      if (dateStr && this.issueForm.dueDate) {
+        const sTime = new Date(dateStr).setHours(0, 0, 0, 0);
+        const dTime = new Date(this.issueForm.dueDate).setHours(0, 0, 0, 0);
+        if (sTime > dTime) {
+          this.issueForm.dueDate = dateStr;
+          this.toast.info('Due date adjusted to match start date');
+        }
+      }
+      return;
+    }
+
+    if (!dateStr) {
+      this.toast.error('Start date is required');
+      return;
+    }
+
+    const payload: any = { startDate: dateStr };
+    let adjustedDue = false;
+
+    // Validation: If setting a start date after the existing due date, adjust due date to match
+    if (dateStr && issue.dueDate) {
+      const sTime = new Date(dateStr).setHours(0, 0, 0, 0);
+      const dTime = new Date(issue.dueDate).setHours(0, 0, 0, 0);
+      if (sTime > dTime) {
+        payload.dueDate = dateStr;
+        adjustedDue = true;
+      }
+    }
+
+    // Save previous state for rollback
+    const prevStartDate = issue.startDate;
+    const prevDueDate = issue.dueDate;
+
+    // Optimistic in-memory update: instant UI response in 0ms
+    this.selectedIssue.update(i => i ? { ...i, ...payload } : null);
+    this.issueForm.startDate = payload.startDate;
+    if (payload.dueDate !== undefined) {
+      this.issueForm.dueDate = payload.dueDate;
+    }
+    this.allIssues.update(issues => issues.map(i => i.id === issue.id ? { ...i, ...payload } : i));
+
+    this.projectsService.updateIssue(this.projectId, issue.id, payload).subscribe({
+      next: () => {
+        if (adjustedDue) {
+          this.toast.success('Start date updated (Due date automatically adjusted to match)');
+        } else {
+          this.toast.success('Start date updated');
+        }
+      },
+      error: () => {
+        // Rollback on failure
+        this.selectedIssue.update(i => i ? { ...i, startDate: prevStartDate, dueDate: prevDueDate } : null);
+        this.issueForm.startDate = prevStartDate;
+        this.issueForm.dueDate = prevDueDate;
+        this.allIssues.update(issues => issues.map(i => i.id === issue.id ? { ...i, startDate: prevStartDate, dueDate: prevDueDate } : i));
+        this.toast.error('Failed to update start date');
+      }
+    });
+  }
+
+  updateIssueDueDate(dateStr: string | null) {
+    const issue = this.selectedIssue();
+    if (!issue) {
+      // Validation: End date should always be greater than or equal to start date
+      if (dateStr && this.issueForm.startDate) {
+        const dTime = new Date(dateStr).setHours(0, 0, 0, 0);
+        const sTime = new Date(this.issueForm.startDate).setHours(0, 0, 0, 0);
+        if (dTime < sTime) {
+          this.toast.error('End date must be on or after start date');
+          return;
+        }
+      }
+      this.issueForm.dueDate = dateStr;
+      return;
+    }
+
+    if (!dateStr) {
+      this.toast.error('Due date is required');
+      return;
+    }
+
+    // Validation: End date should always be greater than or equal to start date
+    if (dateStr && issue.startDate) {
+      const dTime = new Date(dateStr).setHours(0, 0, 0, 0);
+      const sTime = new Date(issue.startDate).setHours(0, 0, 0, 0);
+      if (dTime < sTime) {
+        this.toast.error('End date must be on or after start date');
+        return;
+      }
+    }
+
+    // Save previous state for rollback
+    const prevDueDate = issue.dueDate;
+
+    // Optimistic in-memory update: instant UI response in 0ms
+    this.selectedIssue.update(i => i ? { ...i, dueDate: dateStr } : null);
+    this.issueForm.dueDate = dateStr;
+    this.allIssues.update(issues => issues.map(i => i.id === issue.id ? { ...i, dueDate: dateStr } : i));
+
+    this.projectsService.updateIssue(this.projectId, issue.id, { dueDate: dateStr }).subscribe({
+      next: () => {
+        this.toast.success('Due date updated');
+      },
+      error: () => {
+        // Rollback on failure
+        this.selectedIssue.update(i => i ? { ...i, dueDate: prevDueDate } : null);
+        this.issueForm.dueDate = prevDueDate;
+        this.allIssues.update(issues => issues.map(i => i.id === issue.id ? { ...i, dueDate: prevDueDate } : i));
+        this.toast.error('Failed to update due date');
+      }
+    });
+  }
+
+  setQuickDueDate(preset: 'today' | 'tomorrow' | 'this-friday' | 'next-week' | 'plus-1-week') {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    if (preset === 'today') {
+      // today
+    } else if (preset === 'tomorrow') {
+      d.setDate(d.getDate() + 1);
+    } else if (preset === 'this-friday') {
+      const day = d.getDay();
+      const diff = (5 - day + 7) % 7 || 7;
+      d.setDate(d.getDate() + diff);
+    } else if (preset === 'next-week') {
+      const day = d.getDay();
+      const diff = day === 0 ? 1 : 8 - day;
+      d.setDate(d.getDate() + diff);
+    } else if (preset === 'plus-1-week') {
+      d.setDate(d.getDate() + 7);
+    }
+    const iso = d.toISOString();
+
+    const issue = this.selectedIssue();
+    const startStr = issue ? issue.startDate : this.issueForm.startDate;
+    // If current start date is after the chosen due date, adjust start date to avoid invalid range
+    if (startStr) {
+      const sTime = new Date(startStr).setHours(0, 0, 0, 0);
+      if (sTime > d.getTime()) {
+        this.updateIssueStartDate(iso);
+      }
+    }
+    this.updateIssueDueDate(iso);
+  }
+
+  clearAllIssueDates() {
+    this.toast.error('Start date and due date are required for tasks');
   }
 
   saveDates() {
@@ -5645,26 +6024,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   removeDates() {
-    const issue = this.selectedIssue();
-    if (!issue) return;
-
-    const payload = {
-      startDate: null,
-      dueDate: null,
-      recurring: 'Never',
-      dueReminder: null
-    };
-
-    this.projectsService.updateIssue(this.projectId, issue.id, payload).subscribe({
-      next: () => {
-        this.selectedIssue.update(i => i ? { ...i, ...payload } : null);
-        this.initDatesForm();
-        this.closePopover();
-        this.loadBoardAndIssues();
-        this.toast.success('Dates removed');
-      },
-      error: () => this.toast.error('Failed to remove dates')
-    });
+    this.toast.error('Start date and due date are required for tasks');
   }
 
   formatDisplayDueDate(issue: any): string {
@@ -5689,6 +6049,18 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   saveIssue() {
     if (this.selectedIssue()) {
+      if (this.quillInstance) {
+        const html = this.quillInstance.root.innerHTML;
+        this.issueForm.description = (html === '<p><br></p>') ? '' : html;
+      }
+      const descText = this.issueForm.description
+        ? this.issueForm.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+        : '';
+      if (!descText) {
+        this.toast.error('Description is required');
+        return;
+      }
+
       this.projectsService.updateIssue(this.projectId, this.selectedIssue().id, this.issueForm).subscribe({
         next: () => {
           this.toast.success('Description saved');
@@ -5698,11 +6070,51 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
             current.description = this.issueForm.description;
           }
           this.loadBoardAndIssues();
+        },
+        error: (err) => {
+          this.toast.error(err?.error?.message || 'Failed to save description');
         }
       });
     } else {
-      if (!this.issueForm.title || !this.issueForm.title.trim()) {
-        this.toast.error('Please enter a card title');
+      // Sync Quill description first
+      if (this.quillInstance) {
+        const html = this.quillInstance.root.innerHTML;
+        this.issueForm.description = (html === '<p><br></p>') ? '' : html;
+      }
+
+      this.showValidationErrors.set(true);
+
+      const fieldOrder: Array<{
+        key: 'title' | 'members' | 'startDate' | 'dueDate' | 'prerequisites' | 'smeId' | 'estimatedHours' | 'description';
+        id: string;
+        name: string;
+      }> = [
+        { key: 'title', id: 'task-field-title', name: 'Card Title' },
+        { key: 'members', id: 'task-field-members', name: 'Members' },
+        { key: 'startDate', id: 'task-field-start-date', name: 'Start Date' },
+        { key: 'dueDate', id: 'task-field-due-date', name: 'Due Date' },
+        { key: 'prerequisites', id: 'task-field-prerequisites', name: 'Pre-Requisite' },
+        { key: 'smeId', id: 'task-field-sme', name: 'SME / Govern' },
+        { key: 'estimatedHours', id: 'task-field-estimated-hours', name: 'Estimated Hours' },
+        { key: 'description', id: 'task-field-description', name: 'Description' }
+      ];
+
+      const firstInvalid = fieldOrder.find(f => {
+        if (f.key === 'dueDate') {
+          if (this.isFieldInvalid('dueDate')) return true;
+          if (this.issueForm.startDate && this.issueForm.dueDate && new Date(this.issueForm.dueDate) < new Date(this.issueForm.startDate)) return true;
+          return false;
+        }
+        return this.isFieldInvalid(f.key);
+      });
+
+      if (firstInvalid) {
+        if (firstInvalid.key === 'dueDate' && this.issueForm.startDate && this.issueForm.dueDate && new Date(this.issueForm.dueDate) < new Date(this.issueForm.startDate)) {
+          this.toast.error('Due Date cannot be before Start Date');
+        } else {
+          this.toast.error(`Please fill in all required fields: ${firstInvalid.name} is required`);
+        }
+        this.scrollToField(firstInvalid.id);
         return;
       }
 
@@ -5718,13 +6130,17 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         milestoneId: this.issueForm.milestoneId ? Number(this.issueForm.milestoneId) : null,
         columnId: this.issueForm.columnId || (this.columns().length > 0 ? this.columns()[0].id : null),
         title: this.issueForm.title.trim(),
+        prerequisites: (this.issueForm.prerequisites || '').trim(),
+        smeId: Number(this.issueForm.smeId),
+        estimatedHours: Number(this.issueForm.estimatedHours),
         assigneeId: pendingMembers[0]?.id || null,
       };
 
       this.projectsService.createIssue(this.projectId, payload).subscribe({
         next: (createdIssue: any) => {
-          this.toast.success('Issue created');
+          this.toast.success('Task created successfully');
           this.isEditingDescription.set(false);
+          this.showValidationErrors.set(false);
           this.draftMembers.set([]);
 
           const newId = createdIssue?.id || createdIssue?.issue?.id;
@@ -5958,6 +6374,18 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
           return next;
         });
       }, 180);
+      return;
+    }
+
+    const currentMembers = issue.members || [];
+    const isAttached = currentMembers.some((m: any) => m.employeeId === member.id || m.employee?.id === member.id);
+    if (isAttached && currentMembers.length <= 1) {
+      this.toast.error('At least one member is required on a task');
+      this.loadingMemberIds.update(s => {
+        const next = new Set(s);
+        next.delete(member.id);
+        return next;
+      });
       return;
     }
 

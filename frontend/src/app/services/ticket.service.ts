@@ -97,6 +97,7 @@ export interface TicketStats {
   inProgress: number;
   resolved: number;
   closed: number;
+  rejected?: number;
   byDepartment: { departmentId: number; departmentName: string; count: number }[];
 }
 

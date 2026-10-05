@@ -1,0 +1,144 @@
+<div class="jira-datepicker-container" [class.is-inline]="inline" [class.is-disabled]="disabled" [class.size-sm]="size === 'sm'">
+  
+  <!-- Trigger Input (for dropdown mode) -->
+  <div *ngIf="!inline" 
+       class="jira-datepicker-trigger" 
+       [class.active]="isOpen"
+       [class.has-value]="!!selectedDate"
+       [class.is-overdue]="isOverdue"
+       [class.is-due-today]="isDueToday"
+       [class.disabled]="disabled"
+       (click)="toggleDropdown($event)"
+       #triggerBtn>
+    
+    <span class="trigger-icon-calendar" *ngIf="showIcon" [class.icon-overdue]="isOverdue">
+      <svg *ngIf="!isOverdue" lucideCalendar size="14"></svg>
+      <svg *ngIf="isOverdue" lucideAlertCircle size="14"></svg>
+    </span>
+
+    <span class="trigger-label" [class.is-placeholder]="!selectedDate" [class.text-overdue]="isOverdue">
+      {{ selectedDate ? formattedDisplay : placeholder }}
+    </span>
+
+    <!-- Jira-style Relative Badge -->
+    <span class="jira-status-pill overdue" *ngIf="relativeBadge && isOverdue">
+      {{ relativeBadge }}
+    </span>
+    <span class="jira-status-pill today" *ngIf="relativeBadge && isDueToday">
+      Today
+    </span>
+
+    <div class="trigger-actions">
+      <!-- Clear button -->
+      <button *ngIf="clearable && selectedDate && !disabled && !readonly" 
+              type="button" 
+              class="btn-trigger-clear" 
+              (click)="clearDate($event)"
+              title="Clear date">
+        <svg lucideX size="13"></svg>
+      </button>
+
+      <!-- Chevron -->
+      <span class="trigger-chevron" [class.chevron-open]="isOpen">
+        <svg lucideChevronDown size="13"></svg>
+      </span>
+    </div>
+  </div>
+
+  <!-- Calendar Dropdown / Popover -->
+  <div *ngIf="inline || isOpen" 
+       class="jira-datepicker-dropdown"
+       [class.is-inline-panel]="inline"
+       [style.top]="inline ? 'auto' : dropdownPosition.top"
+       [style.bottom]="inline ? 'auto' : dropdownPosition.bottom"
+       [style.left]="inline ? 'auto' : dropdownPosition.left"
+       (click)="$event.stopPropagation()">
+
+    <!-- Header: Navigation and Month/Year -->
+    <div class="jira-cal-header">
+      <button type="button" class="btn-cal-chevron" (click)="prevMonth($event)" title="Previous month">
+        <svg lucideChevronLeft size="16"></svg>
+      </button>
+
+      <button type="button" class="btn-month-year-select" (click)="toggleYearMonthView($event)" title="Choose month and year">
+        <span>{{ currentMonthName }} {{ currentYear }}</span>
+        <svg lucideChevronDown size="12" class="title-chevron" [class.rotate-180]="isYearMonthView"></svg>
+      </button>
+
+      <button type="button" class="btn-cal-chevron" (click)="nextMonth($event)" title="Next month">
+        <svg lucideChevronRight size="16"></svg>
+      </button>
+    </div>
+
+    <!-- Quick Month & Year Picker Grid (when title is clicked) -->
+    <div class="jira-year-month-panel" *ngIf="isYearMonthView">
+      <div class="year-nav-row">
+        <button type="button" class="btn-cal-chevron" (click)="prevYear($event)"><svg lucideChevronsLeft size="14"></svg></button>
+        <span class="year-display">{{ currentYear }}</span>
+        <button type="button" class="btn-cal-chevron" (click)="nextYear($event)"><svg lucideChevronsRight size="14"></svg></button>
+      </div>
+      <div class="months-grid">
+        <button type="button" 
+                class="btn-month-pill" 
+                *ngFor="let m of months; let idx = index; trackBy: trackByIndex"
+                [class.selected]="idx === viewDate.getMonth()"
+                (click)="setMonth(idx, $event)">
+          {{ m.substring(0, 3) }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Normal Days Calendar View -->
+    <ng-container *ngIf="!isYearMonthView">
+      <!-- Weekday column labels -->
+      <div class="jira-cal-weekdays">
+        <div *ngFor="let day of weekdays; trackBy: trackByIndex" class="weekday-col">{{ day }}</div>
+      </div>
+
+      <!-- 42 Days Grid -->
+      <div class="jira-cal-days-grid" (mouseleave)="onCellLeave()">
+        <button type="button"
+                *ngFor="let cell of calendarGrid; trackBy: trackByCell"
+                class="cal-day-cell"
+                [class.other-month]="!cell.isCurrentMonth"
+                [class.is-today]="cell.isToday"
+                [class.is-selected]="cell.isSelected"
+                [class.is-disabled]="cell.isDisabled"
+                [class.in-range]="cell.isInRange"
+                [disabled]="cell.isDisabled"
+                [title]="cell.isDisabled ? 'Date not allowed by date constraints' : ''"
+                (mouseenter)="onCellHover(cell)"
+                (click)="selectDay(cell, $event)">
+          <span>{{ cell.dayNumber }}</span>
+        </button>
+      </div>
+
+      <!-- Optional Time Picker Section -->
+      <div class="jira-cal-time-row" *ngIf="showTime">
+        <div class="time-label">
+          <svg lucideClock size="13"></svg>
+          <span>Time</span>
+        </div>
+        <select class="jira-cal-time-select" [ngModel]="timeValue" (ngModelChange)="onTimeChange($event)">
+          <option *ngFor="let t of timeOptions; trackBy: trackByIndex" [value]="t">{{ t }}</option>
+        </select>
+      </div>
+    </ng-container>
+
+    <!-- Footer Bar with Quick Actions -->
+    <div class="jira-cal-footer">
+      <button type="button" 
+              class="btn-cal-today" 
+              [disabled]="isTodayDisabled" 
+              [title]="isTodayDisabled ? 'Today is not within allowed date range' : 'Select today'"
+              (click)="selectToday($event)">
+        Today
+      </button>
+
+      <button *ngIf="clearable" type="button" class="btn-cal-clear" (click)="clearDate($event)" title="Clear date">
+        Clear
+      </button>
+    </div>
+
+  </div>
+</div>

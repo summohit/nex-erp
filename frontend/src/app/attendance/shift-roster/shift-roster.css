@@ -2102,4 +2102,43 @@ textarea.form-control-enhanced:focus {
 .bulk-summary.muted { color:#94a3b8; font-weight:500; }
 @media (max-width:640px) { .bulk-summary { display:none; } }
 
+/* Field Visit Roster Indicators */
+.chip-field-visit-legend {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.25);
+}
+
+.chip.chip-shift.is-field-visit {
+  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid #818cf8 !important;
+  box-shadow: 0 2px 5px rgba(79, 70, 229, 0.3) !important;
+}
+
+.chip.chip-shift.is-field-visit .chip-name {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.chip.chip-shift.is-field-visit .fv-tag {
+  font-size: 11px;
+}
+
+.chip.chip-shift.is-field-visit .chip-time {
+  color: #e0e7ff !important;
+  font-weight: 600 !important;
+}
+
+.chip-onsite.fv-onsite {
+  background: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  font-weight: 600 !important;
+}
+
 /* End of shift-roster styles */

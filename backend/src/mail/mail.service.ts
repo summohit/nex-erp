@@ -562,6 +562,7 @@ export class MailService {
    * trusted: a notice is written by a person and read by ninety, and an
    * unescaped angle bracket should not become markup in all of their inboxes.
    */
+  /** `body` is notice HTML, already cleaned by cleanNoticeHtml. */
   async sendNoticeEmail(email: string, title: string, body: string, attachmentCount = 0) {
     const baseUrl = process.env.APP_URL || 'http://localhost:4200';
     const escape = (t: string) =>
@@ -570,7 +571,7 @@ export class MailService {
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
         <h2 style="color: #1e3a8a; text-align: center;">${escape(title)}</h2>
-        <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px; margin: 20px 0; color: #1e293b; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${escape(body)}</div>
+        <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px; margin: 20px 0; color: #1e293b; font-size: 15px; line-height: 1.6;">${body}</div>
         ${attachmentCount > 0 ? `<p style="color: #475569; font-size: 14px;">${attachmentCount} file${attachmentCount === 1 ? '' : 's'} attached &mdash; open the notice board to download ${attachmentCount === 1 ? 'it' : 'them'}.</p>` : ''}
         <div style="text-align: center; margin: 30px 0;">
           <a href="${baseUrl}/dashboard" style="background-color: #3b82f6; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">Open the dashboard</a>
@@ -597,45 +598,154 @@ export class MailService {
     }
   }
 
-  async sendTicketAssignedEmail(email: string, ticketNumber: string, ticketTitle: string) {
-    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
-    const ticketLink = `${baseUrl}/crm/tickets`;
+  /** A new ticket, or one reassigned, for the person now expected to work it. */
+  async sendTicketAssignedEmail(
+    email: string, ticketNumber: string, ticketTitle: string,
+    extra: { ticketId?: number; priority?: string | null; reporterName?: string | null; assignedBy?: string | null } = {},
+  ) {
+    await this.sendTicketEmail(email, {
+      kind: 'ASSIGNED',
+      ticketId: extra.ticketId, ticketNumber, ticketTitle,
+      priority: extra.priority, reporterName: extra.reporterName, actorName: extra.assignedBy,
+    });
+  }
 
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-        <h2 style="color: #1e3a8a; text-align: center;">New Ticket Assigned</h2>
-        <p style="color: #475569; font-size: 16px;">Hello,</p>
-        <p style="color: #475569; font-size: 16px;">A new ticket has been assigned to you.</p>
-        <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px; margin: 20px 0;">
-          <p style="margin: 4px 0; color: #1e293b;"><strong>Ticket:</strong> ${ticketNumber}</p>
-          <p style="margin: 4px 0; color: #1e293b;"><strong>Title:</strong> ${ticketTitle}</p>
-        </div>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${ticketLink}" style="background-color: #3b82f6; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">View Ticket</a>
+  /**
+   * Every ticket email, in one layout: what happened, the ticket, any note
+   * from whoever acted, what the reader should do next, and a button that
+   * opens the ticket itself rather than the list.
+   *
+   * RESOLVED is the one that matters most: the reporter has to verify the fix
+   * and close the ticket, or it sits resolved-but-open indefinitely.
+   */
+  async sendTicketEmail(
+    email: string,
+    t: {
+      kind: 'ASSIGNED' | 'RESOLVED' | 'REJECTED' | 'CLOSED' | 'REOPENED';
+      ticketId?: number;
+      ticketNumber: string;
+      ticketTitle: string;
+      priority?: string | null;
+      reporterName?: string | null;
+      actorName?: string | null;
+      /** Plain text: the resolution or rejection reason. */
+      note?: string | null;
+      recipientName?: string | null;
+    },
+  ) {
+    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
+    const link = `${baseUrl}/crm/tickets${t.ticketId ? `?ticket=${t.ticketId}` : ''}`;
+    const e = (v?: string | null) => this.escapeHtml(v ?? '');
+    const by = t.actorName ? ` by ${e(t.actorName)}` : '';
+
+    const copy = {
+      ASSIGNED: {
+        accent: '#2563eb', badge: 'Assigned to you',
+        heading: 'A ticket has been assigned to you',
+        intro: `Ticket <strong>${e(t.ticketNumber)}</strong> has been assigned to you${by}. Please review the details and start work on it.`,
+        steps: [] as string[],
+        button: 'Open Ticket',
+        subject: `[${t.ticketNumber}] Assigned to you: ${t.ticketTitle}`,
+      },
+      RESOLVED: {
+        accent: '#059669', badge: 'Resolved – awaiting your confirmation',
+        heading: 'Your ticket has been resolved',
+        intro: `Ticket <strong>${e(t.ticketNumber)}</strong> has been marked <strong>Resolved</strong>${by}. Please verify the fix and close the ticket.`,
+        steps: [
+          'Open the ticket using the button below.',
+          'Check that the issue is fixed on your side.',
+          'If it is, click <strong>Verify &amp; Close Ticket</strong> at the top of the ticket.',
+          'If the issue is still there, reply in the ticket discussion so the team can pick it up again.',
+        ],
+        button: 'Review &amp; Close Ticket',
+        subject: `[${t.ticketNumber}] Resolved – please verify and close: ${t.ticketTitle}`,
+      },
+      REJECTED: {
+        accent: '#dc2626', badge: 'Rejected',
+        heading: 'Your ticket was not accepted',
+        intro: `Ticket <strong>${e(t.ticketNumber)}</strong> has been <strong>rejected</strong>${by}. The reason is below.`,
+        steps: ['If you think this was a mistake, reply in the ticket discussion or raise a new ticket with more detail.'],
+        button: 'View Ticket',
+        subject: `[${t.ticketNumber}] Rejected: ${t.ticketTitle}`,
+      },
+      CLOSED: {
+        accent: '#475569', badge: 'Closed',
+        heading: 'Ticket closed',
+        intro: `Ticket <strong>${e(t.ticketNumber)}</strong> has been <strong>closed</strong>${by}. No further action is needed.`,
+        steps: [],
+        button: 'View Ticket',
+        subject: `[${t.ticketNumber}] Closed: ${t.ticketTitle}`,
+      },
+      REOPENED: {
+        accent: '#d97706', badge: 'Reopened',
+        heading: 'Ticket reopened',
+        intro: `Ticket <strong>${e(t.ticketNumber)}</strong> has been <strong>reopened</strong>${by} and needs attention again.`,
+        steps: [],
+        button: 'Open Ticket',
+        subject: `[${t.ticketNumber}] Reopened: ${t.ticketTitle}`,
+      },
+    }[t.kind];
+
+    const row = (label: string, value?: string | null) => value
+      ? `<tr><td style="padding: 6px 0; color: #64748b; font-size: 13px; width: 110px; vertical-align: top;">${label}</td><td style="padding: 6px 0; color: #0f172a; font-size: 14px; font-weight: 600;">${e(value)}</td></tr>`
+      : '';
+    const priority = t.priority ? t.priority.charAt(0) + t.priority.slice(1).toLowerCase() : null;
+
+    const html = `
+      <div style="background: #f1f5f9; padding: 24px 12px; font-family: Arial, Helvetica, sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+          <div style="height: 4px; background: ${copy.accent};"></div>
+          <div style="padding: 28px 28px 8px;">
+            <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; background: ${copy.accent}1a; color: ${copy.accent}; font-size: 12px; font-weight: 700; letter-spacing: .02em;">${copy.badge}</span>
+            <h2 style="margin: 14px 0 8px; color: #0f172a; font-size: 20px;">${copy.heading}</h2>
+            <p style="margin: 0 0 6px; color: #334155; font-size: 15px; line-height: 1.6;">${t.recipientName ? `Hello ${e(t.recipientName)},<br>` : 'Hello,<br>'}${copy.intro}</p>
+          </div>
+          <div style="padding: 8px 28px;">
+            <table style="width: 100%; border-collapse: collapse; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
+              ${row('Ticket', t.ticketNumber)}
+              ${row('Title', t.ticketTitle)}
+              ${row('Priority', priority)}
+              ${row('Raised by', t.reporterName)}
+            </table>
+          </div>
+          ${t.note ? `
+          <div style="padding: 12px 28px 0;">
+            <div style="border-left: 3px solid ${copy.accent}; background: #f8fafc; padding: 12px 14px; border-radius: 6px;">
+              <div style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px;">${t.kind === 'REJECTED' ? 'Reason' : 'Resolution notes'}</div>
+              <div style="color: #1e293b; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${e(t.note)}</div>
+            </div>
+          </div>` : ''}
+          ${copy.steps.length ? `
+          <div style="padding: 16px 28px 0;">
+            <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">What to do next</div>
+            <ol style="margin: 0; padding-left: 20px; color: #334155; font-size: 14px; line-height: 1.7;">
+              ${copy.steps.map((x) => `<li>${x}</li>`).join('')}
+            </ol>
+          </div>` : ''}
+          <div style="padding: 24px 28px; text-align: center;">
+            <a href="${link}" style="display: inline-block; background: ${copy.accent}; color: #ffffff; padding: 12px 26px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px;">${copy.button}</a>
+          </div>
+          <div style="padding: 14px 28px; background: #f8fafc; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; text-align: center;">
+            This is an automated message from the MIRA Helpdesk. Please reply inside the ticket rather than to this email.
+          </div>
         </div>
       </div>
     `;
 
     try {
       if (this.brevoApiKey) {
-        this.logger.log(`Sending ticket assignment email to ${email} via Brevo HTTP API.`);
-        await this.sendBrevoEmail({
-          to: email,
-          subject: `Ticket Assigned: ${ticketNumber} - ${ticketTitle}`,
-          html: htmlContent,
-        });
+        await this.sendBrevoEmail({ to: email, subject: copy.subject, html });
         return;
       }
-      this.logger.log(`Sending ticket assignment email to ${email} via SMTP transport.`);
       await this.sendWithRetry({
-        from: `"NEX ERP Support" <${this.fromEmail}>`,
+        from: `"MIRA Helpdesk" <${this.fromEmail}>`,
         to: email,
         envelope: { from: this.fromEmail, to: email },
-        subject: `Ticket Assigned: ${ticketNumber} - ${ticketTitle}`,
-        html: htmlContent,
+        subject: copy.subject,
+        html,
       });
     } catch (error) {
-      this.logger.error(`Failed to send ticket assignment email to ${email}: ${this.errorDetail(error)}`);
+      this.logger.error(`Failed to send ticket ${t.kind} email to ${email}: ${this.errorDetail(error)}`);
     }
   }
 

@@ -36,7 +36,7 @@ export class TasksController {
     return this.tasks.getMyTasks(req.user.companyId, req.user.employeeId, req.user.role, {
       includeReported: includeReported === 'true',
       includeDone: includeDone === 'true',
-      scope: scope === 'all' ? 'all' : 'mine',
+      scope: scope === 'all' ? 'all' : scope === 'created' ? 'created' : 'mine',
     });
   }
 

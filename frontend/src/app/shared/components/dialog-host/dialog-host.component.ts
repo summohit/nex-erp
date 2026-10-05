@@ -1,7 +1,7 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { DialogService } from '../../services/dialog.service';
+import { DialogService, DialogTone } from '../../services/dialog.service';
 
 @Component({
   selector: 'app-dialog-host',
@@ -15,6 +15,8 @@ export class DialogHostComponent {
 
   /** Rejected files say why, rather than silently not attaching. */
   attachError = signal<string | null>(null);
+  isDragging = signal(false);
+  imagePreviewUrl = signal<string | null>(null);
 
   /**
    * Proof is meant to be a screenshot or a photo, so the ceiling is generous
@@ -24,26 +26,92 @@ export class DialogHostComponent {
    */
   private static readonly MAX_BYTES = 10 * 1024 * 1024;
 
+  get currentTone(): DialogTone {
+    return this.dialog.getTone(this.dialog.state());
+  }
+
+  get charCount(): number {
+    return (this.dialog.promptValue || '').trim().length;
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent) {
+    const s = this.dialog.state();
+    if (!s) return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.close();
+    } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      if (this.canSubmitPrompt) {
+        event.preventDefault();
+        this.respond(true);
+      }
+    }
+  }
+
+  close() {
+    this.respond(false);
+  }
+
   onFilePicked(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0] ?? null;
-    this.attachError.set(null);
+    this.handleFile(file);
+    input.value = '';
+  }
 
-    if (file && file.size > DialogHostComponent.MAX_BYTES) {
+  onDragOver(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragging.set(true);
+  }
+
+  onDragLeave(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragging.set(false);
+  }
+
+  onDrop(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragging.set(false);
+    const file = event.dataTransfer?.files?.[0] ?? null;
+    if (file) {
+      this.handleFile(file);
+    }
+  }
+
+  private handleFile(file: File | null) {
+    this.attachError.set(null);
+    this.clearImagePreview();
+
+    if (!file) return;
+
+    if (file.size > DialogHostComponent.MAX_BYTES) {
       this.attachError.set('That file is over 10 MB. Please attach a smaller one.');
-      // Cleared so the same file can be picked again after it is shrunk;
-      // a file input will not re-fire change for an unchanged value.
-      input.value = '';
       return;
     }
 
     this.dialog.promptFile = file;
-    input.value = '';
+    if (file.type.startsWith('image/')) {
+      this.imagePreviewUrl.set(URL.createObjectURL(file));
+    }
   }
 
   clearFile() {
+    this.clearImagePreview();
     this.dialog.promptFile = null;
     this.attachError.set(null);
+  }
+
+  private clearImagePreview() {
+    const url = this.imagePreviewUrl();
+    if (url) {
+      URL.revokeObjectURL(url);
+      this.imagePreviewUrl.set(null);
+    }
   }
 
   fileSizeLabel(file: File): string {
@@ -52,6 +120,7 @@ export class DialogHostComponent {
   }
 
   respond(result: boolean) {
+    this.clearImagePreview();
     this.attachError.set(null);
     this.dialog.respond(result);
   }
@@ -59,7 +128,8 @@ export class DialogHostComponent {
   /** A required prompt cannot be submitted empty — the server would refuse it. */
   get canSubmitPrompt(): boolean {
     const s = this.dialog.state();
-    if (s?.variant !== 'prompt') return true;
+    if (!s) return false;
+    if (s.variant !== 'prompt') return true;
     return !s.required || this.dialog.promptValue.trim().length > 0;
   }
 }

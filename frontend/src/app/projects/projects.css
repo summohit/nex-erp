@@ -6363,18 +6363,44 @@
   margin: 8px 2px 0;
 }
 
-/* §PB8: a task the manager raised that is not work yet, and one sent back. */
-.type-pill.type-awaiting {
+/* §PB8: a task the manager raised that is not work yet, and one sent back.
+   These pills are drawn by the grid's cell renderer, outside view
+   encapsulation, so they need ::ng-deep like the other pills in the table. */
+.my-tasks-table-wrapper ::ng-deep .type-pill.type-awaiting {
   background: #fef3c7;
   color: #92400e;
-  border: 1px solid #fde68a;
+  border: 1px solid #fcd34d;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
+.my-tasks-table-wrapper ::ng-deep .type-pill.type-awaiting::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d97706;
+  animation: awaiting-pulse 1.6s ease-in-out infinite;
+}
+@keyframes awaiting-pulse { 50% { opacity: 0.3; } }
 
-.type-pill.type-rejected {
+.my-tasks-table-wrapper ::ng-deep .type-pill.type-rejected {
   background: #ffe4e6;
   color: #be123c;
   border: 1px solid #fecdd3;
+  font-weight: 700;
   cursor: help;
+}
+
+/* The whole row reads as waiting, not only its pill. */
+.my-tasks-table-wrapper ::ng-deep .ag-row.row-awaiting-approval {
+  border-left-color: #f59e0b !important;
+  background-color: #fffbeb !important;
+}
+.my-tasks-table-wrapper ::ng-deep .ag-row.row-needs-changes {
+  border-left-color: #e11d48 !important;
+  background-color: #fff1f2 !important;
 }
 
 /* ── §Tasks1: top task performers ───────────────────────────────────────── */
@@ -6501,4 +6527,26 @@
 
 @media (max-width: 640px) {
   .ttp-head { flex-direction: column; }
+}
+
+/* ── Add Task: inline validation ──
+   The message sits directly under the field it is about, and the field itself is
+   outlined, so the problem is visible without reading. */
+.field-error {
+  display: block;
+  margin-top: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #dc2626;
+}
+
+.task-modal-card .enhanced-input.has-error,
+.task-modal-card .custom-select-trigger.has-error {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.task-modal-card .enhanced-input.has-error:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
 }

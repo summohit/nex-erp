@@ -63,4 +63,15 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
       this.server.to(`company_${companyId}`).emit('notification', payload);
     }
   }
+
+  /**
+   * Tell these people a notice has just been posted to them. Only the id goes
+   * out; the client fetches it through the normal, access-checked route.
+   */
+  sendNotice(userIds: number[], noticeId: number) {
+    if (!this.server) return;
+    for (const id of userIds) {
+      this.server.to(`user_${id}`).emit('notice', { id: noticeId });
+    }
+  }
 }

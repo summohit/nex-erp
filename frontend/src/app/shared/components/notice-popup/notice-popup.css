@@ -1,0 +1,304 @@
+/* The high-priority notice popup, shown over any page. Styles from the dashboard's popup. */
+.dash-p-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.dash-p-badge.p-high   { background: #eff6ff; color: #0f4f9c; border: 1px solid #dbeafe; }
+.dash-p-badge.p-normal { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.dash-p-badge.p-low    { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+.dash-notice-avatar-img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.dash-notice-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 9.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dash-author-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+.notice-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(5px);
+  animation: dash-fade-in 0.15s ease-out;
+}
+
+@keyframes dash-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.notice-modal {
+  width: 100%;
+  max-width: 580px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: dash-scale-up 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dash-scale-up {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.notice-modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.notice-modal-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notice-modal-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.notice-modal-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.notice-modal-head h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.notice-modal-author-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notice-modal-author-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notice-modal-author-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.notice-modal-meta {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.notice-modal-body {
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: #334155;
+  word-break: break-word;
+}
+
+/* The notice's editor HTML. innerHTML content is outside view encapsulation. */
+.notice-rich ::ng-deep p { margin: 0 0 6px; }
+.notice-rich ::ng-deep h1 { font-size: 20px; margin: 10px 0 6px; }
+.notice-rich ::ng-deep h2 { font-size: 17px; margin: 10px 0 6px; }
+.notice-rich ::ng-deep h3 { font-size: 15px; margin: 8px 0 4px; }
+.notice-rich ::ng-deep ol, .notice-rich ::ng-deep ul { margin: 0 0 6px; padding-left: 22px; }
+.notice-rich ::ng-deep li[data-list="bullet"] { list-style-type: disc; }
+.notice-rich ::ng-deep li[data-list="ordered"] { list-style-type: decimal; }
+.notice-rich ::ng-deep li > .ql-ui { display: none; }
+.notice-rich ::ng-deep blockquote { margin: 6px 0; padding: 4px 12px; border-left: 3px solid #cbd5e1; color: #475569; }
+.notice-rich ::ng-deep a { color: #2563eb; text-decoration: underline; }
+.notice-rich ::ng-deep table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+.notice-rich ::ng-deep td, .notice-rich ::ng-deep th { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; }
+
+/* Attachments in Modal */
+.notice-modal-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.notice-modal-att-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.notice-modal-att-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notice-modal-att-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.notice-modal-att-card:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.att-icon-box {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.att-pdf         { background: #eff6ff; color: #1373e5; }
+.att-image       { background: #eff6ff; color: #2563eb; }
+.att-spreadsheet { background: #ecfdf5; color: #059669; }
+.att-doc         { background: #f5f3ff; color: #7c3aed; }
+.att-other       { background: #f1f5f9; color: #475569; }
+
+.att-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.att-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.att-size {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.att-arrow {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.notice-modal-att-card:hover .att-arrow {
+  color: #2563eb;
+}
+
+.notice-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.notice-modal-all-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.notice-modal-all-link:hover {
+  color: #1373e5;
+}
+
+.notice-dismiss-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 20px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1373e5 0%, #0f5fbe 100%);
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(19, 115, 229, 0.25);
+  transition: all 0.15s ease;
+}
+
+.notice-dismiss-btn:hover {
+  background: linear-gradient(135deg, #89898a 0%, #696a6b 100%);
+  box-shadow: 0 4px 12px rgba(19, 115, 229, 0.35);
+}
+

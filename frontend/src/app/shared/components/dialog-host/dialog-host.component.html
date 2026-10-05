@@ -1,72 +1,167 @@
 <div class="dlg-backdrop" *ngIf="dialog.state() as s"
-     (click)="s.variant === 'confirm' || s.variant === 'prompt' ? null : respond(true)">
-  <div class="dlg-card" (click)="$event.stopPropagation()">
-    <div class="dlg-icon" [ngClass]="s.variant">
-      <svg *ngIf="s.variant === 'success'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="20 6 9 17 4 12"></polyline>
-      </svg>
-      <svg *ngIf="s.variant === 'error'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="8" x2="12" y2="12"></line>
-        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-      </svg>
-      <svg *ngIf="s.variant === 'confirm'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="16" x2="12" y2="12"></line>
-        <line x1="12" y1="8" x2="12.01" y2="8"></line>
-      </svg>
-      <svg *ngIf="s.variant === 'prompt'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-      </svg>
-    </div>
+     [class.is-danger]="currentTone === 'danger'"
+     [class.is-success]="currentTone === 'success'"
+     [class.is-warning]="currentTone === 'warning'"
+     [class.is-primary]="currentTone === 'primary'"
+     (click)="s.variant === 'confirm' || s.variant === 'prompt' ? null : close()">
 
-    <h3 class="dlg-title">{{s.title}}</h3>
-    <p class="dlg-message">{{s.message}}</p>
+  <div class="dlg-card" [ngClass]="currentTone" (click)="$event.stopPropagation()">
 
-    <!-- ngModel binds the service's plain field, not the state signal: writing
-         to the signal on every keystroke rebuilds the dialog and loses the caret. -->
-    <textarea *ngIf="s.variant === 'prompt'"
-              class="dlg-textarea"
-              rows="3"
-              [placeholder]="s.placeholder || ''"
-              [(ngModel)]="dialog.promptValue"
-              autofocus></textarea>
+    <!-- Top-Right Close Button -->
+    <button type="button" class="dlg-close-btn" (click)="close()" title="Close (Esc)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
 
-    <!-- §Att4: proof beside the reason. Optional by design — see the comment
-         on DialogState.attachment. -->
-    <div class="dlg-attach" *ngIf="s.variant === 'prompt' && s.attachment as att">
-      <label class="dlg-attach-label" *ngIf="!dialog.promptFile">
-        <input type="file" [accept]="att.accept" (change)="onFilePicked($event)" hidden>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+    <!-- Header Icon -->
+    <div class="dlg-icon-wrapper" [ngClass]="currentTone">
+      <!-- Danger: Reject / Delete -->
+      <div class="dlg-icon-inner" *ngIf="currentTone === 'danger'">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
         </svg>
-        <span>{{ att.label }}</span>
-      </label>
-
-      <div class="dlg-attach-chosen" *ngIf="dialog.promptFile as file">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-        </svg>
-        <span class="dlg-attach-name" [title]="file.name">{{ file.name }}</span>
-        <span class="dlg-attach-size">{{ fileSizeLabel(file) }}</span>
-        <button type="button" class="dlg-attach-clear" (click)="clearFile()" title="Remove attachment">&times;</button>
       </div>
 
-      <p class="dlg-attach-hint" *ngIf="att.hint && !attachError()">{{ att.hint }}</p>
-      <p class="dlg-attach-error" *ngIf="attachError() as err">{{ err }}</p>
+      <!-- Success: Resolve / Approve -->
+      <div class="dlg-icon-inner" *ngIf="currentTone === 'success'">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+
+      <!-- Warning: Alert / Confirm -->
+      <div class="dlg-icon-inner" *ngIf="currentTone === 'warning'">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </div>
+
+      <!-- Primary / Prompt Default: Note / Edit -->
+      <div class="dlg-icon-inner" *ngIf="currentTone === 'primary'">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+      </div>
     </div>
 
+    <!-- Title & Description -->
+    <h3 class="dlg-title">{{ s.title }}</h3>
+    <p class="dlg-message">{{ s.message }}</p>
+
+    <!-- Prompt Textarea -->
+    <div class="dlg-field-container" *ngIf="s.variant === 'prompt'">
+      <div class="dlg-field-header">
+        <label class="dlg-field-label">
+          Reason & Details
+          <span class="dlg-req-star" *ngIf="s.required">*</span>
+        </label>
+        <span class="dlg-char-count" [class.has-text]="charCount > 0">
+          {{ charCount }} char<span *ngIf="charCount !== 1">s</span>
+        </span>
+      </div>
+
+      <div class="dlg-textarea-wrap" [ngClass]="currentTone">
+        <textarea
+          class="dlg-textarea"
+          rows="3"
+          [placeholder]="s.placeholder || 'Enter explanation...'"
+          [(ngModel)]="dialog.promptValue"
+          autofocus>
+        </textarea>
+      </div>
+    </div>
+
+    <!-- Attachment Section -->
+    <div class="dlg-attach-section" *ngIf="s.variant === 'prompt' && s.attachment as att">
+
+      <!-- Dropzone when no file selected -->
+      <div class="dlg-dropzone"
+           *ngIf="!dialog.promptFile"
+           [class.is-dragging]="isDragging()"
+           [ngClass]="currentTone"
+           (dragover)="onDragOver($event)"
+           (dragleave)="onDragLeave($event)"
+           (drop)="onDrop($event)">
+
+        <input type="file" [accept]="att.accept" (change)="onFilePicked($event)" id="dlg-file-input" hidden>
+
+        <label for="dlg-file-input" class="dlg-dropzone-inner">
+          <div class="dlg-dropzone-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+            </svg>
+          </div>
+          <div class="dlg-dropzone-content">
+            <span class="dlg-dropzone-title">{{ att.label }}</span>
+            <span class="dlg-dropzone-hint">{{ att.hint || 'Attach screenshots or proof (Max 10MB)' }}</span>
+          </div>
+        </label>
+      </div>
+
+      <!-- File Card when file selected -->
+      <div class="dlg-file-card" *ngIf="dialog.promptFile as file" [ngClass]="currentTone">
+        <div class="dlg-file-thumb" *ngIf="imagePreviewUrl() as imgUrl">
+          <img [src]="imgUrl" alt="Preview" />
+        </div>
+        <div class="dlg-file-icon" *ngIf="!imagePreviewUrl()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+        </div>
+
+        <div class="dlg-file-info">
+          <span class="dlg-file-name" [title]="file.name">{{ file.name }}</span>
+          <span class="dlg-file-size">{{ fileSizeLabel(file) }}</span>
+        </div>
+
+        <button type="button" class="dlg-file-remove" (click)="clearFile()" title="Remove file">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Attachment Error Message -->
+      <div class="dlg-attach-error-box" *ngIf="attachError() as err">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>{{ err }}</span>
+      </div>
+    </div>
+
+    <!-- Actions / Buttons -->
     <div class="dlg-actions">
       <button *ngIf="s.variant === 'confirm' || s.variant === 'prompt'"
-              class="dlg-btn dlg-btn-secondary" (click)="respond(false)">{{s.cancelLabel}}</button>
-      <button class="dlg-btn" [ngClass]="{
-        'dlg-btn-primary': s.variant === 'confirm' || s.variant === 'prompt',
-        'dlg-btn-success': s.variant === 'success',
-        'dlg-btn-error': s.variant === 'error'
-      }"
-      [disabled]="!canSubmitPrompt"
-      (click)="respond(true)">{{s.confirmLabel}}</button>
+              type="button"
+              class="dlg-btn dlg-btn-secondary"
+              (click)="close()">
+        {{ s.cancelLabel || 'Cancel' }}
+      </button>
+
+      <button type="button"
+              class="dlg-btn"
+              [ngClass]="'dlg-btn-' + currentTone"
+              [disabled]="!canSubmitPrompt"
+              (click)="respond(true)">
+        <span>{{ s.confirmLabel }}</span>
+      </button>
     </div>
+
+    <!-- Keyboard shortcut tip -->
+    <div class="dlg-shortcut-tip" *ngIf="s.variant === 'prompt'">
+      <span>Press <kbd>⌘</kbd> + <kbd>Enter</kbd> to submit</span>
+    </div>
+
   </div>
 </div>

@@ -72,6 +72,20 @@ function makeTx(over: any = {}) {
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
+    // Comp-Off: nothing credited yet, and the company already has its type.
+    compOffCredit: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({}),
+      delete: jest.fn().mockResolvedValue({}),
+    },
+    leaveType: {
+      findFirst: jest.fn().mockResolvedValue({ id: 40 }),
+      create: jest.fn().mockResolvedValue({ id: 41 }),
+    },
+    leaveBalance: {
+      upsert: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
     ...over,
   };
   return { tx, service: new FieldVisitActivationService() };
@@ -246,6 +260,47 @@ describe('the roster', () => {
     await expect(service.activate(tx, REQUEST, 90))
       .rejects.toThrow(/Asha Rao is rostered off on 2026-09-23/);
     expect(tx.shiftRosterEntry.create).not.toHaveBeenCalled();
+  });
+
+  describe('overriding a day off', () => {
+    const dayOff = { id: 77, employeeId: 60, date: new Date('2026-09-23T00:00:00.000Z'), isDayOff: true, projectId: null, shiftId: null };
+    const otherSite = { id: 78, employeeId: 61, date: new Date('2026-09-22T00:00:00.000Z'), isDayOff: false, projectId: 99, shiftId: 2 };
+    const withCells = (...cells: any[]) => makeTx({
+      shiftRosterEntry: {
+        ...makeTx().tx.shiftRosterEntry,
+        findMany: jest.fn().mockResolvedValue(cells),
+      },
+    });
+
+    // The client keys on this to offer "approve anyway" rather than a dead end.
+    it('marks a days-off-only refusal as overridable', async () => {
+      const { service, tx } = withCells(dayOff);
+      const err: any = await service.activate(tx, REQUEST, 90).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ code: 'ROSTER_DAY_OFF_CLASH' });
+    });
+
+    it('rosters them on site over the day off once the approver says so', async () => {
+      const { service, tx } = withCells(dayOff);
+      await expect(service.activate(tx, REQUEST, 90, { overrideDayOff: true })).resolves.toBeDefined();
+      expect(tx.shiftRosterEntry.update).toHaveBeenCalledWith({
+        where: { id: 77 },
+        data: expect.objectContaining({ isDayOff: false, projectId: 3 }),
+      });
+    });
+
+    // Another project's site is somebody else's work; no override reaches it.
+    it('still refuses another project site, even with the override', async () => {
+      const { service, tx } = withCells(dayOff, otherSite);
+      const err: any = await service.activate(tx, REQUEST, 90, { overrideDayOff: true }).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ code: 'ROSTER_CLASH' });
+      expect(String(err.message)).toMatch(/another project/);
+    });
+
+    it('does not offer the override when another site is in the mix', async () => {
+      const { service, tx } = withCells(dayOff, otherSite);
+      const err: any = await service.activate(tx, REQUEST, 90).catch((e) => e);
+      expect(err.getResponse()).toMatchObject({ code: 'ROSTER_CLASH' });
+    });
   });
 
   it('refuses to move somebody off another project site', async () => {
@@ -456,5 +511,123 @@ describe('reconciling after a change is approved (§10)', () => {
     expect(tx.issue.updateMany).not.toHaveBeenCalled();
     expect(result.releasedDays).toBe(0);
     expect(result.archivedTasks).toBe(0);
+  });
+});
+
+/**
+ * Comp-Off for trip days that were not working days.
+ *
+ * The trip runs Tue 22 – Thu 24 Sep 2026 for employees 60, 61 and 62.
+ */
+describe('Comp-Off on approval', () => {
+  const D22 = new Date('2026-09-22T00:00:00.000Z');
+  const D23 = new Date('2026-09-23T00:00:00.000Z');
+  const D24 = new Date('2026-09-24T00:00:00.000Z');
+
+  const creditsMade = (tx: any) =>
+    tx.compOffCredit.create.mock.calls.map((c: any[]) =>
+      `${c[0].data.employeeId}|${c[0].data.date.toISOString().slice(0, 10)}|${c[0].data.reason}`);
+
+  it('credits nothing when every day is a working day', async () => {
+    const { service, tx } = makeTx();
+    const out = await service.activate(tx, REQUEST, 90);
+    expect(out.compOffDays).toBe(0);
+    expect(tx.compOffCredit.create).not.toHaveBeenCalled();
+  });
+
+  it('credits a holiday to everybody on the trip', async () => {
+    const { service, tx } = makeTx({ holiday: { findMany: jest.fn().mockResolvedValue([{ date: D23 }]) } });
+    const out = await service.activate(tx, REQUEST, 90);
+    expect(out.compOffDays).toBe(3);
+    expect(creditsMade(tx)).toEqual(['60|2026-09-23|HOLIDAY', '61|2026-09-23|HOLIDAY', '62|2026-09-23|HOLIDAY']);
+    expect(tx.leaveBalance.upsert).toHaveBeenCalledWith({
+      where: { employeeId_leaveTypeId_year: { employeeId: 60, leaveTypeId: 40, year: 2026 } },
+      update: { allocated: { increment: 1 } },
+      create: { employeeId: 60, leaveTypeId: 40, year: 2026, allocated: 1, used: 0 },
+    });
+  });
+
+  // The case from the override: the approver chose to work them on a day off.
+  it('credits an overridden rostered day off to that person only', async () => {
+    const { service, tx } = makeTx({
+      shiftRosterEntry: {
+        ...makeTx().tx.shiftRosterEntry,
+        findMany: jest.fn().mockResolvedValue([
+          { id: 77, employeeId: 61, date: D24, isDayOff: true, projectId: null, shiftId: null, note: null, startTime: null, endTime: null, shift: null },
+        ]),
+      },
+    });
+    await service.activate(tx, REQUEST, 90, { overrideDayOff: true });
+    expect(creditsMade(tx)).toEqual(['61|2026-09-24|DAY_OFF']);
+  });
+
+  it('credits a day the person’s shift does not work', async () => {
+    const MON_TUE = { id: 1, name: 'Short week', startTime: '09:00', endTime: '18:00', bufferTimeMinutes: 0, workingDays: 'Monday,Tuesday' };
+    const { service, tx } = makeTx({
+      employee: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 60, firstName: 'Asha', lastName: 'Rao', shift: MON_TUE },
+          { id: 61, firstName: 'Vikram', lastName: 'Singh', shift: null },
+          { id: 62, firstName: 'Neha', lastName: 'K', shift: null },
+        ]),
+      },
+    });
+    await service.activate(tx, REQUEST, 90);
+    expect(creditsMade(tx)).toEqual(['60|2026-09-23|WEEK_OFF', '60|2026-09-24|WEEK_OFF']);
+  });
+
+  it('does not credit the same day twice when the trip is approved again', async () => {
+    const { service, tx } = makeTx({ holiday: { findMany: jest.fn().mockResolvedValue([{ date: D23 }]) } });
+    tx.compOffCredit.findMany = jest.fn().mockResolvedValue([
+      { id: 1, employeeId: 60, date: D23, leaveTypeId: 40, year: 2026, days: 1 },
+      { id: 2, employeeId: 61, date: D23, leaveTypeId: 40, year: 2026, days: 1 },
+      { id: 3, employeeId: 62, date: D23, leaveTypeId: 40, year: 2026, days: 1 },
+    ]);
+    expect((await service.activate(tx, REQUEST, 90)).compOffDays).toBe(0);
+    expect(tx.leaveBalance.upsert).not.toHaveBeenCalled();
+  });
+
+  // On re-approval the roster shows the trip, not the day off it replaced, so
+  // the credit must survive on the ledger's word.
+  it('keeps an earlier credit for a day still on the trip', async () => {
+    const { service, tx } = makeTx();
+    tx.compOffCredit.findMany = jest.fn().mockResolvedValue([
+      { id: 9, employeeId: 61, date: D24, leaveTypeId: 40, year: 2026, days: 1 },
+    ]);
+    await service.activate(tx, REQUEST, 90);
+    expect(tx.compOffCredit.delete).not.toHaveBeenCalled();
+  });
+
+  it('takes back credits for a person no longer on the trip', async () => {
+    const { service, tx } = makeTx();
+    tx.compOffCredit.findMany = jest.fn().mockResolvedValue([
+      { id: 9, employeeId: 99, date: D22, leaveTypeId: 40, year: 2026, days: 1 },
+    ]);
+    await service.activate(tx, REQUEST, 90);
+    expect(tx.compOffCredit.delete).toHaveBeenCalledWith({ where: { id: 9 } });
+    expect(tx.leaveBalance.updateMany).toHaveBeenCalledWith({
+      where: { employeeId: 99, leaveTypeId: 40, year: 2026 },
+      data: { allocated: { decrement: 1 } },
+    });
+  });
+
+  it('takes back every credit when the trip is called off', async () => {
+    const { service, tx } = makeTx();
+    tx.compOffCredit.findMany = jest.fn().mockResolvedValue([
+      { id: 1, employeeId: 60, date: D23, leaveTypeId: 40, year: 2026, days: 1 },
+      { id: 2, employeeId: 61, date: D23, leaveTypeId: 40, year: 2026, days: 1 },
+    ]);
+    await service.deactivate(tx, REQUEST, 71);
+    expect(tx.compOffCredit.delete).toHaveBeenCalledTimes(2);
+    expect(tx.leaveBalance.updateMany).toHaveBeenCalledTimes(2);
+  });
+
+  it('creates the Comp-Off leave type on first use', async () => {
+    const { service, tx } = makeTx({ holiday: { findMany: jest.fn().mockResolvedValue([{ date: D23 }]) } });
+    tx.leaveType.findFirst = jest.fn().mockResolvedValue(null);
+    await service.activate(tx, REQUEST, 90);
+    expect(tx.leaveType.create).toHaveBeenCalledTimes(1);
+    expect(tx.leaveType.create.mock.calls[0][0].data).toMatchObject({ name: 'Comp-Off', isCompOff: true, companyId: REQUEST.companyId });
+    expect(tx.compOffCredit.create.mock.calls[0][0].data.leaveTypeId).toBe(41);
   });
 });

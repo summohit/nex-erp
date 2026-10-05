@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
@@ -29,6 +29,12 @@ import {
   LucideTimer,
   LucideSliders,
   LucideMapPin,
+  LucideEye,
+  LucideExternalLink,
+  LucideUsers,
+  LucidePaperclip,
+  LucideCheckSquare,
+  LucideLayers,
 } from '@lucide/angular';
 import {
   TaskHoursRequestsService,
@@ -96,6 +102,12 @@ export type RequestSortOption = 'newest' | 'oldest' | 'hours-desc' | 'hours-asc'
     LucideTimer,
     LucideSliders,
     LucideMapPin,
+    LucideEye,
+    LucideExternalLink,
+    LucideUsers,
+    LucidePaperclip,
+    LucideCheckSquare,
+    LucideLayers,
   ],
   templateUrl: './task-hours-requests-tab.html',
   styleUrls: ['./task-hours-requests-tab.css'],
@@ -705,6 +717,100 @@ export class TaskHoursRequestsTabComponent {
       },
       error: (err) => this.toast.error(err?.error?.message || 'Could not archive that task'),
     });
+  }
+
+  // ── Field Visit Details Modal ─────────────────────────────────────────────
+  viewingVisit = signal<FieldVisitRequest | null>(null);
+
+  openVisitDetails(r: FieldVisitRequest) {
+    this.viewingVisit.set(r);
+  }
+
+  closeVisitDetails() {
+    this.viewingVisit.set(null);
+  }
+
+  /** Approve or reject from the modal, then close it. */
+  async decideVisitFromModal(r: FieldVisitRequest, decision: 'APPROVED' | 'REJECTED') {
+    this.closeVisitDetails();
+    await this.decideFieldVisit(r, decision);
+  }
+
+  isGeneralVisit(r: FieldVisitRequest): boolean {
+    return !!r.project?.isSystem;
+  }
+
+  /** "09:00" → "9:00 AM", for the visit's daily hours. */
+  clockLabel(t?: string | null): string {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    if (!Number.isFinite(h)) return t;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${((h + 11) % 12) + 1}:${String(m || 0).padStart(2, '0')} ${ampm}`;
+  }
+
+  // ── Task Details Modal (§Complete Task Inspection) ────────────────────────
+  viewingTask = signal<any | null>(null);
+
+  openTaskDetails(t: any) {
+    this.viewingTask.set(t);
+  }
+
+  closeTaskDetails() {
+    this.viewingTask.set(null);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey() {
+    if (this.viewingVisit()) {
+      this.closeVisitDetails();
+      return;
+    }
+    if (this.viewingTask()) {
+      this.closeTaskDetails();
+    }
+  }
+
+  async decideFromModal(issue: any, action: 'APPROVE' | 'REJECT') {
+    await this.decideTaskApproval(issue, action);
+    this.closeTaskDetails();
+  }
+
+  async archiveFromModal(issue: any) {
+    await this.archiveTaskApproval(issue);
+    this.closeTaskDetails();
+  }
+
+  getPriorityColor(priority: string | undefined | null): string {
+    const colors: Record<string, string> = {
+      'CRITICAL': '#ef4444',
+      'HIGH': '#f97316',
+      'MEDIUM': '#0c66e4',
+      'LOW': '#22c55e',
+    };
+    return (priority && colors[priority]) || '#94a3b8';
+  }
+
+  getPriorityLabel(priority: string | undefined | null): string {
+    if (!priority) return 'None';
+    return priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase();
+  }
+
+  getPriorityBadgeClass(priority: string | undefined | null): string {
+    const p = (priority || '').toUpperCase();
+    if (p === 'CRITICAL') return 'priority-critical';
+    if (p === 'HIGH') return 'priority-high';
+    if (p === 'MEDIUM') return 'priority-medium';
+    if (p === 'LOW') return 'priority-low';
+    return 'priority-default';
+  }
+
+  /** Deduplicate team members so the assignee isn't listed twice */
+  getFilteredMembers(task: any): any[] {
+    if (!task?.members || !Array.isArray(task.members)) return [];
+    const assigneeId = task.assignee?.id;
+    if (!assigneeId) return task.members;
+    return task.members.filter((m: any) => m.employee?.id !== assigneeId);
   }
 
   // ── Budget requests ───────────────────────────────────────────────────────

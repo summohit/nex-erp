@@ -38,11 +38,34 @@
       <div class="form-section">
         <div class="section-header">
           <span class="section-tag">Step 1</span>
-          <span class="section-title">Project & Destination</span>
+          <span class="section-title">{{ visitType() === 'GENERAL' ? 'Visit Type & Destination' : 'Project & Destination' }}</span>
+        </div>
+
+        <!-- Project or General. A change to an approved trip cannot switch kinds. -->
+        <div class="field">
+          <label><span>Visit type</span></label>
+          <div class="visit-type-toggle" role="radiogroup">
+            <button type="button" role="radio" class="visit-type-option"
+              [class.active]="visitType() === 'PROJECT'" [attr.aria-checked]="visitType() === 'PROJECT'"
+              [disabled]="mode === 'modify'" (click)="setVisitType('PROJECT')">
+              <svg lucideBuilding [size]="15"></svg>
+              <span>Project</span>
+            </button>
+            <button type="button" role="radio" class="visit-type-option"
+              [class.active]="visitType() === 'GENERAL'" [attr.aria-checked]="visitType() === 'GENERAL'"
+              [disabled]="mode === 'modify'" (click)="setVisitType('GENERAL')">
+              <svg lucideListChecks [size]="15"></svg>
+              <span>General</span>
+            </button>
+          </div>
+          @if (visitType() === 'GENERAL') {
+            <p class="visit-type-hint">Not tied to a project. Pick who is going in Step 3, then choose from their To Do / In Progress general tasks in Step 4.</p>
+          }
         </div>
 
         <!-- Searchable Project Select -->
-        <div class="field">
+        @if (visitType() === 'PROJECT') {
+        <div class="field" id="field-fvr-project" [class.has-field-error]="showValidationErrors() && isFieldInvalid('project')">
           <label>
             <span>Project</span>
             <span class="required-star">*</span>
@@ -53,6 +76,7 @@
               class="searchable-select-trigger"
               [class.open]="isProjectDropdownOpen()"
               [class.has-value]="selectedProjectId() !== null"
+              [class.has-field-error]="showValidationErrors() && isFieldInvalid('project')"
               (click)="toggleProjectDropdown()">
               <div class="trigger-left">
                 <svg lucideBuilding [size]="16" class="select-icon"></svg>
@@ -126,7 +150,14 @@
               </div>
             }
           </div>
+          @if (showValidationErrors() && isFieldInvalid('project')) {
+            <div class="field-error-message">
+              <svg lucideCircleAlert [size]="14"></svg>
+              <span>Please select a project</span>
+            </div>
+          }
         </div>
+        }
 
         <!-- Standardized saved sites dropdown (§PB10) -->
         <div class="field">
@@ -261,32 +292,64 @@
         </div>
 
         <!-- Site Location -->
-        <div class="field">
+        <div class="field" id="field-fvr-location" [class.has-field-error]="showValidationErrors() && isFieldInvalid('location')">
           <label>
             <span>Site Name & Address</span>
             <span class="required-star">*</span>
           </label>
-          <div class="input-with-icon">
+          <div class="input-with-icon" [class.has-field-error]="showValidationErrors() && isFieldInvalid('location')">
             <svg lucideMapPin [size]="16" class="field-icon"></svg>
-            <input type="text" [(ngModel)]="form.location" placeholder="e.g. Client Site – Delhi, Plot 42" />
+            <input
+              type="text"
+              [(ngModel)]="form.location"
+              [class.has-field-error]="showValidationErrors() && isFieldInvalid('location')"
+              placeholder="e.g. Client Site – Delhi, Plot 42" />
           </div>
+          @if (showValidationErrors() && isFieldInvalid('location')) {
+            <div class="field-error-message">
+              <svg lucideCircleAlert [size]="14"></svg>
+              <span>Site name and address is required</span>
+            </div>
+          }
         </div>
 
         <!-- Coordinates & Pin -->
-        <div class="field-row coordinates-row">
+        <div class="field-row coordinates-row" id="field-fvr-coordinates" [class.has-field-error]="showValidationErrors() && isFieldInvalid('coordinates')">
           <div class="field">
-            <label>Latitude</label>
-            <input type="number" step="0.000001" [(ngModel)]="form.latitude" placeholder="e.g. 28.613939" />
+            <label>
+              <span>Latitude</span>
+              <span class="required-star">*</span>
+            </label>
+            <input
+              type="number"
+              step="0.000001"
+              [(ngModel)]="form.latitude"
+              [class.has-field-error]="showValidationErrors() && isFieldInvalid('coordinates')"
+              placeholder="e.g. 28.613939" />
           </div>
           <div class="field">
-            <label>Longitude</label>
-            <input type="number" step="0.000001" [(ngModel)]="form.longitude" placeholder="e.g. 77.209021" />
+            <label>
+              <span>Longitude</span>
+              <span class="required-star">*</span>
+            </label>
+            <input
+              type="number"
+              step="0.000001"
+              [(ngModel)]="form.longitude"
+              [class.has-field-error]="showValidationErrors() && isFieldInvalid('coordinates')"
+              placeholder="e.g. 77.209021" />
           </div>
           <button class="locate-btn" type="button" (click)="useMyLocation()">
             <svg lucideCrosshair [size]="15"></svg>
             Use my location
           </button>
         </div>
+        @if (showValidationErrors() && isFieldInvalid('coordinates')) {
+          <div class="field-error-message">
+            <svg lucideCircleAlert [size]="14"></svg>
+            <span>Valid GPS coordinates are required for site verification and clock-in</span>
+          </div>
+        }
 
         @if (form.latitude != null && form.longitude != null) {
           <div class="map-container">
@@ -309,14 +372,40 @@
         </div>
 
         <div class="field-row">
-          <div class="field">
-            <label>Start Date</label>
-            <input type="date" [(ngModel)]="form.startDate" (ngModelChange)="onScheduleDateChange()" />
+          <div class="field" id="field-fvr-start-date" [class.has-field-error]="showValidationErrors() && isFieldInvalid('startDate')">
+            <label>
+              <span>Start Date</span>
+              <span class="required-star">*</span>
+            </label>
+            <input
+              type="date"
+              [(ngModel)]="form.startDate"
+              (ngModelChange)="onScheduleDateChange()"
+              [class.has-field-error]="showValidationErrors() && isFieldInvalid('startDate')" />
+            @if (showValidationErrors() && isFieldInvalid('startDate')) {
+              <div class="field-error-message">
+                <svg lucideCircleAlert [size]="14"></svg>
+                <span>Start date is required</span>
+              </div>
+            }
           </div>
-          <div class="field">
-            <label>End Date</label>
-            <input type="date" [(ngModel)]="form.endDate" [min]="form.startDate || null"
-                   (ngModelChange)="onScheduleDateChange()" />
+          <div class="field" id="field-fvr-end-date" [class.has-field-error]="showValidationErrors() && isFieldInvalid('endDate')">
+            <label>
+              <span>End Date</span>
+              <span class="required-star">*</span>
+            </label>
+            <input
+              type="date"
+              [(ngModel)]="form.endDate"
+              [min]="form.startDate || null"
+              (ngModelChange)="onScheduleDateChange()"
+              [class.has-field-error]="showValidationErrors() && isFieldInvalid('endDate')" />
+            @if (showValidationErrors() && isFieldInvalid('endDate')) {
+              <div class="field-error-message">
+                <svg lucideCircleAlert [size]="14"></svg>
+                <span>{{ endDateErrorMessage() }}</span>
+              </div>
+            }
           </div>
           <div class="field days-field">
             <label>Duration</label>
@@ -329,32 +418,66 @@
         </div>
 
         <div class="field-row">
-          <div class="field">
-            <label>Expected Clock-in</label>
-            <div class="input-with-icon">
+          <div class="field" id="field-fvr-start-time" [class.has-field-error]="showValidationErrors() && isFieldInvalid('startTime')">
+            <label>
+              <span>Expected Clock-in</span>
+              <span class="required-star">*</span>
+            </label>
+            <div class="input-with-icon" [class.has-field-error]="showValidationErrors() && isFieldInvalid('startTime')">
               <svg lucideClock [size]="15" class="field-icon"></svg>
-              <input type="time" [(ngModel)]="form.startTime" />
+              <input
+                type="time"
+                [(ngModel)]="form.startTime"
+                [class.has-field-error]="showValidationErrors() && isFieldInvalid('startTime')" />
             </div>
+            @if (showValidationErrors() && isFieldInvalid('startTime')) {
+              <div class="field-error-message">
+                <svg lucideCircleAlert [size]="14"></svg>
+                <span>Clock-in time is required</span>
+              </div>
+            }
           </div>
-          <div class="field">
-            <label>Expected Clock-out</label>
-            <div class="input-with-icon">
+          <div class="field" id="field-fvr-end-time" [class.has-field-error]="showValidationErrors() && isFieldInvalid('endTime')">
+            <label>
+              <span>Expected Clock-out</span>
+              <span class="required-star">*</span>
+            </label>
+            <div class="input-with-icon" [class.has-field-error]="showValidationErrors() && isFieldInvalid('endTime')">
               <svg lucideClock [size]="15" class="field-icon"></svg>
-              <input type="time" [(ngModel)]="form.endTime" />
+              <input
+                type="time"
+                [(ngModel)]="form.endTime"
+                [class.has-field-error]="showValidationErrors() && isFieldInvalid('endTime')" />
             </div>
+            @if (showValidationErrors() && isFieldInvalid('endTime')) {
+              <div class="field-error-message">
+                <svg lucideCircleAlert [size]="14"></svg>
+                <span>{{ endTimeErrorMessage() }}</span>
+              </div>
+            }
           </div>
         </div>
       </div>
 
       <!-- SECTION 3: FIELD TEAM (WHO IS GOING) -->
-      <div class="form-section">
+      <div class="form-section" id="field-fvr-members" [class.has-field-error]="showValidationErrors() && isFieldInvalid('members')">
         <div class="section-header">
           <span class="section-tag">Step 3</span>
           <div class="section-title-wrap">
-            <span class="section-title">Who is going</span>
+            <span class="section-title">
+              Who is going
+              <span class="required-star">*</span>
+            </span>
             <span class="count-pill">{{ selectedEmployeeIds().length }} assigned</span>
           </div>
         </div>
+
+        @if (showValidationErrors() && isFieldInvalid('members')) {
+          <div class="field-error-message members-error-message">
+            <svg lucideCircleAlert [size]="14"></svg>
+            <span>Please select at least one team member who is going on this visit</span>
+          </div>
+        }
 
         <!-- Selected Members Badges -->
         @if (selectedEmployees().length > 0) {
@@ -398,7 +521,7 @@
           }
         </div>
 
-        <div class="member-picker-grid">
+        <div class="member-picker-grid" [class.has-field-error]="showValidationErrors() && isFieldInvalid('members')">
           @for (e of filteredEmployees(); track e.id) {
             <button
               type="button"
@@ -432,14 +555,24 @@
       </div>
 
       <!-- SECTION 4: TASKS & DELIVERABLES -->
-      <div class="form-section">
+      <div class="form-section" id="field-fvr-tasks" [class.has-field-error]="showValidationErrors() && isFieldInvalid('tasks')">
         <div class="section-header">
           <span class="section-tag">Step 4</span>
           <div class="section-title-wrap">
-            <span class="section-title">Site Tasks & Scope</span>
+            <span class="section-title">
+              Site Tasks & Scope
+              <span class="required-star">*</span>
+            </span>
             <span class="count-pill">{{ form.tasks.length }} selected</span>
           </div>
         </div>
+
+        @if (showValidationErrors() && isFieldInvalid('tasks')) {
+          <div class="field-error-message tasks-error-message">
+            <svg lucideCircleAlert [size]="14"></svg>
+            <span>Please select or add at least one task or deliverable for this visit</span>
+          </div>
+        }
 
         @if (tasksError()) {
           <div class="tasks-inline-error">
@@ -456,8 +589,9 @@
             class="searchable-select-trigger scope-trigger"
             [class.open]="isTaskDropdownOpen()"
             [class.has-value]="form.tasks.length > 0"
+            [class.has-field-error]="showValidationErrors() && isFieldInvalid('tasks')"
             (click)="toggleTaskDropdown()"
-            [disabled]="!selectedProjectId()">
+            [disabled]="visitType() === 'GENERAL' ? !selectedEmployeeIds().length : !selectedProjectId()">
             <div class="trigger-left">
               <svg lucideListChecks [size]="16" class="select-icon"></svg>
               <div class="loc-text-col">
@@ -469,10 +603,14 @@
                   }
                 </span>
                 <span class="selected-subtext" [class.subtle]="!form.tasks.length">
-                  @if (!selectedProjectId()) {
+                  @if (visitType() === 'GENERAL' && !selectedEmployeeIds().length) {
+                    Pick who is going first — their general tasks are listed here
+                  } @else if (visitType() === 'PROJECT' && !selectedProjectId()) {
                     Pick a project first — tasks come from that project's board
                   } @else if (form.tasks.length > 1) {
                     {{ form.tasks[0].key ? form.tasks[0].key + ' and ' + (form.tasks.length - 1) + ' more' : form.tasks[0].name }}
+                  } @else if (visitType() === 'GENERAL') {
+                    From their To Do / In Progress general tasks
                   } @else {
                     From {{ selectedProject()?.name }}
                   }
@@ -509,6 +647,12 @@
                           <svg lucideListChecks [size]="12"></svg>
                         }
                         <span class="scope-chip-name">{{ t.name }}</span>
+                        @if (t.issueId != null) {
+                          <span class="scope-chip-owner" [class.not-going]="!taskOwnersGoing(t.issueId).length">· {{ taskOwnerLabel(t.issueId) }}</span>
+                        }
+                        @if (isTaskAwaitingApproval(t.issueId)) {
+                          <span class="awaiting-badge" title="This task is waiting for approval">Awaiting approval</span>
+                        }
                         <button type="button" class="scope-chip-x" (click)="removeTaskAt($index)" title="Remove {{ t.name }}">
                           <svg lucideX [size]="12"></svg>
                         </button>
@@ -535,6 +679,7 @@
 
               <!-- Whose tasks are on offer. Off, the list is the people going in
                    Step 3 plus anything unassigned; on, the whole board. -->
+              @if (visitType() === 'PROJECT') {
               <div class="scope-filter-bar">
                 <div class="scope-filter-copy">
                   <svg lucideFilter [size]="13"></svg>
@@ -548,12 +693,13 @@
                   <span class="scope-switch-track"><span class="scope-switch-thumb"></span></span>
                 </label>
               </div>
+              }
 
               <div class="select-options-list scope-options-list">
                 @if (isLoadingTasks()) {
                   <div class="select-empty-state">
                     <svg lucideLoader [size]="18" class="spin-icon"></svg>
-                    <p>Loading this project's tasks…</p>
+                    <p>{{ visitType() === 'GENERAL' ? 'Loading their general tasks…' : 'Loading this project\'s tasks…' }}</p>
                   </div>
                 } @else {
                   @for (t of filteredProjectTasks(); track t.id) {
@@ -561,7 +707,12 @@
                       <div class="scope-option-left">
                         <span class="scope-key-badge">{{ t.key }}</span>
                         <div class="scope-option-text">
-                          <span class="scope-option-title">{{ t.title }}</span>
+                          <span class="scope-option-title">
+                            {{ t.title }}
+                            @if (t.approvalState === 'PENDING_TECHNICAL' || t.approvalState === 'PENDING_ADMIN') {
+                              <span class="awaiting-badge">Awaiting approval</span>
+                            }
+                          </span>
                           <span class="scope-option-meta">
                             @if (t.assigneeId) {
                               <span class="scope-owner">
@@ -607,10 +758,8 @@
                 }
               </div>
 
-              <!-- Escape hatch. Only shown when the list is empty, so it reads
-                   as what it is: a project with nothing on its board still
-                   needs a way to raise a visit. -->
-              @if (!isLoadingTasks() && !filteredProjectTasks().length) {
+              <!-- Escape hatch. Always shown at the bottom so users can add manual tasks if needed. -->
+              @if (!isLoadingTasks() && visitType() === 'PROJECT') {
                 <div class="scope-manual-block">
                   <label class="scope-manual-label">
                     Or describe work that is not on the project board
@@ -653,6 +802,12 @@
                     <span class="scope-summary-free">New</span>
                   }
                   <span class="scope-summary-name">{{ t.name }}</span>
+                  @if (t.issueId != null) {
+                    <span class="scope-chip-owner" [class.not-going]="!taskOwnersGoing(t.issueId).length">{{ taskOwnerLabel(t.issueId) }}</span>
+                  }
+                  @if (isTaskAwaitingApproval(t.issueId)) {
+                    <span class="awaiting-badge">Awaiting approval</span>
+                  }
                   @if (t.issueId) {
                     <span class="scope-summary-linked" title="This task is already on the project board — approval attaches the people going to it rather than creating a copy">
                       linked
@@ -667,9 +822,29 @@
           </div>
         }
 
+        @if (pickedNotOwnedByAnyoneGoing().length; as n) {
+          <div class="awaiting-alert not-going-alert" role="alert">
+            <strong>{{ n === 1 ? '1 selected task is' : n + ' selected tasks are' }} not assigned to anyone going:</strong>
+            {{ pickedNotOwnedByAnyoneGoing().map(x => (x.key || x.name) + ' (' + x.owner + ')').join(', ') }}.
+            Nobody on this visit will be able to clock in against {{ n === 1 ? 'it' : 'them' }}. Assign {{ n === 1 ? 'it' : 'them' }} to someone going on the project board, or add {{ n === 1 ? 'its owner' : 'their owners' }} in Step 3.
+          </div>
+        }
+
+        @if (pickedAwaitingApproval().length; as n) {
+          <div class="awaiting-alert" role="alert">
+            <strong>{{ n === 1 ? '1 selected task is' : n + ' selected tasks are' }} still waiting for approval:</strong>
+            {{ pickedAwaitingApproval().map(x => x.key || x.name).join(', ') }}.
+            Please ask an admin to approve {{ n === 1 ? 'it' : 'them' }} from <strong>Approval Requests</strong> — the work can't start until {{ n === 1 ? 'it is' : 'they are' }} approved.
+          </div>
+        }
+
         <p class="section-hint">
-          Pick from the project board so the visit and the board cannot disagree about what is
-          being done. Anything selected is attached to the people going when this is approved.
+          @if (visitType() === 'GENERAL') {
+            Pick from the general tasks (To Do or In Progress) of the people going.
+          } @else {
+            Pick from the project board so the visit and the board cannot disagree about what is
+            being done. Anything selected is attached to the people going when this is approved.
+          }
         </p>
       </div>
 

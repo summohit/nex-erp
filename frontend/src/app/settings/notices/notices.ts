@@ -8,9 +8,14 @@ import {
   LucideFilter, LucideAlertTriangle, LucideCheckCircle2, LucideClock, LucideCalendar,
   LucideUser, LucideDownload, LucideTrash2, LucideSparkles, LucideChevronDown,
   LucideChevronUp, LucideRefreshCw, LucideFile, LucideImage, LucideFileSpreadsheet,
-  LucideExternalLink, LucideEye, LucideBell, LucideShare2, LucideCheck
+  LucideExternalLink, LucideEye, LucideBell, LucideShare2, LucideCheck, LucideUsers,
 } from "@lucide/angular";
-import { NoticesService, Notice, NoticeAttachment } from "../../services/notices";
+import { QuillModule } from "ngx-quill";
+import Quill from "quill";
+import {
+  NoticesService, Notice, NoticeAttachment, AudienceOptions, NoticeViews, NoticeAudience,
+  noticeBodyHtml, noticeBodyText,
+} from "../../services/notices";
 import { UploadService } from "../../services/upload.service";
 
 /**
@@ -28,6 +33,7 @@ import { UploadService } from "../../services/upload.service";
     LucideUser, LucideDownload, LucideTrash2, LucideSparkles, LucideChevronDown,
     LucideChevronUp, LucideRefreshCw, LucideFile, LucideImage, LucideFileSpreadsheet,
     LucideExternalLink, LucideEye, LucideBell, LucideShare2, LucideCheck,
+    LucideUsers, QuillModule,
   ],
   templateUrl: "./notices.html",
   styleUrls: ["./notices.css"],
@@ -60,10 +66,179 @@ export class NoticesComponent {
   // Quick feedback for copied notice
   copiedNoticeId = signal<number | null>(null);
 
+  /** A posted notice's audience, shown read-only while editing it. */
+  editingAudience = signal<NoticeAudience | null>(null);
+
   // Form State
   form = this.blank();
   attachments = signal<{ fileName: string; fileUrl: string; fileSize?: number | null }[]>([]);
   uploading = signal(false);
+
+  // ─── Audience ────────────────────────────────────────────────────────────
+  // Empty everywhere means everybody. A notice's audience is fixed once posted:
+  // the recipients were resolved and stored then.
+  audienceOptions = signal<AudienceOptions | null>(null);
+  audienceMode = signal<"ALL" | "SELECTED">("ALL");
+  pickedDepartments = signal<Set<number>>(new Set());
+  pickedRoles = signal<Set<string>>(new Set());
+  pickedDesignations = signal<Set<number>>(new Set());
+  pickedUsers = signal<Set<number>>(new Set());
+  /** Matched by the group picks, then unticked. */
+  excludedUsers = signal<Set<number>>(new Set());
+  personQuery = signal("");
+  matchQuery = signal("");
+
+  /**
+   * Designations merged by name. Each department keeps its own copy of a
+   * title, so "Trainee" can be three rows; to whoever is sending a notice it
+   * is one job.
+   */
+  designationGroups = computed(() => {
+    const opts = this.audienceOptions();
+    if (!opts) return [];
+    const byName = new Map<string, number[]>();
+    for (const d of opts.designations) {
+      const key = d.name.trim();
+      byName.set(key, [...(byName.get(key) || []), d.id]);
+    }
+    return [...byName.entries()]
+      .map(([name, ids]) => ({ name, ids }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  isDesignationGroupOn(ids: number[]) {
+    return ids.some((id) => this.pickedDesignations().has(id));
+  }
+
+  toggleDesignationGroup(ids: number[]) {
+    const on = this.isDesignationGroupOn(ids);
+    this.pickedDesignations.update((set) => {
+      const next = new Set(set);
+      ids.forEach((id) => (on ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  }
+
+  /**
+   * When the picks match nobody, which kind of pick is to blame: the one
+   * whose removal would bring people back.
+   */
+  emptyHint = computed(() => {
+    const opts = this.audienceOptions();
+    if (!opts || !this.hasGroup() || this.groupMatches().length) return "";
+    const d = this.pickedDepartments(), r = this.pickedRoles(), g = this.pickedDesignations();
+    const count = (useD: boolean, useR: boolean, useG: boolean) => opts.people.filter((p) =>
+      (!useD || !d.size || (p.departmentId != null && d.has(p.departmentId)))
+      && (!useR || !r.size || r.has(p.role))
+      && (!useG || !g.size || (p.designationId != null && g.has(p.designationId))),
+    ).length;
+    const tips: string[] = [];
+    if (d.size && count(false, true, true)) tips.push(`without the department pick, ${count(false, true, true)} would match`);
+    if (r.size && count(true, false, true)) tips.push(`without the role pick, ${count(true, false, true)} would match`);
+    if (g.size && count(true, true, false)) tips.push(`without the designation pick, ${count(true, true, false)} would match`);
+    return tips.length ? tips.join("; ") : "";
+  });
+
+  private hasGroup = computed(() =>
+    this.pickedDepartments().size > 0 || this.pickedRoles().size > 0 || this.pickedDesignations().size > 0,
+  );
+
+  /**
+   * Everyone the department, role and designation picks match, before any
+   * unticking. Each kind picked narrows the others.
+   */
+  groupMatches = computed(() => {
+    const opts = this.audienceOptions();
+    if (!opts || !this.hasGroup()) return [];
+    const d = this.pickedDepartments(), r = this.pickedRoles(), g = this.pickedDesignations();
+    return opts.people.filter((p) =>
+      (!d.size || (p.departmentId != null && d.has(p.departmentId)))
+      && (!r.size || r.has(p.role))
+      && (!g.size || (p.designationId != null && g.has(p.designationId))),
+    );
+  });
+
+  visibleMatches = computed(() => {
+    const q = this.matchQuery().trim().toLowerCase();
+    const list = this.groupMatches();
+    return q ? list.filter((p) => p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)) : list;
+  });
+
+  tickedMatchCount = computed(() =>
+    this.groupMatches().filter((p) => !this.excludedUsers().has(p.userId)).length,
+  );
+
+  /** Who the current picks reach, worked out the way the server does. */
+  recipientCount = computed(() => {
+    const opts = this.audienceOptions();
+    if (!opts) return 0;
+    if (this.audienceMode() === "ALL") return opts.people.length;
+    const ids = new Set(
+      this.groupMatches().filter((p) => !this.excludedUsers().has(p.userId)).map((p) => p.userId),
+    );
+    this.pickedUsers().forEach((id) => ids.add(id));
+    return ids.size;
+  });
+
+  /** The picks in words, as the server will apply them. */
+  pickSummary = computed(() => {
+    const opts = this.audienceOptions();
+    if (!opts) return "";
+    const deptNames = opts.departments.filter((x) => this.pickedDepartments().has(x.id)).map((x) => x.name);
+    const desigNames = [...new Set(opts.designations.filter((x) => this.pickedDesignations().has(x.id)).map((x) => x.name.trim()))];
+    const roleNames = [...this.pickedRoles()].map((x) => this.roleLabel(x));
+    const parts: string[] = [];
+    if (desigNames.length) parts.push(desigNames.join(" or "));
+    if (roleNames.length) parts.push(`${roleNames.join(" or ")} role`);
+    let group = parts.join(", ");
+    if (deptNames.length) group = `${group || "Everyone"} in ${deptNames.join(" or ")}`;
+    const excluded = this.groupMatches().length - this.tickedMatchCount();
+    if (group && excluded) group += ` (except ${excluded})`;
+    const n = this.pickedUsers().size;
+    const people = n ? `${n} ${n === 1 ? "person" : "people"} by name` : "";
+    return group && people ? `${group}, plus ${people}` : group || people;
+  });
+
+  personMatches = computed(() => {
+    const opts = this.audienceOptions();
+    const q = this.personQuery().trim().toLowerCase();
+    if (!opts || !q) return [];
+    return opts.people
+      .filter((p) => !this.pickedUsers().has(p.userId)
+        && (p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)))
+      .slice(0, 8);
+  });
+
+  pickedPeople = computed(() => {
+    const opts = this.audienceOptions();
+    const u = this.pickedUsers();
+    return opts ? opts.people.filter((p) => u.has(p.userId)) : [];
+  });
+
+  // ─── View tracking ───────────────────────────────────────────────────────
+  viewsFor = signal<Notice | null>(null);
+  views = signal<NoticeViews | null>(null);
+  viewsLoading = signal(false);
+  viewsTab = signal<"VIEWED" | "PENDING">("PENDING");
+
+  readonly quillModules = {
+    table: true,
+    toolbar: {
+      container: [
+        [{ header: [1, 2, 3, false] }],
+        ["bold", "italic", "underline", "strike"],
+        [{ list: "ordered" }, { list: "bullet" }],
+        ["blockquote", "link"],
+        ["table"],
+        ["clean"],
+      ],
+      handlers: {
+        table(this: { quill: Quill }) {
+          (this.quill.getModule("table") as any).insertTable(3, 3);
+        },
+      },
+    },
+  };
 
   // Visual Priority Options for Composer
   readonly priorityOptions = [
@@ -128,7 +303,7 @@ export class NoticesComponent {
     if (query) {
       list = list.filter((n) => {
         const titleMatch = (n.title || "").toLowerCase().includes(query);
-        const bodyMatch = (n.body || "").toLowerCase().includes(query);
+        const bodyMatch = this.bodyText(n.body).toLowerCase().includes(query);
         const authorMatch = n.createdBy
           ? `${n.createdBy.firstName} ${n.createdBy.lastName}`.toLowerCase().includes(query)
           : false;
@@ -183,6 +358,127 @@ export class NoticesComponent {
     this.load();
   }
 
+  bodyHtml(body: string): string {
+    return noticeBodyHtml(body);
+  }
+
+  bodyText(body: string): string {
+    return noticeBodyText(body);
+  }
+
+  // ─── Audience picking ────────────────────────────────────────────────────
+
+  private loadAudienceOptions() {
+    if (this.audienceOptions()) return;
+    this.api.audienceOptions().subscribe({
+      next: (o) => this.audienceOptions.set(o),
+      error: () => this.toast.error("Could not load departments and people"),
+    });
+  }
+
+  private resetAudience() {
+    this.audienceMode.set("ALL");
+    this.pickedDepartments.set(new Set());
+    this.pickedRoles.set(new Set());
+    this.pickedDesignations.set(new Set());
+    this.pickedUsers.set(new Set());
+    this.excludedUsers.set(new Set());
+    this.personQuery.set("");
+    this.matchQuery.set("");
+  }
+
+  private toggleIn<T>(sig: ReturnType<typeof signal<Set<T>>>, v: T) {
+    sig.update((set) => {
+      const next = new Set(set);
+      next.has(v) ? next.delete(v) : next.add(v);
+      return next;
+    });
+  }
+
+  toggleDepartment(id: number) { this.toggleIn(this.pickedDepartments, id); }
+  toggleRole(role: string) { this.toggleIn(this.pickedRoles, role); }
+  toggleDesignation(id: number) { this.toggleIn(this.pickedDesignations, id); }
+  toggleMatch(userId: number) { this.toggleIn(this.excludedUsers, userId); }
+  isTicked(userId: number) { return !this.excludedUsers().has(userId); }
+
+  /** Tick or untick everyone currently shown in the matches list. */
+  setAllMatches(ticked: boolean) {
+    const shown = this.visibleMatches().map((p) => p.userId);
+    this.excludedUsers.update((set) => {
+      const next = new Set(set);
+      shown.forEach((id) => (ticked ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  }
+
+  departmentName(id: number | null): string {
+    return this.audienceOptions()?.departments.find((d) => d.id === id)?.name ?? "";
+  }
+  addPerson(userId: number) { this.toggleIn(this.pickedUsers, userId); this.personQuery.set(""); }
+  removePerson(userId: number) { this.toggleIn(this.pickedUsers, userId); }
+
+  roleLabel(role: string): string {
+    return role.charAt(0) + role.slice(1).toLowerCase().replace(/_/g, " ");
+  }
+
+  /** "Everybody", or what a posted notice was addressed to, in words. */
+  audienceSummary(a?: NoticeAudience | null): string {
+    if (!a) return "Everybody";
+    const opts = this.audienceOptions();
+    const parts: string[] = [];
+    const depts = (a.departmentIds || []).map((id) => opts?.departments.find((d) => d.id === id)?.name ?? `Dept #${id}`);
+    if (depts.length) parts.push(depts.join(", "));
+    if (a.roles?.length) parts.push(a.roles.map((r) => this.roleLabel(r)).join(", "));
+    const desigs = [...new Set((a.designationIds || []).map((id) => opts?.designations.find((d) => d.id === id)?.name.trim() ?? `Designation #${id}`))];
+    if (desigs.length) parts.push(desigs.join(", "));
+    if (a.excludeUserIds?.length) parts.push(`except ${a.excludeUserIds.length}`);
+    if (a.userIds?.length) parts.push(`${a.userIds.length} ${a.userIds.length === 1 ? "person" : "people"}`);
+    return parts.join(" · ") || "Everybody";
+  }
+
+  // ─── Who has seen it ─────────────────────────────────────────────────────
+
+  openViews(n: Notice) {
+    this.viewsFor.set(n);
+    this.views.set(null);
+    this.viewsTab.set("PENDING");
+    this.viewsLoading.set(true);
+    this.loadAudienceOptions();
+    this.api.views(n.id).subscribe({
+      next: (v) => {
+        this.views.set(v);
+        this.viewsTab.set(v.pendingCount ? "PENDING" : "VIEWED");
+        this.viewsLoading.set(false);
+      },
+      error: (err) => {
+        this.viewsLoading.set(false);
+        this.toast.error(err?.error?.message || "Could not load who has seen it");
+      },
+    });
+  }
+
+  closeViews() {
+    this.viewsFor.set(null);
+    this.views.set(null);
+  }
+
+  viewedPercent(n: Notice): number {
+    const total = n._count?.recipients ?? 0;
+    return total ? Math.round(((n._count?.reads ?? 0) / total) * 100) : 0;
+  }
+
+  /**
+   * Opening the board is reading it: every live notice addressed to this
+   * person is on the screen in front of them.
+   */
+  private markShownAsRead(list: Notice[]) {
+    for (const n of list) {
+      if (n.isRead === false) {
+        this.api.markRead(n.id).subscribe({ error: () => {} });
+      }
+    }
+  }
+
   private blank() {
     return {
       title: "",
@@ -201,6 +497,8 @@ export class NoticesComponent {
         this.notices.set(res?.notices || []);
         this.canPost.set(!!res?.canPost);
         this.loading.set(false);
+        if (res?.canPost) this.loadAudienceOptions();
+        else this.markShownAsRead(res?.notices || []);
       },
       error: (err) => {
         this.loading.set(false);
@@ -245,20 +543,23 @@ export class NoticesComponent {
   }
 
   isLongBody(body: string): boolean {
-    return (body || "").length > 240 || (body || "").split("\n").length > 4;
+    const html = this.bodyHtml(body);
+    return this.bodyText(body).length > 240 || (html.match(/<(p|li|tr|h\d)[\s>]/g) || []).length > 4;
   }
 
   openNew() {
     this.form = this.blank();
     this.attachments.set([]);
     this.editingId.set(null);
+    this.resetAudience();
+    this.loadAudienceOptions();
     this.formOpen.set(true);
   }
 
   openEdit(n: Notice) {
     this.form = {
       title: n.title,
-      body: n.body,
+      body: this.bodyHtml(n.body),
       priority: n.priority,
       publishedAt: n.publishedAt ? n.publishedAt.slice(0, 10) : "",
       expiresAt: n.expiresAt ? n.expiresAt.slice(0, 10) : "",
@@ -274,6 +575,7 @@ export class NoticesComponent {
         : []
     );
     this.editingId.set(n.id);
+    this.editingAudience.set(n.audience ?? null);
     this.formOpen.set(true);
   }
 
@@ -372,7 +674,7 @@ export class NoticesComponent {
 
   copyNoticeText(n: Notice) {
     const author = n.createdBy ? `${n.createdBy.firstName} ${n.createdBy.lastName}` : "Company Announcement";
-    const text = `📢 ${n.title}\n\n${n.body}\n\n— ${author}`;
+    const text = `📢 ${n.title}\n\n${this.bodyText(n.body)}\n\n— ${author}`;
     navigator.clipboard.writeText(text).then(() => {
       this.copiedNoticeId.set(n.id);
       this.toast.success("Notice copied to clipboard");
@@ -388,9 +690,31 @@ export class NoticesComponent {
 
   save() {
     const title = this.form.title.trim();
-    const body = this.form.body.trim();
+    const body = (this.form.body || "").trim();
     if (!title) { this.toast.error("A notice needs a title"); return; }
-    if (!body) { this.toast.error("A notice needs something to say"); return; }
+    if (!this.bodyText(body)) { this.toast.error("A notice needs something to say"); return; }
+
+    const id0 = this.editingId();
+    let audience: NoticeAudience | null = null;
+    if (!id0 && this.audienceMode() === "SELECTED") {
+      const matched = new Set(this.groupMatches().map((p) => p.userId));
+      audience = {
+        departmentIds: [...this.pickedDepartments()],
+        roles: [...this.pickedRoles()],
+        designationIds: [...this.pickedDesignations()],
+        // Only exclusions that still apply to the current picks.
+        excludeUserIds: [...this.excludedUsers()].filter((id) => matched.has(id)),
+        userIds: [...this.pickedUsers()],
+      };
+      if (!this.hasGroup() && !audience.userIds!.length) {
+        this.toast.error("Pick at least one department, role, designation or person");
+        return;
+      }
+      if (!this.recipientCount()) {
+        this.toast.error("Nobody matches what you picked");
+        return;
+      }
+    }
 
     const payload = {
       title,
@@ -400,6 +724,7 @@ export class NoticesComponent {
       expiresAt: this.form.expiresAt || null,
       sendEmail: this.form.sendEmail,
       attachments: this.attachments(),
+      ...(id0 ? {} : { audience }),
     };
 
     this.saving.set(true);
@@ -413,7 +738,9 @@ export class NoticesComponent {
         this.load();
         this.toast.success(
           id ? "Notice updated successfully"
-             : (this.form.sendEmail ? "Notice posted and emailed to team" : "Notice posted successfully"),
+             : (this.form.sendEmail
+                 ? `Notice posted and emailed to ${this.recipientCount()} ${this.recipientCount() === 1 ? "person" : "people"}`
+                 : "Notice posted successfully"),
         );
       },
       error: (err) => {

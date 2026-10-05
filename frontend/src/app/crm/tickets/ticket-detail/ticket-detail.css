@@ -1368,3 +1368,36 @@
 .file-badge.file-slide   .file-badge-ext { background: #1373e5; }
 .file-badge.file-archive .file-badge-ext { background: #7c3aed; }
 .file-badge.file-generic .file-badge-ext { background: #64748b; }
+
+/* ─── Comments: rich text editor and rendered replies ─────────────────── */
+.comment-quill { display: block; width: 100%; }
+.comment-quill ::ng-deep .ql-toolbar { border-radius: 10px 10px 0 0; border-color: #e2e8f0; padding: 6px; }
+.comment-quill ::ng-deep .ql-container { border-radius: 0 0 10px 10px; border-color: #e2e8f0; font-size: 14px; font-family: inherit; }
+.comment-quill ::ng-deep .ql-editor { min-height: 80px; max-height: 260px; overflow-y: auto; }
+
+/* innerHTML content is outside view encapsulation. */
+.comment-body-text.rich-text { white-space: normal; }
+.comment-body-text.rich-text ::ng-deep p { margin: 0 0 6px; }
+.comment-body-text.rich-text ::ng-deep p:last-child { margin-bottom: 0; }
+.comment-body-text.rich-text ::ng-deep ol, .comment-body-text.rich-text ::ng-deep ul { margin: 0 0 6px; padding-left: 22px; }
+.comment-body-text.rich-text ::ng-deep li[data-list="bullet"] { list-style-type: disc; }
+.comment-body-text.rich-text ::ng-deep li[data-list="ordered"] { list-style-type: decimal; }
+.comment-body-text.rich-text ::ng-deep li > .ql-ui { display: none; }
+.comment-body-text.rich-text ::ng-deep blockquote { margin: 6px 0; padding: 4px 12px; border-left: 3px solid #cbd5e1; color: #475569; }
+.comment-body-text.rich-text ::ng-deep pre { background: #f1f5f9; padding: 8px 10px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }
+.comment-body-text.rich-text ::ng-deep a { color: #2563eb; text-decoration: underline; }
+
+/* Reporter verify-and-close prompt */
+.status-actions-bar.reporter-bar { gap: 14px; flex-wrap: wrap; align-items: center; }
+.reporter-verify-text { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 220px; }
+.reporter-verify-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; color: #15803d; }
+.reporter-verify-title svg { color: #16a34a; }
+.reporter-verify-sub { font-size: 12.5px; color: #3f6212; line-height: 1.5; }
+.btn-verify-close {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #16a34a; color: #ffffff; border: 1px solid #15803d;
+  padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(22, 101, 52, 0.2);
+}
+.btn-verify-close:hover:not(:disabled) { background: #15803d; }
+.btn-verify-close:disabled { opacity: 0.7; cursor: default; }

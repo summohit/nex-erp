@@ -9,11 +9,12 @@ import { MyTaskDto, NormalisedStatus, TaskPerson } from './dto/my-task.dto';
 import { canCreateTask } from './task-permissions';
 import { APPROVAL_STATE, needsApprovalOnCreate } from '../approvals/two-step-approval';
 import { rankTaskPerformers, TaskPerformanceInput, TaskPerformer } from './task-performance';
-import { isSuperAdmin } from '../common/company-roles';
+import { isCompanyAdmin, isSuperAdmin } from '../common/company-roles';
 import { resolveProjectViewer } from '../projects/project-roles';
 
 /** Whose tasks a My Tasks request is asking for. 'all' is administrators only. */
-export type TaskScope = 'mine' | 'all';
+/** 'created' = tasks I raised for anybody, so a PM can follow what they handed out. */
+export type TaskScope = 'mine' | 'all' | 'created';
 
 /** Board columns whose names map onto the normalised ladder. */
 const STATUS_LADDER: Record<string, NormalisedStatus> = {
@@ -63,11 +64,20 @@ export class TasksService {
     actorEmployeeId: number | null,
     role: string | undefined,
     project?: { id?: number; leadId: number | null } | null,
+    /**
+     * What was being attempted. The refusal differs because the way forward
+     * differs: being made a project manager fixes one and does nothing for the
+     * other, and "create tasks here" did not say which this was.
+     */
+    kind: 'GENERAL' | 'PROJECT' = 'PROJECT',
   ): Promise<void> {
     if (await this.canCreateTask(companyId, actorEmployeeId, role, project)) return;
     throw new ForbiddenException(
-      'You do not have permission to create tasks here. A project manager can raise tasks ' +
-      'inside a project they manage; otherwise ask an administrator to enable it for your department.',
+      kind === 'GENERAL'
+        ? 'You do not have permission to change general tasks for other people. Ask an administrator '
+          + 'to enable task creation for your department.'
+        : 'You can only raise tasks in projects you own or manage. Pick one of those, or ask an '
+          + 'administrator to enable task creation for your department.',
     );
   }
 
@@ -93,7 +103,7 @@ export class TasksService {
      * server would allow the thing the screen never offers.
      */
     const managesAProject =
-      !canCreate && actorEmployeeId != null
+      actorEmployeeId != null
         ? !!(await this.prisma.projectMember.findFirst({
             where: {
               employeeId: actorEmployeeId,
@@ -104,12 +114,35 @@ export class TasksService {
           }))
         : false;
 
+    const isAdmin = role === 'SUPERADMIN' || role === 'ADMIN';
+
     return {
       canCreateTask: canCreate || managesAProject,
-      // General tasks belong to no project, so managing one grants nothing here.
-      canCreateGeneral: canCreate,
-      isAdmin: role === 'SUPERADMIN' || role === 'ADMIN',
+      // General tasks: administrators and project managers only — see
+      // canCreateGeneralTask. A department flag does not grant this.
+      canCreateGeneral: isAdmin || managesAProject,
+      /** Raise a task in ANY project: admin, or a department flagged in Master Data. */
+      canCreateAnywhere: canCreate,
+      isAdmin,
     };
+  }
+
+  /**
+   * Who may raise a general task — one that belongs to no project and no deal.
+   *
+   * Administrators, and anyone who is a project manager on at least one
+   * project. Deliberately not the Master Data department flag: that flag is
+   * about raising work inside projects, and a general task has no project to
+   * scope it, so it is limited to the people who already direct other people's
+   * work. Such a task may be assigned to anybody in the company.
+   */
+  async canCreateGeneralTask(companyId: number, actorEmployeeId: number | null, role?: string) {
+    if (role === 'SUPERADMIN' || role === 'ADMIN') return true;
+    if (actorEmployeeId == null) return false;
+    return !!(await this.prisma.projectMember.findFirst({
+      where: { employeeId: actorEmployeeId, role: 'PROJECT_MANAGER', project: { companyId } },
+      select: { id: true },
+    }));
   }
 
   // ── the General project ──────────────────────────────────────────────────
@@ -251,6 +284,42 @@ export class TasksService {
     return unique;
   }
 
+  /**
+   * The estimate and the dates, checked together.
+   *
+   * Hours are required and must be positive: an unestimated task cannot be
+   * planned, and zero is the value people type to get past a required box.
+   * Both dates are required for the same reason a plan needs them, and the end
+   * cannot precede the start. Compared as calendar days rather than instants,
+   * because the form sends plain dates and "due the same day it starts" is a
+   * normal one-day task.
+   *
+   * Applied on the server as well as the form: the form is a courtesy, and the
+   * API is also reachable from the mobile app.
+   */
+  private assertValidSchedule(data: {
+    parentKind?: string; startDate?: string; dueDate?: string; estimatedHours?: number | string | null;
+  }) {
+    const hours = Number(data.estimatedHours);
+    if (data.estimatedHours == null || data.estimatedHours === '' || !Number.isFinite(hours) || hours <= 0) {
+      throw new BadRequestException('Enter the estimated hours — it must be greater than zero.');
+    }
+
+    const parse = (v?: string) => {
+      const d = v ? new Date(v) : null;
+      return d && !Number.isNaN(d.getTime()) ? d : null;
+    };
+    const start = parse(data.startDate);
+    const due = parse(data.dueDate);
+    if (!start) throw new BadRequestException('Choose a start date.');
+    if (!due) throw new BadRequestException('Choose a due date.');
+
+    const day = (d: Date) => d.toISOString().slice(0, 10);
+    if (day(due) < day(start)) {
+      throw new BadRequestException('The due date cannot be before the start date.');
+    }
+  }
+
   // ── creating a task ──────────────────────────────────────────────────────
 
   /**
@@ -290,6 +359,7 @@ export class TasksService {
     },
   ) {
     if (!data?.title?.trim()) throw new BadRequestException('A task needs a title.');
+    this.assertValidSchedule(data);
 
     // Resolve where it lives. A lead-linked or general task goes in the hidden
     // General project, which is what gives it a key, a column and a detail view.
@@ -306,20 +376,37 @@ export class TasksService {
       project = await this.ensureGeneralProject(companyId);
     }
 
-    await this.assertCanCreateTask(companyId, reporterId, role, project);
+    const assigneeIds = [...new Set((data.assigneeIds ?? []).map(Number).filter(Boolean))];
+
+    if (data.parentKind === 'PROJECT') {
+      await this.assertCanCreateTask(companyId, reporterId, role, project, 'PROJECT');
+    } else if (!(await this.canCreateGeneralTask(companyId, reporterId, role))) {
+      throw new ForbiddenException(
+        'Only administrators and project managers can create general tasks.',
+      );
+    }
 
     // §PB8: the same approval a task raised from the board gets. This is a
     // second creation path into the same Issue table, so the rule has to be
     // applied here too — otherwise the Add Task modal is simply a way around
     // it, and an approval anybody can sidestep is not an approval.
     //
-    // Only for work that belongs to a real project. A general or lead-linked
-    // task lands in the hidden General project, which has no technical
-    // architect to review it and no delivery for the approval to protect.
+    // A lead-linked task lands in the hidden General project, which has no
+    // technical architect to review it and no delivery to protect, so it is
+    // never held. General tasks have their own, admin-only rule below.
     const creator = await resolveProjectViewer(
       this.prisma as any, companyId, project.id, reporterId, role,
     );
-    const approvalNeeded = data.parentKind === 'PROJECT' && needsApprovalOnCreate(creator);
+    const projectApproval = data.parentKind === 'PROJECT' && needsApprovalOnCreate(creator);
+
+    // A general task raised by a project manager waits for an administrator.
+    // There is no technical architect over the General workspace, so it
+    // starts at the admin step. An administrator's own goes straight in.
+    const isGeneral = data.parentKind !== 'PROJECT' && data.parentKind !== 'LEAD' && !data.leadId;
+    const generalApproval = isGeneral && !isCompanyAdmin(role);
+
+    const approvalNeeded = projectApproval || generalApproval;
+    const initialApproval = generalApproval ? APPROVAL_STATE.PENDING_ADMIN : APPROVAL_STATE.PENDING_TECHNICAL;
 
     if (data.leadId) {
       const lead = await this.prisma.lead.findFirst({
@@ -334,7 +421,12 @@ export class TasksService {
     // §8: a new task belongs to a phase -- the same rule the board enforces,
     // and for the same reason it is conditional there: a company with no
     // active phases would otherwise lose task creation altogether.
-    if (!data.phaseId) {
+    //
+    // Only for a task that belongs to a project. A phase is a stage of a
+    // project's delivery; a general task has no delivery to be in a stage of,
+    // and the form does not offer the field there. Demanding it anyway made
+    // General tasks impossible to create in any company that had phases.
+    if (data.parentKind === 'PROJECT' && !data.phaseId) {
       const phasesExist = await this.prisma.projectPhase.count({
         where: { companyId, isActive: true },
       });
@@ -381,7 +473,9 @@ export class TasksService {
           leadId: data.leadId ? Number(data.leadId) : null,
           taskTypeId: data.taskTypeId ? Number(data.taskTypeId) : null,
           // §8: the delivery phase the task belongs to.
-          phaseId: data.phaseId ? Number(data.phaseId) : null,
+          // A general task has no project to be in a phase of, so a stray
+          // phaseId from a stale client is dropped rather than stored.
+          phaseId: data.parentKind === 'PROJECT' && data.phaseId ? Number(data.phaseId) : null,
           companyId,
           columnId: firstColumn?.id ?? null,
           reporterId,
@@ -389,12 +483,12 @@ export class TasksService {
           startDate: data.startDate ? new Date(data.startDate) : null,
           dueDate: data.dueDate ? new Date(data.dueDate) : null,
           estimatedHours: data.estimatedHours != null ? Number(data.estimatedHours) : null,
-          approvalState: approvalNeeded ? APPROVAL_STATE.PENDING_TECHNICAL : null,
+          approvalState: approvalNeeded ? initialApproval : null,
           approvalRequestedById: approvalNeeded ? reporterId : null,
         },
       });
 
-      const assignees = await this.syncAssignees(tx, created.id, data.assigneeIds ?? []);
+      const assignees = await this.syncAssignees(tx, created.id, assigneeIds);
 
       // An assignee who is not on the project cannot see the project the task
       // lives in — getProjects filters non-admins by membership. The board's
@@ -452,7 +546,7 @@ export class TasksService {
     });
 
     this.tasksGateway.emitIssueUpdated(issue.id, project.id, issue);
-    await this.notificationsService.notifyEmployees(data.assigneeIds ?? [], {
+    await this.notificationsService.notifyEmployees(assigneeIds, {
       companyId,
       title: `New task: ${issue.title}`,
       message: `${issue.key} has been assigned to you.`,
@@ -495,6 +589,8 @@ export class TasksService {
     opts: { includeReported?: boolean; includeDone?: boolean; scope?: TaskScope } = {},
   ): Promise<{ items: MyTaskDto[]; truncated: boolean; scope: TaskScope }> {
     const everyone = opts.scope === 'all' && (role === 'SUPERADMIN' || role === 'ADMIN');
+    // Anyone may see what they themselves raised; no role check needed.
+    const created = !everyone && opts.scope === 'created';
 
     const mine: any[] = [
       { assigneeId: employeeId },
@@ -507,7 +603,7 @@ export class TasksService {
         companyId,
         isArchived: false,
         ...(opts.includeDone ? {} : { status: { notIn: CLOSED_STATUSES } }),
-        ...(everyone ? {} : { OR: mine }),
+        ...(everyone ? {} : created ? { reporterId: employeeId } : { OR: mine }),
       },
       select: {
         id: true, key: true, title: true, status: true, priority: true,
@@ -605,6 +701,7 @@ export class TasksService {
       includeDone: opts.includeDone === true,
       take: PER_SOURCE_CAP,
       everyone,
+      createdBy: created,
       isAdmin: role === 'SUPERADMIN' || role === 'ADMIN',
     });
 
@@ -624,7 +721,7 @@ export class TasksService {
       truncated: issues.length >= PER_SOURCE_CAP || preSales.length >= PER_SOURCE_CAP,
       // Echoed back so the UI reflects what it actually got rather than what it
       // asked for — a non-admin who sends scope=all is answered with 'mine'.
-      scope: everyone ? 'all' : 'mine',
+      scope: everyone ? 'all' : created ? 'created' : 'mine',
     };
   }
 
