@@ -2770,3 +2770,45 @@
 .fv-file { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; border: 1px solid #e2e8f0; color: #1d4ed8; font-size: 13px; text-decoration: none; }
 .fv-file:hover { background: #eff6ff; }
 @media (max-width: 640px) { .fv-detail-grid { grid-template-columns: 1fr; } }
+
+/* ─── Task approvals: table view and bulk actions ───────────────────────── */
+.ta-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.ta-view-switch { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.ta-view-switch button { border: none; background: transparent; padding: 6px 14px; border-radius: 7px; font-weight: 600; font-size: 13px; color: #64748b; cursor: pointer; }
+.ta-view-switch button.active { background: #fff; color: #1d4ed8; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.ta-bulk { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ta-bulk-count { font-size: 13px; font-weight: 700; color: #334155; }
+.ta-table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+.ta-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ta-table th { text-align: left; padding: 10px 12px; background: #f8fafc; color: #475569; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+.ta-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; color: #0f172a; }
+.ta-table tr:last-child td { border-bottom: none; }
+.ta-table tbody tr:hover { background: #f8fafc; }
+.ta-table tbody tr.selected { background: #eff6ff; }
+.ta-check { width: 36px; text-align: center; }
+.ta-check input { width: 16px; height: 16px; accent-color: #2563eb; cursor: pointer; }
+.ta-task { display: flex; align-items: center; gap: 8px; min-width: 260px; }
+.ta-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 360px; }
+.ta-muted { color: #475569; }
+.ta-muted a { color: #2563eb; text-decoration: none; }
+.ta-muted a:hover { text-decoration: underline; }
+.ta-person { font-weight: 600; color: #0f172a; }
+.ta-nowrap { white-space: nowrap; }
+.ta-stage { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.ta-actions-col { white-space: nowrap; text-align: right; }
+.ta-icon-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; margin-left: 4px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; cursor: pointer; }
+.ta-icon-btn:hover { background: #f1f5f9; }
+.ta-icon-btn.approve { color: #15803d; border-color: #bbf7d0; }
+.ta-icon-btn.approve:hover { background: #f0fdf4; }
+.ta-icon-btn.reject { color: #be123c; border-color: #fecdd3; }
+.ta-icon-btn.reject:hover { background: #fff1f2; }
+.ta-assigned { font-weight: 600; color: #334155; }
+
+/* Task approval filters */
+.ta-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1; }
+.ta-filter-input, .ta-filter-select { height: 34px; padding: 0 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; background: #fff; color: #0f172a; }
+.ta-filter-input { min-width: 200px; flex: 1 1 200px; max-width: 280px; }
+.ta-filter-input:focus, .ta-filter-select:focus { outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px #dbeafe; }
+.ta-clear { border: none; background: none; color: #2563eb; font-weight: 600; font-size: 13px; cursor: pointer; }
+.ta-showing { font-size: 12.5px; color: #64748b; white-space: nowrap; }
+.ta-none { text-align: center; color: #64748b; padding: 22px 12px !important; }

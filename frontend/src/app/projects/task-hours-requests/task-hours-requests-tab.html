@@ -802,7 +802,80 @@
       <p>Every task raised for approval has been ruled on.</p>
     </div>
 
-    <article class="prq-card" *ngFor="let t of taskApprovals()">
+    <!-- View switch + bulk actions -->
+    <div class="ta-toolbar" *ngIf="taskApprovals().length">
+      <div class="ta-view-switch" role="tablist">
+        <button type="button" role="tab" [class.active]="taskView() === 'TABLE'" (click)="setTaskView('TABLE')">Table</button>
+        <button type="button" role="tab" [class.active]="taskView() === 'CARDS'" (click)="setTaskView('CARDS')">Cards</button>
+      </div>
+      <div class="ta-filters">
+        <input type="search" class="ta-filter-input" placeholder="Project name or code…"
+               [value]="taskProjectQuery()" (input)="setTaskFilter('project', $any($event.target).value)" />
+        <input type="search" class="ta-filter-input" placeholder="Person (assigned, member or raised by)…"
+               [value]="taskPersonQuery()" (input)="setTaskFilter('person', $any($event.target).value)" />
+        <select class="ta-filter-select" [value]="taskWhen()" (change)="setTaskFilter('when', $any($event.target).value)">
+          <option value="ALL">Any date</option>
+          <option value="TODAY">Today</option>
+          <option value="NEXT_30">Next 30 days</option>
+          <option value="NEXT_60">Next 60 days</option>
+          <option value="FUTURE">Future (after today)</option>
+        </select>
+        <button type="button" class="ta-clear" *ngIf="hasTaskFilters()" (click)="clearTaskFilters()">Clear</button>
+        <span class="ta-showing">Showing {{ filteredTaskApprovals().length }} of {{ taskApprovals().length }}</span>
+      </div>
+      <div class="ta-bulk" *ngIf="taskView() === 'TABLE' && selectedTaskIds().size">
+        <span class="ta-bulk-count">{{ selectedTaskIds().size }} selected</span>
+        <button type="button" class="prq-btn reject" [disabled]="bulkTaskBusy()" (click)="bulkDecideTasks('REJECT')">
+          <svg lucideX size="14"></svg> Reject selected
+        </button>
+        <button type="button" class="prq-btn approve" [disabled]="bulkTaskBusy()" (click)="bulkDecideTasks('APPROVE')">
+          <svg lucideCheck size="14"></svg> {{ bulkTaskBusy() ? 'Working…' : 'Approve selected' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Table view (default) -->
+    <div class="ta-table-wrap" *ngIf="taskApprovals().length && taskView() === 'TABLE'">
+      <table class="ta-table">
+        <thead>
+          <tr>
+            <th class="ta-check"><input type="checkbox" [checked]="allTasksSelected()" (change)="toggleAllTasks()" title="Select all" /></th>
+            <th>Task</th>
+            <th>Project</th>
+            <th>Assigned to</th>
+            <th>Raised by</th>
+            <th>Scheduled</th>
+            <th>Stage</th>
+            <th class="ta-actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let t of filteredTaskApprovals()" [class.selected]="isTaskSelected(t.id)">
+            <td class="ta-check"><input type="checkbox" [checked]="isTaskSelected(t.id)" (change)="toggleTaskSelected(t.id)" /></td>
+            <td class="ta-task">
+              <span class="prq-key clickable" (click)="openTaskDetails(t)">{{ t.key }}</span>
+              <span class="ta-title clickable" (click)="openTaskDetails(t)" [title]="t.title">{{ t.title }}</span>
+            </td>
+            <td class="ta-muted"><a *ngIf="t.project" [routerLink]="['/projects', t.projectId || t.project?.id]">{{ t.project.name }}</a></td>
+            <td class="ta-person">{{ taskPeople(t) }}</td>
+            <td class="ta-muted">{{ t.approvalRequestedBy ? t.approvalRequestedBy.firstName + ' ' + t.approvalRequestedBy.lastName : '—' }}</td>
+            <td class="ta-muted ta-nowrap">{{ (t.startDate || t.dueDate) ? ((t.startDate || t.dueDate) | date: 'd MMM y') : '—' }}</td>
+            <td><span class="ta-stage">{{ approvalStageLabel(t) }}</span></td>
+            <td class="ta-actions-col">
+              <button type="button" class="ta-icon-btn" title="View details" (click)="openTaskDetails(t)"><svg lucideEye size="14"></svg></button>
+              <button type="button" class="ta-icon-btn reject" title="Reject" (click)="decideTaskApproval(t, 'REJECT')"><svg lucideX size="14"></svg></button>
+              <button type="button" class="ta-icon-btn approve" title="Approve" (click)="decideTaskApproval(t, 'APPROVE')"><svg lucideCheck size="14"></svg></button>
+            </td>
+          </tr>
+          <tr *ngIf="!filteredTaskApprovals().length">
+            <td colspan="8" class="ta-none">No waiting task matches these filters.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-container *ngIf="taskView() === 'CARDS'">
+    <article class="prq-card" *ngFor="let t of filteredTaskApprovals()">
       <div class="prq-card-head">
         <div class="prq-card-ident">
           <span class="prq-key clickable" (click)="openTaskDetails(t)" title="View complete task details">{{ t.key }}</span>
@@ -822,6 +895,7 @@
           Raised by {{ t.approvalRequestedBy.firstName }} {{ t.approvalRequestedBy.lastName }}
         </span>
         <span>{{ t.createdAt | date: 'd MMM y, HH:mm' }}</span>
+        <span class="ta-assigned">Assigned to {{ taskPeople(t) }}</span>
       </div>
 
       <p class="prq-note" *ngIf="t.description" [innerHTML]="t.description"></p>
@@ -845,6 +919,7 @@
         </button>
       </div>
     </article>
+    </ng-container>
   </ng-container>
 
   <!-- ── Budget requests ──────────────────────────────────────────────────── -->

@@ -1,3 +1,4 @@
+import { firstValueFrom } from 'rxjs';
 import { Component, inject, signal, computed, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -127,6 +128,76 @@ export class TaskHoursRequestsTabComponent {
   requestType = signal<ProjectRequestType>('HOURS');
 
   taskApprovals = signal<any[]>([]);
+
+  // ── Task approvals: table view (default) with bulk decisions ─────────────
+  taskView = signal<'TABLE' | 'CARDS'>(this.readTaskView());
+  selectedTaskIds = signal<Set<number>>(new Set());
+  bulkTaskBusy = signal(false);
+
+  // Filters: project (name or code), person (assignee, member or who raised
+  // it), and when the work is scheduled.
+  taskProjectQuery = signal('');
+  taskPersonQuery = signal('');
+  taskWhen = signal<'ALL' | 'TODAY' | 'NEXT_30' | 'NEXT_60' | 'FUTURE'>('ALL');
+
+  hasTaskFilters = computed(() =>
+    !!this.taskProjectQuery().trim() || !!this.taskPersonQuery().trim() || this.taskWhen() !== 'ALL');
+
+  filteredTaskApprovals = computed(() => {
+    const pq = this.taskProjectQuery().trim().toLowerCase();
+    const uq = this.taskPersonQuery().trim().toLowerCase();
+    const when = this.taskWhen();
+
+    const dayMs = 86_400_000;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const t0 = today.getTime();
+
+    return this.taskApprovals().filter((t) => {
+      if (pq) {
+        const name = String(t.project?.name ?? '').toLowerCase();
+        const key = String(t.project?.key ?? '').toLowerCase();
+        if (!name.includes(pq) && !key.includes(pq)) return false;
+      }
+      if (uq) {
+        const people = [t.assignee, t.approvalRequestedBy, ...(t.members || []).map((m: any) => m.employee)]
+          .filter(Boolean)
+          .map((p: any) => `${p.firstName ?? ''} ${p.lastName ?? ''}`.toLowerCase());
+        if (!people.some((n) => n.includes(uq))) return false;
+      }
+      if (when !== 'ALL') {
+        // The day the work is scheduled: its start date, else its due date.
+        const raw = t.startDate || t.dueDate;
+        if (!raw) return false;
+        const d = new Date(raw); d.setHours(0, 0, 0, 0);
+        const diff = Math.round((d.getTime() - t0) / dayMs);
+        if (when === 'TODAY' && diff !== 0) return false;
+        if (when === 'NEXT_30' && (diff < 0 || diff > 30)) return false;
+        if (when === 'NEXT_60' && (diff < 0 || diff > 60)) return false;
+        if (when === 'FUTURE' && diff <= 0) return false;
+      }
+      return true;
+    });
+  });
+
+  allTasksSelected = computed(() => {
+    const rows = this.filteredTaskApprovals();
+    return rows.length > 0 && rows.every((t) => this.selectedTaskIds().has(t.id));
+  });
+
+  /** Changing a filter starts the selection again, so a bulk action only ever touches what is on screen. */
+  setTaskFilter(which: 'project' | 'person' | 'when', value: string) {
+    if (which === 'project') this.taskProjectQuery.set(value);
+    else if (which === 'person') this.taskPersonQuery.set(value);
+    else this.taskWhen.set(value as any);
+    this.selectedTaskIds.set(new Set());
+  }
+
+  clearTaskFilters() {
+    this.taskProjectQuery.set('');
+    this.taskPersonQuery.set('');
+    this.taskWhen.set('ALL');
+    this.selectedTaskIds.set(new Set());
+  }
   budgetRequests = signal<BudgetRequest[]>([]);
   scopeRequests = signal<ScopeRequest[]>([]);
   visitLocationRequests = signal<VisitLocationRequest[]>([]);
@@ -591,6 +662,9 @@ export class TaskHoursRequestsTabComponent {
       this.projectsApi.getPendingTaskApprovals().subscribe({
         next: (rows) => {
           this.taskApprovals.set(rows || []);
+          // Keep only selections that are still waiting.
+          const live = new Set((rows || []).map((r: any) => r.id));
+          this.selectedTaskIds.update((set) => new Set([...set].filter((id) => live.has(id))));
           done();
         },
         error: () => {
@@ -658,6 +732,94 @@ export class TaskHoursRequestsTabComponent {
     return issue?.approvalState === 'PENDING_TECHNICAL'
       ? 'Awaiting technical architect'
       : 'Awaiting administrator';
+  }
+
+  private readTaskView(): 'TABLE' | 'CARDS' {
+    try { return localStorage.getItem('taskApprovalsView') === 'CARDS' ? 'CARDS' : 'TABLE'; } catch { return 'TABLE'; }
+  }
+
+  setTaskView(v: 'TABLE' | 'CARDS') {
+    this.taskView.set(v);
+    try { localStorage.setItem('taskApprovalsView', v); } catch { /* per-viewer convenience only */ }
+  }
+
+  /** Who the task is for: its assignee, then any other members. */
+  taskPeople(t: any): string {
+    const names: string[] = [];
+    const seen = new Set<number>();
+    const add = (p: any) => {
+      if (!p || seen.has(p.id)) return;
+      seen.add(p.id);
+      names.push(`${p.firstName ?? ''} ${p.lastName ?? ''}`.trim());
+    };
+    add(t.assignee);
+    (t.members || []).forEach((m: any) => add(m.employee));
+    return names.filter(Boolean).join(', ') || 'Unassigned';
+  }
+
+  isTaskSelected(id: number) {
+    return this.selectedTaskIds().has(id);
+  }
+
+  toggleTaskSelected(id: number) {
+    this.selectedTaskIds.update((set) => {
+      const next = new Set(set);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  toggleAllTasks() {
+    const all = this.allTasksSelected();
+    this.selectedTaskIds.set(all ? new Set() : new Set(this.filteredTaskApprovals().map((t) => t.id)));
+  }
+
+  /**
+   * Approve or send back every selected task. One confirmation (or one reason
+   * for all of them when sending back), then the same per-task review the
+   * single buttons use — so permissions and notifications are unchanged.
+   */
+  async bulkDecideTasks(action: 'APPROVE' | 'REJECT') {
+    const picked = this.filteredTaskApprovals().filter((t) => this.selectedTaskIds().has(t.id));
+    if (!picked.length || this.bulkTaskBusy()) return;
+    const n = picked.length;
+
+    let reason: string | undefined;
+    if (action === 'REJECT') {
+      const typed = await this.dialog.prompt(
+        `Send ${n} ${n === 1 ? 'task' : 'tasks'} back? The same reason goes to each, and the manager who raised them can send them back once fixed.`,
+        `Send ${n} ${n === 1 ? 'Task' : 'Tasks'} Back`,
+        { placeholder: 'e.g. Needs estimates and clearer acceptance criteria', confirmLabel: 'Send back', required: true },
+      );
+      if (!typed || !typed.trim()) return;
+      reason = typed.trim();
+    } else {
+      const ok = await this.dialog.confirm(
+        `Approve ${n} ${n === 1 ? 'task' : 'tasks'}? ${n === 1 ? 'It becomes' : 'They become'} ordinary work the team can pick up.`,
+        `Approve ${n} ${n === 1 ? 'Task' : 'Tasks'}`,
+        'Approve',
+        'Cancel',
+      );
+      if (!ok) return;
+    }
+
+    this.bulkTaskBusy.set(true);
+    let done = 0;
+    const failed: string[] = [];
+    for (const t of picked) {
+      try {
+        await firstValueFrom(this.projectsApi.reviewIssueApproval(t.projectId, t.id, action, reason));
+        done++;
+      } catch (err: any) {
+        failed.push(`${t.key}: ${err?.error?.message || 'failed'}`);
+      }
+    }
+    this.bulkTaskBusy.set(false);
+    this.selectedTaskIds.set(new Set());
+
+    if (done) this.toast.success(`${done} ${done === 1 ? 'task' : 'tasks'} ${action === 'APPROVE' ? 'approved' : 'sent back'}`);
+    if (failed.length) this.toast.error(`${failed.length} could not be done — ${failed.slice(0, 3).join('; ')}${failed.length > 3 ? '…' : ''}`);
+    this.loadOthers('TASKS');
   }
 
   async decideTaskApproval(issue: any, action: 'APPROVE' | 'REJECT') {
