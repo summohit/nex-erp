@@ -86,14 +86,26 @@ export class AttendanceService {
 
     const companyId = attendance.employee.companyId;
     const year = date.getUTCFullYear();
-    let leaveType = await this.prisma.leaveType.findFirst({
-      where: { companyId, name: { equals: 'Comp Off', mode: 'insensitive' } },
-    });
+    // The company's comp-off type: the one flagged isCompOff, else an existing
+    // type plainly named for it ("Compensatory Off", "Comp Off", "Comp-Off"),
+    // which is then flagged. Only created when none exists, so a second
+    // look-alike type never appears beside the one people already use.
+    let leaveType = await this.prisma.leaveType.findFirst({ where: { companyId, isCompOff: true } })
+      ?? await this.prisma.leaveType.findFirst({
+        where: {
+          companyId,
+          OR: ['Compensatory Off', 'Comp Off', 'Comp-Off'].map((name) => ({ name: { equals: name, mode: 'insensitive' as const } })),
+        },
+        orderBy: { id: 'asc' },
+      });
+    if (leaveType && !leaveType.isCompOff) {
+      leaveType = await this.prisma.leaveType.update({ where: { id: leaveType.id }, data: { isCompOff: true } });
+    }
     if (!leaveType) {
       leaveType = await this.prisma.leaveType.create({
         data: {
-          companyId, name: 'Comp Off', description: 'Automatically credited for working on a Sunday or scheduled day off.',
-          defaultDays: 0, accrualFrequency: 'NONE', accrualAmount: 0, isPaid: true, allowHalfDay: false,
+          companyId, name: 'Compensatory Off', description: 'Automatically credited for working on a Sunday, holiday or scheduled day off.',
+          defaultDays: 0, accrualFrequency: 'NONE', accrualAmount: 0, isPaid: true, allowHalfDay: false, isCompOff: true,
         },
       });
     }
