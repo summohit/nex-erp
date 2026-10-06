@@ -15,7 +15,7 @@ import { SystemSettingsService } from '../services/system-settings.service';
 import { AuthService } from '../services/auth.service';
 import { LeaveActionCellRendererComponent } from '../shared/components/leave-action-cell-renderer.component';
 import { ActionCellRendererComponent } from '../shared/components/action-cell-renderer.component';
-import { forkJoin } from 'rxjs';
+import { forkJoin, firstValueFrom } from 'rxjs';
 import { SkeletonComponent } from '../shared/components/skeleton/skeleton.component';
 import { SearchableSelectComponent, SearchableSelectOption } from '../shared/components/searchable-select/searchable-select.component';
 import { 
@@ -30,19 +30,20 @@ import {
   LucideFile,
   LucidePaperclip,
   LucidePlus,
+  LucideFilter,
   LucideTrash2,
   LucideEdit,
   LucideGrid,
   LucideList,
   LucideChevronLeft,
   LucideChevronRight,
+  LucideSearch,
   LucideClock,
   LucideFlag,
   LucideUser,
   LucideBuilding,
   LucideBriefcase,
-  LucideMail,
-  LucideLoader2
+  LucideMail
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -68,6 +69,7 @@ export interface DayStatus {
 import { OutsideOfficeAnswer, OutsideOfficeService } from '../shared/services/outside-office.service';
 import { GeolocationService } from '../shared/services/geolocation.service';
 import { isWeeklyOff } from '../shared/utils/weekly-offs';
+import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDatePreset } from '../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 @Component({
   selector: 'app-attendance-leave',
   standalone: true,
@@ -86,21 +88,23 @@ import { isWeeklyOff } from '../shared/utils/weekly-offs';
     LucideFile,
     LucidePaperclip,
     LucidePlus,
+    LucideFilter,
     LucideTrash2,
     LucideEdit,
     LucideGrid,
     LucideList,
     LucideChevronLeft,
     LucideChevronRight,
+    LucideSearch,
     LucideClock,
     LucideFlag,
     SkeletonComponent,
     SearchableSelectComponent,
+    AttendanceFilterDrawerComponent,
     LucideUser,
     LucideBuilding,
     LucideBriefcase,
-    LucideMail,
-    LucideLoader2
+    LucideMail
   ],
   providers: [DatePipe],
   templateUrl: './attendance-leave.html',
@@ -128,6 +132,301 @@ export class AttendanceLeaveComponent implements OnInit {
   isLoadingMyShift = signal<boolean>(false);
 
   activeTab = signal<string>('attendance');
+  leaveSection = signal<'application' | 'approvals' | 'team-approvals' | 'balances'>('application');
+  leaveViewMode = signal<'list' | 'calendar' | 'employee'>('list');
+  leaveCalendarMonth = signal(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  filterDrawerOpen = signal(false);
+  filterStartDate = signal('');
+  filterEndDate = signal('');
+  filterEmployeeQuery = signal('');
+  filterDatePreset = signal<AttendanceDatePreset>('ALL');
+  filterLeaveTypeId = signal('');
+  leaveStatusFilter = signal('');
+  leaveApplicationsSearch = signal('');
+  attendanceDateFilter = signal('');
+  attendanceDepartmentFilter = signal('');
+  attendanceStatusFilter = signal('');
+  attendanceFlagFilter = signal('');
+  attendanceSearch = signal('');
+
+  get attendanceFilterGroups() {
+    const departments = [...new Set(
+      this.employees().map((employee) => employee.department?.name).filter((name): name is string => !!name),
+    )].sort((a, b) => a.localeCompare(b));
+    return [
+      ...(this.canViewAllAttendance() ? [{
+        key: 'employee',
+        label: 'Employee',
+        placeholder: 'My Attendance',
+        options: this.employees().map((employee) => ({
+          value: String(employee.id),
+          label: `${employee.firstName} ${employee.lastName}`.trim(),
+        })),
+      }] : []),
+      ...(this.canViewAllAttendance() ? [{
+        key: 'department',
+        label: 'Department',
+        placeholder: 'All Departments',
+        options: departments.map((name) => ({ value: name, label: name })),
+      }] : []),
+      {
+        key: 'status',
+        label: 'Status',
+        placeholder: 'All Statuses',
+        options: ['Present', 'Half Day', 'Late', 'Absent', 'On Leave', 'Holiday', 'Day Off', 'Empty']
+          .map((status) => ({ value: status, label: status })),
+      },
+      {
+        key: 'flag',
+        label: 'Flags',
+        placeholder: 'All Flags',
+        options: [
+          { value: 'MISSED_CLOCK_OUT', label: 'Missed Clock Out' },
+          { value: 'GPS_LOGGED', label: 'GPS Logged' },
+        ],
+      },
+    ];
+  }
+
+  get attendanceDrawerValues(): Record<string, string> {
+    return {
+      employee: this.selectedAttendanceEmployeeId() === null ? '' : String(this.selectedAttendanceEmployeeId()),
+      department: this.attendanceDepartmentFilter(),
+      status: this.attendanceStatusFilter(),
+      flag: this.attendanceFlagFilter(),
+    };
+  }
+
+  filteredMonthlyGrid = computed(() => {
+    const date = this.attendanceDateFilter();
+    const department = this.attendanceDepartmentFilter();
+    const status = this.attendanceStatusFilter();
+    const flag = this.attendanceFlagFilter();
+    const search = this.attendanceSearch().trim().toLowerCase();
+    const employee = this.selectedAttendanceEmployee();
+    const currentEmployee = employee || this.authService.currentUser()?.employee;
+    const departmentMatches = !department || currentEmployee?.department?.name === department;
+    if (!departmentMatches) return [];
+
+    return this.monthlyGrid().filter((day) => {
+      const dayKey = this.getLocalDateString(day.date);
+      const matchesFlag = !flag
+        || (flag === 'MISSED_CLOCK_OUT' && !!day.clockInStr && !day.clockOutStr && !day.isFuture)
+        || (flag === 'GPS_LOGGED' && (!!day.clockInLat || !!day.clockOutLat));
+      const searchText = [
+        day.dayNumber, day.weekdayStr, day.status, day.tooltip,
+        this.months[this.selectedMonth()], this.selectedYear(),
+        currentEmployee?.firstName, currentEmployee?.lastName,
+        currentEmployee?.department?.name,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return (!date || dayKey === date)
+        && (!status || day.status === status)
+        && matchesFlag
+        && (!search || searchText.includes(search));
+    });
+  });
+
+  filteredAttendanceTotals = computed(() => {
+    const days = this.filteredMonthlyGrid();
+    return {
+      present: days.filter((day) => day.status === 'Present' || day.status === 'Half Day' || day.status === 'Late').length,
+      working: days.filter((day) => !day.isFuture && day.status !== 'Day Off' && day.status !== 'Holiday').length,
+    };
+  });
+
+  private matchesLeaveApplicationSearch(request: LeaveRequest): boolean {
+    const query = this.leaveApplicationsSearch().trim().toLocaleLowerCase();
+    if (!query) return true;
+
+    const employee = request.employee;
+    const values = [
+      employee?.firstName,
+      employee?.lastName,
+      `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`,
+      employee?.employeeCode,
+      employee?.id,
+      request.startDate,
+      request.endDate,
+      this.datePipe.transform(request.startDate, 'dd-MM-yyyy (EEEE)'),
+      this.datePipe.transform(request.endDate, 'dd-MM-yyyy (EEEE)'),
+      request.isHalfDay ? `Half Day ${request.halfDayPeriod || 'AM'}` : 'Full Day',
+      request.status,
+      request.leaveType?.name,
+      request.leaveType?.isPaid === false ? 'Unpaid' : 'Paid',
+    ].filter((value) => value !== null && value !== undefined)
+      .map((value) => String(value).toLocaleLowerCase());
+
+    return query.split(/\s+/).every((term) => values.some((value) => value.includes(term)));
+  }
+
+  get leaveFilterGroups() {
+    const groups = [{
+      key: 'leaveType',
+      label: 'Leave type',
+      placeholder: 'All leave types',
+      options: this.leaveTypes().map((type) => ({ value: String(type.id), label: type.name })),
+    }];
+    if (this.leaveSection() !== 'balances') {
+      groups.push({
+        key: 'status',
+        label: 'Request status',
+        placeholder: 'All statuses',
+        options: [
+          { value: 'PENDING', label: 'Pending' },
+          { value: 'APPROVED', label: 'Approved' },
+          { value: 'REJECTED', label: 'Rejected' },
+          { value: 'CANCELLED', label: 'Cancelled' },
+        ],
+      });
+    }
+    return groups;
+  }
+
+  get leaveDrawerValues(): Record<string, string> {
+    return {
+      leaveType: this.filterLeaveTypeId(),
+      status: this.isAdmin() && this.leaveSection() !== 'balances'
+        ? (this.approvalStatusFilter() === 'ALL' ? '' : this.approvalStatusFilter())
+        : this.leaveStatusFilter(),
+    };
+  }
+
+  private matchesAttendanceFilters(employee: any, startDate?: string | Date, endDate?: string | Date): boolean {
+    const query = this.filterEmployeeQuery().trim().toLowerCase();
+    if (query && employee) {
+      const name = `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim().toLowerCase();
+      const code = String(employee?.employeeCode ?? '').toLowerCase();
+      const id = String(employee?.id ?? employee?.employeeId ?? '');
+      if (!name.includes(query) && !code.includes(query) && !id.includes(query)) return false;
+    }
+    const from = this.filterStartDate();
+    const to = this.filterEndDate();
+    if (from || to) {
+      const recordStart = String(startDate ?? endDate ?? '').slice(0, 10);
+      const recordEnd = String(endDate ?? startDate ?? '').slice(0, 10);
+      if (!recordStart || !recordEnd || (to && recordStart > to) || (from && recordEnd < from)) return false;
+    }
+    return true;
+  }
+
+  filteredMyRequests = computed(() =>
+    this.myRequests().filter(r =>
+      this.matchesLeaveApplicationSearch(r)
+      &&
+      (!this.filterLeaveTypeId() || String(r.leaveTypeId) === this.filterLeaveTypeId())
+      && (!this.leaveStatusFilter() || r.status === this.leaveStatusFilter())
+      && this.matchesAttendanceFilters(r.employee, r.startDate, r.endDate)),
+  );
+
+  leaveCalendarCells = computed(() => {
+    const month = this.leaveCalendarMonth();
+    const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+    const start = new Date(firstDay);
+    start.setDate(firstDay.getDate() - firstDay.getDay());
+    return Array.from({ length: 42 }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + index);
+      const dateKey = this.datePipe.transform(date, 'yyyy-MM-dd') || '';
+      return {
+        date,
+        dateKey,
+        inMonth: date.getMonth() === month.getMonth(),
+        requests: this.filteredLeaveApplications().filter((request) =>
+          request.startDate.slice(0, 10) <= dateKey && request.endDate.slice(0, 10) >= dateKey),
+      };
+    });
+  });
+
+  leaveCalendarTitle = computed(() =>
+    this.leaveCalendarMonth().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+  );
+
+  filteredRequests = computed(() => {
+    const status = this.approvalStatusFilter();
+    return this.allRequests().filter(r =>
+      this.matchesLeaveApplicationSearch(r)
+      &&
+      (status === 'ALL' || r.status === status)
+      && (!this.filterLeaveTypeId() || String(r.leaveTypeId) === this.filterLeaveTypeId())
+      && this.matchesAttendanceFilters(r.employee, r.startDate, r.endDate),
+    );
+  });
+
+  filteredManagerRequests = computed(() =>
+    this.managerRequests().filter(r =>
+      this.matchesLeaveApplicationSearch(r)
+      &&
+      (!this.filterLeaveTypeId() || String(r.leaveTypeId) === this.filterLeaveTypeId())
+      && (!this.leaveStatusFilter() || r.status === this.leaveStatusFilter())
+      && this.matchesAttendanceFilters(r.employee, r.startDate, r.endDate),
+    ),
+  );
+
+  filteredLeaveApplications = computed(() => {
+    if (this.isAdmin()) return this.filteredRequests();
+    const requests = new Map<number, LeaveRequest>();
+    for (const request of [...this.filteredMyRequests(), ...this.filteredManagerRequests()]) {
+      requests.set(request.id, request);
+    }
+    return [...requests.values()].sort((a, b) =>
+      b.startDate.localeCompare(a.startDate) || b.id - a.id,
+    );
+  });
+
+  myLeaveQuotaRows = computed(() => {
+    const balancesByType = new Map<number, { allocated: number; used: number }>();
+    for (const balance of this.myBalances()) {
+      const totals = balancesByType.get(balance.leaveTypeId) ?? { allocated: 0, used: 0 };
+      totals.allocated += balance.allocated;
+      totals.used += balance.used;
+      balancesByType.set(balance.leaveTypeId, totals);
+    }
+
+    const rowsByName = new Map<string, {
+      leaveType: LeaveType;
+      allocated: number;
+      used: number;
+    }>();
+    for (const leaveType of this.leaveTypes()) {
+      const key = leaveType.name.trim().toLocaleLowerCase();
+      const balance = balancesByType.get(leaveType.id) ?? { allocated: 0, used: 0 };
+      const row = rowsByName.get(key);
+      if (row) {
+        row.allocated += balance.allocated;
+        row.used += balance.used;
+      } else {
+        rowsByName.set(key, { leaveType, ...balance });
+      }
+    }
+
+    return [...rowsByName.values()]
+      .sort((a, b) => a.leaveType.name.localeCompare(b.leaveType.name))
+      .map(({ leaveType, allocated, used }) => ({
+        leaveType,
+        allocated,
+        used,
+        remaining: Math.max(allocated - used, 0),
+        overUtilized: Math.max(used - allocated, 0),
+        unused: allocated - used,
+      }));
+  });
+
+  myRemainingLeaveDays = computed(() =>
+    this.myLeaveQuotaRows().reduce((total, row) => total + row.remaining, 0),
+  );
+
+  isLoadingLeaveApplications = computed(() =>
+    this.isLoadingRequests()
+      || (this.isAdmin() && this.isLoadingLeaveApprovals())
+      || (!this.isAdmin() && this.isLoadingManagerRequests()),
+  );
+
+  canApproveLeaveApplication = (request: LeaveRequest): boolean =>
+    this.isAdmin()
+    || (this.isManager() && !this.myRequests().some((ownRequest) => ownRequest.id === request.id));
+
+  canEditLeaveApplication = (request: LeaveRequest): boolean =>
+    this.isAdmin() || this.myRequests().some((ownRequest) => ownRequest.id === request.id);
   
   // Clock in widget
   math = Math;
@@ -196,6 +495,13 @@ export class AttendanceLeaveComponent implements OnInit {
     return role === 'ADMIN' || role === 'HR' || role === 'SUPERADMIN';
   });
 
+  /** The employee picker exposes colleagues' attendance, so it follows the
+   * same narrow rule as the merged company-wide Attendance page. */
+  canViewAllAttendance = computed(() => {
+    const role = this.authService.currentUser()?.role;
+    return role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'HR';
+  });
+
   isManager = computed(() => {
     const role = this.authService.currentUser()?.role;
     return role === 'MANAGER';
@@ -261,61 +567,109 @@ export class AttendanceLeaveComponent implements OnInit {
     constructor() {}
 
   leaveColDefs: ColDef[] = [
-
-
-    { 
-      field: 'leaveType.name', 
-      headerName: 'Type', 
-      flex: 1,
-      autoHeight: true,
+    {
+      headerName: 'Employee',
+      field: 'employee',
+      minWidth: 190,
+      flex: 1.4,
       cellRenderer: (params: any) => {
-        if (!params.value) return '';
-        const attachmentLink = params.data.attachmentUrl 
-          ? `<a href="${params.data.attachmentUrl}" target="_blank" style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #1373e5; text-decoration: underline; margin-top: 2px;">View Attachment <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg></a>`
-          : '';
-        return `<div style="display: flex; flex-direction: column; justify-content: center; padding: 6px 0; line-height: 1.2;">
-                  <span style="font-weight: 500;">${params.value}</span>
-                  ${attachmentLink}
-                </div>`;
-      }
-    },
-    { 
-      headerName: 'Dates', 
-      flex: 1.5,
-      valueGetter: (params) => {
-        const start = this.datePipe.transform(params.data.startDate, 'MMM d');
-        const end = this.datePipe.transform(params.data.endDate, 'MMM d');
-        return `${start} - ${end}`;
-      },
-      cellRenderer: (params: any) => {
-        const start = this.datePipe.transform(params.data.startDate, 'MMM d');
-        const end = this.datePipe.transform(params.data.endDate, 'MMM d');
-        const halfBadge = params.data.isHalfDay
-          ? `<span class="status-badge status-half-day" style="background: rgba(236, 95, 42, 0.12); color: #1373e5; font-size: 10px; margin-left: 6px; padding: 2px 6px; border-radius: 10px;">Half Day (${params.data.halfDayPeriod || 'AM'})</span>`
-          : '';
-        return `<div style="display: flex; align-items: center;">${start} - ${end}${halfBadge}</div>`;
-      }
-    },
-    { 
-      field: 'status', 
-      headerName: 'Status', 
-      flex: 1,
-      autoHeight: true,
-      cellRenderer: (params: any) => {
-        const statusClass = params.value ? params.value.toLowerCase() : '';
-        let badgeHtml = `<span class="status-badge ${statusClass}">${params.value}</span>`;
-        let reasonLink = params.value === 'REJECTED' && params.data.rejectionReason 
-          ? `<div class="view-reason-link" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #1373e5; text-decoration: underline; margin-top: 4px; cursor: pointer;">View Reason <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>`
-          : '';
-        return `<div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 6px 0; line-height: 1.2;">
-                  ${badgeHtml}
-                  ${reasonLink}
-                </div>`;
+        const employee = params.data?.employee;
+        const name = `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim()
+          || `${this.authService.currentUser()?.firstName ?? ''} ${this.authService.currentUser()?.lastName ?? ''}`.trim()
+          || 'You';
+        const subtitle = [employee?.designation?.name, employee?.department?.name].filter(Boolean).join(' · ')
+          || employee?.employeeCode
+          || 'Employee';
+        const initials = name.split(/\s+/).map((part: string) => part[0]).slice(0, 2).join('').toUpperCase();
+        const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        })[char] || char);
+        const avatar = employee?.avatarUrl
+          ? `<img src="${escapeHtml(employee.avatarUrl)}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex:none;">`
+          : `<span style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#e0edff;color:#2563eb;font-weight:700;flex:none;">${escapeHtml(initials)}</span>`;
+        return `<div style="display:flex;align-items:center;gap:9px;min-width:0;">
+          ${avatar}
+          <div style="display:flex;flex-direction:column;min-width:0;line-height:1.3;">
+            <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(name)}</span>
+            <span style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(subtitle)}</span>
+          </div>
+          <span style="font-size:9px;font-weight:700;color:#fff;background:#64748b;border-radius:4px;padding:2px 4px;white-space:nowrap;">It's you</span>
+        </div>`;
       }
     },
     {
-      headerName: 'Actions',
-      flex: 1,
+      headerName: 'Leave Date',
+      minWidth: 180,
+      flex: 1.2,
+      cellRenderer: (params: any) => {
+        const start = this.datePipe.transform(params.data.startDate, 'dd-MM-yyyy (EEEE)');
+        const end = this.datePipe.transform(params.data.endDate, 'dd-MM-yyyy (EEEE)');
+        return params.data.startDate?.slice(0, 10) === params.data.endDate?.slice(0, 10)
+          ? start
+          : `${start} – ${end}`;
+      }
+    },
+    {
+      headerName: 'Duration',
+      minWidth: 105,
+      flex: 0.8,
+      cellRenderer: (params: any) => params.data.isHalfDay
+        ? `Half Day (${params.data.halfDayPeriod || 'AM'})`
+        : 'Full Day',
+    },
+    {
+      field: 'status',
+      headerName: 'Leave Status',
+      minWidth: 120,
+      flex: 0.9,
+      cellRenderer: (params: any) => {
+        const status = params.value || 'PENDING';
+        const colors: Record<string, string> = {
+          APPROVED: '#22c55e',
+          PENDING: '#f59e0b',
+          REJECTED: '#ef4444',
+          CANCELLED: '#94a3b8',
+        };
+        const reasonLink = status === 'REJECTED' && params.data.rejectionReason
+          ? `<div class="view-reason-link" style="font-size:11px;color:#1373e5;text-decoration:underline;margin-top:4px;cursor:pointer;">View Reason</div>`
+          : '';
+        return `<div style="display:flex;flex-direction:column;gap:4px;">
+          <span style="display:flex;align-items:center;gap:7px;">
+            <span style="width:9px;height:9px;border-radius:50%;background:${colors[status] || colors['PENDING']};"></span>
+            ${status}
+          </span>${reasonLink}
+        </div>`;
+      }
+    },
+    {
+      field: 'leaveType.name',
+      headerName: 'Leave Type',
+      minWidth: 120,
+      flex: 0.9,
+      cellRenderer: (params: any) => {
+        if (!params.value) return '—';
+        return `<span style="display:inline-block;background:#e0f2fe;color:#0369a1;font-size:10px;font-weight:700;padding:3px 6px;border-radius:4px;">${params.value}</span>`;
+      }
+    },
+    {
+      headerName: 'Paid',
+      minWidth: 80,
+      flex: 0.6,
+      cellRenderer: (params: any) => {
+        const isPaid = params.data.leaveType?.isPaid !== false;
+        const label = isPaid ? 'Paid' : 'Unpaid';
+        const color = isPaid ? '#15803d' : '#b91c1c';
+        const background = isPaid ? '#dcfce7' : '#fee2e2';
+        return `<span style="display:inline-block;background:${background};color:${color};font-size:10px;font-weight:700;padding:3px 6px;border-radius:4px;">${label}</span>`;
+      }
+    },
+    {
+      headerName: 'Action',
+      minWidth: 80,
+      width: 100,
+      pinned: 'right',
+      sortable: false,
+      filter: false,
       cellRenderer: LeaveActionCellRendererComponent,
       cellRendererParams: {
         onView: (data: any) => this.openLeaveDetail(data),
@@ -375,7 +729,7 @@ export class AttendanceLeaveComponent implements OnInit {
       }
     },
     { 
-      headerName: 'Actions',
+      headerName: 'Action',
       width: 120,
       flex: 0,
       sortable: false,
@@ -404,8 +758,15 @@ export class AttendanceLeaveComponent implements OnInit {
   hrRegularizationColDefs: ColDef[] = [
     { 
       field: 'employee',
-      headerName: 'Employee', 
-      valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : '',
+      headerName: 'Employee',
+      // Do not rely on an object-valued field being formatted by the grid.
+      // The renderer gets the nested employee when available, with a clear
+      // employee-id fallback rather than an empty first column.
+      valueGetter: (p: any) => {
+        const emp = p.data?.employee;
+        return emp ? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() : `Employee #${p.data?.employeeId ?? '—'}`;
+      },
+      valueFormatter: (p) => p.value || 'Employee',
       minWidth: 200,
       flex: 1.5,
       cellRenderer: (params: any) => {
@@ -451,15 +812,19 @@ export class AttendanceLeaveComponent implements OnInit {
   hrRequestsColDefs: ColDef[] = [
     { 
       field: 'employee',
-      headerName: 'Employee', 
-      valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : '',
+      headerName: 'Employee',
+      valueGetter: (p: any) => {
+        const emp = p.data?.employee;
+        return emp ? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() : `Employee #${p.data?.employeeId ?? '—'}`;
+      },
+      valueFormatter: (p) => p.value || 'Employee',
       minWidth: 230,
       flex: 1.5,
       pinned: 'left',
       cellRenderer: (params: any) => {
         const emp = params.data?.employee;
-        if (!emp) return 'N/A';
-        const name = emp.lastName ? `${emp.firstName} ${emp.lastName}` : (emp.firstName || 'Employee');
+        if (!emp) return `<span class="text-secondary">Employee #${params.data?.employeeId ?? '—'}</span>`;
+        const name = `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() || `Employee #${params.data?.employeeId ?? '—'}`;
         const dept = emp.department?.name || '';
         const des = emp.designation?.name || '';
         const sub = [des, dept].filter(Boolean).join(' · ') || 'General';
@@ -487,56 +852,28 @@ export class AttendanceLeaveComponent implements OnInit {
         `;
       }
     },
-    { 
-      field: 'leaveType.name', 
-      headerName: 'Leave Type', 
+    {
+      headerName: 'Leave Date',
+      minWidth: 170,
       flex: 1.2,
-      minWidth: 150,
-      cellRenderer: (params: any) => {
-        if (!params.value) return 'N/A';
-        const attachmentLink = params.data.attachmentUrl 
-          ? `<a href="${params.data.attachmentUrl}" target="_blank" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #2563EB; font-weight: 600; text-decoration: none; margin-top: 3px;">📎 Attachment</a>`
-          : '';
-        return `
-          <div class="cell-stacked">
-            <span class="cat-badge cat-laptop">${params.value}</span>
-            ${attachmentLink}
-          </div>
-        `;
-      }
-    },
-    { 
-      headerName: 'Dates & Duration', 
-      flex: 1.5,
-      minWidth: 180,
       cellRenderer: (params: any) => {
         if (!params.data?.startDate || !params.data?.endDate) return '-';
-        const start = this.datePipe.transform(params.data.startDate, 'MMM d, yyyy');
-        const end = this.datePipe.transform(params.data.endDate, 'MMM d, yyyy');
-        
-        const s = new Date(params.data.startDate);
-        const e = new Date(params.data.endDate);
-        const diffDays = Math.ceil(Math.abs(e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        const durationDays = params.data.isHalfDay ? 0.5 : diffDays;
-        const halfLabel = params.data.isHalfDay ? ` · Half Day (${params.data.halfDayPeriod || 'AM'})` : '';
-        
-        return `
-          <div class="cell-stacked">
-            <div class="cell-title-bold">${start} → ${end}</div>
-            <div class="user-text-stack text-secondary">${durationDays} day${durationDays === 1 ? '' : 's'} duration${halfLabel}</div>
-          </div>
-        `;
+        const start = this.datePipe.transform(params.data.startDate, 'dd-MM-yyyy (EEEE)');
+        if (params.data.startDate.slice(0, 10) === params.data.endDate.slice(0, 10)) return start;
+        const end = this.datePipe.transform(params.data.endDate, 'dd-MM-yyyy (EEEE)');
+        return `${start} – ${end}`;
       }
     },
-    { 
-      field: 'reason',
-      headerName: 'Reason', 
-      flex: 1.5,
-      minWidth: 180,
-      cellRenderer: (params: any) => `<span style="font-size: 12px; color: #334155;">${params.value || 'No reason provided'}</span>`
+    {
+      headerName: 'Duration',
+      minWidth: 105,
+      flex: 0.75,
+      cellRenderer: (params: any) => params.data?.isHalfDay
+        ? `Half Day (${params.data.halfDayPeriod || 'AM'})`
+        : 'Full Day',
     },
-    { 
-      headerName: 'Status', 
+    {
+      headerName: 'Leave Status',
       field: 'status',
       flex: 1.2,
       minWidth: 140,
@@ -561,7 +898,32 @@ export class AttendanceLeaveComponent implements OnInit {
       }
     },
     {
-      headerName: 'Actions',
+      field: 'leaveType.name',
+      headerName: 'Leave Type',
+      minWidth: 120,
+      flex: 0.9,
+      cellRenderer: (params: any) => {
+        if (!params.value) return '—';
+        const attachmentLink = params.data.attachmentUrl
+          ? `<a href="${params.data.attachmentUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#2563EB;text-decoration:none;margin-top:3px;">Attachment</a>`
+          : '';
+        return `<div><span class="cat-badge cat-laptop">${params.value}</span>${attachmentLink}</div>`;
+      }
+    },
+    {
+      headerName: 'Paid',
+      minWidth: 75,
+      flex: 0.55,
+      cellRenderer: (params: any) => {
+        const isPaid = params.data?.leaveType?.isPaid !== false;
+        const label = isPaid ? 'Paid' : 'Unpaid';
+        const color = isPaid ? '#15803d' : '#b91c1c';
+        const background = isPaid ? '#dcfce7' : '#fee2e2';
+        return `<span style="display:inline-block;background:${background};color:${color};font-size:10px;font-weight:700;padding:3px 6px;border-radius:4px;">${label}</span>`;
+      }
+    },
+    {
+      headerName: 'Action',
       width: 150,
       pinned: 'right',
       sortable: false,
@@ -569,8 +931,14 @@ export class AttendanceLeaveComponent implements OnInit {
       cellRenderer: LeaveActionCellRendererComponent,
       cellRendererParams: {
         onView: (data: any) => this.openLeaveDetail(data),
+        onEdit: (data: any) => this.editLeaveRequest(data),
+        onCancel: (data: any) => this.cancelLeaveRequest(data.id),
         onApprove: (data: any) => this.approveLeaveRequest(data.id),
         onReject: (data: any) => this.openRejectModal(data.id),
+        canEdit: (data: LeaveRequest) => this.canEditLeaveApplication(data),
+        canCancel: (data: LeaveRequest) => this.canEditLeaveApplication(data),
+        canApprove: (data: LeaveRequest) => this.canApproveLeaveApplication(data),
+        canReject: (data: LeaveRequest) => this.canApproveLeaveApplication(data),
         onViewAttachment: (data: any) => this.viewAttachment(data.attachmentUrl),
         onViewReason: (data: any) => this.openRejectionReasonModal(data.rejectionReason),
         onDelete: this.canDeleteLeave() ? (data: any) => this.deleteLeaveRequest(data) : undefined
@@ -591,14 +959,16 @@ export class AttendanceLeaveComponent implements OnInit {
   allBalances = signal<LeaveBalance[]>([]);
   allRequests = signal<LeaveRequest[]>([]);
   isLoadingLeaveApprovals = signal<boolean>(true);
-  approvalStatusFilter = signal<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('PENDING');
-  filteredRequests = computed(() => {
-    const filter = this.approvalStatusFilter();
-    const requests = this.allRequests();
-    if (filter === 'ALL') return requests;
-    return requests.filter(r => r.status === filter);
-  });
+  approvalStatusFilter = signal<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('ALL');
   pendingCount = computed(() => this.allRequests().filter(r => r.status === 'PENDING').length);
+  selectedApprovalIds = signal<number[]>([]);
+  private approvalGridApi: any;
+  readonly approvalRowSelection = {
+    mode: 'multiRow' as const,
+    checkboxes: (params: any) => params.data?.status === 'PENDING',
+    headerCheckbox: true,
+    enableClickSelection: false,
+  };
   managerRequests = signal<LeaveRequest[]>([]);
   isLoadingManagerRequests = signal<boolean>(true);
   employees = signal<Employee[]>([]);
@@ -606,6 +976,12 @@ export class AttendanceLeaveComponent implements OnInit {
   leaveTypes = signal<LeaveType[]>([]);
   targetEmployeeBalances = signal<LeaveBalance[] | null>(null);
   isLoadingEmployeeBalances = signal<boolean>(false);
+
+  // Keep a refresh or route change from launching the same expensive requests twice.
+  private leaveApplicationLoading = false;
+  private adminDataLoading = false;
+  private managerDataLoading = false;
+  private holidaysLoading = false;
 
   // Whether the currently selected leave type allows half-day
   selectedLeaveTypeAllowsHalfDay = computed(() => {
@@ -903,6 +1279,7 @@ export class AttendanceLeaveComponent implements OnInit {
   isRejectModalOpen = signal<boolean>(false);
   rejectReason = signal<string>('');
   rejectingRequestId = signal<number | null>(null);
+  rejectingRequestIds = signal<number[]>([]);
 
   // Rejection Reason Modal
   isRejectionReasonModalOpen = signal<boolean>(false);
@@ -913,11 +1290,61 @@ export class AttendanceLeaveComponent implements OnInit {
   timelineEndDate = signal<string>(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]);
   timelineEmployees = signal<any[]>([]);
   teamTimelineData = signal<any[]>([]);
+  timelineFilterDrawerOpen = signal(false);
+  timelineEmployeeQuery = signal('');
+  timelineDepartmentFilter = signal('');
+
+  get timelineFilterGroups() {
+    const departments = [...new Set(
+      this.timelineEmployees()
+        .map((employee) => employee.department?.name)
+        .filter((name): name is string => !!name),
+    )].sort((a, b) => a.localeCompare(b));
+    return [{
+      key: 'department',
+      label: 'Department',
+      placeholder: 'All departments',
+      options: departments.map((name) => ({ value: name, label: name })),
+    }];
+  }
+
+  get timelineFilterValues(): Record<string, string> {
+    return { department: this.timelineDepartmentFilter() };
+  }
+
+  timelineVisibleEmployees = computed(() => {
+    const query = this.timelineEmployeeQuery().trim().toLowerCase();
+    const department = this.timelineDepartmentFilter();
+    return this.timelineEmployees().filter((employee) => {
+      const name = `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.toLowerCase();
+      const id = String(employee.id ?? '');
+      return (!query || name.includes(query) || id.includes(query))
+        && (!department || employee.department?.name === department);
+    });
+  });
 
   // Holiday Tab Signals & State
   selectedHolidayYear = signal<number>(new Date().getFullYear());
   holidayViewMode = signal<'cards' | 'calendar'>('cards');
   holidayCalendarDate = signal(new Date());
+  holidayFilterDrawerOpen = signal(false);
+  holidayQuery = signal('');
+  holidayStatusFilter = signal('');
+  holidayStartDate = signal('');
+  holidayEndDate = signal('');
+  readonly holidayFilterGroups = [{
+    key: 'status',
+    label: 'Holiday timing',
+    placeholder: 'Upcoming and past',
+    options: [
+      { value: 'upcoming', label: 'Upcoming' },
+      { value: 'today', label: 'Today' },
+      { value: 'past', label: 'Past' },
+    ],
+  }];
+  get holidayFilterValues(): Record<string, string> {
+    return { status: this.holidayStatusFilter() };
+  }
   isHolidayModalOpen = signal<boolean>(false);
   isSavingHoliday = signal<boolean>(false);
   holidayForm = {
@@ -928,8 +1355,18 @@ export class AttendanceLeaveComponent implements OnInit {
 
   filteredHolidays = computed(() => {
     const year = Number(this.selectedHolidayYear());
+    const query = this.holidayQuery().trim().toLowerCase();
     const list = this.holidays()
-      .filter(h => new Date(h.date).getFullYear() === year)
+      .filter(h => {
+        const date = String(h.date).slice(0, 10);
+        const inRange = this.holidayStartDate() || this.holidayEndDate()
+          ? (!this.holidayStartDate() || date >= this.holidayStartDate())
+            && (!this.holidayEndDate() || date <= this.holidayEndDate())
+          : new Date(h.date).getFullYear() === year;
+        const status = this.holidayStatusFilter();
+        const timingMatches = !status || this.getHolidayStatus(h.date).class === `status-${status}`;
+        return inRange && timingMatches && (!query || h.name.toLowerCase().includes(query));
+      })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const seen = new Set<string>();
@@ -1127,6 +1564,11 @@ export class AttendanceLeaveComponent implements OnInit {
       this.requestForm = { leaveTypeId: '', startDate: '', endDate: '', reason: '', attachmentUrl: '', isHalfDay: false, halfDayPeriod: 'AM', onBehalfOfEmployeeId: null };
     }
     this.isRequestModalOpen.set(true);
+  }
+
+  stepLeaveCalendarMonth(step: number): void {
+    const month = this.leaveCalendarMonth();
+    this.leaveCalendarMonth.set(new Date(month.getFullYear(), month.getMonth() + step, 1));
   }
 
   onApplyingForChange(empId: any) {
@@ -1465,6 +1907,63 @@ export class AttendanceLeaveComponent implements OnInit {
     }
   }
 
+  onApprovalsGridReady(event: any): void {
+    this.approvalGridApi = event.api;
+  }
+
+  onApprovalSelectionChanged(event: any): void {
+    const pendingIds = event.api.getSelectedRows()
+      .filter((request: LeaveRequest) => request.status === 'PENDING')
+      .map((request: LeaveRequest) => request.id);
+    this.selectedApprovalIds.set(pendingIds);
+  }
+
+  clearApprovalSelection(): void {
+    this.approvalGridApi?.deselectAll();
+    this.selectedApprovalIds.set([]);
+  }
+
+  async approveSelectedLeaveRequests(): Promise<void> {
+    const ids = this.selectedApprovalIds();
+    if (!ids.length) return;
+    if (!confirm(`Approve ${ids.length} selected leave request${ids.length === 1 ? '' : 's'}?`)) return;
+    await this.updateSelectedLeaveRequests(ids, 'APPROVED');
+  }
+
+  rejectSelectedLeaveRequests(): void {
+    const ids = this.selectedApprovalIds();
+    if (!ids.length) return;
+    this.rejectingRequestId.set(null);
+    this.rejectingRequestIds.set(ids);
+    this.rejectReason.set('');
+    this.isRejectModalOpen.set(true);
+  }
+
+  private async updateSelectedLeaveRequests(ids: number[], status: 'APPROVED' | 'REJECTED', rejectionReason?: string): Promise<void> {
+    // Keep requests deliberately sequential. Each approval updates balances,
+    // attendance and notifications in a transaction; flooding the small DB
+    // pool creates the exact UI stall bulk actions are meant to avoid.
+    let succeeded = 0;
+    for (const id of ids) {
+      try {
+        await firstValueFrom(this.leavesService.updateRequestStatus(id, status, rejectionReason));
+        succeeded++;
+      } catch {
+        // Continue so one stale request does not prevent the rest of a batch.
+      }
+    }
+    this.clearApprovalSelection();
+    this.loadAdminData();
+    this.loadManagerData();
+    this.loadData();
+    const label = status === 'APPROVED' ? 'approved' : 'rejected';
+    if (succeeded === ids.length) {
+      this.toast.success(`${succeeded} leave request${succeeded === 1 ? '' : 's'} ${label}`);
+    } else {
+      this.toast.error(`${succeeded} of ${ids.length} leave requests ${label}. Refresh the list and try the remaining requests again.`);
+    }
+  }
+
   onCellClicked(params: CellClickedEvent) {
     if (params.colDef.field === 'status' && params.event?.target) {
       const target = params.event.target as HTMLElement;
@@ -1628,6 +2127,7 @@ export class AttendanceLeaveComponent implements OnInit {
 
   openRejectModal(id: number) {
     this.rejectingRequestId.set(id);
+    this.rejectingRequestIds.set([]);
     this.rejectReason.set('');
     this.isRejectModalOpen.set(true);
   }
@@ -1635,6 +2135,7 @@ export class AttendanceLeaveComponent implements OnInit {
   closeRejectModal() {
     this.isRejectModalOpen.set(false);
     this.rejectingRequestId.set(null);
+    this.rejectingRequestIds.set([]);
     this.rejectReason.set('');
   }
 
@@ -1644,6 +2145,13 @@ export class AttendanceLeaveComponent implements OnInit {
       return;
     }
     const id = this.rejectingRequestId();
+    const ids = this.rejectingRequestIds();
+    if (ids.length) {
+      const reason = this.rejectReason().trim();
+      this.closeRejectModal();
+      void this.updateSelectedLeaveRequests(ids, 'REJECTED', reason);
+      return;
+    }
     if (!id) return;
 
     this.leavesService.updateRequestStatus(id, 'REJECTED', this.rejectReason()).subscribe({
@@ -1664,7 +2172,7 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   pivotedBalances = computed(() => {
-    const balances = this.allBalances() || [];
+    const balances = this.filteredBalanceRecords();
     const empMap = new Map<number, any>();
 
     balances.forEach((b: any) => {
@@ -1684,11 +2192,33 @@ export class AttendanceLeaveComponent implements OnInit {
     return Array.from(empMap.values());
   });
 
+  filteredBalanceRecords = computed(() => {
+    const selectedType = this.filterLeaveTypeId();
+    const term = this.filterEmployeeQuery().trim().toLowerCase();
+    const search = this.balanceSearch().trim().toLowerCase();
+    return (this.allBalances() || []).filter((balance: any) => {
+      const employee = balance.employee;
+      const name = `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim().toLowerCase();
+      const employeeCode = String(employee?.employeeCode ?? '').toLowerCase();
+      const leaveType = String(balance.leaveType?.name ?? '').toLowerCase();
+      return (!selectedType || String(balance.leaveTypeId) === selectedType)
+        && (!term || name.includes(term) || employeeCode.includes(term) || String(balance.employeeId).includes(term))
+        && (!search || name.includes(search) || employeeCode.includes(search)
+          || String(balance.employeeId).includes(search) || leaveType.includes(search));
+    });
+  });
+
   dynamicColDefs = computed(() => {
     const balances = this.allBalances() || [];
     
     const cols: ColDef[] = [
-      { headerName: 'Employee', field: 'employee', flex: 1.5, minWidth: 200, pinned: 'left' }
+      {
+        headerName: 'Employee',
+        field: 'employee',
+        flex: 2,
+        minWidth: 150,
+        cellStyle: { textAlign: 'left', fontWeight: '600' },
+      }
     ];
 
     const types = new Set<string>();
@@ -1702,14 +2232,18 @@ export class AttendanceLeaveComponent implements OnInit {
       }
     });
 
-    Array.from(types).forEach(type => {
+    const selectedType = this.leaveTypes().find((type) => String(type.id) === this.filterLeaveTypeId());
+    Array.from(types).filter((type) => !selectedType || type === selectedType.name).forEach(type => {
       const halfDay = typeHalfDay.get(type);
       const suffix = halfDay === false ? ' · No Half Day' : ' · Half Day';
       cols.push({
-        headerName: `${type} (Avail / Total)${suffix}`,
+        headerName: type,
+        headerTooltip: `${type} · Available / total${suffix}`,
         field: type,
         flex: 1,
-        minWidth: 160
+        minWidth: 44,
+        wrapHeaderText: true,
+        autoHeaderHeight: true,
       });
     });
 
@@ -1725,6 +2259,22 @@ export class AttendanceLeaveComponent implements OnInit {
 
   gridOptions: GridOptions = {
     theme: 'legacy' as const
+  };
+
+  balanceSearch = signal('');
+  balanceDefaultColDef: ColDef = {
+    flex: 1,
+    minWidth: 44,
+    filter: true,
+    sortable: true,
+    resizable: true,
+    wrapHeaderText: true,
+    autoHeaderHeight: true,
+    cellStyle: { textAlign: 'center' },
+  };
+  balanceGridOptions: GridOptions = {
+    theme: 'legacy' as const,
+    suppressHorizontalScroll: true,
   };
 
   // Leave lists run to hundreds of rows once historic leave is imported.
@@ -1748,9 +2298,7 @@ export class AttendanceLeaveComponent implements OnInit {
 
   // HR Target Employee Selection & Day Log Modal State
   selectedAttendanceEmployeeId = signal<number | null>(null);
-  isEmpDropdownOpen = signal(false);
   isLoadingTimesheet = signal(false);
-  empSearchQuery = signal<string>('');
 
   isDayDetailsModalOpen = signal<boolean>(false);
   isGpsModalOpen = signal<boolean>(false);
@@ -1769,37 +2317,11 @@ export class AttendanceLeaveComponent implements OnInit {
   }
   selectedDayDetails = signal<any | null>(null);
 
-  toggleEmpDropdown() {
-    this.isEmpDropdownOpen.update(v => !v);
-  }
-
-  closeEmpDropdown() {
-    this.isEmpDropdownOpen.set(false);
-  }
-
   selectedAttendanceEmployee = computed(() => {
     const empId = this.selectedAttendanceEmployeeId();
     if (!empId) return null;
     return this.employees().find(e => e.id === empId) || null;
   });
-
-  filteredAttendanceEmployees = computed(() => {
-    const q = this.empSearchQuery().toLowerCase().trim();
-    const list = this.employees() || [];
-    if (!q) return list;
-    return list.filter(e => {
-      const name = `${e.firstName} ${e.lastName}`.toLowerCase();
-      const dept = (e.department?.name || '').toLowerCase();
-      const desig = (e.designation?.name || '').toLowerCase();
-      return name.includes(q) || dept.includes(q) || desig.includes(q);
-    });
-  });
-
-  selectAttendanceEmp(empId: number | null) {
-    this.selectedAttendanceEmployeeId.set(empId);
-    this.loadTimesheetHistory();
-    this.closeEmpDropdown();
-  }
 
   /**
    * Loads exactly the month the grid is showing.
@@ -2014,13 +2536,21 @@ export class AttendanceLeaveComponent implements OnInit {
       const tab = params.get('tab');
       if (tab === 'timesheets' || tab === 'attendance') {
         this.activeTab.set('attendance');
-      } else if (tab === 'me' || tab === 'leaves' || tab === 'my-leaves' || tab === 'request') {
-        this.activeTab.set('leaves');
-      } else if (tab === 'balances' || tab === 'approvals' || tab === 'shifts' || tab === 'holidays') {
-        this.activeTab.set(tab);
-        if (tab === 'balances' || tab === 'approvals') {
+      } else if (tab === 'leave' || tab === 'me' || tab === 'leaves' || tab === 'my-leaves' || tab === 'request') {
+        this.activeTab.set('leave');
+        this.leaveSection.set('application');
+      } else if (tab === 'balances' || tab === 'approvals' || tab === 'team-approvals') {
+        this.activeTab.set('leave');
+        this.leaveSection.set(tab === 'balances' ? 'balances' : 'application');
+        if (tab === 'balances') {
           this.loadAdminData();
+        } else {
+          this.loadLeaveApplicationData();
+          if (this.isAdmin()) this.loadAdminData();
+          if (!this.isAdmin()) this.loadManagerData();
         }
+      } else if (tab === 'shifts' || tab === 'holidays') {
+        this.activeTab.set(tab);
       } else if (tab === 'timeline') {
         this.activeTab.set('timeline');
         this.loadTeamTimeline();
@@ -2064,73 +2594,125 @@ export class AttendanceLeaveComponent implements OnInit {
   loadData() {
     this.attendanceService.getTodayAttendance().subscribe((res: any) => this.todayAttendance.set(res));
     this.loadTimesheetHistory();
-    this.isLoadingBalances.set(true);
-    this.isLoadingRequests.set(true);
-    this.leavesService.getMyBalances().subscribe({
-      next: (res: any) => this.myBalances.set(res),
-      complete: () => this.isLoadingBalances.set(false),
-      error: () => this.isLoadingBalances.set(false)
-    });
-    this.leavesService.getMyRequests().subscribe({
-      next: (res: any) => this.myRequests.set(res),
-      complete: () => this.isLoadingRequests.set(false),
-      error: () => this.isLoadingRequests.set(false)
-    });
     this.attendanceService.getMyRegularizations().subscribe((res: any) => this.myRegularizations.set(res));
     this.loadHolidays();
 
-    this.loadAdminData();
-    this.loadManagerData();
-    this.loadShifts();
+    // Do not download every HR/admin dataset on every page refresh.  Those lists
+    // can be large and previously competed for the two available DB connections.
+    if (this.activeTab() === 'leave') {
+      if (this.leaveSection() === 'application') {
+        this.loadLeaveApplicationData();
+        if (this.isAdmin()) this.loadAdminData();
+        if (!this.isAdmin()) this.loadManagerData();
+      }
+      else if (this.leaveSection() === 'approvals' || this.leaveSection() === 'balances') this.loadAdminData();
+      else if (this.leaveSection() === 'team-approvals') this.loadManagerData();
+    }
+  }
+
+  private loadLeaveApplicationData() {
+    if (this.leaveApplicationLoading) return;
+    this.leaveApplicationLoading = true;
+    this.isLoadingBalances.set(true);
+    this.isLoadingRequests.set(true);
+    forkJoin({
+      balances: this.leavesService.getMyBalances(),
+      requests: this.leavesService.getMyRequests(),
+      leaveTypes: this.masterDataService.getLeaveTypes(),
+    }).subscribe({
+      next: ({ balances, requests, leaveTypes }: any) => {
+        this.myBalances.set(balances);
+        this.myRequests.set(requests);
+        this.leaveTypes.set(leaveTypes);
+      },
+      error: () => {
+        this.isLoadingBalances.set(false);
+        this.isLoadingRequests.set(false);
+        this.leaveApplicationLoading = false;
+      },
+      complete: () => {
+        this.isLoadingBalances.set(false);
+        this.isLoadingRequests.set(false);
+        this.leaveApplicationLoading = false;
+      },
+    });
   }
 
   loadHolidays() {
+    if (this.holidaysLoading) return;
+    this.holidaysLoading = true;
     this.isLoadingHolidays.set(true);
     this.masterDataService.getHolidays().subscribe({
       next: (res: any) => {
         this.holidays.set(res);
         this.generateGrid();
         this.isLoadingHolidays.set(false);
+        this.holidaysLoading = false;
       },
-      error: () => this.isLoadingHolidays.set(false)
+      error: () => {
+        this.isLoadingHolidays.set(false);
+        this.holidaysLoading = false;
+      }
     });
   }
 
   loadAdminData() {
+    if (!this.isAdmin() || this.adminDataLoading) return;
+    this.adminDataLoading = true;
     const year = new Date().getFullYear();
     this.isLoadingBalances.set(true);
-    this.leavesService.getAllBalances(year).subscribe({
-      next: (res: any) => {
-        this.allBalances.set(res);
-        this.isLoadingBalances.set(false);
-      },
-      error: () => this.isLoadingBalances.set(false)
-    });
     this.isLoadingLeaveApprovals.set(true);
-    this.leavesService.getRequests().subscribe({
-      next: (res: any) => {
-        this.allRequests.set(res);
-        this.isLoadingLeaveApprovals.set(false);
-      },
-      error: () => this.isLoadingLeaveApprovals.set(false)
-    });
-    this.attendanceService.getPendingRegularizations().subscribe((res: any) => this.pendingRegularizations.set(res));
     this.isLoadingEmployees.set(true);
-    this.employeeService.getEmployees().subscribe({
-      next: (res: any) => this.employees.set(res),
-      complete: () => this.isLoadingEmployees.set(false)
+    const isBalancesPage = this.leaveSection() === 'balances';
+    const pageData$ = isBalancesPage
+      ? forkJoin({
+          balances: this.leavesService.getAllBalances(year, undefined, 200),
+          employees: this.employeeService.getEmployeesBasicList(),
+          leaveTypes: this.masterDataService.getLeaveTypes(),
+        })
+      : forkJoin({
+          requests: this.leavesService.getRequests(),
+          leaveTypes: this.masterDataService.getLeaveTypes(),
+        });
+    (pageData$ as any).subscribe({
+      next: (data: any) => {
+        if (isBalancesPage) {
+          this.allBalances.set(data.balances);
+          this.employees.set(data.employees);
+        } else {
+          this.allRequests.set(data.requests);
+        }
+        this.leaveTypes.set(data.leaveTypes);
+      },
+      complete: () => {
+        this.isLoadingBalances.set(false);
+        this.isLoadingLeaveApprovals.set(false);
+        this.isLoadingEmployees.set(false);
+        this.adminDataLoading = false;
+      },
+      error: () => {
+        this.isLoadingBalances.set(false);
+        this.isLoadingLeaveApprovals.set(false);
+        this.isLoadingEmployees.set(false);
+        this.adminDataLoading = false;
+      },
     });
-    this.masterDataService.getLeaveTypes().subscribe((res: any) => this.leaveTypes.set(res));
   }
 
   loadManagerData() {
+    if (this.isAdmin() || this.managerDataLoading) return;
+    this.managerDataLoading = true;
     this.isLoadingManagerRequests.set(true);
     this.leavesService.getManagerRequests().subscribe({
       next: (res: any) => {
         this.managerRequests.set(res);
         this.isLoadingManagerRequests.set(false);
+        this.managerDataLoading = false;
       },
-      error: () => this.isLoadingManagerRequests.set(false)
+      error: () => {
+        this.isLoadingManagerRequests.set(false);
+        this.managerDataLoading = false;
+      }
     });
   }
 
@@ -2377,6 +2959,130 @@ export class AttendanceLeaveComponent implements OnInit {
     window.URL.revokeObjectURL(url);
   }
 
+  exportHolidaysCsv(): void {
+    const rows = [['holiday_name', 'date'], ...this.filteredHolidays().map((holiday: any) => [holiday.name, String(holiday.date).slice(0, 10)])];
+    this.downloadCsv(rows, 'company-holidays.csv');
+  }
+
+  exportLeaveRequestsCsv(): void {
+    const rows = [['request_id', 'employee_id', 'applicant', 'leave_type', 'start_date', 'end_date', 'half_day', 'status', 'reason']];
+    const requests = this.filteredLeaveApplications();
+    for (const request of requests) {
+      const employee: any = request.employee;
+      rows.push([String(request.id), String(request.employeeId), `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim(), request.leaveType?.name || '', String(request.startDate).slice(0, 10), String(request.endDate).slice(0, 10), request.isHalfDay ? 'true' : 'false', request.status, request.reason || '']);
+    }
+    this.downloadCsv(rows, 'leave-requests.csv');
+    this.toast.success(`Exported ${requests.length} leave request${requests.length === 1 ? '' : 's'}`);
+  }
+
+  exportLeaveBalancesCsv(): void {
+    const rows = [['employee_id', 'employee_name', 'leave_type_id', 'leave_type', 'allocated', 'used', 'year']];
+    for (const balance of this.filteredBalanceRecords()) {
+      const employee: any = balance.employee;
+      rows.push([String(balance.employeeId), `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim(), String(balance.leaveTypeId), balance.leaveType?.name || '', String(balance.allocated), String(balance.used), String(balance.year)]);
+    }
+    this.downloadCsv(rows, 'leave-balances.csv');
+    this.toast.success(`Exported ${this.filteredBalanceRecords().length} leave balance record${this.filteredBalanceRecords().length === 1 ? '' : 's'}`);
+  }
+
+  downloadLeaveBalanceTemplate(): void {
+    this.downloadCsv([['employee_id', 'leave_type_id', 'allocated', 'year'], ['123', '4', '12', String(new Date().getFullYear())]], 'leave-balance-import-template.csv');
+  }
+
+  async importLeaveBalancesCsv(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0]; input.value = '';
+    if (!file) return;
+    const csvRows = await this.readImportCsv(file);
+    if (!csvRows) return;
+    const rows = csvRows.slice(1).map(([employeeId, leaveTypeId, allocated, year]) => ({ employeeId: Number(employeeId), leaveTypeId: Number(leaveTypeId), allocated: Number(allocated), year: Number(year) }))
+      .filter((row) => Number.isInteger(row.employeeId) && Number.isInteger(row.leaveTypeId) && Number.isFinite(row.allocated) && Number.isInteger(row.year));
+    if (!rows.length) { this.toast.error('No valid balance rows found. Expected columns: employee_id, leave_type_id, allocated, year.'); return; }
+    if (!confirm(`Set ${rows.length} leave balance${rows.length === 1 ? '' : 's'} from this CSV?`)) return;
+    try {
+      for (const row of rows) await firstValueFrom(this.leavesService.assignBalance(row));
+      this.toast.success(`Imported ${rows.length} leave balance${rows.length === 1 ? '' : 's'}`);
+      this.loadAdminData();
+    } catch (error: any) { this.toast.error(error?.error?.message || 'Could not import leave balances.'); }
+  }
+
+  downloadLeaveRequestTemplate(): void {
+    this.downloadCsv([['employee_id', 'leave_type_id', 'start_date', 'end_date', 'reason'], ['123', '4', '2026-10-12', '2026-10-14', 'Planned leave']], 'leave-request-import-template.csv');
+  }
+
+  async importLeaveRequestsCsv(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0]; input.value = '';
+    if (!file) return;
+    const csvRows = await this.readImportCsv(file);
+    if (!csvRows) return;
+    const rows = csvRows.slice(1).map(([employeeId, leaveTypeId, startDate, endDate, reason]) => ({ employeeId: Number(employeeId), leaveTypeId: Number(leaveTypeId), startDate: (startDate || '').trim(), endDate: (endDate || '').trim(), reason: (reason || '').trim() || undefined }))
+      .filter((row) => Number.isInteger(row.employeeId) && Number.isInteger(row.leaveTypeId) && /^\d{4}-\d{2}-\d{2}$/.test(row.startDate) && /^\d{4}-\d{2}-\d{2}$/.test(row.endDate));
+    if (!rows.length) { this.toast.error('No valid leave request rows found. Expected columns: employee_id, leave_type_id, start_date, end_date, reason.'); return; }
+    if (!confirm(`Create ${rows.length} pending leave request${rows.length === 1 ? '' : 's'}? They will still require approval.`)) return;
+    try {
+      for (const row of rows) await firstValueFrom(this.leavesService.requestLeaveOnBehalf(row));
+      this.toast.success(`Imported ${rows.length} pending leave request${rows.length === 1 ? '' : 's'}`);
+      this.loadAdminData();
+      this.loadData();
+    } catch (error: any) { this.toast.error(error?.error?.message || 'Could not import leave requests.'); }
+  }
+
+  downloadHolidayTemplate(): void {
+    this.downloadCsv([['holiday_name', 'date'], ['New Year’s Day', '2027-01-01']], 'holiday-import-template.csv');
+  }
+
+  async importHolidaysCsv(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0]; input.value = '';
+    if (!file) return;
+    const csvRows = await this.readImportCsv(file);
+    if (!csvRows) return;
+    const rows = csvRows.slice(1)
+      .map(([name, date]) => ({ name: (name || '').trim(), date: (date || '').trim() }))
+      .filter((row) => row.name && /^\d{4}-\d{2}-\d{2}$/.test(row.date));
+    if (!rows.length) {
+      this.toast.error('No valid holiday rows found. Expected columns: holiday_name, date.');
+      return;
+    }
+    if (!confirm(`Import ${rows.length} holiday${rows.length === 1 ? '' : 's'}?`)) return;
+    try {
+      await firstValueFrom(this.masterDataService.seedHolidays({ holidays: rows }));
+      this.toast.success(`Imported ${rows.length} holiday${rows.length === 1 ? '' : 's'}`);
+      this.loadHolidays();
+    } catch (error: any) {
+      this.toast.error(error?.error?.message || 'Could not import holidays.');
+    }
+  }
+
+  private parseCsv(text: string): string[][] {
+    return text.replace(/^\uFEFF/, '').trim().split(/\r?\n/).filter(Boolean).map((line) =>
+      line.match(/(?:[^,\"]+|\"(?:[^\"]|\"\")*\")+/g)?.map((cell) => cell.replace(/^\"|\"$/g, '').replace(/\"\"/g, '\"').trim()) || [],
+    );
+  }
+
+  private async readImportCsv(file: File): Promise<string[][] | null> {
+    const maxImportBytes = 5 * 1024 * 1024;
+    const maxImportRows = 2_000;
+    if (file.size > maxImportBytes) {
+      this.toast.error('This CSV is too large to import here. Split it into files smaller than 5 MB.');
+      return null;
+    }
+    const rows = this.parseCsv(await file.text());
+    if (rows.length - 1 > maxImportRows) {
+      this.toast.error(`This CSV has more than ${maxImportRows.toLocaleString()} rows. Split it into smaller files.`);
+      return null;
+    }
+    return rows;
+  }
+
+  private downloadCsv(rows: string[][], fileName: string): void {
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   setTab(tab: string) {
     this.activeTab.set(tab);
     if (tab === 'balances' || tab === 'approvals') {
@@ -2398,6 +3104,140 @@ export class AttendanceLeaveComponent implements OnInit {
       this.loadHolidays();
     }
     this.router.navigate(['/attendance', tab]);
+  }
+
+  setLeaveSection(section: 'application' | 'approvals' | 'team-approvals' | 'balances') {
+    const targetSection = section === 'balances' ? 'balances' : 'application';
+    this.activeTab.set('leave');
+    this.leaveSection.set(targetSection);
+    if (targetSection === 'application') {
+      this.loadLeaveApplicationData();
+      if (this.isAdmin()) this.loadAdminData();
+      if (!this.isAdmin()) this.loadManagerData();
+    } else if (targetSection === 'balances') {
+      this.loadAdminData();
+    }
+    const routeTab = targetSection === 'application' ? 'leaves' : targetSection;
+    this.router.navigate(['/attendance', routeTab]);
+  }
+
+  openLeaveFilters(): void {
+    this.filterDrawerOpen.set(true);
+  }
+
+  hasActiveLeaveFilters(): boolean {
+    return !!(
+      this.filterStartDate() || this.filterEndDate() || this.filterEmployeeQuery()
+      || this.filterLeaveTypeId() || this.leaveStatusFilter()
+      || this.approvalStatusFilter() !== 'ALL'
+    );
+  }
+
+  hasActiveBalanceFilters(): boolean {
+    return !!(this.filterEmployeeQuery() || this.filterLeaveTypeId());
+  }
+
+  hasActiveAttendanceFilters(): boolean {
+    return !!(
+      this.attendanceDateFilter() || this.attendanceDepartmentFilter()
+      || this.attendanceStatusFilter() || this.attendanceFlagFilter()
+      || this.attendanceSearch()
+      || (this.selectedAttendanceEmployeeId() !== null)
+      || this.selectedMonth() !== new Date().getMonth()
+      || this.selectedYear() !== new Date().getFullYear()
+    );
+  }
+
+  openAttendanceFilters(): void {
+    this.filterDrawerOpen.set(true);
+    if (this.canViewAllAttendance() && this.employees().length === 0 && !this.isLoadingEmployees()) {
+      this.isLoadingEmployees.set(true);
+      this.employeeService.getEmployeesBasicList().subscribe({
+        next: (employees) => this.employees.set(employees),
+        error: () => {
+          this.isLoadingEmployees.set(false);
+          this.toast.error('Could not load employees for attendance filters.');
+        },
+        complete: () => this.isLoadingEmployees.set(false),
+      });
+    }
+  }
+
+  applyAttendanceFilters(filters: AttendanceFilterValue): void {
+    if (this.activeTab() === 'attendance') {
+      const previousEmployeeId = this.selectedAttendanceEmployeeId();
+      const previousMonth = this.selectedMonth();
+      const previousYear = this.selectedYear();
+      const employeeId = filters.filters['employee'];
+      if (employeeId) {
+        this.selectedAttendanceEmployeeId.set(Number(employeeId));
+      } else if (this.canViewAllAttendance()) {
+        this.selectedAttendanceEmployeeId.set(null);
+      }
+      const selectedDate = filters.date || '';
+      let month = filters.periodMonth ?? this.selectedMonth();
+      let year = filters.periodYear ?? this.selectedYear();
+      if (selectedDate) {
+        const [dateYear, dateMonth] = selectedDate.split('-').map(Number);
+        month = dateMonth - 1;
+        year = dateYear;
+      } else if (
+        month !== previousMonth
+        || year !== previousYear
+      ) {
+        this.attendanceDateFilter.set('');
+      }
+      this.selectedMonth.set(month);
+      this.selectedYear.set(year);
+      this.attendanceDateFilter.set(selectedDate);
+      this.attendanceDepartmentFilter.set(filters.filters['department'] || '');
+      this.attendanceStatusFilter.set(filters.filters['status'] || '');
+      this.attendanceFlagFilter.set(filters.filters['flag'] || '');
+      if (
+        previousEmployeeId !== this.selectedAttendanceEmployeeId()
+        || previousMonth !== this.selectedMonth()
+        || previousYear !== this.selectedYear()
+      ) {
+        this.loadTimesheetHistory();
+      }
+      this.filterDrawerOpen.set(false);
+      return;
+    }
+
+    this.filterStartDate.set(filters.startDate);
+    this.filterEndDate.set(filters.endDate);
+    this.filterEmployeeQuery.set(filters.employeeQuery);
+    this.filterLeaveTypeId.set(filters.filters['leaveType'] || '');
+    const status = filters.filters['status'] || '';
+    if (this.isAdmin() && this.leaveSection() !== 'balances') {
+      this.approvalStatusFilter.set(
+        status === 'PENDING' || status === 'APPROVED' || status === 'REJECTED' || status === 'CANCELLED'
+          ? status
+          : 'ALL',
+      );
+    } else {
+      this.leaveStatusFilter.set(status);
+    }
+
+    this.filterDatePreset.set(filters.preset);
+    this.filterDrawerOpen.set(false);
+  }
+
+  applyTimelineFilters(filters: AttendanceFilterValue): void {
+    this.timelineStartDate.set(filters.startDate);
+    this.timelineEndDate.set(filters.endDate);
+    this.timelineEmployeeQuery.set(filters.employeeQuery);
+    this.timelineDepartmentFilter.set(filters.filters['department'] || '');
+    this.timelineFilterDrawerOpen.set(false);
+    this.loadTeamTimeline();
+  }
+
+  applyHolidayFilters(filters: AttendanceFilterValue): void {
+    this.holidayQuery.set(filters.employeeQuery);
+    this.holidayStatusFilter.set(filters.filters['status'] || '');
+    this.holidayStartDate.set(filters.startDate);
+    this.holidayEndDate.set(filters.endDate);
+    this.holidayFilterDrawerOpen.set(false);
   }
 
   getHolidayStatus(dateStr: string): { label: string; class: string } {

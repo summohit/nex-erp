@@ -102,10 +102,22 @@ export class AttendanceService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/attendance`;
 
+  importAttendance(rows: Array<{ employeeId: number; date: string; status?: string; clockIn?: string; clockOut?: string }>) {
+    return this.http.post<{ imported: number; skipped: number }>(`${this.apiUrl}/import`, { rows });
+  }
+
   /** §Att7: attendance grouped by shift, for a week or a month. */
-  getShiftPeriodSummary(period: 'week' | 'month', date?: string) {
-    const q = `?period=${period}${date ? `&date=${date}` : ''}`;
-    return this.http.get<ShiftPeriodSummary>(`${this.apiUrl}/shift-summary${q}`);
+  getShiftPeriodSummary(
+    period: 'week' | 'month',
+    date?: string,
+    filters?: { from?: string; to?: string; employee?: string },
+  ) {
+    const params: Record<string, string> = { period };
+    if (date) params['date'] = date;
+    if (filters?.from) params['from'] = filters.from;
+    if (filters?.to) params['to'] = filters.to;
+    if (filters?.employee) params['employee'] = filters.employee;
+    return this.http.get<ShiftPeriodSummary>(`${this.apiUrl}/shift-summary`, { params });
   }
 
   getTodayAttendance(): Observable<AttendanceRecord | null> {
@@ -200,13 +212,19 @@ export class AttendanceService {
     return this.http.get<any[]>(`${this.apiUrl}/team/timeline?start=${start}&end=${end}`);
   }
 
-  getAllEmployeesAttendance(filters: { month?: number; year?: number; employeeId?: number; departmentId?: number; status?: string }): Observable<AttendanceRecord[]> {
+  getAllEmployeesAttendance(filters: {
+    month?: number; year?: number; employeeId?: number; departmentId?: number;
+    status?: string; from?: string; to?: string; all?: boolean;
+  }): Observable<AttendanceRecord[]> {
     const params: string[] = [];
     if (filters.month) params.push(`month=${filters.month}`);
     if (filters.year) params.push(`year=${filters.year}`);
     if (filters.employeeId) params.push(`employeeId=${filters.employeeId}`);
     if (filters.departmentId) params.push(`departmentId=${filters.departmentId}`);
     if (filters.status) params.push(`status=${filters.status}`);
+    if (filters.from) params.push(`from=${encodeURIComponent(filters.from)}`);
+    if (filters.to) params.push(`to=${encodeURIComponent(filters.to)}`);
+    if (filters.all) params.push('all=true');
     const qs = params.length ? `?${params.join('&')}` : '';
     return this.http.get<AttendanceRecord[]>(`${this.apiUrl}/all${qs}`);
   }

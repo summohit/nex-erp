@@ -294,7 +294,7 @@
 .filter-bar-main-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -305,7 +305,12 @@
   align-items: center;
   flex: 1;
   min-width: 240px;
-  max-width: 340px;
+  max-width: 440px;
+}
+
+.filter-drawer-trigger {
+  min-height: 38px;
+  border-radius: 9px;
 }
 
 .search-icon {
@@ -1468,7 +1473,7 @@
   font-size: 13px;
   font-weight: 500;
   color: #101729;
-  cursor: pointer;
+  cursor: default;
   user-select: none;
   transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
@@ -1476,10 +1481,10 @@
 }
 
 .legend-item:hover {
-  background: #eaf0f5;
-  border-color: #cbd5e1;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+  background: #F4F7F9;
+  border-color: transparent;
+  transform: none;
+  box-shadow: none;
 }
 
 .legend-item.active {
@@ -1659,7 +1664,8 @@
 }
 
 .matrix-scroll-wrapper {
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   max-height: calc(100vh - 270px);
   min-height: 420px;
   max-width: 100%;
@@ -1668,6 +1674,7 @@
 
 .matrix-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 13px;
@@ -1694,14 +1701,16 @@
 
 .matrix-table th.col-employee-header {
   text-align: left;
-  padding-left: 18px;
-  width: 220px;
-  min-width: 220px;
+  padding-left: 14px;
+  width: 210px;
+  min-width: 0;
 }
 
 .matrix-table th.col-day-header {
-  min-width: 40px;
-  width: 40px;
+  min-width: 0;
+  width: auto;
+  padding-right: 1px;
+  padding-left: 1px;
 }
 
 .matrix-table th.col-day-header.is-weekend {
@@ -1716,13 +1725,13 @@
 }
 
 .day-header-inner .day-num {
-  font-size: 13.5px;
+  font-size: 12px;
   font-weight: 700;
   color: #0f172a;
 }
 
 .day-header-inner .day-week {
-  font-size: 10px;
+  font-size: 8px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1730,8 +1739,8 @@
 }
 
 .matrix-table th.col-total-header {
-  width: 75px;
-  min-width: 75px;
+  width: 62px;
+  min-width: 0;
   font-size: 11px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -1896,8 +1905,9 @@
 }
 
 .day-cell-badge {
-  width: 36px;
-  height: 36px;
+  width: min(28px, 100%);
+  aspect-ratio: 1;
+  height: auto;
   border-radius: 50%;
   margin: 0 auto;
   display: flex;

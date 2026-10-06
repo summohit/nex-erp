@@ -17,6 +17,7 @@ import {
   FieldVisitRequestsService, FieldVisitRequest, FieldVisitRequestInput,
 } from '../../services/field-visit-requests';
 import { ProjectsService } from '../../services/projects';
+import { TasksService } from '../../services/tasks.service';
 import { EmployeeService } from '../../services/employee.service';
 import { MasterDataService, VisitLocation } from '../../services/master-data.service';
 import { RoleService } from '../../services/role.service';
@@ -94,6 +95,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
 
   private api = inject(FieldVisitRequestsService);
   private projectsService = inject(ProjectsService);
+  private tasksService = inject(TasksService);
   private employeeService = inject(EmployeeService);
   private masterData = inject(MasterDataService);
   private roleService = inject(RoleService);
@@ -384,6 +386,12 @@ export class FieldVisitRequestFormComponent implements OnInit {
 
   // Searchable Project select state
   selectedProjectId = signal<number | null>(null);
+  /** A General visit has no customer project; the API maps it to the General workspace. */
+  isGeneralVisit = signal(false);
+  canCreateGeneralTask = signal(false);
+  isCreatingGeneralTask = signal(false);
+  generalTaskTitle = '';
+  generalTaskDescription = '';
   isProjectDropdownOpen = signal(false);
   projectSearchQuery = signal('');
 
@@ -462,7 +470,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
       this.selectedVisitLocationId.set((this.request as any).visitLocationId ?? null);
       this.selectedEmployeeIds.set(this.request.members.map((m) => m.employee.id));
       this.form = {
-        projectId: this.request.project.id,
+        projectId: this.visitType() === 'GENERAL' ? null : this.request.project.id,
         location: this.request.location,
         visitLocationId: (this.request as any).visitLocationId ?? null,
         latitude: this.request.latitude,
@@ -524,6 +532,12 @@ export class FieldVisitRequestFormComponent implements OnInit {
     this.locationRequests.capabilities().subscribe({
       next: (c) => this.canAddVisitLocation.set(!!c?.canAdd),
       error: () => this.canAddVisitLocation.set(false),
+    });
+
+    // The server owns this permission; the UI only mirrors it.
+    this.tasksService.getCapabilities().subscribe({
+      next: (capabilities) => this.canCreateGeneralTask.set(!!capabilities?.canCreateGeneral),
+      error: () => this.canCreateGeneralTask.set(false),
     });
 
     this.isLoadingProjects.set(true);
@@ -699,6 +713,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
   }
 
   selectProject(projectId: number | null): void {
+    this.isGeneralVisit.set(false);
     this.selectedProjectId.set(projectId);
     this.form.projectId = projectId;
     this.isProjectDropdownOpen.set(false);
@@ -713,6 +728,45 @@ export class FieldVisitRequestFormComponent implements OnInit {
       this.showAllProjectTasks.set(true);
       if (projectId != null) this.loadProjectTasks(projectId);
     }
+  }
+
+  selectGeneralVisit(): void {
+    this.isGeneralVisit.set(true);
+    this.selectedProjectId.set(null);
+    this.form.projectId = null;
+    this.form.tasks = [];
+    this.projectTasks.set([]);
+    this.tasksError.set(null);
+    this.isTaskDropdownOpen.set(false);
+    this.isProjectDropdownOpen.set(false);
+  }
+
+  createGeneralTask(): void {
+    const title = this.generalTaskTitle.trim();
+    if (!title || this.isCreatingGeneralTask()) return;
+    this.isCreatingGeneralTask.set(true);
+    this.tasksService.createTask({
+      title,
+      description: this.generalTaskDescription.trim() || undefined,
+      parentKind: 'GENERAL',
+      assigneeIds: this.selectedEmployeeIds(),
+    }).subscribe({
+      next: (created: any) => {
+        this.isCreatingGeneralTask.set(false);
+        this.form.tasks = [...this.form.tasks, {
+          issueId: created.id, name: created.title || title,
+          description: this.generalTaskDescription.trim(), key: created.key,
+          status: created.status || 'TODO',
+        }];
+        this.generalTaskTitle = '';
+        this.generalTaskDescription = '';
+        this.toast.success(`${created.key || 'Task'} created and added to this visit`);
+      },
+      error: (err) => {
+        this.isCreatingGeneralTask.set(false);
+        this.toast.error(this.messageOf(err) || 'Could not create the general task.');
+      },
+    });
   }
 
   // ── Project task picker ─────────────────────────────────────────────────

@@ -23,10 +23,13 @@ export class LeavesController {
     @Request() req,
     @Query('year') year?: string,
     @Query('employeeId') employeeId?: string,
+    @Query('limit') limit?: string,
   ) {
     const y = year ? parseInt(year) : new Date().getFullYear();
     const empId = employeeId ? parseInt(employeeId) : undefined;
-    return this.leavesService.getAllBalances(req.user.companyId, y, empId);
+    const requestedLimit = limit ? parseInt(limit, 10) : 200;
+    const safeLimit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 500) : 200;
+    return this.leavesService.getAllBalances(req.user.companyId, y, empId, safeLimit);
   }
 
   /** Leave quota report. Non-admins are scoped to themselves by the service. */
@@ -84,7 +87,7 @@ export class LeavesController {
 
   @Get('requests')
   getRequests(@Request() req, @Query() filter: any) {
-    return this.leavesService.getRequests(req.user.companyId, filter);
+    return this.leavesService.getRequests(req.user.companyId, filter, req.user.role);
   }
 
   @Put('requests/:id')

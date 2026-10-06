@@ -13,6 +13,10 @@ export interface LeaveActionCellParams extends ICellRendererParams {
   onReject?: (data: any) => void;
   onViewAttachment?: (data: any) => void;
   onViewReason?: (data: any) => void;
+  canEdit?: (data: any) => boolean;
+  canCancel?: (data: any) => boolean;
+  canApprove?: (data: any) => boolean;
+  canReject?: (data: any) => boolean;
   /**
    * §Att10: remove the request outright. Passed only by screens whose viewer
    * is a Super Admin, so its presence is the permission — the menu never has
@@ -45,19 +49,19 @@ export interface LeaveActionCellParams extends ICellRendererParams {
           <svg lucidePaperclip size="18" class="menu-icon"></svg>
           <span class="menu-text">View Attachment</span>
         </button>
-        <button mat-menu-item class="menu-item" (click)="edit()" *ngIf="params.onEdit && params.data.status === 'PENDING'">
+        <button mat-menu-item class="menu-item" (click)="edit()" *ngIf="params.onEdit && params.data.status === 'PENDING' && isAllowed(params.canEdit)">
           <svg lucideEdit2 size="18" class="menu-icon"></svg>
           <span class="menu-text">Edit</span>
         </button>
-        <button mat-menu-item class="menu-item text-danger" (click)="cancel()" *ngIf="params.onCancel && !isPastStartDate(params.data.startDate) && params.data.status !== 'CANCELLED' && params.data.status !== 'REJECTED'">
+        <button mat-menu-item class="menu-item text-danger" (click)="cancel()" *ngIf="params.onCancel && !isPastStartDate(params.data.startDate) && params.data.status !== 'CANCELLED' && params.data.status !== 'REJECTED' && isAllowed(params.canCancel)">
           <svg lucideX size="18" class="menu-icon"></svg>
           <span class="menu-text">Cancel Request</span>
         </button>
-        <button mat-menu-item class="menu-item text-success" (click)="approve()" *ngIf="params.onApprove && params.data.status === 'PENDING'">
+        <button mat-menu-item class="menu-item text-success" (click)="approve()" *ngIf="params.onApprove && params.data.status === 'PENDING' && isAllowed(params.canApprove)">
           <svg lucideCheckCircle size="18" class="menu-icon"></svg>
           <span class="menu-text">Approve</span>
         </button>
-        <button mat-menu-item class="menu-item text-danger" (click)="reject()" *ngIf="params.onReject && params.data.status === 'PENDING'">
+        <button mat-menu-item class="menu-item text-danger" (click)="reject()" *ngIf="params.onReject && params.data.status === 'PENDING' && isAllowed(params.canReject)">
           <svg lucideXCircle size="18" class="menu-icon"></svg>
           <span class="menu-text">Reject</span>
         </button>
@@ -222,11 +226,15 @@ export class LeaveActionCellRendererComponent implements ICellRendererAngularCom
     const d = this.params.data;
     if (d.status === 'REJECTED' && d.rejectionReason) return true;
     if (this.params.onViewAttachment && d.attachmentUrl) return true;
-    if (this.params.onEdit && d.status === 'PENDING') return true;
-    if (this.params.onCancel && !this.isPastStartDate(d.startDate) && d.status !== 'CANCELLED' && d.status !== 'REJECTED') return true;
-    if (this.params.onApprove && d.status === 'PENDING') return true;
-    if (this.params.onReject && d.status === 'PENDING') return true;
+    if (this.params.onEdit && d.status === 'PENDING' && this.isAllowed(this.params.canEdit)) return true;
+    if (this.params.onCancel && !this.isPastStartDate(d.startDate) && d.status !== 'CANCELLED' && d.status !== 'REJECTED' && this.isAllowed(this.params.canCancel)) return true;
+    if (this.params.onApprove && d.status === 'PENDING' && this.isAllowed(this.params.canApprove)) return true;
+    if (this.params.onReject && d.status === 'PENDING' && this.isAllowed(this.params.canReject)) return true;
     if (this.params.onDelete) return true;
     return false;
+  }
+
+  isAllowed(predicate?: (data: any) => boolean): boolean {
+    return !predicate || predicate(this.params.data);
   }
 }

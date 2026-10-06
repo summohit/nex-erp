@@ -451,6 +451,9 @@
   gap: 7px;
 }
 
+.row-link { padding: 0; border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; max-width: 100%; }
+.row-link:hover .project-name { color: #4f46e5; text-decoration: underline; }
+
 .cell-icon {
   color: #94a3b8;
   flex-shrink: 0;
@@ -532,6 +535,22 @@
   color: #7e22ce;
   border: 1px solid #e9d5ff;
 }
+
+.assignees-cell { min-width: 180px; }
+.assigned-people { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.assigned-person { display: inline-flex; align-items: center; gap: 5px; min-width: 0; color: #334155; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.assigned-person img, .assigned-avatar-fallback { width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%; object-fit: cover; }
+.assigned-avatar-fallback { display: inline-flex; align-items: center; justify-content: center; background: #e0e7ff; color: #4338ca; font-size: 9px; font-weight: 800; }
+.more-people, .more-tasks { flex: 0 0 auto; color: #64748b; font-size: 11px; font-weight: 700; }
+.tasks-cell { min-width: 190px; }
+.visit-task-list { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+.visit-task-link { display: flex; flex-direction: column; align-items: flex-start; max-width: 100%; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.visit-task-link:hover .visit-task-name { color: #4f46e5; text-decoration: underline; }
+.visit-task-link:disabled { cursor: default; opacity: .7; }
+.visit-task-link.unlinked .visit-task-name { color: #64748b; }
+.visit-task-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; font-size: 12.5px; font-weight: 700; }
+.visit-task-project { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #64748b; font-size: 11px; font-weight: 500; }
+.cell-empty { color: #94a3b8; font-size: 12px; }
 
 /* ── Status Pills ────────────────────────────────────────────────────────── */
 .status-pill {

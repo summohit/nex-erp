@@ -347,18 +347,24 @@ export class MenusService implements OnModuleInit {
     
     let formattedMenus = tree.map(section => ({
       title: section.title,
-      items: section.children.map(item => ({
-        id: item.route ? item.route.replace('/', '') : item.title.toLowerCase().replace(/ /g, '-'),
-        title: item.title,
-        icon: item.icon,
-        route: item.route,
-        subItems: item.children.length > 0 ? item.children.map(sub => ({
-          id: sub.route === '/careers' ? 'recruitment/careers-page' : (sub.route ? sub.route.replace('/', '') : sub.title.toLowerCase().replace(/ /g, '-')),
-          title: sub.title,
-          route: sub.route,
-          external: sub.openInNewTab
-        })) : undefined
-      }))
+      items: section.children.map(item => {
+        // Existing databases can still contain the old menu row. It must never
+        // be sent to a client: Attendance is now the single entry point and
+        // decides between company-wide and self attendance from the role.
+        const children = item.children.filter(sub => sub.route !== '/attendance/all');
+        return {
+          id: item.route ? item.route.replace('/', '') : item.title.toLowerCase().replace(/ /g, '-'),
+          title: item.title,
+          icon: item.icon,
+          route: item.route,
+          subItems: children.length > 0 ? children.map(sub => ({
+            id: sub.route === '/careers' ? 'recruitment/careers-page' : (sub.route ? sub.route.replace('/', '') : sub.title.toLowerCase().replace(/ /g, '-')),
+            title: sub.title,
+            route: sub.route,
+            external: sub.openInNewTab
+          })) : undefined
+        };
+      })
     }));
 
     // 3. Superadmin gets everything

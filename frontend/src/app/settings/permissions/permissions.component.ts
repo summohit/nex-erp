@@ -78,11 +78,10 @@ export class PermissionsComponent implements OnInit {
       id: 'attendance', title: 'Attendance & Leave', isExpanded: true, enabled: false,
       subItems: [
         { id: 'attendance/timesheets', title: 'Attendance', enabled: false },
-        { id: 'attendance/all', title: 'All People Attendance', enabled: false },
         { id: 'attendance/leaves', title: 'Time Off Requests', enabled: false },
         { id: 'attendance/approvals', title: 'Leave Approvals', enabled: false },
         { id: 'attendance/balances', title: 'Leave Balances', enabled: false },
-        { id: 'attendance/shifts', title: 'All People Shift Roster', enabled: false },
+        { id: 'attendance/shifts', title: 'Shift Roster', enabled: false },
         { id: 'attendance/shift-summary', title: 'Shift Attendance', enabled: false },
         { id: 'attendance/timeline', title: 'Team Timeline', enabled: false },
         { id: 'attendance/holidays', title: 'Holidays', enabled: false }

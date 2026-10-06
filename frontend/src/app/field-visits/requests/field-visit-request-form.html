@@ -80,6 +80,9 @@
               (click)="toggleProjectDropdown()">
               <div class="trigger-left">
                 <svg lucideBuilding [size]="16" class="select-icon"></svg>
+                @if (isGeneralVisit()) {
+                  <span class="selected-text selected-general">General — not linked to a project</span>
+                }
                 <span class="selected-text">@if (selectedProject()?.key) {<span class="project-code">{{ selectedProject()?.key }}</span>}{{ selectedProject()?.name || 'Select a project…' }}</span>
               </div>
               <div class="trigger-right">
@@ -110,6 +113,18 @@
                 </div>
 
                 <div class="select-options-list">
+                  <div
+                    class="select-option"
+                    [class.selected]="isGeneralVisit()"
+                    (click)="selectGeneralVisit()">
+                    <div class="option-content">
+                      <svg lucideListChecks [size]="14" class="option-icon"></svg>
+                      <span class="option-name">General</span>
+                    </div>
+                    @if (isGeneralVisit()) {
+                      <svg lucideCheck [size]="15" class="option-check"></svg>
+                    }
+                  </div>
                   <div
                     class="select-option none-option"
                     [class.selected]="selectedProjectId() === null"
@@ -581,6 +596,21 @@
           </div>
         }
 
+        @if (isGeneralVisit() && canCreateGeneralTask()) {
+          <div class="general-task-create">
+            <div class="general-task-create-copy">
+              <strong>Create a general task</strong>
+              <span>Create it here and attach it to this field visit.</span>
+            </div>
+            <input type="text" [(ngModel)]="generalTaskTitle" placeholder="Task title" />
+            <input type="text" [(ngModel)]="generalTaskDescription" placeholder="Description (optional)" />
+            <button type="button" class="scope-manual-btn" [disabled]="!generalTaskTitle.trim() || isCreatingGeneralTask()" (click)="createGeneralTask()">
+              @if (isCreatingGeneralTask()) { <svg lucideLoader [size]="14" class="spin-icon"></svg> }
+              Create task
+            </button>
+          </div>
+        }
+
         <!-- The trip's scope, collapsed into a dropdown so the whole thing stays
              one glanceable list however many tasks are picked. -->
         <div class="searchable-select-container">
@@ -606,6 +636,9 @@
                   @if (visitType() === 'GENERAL' && !selectedEmployeeIds().length) {
                     Pick who is going first — their general tasks are listed here
                   } @else if (visitType() === 'PROJECT' && !selectedProjectId()) {
+                  @if (isGeneralVisit()) {
+                    General tasks created here are attached to this visit
+                  } @else if (!selectedProjectId()) {
                     Pick a project first — tasks come from that project's board
                   } @else if (form.tasks.length > 1) {
                     {{ form.tasks[0].key ? form.tasks[0].key + ' and ' + (form.tasks.length - 1) + ' more' : form.tasks[0].name }}

@@ -284,8 +284,8 @@
             <th>Site Location</th>
             <th>Scheduled Dates</th>
             <th class="num">Days</th>
-            <th class="num">Team</th>
-            <th class="num">Tasks</th>
+            <th>Assigned to</th>
+            <th>Tasks</th>
             <th>Status</th>
             <th class="action-col"></th>
           </tr>
@@ -305,10 +305,10 @@
                 <span class="request-tag">{{ r.requestNumber }}</span>
               </td>
               <td class="project-cell">
-                <div class="project-info">
+                <button type="button" class="project-info row-link" (click)="openProject(r, $event)" title="Open project board">
                   <svg lucideBuilding [size]="14" class="cell-icon"></svg>
                   <span class="project-name" title="{{ r.project.name }}">{{ r.project.name }}</span>
-                </div>
+                </button>
               </td>
               <td class="site-cell">
                 <div class="site-info" title="{{ r.location }}">
@@ -330,14 +330,35 @@
               <td class="num">
                 <span class="badge-num days-badge">{{ r.visitDays }}d</span>
               </td>
-              <td class="num">
-                <span class="badge-num people-badge" title="{{ r.members.length }} members assigned">
-                  <svg lucideUsers [size]="11"></svg>
-                  {{ r.members.length }}
-                </span>
+              <td class="assignees-cell">
+                @if (r.members.length) {
+                  <div class="assigned-people" title="{{ r.members.length }} member{{ r.members.length === 1 ? '' : 's' }} assigned">
+                    @for (m of r.members.slice(0, 2); track m.id) {
+                      <span class="assigned-person">
+                        @if (m.employee.avatarUrl) {
+                          <img [src]="m.employee.avatarUrl" [alt]="m.employee.firstName + ' ' + m.employee.lastName" />
+                        } @else {
+                          <span class="assigned-avatar-fallback">{{ (m.employee.firstName?.[0] || '') + (m.employee.lastName?.[0] || '') }}</span>
+                        }
+                        <span>{{ m.employee.firstName }} {{ m.employee.lastName }}</span>
+                      </span>
+                    }
+                    @if (r.members.length > 2) { <span class="more-people">+{{ r.members.length - 2 }}</span> }
+                  </div>
+                } @else { <span class="cell-empty">No one assigned</span> }
               </td>
-              <td class="num">
-                <span class="badge-num tasks-badge" title="{{ r.tasks.length }} tasks">{{ r.tasks.length }}</span>
+              <td class="tasks-cell">
+                @if (r.tasks.length) {
+                  <div class="visit-task-list">
+                    @for (task of r.tasks.slice(0, 2); track task.id) {
+                      <button type="button" class="visit-task-link" [class.unlinked]="!task.issueId" (click)="openTask(r, task, $event)" [disabled]="!task.issueId" [title]="task.issueId ? 'Open task details' : 'This task is not yet linked to a board task'">
+                        <span class="visit-task-name">{{ task.name }}</span>
+                        <span class="visit-task-project">{{ r.project.name }}</span>
+                      </button>
+                    }
+                    @if (r.tasks.length > 2) { <span class="more-tasks">+{{ r.tasks.length - 2 }} more</span> }
+                  </div>
+                } @else { <span class="cell-empty">No tasks</span> }
               </td>
               <td class="status-cell" (click)="$event.stopPropagation()">
                 <div class="status-dropdown-wrap">

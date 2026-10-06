@@ -12,6 +12,7 @@ import { isHalfDayStart } from './half-day-rule';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
 import { isCompanyAdmin, isHrAdmin } from '../common/company-roles';
+import { isBranchWeeklyOff } from '../common/weekly-offs';
 
 /**
  * What the field visit clock tells attendance about the day it is clocking.
@@ -32,6 +33,92 @@ export class AttendanceService {
     private roster: ShiftRosterService,
     private approvals: ApprovalsService,
   ) {}
+
+  async importAttendance(companyId: number, rows: Array<{ employeeId: number; date: string; status?: string; clockIn?: string; clockOut?: string }>) {
+    if (!Array.isArray(rows) || rows.length === 0) throw new BadRequestException('At least one attendance row is required.');
+    if (rows.length > 2000) throw new BadRequestException('Import is limited to 2,000 rows at a time.');
+    const employeeIds = [...new Set(rows.map((row) => Number(row.employeeId)).filter(Number.isInteger))];
+    const employees = await this.prisma.employee.findMany({ where: { companyId, id: { in: employeeIds } }, select: { id: true } });
+    const allowed = new Set(employees.map((employee) => employee.id));
+    let imported = 0;
+    for (const row of rows) {
+      const employeeId = Number(row.employeeId);
+      if (!allowed.has(employeeId) || !/^\d{4}-\d{2}-\d{2}$/.test(row.date)) continue;
+      const status = ['PRESENT', 'HALF_DAY', 'ABSENT', 'ON_LEAVE', 'HOLIDAY', 'WEEKLY_OFF'].includes(String(row.status).toUpperCase())
+        ? String(row.status).toUpperCase() : 'PRESENT';
+      const clockIn = row.clockIn ? new Date(row.clockIn) : null;
+      const clockOut = row.clockOut ? new Date(row.clockOut) : null;
+      if ((clockIn && Number.isNaN(clockIn.getTime())) || (clockOut && Number.isNaN(clockOut.getTime()))) continue;
+      await this.prisma.attendance.upsert({
+        where: { employeeId_date: { employeeId, date: new Date(`${row.date}T00:00:00.000Z`) } },
+        create: { employeeId, date: new Date(`${row.date}T00:00:00.000Z`), status, clockIn, clockOut },
+        update: { status, clockIn, clockOut },
+      });
+      imported++;
+    }
+    return { imported, skipped: rows.length - imported };
+  }
+
+  /**
+   * Credit a completed attendance day that falls on Sunday or the employee's
+   * roster/branch day off. The unique attendanceId ledger row is the guard
+   * against duplicate credits when a clock-out is retried or later approved.
+   */
+  private async grantCompOffIfEligible(attendanceId: number): Promise<void> {
+    const attendance = await this.prisma.attendance.findUnique({
+      where: { id: attendanceId },
+      include: { employee: { include: { shift: true, branch: true } }, compOffCredit: true },
+    });
+    if (!attendance?.clockIn || !attendance.clockOut || attendance.compOffCredit) return;
+    if (attendance.clockOutApproval === CLOCK_OUT_APPROVAL.PENDING || attendance.clockOutApproval === CLOCK_OUT_APPROVAL.REJECTED) return;
+
+    const date = attendance.date;
+    const isSunday = date.getUTCDay() === 0;
+    const weeklyOff = isBranchWeeklyOff(date, attendance.employee.branch?.weeklyOffs);
+    const holiday = await this.isHoliday(attendance.employee.companyId, date);
+    const effective = await this.roster.getEffectiveShift(
+      attendance.employeeId,
+      date,
+      attendance.employee.shift,
+      attendance.employee.branch?.weeklyOffs ?? '',
+    );
+    if (!isSunday && !weeklyOff && !effective.isDayOff && !holiday) return;
+
+    const companyId = attendance.employee.companyId;
+    const year = date.getUTCFullYear();
+    let leaveType = await this.prisma.leaveType.findFirst({
+      where: { companyId, name: { equals: 'Comp Off', mode: 'insensitive' } },
+    });
+    if (!leaveType) {
+      leaveType = await this.prisma.leaveType.create({
+        data: {
+          companyId, name: 'Comp Off', description: 'Automatically credited for working on a Sunday or scheduled day off.',
+          defaultDays: 0, accrualFrequency: 'NONE', accrualAmount: 0, isPaid: true, allowHalfDay: false,
+        },
+      });
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Re-check inside the transaction for normal sequential requests.
+        const credited = await tx.compOffCredit.findUnique({ where: { attendanceId } });
+        if (credited) return;
+        await tx.compOffCredit.create({
+          data: { attendanceId, employeeId: attendance.employeeId, leaveTypeId: leaveType.id, year },
+        });
+        await tx.leaveBalance.upsert({
+          where: { employeeId_leaveTypeId_year: { employeeId: attendance.employeeId, leaveTypeId: leaveType.id, year } },
+          create: { employeeId: attendance.employeeId, leaveTypeId: leaveType.id, year, allocated: 1 },
+          update: { allocated: { increment: 1 } },
+        });
+      });
+    } catch (error: any) {
+      // A concurrent completion may win the unique attendanceId race. Its
+      // transaction has already created the credit and balance, so there is
+      // nothing to retry or compensate.
+      if (error?.code !== 'P2002') throw error;
+    }
+  }
 
   async getTodayAttendance(userId: number) {
     const employee = await this.prisma.employee.findUnique({ where: { userId } });
@@ -340,7 +427,7 @@ export class AttendanceService {
       }
     });
 
-    return this.prisma.attendance.update({
+    const updated = await this.prisma.attendance.update({
       where: { id: existing.id },
       data: {
         status: existing.status === 'HALF_DAY' || isHalfDay ? 'HALF_DAY' : 'PRESENT',
@@ -360,7 +447,8 @@ export class AttendanceService {
         ...(existing.clockInOutside ? {} : outsideIn),
       },
       include: { logs: true }
-    }).then(r => this.withTotalHours(r));
+    });
+    return this.withTotalHours(updated);
   }
 
   /**
@@ -616,7 +704,7 @@ export class AttendanceService {
       });
     }
 
-    return this.prisma.attendance.update({
+    const updated = await this.prisma.attendance.update({
       where: { id: existing.id },
       data: {
         clockOut: now,
@@ -648,7 +736,12 @@ export class AttendanceService {
         missedClockOut: false,
       },
       include: { logs: true }
-    }).then(r => this.withTotalHours(r));
+    });
+
+    // Previous-day clock-outs await approval; a completed same-day off-day
+    // shift earns its Comp Off immediately.
+    if (!isPreviousDay) await this.grantCompOffIfEligible(updated.id);
+    return this.withTotalHours(updated);
   }
 
   /**
@@ -774,6 +867,8 @@ export class AttendanceService {
       },
       include: { logs: true },
     });
+
+    if (!rejecting) await this.grantCompOffIfEligible(updated.id);
 
     await this.notificationsService.notifyEmployees([record.employeeId], {
       companyId,
@@ -1030,19 +1125,36 @@ export class AttendanceService {
 
   async getAllEmployeesAttendance(
     companyId: number,
-    filters: { month?: number; year?: number; employeeId?: number; departmentId?: number; status?: string },
+    filters: {
+      month?: number; year?: number; employeeId?: number; departmentId?: number;
+      status?: string; from?: string; to?: string; all?: boolean;
+    },
   ) {
     const now = new Date();
     const year = filters.year ?? now.getFullYear();
     const month = filters.month ?? now.getMonth() + 1; // 1-12, default current month
 
-    const startDate = new Date(Date.UTC(year, month - 1, 1));
-    const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    let dateFilter: { gte?: Date; lte?: Date } | undefined;
+    if (!filters.all) {
+      if (filters.from || filters.to) {
+        const from = filters.from ? new Date(`${filters.from}T00:00:00.000Z`) : null;
+        const to = filters.to ? new Date(`${filters.to}T23:59:59.999Z`) : null;
+        if ((from && isNaN(from.getTime())) || (to && isNaN(to.getTime())) || (from && to && from > to)) {
+          throw new BadRequestException('Attendance date range is invalid.');
+        }
+        dateFilter = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
+      } else {
+        dateFilter = {
+          gte: new Date(Date.UTC(year, month - 1, 1)),
+          lte: new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)),
+        };
+      }
+    }
 
     const where: any = {
-      date: { gte: startDate, lte: endDate },
       employee: { companyId },
     };
+    if (dateFilter) where.date = dateFilter;
     if (filters.employeeId) where.employeeId = filters.employeeId;
     if (filters.departmentId) where.employee = { companyId, departmentId: filters.departmentId };
     if (filters.status) where.status = filters.status;
@@ -1075,12 +1187,72 @@ export class AttendanceService {
       orderBy: [{ date: 'desc' }, { employeeId: 'asc' }],
     });
 
-    const fieldVisits = await this.prisma.fieldVisitAttendance.findMany({
-      where: {
+    // Planned state belongs in the attendance matrix before the day arrives.
+    // Attendance rows remain authoritative: a real clock-in always replaces a
+    // planned leave/day-off marker for the same employee and day.
+    const virtualRecords: any[] = [];
+    if (dateFilter && !filters.all) {
+      const employeeWhere: any = {
         companyId,
-        visitDate: { gte: startDate, lte: endDate },
-        request: { status: { in: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] } },
-      },
+        ...(filters.employeeId ? { id: filters.employeeId } : {}),
+        ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+      };
+      const employeeSelect = {
+        id: true, firstName: true, lastName: true, avatarUrl: true, employeeCode: true,
+        department: { select: { id: true, name: true } },
+        designation: { select: { id: true, name: true } },
+        user: { select: { email: true, role: true } },
+      } as const;
+      const rangeStart = dateFilter.gte ?? new Date('1970-01-01T00:00:00.000Z');
+      const rangeEnd = dateFilter.lte ?? new Date('9999-12-31T23:59:59.999Z');
+      const [approvedLeaves, rosterDaysOff] = await Promise.all([
+        this.prisma.leaveRequest.findMany({
+          where: {
+            status: 'APPROVED', deletedAt: null, employee: employeeWhere,
+            startDate: { lte: rangeEnd }, endDate: { gte: rangeStart },
+          },
+          include: { employee: { select: employeeSelect }, leaveType: { select: { name: true } } },
+        }),
+        this.prisma.shiftRosterEntry.findMany({
+          where: { companyId, isDayOff: true, date: dateFilter, employee: employeeWhere },
+          include: { employee: { select: employeeSelect } },
+        }),
+      ]);
+
+      const actualDays = new Set(records.map((row) => `${row.employeeId}_${row.date.toISOString().slice(0, 10)}`));
+      const markerDays = new Map<string, any>();
+      for (const row of rosterDaysOff) {
+        const key = `${row.employeeId}_${row.date.toISOString().slice(0, 10)}`;
+        if (!actualDays.has(key)) markerDays.set(key, {
+          id: -row.id, employeeId: row.employeeId, date: row.date, status: 'WEEKLY_OFF',
+          clockIn: null, clockOut: null, isLate: false, isEarlyLeave: false, employee: row.employee,
+        });
+      }
+      // Leave is more informative than a coincident planned day off, so it
+      // intentionally overwrites the roster marker. A real attendance row
+      // above still wins over both.
+      for (const leave of approvedLeaves) {
+        const start = new Date(Math.max(leave.startDate.getTime(), rangeStart.getTime()));
+        const end = new Date(Math.min(leave.endDate.getTime(), rangeEnd.getTime()));
+        for (let day = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate())); day <= end; day.setUTCDate(day.getUTCDate() + 1)) {
+          const key = `${leave.employeeId}_${day.toISOString().slice(0, 10)}`;
+          if (!actualDays.has(key)) markerDays.set(key, {
+            id: -(100000000 + leave.id), employeeId: leave.employeeId, date: new Date(day), status: 'ON_LEAVE',
+            clockIn: null, clockOut: null, isLate: false, isEarlyLeave: false, employee: leave.employee,
+            leaveType: leave.leaveType?.name, isHalfDay: leave.isHalfDay,
+          });
+        }
+      }
+      virtualRecords.push(...markerDays.values());
+    }
+
+    const fieldVisitWhere: any = {
+      companyId,
+      request: { status: { in: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] } },
+    };
+    if (dateFilter) fieldVisitWhere.visitDate = dateFilter;
+    const fieldVisits = await this.prisma.fieldVisitAttendance.findMany({
+      where: fieldVisitWhere,
       include: {
         request: {
           select: {
@@ -1101,7 +1273,7 @@ export class AttendanceService {
       fvByEmpDate.set(`${fv.employeeId}_${dKey}`, fv);
     }
 
-    const enhancedRecords = records.map((r) => {
+    const enhancedRecords = [...records, ...virtualRecords].map((r) => {
       const dKey = r.date.toISOString().slice(0, 10);
       const fv = fvByEmpDate.get(`${r.employeeId}_${dKey}`);
       if (fv) {
@@ -1151,16 +1323,52 @@ export class AttendanceService {
     companyId: number,
     period: ShiftPeriod,
     anchorDate?: string,
+    from?: string,
+    to?: string,
+    employeeQuery?: string,
   ) {
     const anchor = anchorDate ? new Date(`${anchorDate}T12:00:00`) : new Date();
     if (Number.isNaN(anchor.getTime())) {
       throw new BadRequestException('That date could not be read.');
     }
-    const range = resolvePeriod(period, anchor);
+    const range = from || to
+      ? (() => {
+          if (!from || !to || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+            throw new BadRequestException('Provide a valid start and end date.');
+          }
+          const start = new Date(`${from}T00:00:00`);
+          const end = new Date(`${to}T23:59:59.999`);
+          const localDateKey = (date: Date) =>
+            `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+          if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end
+              || localDateKey(start) !== from || localDateKey(end) !== to) {
+            throw new BadRequestException('The date range is invalid.');
+          }
+          return {
+            from: start,
+            to: end,
+            label: `${from} – ${to}`,
+          };
+        })()
+      : resolvePeriod(period, anchor);
+
+    const query = employeeQuery?.trim();
+    const numericId = query && /^\d+$/.test(query) ? Number(query) : null;
+    const employeeWhere = query
+      ? {
+          companyId,
+          OR: [
+            { firstName: { contains: query, mode: 'insensitive' as const } },
+            { lastName: { contains: query, mode: 'insensitive' as const } },
+            { employeeCode: { contains: query, mode: 'insensitive' as const } },
+            ...(numericId ? [{ id: numericId }] : []),
+          ],
+        }
+      : { companyId };
 
     const rows = await this.prisma.attendance.findMany({
       where: {
-        employee: { companyId },
+        employee: employeeWhere,
         date: { gte: range.from, lte: range.to },
       },
       select: {
@@ -1241,8 +1449,8 @@ export class AttendanceService {
 
     return {
       period,
-      from: range.from.toISOString().slice(0, 10),
-      to: range.to.toISOString().slice(0, 10),
+      from: `${range.from.getFullYear()}-${String(range.from.getMonth() + 1).padStart(2, '0')}-${String(range.from.getDate()).padStart(2, '0')}`,
+      to: `${range.to.getFullYear()}-${String(range.to.getMonth() + 1).padStart(2, '0')}-${String(range.to.getDate()).padStart(2, '0')}`,
       label: range.label,
       days: datesInRange(range).length,
       shifts,

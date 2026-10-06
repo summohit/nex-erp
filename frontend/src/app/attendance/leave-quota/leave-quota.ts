@@ -15,6 +15,7 @@ import {
 } from '@lucide/angular';
 
 import { LeavesService, QuotaReport, QuotaRow } from '../../services/leaves';
+import { AttendanceFilterDrawerComponent, AttendanceFilterValue } from '../../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -28,7 +29,7 @@ export type QuickFilterType = 'ALL' | 'LOW_REMAINING' | 'HIGH_USED' | 'UNASSIGNE
     LucideDownload, LucideRefreshCw, LucideX, LucideTriangleAlert, LucideCalendarDays,
     LucideSearch, LucideClock, LucideCheckCircle2, LucideTrendingUp, LucidePieChart,
     LucideUsers, LucideFilter, LucideChevronRight, LucideInfo, LucideFileText, LucideAlertCircle,
-    LucideExternalLink,
+    LucideExternalLink, AttendanceFilterDrawerComponent,
   ],
   templateUrl: './leave-quota.html',
   styleUrls: ['./leave-quota.css'],
@@ -47,6 +48,7 @@ export class LeaveQuotaComponent implements OnInit {
   leaveTypeId = signal<number | null>(null);
   search = signal('');
   quickFilter = signal<QuickFilterType>('ALL');
+  filterDrawerOpen = signal(false);
 
   detailRow = signal<QuotaRow | null>(null);
 
@@ -87,6 +89,50 @@ export class LeaveQuotaComponent implements OnInit {
   onLeaveTypeChange(value: any) {
     const num = value === 'null' || value === null || value === undefined ? null : Number(value);
     this.leaveTypeId.set(num);
+  }
+
+  /** Keep the report's related decisions in one place. */
+  get quotaFilterGroups() {
+    return [
+      {
+        key: 'leaveType',
+        label: 'Leave type',
+        placeholder: 'All leave types',
+        options: (this.report()?.leaveTypes ?? []).map((type) => ({ value: String(type.id), label: type.name })),
+      },
+      {
+        key: 'balanceHealth',
+        label: 'Balance health',
+        placeholder: 'All balances',
+        options: [
+          { value: 'LOW_REMAINING', label: 'Low remaining (2 days or less)' },
+          { value: 'HIGH_USED', label: 'High utilisation (75% or more)' },
+          { value: 'UNASSIGNED', label: 'No balance assigned' },
+        ],
+      },
+    ];
+  }
+
+  get quotaFilterValues(): Record<string, string> {
+    return {
+      leaveType: this.leaveTypeId() === null ? '' : String(this.leaveTypeId()),
+      balanceHealth: this.quickFilter() === 'ALL' ? '' : this.quickFilter(),
+    };
+  }
+
+  get quotaFilterCount(): number {
+    return Number(this.leaveTypeId() !== null) + Number(this.quickFilter() !== 'ALL') + Number(!!this.search().trim());
+  }
+
+  applyAttendanceFilters(filters: AttendanceFilterValue): void {
+    this.search.set(filters.employeeQuery);
+    const type = Number(filters.filters['leaveType']);
+    this.leaveTypeId.set(Number.isInteger(type) && type > 0 ? type : null);
+    const health = filters.filters['balanceHealth'];
+    this.quickFilter.set(
+      health === 'LOW_REMAINING' || health === 'HIGH_USED' || health === 'UNASSIGNED' ? health : 'ALL',
+    );
+    this.filterDrawerOpen.set(false);
   }
 
   setQuickFilter(filter: QuickFilterType) {
@@ -134,6 +180,7 @@ export class LeaveQuotaComponent implements OnInit {
         if (term) {
           const matchesTerm =
             r.employee.name.toLowerCase().includes(term) ||
+            String(r.employee.id).includes(term) ||
             (r.employee.employeeCode ?? '').toLowerCase().includes(term) ||
             (r.employee.department ?? '').toLowerCase().includes(term) ||
             (r.employee.designation ?? '').toLowerCase().includes(term);

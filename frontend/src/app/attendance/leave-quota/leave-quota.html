@@ -14,6 +14,10 @@
     </div>
 
     <div class="header-actions-group">
+      <button class="btn-header-secondary" (click)="filterDrawerOpen.set(true)" title="Filter report results">
+        <svg lucideSearch [size]="15"></svg>
+        <span>Filters<span *ngIf="quotaFilterCount"> ({{ quotaFilterCount }})</span></span>
+      </button>
       <!-- Export CSV Button -->
       <button class="btn-header-primary" (click)="exportCsv()" [disabled]="loading() || !rows().length" title="Export current quota report to CSV">
         <svg lucideDownload [size]="15"></svg>
@@ -25,6 +29,19 @@
         <svg lucideRefreshCw [size]="15" [class.spin-anim]="loading()"></svg>
         <span>Refresh</span>
       </button>
+      <app-attendance-filter-drawer
+        [open]="filterDrawerOpen()"
+        title="Leave quota filters"
+        description="Find employees, focus a leave type, or surface balances that need attention."
+        [showDates]="false"
+        [filterGroups]="quotaFilterGroups"
+        [filterValues]="quotaFilterValues"
+        [employeeQuery]="search()"
+        employeeLabel="Employee name or ID"
+        employeeHint="Matches employee name, ID, code, department, or designation."
+        (closed)="filterDrawerOpen.set(false)"
+        (applied)="applyAttendanceFilters($event)">
+      </app-attendance-filter-drawer>
     </div>
   </div>
 

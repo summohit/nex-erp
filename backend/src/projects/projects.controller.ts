@@ -13,6 +13,11 @@ export class ProjectsController {
     private readonly projectAiService: ProjectAiService
   ) {}
 
+  @Get('active-timer')
+  getMyActiveTimer(@Req() req) {
+    return this.projectsService.getMyActiveTimer(req.user.companyId, req.user.sub);
+  }
+
   @Post()
   createProject(@Req() req, @Body() data: any) {
     return this.projectsService.createProject(req.user.companyId, req.user.employeeId ?? req.user.sub, data);

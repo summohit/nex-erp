@@ -1,0 +1,90 @@
+<div class="attendance-filter-backdrop" *ngIf="open" (click)="closed.emit()"></div>
+<aside class="attendance-filter-drawer" *ngIf="open" role="dialog" aria-modal="true" aria-labelledby="attendance-filter-title">
+  <header class="drawer-header">
+    <div class="drawer-heading">
+      <span class="drawer-icon"><svg lucideSlidersHorizontal [size]="18"></svg></span>
+      <div>
+        <h2 id="attendance-filter-title">{{ title }}</h2>
+        <p>{{ description }}</p>
+      </div>
+    </div>
+    <button type="button" class="drawer-close" aria-label="Close filters" (click)="closed.emit()">
+      <svg lucideX [size]="18"></svg>
+    </button>
+  </header>
+
+  <div class="drawer-body">
+    <section class="filter-section" *ngIf="showPeriodControls">
+      <label class="filter-label">Attendance period</label>
+      <div class="period-filter-fields">
+        <select aria-label="Month" [ngModel]="draftPeriodMonth" (ngModelChange)="setDraftPeriodMonth($event)">
+          <option *ngFor="let month of months; let i = index" [ngValue]="i">{{ month }}</option>
+        </select>
+        <select aria-label="Year" [ngModel]="draftPeriodYear" (ngModelChange)="setDraftPeriodYear($event)">
+          <option *ngFor="let year of years" [ngValue]="year">{{ year }}</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="filter-section" *ngIf="showSingleDate">
+      <label class="filter-label" for="attendance-single-date">Date</label>
+      <input class="single-date-input" id="attendance-single-date" type="date"
+             [ngModel]="draftDate" (ngModelChange)="setDraftDate($event)">
+    </section>
+
+    <section class="filter-section" *ngFor="let group of filterGroups">
+      <label class="filter-label" [for]="'attendance-filter-' + group.key">{{ group.label }}</label>
+      <div class="select-wrap">
+        <select [id]="'attendance-filter-' + group.key"
+                [ngModel]="draftFilters[group.key] || ''"
+                (ngModelChange)="draftFilters[group.key] = $event">
+          <option value="">{{ group.placeholder || 'All' }}</option>
+          <option *ngFor="let option of group.options" [ngValue]="option.value">{{ option.label }}</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="filter-section" *ngIf="showDates">
+      <label class="filter-label" for="attendance-date-preset">Date range</label>
+      <div class="select-wrap">
+        <svg lucideCalendarDays [size]="16"></svg>
+        <select id="attendance-date-preset" [ngModel]="draftPreset" (ngModelChange)="onPresetChange($event)">
+          <option *ngFor="let item of availableDatePresets" [ngValue]="item.value">{{ item.label }}</option>
+        </select>
+      </div>
+      <div class="date-range-fields">
+        <label>
+          <span>Start date</span>
+          <input type="date" [(ngModel)]="draftStartDate" (ngModelChange)="draftPreset = 'CUSTOM'">
+        </label>
+        <label>
+          <span>End date</span>
+          <input type="date" [(ngModel)]="draftEndDate" (ngModelChange)="draftPreset = 'CUSTOM'">
+        </label>
+      </div>
+      <p class="field-hint" *ngIf="invalidDateRange">
+        Enter both dates, and make sure the end date is on or after the start date.
+      </p>
+    </section>
+
+    <section class="filter-section" *ngIf="showEmployee">
+      <label class="filter-label" for="attendance-employee-query">{{ employeeLabel }}</label>
+      <div class="search-field">
+        <svg lucideSearch [size]="16"></svg>
+        <input id="attendance-employee-query" type="search" [(ngModel)]="draftEmployeeQuery"
+               [placeholder]="employeePlaceholder || ('Search ' + employeeLabel.toLowerCase())" autocomplete="off">
+      </div>
+      <p class="field-hint">{{ employeeHint }}</p>
+    </section>
+  </div>
+
+  <footer class="drawer-footer">
+    <button type="button" class="reset-button" (click)="reset()">Clear all</button>
+    <div class="footer-actions">
+      <button type="button" class="cancel-button" (click)="closed.emit()">Cancel</button>
+      <button type="button" class="apply-button"
+              [disabled]="invalidDateRange"
+              (click)="apply()">Apply filters</button>
+    </div>
+  </footer>
+</aside>

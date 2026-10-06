@@ -7,12 +7,12 @@
         <h2>Out-of-office clock-ins &amp; clock-outs</h2>
         <p>General Shift staff who clocked more than the office radius away. Approving accepts it; rejecting only flags the day.</p>
       </div>
-      <span class="geo-count">{{ geoRows().length }} pending</span>
+      <span class="geo-count">{{ visibleGeoRows().length }} pending</span>
     </div>
 
-    <div class="geo-empty" *ngIf="!geoRows().length">Nothing waiting — everyone clocked from the office.</div>
+    <div class="geo-empty" *ngIf="!visibleGeoRows().length">Nothing waiting — everyone clocked from the office.</div>
 
-    <article class="geo-card" *ngFor="let r of geoRows()">
+    <article class="geo-card" *ngFor="let r of visibleGeoRows()">
       <div class="geo-who">
         <strong>{{ employeeName(r) }}</strong>
         <span>{{ r.employee?.designation || r.employee?.department?.name || '' }}</span>
@@ -100,6 +100,10 @@
       </div>
 
       <div class="header-actions-group">
+        <button type="button" class="btn-header-secondary" (click)="filterDrawerOpen.set(true)">
+          <svg lucideSearch [size]="15"></svg>
+          <span>Filters<span *ngIf="activeApprovalFilterCount"> ({{ activeApprovalFilterCount }})</span></span>
+        </button>
         <!-- Batch Approve All Visible Button -->
         <button 
           type="button" 
@@ -124,6 +128,22 @@
           <span>Refresh</span>
         </button>
       </div>
+      <app-attendance-filter-drawer
+        [open]="filterDrawerOpen()"
+        title="Approval queue filters"
+        description="Find overdue requests by employee, date, department, or evidence."
+        employeeLabel="Employee, ID, or clock-out reason"
+        employeePlaceholder="Search employee or reason"
+        employeeHint="Also matches employee ID, department, designation, and reason."
+        [filterGroups]="approvalFilterGroups"
+        [filterValues]="approvalFilterValues"
+        [startDate]="filterStartDate()"
+        [endDate]="filterEndDate()"
+        [employeeQuery]="search()"
+        [preset]="filterDatePreset()"
+        (closed)="filterDrawerOpen.set(false)"
+        (applied)="applyAttendanceFilters($event)">
+      </app-attendance-filter-drawer>
     </div>
 
     <!-- ── Interactive KPI Stats Cards ────────────────────────────────────── -->

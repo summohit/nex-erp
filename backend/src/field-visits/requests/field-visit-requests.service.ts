@@ -7,6 +7,7 @@ import { NotificationsService } from '../../notifications/notifications.service'
 import { FieldVisitActivationService } from './field-visit-activation.service';
 import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY } from '../field-visit-status';
 import { CompanyRole, isCompanyAdmin } from '../../common/company-roles';
+import { canCreateTask } from '../../tasks/task-permissions';
 
 /**
  * Who is notified about a trip awaiting a decision.
@@ -193,7 +194,7 @@ export class FieldVisitRequestsService {
     const project = await this.prisma.project.findFirst({
       where: general ? { companyId, isSystem: true } : { id: Number(projectId), companyId, isSystem: false },
       select: {
-        id: true, name: true, key: true, leadId: true,
+        id: true, name: true, key: true, leadId: true, isSystem: true,
         members: { select: { employeeId: true, role: true } },
       },
     });
@@ -427,8 +428,16 @@ export class FieldVisitRequestsService {
   }
 
   /** Whoever runs the project asks; an administrator may raise one anywhere. */
-  private mayRaise(project: any, role: string, employeeId: number | null): boolean {
-    return this.isApprover(role) || this.managesProject(project, employeeId);
+  private async mayRaise(
+    companyId: number, project: any, role: string, employeeId: number | null,
+  ): Promise<boolean> {
+    if (this.isApprover(role)) return true;
+    // General visits are not attached to a project manager. Apply the same
+    // authority that permits creating General tasks instead.
+    if (project?.isSystem) {
+      return canCreateTask(this.prisma as any, companyId, employeeId, role, project);
+    }
+    return this.managesProject(project, employeeId);
   }
 
   /**
@@ -507,7 +516,7 @@ export class FieldVisitRequestsService {
     const project = await this.loadProject(companyId, request.project.id, request.project.isSystem);
     // A general visit has no project manager, so the person who raised it
     // stands in for one.
-    const mayRaise = this.mayRaise(project, role, employeeId)
+    const mayRaise = await this.mayRaise(companyId, project, role, employeeId)
       || (project.isGeneral && request.raisedBy?.id === employeeId);
     return {
       ...request,
@@ -604,7 +613,7 @@ export class FieldVisitRequestsService {
 
     // A general visit has no project manager to ask, so anyone may raise one;
     // it still goes to an administrator for approval like every other trip.
-    if (!project.isGeneral && !this.mayRaise(project, role, employeeId)) {
+    if (!project.isGeneral && !(await this.mayRaise(companyId, project, role, employeeId))) {
       throw new ForbiddenException('Only the project manager raises a field visit for this project');
     }
     if (employeeId == null) {
@@ -705,7 +714,7 @@ export class FieldVisitRequestsService {
 
     const { project, fields, employeeIds, tasks, attachments } =
       await this.normalize(companyId, data);
-    if (!this.mayRaise(project, role, employeeId) && existing.raisedById !== employeeId) {
+    if (!(await this.mayRaise(companyId, project, role, employeeId)) && existing.raisedById !== employeeId) {
       throw new ForbiddenException('You cannot edit this field visit request');
     }
 
@@ -800,7 +809,7 @@ export class FieldVisitRequestsService {
     const request = await this.loadForDecision(companyId, id);
     const project = await this.loadProject(companyId, request.project.id, request.project.isSystem);
 
-    if (!this.mayRaise(project, role, employeeId) && request.raisedById !== employeeId) {
+    if (!(await this.mayRaise(companyId, project, role, employeeId)) && request.raisedById !== employeeId) {
       throw new ForbiddenException('You cannot submit this field visit request');
     }
     if (request.status !== FIELD_VISIT_STATUS.DRAFT) {
@@ -1324,7 +1333,7 @@ export class FieldVisitRequestsService {
     // Validated now rather than at approval, so an impossible change is
     // refused while the person proposing it is still looking at it.
     const { project, fields, employeeIds, tasks } = await this.normalize(companyId, data);
-    if (!this.mayRaise(project, role, employeeId) && request.raisedById !== employeeId) {
+    if (!(await this.mayRaise(companyId, project, role, employeeId)) && request.raisedById !== employeeId) {
       throw new ForbiddenException('You cannot change this field visit request');
     }
     if (project.id !== request.projectId) {

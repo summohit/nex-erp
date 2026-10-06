@@ -14,11 +14,12 @@ import {
   LucideZap, LucideExternalLink, LucideTrophy, LucideAward,
   LucideRoute
 } from '@lucide/angular';
-import { forkJoin } from 'rxjs';
+import { forkJoin, firstValueFrom } from 'rxjs';
 import { AttendanceService, AttendanceRecord } from '../../services/attendance';
 import { isWeeklyOff } from '../../shared/utils/weekly-offs';
 import { MasterDataService, Department } from '../../services/master-data.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
+import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDatePreset } from '../../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 
 export interface DayMatrixStatus {
   dayNumber: number;
@@ -115,6 +116,7 @@ export class AllAttendanceComponent implements OnInit {
     { value: 7, label: 'July' }, { value: 8, label: 'August' }, { value: 9, label: 'September' },
     { value: 10, label: 'October' }, { value: 11, label: 'November' }, { value: 12, label: 'December' }
   ];
+  monthLabels = this.months.map((month) => month.label);
   years: number[] = [];
 
   // Active Filter state
@@ -151,6 +153,11 @@ export class AllAttendanceComponent implements OnInit {
   }
 
   searchQuery = signal('');
+  filterDrawerOpen = signal(false);
+  filterStartDate = signal('');
+  filterEndDate = signal('');
+  filterDatePreset = signal<AttendanceDatePreset>('ALL');
+  filterAllDates = signal(false);
   sortBy: 'date_desc' | 'date_asc' | 'name_asc' | 'hours_desc' = 'date_desc';
 
   // Searchable Dropdown state
@@ -191,8 +198,55 @@ export class AllAttendanceComponent implements OnInit {
 
   readonly flagOptions = [
     { value: 'ALL', label: 'All Flags / Logs' },
-    { value: 'EARLY', label: 'Early Departure' }
+    { value: 'LATE', label: 'Late arrival' },
+    { value: 'EARLY', label: 'Early Departure' },
+    { value: 'ON_TIME', label: 'On time' },
+    { value: 'MISSING_OUT', label: 'Missed clock-out' }
   ];
+  get attendanceFilterGroups() {
+    return [
+      {
+        key: 'employee',
+        label: 'Employee',
+        placeholder: 'All Employees',
+        options: this.employees().map((employee) => ({
+          value: String(employee.id),
+          label: `${employee.firstName} ${employee.lastName || ''}`.trim(),
+        })),
+      },
+      {
+        key: 'department',
+        label: 'Department',
+        placeholder: 'All Departments',
+        options: this.departments().map((department) => ({
+          value: String(department.id),
+          label: department.name,
+        })),
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        placeholder: 'All Statuses',
+        options: this.statusOptions.filter((option) => !!option.value)
+          .map(({ value, label }) => ({ value, label })),
+      },
+      {
+        key: 'flag',
+        label: 'Flags',
+        placeholder: 'All Flags',
+        options: this.flagOptions.filter((option) => option.value !== 'ALL'),
+      },
+    ];
+  }
+
+  get attendanceFilterValues(): Record<string, string> {
+    return {
+      employee: this.filterEmployeeId ? String(this.filterEmployeeId) : '',
+      department: this.filterDepartmentId ? String(this.filterDepartmentId) : '',
+      status: this.filterStatus,
+      flag: this.filterFlag === 'ALL' ? '' : this.filterFlag,
+    };
+  }
 
   constructor() {
     const current = new Date().getFullYear();
@@ -217,7 +271,10 @@ export class AllAttendanceComponent implements OnInit {
       month: this.filterMonth,
       year: this.filterYear,
       employeeId: this.filterEmployeeId || undefined,
-      departmentId: this.filterDepartmentId || undefined
+      departmentId: this.filterDepartmentId || undefined,
+      from: this.filterStartDate() || undefined,
+      to: this.filterEndDate() || undefined,
+      all: this.filterAllDates(),
     }).subscribe({
       next: (res) => {
         this.records.set(res || []);
@@ -228,6 +285,108 @@ export class AllAttendanceComponent implements OnInit {
         this.isLoading.set(false);
       }
     });
+  }
+
+  openAttendanceFilters(event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.filterDrawerOpen.set(true);
+  }
+
+  closeAttendanceFilters(): void {
+    this.filterDrawerOpen.set(false);
+  }
+
+  applyAttendanceFilters(filters: AttendanceFilterValue): void {
+    const selectedDate = filters.date || '';
+    // Native select events can provide strings. Normalise them before adding
+    // one to the zero-based month, otherwise e.g. "9" becomes "91" and the
+    // attendance request silently asks for an invalid month.
+    const periodMonth = Number(filters.periodMonth);
+    const periodYear = Number(filters.periodYear);
+    if (Number.isInteger(periodMonth) && periodMonth >= 0 && periodMonth <= 11) {
+      this.filterMonth = periodMonth + 1;
+    }
+    if (Number.isInteger(periodYear) && periodYear > 1900) {
+      this.filterYear = periodYear;
+    }
+    if (selectedDate) {
+      const [year, month] = selectedDate.split('-').map(Number);
+      this.filterYear = year;
+      this.filterMonth = month;
+    }
+    this.filterDate = selectedDate || null;
+    this.filterStartDate.set('');
+    this.filterEndDate.set('');
+    this.filterDatePreset.set('ALL');
+    this.filterAllDates.set(false);
+    this.filterEmployeeId = Number(filters.filters['employee']) || null;
+    this.filterDepartmentId = Number(filters.filters['department']) || null;
+    this.filterStatus = filters.filters['status'] || '';
+    const flag = filters.filters['flag'];
+    this.filterFlag = flag === 'LATE' || flag === 'EARLY' || flag === 'ON_TIME' || flag === 'MISSING_OUT'
+      ? flag
+      : 'ALL';
+    this.closeAttendanceFilters();
+    this.load();
+  }
+
+  downloadAttendanceTemplate(): void {
+    this.downloadCsv([
+      ['employee_id', 'date', 'status', 'clock_in_iso', 'clock_out_iso'],
+      ['123', '2026-10-12', 'PRESENT', '2026-10-12T09:30:00+05:30', '2026-10-12T18:30:00+05:30'],
+    ], 'attendance-import-template.csv');
+  }
+
+  async importAttendanceCsv(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0]; input.value = '';
+    if (!file) return;
+    const maxImportBytes = 5 * 1024 * 1024;
+    const maxImportRows = 2_000;
+    if (file.size > maxImportBytes) {
+      this.toast.error('This CSV is too large to import here. Split it into files smaller than 5 MB.');
+      return;
+    }
+    const csvRows = this.csvRows(await file.text());
+    if (csvRows.length - 1 > maxImportRows) {
+      this.toast.error(`This CSV has more than ${maxImportRows.toLocaleString()} rows. Split it into smaller files.`);
+      return;
+    }
+    const rows = csvRows.slice(1).map(([employeeId, date, status, clockIn, clockOut]) => ({
+      employeeId: Number(employeeId), date: (date || '').trim(), status: (status || '').trim().toUpperCase(),
+      clockIn: (clockIn || '').trim() || undefined, clockOut: (clockOut || '').trim() || undefined,
+    })).filter((row) => Number.isInteger(row.employeeId) && /^\d{4}-\d{2}-\d{2}$/.test(row.date));
+    if (!rows.length) { this.toast.error('No valid attendance rows found. Use the template format.'); return; }
+    if (!confirm(`Import ${rows.length} attendance row${rows.length === 1 ? '' : 's'}? Existing records for those employee dates will be updated.`)) return;
+    try {
+      const result = await firstValueFrom(this.attendanceService.importAttendance(rows));
+      this.toast.success(`Imported ${result.imported} attendance row${result.imported === 1 ? '' : 's'}${result.skipped ? `; ${result.skipped} skipped` : ''}.`);
+      this.load();
+    } catch (error: any) { this.toast.error(error?.error?.message || 'Could not import attendance.'); }
+  }
+
+  private csvRows(text: string): string[][] {
+    return text.replace(/^\uFEFF/, '').trim().split(/\r?\n/).filter(Boolean).map((line) =>
+      line.match(/(?:[^,\"]+|\"(?:[^\"]|\"\")*\")+/g)?.map((cell) => cell.replace(/^\"|\"$/g, '').replace(/\"\"/g, '\"').trim()) || [],
+    );
+  }
+
+  private downloadCsv(rows: string[][], fileName: string): void {
+    const text = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a'); link.href = url; link.download = fileName; link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  get attendanceFilterCount(): number {
+    const now = new Date();
+    const periodChanged = this.filterMonth !== now.getMonth() + 1 || this.filterYear !== now.getFullYear();
+    return Number(!!this.filterDate || periodChanged)
+      + Number(!!this.filterEmployeeId)
+      + Number(!!this.filterDepartmentId)
+      + Number(!!this.filterStatus)
+      + Number(this.filterFlag !== 'ALL');
   }
 
   // Month navigation
@@ -409,7 +568,7 @@ export class AllAttendanceComponent implements OnInit {
         const dept = (e.department?.name || '').toLowerCase();
         const desig = (e.designation?.name || '').toLowerCase();
         const code = (e.employeeCode || '').toLowerCase();
-        return name.includes(q) || dept.includes(q) || desig.includes(q) || code.includes(q);
+        return name.includes(q) || String(e.id).includes(q) || dept.includes(q) || desig.includes(q) || code.includes(q);
       });
     }
     return emps;
@@ -439,7 +598,16 @@ export class AllAttendanceComponent implements OnInit {
         let status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Empty' = 'Empty';
         let tooltip = '';
 
-        if (day.isFuture && holiday) {
+        // Planned approved leave and a rostered day off are meaningful before
+        // the date arrives. They must be checked before the generic future-day
+        // branch, otherwise the matrix shows an empty cell until after the day.
+        if (record && record.status === 'ON_LEAVE') {
+          status = 'On Leave';
+          tooltip = (record as any).leaveType ? `On Leave · ${(record as any).leaveType}` : 'On Leave';
+        } else if (record && record.status === 'WEEKLY_OFF') {
+          status = 'Day Off';
+          tooltip = 'Rostered Day Off';
+        } else if (day.isFuture && holiday) {
           // An upcoming holiday is known now — show it, rather than an empty
           // dot that reads like an ordinary working day.
           status = 'Holiday';
@@ -1015,6 +1183,11 @@ export class AllAttendanceComponent implements OnInit {
     return !!(
       this.searchQuery() ||
       this.filterDate ||
+      this.filterStartDate() ||
+      this.filterEndDate() ||
+      this.filterAllDates() ||
+      this.filterMonth !== new Date().getMonth() + 1 ||
+      this.filterYear !== new Date().getFullYear() ||
       this.filterEmployeeId ||
       this.filterDepartmentId ||
       this.filterStatus ||
@@ -1038,6 +1211,15 @@ export class AllAttendanceComponent implements OnInit {
         key: 'date',
         label: `Date: ${this.formatDateLabel(this.filterDate)}`,
         clear: () => { this.clearDate(); }
+      });
+    } else if (
+      this.filterMonth !== new Date().getMonth() + 1
+      || this.filterYear !== new Date().getFullYear()
+    ) {
+      chips.push({
+        key: 'period',
+        label: `Period: ${this.getSelectedMonthLabel()} ${this.filterYear}`,
+        clear: () => { this.jumpToCurrentMonth(); }
       });
     }
 
@@ -1083,6 +1265,10 @@ export class AllAttendanceComponent implements OnInit {
     this.filterEmployeeId = null;
     this.filterDepartmentId = null;
     this.filterDate = null;
+    this.filterStartDate.set('');
+    this.filterEndDate.set('');
+    this.filterDatePreset.set('ALL');
+    this.filterAllDates.set(false);
     this.filterStatus = '';
     this.filterFlag = 'ALL';
     this.searchQuery.set('');
@@ -1228,26 +1414,19 @@ export class AllAttendanceComponent implements OnInit {
       this.toast.error('No attendance records to export');
       return;
     }
-    const headers = ['Employee', 'Department', 'Date', 'Status', 'Clock In', 'Clock Out', 'Duration', 'Late', 'Early Leave'];
-    const rows = data.map(r => [
-      `"${r.employee?.firstName || ''} ${r.employee?.lastName || ''}"`,
-      `"${r.employee?.department?.name || '—'}"`,
-      `"${new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}"`,
-      `"${r.status}"`,
-      `"${this.formatTime(r.clockIn)}"`,
-      `"${this.formatTime(r.clockOut)}"`,
-      `"${this.calculateWorkHours(r.clockIn, r.clockOut).text}"`,
-      `"${r.isLate ? 'Yes' : 'No'}"`,
-      `"${r.isEarlyLeave ? 'Yes' : 'No'}"`,
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Attendance_${this.getSelectedMonthLabel()}_${this.filterYear}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const rows = [
+      ['Employee', 'Department', 'Date', 'Status', 'Clock In', 'Clock Out', 'Duration', 'Late', 'Early Leave'],
+      ...data.map(r => [
+        `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(),
+        r.employee?.department?.name || '—',
+        new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        r.status || '', this.formatTime(r.clockIn), this.formatTime(r.clockOut),
+        this.calculateWorkHours(r.clockIn, r.clockOut).text,
+        r.isLate ? 'Yes' : 'No', r.isEarlyLeave ? 'Yes' : 'No',
+      ]),
+    ];
+    // Blob URLs avoid constructing a large encoded data URL on the UI thread.
+    this.downloadCsv(rows, `Attendance_${this.getSelectedMonthLabel()}_${this.filterYear}.csv`);
     this.toast.success('Attendance report exported successfully!');
   }
 

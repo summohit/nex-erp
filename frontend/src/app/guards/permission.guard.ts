@@ -42,7 +42,14 @@ export const permissionGuard: CanActivateFn = (route: ActivatedRouteSnapshot) =>
     return permissionsService.getAllPermissions(userRole).pipe(
       map(perms => {
         // Check if user role has explicit VIEW or requested action permission for targetModule
-        const hasAccess = perms && perms.some(p => p.module === targetModule && (p.action === targetAction || p.action === 'VIEW'));
+        const hasLeaveAccess = targetModule === 'attendance/leaves'
+          && perms?.some(p =>
+            ['attendance/leaves', 'attendance/approvals', 'attendance/balances', 'attendance/leave-quota']
+              .includes(p.module)
+            && (p.action === targetAction || p.action === 'VIEW'),
+          );
+        const hasAccess = hasLeaveAccess
+          || (perms && perms.some(p => p.module === targetModule && (p.action === targetAction || p.action === 'VIEW')));
 
         if (hasAccess) {
           return true;
@@ -53,7 +60,11 @@ export const permissionGuard: CanActivateFn = (route: ActivatedRouteSnapshot) =>
           return true; // Admin has fallback access to all standard management routes
         }
 
-        if (userRole === 'HR' && ['employees', 'attendance', 'recruitment', 'appreciation', 'overview'].includes(targetModule)) {
+        // HR is named for company-wide attendance alongside 'attendance': the
+        // Attendance tab is one screen, and for HR that screen is everybody's
+        // attendance (guards/attendance-landing.guard.ts). Without the module
+        // here, an unseeded matrix would bounce them off their own tab.
+        if (userRole === 'HR' && ['employees', 'attendance', 'attendance/all', 'recruitment', 'appreciation', 'overview'].includes(targetModule)) {
           return true;
         }
 

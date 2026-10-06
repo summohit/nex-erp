@@ -1138,3 +1138,49 @@ button.menu-link {
 }
 
 .push-optin-btn:hover { background: #0f4f9c; }
+
+.task-timer-clockout-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, .48);
+}
+
+.task-timer-clockout-modal {
+  width: min(460px, 100%);
+  padding: 28px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
+  text-align: center;
+}
+
+.task-timer-clockout-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  color: #d97706;
+  background: #fef3c7;
+}
+
+.task-timer-clockout-modal h2 { margin: 0; color: #0f172a; font-size: 18px; }
+.task-timer-clockout-modal p { margin: 10px 0 22px; color: #475569; font-size: 13px; line-height: 1.55; }
+.task-timer-clockout-actions { display: grid; gap: 10px; }
+.task-timer-clockout-actions button, .task-timer-cancel {
+  min-height: 42px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.task-timer-pause { border: 1px solid #93c5fd; color: #1d4ed8; background: #eff6ff; }
+.task-timer-stop { border: 1px solid #15803d; color: #fff; background: #16a34a; }
+.task-timer-cancel { width: 100%; margin-top: 12px; border: 0; color: #64748b; background: transparent; }
+.task-timer-clockout-actions button:disabled, .task-timer-cancel:disabled { opacity: .55; cursor: wait; }

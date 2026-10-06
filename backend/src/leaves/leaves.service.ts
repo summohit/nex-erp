@@ -91,7 +91,7 @@ export class LeavesService {
     });
   }
 
-  async getAllBalances(companyId: number, year: number, employeeId?: number) {
+  async getAllBalances(companyId: number, year: number, employeeId?: number, limit = 200) {
     return this.prisma.leaveBalance.findMany({
       where: { 
         employee: { companyId }, 
@@ -101,7 +101,9 @@ export class LeavesService {
       include: { 
         employee: { select: { id: true, firstName: true, lastName: true } },
         leaveType: true 
-      }
+      },
+      orderBy: { employeeId: 'asc' },
+      take: limit,
     });
   }
 
@@ -435,7 +437,11 @@ export class LeavesService {
     }
   }
 
-  async getRequests(companyId: number, filter: any) {
+  async getRequests(companyId: number, filter: any, role?: string) {
+    if (!isHrAdmin(role)) {
+      throw new ForbiddenException('You are not authorized to view company leave requests');
+    }
+
     return this.prisma.leaveRequest.findMany({
       // §Att10: a deleted request is gone for every reader. Soft deletion that
       // leaks into one list is worse than none — it tells the Super Admin the
@@ -497,7 +503,7 @@ export class LeavesService {
     if (descendantIds.length === 0) return [];
 
     return this.prisma.leaveRequest.findMany({
-      where: { employeeId: { in: descendantIds }, status: 'PENDING', deletedAt: null },
+      where: { employeeId: { in: descendantIds }, deletedAt: null },
       include: {
         employee: { 
           select: { 

@@ -11,6 +11,13 @@
     </div>
 
     <div class="header-actions-group">
+      <input #attendanceImport type="file" accept=".csv,text/csv" hidden (change)="importAttendanceCsv($event)">
+      <button class="btn-header-secondary" (click)="downloadAttendanceTemplate()" title="Download the attendance import template">
+        <span>Template</span>
+      </button>
+      <button class="btn-header-secondary" (click)="attendanceImport.click()" title="Import attendance from CSV">
+        <span>Import CSV</span>
+      </button>
       <!-- View Mode Toggle -->
       <div class="view-mode-toggle-group">
         <button type="button" class="btn-toggle-view" [class.active]="viewMode() === 'grid'" (click)="viewMode.set('grid')" title="Monthly Matrix Grid View">
@@ -36,6 +43,24 @@
       </button>
     </div>
   </div>
+  <app-attendance-filter-drawer
+    [open]="filterDrawerOpen()"
+    title="Attendance filters"
+    description="Choose a month, employee, date, department, status, or attendance flag."
+    [showDates]="false"
+    [showEmployee]="false"
+    [showPeriodControls]="true"
+    [periodMonth]="filterMonth - 1"
+    [periodYear]="filterYear"
+    [months]="monthLabels"
+    [years]="years"
+    [showSingleDate]="true"
+    [selectedDate]="filterDate || ''"
+    [filterGroups]="attendanceFilterGroups"
+    [filterValues]="attendanceFilterValues"
+    (closed)="closeAttendanceFilters()"
+    (applied)="applyAttendanceFilters($event)">
+  </app-attendance-filter-drawer>
 
   <!-- KPI / Stats Row -->
   <div class="stats-row">
@@ -214,9 +239,8 @@
           <svg lucideX [size]="14"></svg>
         </button>
       </div>
-
       <!-- Filter Searchable Dropdowns -->
-      <div class="filter-dropdowns-group">
+      <div class="filter-dropdowns-group" *ngIf="false">
 
         <!-- 1. Month Dropdown (Searchable) -->
         <div class="searchable-filter-dropdown">
@@ -428,35 +452,15 @@
       </div>
     </div>
 
-    <!-- Active Filter Chips -->
-    <div class="active-filter-chips" *ngIf="hasActiveFilters()">
-      <div class="chips-title">
-        <svg lucideFilter [size]="12"></svg>
-        <span>Active Filters:</span>
-      </div>
-      <div class="filter-chips-list">
-        <span class="filter-chip" *ngFor="let chip of getActiveFilterChips()">
-          <span class="chip-text">{{ chip.label }}</span>
-          <button type="button" class="chip-remove-btn" (click)="chip.clear()" title="Remove filter">
-            <svg lucideX [size]="11"></svg>
-          </button>
-        </span>
-      </div>
-      <button type="button" class="btn-clear-all-chips" (click)="resetFilters()">Clear All</button>
-    </div>
   </div>
 
-  <!-- Status Legend & Interactive Filter Tags (matching Screenshot 1 & Screenshot 2) -->
+  <!-- Status legend -->
   <div class="status-legend" *ngIf="!isLoading()">
     <div class="legend-items-list">
-      <button
+      <div
         *ngFor="let tag of statusTags"
-        type="button"
         class="legend-item"
-        [class.active]="filterStatus === tag.value"
-        [attr.data-status]="tag.value"
-        (click)="toggleStatusFilter(tag.value)"
-        [title]="filterStatus === tag.value ? 'Click to clear ' + tag.label + ' filter' : 'Filter by ' + tag.label">
+        [attr.data-status]="tag.value">
         <div class="legend-icon-wrapper" [ngClass]="tag.bgClass">
           <svg *ngIf="tag.icon === 'check'" lucideCheck class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'star-half'" lucideStarHalf class="status-icon" [ngClass]="tag.iconClass"></svg>
@@ -469,27 +473,8 @@
           <svg *ngIf="tag.icon === 'timer-off'" lucideTimerOff class="status-icon" [ngClass]="tag.iconClass"></svg>
         </div>
         <span class="legend-label">{{ tag.label }}</span>
-        <!-- Inline Clear Button when tag is active -->
-        <span
-          *ngIf="filterStatus === tag.value"
-          class="tag-clear-btn"
-          (click)="$event.stopPropagation(); clearStatusFilter()"
-          title="Clear filter">
-          <svg lucideX [size]="11"></svg>
-        </span>
-      </button>
+      </div>
     </div>
-
-    <!-- Clear Filter Pill in Legend bar -->
-    <button
-      *ngIf="filterStatus"
-      type="button"
-      class="legend-clear-all"
-      (click)="clearStatusFilter()"
-      title="Clear status filter">
-      <svg lucideX [size]="12"></svg>
-      <span>Clear filter</span>
-    </button>
   </div>
   </div>
 

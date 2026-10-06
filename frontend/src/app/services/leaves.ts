@@ -75,11 +75,18 @@ export interface LeaveRequest {
   isHalfDay?: boolean;
   halfDayPeriod?: string | null;
   leaveType: {
+    id?: number;
     name: string;
+    isPaid?: boolean;
   };
   employee?: {
+    id?: number;
     firstName: string;
     lastName: string;
+    avatarUrl?: string | null;
+    employeeCode?: string | null;
+    designation?: { name: string } | null;
+    department?: { name: string } | null;
   };
   /**
    * §Att9: set when somebody other than the employee raised this. Null — the
@@ -126,10 +133,11 @@ export class LeavesService {
     return this.http.get<LeaveBalance[]>(`${this.apiUrl}/balances/me`, { params });
   }
 
-  getAllBalances(year?: number, employeeId?: number) {
+  getAllBalances(year?: number, employeeId?: number, limit = 200) {
     const params: any = {};
     if (year) params.year = year.toString();
     if (employeeId) params.employeeId = employeeId.toString();
+    params.limit = limit.toString();
     return this.http.get<LeaveBalance[]>(`${this.apiUrl}/balances`, { params });
   }
 

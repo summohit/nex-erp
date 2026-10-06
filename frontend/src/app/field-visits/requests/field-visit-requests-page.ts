@@ -10,7 +10,7 @@ import {
   LucideRotateCcw, LucideRefreshCw, LucideFilter, LucideCheck,
   LucideChevronDown, LucideAlertTriangle,
 } from '@lucide/angular';
-import { FieldVisitRequestsService, FieldVisitRequest } from '../../services/field-visit-requests';
+import { FieldVisitRequestsService, FieldVisitRequest, FieldVisitRequestTask } from '../../services/field-visit-requests';
 import { FieldVisitRequestFormComponent } from './field-visit-request-form';
 import { MyFieldVisitComponent } from '../my-field-visit/my-field-visit';
 import { DialogService } from '../../shared/services/dialog.service';
@@ -688,6 +688,22 @@ export class FieldVisitRequestsPageComponent implements OnInit {
   onSaved(): void {
     this.closeForm();
     this.load();
+  }
+
+  /** The row itself is the visit detail; nested links deliberately override it. */
+  openRequest(request: FieldVisitRequest): void {
+    void this.router.navigate(['/field-visits/requests', request.id]);
+  }
+
+  openProject(request: FieldVisitRequest, event: Event): void {
+    event.stopPropagation();
+    if (request.project?.id) void this.router.navigate(['/projects', request.project.id]);
+  }
+
+  openTask(request: FieldVisitRequest, task: FieldVisitRequestTask, event: Event): void {
+    event.stopPropagation();
+    if (!task.issueId || !request.project?.id) return;
+    void this.router.navigate(['/projects', request.project.id], { queryParams: { task: task.issueId } });
   }
 
   private messageOf(err: any): string {

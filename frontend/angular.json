@@ -60,9 +60,10 @@
               }
             },
             "development": {
+              "aot": false,
               "optimization": false,
               "extractLicenses": false,
-              "sourceMap": true
+              "sourceMap": false
             }
           },
           "defaultConfiguration": "production"

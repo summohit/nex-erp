@@ -1054,6 +1054,7 @@ export class IssuesService {
         if (data.status === undefined) {
           const colName = targetCol.name.toLowerCase();
           if (colName.includes('done') || colName.includes('complete')) updateData.status = 'DONE';
+          else if (targetCol.type === 'CANCELLED' || colName.includes('cancel')) updateData.status = 'CANCELLED';
           else if (colName.includes('progress') || colName.includes('doing')) updateData.status = 'IN_PROGRESS';
           else if (colName.includes('review')) updateData.status = 'IN_REVIEW';
           else if (colName.includes('to do') || colName.includes('todo')) updateData.status = 'TODO';

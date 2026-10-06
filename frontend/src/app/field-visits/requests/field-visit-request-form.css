@@ -129,6 +129,23 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
+.selected-general ~ .selected-text { display: none; }
+
+.general-task-create {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(140px, 1fr) minmax(160px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  background: #f5f7ff;
+}
+.general-task-create-copy { display: flex; flex-direction: column; gap: 2px; color: #334155; font-size: 12px; }
+.general-task-create-copy strong { color: #312e81; font-size: 13px; }
+.general-task-create input { min-width: 0; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 7px; font: inherit; }
+@media (max-width: 720px) { .general-task-create { grid-template-columns: 1fr; } }
+
 .section-header {
   display: flex;
   align-items: center;

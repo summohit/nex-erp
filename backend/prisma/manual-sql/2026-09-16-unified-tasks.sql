@@ -107,8 +107,8 @@ SELECT col.name, col.color, col.position, true, col.type, b.id
     ('To Do',       '#6b7280', 0, 'TODO'),
     ('In Progress', '#3b82f6', 1, 'IN_PROGRESS'),
     ('In Review',   '#8b5cf6', 2, 'REVIEW'),
-    ('Done',        '#22c55e', 3, 'DONE'),
-    ('Archived',    '#9ca3af', 4, 'DONE')
+    ('Completed',   '#22c55e', 3, 'DONE'),
+    ('Cancelled',   '#ef4444', 4, 'CANCELLED')
   ) AS col(name, color, position, type)
  WHERE NOT EXISTS (
    SELECT 1 FROM "BoardColumn" bc WHERE bc."boardId" = b.id AND bc.position = col.position

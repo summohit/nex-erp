@@ -4,9 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucideChevronLeft, LucideChevronRight, LucideCalendarDays,
-  LucideClock, LucideUsers, LucideAlertCircle, LucideInbox,
+  LucideClock, LucideUsers, LucideAlertCircle, LucideInbox, LucideDownload,
 } from '@lucide/angular';
 import { AttendanceService, ShiftPeriodSummary, ShiftPeriodRow } from '../../services/attendance';
+import { AttendanceFilterDrawerComponent, AttendanceFilterValue } from '../../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 
 /**
  * §Att7: how each shift did over a week or a month.
@@ -22,7 +23,7 @@ import { AttendanceService, ShiftPeriodSummary, ShiftPeriodRow } from '../../ser
   imports: [
     CommonModule, FormsModule,
     LucideChevronLeft, LucideChevronRight, LucideCalendarDays,
-    LucideClock, LucideUsers, LucideAlertCircle, LucideInbox,
+    LucideClock, LucideUsers, LucideAlertCircle, LucideInbox, LucideDownload, AttendanceFilterDrawerComponent,
   ],
   templateUrl: './shift-summary.html',
   styleUrls: ['./shift-summary.css'],
@@ -34,12 +35,26 @@ export class ShiftSummaryComponent implements OnInit {
   summary = signal<ShiftPeriodSummary | null>(null);
   isLoading = signal(false);
   period = signal<'week' | 'month'>('week');
+  filterDrawerOpen = signal(false);
+  startDate = signal('');
+  endDate = signal('');
+  employeeQuery = signal('');
 
   /** The day the period is resolved around; the server decides the boundaries. */
   anchor = signal<Date>(new Date());
 
   ngOnInit(): void {
     this.load();
+  }
+
+  openFilters(event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.filterDrawerOpen.set(true);
+  }
+
+  closeFilters(): void {
+    this.filterDrawerOpen.set(false);
   }
 
   private anchorKey(): string {
@@ -49,7 +64,11 @@ export class ShiftSummaryComponent implements OnInit {
 
   load(): void {
     this.isLoading.set(true);
-    this.attendanceService.getShiftPeriodSummary(this.period(), this.anchorKey()).subscribe({
+    this.attendanceService.getShiftPeriodSummary(this.period(), this.anchorKey(), {
+      from: this.startDate(),
+      to: this.endDate(),
+      employee: this.employeeQuery(),
+    }).subscribe({
       next: (data) => {
         this.summary.set(data);
         this.isLoading.set(false);
@@ -64,12 +83,16 @@ export class ShiftSummaryComponent implements OnInit {
 
   setPeriod(period: 'week' | 'month'): void {
     if (period === this.period()) return;
+    this.startDate.set('');
+    this.endDate.set('');
     this.period.set(period);
     this.load();
   }
 
   /** Step a whole period at a time, so the arrows move what the label says. */
   step(direction: -1 | 1): void {
+    this.startDate.set('');
+    this.endDate.set('');
     const d = new Date(this.anchor());
     if (this.period() === 'week') d.setDate(d.getDate() + 7 * direction);
     else d.setMonth(d.getMonth() + direction);
@@ -78,8 +101,36 @@ export class ShiftSummaryComponent implements OnInit {
   }
 
   today(): void {
+    this.startDate.set('');
+    this.endDate.set('');
     this.anchor.set(new Date());
     this.load();
+  }
+
+  applyAttendanceFilters(filters: AttendanceFilterValue): void {
+    this.startDate.set(filters.startDate);
+    this.endDate.set(filters.endDate);
+    this.employeeQuery.set(filters.employeeQuery);
+    this.closeFilters();
+    this.load();
+  }
+
+  /** Download exactly the report currently on screen. */
+  exportCsv(): void {
+    const summary = this.summary();
+    if (!summary?.shifts.length) return;
+    const quote = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const rows = [
+      ['Shift', 'People', 'Working days', 'Present', 'Half day', 'Absent', 'On leave', 'Late', 'Hours', 'Attendance rate'],
+      ...summary.shifts.map((row) => [row.name, row.people, row.workingDays, row.present, row.halfDay, row.absent, row.onLeave, row.late, row.hours, this.attendanceRate(row) ?? '']),
+    ];
+    const blob = new Blob([rows.map((row) => row.map(quote).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `shift-attendance-${this.anchorKey()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   /**

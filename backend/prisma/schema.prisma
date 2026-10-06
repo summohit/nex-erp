@@ -498,6 +498,7 @@ model Employee {
   emergencyContacts             EmergencyContact[]
   documents                     EmployeeDocument[]
   leaveBalances                 LeaveBalance[]
+  compOffCredits                CompOffCredit[]
   leaveEncashments              LeaveEncashment[]
   appreciations                 Appreciation[]
   leaveRequests                 LeaveRequest[]
@@ -754,6 +755,23 @@ model LeaveBalance {
   @@unique([employeeId, leaveTypeId, year])
 }
 
+/// A workday that earned one Comp Off. Keeping this separate from the balance
+/// makes the automatic credit auditable and, crucially, idempotent when a
+/// clock-out is edited, approved later, or attendance is imported again.
+model CompOffCredit {
+  id           Int        @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  attendanceId Int        @unique
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  leaveTypeId  Int
+  leaveType    LeaveType  @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  year         Int
+  createdAt    DateTime   @default(now())
+
+  @@index([employeeId, year])
+}
+
 model LeaveRequest {
   id              Int       @id @default(autoincrement())
   employeeId      Int
@@ -833,6 +851,7 @@ model Attendance {
   id                   Int             @id @default(autoincrement())
   employeeId           Int
   employee             Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  compOffCredit        CompOffCredit?
   date                 DateTime        @db.Date
   clockIn              DateTime?
   clockOut             DateTime?

@@ -2240,7 +2240,7 @@
 
 .boards-grid-table {
   width: 100%;
-  height: 560px;
+  height: auto;
 }
 
 .table-name-cell {
@@ -5385,8 +5385,178 @@
   background: #ffffff;
 }
 
+/* The project list remains readable; detailed criteria live in a modal drawer. */
+.project-filters-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.project-filters-drawer {
+  position: fixed;
+  z-index: 1001;
+  top: 0;
+  right: 0;
+  width: min(480px, 100vw);
+  height: 100dvh;
+  padding: 24px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  background: #ffffff;
+  box-shadow: -16px 0 36px rgba(15, 23, 42, 0.18);
+  animation: project-filter-drawer-in 0.2s ease-out;
+}
+
+@keyframes project-filter-drawer-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.project-filters-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.project-filters-drawer-head h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.project-filters-drawer-head p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.project-filter-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #475569;
+  background: #fff;
+  cursor: pointer;
+}
+
+.project-filters-drawer .project-filters-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 20px;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+.project-filters-drawer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.project-filter-reset,
+.project-filter-cancel,
+.project-filter-apply {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.project-filter-reset,
+.project-filter-cancel {
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  background: #ffffff;
+}
+
+.project-filter-apply {
+  border: 1px solid #2563eb;
+  color: #ffffff;
+  background: #2563eb;
+}
+
+.compact-status-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+  height: 100%;
+}
+
+.compact-progress-track {
+  width: 100%;
+  height: 19px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #e2e8f0;
+}
+
+.compact-progress-track > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 100%;
+  border-radius: inherit;
+  color: #ffffff;
+  background: #e00000;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.compact-status-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 4px 10px;
+  color: #172033;
+  border: 1px solid #dce3ed;
+  border-radius: 5px;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+
+.compact-status-dot {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  border-radius: 50%;
+  background: var(--project-status-color, #0ea5e9);
+}
+
+.compact-status-chevron {
+  margin-left: auto;
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1;
+}
+
 @media (max-width: 640px) {
   .project-filters-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-filters-drawer {
+    padding: 18px;
+  }
+
+  .project-filters-drawer .project-filters-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -6576,3 +6746,38 @@
 .my-tasks-table-wrapper ::ng-deep .cell-parent-link:hover { text-decoration: underline; }
 .my-tasks-table-wrapper ::ng-deep .cell-parent-link.plain { color: #64748b; cursor: inherit; }
 .my-tasks-table-wrapper ::ng-deep .cell-parent-link.plain:hover { text-decoration: none; }
+/* Task register: names are links, so opening a task or its project is clear
+   without making every cell look like a button. */
+/* AG Grid inserts string renderers outside Angular's encapsulated stylesheet.
+   Keep these selectors under ::ng-deep so their controls never fall back to
+   browser-default buttons (which was making each task title overlap rows). */
+:host ::ng-deep .my-tasks-table-wrapper .ag-cell { display: flex; align-items: center; overflow: hidden; }
+:host ::ng-deep .my-tasks-table-wrapper .task-table-link { display: inline; max-width: 100%; padding: 0; margin: 0; color: #1d4ed8; border: 0; background: transparent; font: inherit; line-height: 1.25; cursor: pointer; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:host ::ng-deep .my-tasks-table-wrapper .task-table-link:hover { color: #1e40af; text-decoration: underline; }
+:host ::ng-deep .my-tasks-table-wrapper .task-code-link { font-size: 12px; font-weight: 650; }
+:host ::ng-deep .my-tasks-table-wrapper .task-title-link { color: #172033; font-size: 13px; font-weight: 700; }
+:host ::ng-deep .my-tasks-table-wrapper .task-project-link { display: block; width: 100%; margin-top: 3px; color: #526176; font-size: 11.5px; font-weight: 500; }
+:host ::ng-deep .my-tasks-table-wrapper .task-name-cell { display: flex; flex-direction: column; justify-content: center; width: 100%; min-width: 0; height: 100%; line-height: 1.2; overflow: hidden; }
+:host ::ng-deep .my-tasks-table-wrapper .task-name-cell > div { min-width: 0; overflow: hidden; white-space: nowrap; }
+:host ::ng-deep .my-tasks-table-wrapper .task-priority-chip { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 9px; color: #fff; background: #f7b500; font-size: 10px; font-weight: 700; line-height: 1.1; vertical-align: middle; }
+:host ::ng-deep .my-tasks-table-wrapper .task-table-status { display: inline-flex; align-items: center; gap: 7px; color: #172033; font-size: 12px; font-weight: 600; white-space: nowrap; }
+:host ::ng-deep .my-tasks-table-wrapper .task-table-status i { width: 11px; height: 11px; border-radius: 50%; flex: 0 0 11px; }
+:host ::ng-deep .my-tasks-table-wrapper .task-table-more { width: 34px; height: 34px; padding: 0; border: 1px solid #aebbd0; border-radius: 6px; color: #64748b; background: #fff; font-size: 21px; line-height: 1; cursor: pointer; }
+:host ::ng-deep .my-tasks-table-wrapper .task-table-more:hover { color: #1d4ed8; border-color: #1d4ed8; }
+:host ::ng-deep .my-tasks-table-wrapper .task-due-overdue { color: #dc2626; font-weight: 700; }
+
+/* Initial time entry in Create Task: clearly a record of the creator's work,
+   rather than the task's target schedule. */
+.task-initial-time-log {
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+.task-initial-time-log-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.task-log-toggle { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 12px; font-weight: 650; color: #1d4ed8; cursor: pointer; }
+.task-log-toggle input { accent-color: #2563eb; }
+.task-form-grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.task-initial-time-log .enhanced-textarea { width: 100%; min-height: 58px; margin-top: 2px; resize: vertical; }
+@media (max-width: 780px) { .task-form-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .task-initial-time-log-head { flex-direction: column; } .task-form-grid-4 { grid-template-columns: 1fr; } }

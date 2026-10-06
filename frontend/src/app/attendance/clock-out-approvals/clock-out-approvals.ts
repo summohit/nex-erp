@@ -12,6 +12,7 @@ import {
 } from '@lucide/angular';
 import { AttendanceService } from '../../services/attendance';
 import { DialogService } from '../../shared/services/dialog.service';
+import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDatePreset } from '../../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 
 /**
  * §Att5: Enhanced Late Clock-out Approval Queue.
@@ -31,6 +32,7 @@ import { DialogService } from '../../shared/services/dialog.service';
     LucideCheckCircle2, LucideAlertTriangle, LucideExternalLink,
     LucideLayers, LucideSparkles, LucideBuilding, LucideArrowUpDown,
     LucideCheckCheck
+    , AttendanceFilterDrawerComponent
   ],
   templateUrl: './clock-out-approvals.html',
   styleUrls: ['./clock-out-approvals.css'],
@@ -47,8 +49,50 @@ export class ClockOutApprovalsComponent implements OnInit {
   isBatchApproving = signal(false);
 
   search = signal('');
+  filterDrawerOpen = signal(false);
+  filterStartDate = signal('');
+  filterEndDate = signal('');
+  filterDatePreset = signal<AttendanceDatePreset>('ALL');
+  filterDepartment = signal('');
+  filterProofStatus = signal('');
   filterTab = signal<'ALL' | 'URGENT' | 'RECENT' | 'HAS_PROOF'>('ALL');
   sortOrder = signal<'OLDEST' | 'NEWEST'>('OLDEST');
+
+  get approvalFilterGroups() {
+    const departments = [...new Set(
+      [...this.rows(), ...this.geoRows()]
+        .map((row) => row.employee?.department?.name || row.employee?.department)
+        .filter((name): name is string => typeof name === 'string' && !!name),
+    )].sort((a, b) => a.localeCompare(b));
+    return [
+      {
+        key: 'department',
+        label: 'Department',
+        placeholder: 'All departments',
+        options: departments.map((name) => ({ value: name, label: name })),
+      },
+      {
+        key: 'proof',
+        label: 'Supporting evidence',
+        placeholder: 'With or without attachment',
+        options: [
+          { value: 'HAS_PROOF', label: 'Has attachment' },
+          { value: 'NO_PROOF', label: 'No attachment' },
+        ],
+      },
+    ];
+  }
+
+  get approvalFilterValues(): Record<string, string> {
+    return { department: this.filterDepartment(), proof: this.filterProofStatus() };
+  }
+
+  get activeApprovalFilterCount(): number {
+    return Number(!!this.filterStartDate() || !!this.filterEndDate())
+      + Number(!!this.search().trim())
+      + Number(!!this.filterDepartment())
+      + Number(!!this.filterProofStatus());
+  }
 
   // Computed KPI statistics
   totalCount = computed(() => this.rows().length);
@@ -60,6 +104,21 @@ export class ClockOutApprovalsComponent implements OnInit {
   geoCanApprove = signal(false);
   geoRows = signal<any[]>([]);
   geoBusyId = signal<number | null>(null);
+  visibleGeoRows = computed(() => this.geoRows().filter(row => this.matchesFilter(row)));
+
+  private matchesFilter(row: any): boolean {
+    const query = this.search().trim().toLowerCase();
+    const name = this.employeeName(row).toLowerCase();
+    const employeeId = String(row.employee?.id ?? row.employeeId ?? '');
+    const employeeCode = String(row.employee?.employeeCode ?? '').toLowerCase();
+    const department = row.employee?.department?.name ?? row.employee?.department ?? '';
+    if (query && !name.includes(query) && !employeeId.includes(query) && !employeeCode.includes(query)
+      && !String(department).toLowerCase().includes(query)) return false;
+    if (this.filterDepartment() && department !== this.filterDepartment()) return false;
+    const date = String(row.date ?? '').slice(0, 10);
+    return (!this.filterStartDate() || date >= this.filterStartDate())
+      && (!this.filterEndDate() || date <= this.filterEndDate());
+  }
 
   loadGeofence(): void {
     this.attendanceService.getPendingGeofence().subscribe({
@@ -147,15 +206,28 @@ export class ClockOutApprovalsComponent implements OnInit {
     } else if (tab === 'HAS_PROOF') {
       list = list.filter(r => !!r.clockOutProofUrl);
     }
+    const proof = this.filterProofStatus();
+    if (proof === 'HAS_PROOF') list = list.filter(r => !!r.clockOutProofUrl);
+    else if (proof === 'NO_PROOF') list = list.filter(r => !r.clockOutProofUrl);
 
     if (q) {
       list = list.filter((r) => {
         const name = `${r.employee?.firstName ?? ''} ${r.employee?.lastName ?? ''}`.toLowerCase();
         return name.includes(q)
+          || String(r.employee?.id ?? r.employeeId ?? '').includes(q)
           || (r.employee?.employeeCode ?? '').toLowerCase().includes(q)
           || (r.employee?.department?.name ?? '').toLowerCase().includes(q)
           || (r.employee?.designation ?? '').toLowerCase().includes(q)
           || (r.clockOutReason ?? '').toLowerCase().includes(q);
+      });
+    }
+
+    const from = this.filterStartDate();
+    const to = this.filterEndDate();
+    if (from || to) {
+      list = list.filter(r => {
+        const date = String(r.date ?? '').slice(0, 10);
+        return !!date && (!from || date >= from) && (!to || date <= to);
       });
     }
 
@@ -166,6 +238,16 @@ export class ClockOutApprovalsComponent implements OnInit {
       return order === 'OLDEST' ? dateA - dateB : dateB - dateA;
     });
   });
+
+  applyAttendanceFilters(filters: AttendanceFilterValue): void {
+    this.filterStartDate.set(filters.startDate);
+    this.filterEndDate.set(filters.endDate);
+    this.filterDatePreset.set(filters.preset);
+    this.search.set(filters.employeeQuery);
+    this.filterDepartment.set(filters.filters['department'] || '');
+    this.filterProofStatus.set(filters.filters['proof'] || '');
+    this.filterDrawerOpen.set(false);
+  }
 
   setFilterTab(tab: 'ALL' | 'URGENT' | 'RECENT' | 'HAS_PROOF'): void {
     this.filterTab.set(tab);
@@ -178,6 +260,11 @@ export class ClockOutApprovalsComponent implements OnInit {
   clearFilters(): void {
     this.search.set('');
     this.filterTab.set('ALL');
+    this.filterStartDate.set('');
+    this.filterEndDate.set('');
+    this.filterDatePreset.set('ALL');
+    this.filterDepartment.set('');
+    this.filterProofStatus.set('');
   }
 
   employeeName(row: any): string {

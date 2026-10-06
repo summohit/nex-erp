@@ -23,6 +23,21 @@ export class ProjectsService {
     private crm: CrmService,
   ) {}
 
+  /** The caller's most recently started timer that has not yet been closed. */
+  async getMyActiveTimer(companyId: number, userId: number) {
+    const employee = await this.prisma.employee.findFirst({ where: { companyId, userId }, select: { id: true } });
+    if (!employee) return null;
+    const log = await this.prisma.issueTimeLog.findFirst({
+      where: { employeeId: employee.id, endedAt: null, issue: { companyId } },
+      orderBy: { startedAt: 'desc' },
+      select: {
+        startedAt: true,
+        issue: { select: { id: true, key: true, title: true, projectId: true } },
+      },
+    });
+    return log ? { projectId: log.issue.projectId, issueId: log.issue.id, taskKey: log.issue.key, taskTitle: log.issue.title, startedAt: log.startedAt } : null;
+  }
+
   /**
    * The Client id a project should be saved against (§4).
    *
@@ -1089,8 +1104,8 @@ export class ProjectsService {
                   { name: 'To Do', color: '#6b7280', position: 0, isSystem: true, type: 'TODO' },
                   { name: 'In Progress', color: '#3b82f6', position: 1, isSystem: true, type: 'IN_PROGRESS' },
                   { name: 'In Review', color: '#8b5cf6', position: 2, isSystem: true, type: 'REVIEW' },
-                  { name: 'Done', color: '#22c55e', position: 3, isSystem: true, type: 'DONE' },
-                  { name: 'Archived', color: '#9ca3af', position: 4, isSystem: true, type: 'DONE' }
+                  { name: 'Completed', color: '#22c55e', position: 3, isSystem: true, type: 'DONE' },
+                  { name: 'Cancelled', color: '#ef4444', position: 4, isSystem: true, type: 'CANCELLED' }
                 ]
               }
             }

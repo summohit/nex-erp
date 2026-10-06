@@ -356,10 +356,27 @@ export class TasksService {
       dependsOnIssueIds?: number[];
       checklists?: { title: string; items?: string[] }[];
       attachments?: { fileName: string; fileUrl: string; fileSize?: number }[];
+      /** Work already completed by the employee raising this task. */
+      initialTimeLog?: { startedAt: string; endedAt: string; note?: string };
     },
   ) {
     if (!data?.title?.trim()) throw new BadRequestException('A task needs a title.');
     this.assertValidSchedule(data);
+
+    let initialTimeLog: { startedAt: Date; endedAt: Date; durationMin: number; note: string | null } | null = null;
+    if (data.initialTimeLog) {
+      const startedAt = new Date(data.initialTimeLog.startedAt);
+      const endedAt = new Date(data.initialTimeLog.endedAt);
+      if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime()) || endedAt <= startedAt) {
+        throw new BadRequestException('The work log end must be after its start.');
+      }
+      const durationMin = Math.round((endedAt.getTime() - startedAt.getTime()) / 60000);
+      if (durationMin < 1) throw new BadRequestException('A work log must be at least one minute.');
+      initialTimeLog = {
+        startedAt, endedAt, durationMin,
+        note: String(data.initialTimeLog.note ?? '').trim() || null,
+      };
+    }
 
     // Resolve where it lives. A lead-linked or general task goes in the hidden
     // General project, which is what gives it a key, a column and a detail view.
@@ -384,6 +401,19 @@ export class TasksService {
       throw new ForbiddenException(
         'Only administrators and project managers can create general tasks.',
       );
+    }
+
+    if (initialTimeLog && data.estimatedHours != null && initialTimeLog.durationMin > Number(data.estimatedHours) * 60) {
+      throw new BadRequestException('The logged time cannot exceed this task\'s estimated hours.');
+    }
+
+    if (initialTimeLog) {
+      const manualLogging = await this.prisma.project.findUnique({
+        where: { id: project.id }, select: { allowManualTimeLogging: true, name: true },
+      });
+      if (manualLogging && !manualLogging.allowManualTimeLogging) {
+        throw new BadRequestException(`${manualLogging.name} does not allow manual time entry. Use the timer after creating the task.`);
+      }
     }
 
     // §PB8: the same approval a task raised from the board gets. This is a
@@ -483,12 +513,27 @@ export class TasksService {
           startDate: data.startDate ? new Date(data.startDate) : null,
           dueDate: data.dueDate ? new Date(data.dueDate) : null,
           estimatedHours: data.estimatedHours != null ? Number(data.estimatedHours) : null,
+          workStartedAt: initialTimeLog?.startedAt ?? null,
           approvalState: approvalNeeded ? initialApproval : null,
           approvalRequestedById: approvalNeeded ? reporterId : null,
         },
       });
 
       const assignees = await this.syncAssignees(tx, created.id, assigneeIds);
+
+      if (initialTimeLog) {
+        await tx.issueTimeLog.create({
+          data: {
+            issueId: created.id,
+            employeeId: reporterId,
+            startedAt: initialTimeLog.startedAt,
+            endedAt: initialTimeLog.endedAt,
+            durationMin: initialTimeLog.durationMin,
+            source: 'MANUAL',
+            note: initialTimeLog.note,
+          },
+        });
+      }
 
       // An assignee who is not on the project cannot see the project the task
       // lives in — getProjects filters non-admins by membership. The board's

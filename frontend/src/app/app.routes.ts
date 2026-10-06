@@ -4,6 +4,7 @@ import { DashboardComponent } from './dashboard/dashboard.component';
 import { MainLayoutComponent } from './layout/main-layout/main-layout';
 import { authGuard } from './guards/auth.guard';
 import { permissionGuard } from './guards/permission.guard';
+import { attendanceHomeGuard, attendanceLandingGuard, companyAttendanceGuard } from './guards/attendance-landing.guard';
 import { EmployeeListComponent } from './employees/employee-list/employee-list';
 import { OnboardingComponent } from './employees/onboarding/onboarding';
 import { TimesheetsComponent } from './timesheets/timesheets.component';
@@ -162,13 +163,20 @@ export const routes: Routes = [
         loadComponent: () => import('./settings/payroll-settings/payroll-settings').then(m => m.PayrollSettingsComponent)
       },
       {
+        // The two attendance screens are one screen now: Super Admin and HR get
+        // everybody's attendance, everyone else gets their own. The redirect a
+        // static `redirectTo` used to give everyone can no longer be right for
+        // both, so the role decides it.
         path: 'attendance',
-        redirectTo: 'attendance/my-attendance',
-        pathMatch: 'full'
+        pathMatch: 'full',
+        canActivate: [attendanceHomeGuard],
+        loadComponent: () => import('./attendance-leave/attendance-leave').then(m => m.AttendanceLeaveComponent)
       },
       {
         path: 'attendance/all',
-        canActivate: [permissionGuard],
+        // Protect the direct URL too.  The landing guard only handles the
+        // self-service route, while this one contains every employee's data.
+        canActivate: [companyAttendanceGuard, permissionGuard],
         data: { module: 'attendance/all' },
         loadComponent: () => import('./attendance/all-attendance/all-attendance').then(m => m.AllAttendanceComponent)
       },
@@ -203,8 +211,11 @@ export const routes: Routes = [
         loadComponent: () => import('./attendance/leave-quota/leave-quota').then(m => m.LeaveQuotaComponent)
       },
       {
+        // attendanceLandingGuard runs first: for Super Admin and HR the
+        // self-service attendance tabs are the company-wide page, so it answers
+        // with a UrlTree and permissionGuard never gets the chance to say no.
         path: 'attendance/:tab',
-        canActivate: [permissionGuard],
+        canActivate: [attendanceLandingGuard, permissionGuard],
         data: { module: 'attendance' },
         loadComponent: () => import('./attendance-leave/attendance-leave').then(m => m.AttendanceLeaveComponent)
       },

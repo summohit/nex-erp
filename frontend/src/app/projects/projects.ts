@@ -27,6 +27,7 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { DialogService } from '../shared/services/dialog.service';
 import { ProjectStarCellRendererComponent } from '../shared/components/project-star-cell-renderer.component';
 import { ProjectActionCellRendererComponent } from '../shared/components/project-action-cell-renderer.component';
+import { ProjectStatusCellRendererComponent } from '../shared/components/project-status-cell-renderer.component';
 import { getAccessToken } from '../core/token-storage';
 import { RoleService } from '../services/role.service';
 import {
@@ -208,7 +209,7 @@ export class ProjectsComponent implements OnInit {
       }
     })()
   );
-  viewMode = signal<'card' | 'table'>((localStorage.getItem('projects-view-mode') as 'card' | 'table') || 'card');
+  viewMode = signal<'card' | 'table'>((localStorage.getItem('projects-view-mode') as 'card' | 'table') || 'table');
   quickFilter = signal<'none' | 'overdue' | 'due-week' | 'led-by-me'>('none');
 
   // ── My Tasks ───────────────────────────────────────────────────────────
@@ -558,6 +559,10 @@ export class ProjectsComponent implements OnInit {
   selectedProjects = signal<any[]>([]);
 
   gridOptions = {
+    // The list has a deliberately small column set; size its rows naturally
+    // and keep every column inside the table instead of creating grid scrollbars.
+    domLayout: 'autoHeight' as const,
+    suppressHorizontalScroll: true,
     rowSelection: {
       mode: 'multiRow' as const,
       checkboxes: true,
@@ -979,6 +984,111 @@ export class ProjectsComponent implements OnInit {
     return cols;
   });
 
+  /**
+   * The list view is deliberately concise.  Detail such as department,
+   * priority, hours and financials is available after opening a project; it
+   * should not force a horizontal scroll in the everyday project list.
+   */
+  compactBoardsColumnDefs = computed<ColDef[]>(() => [
+    {
+      headerName: 'Code',
+      field: 'key',
+      width: 120,
+      minWidth: 100,
+      cellRenderer: (params: any) =>
+        params.value ? `<span class="project-code-chip">${params.value}</span>` : '<span class="cell-muted">—</span>'
+    },
+    {
+      headerName: 'Project name',
+      field: 'name',
+      flex: 1.5,
+      minWidth: 150,
+      cellRenderer: (params: any) => `<span class="board-title">${params.value || '—'}</span>`
+    },
+    {
+      headerName: 'Members',
+      field: 'members',
+      width: 130,
+      minWidth: 105,
+      sortable: false,
+      filter: false,
+      cellRenderer: (params: any) => this.buildTeamStackHtml(params.data),
+      onCellClicked: (params: any) => {
+        const button = (params.event?.target as HTMLElement)?.closest('[data-team-project-id]');
+        if (button) this.openTeamModal(params.data);
+      }
+    },
+    {
+      headerName: 'Start date',
+      field: 'startDate',
+      width: 112,
+      minWidth: 98,
+      valueFormatter: (params: any) => this.formatProjectListDate(params.value)
+    },
+    {
+      headerName: 'Deadline',
+      field: 'endDate',
+      width: 112,
+      minWidth: 98,
+      valueFormatter: (params: any) => this.formatProjectListDate(params.value)
+    },
+    {
+      headerName: 'Client',
+      field: 'client.name',
+      width: 130,
+      minWidth: 105,
+      valueGetter: (params: any) => params.data?.client?.name || '—'
+    },
+    {
+      headerName: 'Status',
+      field: 'workStatus',
+      width: 145,
+      minWidth: 120,
+      cellRenderer: ProjectStatusCellRendererComponent,
+      cellRendererParams: {
+        canChange: () => this.isManagementAdmin,
+        onStatusChange: (project: any, stage: string) => this.updateProjectStage(project, stage)
+      }
+    },
+    {
+      headerName: 'Actions',
+      field: 'actions',
+      width: 70,
+      sortable: false,
+      filter: false,
+      resizable: false,
+      pinned: 'right',
+      cellRenderer: ProjectActionCellRendererComponent,
+      cellRendererParams: {
+        showActions: () => this.isManagementAdmin,
+        onEdit: (data: any) => this.openEditModal(data, new Event('click')),
+        onArchive: (data: any) => this.archiveBoard(data, false, new Event('click')),
+        onDuplicate: (data: any) => this.openDuplicateModal(data, new Event('click')),
+        canDuplicate: () => this.isSuperAdmin
+      }
+    }
+  ]);
+
+  private formatProjectListDate(value: string | null | undefined): string {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString('en-GB', {
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+  }
+
+  updateProjectStage(project: any, workStatus: string): void {
+    if (!this.isManagementAdmin || !project?.id || project.workStatus === workStatus) return;
+    this.projectsService.updateProject(project.id, { workStatus }).subscribe({
+      next: () => {
+        this.projects.update((projects) => projects.map((item) =>
+          item.id === project.id ? { ...item, workStatus } : item
+        ));
+        this.toast.success('Project stage updated');
+      },
+      error: (error) => this.toast.error(error?.error?.message || 'Could not update the project stage'),
+    });
+  }
+
   onBoardRowClicked(event: any) {
     const target = event.event?.target as HTMLElement | null;
     // Don't navigate when clicking the team count button, checkbox, or action menu
@@ -1285,7 +1395,7 @@ export class ProjectsComponent implements OnInit {
     return err?.error?.message || err?.message || `upload failed (HTTP ${err?.status ?? 'unknown'})`;
   }
 
-  /** Collapsed by default — see the note in projects.html. */
+  /** The drawer edits draft values; only Apply changes the list. */
   filtersOpen = signal<boolean>(false);
   filterClientId = signal<string>('ALL');
   filterPmId = signal<string>('ALL');
@@ -1297,6 +1407,16 @@ export class ProjectsComponent implements OnInit {
   filterPriority = signal<string>('ALL');
   filterStartFrom = signal<string>('');
   filterDeadlineTo = signal<string>('');
+
+  draftFilterClientId = signal<string>('ALL');
+  draftFilterPmId = signal<string>('ALL');
+  draftFilterDepartmentId = signal<string>('ALL');
+  draftFilterCategory = signal<string>('ALL');
+  draftFilterStatus = signal<string>('ALL');
+  draftFilterClosureStatus = signal<string>('ALL');
+  draftFilterPriority = signal<string>('ALL');
+  draftFilterStartFrom = signal<string>('');
+  draftFilterDeadlineTo = signal<string>('');
 
   readonly projectStatusOptions = PROJECT_STATUSES;
   readonly projectClosureStatusOptions = PROJECT_CLOSURE_STATUSES;
@@ -1665,6 +1785,49 @@ export class ProjectsComponent implements OnInit {
     this.filterPriority.set('ALL');
     this.filterStartFrom.set('');
     this.filterDeadlineTo.set('');
+    this.resetProjectFilterDraft();
+  }
+
+  openProjectFilters() {
+    this.draftFilterClientId.set(this.filterClientId());
+    this.draftFilterPmId.set(this.filterPmId());
+    this.draftFilterDepartmentId.set(this.filterDepartmentId());
+    this.draftFilterCategory.set(this.filterCategory());
+    this.draftFilterStatus.set(this.filterStatus());
+    this.draftFilterClosureStatus.set(this.filterClosureStatus());
+    this.draftFilterPriority.set(this.filterPriority());
+    this.draftFilterStartFrom.set(this.filterStartFrom());
+    this.draftFilterDeadlineTo.set(this.filterDeadlineTo());
+    this.filtersOpen.set(true);
+  }
+
+  closeProjectFilters() {
+    this.filtersOpen.set(false);
+  }
+
+  resetProjectFilterDraft() {
+    this.draftFilterClientId.set('ALL');
+    this.draftFilterPmId.set('ALL');
+    this.draftFilterDepartmentId.set('ALL');
+    this.draftFilterCategory.set('ALL');
+    this.draftFilterStatus.set('ALL');
+    this.draftFilterClosureStatus.set('ALL');
+    this.draftFilterPriority.set('ALL');
+    this.draftFilterStartFrom.set('');
+    this.draftFilterDeadlineTo.set('');
+  }
+
+  applyProjectFilterDraft() {
+    this.filterClientId.set(this.draftFilterClientId());
+    this.filterPmId.set(this.draftFilterPmId());
+    this.filterDepartmentId.set(this.draftFilterDepartmentId());
+    this.filterCategory.set(this.draftFilterCategory());
+    this.filterStatus.set(this.draftFilterStatus());
+    this.filterClosureStatus.set(this.draftFilterClosureStatus());
+    this.filterPriority.set(this.draftFilterPriority());
+    this.filterStartFrom.set(this.draftFilterStartFrom());
+    this.filterDeadlineTo.set(this.draftFilterDeadlineTo());
+    this.filtersOpen.set(false);
   }
 
   private applyProjectFilters(list: any[]): any[] {
@@ -2141,6 +2304,13 @@ export class ProjectsComponent implements OnInit {
       priority: 'MEDIUM',
       startDate: '',
       dueDate: '',
+      /** Optional work already performed by the employee creating the task. */
+      logInitialTime: false,
+      workStartDate: '',
+      workStartTime: '',
+      workEndDate: '',
+      workEndTime: '',
+      workNote: '',
       // Pre-sales work is scheduled to an instant, not a day — "6:24 PM on the
       // 14th" is the whole point of a site visit or a call.
       dueTime: '',
@@ -2475,6 +2645,27 @@ export class ProjectsComponent implements OnInit {
     this.revalidateTask();
   }
 
+  /** A datetime-local value is interpreted in the employee's browser timezone. */
+  private employeeDateTime(date: string, time: string): string {
+    return new Date(`${date}T${time}:00`).toISOString();
+  }
+
+  private initialTimeLogPayload(): { startedAt: string; endedAt: string; note?: string } | undefined {
+    if (!this.taskForm.logInitialTime) return undefined;
+    const { workStartDate, workStartTime, workEndDate, workEndTime } = this.taskForm;
+    if (!workStartDate || !workStartTime || !workEndDate || !workEndTime) {
+      this.toast.error('Enter the start date, end date, start time, and end time for your work log.');
+      return undefined;
+    }
+    const startedAt = this.employeeDateTime(workStartDate, workStartTime);
+    const endedAt = this.employeeDateTime(workEndDate, workEndTime);
+    if (Number.isNaN(Date.parse(startedAt)) || Number.isNaN(Date.parse(endedAt)) || Date.parse(endedAt) <= Date.parse(startedAt)) {
+      this.toast.error('Your work log must end after it starts.');
+      return undefined;
+    }
+    return { startedAt, endedAt, note: this.taskForm.workNote.trim() || undefined };
+  }
+
   saveTask() {
     this.taskSubmitted = true;
     const errors = this.validateTaskForm();
@@ -2488,6 +2679,9 @@ export class ProjectsComponent implements OnInit {
       });
       return;
     }
+
+    const initialTimeLog = this.initialTimeLogPayload();
+    if (this.taskForm.logInitialTime && !initialTimeLog) return;
 
     // A pre-sales deal gets a pre-sales task — a different model, different
     // endpoint, and an hours budget the CRM enforces.
@@ -2515,6 +2709,7 @@ export class ProjectsComponent implements OnInit {
         ? Number(this.taskForm.estimatedHours) : undefined,
       assigneeIds: this.taskForm.assigneeIds,
       attachments: this.taskForm.attachments?.length ? this.taskForm.attachments : undefined,
+      initialTimeLog,
     }).subscribe({
       next: (created: any) => {
         this.isSavingTask.set(false);
@@ -2967,6 +3162,8 @@ export class ProjectsComponent implements OnInit {
     }
 
     if (act) {
+      if (act === 'task') { this.openTaskFromRegister(task); return; }
+      if (act === 'project') { this.openProjectFromRegister(task); return; }
       if (act === 'board-status') { this.openMyTasksStatusMenu(task, hit); return; }
       if (act === 'status') this.openPreSalesStatus(task, hit!.getAttribute('data-status') || 'WORKING');
       else if (act === 'history') this.openPreSalesHistory(task);
@@ -2983,6 +3180,19 @@ export class ProjectsComponent implements OnInit {
     }
     if (!task.link) return;
     this.router.navigate([task.link.route], { queryParams: task.link.queryParams });
+  }
+
+  private openTaskFromRegister(task: MyTask): void {
+    if (task.source === 'PRE_SALES') {
+      this.openPreSalesHistory(task);
+      return;
+    }
+    if (task.link) this.router.navigate([task.link.route], { queryParams: task.link.queryParams });
+  }
+
+  private openProjectFromRegister(task: MyTask): void {
+    if (task.projectId != null) this.goToProject(task.projectId);
+    else this.openTaskFromRegister(task);
   }
 
   // ── In-row status change (§ status ↔ board) ─────────────────────────────
@@ -3439,6 +3649,42 @@ export class ProjectsComponent implements OnInit {
     'row-status-closed':      (p: any) => p.data?.status === 'CANCELLED' || p.data?.status === 'CLOSED',
     'row-status-rejected':    (p: any) => p.data?.status === 'BLOCKED' || (p.data?.isOverdue && p.data?.status !== 'DONE' && p.data?.status !== 'CANCELLED'),
   };
+
+  /** Compact delivery register shown on the Tasks tab. */
+  taskTableColDefs: ColDef[] = [
+    { headerName: 'Code', field: 'refKey', width: 125, minWidth: 105,
+      cellRenderer: (p: any) => `<button type="button" class="task-table-link task-code-link" data-act="task">${this.esc(p.value || '—')}</button>` },
+    { headerName: 'Task', field: 'title', flex: 1.6, minWidth: 230,
+      cellRenderer: (p: any) => {
+        const priority = p.data?.priority ? `<span class="task-priority-chip">${this.esc(p.data.priority)}</span>` : '';
+        const project = p.data?.parent?.name ? `<button type="button" class="task-table-link task-project-link" data-act="project">${this.esc(p.data.parent.name)}</button>` : '';
+        return `<div class="task-name-cell"><div><button type="button" class="task-table-link task-title-link" data-act="task">${this.esc(p.value || 'Untitled task')}</button>${priority}</div>${project}</div>`;
+      } },
+    { headerName: 'Completed on', field: 'workCompletedAt', width: 125, minWidth: 115, valueFormatter: (p: any) => this.taskTableDate(p.value) },
+    { headerName: 'Milestones', field: 'milestone.name', width: 130, minWidth: 115, valueGetter: (p: any) => p.data?.milestone?.name || '—' },
+    { headerName: 'Start date', field: 'startDate', width: 108, minWidth: 96, valueFormatter: (p: any) => this.taskTableDate(p.value) },
+    { headerName: 'Due date', field: 'dueDate', width: 108, minWidth: 96, cellRenderer: (p: any) => `<span class="${p.data?.isOverdue ? 'task-due-overdue' : ''}">${this.taskTableDate(p.value)}</span>` },
+    { headerName: 'Hours logged', field: 'loggedMinutes', width: 105, minWidth: 95, valueFormatter: (p: any) => this.taskTableDuration(p.value) },
+    { headerName: 'Assigned to', field: 'assignees', width: 120, minWidth: 105, sortable: false, valueGetter: (p: any) => (p.data?.assignees || []).map((a: any) => `${a.firstName || ''} ${a.lastName || ''}`.trim()).join(', ') || '—' },
+    { headerName: 'Status', field: 'status', width: 120, minWidth: 105, cellRenderer: (p: any) => this.taskTableStatus(p.value) },
+    { headerName: 'Action', field: 'actions', width: 82, minWidth: 76, sortable: false, filter: false, cellRenderer: () => '<button type="button" class="task-table-more" data-act="task" title="Open task">⋮</button>' },
+  ];
+
+  private taskTableDate(value: string | Date | null | undefined): string {
+    return value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+  }
+
+  private taskTableDuration(value: number | null | undefined): string {
+    const minutes = Math.max(0, Number(value || 0));
+    return minutes < 60 ? `${Math.round(minutes)}s` : `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${Math.round(minutes % 60)}m` : ''}`;
+  }
+
+  private taskTableStatus(value: string): string {
+    const status = String(value || 'TODO').toUpperCase();
+    const labels: Record<string, string> = { TODO: 'Incomplete', IN_PROGRESS: 'In Progress', IN_REVIEW: 'In Review', DONE: 'Completed', CANCELLED: 'Cancelled' };
+    const colors: Record<string, string> = { TODO: '#dc2626', IN_PROGRESS: '#0ea5e9', IN_REVIEW: '#8b5cf6', DONE: '#16a34a', CANCELLED: '#64748b' };
+    return `<span class="task-table-status"><i style="background:${colors[status] || '#64748b'}"></i>${labels[status] || status.replace(/_/g, ' ')}</span>`;
+  }
 
   myTasksColDefs: ColDef[] = [
     {

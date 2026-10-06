@@ -12,9 +12,32 @@
     </div>
 
     <div class="period-switch">
+      <button type="button" class="filter-toggle" (click)="exportCsv()" [disabled]="!hasRows()" title="Export the visible shift report">
+        <svg lucideDownload [size]="14"></svg>
+        Export CSV
+      </button>
+      <button type="button" class="filter-toggle" (click)="openFilters($event)" aria-haspopup="dialog">
+        <svg lucideCalendarDays [size]="14"></svg>
+        Filters
+        <span *ngIf="startDate() || endDate() || employeeQuery()"> · Active</span>
+      </button>
       <button type="button" [class.active]="period() === 'week'" (click)="setPeriod('week')">Week</button>
       <button type="button" [class.active]="period() === 'month'" (click)="setPeriod('month')">Month</button>
     </div>
+    <app-attendance-filter-drawer
+      [open]="filterDrawerOpen()"
+      title="Shift attendance filters"
+      description="Choose the reporting period and search for an employee in the summary."
+      [datePresetOptions]="['TODAY', 'THIS_WEEK', 'THIS_MONTH', 'CUSTOM']"
+      [preset]="startDate() ? 'CUSTOM' : (period() === 'week' ? 'THIS_WEEK' : 'THIS_MONTH')"
+      [startDate]="startDate()"
+      [endDate]="endDate()"
+      employeeLabel="Employee name or ID"
+      employeeHint="Search the report for a specific employee."
+      [employeeQuery]="employeeQuery()"
+      (closed)="closeFilters()"
+      (applied)="applyAttendanceFilters($event)">
+    </app-attendance-filter-drawer>
   </div>
 
   <!-- Arrows move a whole period, so they move what the label says. -->

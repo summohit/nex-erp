@@ -8,6 +8,13 @@ import { MenusService } from '../../services/menus.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen, LucideFunnel, LucideShoppingCart, LucideBug, LucideMapPin, LucideMegaphone } from '@lucide/angular';
 
+const LEAVE_MENU_ROUTES = new Set([
+  '/attendance/leaves',
+  '/attendance/approvals',
+  '/attendance/balances',
+  '/attendance/leave-quota',
+]);
+
 @Component({
   selector: 'app-sidebar',
   standalone: true,
@@ -48,7 +55,7 @@ export class SidebarComponent implements OnInit {
   loadMenus() {
     this.menusService.getSidebarMenus().subscribe({
       next: (menus) => {
-        this.menuSections = menus;
+        this.menuSections = this.mergeLeaveMenuItems(menus);
         this.checkExpandedMenu(this.router.url);
         this.isLoading.set(false);
       },
@@ -94,7 +101,11 @@ export class SidebarComponent implements OnInit {
       }
     }
     if (item.subItems) {
-      return item.subItems.some((sub: any) => currentPath.startsWith(sub.route) || currentUrl.includes(sub.route));
+      return item.subItems.some((sub: any) =>
+        this.isMergedLeavesItem(sub)
+          ? this.isLeaveRoute(currentPath)
+          : currentPath.startsWith(sub.route) || currentUrl.includes(sub.route),
+      );
     }
     return false;
   }
@@ -102,7 +113,34 @@ export class SidebarComponent implements OnInit {
   isSubItemActive(sub: any): boolean {
     if (!sub?.route) return false;
     const currentPath = this.router.url.split('?')[0];
+    if (this.isMergedLeavesItem(sub)) return this.isLeaveRoute(currentPath);
     return currentPath === sub.route;
+  }
+
+  private mergeLeaveMenuItems(sections: any[]): any[] {
+    return sections.map(section => ({
+      ...section,
+      items: section.items.map((item: any) => {
+        if (item.id !== 'attendance' || !item.subItems?.length) return item;
+
+        const leaveItems = item.subItems.filter((sub: any) => LEAVE_MENU_ROUTES.has(sub.route));
+        if (leaveItems.length === 0) return item;
+
+        const firstLeaveIndex = item.subItems.findIndex((sub: any) => LEAVE_MENU_ROUTES.has(sub.route));
+        const mergedLeaves = { ...leaveItems[0], id: 'attendance/leaves', title: 'Leaves', route: '/attendance/leaves' };
+        const subItems = item.subItems.filter((sub: any) => !LEAVE_MENU_ROUTES.has(sub.route));
+        subItems.splice(firstLeaveIndex, 0, mergedLeaves);
+        return { ...item, subItems };
+      }),
+    }));
+  }
+
+  private isMergedLeavesItem(sub: any): boolean {
+    return sub?.id === 'attendance/leaves' && sub?.title === 'Leaves';
+  }
+
+  private isLeaveRoute(path: string): boolean {
+    return LEAVE_MENU_ROUTES.has(path);
   }
 
   ngOnInit() {
@@ -155,7 +193,12 @@ export class SidebarComponent implements OnInit {
     for (const section of this.menuSections) {
       for (const item of section.items) {
         if (item.subItems) {
-          const hasActiveSubItem = item.subItems.some((sub: any) => url.includes(sub.route));
+          const currentPath = url.split('?')[0];
+          const hasActiveSubItem = item.subItems.some((sub: any) =>
+            this.isMergedLeavesItem(sub)
+              ? this.isLeaveRoute(currentPath)
+              : url.includes(sub.route),
+          );
           if (hasActiveSubItem) {
             this.expandedMenu.set(item.id);
             activeFound = true;

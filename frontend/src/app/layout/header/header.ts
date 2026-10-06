@@ -21,6 +21,7 @@ import { GeolocationService } from '../../shared/services/geolocation.service';
 import { OutsideOfficeAnswer, OutsideOfficeService } from '../../shared/services/outside-office.service';
 import { UploadService } from '../../services/upload.service';
 import { PushNotificationsService } from '../../services/push-notifications.service';
+import { ProjectsService } from '../../services/projects';
 
 @Component({
   selector: 'app-header',
@@ -52,6 +53,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private outsideOffice = inject(OutsideOfficeService);
   private uploadService = inject(UploadService);
   private push = inject(PushNotificationsService);
+  private projectsService = inject(ProjectsService);
   notificationsService = inject(NotificationsService);
 
   // Change Password Modal
@@ -76,6 +78,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
   clockInTime = signal<Date | null>(null);
   timerStr = signal<string>('00:00:00');
   totalHoursStr = signal<string>('');
+  activeTaskTimer = signal<{ projectId: number; issueId: number; taskKey: string; taskTitle: string } | null>(null);
+  isTaskTimerModalOpen = signal(false);
   private timerInterval: any;
 
   // Open-ticket indicator — only meaningful for the dev team and management,
@@ -211,10 +215,48 @@ export class HeaderComponent implements OnInit, OnDestroy {
     if (this.isClocking()) return;
     this.isClocking.set(true);
     if (this.isClockedIn()) {
-      this.executeClock('clockOut');
+      this.projectsService.getMyActiveTimer().subscribe({
+        next: (timer) => {
+          if (timer) {
+            this.activeTaskTimer.set(timer);
+            this.isTaskTimerModalOpen.set(true);
+            this.isClocking.set(false);
+            return;
+          }
+          this.executeClock('clockOut');
+        },
+        error: () => {
+          this.toast.error('Could not check the active task timer. Please try clocking out again.');
+          this.isClocking.set(false);
+        },
+      });
     } else {
       this.executeClock('clockIn');
     }
+  }
+
+  closeTaskTimerModal(): void {
+    if (this.isClocking()) return;
+    this.isTaskTimerModalOpen.set(false);
+    this.activeTaskTimer.set(null);
+  }
+
+  resolveTaskTimerAndClockOut(action: 'pause' | 'stop'): void {
+    const timer = this.activeTaskTimer();
+    if (!timer || this.isClocking()) return;
+    this.isClocking.set(true);
+    this.projectsService.stopTime(timer.projectId, timer.issueId).subscribe({
+      next: () => {
+        this.isTaskTimerModalOpen.set(false);
+        this.activeTaskTimer.set(null);
+        this.toast.success(action === 'pause' ? 'Task timer paused' : 'Task timer stopped');
+        this.executeClock('clockOut');
+      },
+      error: (err) => {
+        this.toast.error(err?.error?.message || 'Could not stop the task timer.');
+        this.isClocking.set(false);
+      },
+    });
   }
 
   /**

@@ -692,7 +692,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     { value: 'IN_PROGRESS', label: 'In Progress', color: '#2563eb' },
     { value: 'IN_REVIEW', label: 'In Review', color: '#9333ea' },
     { value: 'DONE', label: 'Completed', color: '#16a34a' },
-    { value: 'ARCHIVED', label: 'Archived', color: '#94a3b8' },
+    { value: 'CANCELLED', label: 'Cancelled', color: '#ef4444' },
     { value: 'AWAITING_APPROVAL', label: 'Awaiting Approval', color: '#f59e0b' },
     { value: 'REJECTED', label: 'Needs Changes (Rejected)', color: '#e11d48' },
   ];
@@ -731,9 +731,6 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     // wearing two names. 'ARCHIVED' also pulls in the rows the board hides.
     const statuses = this.listFilterStatuses();
     if (statuses.length > 0) {
-      if (statuses.includes('ARCHIVED')) {
-        issues = issues.concat(this.archivedIssues());
-      }
       issues = issues.filter(i => {
         if (statuses.includes('AWAITING_APPROVAL') && this.isAwaitingApproval(i)) {
           return true;
@@ -741,7 +738,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         if (statuses.includes('REJECTED') && this.isRejectedApproval(i)) {
           return true;
         }
-        if (i.isArchived) return statuses.includes('ARCHIVED');
+        if (i.isArchived) return false;
         return statuses.includes(i.status);
       });
     }

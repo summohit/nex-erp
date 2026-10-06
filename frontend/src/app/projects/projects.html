@@ -375,17 +375,14 @@
       </button>
     </div>
 
-    <!-- §3 Project filters. Collapsed by default: nine dropdowns above a list
-         most people open to click one project is a wall, not a tool. The
-         summary row says how many are on so a filtered-empty list is never a
-         mystery. -->
+    <!-- Filters stay out of the table. The drawer uses draft values, so the
+         result list only changes after the user presses Apply. -->
     <div class="project-filters">
       <div class="project-filters-head">
-        <button type="button" class="project-filters-toggle" (click)="filtersOpen.set(!filtersOpen())">
+        <button type="button" class="project-filters-toggle" (click)="openProjectFilters()">
           <svg lucideFilter size="14"></svg>
           Filters
           <span class="project-filters-count" *ngIf="activeFilterCount() > 0">{{ activeFilterCount() }}</span>
-          <svg lucideChevronDown size="14" [class.rotated]="filtersOpen()"></svg>
         </button>
         <button
           type="button"
@@ -396,10 +393,21 @@
         </button>
       </div>
 
-      <div class="project-filters-grid" *ngIf="filtersOpen()">
+      <div class="project-filters-backdrop" *ngIf="filtersOpen()" (click)="closeProjectFilters()"></div>
+      <aside class="project-filters-drawer" *ngIf="filtersOpen()" role="dialog" aria-modal="true" aria-label="Project filters">
+        <div class="project-filters-drawer-head">
+          <div>
+            <h3>Filter projects</h3>
+            <p>Choose filters, then apply them to the table.</p>
+          </div>
+          <button type="button" class="project-filter-icon-button" (click)="closeProjectFilters()" aria-label="Close filters">
+            <svg lucideX size="18"></svg>
+          </button>
+        </div>
+        <div class="project-filters-grid">
         <label class="project-filter-field">
           <span>Client</span>
-          <select [ngModel]="filterClientId()" (ngModelChange)="filterClientId.set($event)">
+          <select [ngModel]="draftFilterClientId()" (ngModelChange)="draftFilterClientId.set($event)">
             <option value="ALL">All clients</option>
             <option *ngFor="let c of clientOptions()" [value]="c.id">{{ c.name }}</option>
           </select>
@@ -407,7 +415,7 @@
 
         <label class="project-filter-field">
           <span>Project manager</span>
-          <select [ngModel]="filterPmId()" (ngModelChange)="filterPmId.set($event)">
+          <select [ngModel]="draftFilterPmId()" (ngModelChange)="draftFilterPmId.set($event)">
             <option value="ALL">All managers</option>
             <option *ngFor="let m of pmOptions()" [value]="m.id">{{ m.name }}</option>
           </select>
@@ -415,7 +423,7 @@
 
         <label class="project-filter-field">
           <span>Department</span>
-          <select [ngModel]="filterDepartmentId()" (ngModelChange)="filterDepartmentId.set($event)">
+          <select [ngModel]="draftFilterDepartmentId()" (ngModelChange)="draftFilterDepartmentId.set($event)">
             <option value="ALL">All departments</option>
             <option *ngFor="let d of departmentOptions()" [value]="d.id">{{ d.name }}</option>
           </select>
@@ -423,7 +431,7 @@
 
         <label class="project-filter-field">
           <span>Category</span>
-          <select [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event)">
+          <select [ngModel]="draftFilterCategory()" (ngModelChange)="draftFilterCategory.set($event)">
             <option value="ALL">All categories</option>
             <option *ngFor="let c of categoryOptions()" [value]="c">{{ c }}</option>
           </select>
@@ -431,7 +439,7 @@
 
         <label class="project-filter-field">
           <span>Status</span>
-          <select [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)">
+          <select [ngModel]="draftFilterStatus()" (ngModelChange)="draftFilterStatus.set($event)">
             <option value="ALL">All statuses</option>
             <option *ngFor="let st of projectStatusOptions" [value]="st">{{ st.replace('_', ' ') }}</option>
           </select>
@@ -442,7 +450,7 @@
              the work status beside it. -->
         <label class="project-filter-field">
           <span>Sign-off status</span>
-          <select [ngModel]="filterClosureStatus()" (ngModelChange)="filterClosureStatus.set($event)">
+          <select [ngModel]="draftFilterClosureStatus()" (ngModelChange)="draftFilterClosureStatus.set($event)">
             <option value="ALL">All stages</option>
             <option *ngFor="let cs of projectClosureStatusOptions" [value]="cs.value">{{ cs.label }}</option>
           </select>
@@ -450,7 +458,7 @@
 
         <label class="project-filter-field">
           <span>Priority</span>
-          <select [ngModel]="filterPriority()" (ngModelChange)="filterPriority.set($event)">
+          <select [ngModel]="draftFilterPriority()" (ngModelChange)="draftFilterPriority.set($event)">
             <option value="ALL">All priorities</option>
             <option *ngFor="let pr of projectPriorityOptions" [value]="pr">{{ pr }}</option>
           </select>
@@ -458,14 +466,20 @@
 
         <label class="project-filter-field">
           <span>Started on or after</span>
-          <input type="date" [ngModel]="filterStartFrom()" (ngModelChange)="filterStartFrom.set($event)" />
+          <input type="date" [ngModel]="draftFilterStartFrom()" (ngModelChange)="draftFilterStartFrom.set($event)" />
         </label>
 
         <label class="project-filter-field">
           <span>Deadline on or before</span>
-          <input type="date" [ngModel]="filterDeadlineTo()" (ngModelChange)="filterDeadlineTo.set($event)" />
+          <input type="date" [ngModel]="draftFilterDeadlineTo()" (ngModelChange)="draftFilterDeadlineTo.set($event)" />
         </label>
-      </div>
+        </div>
+        <div class="project-filters-drawer-actions">
+          <button type="button" class="project-filter-reset" (click)="resetProjectFilterDraft()">Reset</button>
+          <button type="button" class="project-filter-cancel" (click)="closeProjectFilters()">Cancel</button>
+          <button type="button" class="project-filter-apply" (click)="applyProjectFilterDraft()">Apply filters</button>
+        </div>
+      </aside>
     </div>
 
     <!-- Boards Grid / Table -->
@@ -588,7 +602,7 @@
             class="ag-theme-quartz boards-grid-table"
             [theme]="'legacy'"
             [rowData]="filteredProjects()"
-            [columnDefs]="boardsColumnDefs()"
+            [columnDefs]="compactBoardsColumnDefs()"
             [defaultColDef]="defaultColDef"
             [gridOptions]="gridOptions"
             [pagination]="true"
@@ -596,7 +610,7 @@
             [paginationPageSizeSelector]="paginationPageSizeOptions"
             [suppressPaginationPanel]="filteredProjects().length <= paginationPageSize"
             [quickFilterText]="searchQuery()"
-            [rowHeight]="52"
+            [rowHeight]="80"
             (gridReady)="onBoardsGridReady($event)"
             (selectionChanged)="onBoardsSelectionChanged()"
             (rowClicked)="onBoardRowClicked($event)">
@@ -1226,7 +1240,7 @@
         [theme]="'legacy'"
         style="width: 100%;"
         [rowData]="filteredMyTasks()"
-        [columnDefs]="myTasksColDefs"
+        [columnDefs]="taskTableColDefs"
         [defaultColDef]="myTasksDefaultColDef"
         [rowClassRules]="myTasksRowClassRules"
         [rowHeight]="78"
@@ -1740,6 +1754,42 @@
         <span class="field-error" *ngIf="taskError('hours') as m">{{ m }}</span>
         <small class="form-hint" *ngIf="isPreSalesTarget">Counts against this person's hours allocation on the deal.</small>
       </div>
+    </div>
+
+    <!-- The person creating the task can record work that has already been
+         performed. These are their own local date/time inputs, not a schedule
+         imposed on an assignee. -->
+    <div class="task-initial-time-log" *ngIf="!isPreSalesTarget">
+      <div class="task-initial-time-log-head">
+        <div>
+          <label class="form-label mb-0">Log your time <span class="optional">(optional)</span></label>
+          <small class="form-hint">Record work you have already done on this task in your local time.</small>
+        </div>
+        <label class="task-log-toggle">
+          <input type="checkbox" [(ngModel)]="taskForm.logInitialTime" />
+          <span>Include time log</span>
+        </label>
+      </div>
+
+      <div class="task-form-grid-4" *ngIf="taskForm.logInitialTime">
+        <div class="form-group">
+          <label class="form-label">Start date</label>
+          <input type="date" class="enhanced-input" [(ngModel)]="taskForm.workStartDate" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Start time</label>
+          <input type="time" class="enhanced-input" [(ngModel)]="taskForm.workStartTime" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">End date</label>
+          <input type="date" class="enhanced-input" [min]="taskForm.workStartDate || ''" [(ngModel)]="taskForm.workEndDate" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">End time</label>
+          <input type="time" class="enhanced-input" [(ngModel)]="taskForm.workEndTime" />
+        </div>
+      </div>
+      <textarea *ngIf="taskForm.logInitialTime" rows="2" class="enhanced-textarea" [(ngModel)]="taskForm.workNote" placeholder="What did you work on? (optional)"></textarea>
     </div>
 
     <!-- Assignees Section (Search, Name, and Image) -->

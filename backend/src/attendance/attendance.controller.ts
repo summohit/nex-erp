@@ -1,13 +1,20 @@
-import { Controller, Get, Post, Body, UseGuards, Request, Param, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Request, Param, Query, ParseIntPipe, ForbiddenException } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { isSuperAdmin, normaliseRole } from '../common/company-roles';
 
 @Controller('attendance')
 @UseGuards(AuthGuard, PermissionsGuard)
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
+
+  /** Company-wide attendance is HR and Super Admin only, even when a role has
+   * a broad attendance permission or calls an endpoint directly. */
+  private mayViewAllAttendance(role?: string | null): boolean {
+    return isSuperAdmin(role) || normaliseRole(role) === 'HR';
+  }
 
   @Get('me')
   getTodayAttendance(@Request() req) {
@@ -24,11 +31,16 @@ export class AttendanceController {
 
   @Get('employee/:employeeId')
   getEmployeeHistory(
+    @Request() req,
     @Param('employeeId') employeeId: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.attendanceService.getEmployeeHistory(+employeeId, from, to);
+    const targetEmployeeId = +employeeId;
+    if (!this.mayViewAllAttendance(req.user.role) && req.user.employeeId !== targetEmployeeId) {
+      throw new ForbiddenException('You can only view your own attendance history.');
+    }
+    return this.attendanceService.getEmployeeHistory(targetEmployeeId, from, to);
   }
 
   @Post('clock-in')
@@ -135,9 +147,12 @@ export class AttendanceController {
     @Request() req,
     @Query('period') period?: string,
     @Query('date') date?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('employee') employee?: string,
   ) {
     return this.attendanceService.getShiftPeriodSummary(
-      req.user.companyId, period === 'week' ? 'week' : 'month', date,
+      req.user.companyId, period === 'week' ? 'week' : 'month', date, from, to, employee,
     );
   }
 
@@ -150,13 +165,29 @@ export class AttendanceController {
     @Query('employeeId') employeeId?: string,
     @Query('departmentId') departmentId?: string,
     @Query('status') status?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('all') all?: string,
   ) {
+    if (!this.mayViewAllAttendance(req.user.role)) {
+      throw new ForbiddenException('Only Super Admin and HR can view all employees attendance.');
+    }
     return this.attendanceService.getAllEmployeesAttendance(req.user.companyId, {
       month: month ? +month : undefined,
       year: year ? +year : undefined,
       employeeId: employeeId ? +employeeId : undefined,
       departmentId: departmentId ? +departmentId : undefined,
       status,
+      from,
+      to,
+      all: all === 'true',
     });
+  }
+
+  @Post('import')
+  @Permissions('attendance/all')
+  importAttendance(@Request() req, @Body() body: { rows: Array<{ employeeId: number; date: string; status?: string; clockIn?: string; clockOut?: string }> }) {
+    if (!this.mayViewAllAttendance(req.user.role)) throw new ForbiddenException('Only Super Admin and HR can import attendance.');
+    return this.attendanceService.importAttendance(req.user.companyId, body?.rows || []);
   }
 }

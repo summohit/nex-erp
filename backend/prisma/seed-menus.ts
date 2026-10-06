@@ -88,12 +88,14 @@ const menuSections: MenuSection[] = [
         icon: 'lucideCalendarClock',
         route: '/attendance',
         subItems: [
+          // "All People Attendance" is gone as a separate entry: the Attendance
+          // tab below is that page for Super Admin and HR, and their own for
+          // everyone else. One entry, one screen, chosen by role.
           { id: 'attendance/timesheets', title: 'Attendance', route: '/attendance/timesheets' },
-          { id: 'attendance/all', title: 'All People Attendance', route: '/attendance/all' },
           { id: 'attendance/leaves', title: 'Time Off Requests', route: '/attendance/leaves' },
           { id: 'attendance/approvals', title: 'Leave Approvals', route: '/attendance/approvals' },
           { id: 'attendance/balances', title: 'Leave Balances', route: '/attendance/balances' },
-          { id: 'attendance/shifts', title: 'All People Shift Roster', route: '/attendance/shifts' },
+          { id: 'attendance/shifts', title: 'Shift Roster', route: '/attendance/shifts' },
           { id: 'attendance/shift-summary', title: 'Shift Attendance', route: '/attendance/shift-summary' },
           { id: 'attendance/timeline', title: 'Team Timeline', route: '/attendance/timeline' },
           { id: 'attendance/holidays', title: 'Holidays', route: '/attendance/holidays' }

@@ -254,6 +254,10 @@ export class ProjectsService {
     return this.http.post<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/time-stop`, {});
   }
 
+  getMyActiveTimer() {
+    return this.http.get<{ projectId: number; issueId: number; taskKey: string; taskTitle: string; startedAt: string } | null>(`${this.apiUrl}/active-timer`);
+  }
+
   reviewIssue(projectId: number, issueId: number, data: { action: 'APPROVE' | 'REJECT', reason?: string }) {
     return this.http.post<any>(`${this.apiUrl}/${projectId}/issues/${issueId}/review`, data);
   }

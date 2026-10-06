@@ -14,6 +14,8 @@ import { ProjectsService } from '../../services/projects';
 import { AuthService } from '../../services/auth.service';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
+import { AttendanceFilterDrawerComponent, AttendanceFilterValue } from '../../shared/components/attendance-filter-drawer/attendance-filter-drawer';
+import { firstValueFrom } from 'rxjs';
 
 type ViewMode = 'week' | 'month';
 
@@ -38,7 +40,7 @@ interface OnSiteCtx {
     LucideBadgeCheck, LucideXCircle, LucideBuilding2, LucideMapPin,
     LucideClock, LucideAlertCircle, LucideCheckCircle2, LucideArrowRight,
     LucideBriefcase, LucideInfo, LucideUserCheck, LucideUsers, LucideSearch, LucideCheck,
-    SearchableSelectComponent, SkeletonComponent
+    SearchableSelectComponent, SkeletonComponent, AttendanceFilterDrawerComponent
   ],
   templateUrl: './shift-roster.html',
   styleUrls: ['./shift-roster.css'],
@@ -56,13 +58,6 @@ export class ShiftRosterComponent implements OnInit {
   departments = signal<any[]>([]);
   projects = signal<any[]>([]);
   currentUser = this.authService.currentUser;
-
-  departmentOptions = computed<SearchableSelectOption[]>(() => {
-    return this.departments().map(d => ({
-      id: d.id,
-      name: d.name
-    }));
-  });
 
   projectOptions = computed<SearchableSelectOption[]>(() => {
     return this.projects().map(p => ({
@@ -84,8 +79,88 @@ export class ShiftRosterComponent implements OnInit {
   viewMode = signal<ViewMode>('week');
   /** Monday of the displayed week, or the 1st for month view. */
   anchor = signal<Date>(this.startOfWeek(new Date()));
+  readonly monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  readonly rosterYears = Array.from({ length: 7 }, (_, index) => new Date().getFullYear() - 3 + index);
+  rosterPage = signal(1);
+  rosterPageSize = signal(10);
+  readonly rosterPageSizes = [10, 25, 50];
   filterDepartmentId = signal<number | null>(null);
+  filterEmployeeId = signal<number | null>(null);
   search = signal('');
+  filterDrawerOpen = signal(false);
+  rosterShiftFilter = signal('');
+  rosterStateFilter = signal('');
+  customRange = signal<{ start: Date; end: Date } | null>(null);
+
+  employeeFilterOptions = computed<SearchableSelectOption[]>(() =>
+    this.grid().rows.map(({ employee }) => ({
+      id: employee.id,
+      name: employee.name,
+      subtitle: [employee.designation, employee.department, employee.employeeCode]
+        .filter(Boolean)
+        .join(' · '),
+      avatarUrl: employee.avatarUrl || undefined,
+      avatarText: employee.avatarUrl ? undefined : employee.name.charAt(0).toUpperCase(),
+    })),
+  );
+
+  departmentFilterOptions = computed<SearchableSelectOption[]>(() =>
+    this.departments().map((department) => ({
+      id: Number(department.id),
+      name: department.name,
+    })),
+  );
+
+  get rosterFilterGroups() {
+    return [
+      {
+        key: 'department',
+        label: 'Department',
+        placeholder: 'All departments',
+        options: this.departments().map((department) => ({
+          value: String(department.id),
+          label: department.name,
+        })),
+      },
+      {
+        key: 'shift',
+        label: 'Shift',
+        placeholder: 'All shifts',
+        options: this.grid().shifts.map((shift) => ({
+          value: String(shift.id),
+          label: `${shift.name}${shift.shortCode ? ` (${shift.shortCode})` : ''}`,
+        })),
+      },
+      {
+        key: 'rosterState',
+        label: 'Roster entry',
+        placeholder: 'All entry types',
+        options: [
+          { value: 'SHIFT', label: 'Assigned shift' },
+          { value: 'DAY_OFF', label: 'Day off' },
+          { value: 'LEAVE', label: 'On leave' },
+          { value: 'UNASSIGNED', label: 'No shift assigned' },
+          { value: 'ONSITE_PENDING', label: 'On-site approval pending' },
+        ],
+      },
+    ];
+  }
+
+  get rosterFilterValues(): Record<string, string> {
+    return {
+      department: this.filterDepartmentId() ? String(this.filterDepartmentId()) : '',
+      shift: this.rosterShiftFilter(),
+      rosterState: this.rosterStateFilter(),
+    };
+  }
+
+  get rosterFilterCount(): number {
+    return Number(!!this.filterDepartmentId())
+      + Number(!!this.rosterShiftFilter())
+      + Number(!!this.rosterStateFilter())
+      + Number(!!this.search().trim())
+      + Number(!!this.customRange());
+  }
 
   // Cell editor
   editorOpen = signal(false);
@@ -221,16 +296,20 @@ export class ShiftRosterComponent implements OnInit {
     return c;
   }
 
-  private fmt(d: Date): string {
+  fmt(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   rangeStart = computed(() => {
+    const custom = this.customRange();
+    if (custom) return custom.start;
     const a = this.anchor();
     return this.viewMode() === 'week' ? a : new Date(a.getFullYear(), a.getMonth(), 1);
   });
 
   rangeEnd = computed(() => {
+    const custom = this.customRange();
+    if (custom) return custom.end;
     const s = this.rangeStart();
     if (this.viewMode() === 'week') {
       const e = new Date(s); e.setDate(e.getDate() + 6); return e;
@@ -252,6 +331,10 @@ export class ShiftRosterComponent implements OnInit {
 
   rangeLabel = computed(() => {
     const s = this.rangeStart(), e = this.rangeEnd();
+    if (this.customRange()) {
+      const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+      return `${s.toLocaleDateString(undefined, opts)} – ${e.toLocaleDateString(undefined, opts)}`;
+    }
     if (this.viewMode() === 'month') {
       return s.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     }
@@ -260,24 +343,46 @@ export class ShiftRosterComponent implements OnInit {
   });
 
   shift(step: number) {
+    this.customRange.set(null);
     const a = new Date(this.anchor());
     if (this.viewMode() === 'week') a.setDate(a.getDate() + step * 7);
     else a.setMonth(a.getMonth() + step);
     this.anchor.set(a);
+    this.rosterPage.set(1);
     this.load();
   }
 
   today() {
+    this.customRange.set(null);
     const now = new Date();
     this.anchor.set(this.viewMode() === 'week' ? this.startOfWeek(now) : new Date(now.getFullYear(), now.getMonth(), 1));
+    this.rosterPage.set(1);
     this.load();
   }
 
   setView(mode: ViewMode) {
     if (this.viewMode() === mode) return;
+    this.customRange.set(null);
     this.viewMode.set(mode);
     const now = this.anchor();
     this.anchor.set(mode === 'week' ? this.startOfWeek(now) : new Date(now.getFullYear(), now.getMonth(), 1));
+    this.rosterPage.set(1);
+    this.load();
+  }
+
+  setRosterMonth(month: number): void {
+    const current = this.anchor();
+    this.customRange.set(null);
+    this.anchor.set(new Date(current.getFullYear(), month, 1));
+    this.rosterPage.set(1);
+    this.load();
+  }
+
+  setRosterYear(year: number): void {
+    const current = this.anchor();
+    this.customRange.set(null);
+    this.anchor.set(new Date(Number(year), current.getMonth(), 1));
+    this.rosterPage.set(1);
     this.load();
   }
 
@@ -296,21 +401,148 @@ export class ShiftRosterComponent implements OnInit {
 
   visibleRows = computed(() => {
     const q = this.search().toLowerCase().trim();
-    const rows = this.grid().rows;
-    if (!q) return rows;
-    return rows.filter(r =>
-      r.employee.name.toLowerCase().includes(q) ||
-      (r.employee.designation || '').toLowerCase().includes(q) ||
-      (r.employee.department || '').toLowerCase().includes(q));
+    const employeeId = this.filterEmployeeId();
+    const shiftId = this.rosterShiftFilter();
+    const state = this.rosterStateFilter();
+    return this.grid().rows.filter((row) => {
+      const matchesEmployee = !q
+        || row.employee.name.toLowerCase().includes(q)
+        || String(row.employee.id).includes(q)
+        || (row.employee.employeeCode || '').toLowerCase().includes(q)
+        || (row.employee.designation || '').toLowerCase().includes(q)
+        || (row.employee.department || '').toLowerCase().includes(q);
+      const matchesSelectedEmployee = employeeId === null || row.employee.id === employeeId;
+      const matchesShift = !shiftId || row.cells.some((cell) => String(cell.shift?.id ?? '') === shiftId);
+      const matchesState = !state || row.cells.some((cell) => {
+        if (state === 'ONSITE_PENDING') return cell.onSite?.approvalStatus === 'PENDING';
+        return cell.type === state;
+      });
+      return matchesEmployee && matchesSelectedEmployee && matchesShift && matchesState;
+    });
   });
 
+  rosterPageCount = computed(() => Math.max(1, Math.ceil(this.visibleRows().length / this.rosterPageSize())));
+  rosterPageNumbers = computed(() => Array.from({ length: this.rosterPageCount() }, (_, index) => index + 1));
+  pagedRows = computed(() => {
+    const page = Math.min(this.rosterPage(), this.rosterPageCount());
+    const start = (page - 1) * this.rosterPageSize();
+    return this.visibleRows().slice(start, start + this.rosterPageSize());
+  });
+  rosterRangeStart = computed(() => this.visibleRows().length ? (Math.min(this.rosterPage(), this.rosterPageCount()) - 1) * this.rosterPageSize() + 1 : 0);
+  rosterRangeEnd = computed(() => Math.min(this.rosterRangeStart() + this.rosterPageSize() - 1, this.visibleRows().length));
+
+  setRosterPage(page: number): void {
+    this.rosterPage.set(Math.max(1, Math.min(page, this.rosterPageCount())));
+  }
+
+  setRosterPageSize(size: number): void {
+    this.rosterPageSize.set(Number(size));
+    this.rosterPage.set(1);
+  }
+
+  applyAttendanceFilters(filters: AttendanceFilterValue): void {
+    this.search.set(filters.employeeQuery);
+    this.filterEmployeeId.set(null);
+    const departmentId = Number(filters.filters['department']);
+    this.filterDepartmentId.set(Number.isInteger(departmentId) && departmentId > 0 ? departmentId : null);
+    this.rosterShiftFilter.set(filters.filters['shift'] || '');
+    this.rosterStateFilter.set(filters.filters['rosterState'] || '');
+    this.customRange.set(
+      filters.startDate && filters.endDate
+        ? {
+            start: new Date(`${filters.startDate}T00:00:00`),
+            end: new Date(`${filters.endDate}T00:00:00`),
+          }
+        : null,
+    );
+    this.filterDrawerOpen.set(false);
+    this.load();
+  }
+
+  setRosterDepartment(value: unknown): void {
+    const departmentId = Number(value);
+    this.filterDepartmentId.set(Number.isInteger(departmentId) && departmentId > 0 ? departmentId : null);
+    this.filterEmployeeId.set(null);
+    this.rosterPage.set(1);
+    this.load();
+  }
+
+  setRosterEmployee(value: unknown): void {
+    const employeeId = Number(value);
+    this.filterEmployeeId.set(Number.isInteger(employeeId) && employeeId > 0 ? employeeId : null);
+    this.rosterPage.set(1);
+  }
+
+  exportCsv(): void {
+    const lines = [['employee_id', 'employee_name', 'date', 'assignment', 'shift_id', 'shift_name', 'note']];
+    for (const row of this.visibleRows()) {
+      for (const cell of row.cells) {
+        lines.push([
+          String(row.employee.id), row.employee.name, cell.date,
+          cell.type === 'DAY_OFF' ? 'DAY_OFF' : cell.type,
+          cell.shift?.id ? String(cell.shift.id) : '', cell.shift?.name || '', cell.note || '',
+        ]);
+      }
+    }
+    this.downloadCsv(lines, `shift-roster-${this.fmt(this.rangeStart())}-to-${this.fmt(this.rangeEnd())}.csv`);
+  }
+
+  downloadRosterTemplate(): void {
+    this.downloadCsv([
+      ['employee_id', 'date', 'shift_id', 'day_off', 'note'],
+      ['123', '2026-10-12', '4', 'false', 'Optional note'],
+      ['123', '2026-10-13', '', 'true', 'Weekly rest day'],
+    ], 'shift-roster-import-template.csv');
+  }
+
+  async importCsv(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    const text = await file.text();
+    const rows = this.csvRows(text);
+    const data = rows.slice(1).map((row) => ({
+      employeeId: Number(row[0]), date: row[1], shiftId: row[2] ? Number(row[2]) : null,
+      isDayOff: ['true', 'yes', '1'].includes((row[3] || '').trim().toLowerCase()), note: row[4] || undefined,
+    })).filter((row) => Number.isInteger(row.employeeId) && /^\d{4}-\d{2}-\d{2}$/.test(row.date) && (row.isDayOff || !!row.shiftId));
+    if (!data.length) {
+      this.toast.error('No valid roster rows found. Download the template for the required columns.');
+      return;
+    }
+    if (!confirm(`Import ${data.length} roster assignment${data.length === 1 ? '' : 's'}? Existing entries on those dates will be updated.`)) return;
+    try {
+      await Promise.all(data.map((row) => firstValueFrom(this.shiftsService.assignRoster(row))));
+      this.toast.success(`Imported ${data.length} roster assignment${data.length === 1 ? '' : 's'}`);
+      this.load();
+    } catch (error: any) {
+      this.toast.error(error?.error?.message || 'Import stopped because one or more roster rows were invalid.');
+    }
+  }
+
+  private csvRows(text: string): string[][] {
+    return text.replace(/^\uFEFF/, '').trim().split(/\r?\n/).filter(Boolean).map((line) =>
+      line.match(/(?:[^,\"]+|\"(?:[^\"]|\"\")*\")+/g)?.map((value) => value.replace(/^\"|\"$/g, '').replace(/\"\"/g, '\"').trim()) ?? [],
+    );
+  }
+
+  private downloadCsv(rows: string[][], fileName: string): void {
+    const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const blob = new Blob([rows.map((row) => row.map(escape).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = fileName; link.click(); URL.revokeObjectURL(url);
+  }
+
   // ── cell presentation ───────────────────────────────────────────────────
-  dayLabel(day: string): { num: string; name: string; isToday: boolean; isWeekend: boolean } {
+  dayLabel(day: string): { num: string; name: string; weekday: string; month: string; isToday: boolean; isWeekend: boolean } {
     const d = new Date(`${day}T00:00:00`);
     const today = new Date(); today.setHours(0, 0, 0, 0);
     return {
       num: String(d.getDate()),
       name: d.toLocaleDateString(undefined, { weekday: 'short' }),
+      weekday: d.toLocaleDateString(undefined, { weekday: 'long' }),
+      month: d.toLocaleDateString(undefined, { month: 'short' }),
       isToday: d.getTime() === today.getTime(),
       isWeekend: d.getDay() === 0 || d.getDay() === 6,
     };

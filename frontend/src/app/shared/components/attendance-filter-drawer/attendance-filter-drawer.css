@@ -1,0 +1,146 @@
+:host {
+  display: contents;
+}
+
+.attendance-filter-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: rgba(15, 23, 42, .42);
+  backdrop-filter: blur(2px);
+}
+
+.attendance-filter-drawer {
+  position: fixed;
+  z-index: 100001;
+  inset: 0 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 100vw);
+  background: #fff;
+  box-shadow: -18px 0 48px rgba(15, 23, 42, .18);
+  animation: attendance-drawer-in .2s ease-out;
+}
+
+@keyframes attendance-drawer-in {
+  from { transform: translateX(24px); opacity: .8; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 24px;
+  border-bottom: 1px solid #e8edf4;
+}
+
+.drawer-heading { display: flex; align-items: center; gap: 12px; }
+.drawer-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: #2563eb;
+  background: #eff6ff;
+  border-radius: 12px;
+}
+.drawer-heading h2 { margin: 0; color: #172033; font-size: 18px; font-weight: 700; }
+.drawer-heading p { margin: 4px 0 0; color: #738096; font-size: 12px; }
+.drawer-close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: #64748b;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.drawer-close:hover { color: #172033; background: #f1f5f9; }
+
+.drawer-body { flex: 1; overflow: auto; padding: 8px 24px 24px; }
+.filter-section { padding: 20px 0; border-bottom: 1px solid #edf1f6; }
+.filter-label { display: block; margin: 0 0 10px; color: #273449; font-size: 13px; font-weight: 650; }
+.period-filter-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.period-filter-fields select, .single-date-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  color: #273449;
+  background: #fff;
+  border: 1px solid #dce3ed;
+  border-radius: 10px;
+  outline: none;
+}
+.period-filter-fields select:focus, .single-date-input:focus {
+  border-color: #4384f5;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
+}
+.select-wrap, .search-field { position: relative; display: flex; align-items: center; }
+.select-wrap > svg, .search-field > svg {
+  position: absolute;
+  left: 12px;
+  color: #8290a5;
+  pointer-events: none;
+}
+.select-wrap select, .search-field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  color: #273449;
+  background: #fff;
+  border: 1px solid #dce3ed;
+  border-radius: 10px;
+  outline: none;
+}
+.select-wrap:has(> svg) select { padding-left: 38px; }
+.select-wrap select:focus, .search-field input:focus, .date-range-fields input:focus {
+  border-color: #4384f5;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
+}
+.date-range-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.date-range-fields label span { display: block; margin-bottom: 7px; color: #718096; font-size: 11px; font-weight: 600; }
+.date-range-fields input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 9px;
+  color: #273449;
+  border: 1px solid #dce3ed;
+  border-radius: 9px;
+  outline: none;
+}
+.field-hint { margin: 8px 0 0; color: #8793a5; font-size: 11px; line-height: 1.5; }
+.field-hint:has(+ *) { color: #dc2626; }
+
+.drawer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #e8edf4;
+  background: #fff;
+}
+.footer-actions { display: flex; gap: 9px; }
+.drawer-footer button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.reset-button { color: #526176; background: transparent; border: 0; }
+.reset-button:hover { color: #1d4ed8; background: #f1f6ff; }
+.cancel-button { color: #526176; background: #fff; border: 1px solid #dce3ed; }
+.apply-button { color: #fff; background: #2563eb; border: 1px solid #2563eb; box-shadow: 0 4px 12px rgba(37, 99, 235, .2); }
+.apply-button:hover:not(:disabled) { background: #1d4ed8; }
+.apply-button:disabled { opacity: .45; cursor: not-allowed; }
+
+@media (max-width: 480px) {
+  .attendance-filter-drawer { width: 100vw; }
+  .drawer-header, .drawer-body { padding-right: 18px; padding-left: 18px; }
+  .drawer-footer { padding-right: 18px; padding-left: 18px; }
+}

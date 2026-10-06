@@ -240,3 +240,17 @@
     </div>
   </div>
 </div>
+
+<!-- An open task timer must be settled before attendance is closed. -->
+<div class="task-timer-clockout-overlay" *ngIf="isTaskTimerModalOpen()" (click)="closeTaskTimerModal()">
+  <section class="task-timer-clockout-modal" role="dialog" aria-modal="true" aria-labelledby="task-timer-clockout-title" (click)="$event.stopPropagation()">
+    <div class="task-timer-clockout-icon"><svg lucideClock size="22"></svg></div>
+    <h2 id="task-timer-clockout-title">Task timer is still running</h2>
+    <p>The timer for <strong>{{ activeTaskTimer()?.taskKey }} · {{ activeTaskTimer()?.taskTitle }}</strong> is on. Choose what to do before clocking out.</p>
+    <div class="task-timer-clockout-actions">
+      <button type="button" class="task-timer-pause" [disabled]="isClocking()" (click)="resolveTaskTimerAndClockOut('pause')">Pause task timer and clock out</button>
+      <button type="button" class="task-timer-stop" [disabled]="isClocking()" (click)="resolveTaskTimerAndClockOut('stop')">Stop task timer and clock out</button>
+    </div>
+    <button type="button" class="task-timer-cancel" [disabled]="isClocking()" (click)="closeTaskTimerModal()">Cancel</button>
+  </section>
+</div>
