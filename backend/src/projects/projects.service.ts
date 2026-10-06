@@ -1,3 +1,4 @@
+import { DEFAULT_BOARD_COLUMNS } from './boards/default-board-columns';
 import { Logger, Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -171,18 +172,7 @@ export class ProjectsService {
           create: buildInitialMembers(leadId, data.pmIds, data.memberIds, (data as any).architectIds)
         },
         boards: {
-          create: {
-            name: 'Main Board',
-            columns: {
-              create: [
-                { name: 'To Do', color: '#6b7280', position: 0, isSystem: true, type: 'TODO' },
-                { name: 'In Progress', color: '#3b82f6', position: 1, isSystem: true, type: 'IN_PROGRESS' },
-                { name: 'In Review', color: '#8b5cf6', position: 2, isSystem: true, type: 'REVIEW' },
-                { name: 'Done', color: '#22c55e', position: 3, isSystem: true, type: 'DONE' },
-                { name: 'Archived', color: '#9ca3af', position: 4, isSystem: true, type: 'DONE' }
-              ]
-            }
-          }
+          create: { name: 'Main Board', columns: { create: DEFAULT_BOARD_COLUMNS } }
         }
       }
     });
@@ -629,6 +619,17 @@ export class ProjectsService {
             if (firstColumnId === null) firstColumnId = created.columns[i].id;
           });
         }
+      }
+
+      // Every project needs a board: without one the Board tab 404s and the
+      // copied tasks have no column. Boards not copied (or none on the
+      // source) get the standard one, and the copied tasks start in To Do.
+      if (firstColumnId === null) {
+        const fresh = await tx.board.create({
+          data: { name: 'Main Board', projectId: project.id, columns: { create: DEFAULT_BOARD_COLUMNS } },
+          include: { columns: { orderBy: { position: 'asc' } } },
+        });
+        firstColumnId = fresh.columns[0].id;
       }
 
       // ── Labels (project tags) ───────────────────────────────────────────
@@ -1451,7 +1452,8 @@ export class ProjectsService {
       where: whereClause,
       include: {
         _count: {
-          select: { members: true, issues: true, milestones: true }
+          // Archived tasks are off the board, so they are not in the count either.
+          select: { members: true, issues: { where: { isArchived: false } }, milestones: true }
         },
         lead: {
           select: { id: true, firstName: true, lastName: true, avatarUrl: true }
@@ -1478,7 +1480,9 @@ export class ProjectsService {
             }
           }
         },
+        // Active tasks only, matching the board and the card count.
         issues: {
+          where: { isArchived: false },
           select: { status: true }
         },
         expenseClaims: {
@@ -1737,7 +1741,7 @@ export class ProjectsService {
       where: whereClause,
       include: {
         _count: {
-          select: { members: true, issues: true }
+          select: { members: true, issues: { where: { isArchived: false } } }
         }
       },
       orderBy: { updatedAt: 'desc' }

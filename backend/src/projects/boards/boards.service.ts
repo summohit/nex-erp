@@ -1,3 +1,4 @@
+import { DEFAULT_BOARD_COLUMNS } from './default-board-columns';
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveProjectViewer, mayChangeAnyTask } from '../project-roles';
@@ -45,7 +46,7 @@ export class BoardsService {
   }
 
   async getBoard(companyId: number, projectId: number) {
-    const board = await this.prisma.board.findFirst({
+    const find = () => this.prisma.board.findFirst({
       where: { projectId, project: { companyId } },
       include: {
         columns: {
@@ -54,6 +55,30 @@ export class BoardsService {
         }
       }
     });
+    let board = await find();
+
+    // A project of this company with no board (duplicated without one, before
+    // that was fixed) gets the standard board instead of a 404 and an empty
+    // screen, and any task left without a column lands in To Do.
+    if (!board) {
+      const project = await this.prisma.project.findFirst({
+        where: { id: projectId, companyId }, select: { id: true },
+      });
+      if (!project) throw new NotFoundException('Board not found');
+      await this.prisma.$transaction(async (tx) => {
+        const exists = await tx.board.findFirst({ where: { projectId }, select: { id: true } });
+        if (exists) return;
+        const created = await tx.board.create({
+          data: { name: 'Main Board', projectId, columns: { create: DEFAULT_BOARD_COLUMNS } },
+          include: { columns: { orderBy: { position: 'asc' } } },
+        });
+        await tx.issue.updateMany({
+          where: { projectId, columnId: null },
+          data: { columnId: created.columns[0].id },
+        });
+      });
+      board = await find();
+    }
 
     if (!board) throw new NotFoundException('Board not found');
     return board;
