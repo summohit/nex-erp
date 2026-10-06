@@ -390,8 +390,16 @@ export class TicketDetailComponent implements OnInit {
     });
   }
 
+  /**
+   * Send is not disabled on an empty box: the editor reports changes outside
+   * Angular's change detection, so a [disabled] tied to the text never saw
+   * the typing and left Send greyed out. The check happens here instead.
+   */
   submitComment() {
-    if (!this.hasText(this.commentBody)) return;
+    if (!this.hasText(this.commentBody)) {
+      this.toast.error('Write a reply first');
+      return;
+    }
     this.submittingComment = true;
     this.ticketService.addComment(this.ticket.id, this.commentBody.trim()).subscribe({
       next: (c) => {
@@ -413,7 +421,10 @@ export class TicketDetailComponent implements OnInit {
   }
 
   saveEditComment(comment: CommentRef) {
-    if (!this.hasText(this.editCommentBody)) return;
+    if (!this.hasText(this.editCommentBody)) {
+      this.toast.error('A comment needs some text');
+      return;
+    }
     this.ticketService.updateComment(this.ticket.id, comment.id, this.editCommentBody.trim()).subscribe({
       next: (updated) => {
         this.ticket = {

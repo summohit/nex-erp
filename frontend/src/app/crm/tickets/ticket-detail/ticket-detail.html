@@ -368,7 +368,7 @@
             <svg lucideImagePlus [size]="14"></svg>
             <input type="file" (change)="onAttachmentPicked($event)" accept="image/*" hidden />
           </label>
-          <button class="btn-send-comment" (click)="submitComment()" [disabled]="submittingComment || !hasText(commentBody)">
+          <button class="btn-send-comment" (click)="submitComment()" [disabled]="submittingComment">
             <svg lucideSend [size]="14"></svg>
             <span>{{ submittingComment ? 'Posting…' : 'Send' }}</span>
           </button>
