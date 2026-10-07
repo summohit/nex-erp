@@ -53,7 +53,7 @@
     [years]="years"
     [showSingleDate]="true"
     [selectedDate]="filterDate || ''"
-    [filterGroups]="attendanceFilterGroups"
+    [filterGroups]="attendanceFilterGroups()"
     [filterValues]="attendanceFilterValues"
     (closed)="closeAttendanceFilters()"
     (applied)="applyAttendanceFilters($event)">
@@ -290,6 +290,16 @@
           <svg lucideX [size]="14"></svg>
         </button>
       </div>
+      <!-- Month, employee, department, status and flags live in the drawer. -->
+      <button type="button" class="btn-attendance-filters" (click)="openAttendanceFilters($event)">
+        <svg lucideFilter [size]="15"></svg>
+        Filters
+        <span class="filters-active-dot" *ngIf="hasActiveFilters()" aria-label="Filters active"></span>
+      </button>
+      <button type="button" class="btn-attendance-filters btn-attendance-reset" *ngIf="hasActiveFilters()" (click)="resetFilters()" title="Reset all filters">
+        <svg lucideRotateCcw [size]="15"></svg>
+        Reset Filters
+      </button>
       <!-- Filter Searchable Dropdowns -->
       <div class="filter-dropdowns-group">
 

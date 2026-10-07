@@ -79,24 +79,48 @@ export interface LeaveActionCellParams extends ICellRendererParams {
       display: flex;
       justify-content: flex-end;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
       height: 100%;
     }
+    .btn-view {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      color: #2563EB;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-view:hover {
+      background: #dbeafe;
+      border-color: #93c5fd;
+      color: #1d4ed8;
+      box-shadow: 0 1px 2px rgba(37, 99, 235, 0.1);
+    }
     .btn-icon {
-      background: none;
-      border: none;
-      padding: 8px;
+      background: transparent;
+      border: 1px solid #e2e8f0;
+      padding: 0;
+      width: 28px;
+      height: 28px;
       cursor: pointer;
       color: #64748b;
-      transition: all 0.2s ease;
-      display: flex;
+      transition: all 0.15s ease;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      border-radius: 50%;
+      border-radius: 6px;
     }
     .btn-icon:hover:not(.disabled-btn) {
-      background: #f1f5f9;
-      color: #334155;
+      background: #f8fafc;
+      border-color: #cbd5e1;
+      color: #1e293b;
     }
     .disabled-btn {
       opacity: 0.3;
@@ -107,21 +131,21 @@ export interface LeaveActionCellParams extends ICellRendererParams {
       align-items: center;
       gap: 12px;
       font-size: 13px !important;
-      font-family: 'Plus Jakarta Sans', sans-serif !important;
+      font-family: inherit !important;
       height: 40px !important;
       min-height: 40px !important;
     }
     .text-danger {
-      color: #1373e5 !important;
+      color: #dc2626 !important;
     }
     .text-danger:hover {
-      background: #dbeafe !important;
+      background: #fef2f2 !important;
     }
     .text-success {
-      color: #10b981 !important;
+      color: #16a34a !important;
     }
     .text-success:hover {
-      background: #d1fae5 !important;
+      background: #f0fdf4 !important;
     }
     /* Deletion is the only irreversible thing in this menu, and the only red. */
     .menu-destructive {

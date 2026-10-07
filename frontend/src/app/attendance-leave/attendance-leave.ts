@@ -575,8 +575,9 @@ export class AttendanceLeaveComponent implements OnInit {
     {
       headerName: 'Employee',
       field: 'employee',
-      minWidth: 190,
+      minWidth: 240,
       flex: 1.4,
+      pinned: 'left',
       cellRenderer: (params: any) => {
         const employee = params.data?.employee;
         const name = `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim()
@@ -590,91 +591,187 @@ export class AttendanceLeaveComponent implements OnInit {
           '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
         })[char] || char);
         const avatar = employee?.avatarUrl
-          ? `<img src="${escapeHtml(employee.avatarUrl)}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex:none;">`
-          : `<span style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#e0edff;color:#2563eb;font-weight:700;flex:none;">${escapeHtml(initials)}</span>`;
-        return `<div style="display:flex;align-items:center;gap:9px;min-width:0;">
-          ${avatar}
-          <div style="display:flex;flex-direction:column;min-width:0;line-height:1.3;">
-            <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(name)}</span>
-            <span style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(subtitle)}</span>
+          ? `<img src="${escapeHtml(employee.avatarUrl)}" alt="" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex:none;border:1.5px solid #e2e8f0;">`
+          : `<span style="width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#eff6ff;color:#2563eb;font-weight:700;font-size:12px;flex:none;border:1.5px solid #dbeafe;">${escapeHtml(initials)}</span>`;
+        return `
+          <div style="display:flex;align-items:center;gap:10px;height:100%;min-width:0;cursor:pointer;" title="Click to view details">
+            ${avatar}
+            <div style="display:flex;flex-direction:column;min-width:0;line-height:1.25;">
+              <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                <span style="font-size:13px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(name)}</span>
+                <span style="font-size:9.5px;font-weight:700;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:1px 5px;white-space:nowrap;">You</span>
+              </div>
+              <span style="font-size:11.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${escapeHtml(subtitle)}</span>
+            </div>
           </div>
-          <span style="font-size:9px;font-weight:700;color:#fff;background:#64748b;border-radius:4px;padding:2px 4px;white-space:nowrap;">It's you</span>
-        </div>`;
+        `;
       }
     },
     {
       headerName: 'Leave Date',
-      minWidth: 180,
-      flex: 1.2,
+      minWidth: 200,
+      flex: 1.3,
       cellRenderer: (params: any) => {
-        const start = this.datePipe.transform(params.data.startDate, 'dd-MM-yyyy (EEEE)');
-        const end = this.datePipe.transform(params.data.endDate, 'dd-MM-yyyy (EEEE)');
-        return params.data.startDate?.slice(0, 10) === params.data.endDate?.slice(0, 10)
-          ? start
-          : `${start} – ${end}`;
+        if (!params.data?.startDate || !params.data?.endDate) return '-';
+        const isSingleDay = params.data.startDate.slice(0, 10) === params.data.endDate.slice(0, 10);
+        const sDate = this.datePipe.transform(params.data.startDate, 'dd MMM yyyy');
+        if (isSingleDay) {
+          const fullDay = this.datePipe.transform(params.data.startDate, 'EEEE');
+          return `
+            <div style="display:flex;flex-direction:column;justify-content:center;height:100%;line-height:1.3;">
+              <span style="font-size:13px;font-weight:600;color:#0f172a;letter-spacing:-0.2px;">${sDate}</span>
+              <span style="font-size:11.5px;color:#64748b;margin-top:1px;">${fullDay}</span>
+            </div>
+          `;
+        }
+        const eDate = this.datePipe.transform(params.data.endDate, 'dd MMM yyyy');
+        const sDay = this.datePipe.transform(params.data.startDate, 'EEE');
+        const eDay = this.datePipe.transform(params.data.endDate, 'EEE');
+        const days = this.leaveDuration(params.data);
+        return `
+          <div style="display:flex;flex-direction:column;justify-content:center;height:100%;line-height:1.3;">
+            <div style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#0f172a;">
+              <span>${sDate}</span>
+              <span style="color:#94a3b8;font-weight:400;">→</span>
+              <span>${eDate}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:#64748b;margin-top:2px;">
+              <span>${sDay} – ${eDay}</span>
+              <span style="display:inline-block;width:3px;height:3px;border-radius:50%;background:#94a3b8;"></span>
+              <span style="color:#475569;font-weight:600;">${days} ${days === 1 ? 'day' : 'days'}</span>
+            </div>
+          </div>
+        `;
       }
     },
     {
       headerName: 'Duration',
-      minWidth: 105,
+      minWidth: 125,
       flex: 0.8,
-      cellRenderer: (params: any) => params.data.isHalfDay
-        ? `Half Day (${params.data.halfDayPeriod || 'AM'})`
-        : 'Full Day',
+      cellRenderer: (params: any) => {
+        if (params.data?.isHalfDay) {
+          const period = params.data.halfDayPeriod || 'AM';
+          const periodLabel = period === 'PM' ? 'Half Day (PM)' : 'Half Day (AM)';
+          return `
+            <div style="display:flex;align-items:center;height:100%;">
+              <span style="display:inline-flex;align-items:center;gap:4px;height:22px;line-height:20px;padding:0 8px;border-radius:6px;font-size:11px;font-weight:600;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;white-space:nowrap;box-sizing:border-box;width:fit-content;max-width:fit-content;flex-shrink:0;">
+                <span style="font-size:11px;line-height:1;">🌓</span>
+                <span>${periodLabel}</span>
+              </span>
+            </div>
+          `;
+        }
+        return `
+          <div style="display:flex;align-items:center;height:100%;">
+            <span style="display:inline-flex;align-items:center;gap:4px;height:22px;line-height:20px;padding:0 8px;border-radius:6px;font-size:11px;font-weight:600;background:#f8fafc;color:#334155;border:1px solid #e2e8f0;white-space:nowrap;box-sizing:border-box;width:fit-content;max-width:fit-content;flex-shrink:0;">
+              <span style="font-size:11px;line-height:1;">☀️</span>
+              <span>Full Day</span>
+            </span>
+          </div>
+        `;
+      }
     },
     {
       field: 'status',
       headerName: 'Leave Status',
-      minWidth: 120,
-      flex: 0.9,
+      minWidth: 155,
+      flex: 1.1,
       cellRenderer: (params: any) => {
-        const status = params.value || 'PENDING';
-        const colors: Record<string, string> = {
-          APPROVED: '#22c55e',
-          PENDING: '#f59e0b',
-          REJECTED: '#ef4444',
-          CANCELLED: '#94a3b8',
-        };
-        const reasonLink = status === 'REJECTED' && params.data.rejectionReason
-          ? `<button type="button" class="view-reason-link" title="${String(params.data.rejectionReason).replace(/\"/g, '&quot;')}" style="display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;padding:0;font-size:11px;color:#1373e5;text-decoration:underline;margin-top:4px;cursor:pointer;text-align:left;">Reason: ${String(params.data.rejectionReason).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</button>`
+        const s = (params.value || 'PENDING').toUpperCase();
+        let bg = '#fffbeb';
+        let border = '#fde68a';
+        let color = '#92400e';
+        let dot = '#f59e0b';
+        let label = 'Pending';
+        if (s === 'APPROVED') {
+          bg = '#ecfdf5';
+          border = '#a7f3d0';
+          color = '#065f46';
+          dot = '#10b981';
+          label = 'Approved';
+        } else if (s === 'REJECTED') {
+          bg = '#fef2f2';
+          border = '#fecaca';
+          color = '#991b1b';
+          dot = '#ef4444';
+          label = 'Rejected';
+        } else if (s === 'CANCELLED') {
+          bg = '#f1f5f9';
+          border = '#e2e8f0';
+          color = '#475569';
+          dot = '#94a3b8';
+          label = 'Cancelled';
+        }
+        const safeReason = (params.data?.rejectionReason || '').replace(/"/g, '&quot;');
+        const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason
+          ? `<div class="view-reason-link" title="Reason: ${safeReason}" style="font-size:10.5px;color:#dc2626;font-weight:500;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;display:inline-flex;align-items:center;gap:3px;background:#fef2f2;padding:1px 6px;border-radius:4px;border:1px solid #fecaca;margin-top:3px;line-height:1.2;">
+              <span style="opacity:0.8;">Reason:</span>
+              <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:85px;">${safeReason}</span>
+            </div>`
           : '';
-        return `<div style="display:flex;flex-direction:column;gap:4px;min-width:0;width:100%;overflow:hidden;">
-          <span style="display:flex;align-items:center;gap:7px;min-width:0;">
-            <span style="width:9px;height:9px;border-radius:50%;background:${colors[status] || colors['PENDING']};"></span>
-            ${status}
-          </span>${reasonLink}
-        </div>`;
+        return `
+          <div style="display:flex;flex-direction:column;justify-content:center;align-items:flex-start;height:100%;box-sizing:border-box;">
+            <span style="display:inline-flex;align-items:center;height:22px;line-height:20px;padding:0 8px;border-radius:11px;font-size:11px;font-weight:600;background:${bg};border:1px solid ${border};color:${color};white-space:nowrap;flex-shrink:0;box-sizing:border-box;">
+              <span style="width:6px;height:6px;min-width:6px;min-height:6px;border-radius:50%;background:${dot};margin-right:5px;flex-shrink:0;display:inline-block;"></span>
+              <span>${label}</span>
+            </span>
+            ${reasonHtml}
+          </div>
+        `;
       }
     },
     {
       field: 'leaveType.name',
       headerName: 'Leave Type',
-      minWidth: 120,
-      flex: 0.9,
+      minWidth: 165,
+      flex: 1.1,
       cellRenderer: (params: any) => {
-        if (!params.value) return '—';
-        const attachmentIcon = params.data?.attachmentUrl
-          ? `<a href="${params.data.attachmentUrl}" target="_blank" rel="noopener noreferrer" title="Open attachment" aria-label="Open attachment" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 24px;border:1px solid #bfdbfe;border-radius:6px;color:#2563eb;background:#eff6ff;text-decoration:none;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></a>`
+        if (!params.value) return '<span style="color:#94a3b8;">—</span>';
+        const typeName = params.value;
+        const color = this.getLeaveTypeColor(typeName);
+        const bg = this.getLeaveTypeBgColor(typeName);
+        const border = this.getLeaveTypeBorderColor(typeName);
+        const attachHtml = params.data?.attachmentUrl
+          ? `<a href="${params.data.attachmentUrl}" target="_blank" rel="noopener noreferrer" 
+                title="View attached document" 
+                style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:500;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:1px 6px;margin-top:3px;text-decoration:none;width:fit-content;line-height:1.2;">
+                <span>📎</span> Receipt
+             </a>`
           : '';
-        return `<div style="display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;overflow:hidden;"><span style="display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#e0f2fe;color:#0369a1;font-size:10px;font-weight:700;padding:3px 6px;border-radius:4px;">${params.value}</span>${attachmentIcon}</div>`;
+        return `
+          <div style="display:flex;flex-direction:column;justify-content:center;align-items:flex-start;height:100%;min-width:0;max-width:100%;box-sizing:border-box;">
+            <span style="display:inline-flex;align-items:center;height:22px;line-height:20px;padding:0 8px;border-radius:6px;font-size:11px;font-weight:600;background:${bg};color:${color};border:1px solid ${border};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;box-sizing:border-box;flex-shrink:0;" title="${typeName}">
+              <span style="width:5px;height:5px;min-width:5px;min-height:5px;border-radius:50%;background:${color};margin-right:5px;flex-shrink:0;display:inline-block;"></span>
+              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${typeName}</span>
+            </span>
+            ${attachHtml}
+          </div>
+        `;
       }
     },
     {
       headerName: 'Paid',
-      minWidth: 80,
+      minWidth: 85,
       flex: 0.6,
       cellRenderer: (params: any) => {
-        const isPaid = params.data.leaveType?.isPaid !== false;
+        const isPaid = params.data?.leaveType?.isPaid !== false;
         const label = isPaid ? 'Paid' : 'Unpaid';
         const color = isPaid ? '#15803d' : '#b91c1c';
         const background = isPaid ? '#dcfce7' : '#fee2e2';
-        return `<span style="display:inline-block;background:${background};color:${color};font-size:10px;font-weight:700;padding:3px 6px;border-radius:4px;">${label}</span>`;
+        const border = isPaid ? '#bbf7d0' : '#fecaca';
+        return `
+          <div style="display:flex;align-items:center;height:100%;">
+            <span style="display:inline-flex;align-items:center;height:22px;line-height:20px;padding:0 8px;background:${background};color:${color};border:1px solid ${border};font-size:11px;font-weight:600;border-radius:6px;white-space:nowrap;box-sizing:border-box;">
+              ${label}
+            </span>
+          </div>
+        `;
       }
     },
     {
       headerName: 'Action',
-      minWidth: 80,
-      width: 100,
+      minWidth: 120,
+      width: 140,
       pinned: 'right',
       sortable: false,
       filter: false,
@@ -685,9 +782,6 @@ export class AttendanceLeaveComponent implements OnInit {
         onCancel: (data: any) => this.cancelLeaveRequest(data.id),
         onViewAttachment: (data: any) => this.viewAttachment(data.attachmentUrl),
         onViewReason: (data: any) => this.openRejectionReasonModal(data.rejectionReason),
-        // §Att10: handed over only to a Super Admin. The renderer treats the
-        // callback's presence as the permission, so withholding it hides the
-        // menu entry entirely rather than showing something that would 403.
         onDelete: this.canDeleteLeave() ? (data: any) => this.deleteLeaveRequest(data) : undefined
       }
     }
@@ -826,7 +920,7 @@ export class AttendanceLeaveComponent implements OnInit {
         return emp ? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() : `Employee #${p.data?.employeeId ?? '—'}`;
       },
       valueFormatter: (p) => p.value || 'Employee',
-      minWidth: 230,
+      minWidth: 260,
       flex: 1.5,
       pinned: 'left',
       cellRenderer: (params: any) => {
@@ -862,43 +956,111 @@ export class AttendanceLeaveComponent implements OnInit {
     },
     {
       headerName: 'Leave Date',
-      minWidth: 170,
-      flex: 1.2,
+      minWidth: 200,
+      flex: 1.3,
       cellRenderer: (params: any) => {
         if (!params.data?.startDate || !params.data?.endDate) return '-';
-        const start = this.datePipe.transform(params.data.startDate, 'dd-MM-yyyy (EEEE)');
-        if (params.data.startDate.slice(0, 10) === params.data.endDate.slice(0, 10)) return start;
-        const end = this.datePipe.transform(params.data.endDate, 'dd-MM-yyyy (EEEE)');
-        return `${start} – ${end}`;
+        const isSingleDay = params.data.startDate.slice(0, 10) === params.data.endDate.slice(0, 10);
+        const sDate = this.datePipe.transform(params.data.startDate, 'dd MMM yyyy');
+        if (isSingleDay) {
+          const fullDay = this.datePipe.transform(params.data.startDate, 'EEEE');
+          return `
+            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; line-height: 1.3;">
+              <span style="font-size: 13px; font-weight: 600; color: #0f172a; letter-spacing: -0.2px;">${sDate}</span>
+              <span style="font-size: 11.5px; color: #64748b; margin-top: 1px;">${fullDay}</span>
+            </div>
+          `;
+        }
+        const eDate = this.datePipe.transform(params.data.endDate, 'dd MMM yyyy');
+        const sDay = this.datePipe.transform(params.data.startDate, 'EEE');
+        const eDay = this.datePipe.transform(params.data.endDate, 'EEE');
+        const days = this.leaveDuration(params.data);
+        return `
+          <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; line-height: 1.3;">
+            <div style="display: flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: #0f172a;">
+              <span>${sDate}</span>
+              <span style="color: #94a3b8; font-weight: 400;">→</span>
+              <span>${eDate}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #64748b; margin-top: 2px;">
+              <span>${sDay} – ${eDay}</span>
+              <span style="display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: #94a3b8;"></span>
+              <span style="color: #475569; font-weight: 600;">${days} ${days === 1 ? 'day' : 'days'}</span>
+            </div>
+          </div>
+        `;
       }
     },
     {
       headerName: 'Duration',
-      minWidth: 105,
-      flex: 0.75,
-      cellRenderer: (params: any) => params.data?.isHalfDay
-        ? `Half Day (${params.data.halfDayPeriod || 'AM'})`
-        : 'Full Day',
+      minWidth: 125,
+      flex: 0.8,
+      cellRenderer: (params: any) => {
+        if (params.data?.isHalfDay) {
+          const period = params.data.halfDayPeriod || 'AM';
+          const periodLabel = period === 'PM' ? 'Half Day (PM)' : 'Half Day (AM)';
+          return `
+            <div style="display: flex; align-items: center; height: 100%;">
+              <span style="display: inline-flex; align-items: center; gap: 4px; height: 22px; line-height: 20px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; white-space: nowrap; box-sizing: border-box; width: fit-content; max-width: fit-content; flex-shrink: 0;">
+                <span style="font-size: 11px; line-height: 1;">🌓</span>
+                <span>${periodLabel}</span>
+              </span>
+            </div>
+          `;
+        }
+        return `
+          <div style="display: flex; align-items: center; height: 100%;">
+            <span style="display: inline-flex; align-items: center; gap: 4px; height: 22px; line-height: 20px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; white-space: nowrap; box-sizing: border-box; width: fit-content; max-width: fit-content; flex-shrink: 0;">
+              <span style="font-size: 11px; line-height: 1;">☀️</span>
+              <span>Full Day</span>
+            </span>
+          </div>
+        `;
+      }
     },
     {
       headerName: 'Leave Status',
       field: 'status',
-      flex: 1.2,
-      minWidth: 140,
+      flex: 1.1,
+      minWidth: 155,
       cellRenderer: (params: any) => {
-        const s = params.value || 'PENDING';
-        let statusClass = 'status-pending';
-        if (s === 'APPROVED') statusClass = 'status-approved';
-        if (s === 'REJECTED') statusClass = 'status-rejected';
-        
+        const s = (params.value || 'PENDING').toUpperCase();
+        let bg = '#fffbeb';
+        let border = '#fde68a';
+        let color = '#92400e';
+        let dot = '#f59e0b';
+        let label = 'Pending';
+        if (s === 'APPROVED') {
+          bg = '#ecfdf5';
+          border = '#a7f3d0';
+          color = '#065f46';
+          dot = '#10b981';
+          label = 'Approved';
+        } else if (s === 'REJECTED') {
+          bg = '#fef2f2';
+          border = '#fecaca';
+          color = '#991b1b';
+          dot = '#ef4444';
+          label = 'Rejected';
+        } else if (s === 'CANCELLED') {
+          bg = '#f1f5f9';
+          border = '#e2e8f0';
+          color = '#475569';
+          dot = '#94a3b8';
+          label = 'Cancelled';
+        }
+        const safeReason = (params.data?.rejectionReason || '').replace(/"/g, '&quot;');
         const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason 
-          ? `<button type="button" class="view-reason-link" title="${String(params.data.rejectionReason).replace(/\"/g, '&quot;')}" style="display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;padding:0;font-size:10px;color:#1373e5;font-weight:500;margin-top:3px;cursor:pointer;text-align:left;">Reason: ${String(params.data.rejectionReason).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</button>`
+          ? `<div class="view-reason-link" title="Reason: ${safeReason}" style="font-size: 10.5px; color: #dc2626; font-weight: 500; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; display: inline-flex; align-items: center; gap: 3px; background: #fef2f2; padding: 1px 6px; border-radius: 4px; border: 1px solid #fecaca; margin-top: 3px; line-height: 1.2;">
+              <span style="opacity: 0.8;">Reason:</span>
+              <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85px;">${safeReason}</span>
+            </div>`
           : '';
         return `
-          <div class="cell-stacked" style="min-width:0;width:100%;overflow:hidden;">
-            <span class="status-round ${statusClass}" style="max-width:100%;">
-              <span class="status-dot"></span>
-              ${s}
+          <div style="display: flex; flex-direction: column; justify-content: center; align-items: flex-start; height: 100%; box-sizing: border-box;">
+            <span style="display: inline-flex; align-items: center; height: 22px; line-height: 20px; padding: 0 8px; border-radius: 11px; font-size: 11px; font-weight: 600; background:${bg}; border: 1px solid ${border}; color:${color}; white-space: nowrap; flex-shrink: 0; box-sizing: border-box;">
+              <span style="width: 6px; height: 6px; min-width: 6px; min-height: 6px; border-radius: 50%; background:${dot}; margin-right: 5px; flex-shrink: 0; display: inline-block;"></span>
+              <span>${label}</span>
             </span>
             ${reasonHtml}
           </div>
@@ -908,26 +1070,49 @@ export class AttendanceLeaveComponent implements OnInit {
     {
       field: 'leaveType.name',
       headerName: 'Leave Type',
-      minWidth: 120,
-      flex: 0.9,
+      minWidth: 165,
+      flex: 1.1,
       cellRenderer: (params: any) => {
-        if (!params.value) return '—';
-        const attachmentIcon = params.data.attachmentUrl
-          ? `<a href="${params.data.attachmentUrl}" target="_blank" rel="noopener noreferrer" title="Open attachment" aria-label="Open attachment" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 24px;border:1px solid #bfdbfe;border-radius:6px;color:#2563eb;background:#eff6ff;text-decoration:none;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></a>`
+        if (!params.value) return '<span style="color:#94a3b8;">—</span>';
+        const typeName = params.value;
+        const color = this.getLeaveTypeColor(typeName);
+        const bg = this.getLeaveTypeBgColor(typeName);
+        const border = this.getLeaveTypeBorderColor(typeName);
+        const attachHtml = params.data?.attachmentUrl
+          ? `<a href="${params.data.attachmentUrl}" target="_blank" rel="noopener noreferrer" 
+                title="View attached document" 
+                style="display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 500; color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 1px 6px; margin-top: 3px; text-decoration: none; width: fit-content; line-height: 1.2;">
+                <span>📎</span> Receipt
+             </a>`
           : '';
-        return `<div style="display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;overflow:hidden;"><span class="cat-badge cat-laptop" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${params.value}</span>${attachmentIcon}</div>`;
+        return `
+          <div style="display: flex; flex-direction: column; justify-content: center; align-items: flex-start; height: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;">
+            <span style="display: inline-flex; align-items: center; height: 22px; line-height: 20px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background:${bg}; color:${color}; border: 1px solid ${border}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; box-sizing: border-box; flex-shrink: 0;" title="${typeName}">
+              <span style="width: 5px; height: 5px; min-width: 5px; min-height: 5px; border-radius: 50%; background:${color}; margin-right: 5px; flex-shrink: 0; display: inline-block;"></span>
+              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${typeName}</span>
+            </span>
+            ${attachHtml}
+          </div>
+        `;
       }
     },
     {
       headerName: 'Paid',
-      minWidth: 75,
-      flex: 0.55,
+      minWidth: 85,
+      flex: 0.6,
       cellRenderer: (params: any) => {
         const isPaid = params.data?.leaveType?.isPaid !== false;
         const label = isPaid ? 'Paid' : 'Unpaid';
         const color = isPaid ? '#15803d' : '#b91c1c';
         const background = isPaid ? '#dcfce7' : '#fee2e2';
-        return `<span style="display:inline-block;background:${background};color:${color};font-size:10px;font-weight:700;padding:3px 6px;border-radius:4px;">${label}</span>`;
+        const border = isPaid ? '#bbf7d0' : '#fecaca';
+        return `
+          <div style="display: flex; align-items: center; height: 100%;">
+            <span style="display: inline-flex; align-items: center; height: 22px; line-height: 20px; padding: 0 8px; background:${background}; color:${color}; border: 1px solid ${border}; font-size: 11px; font-weight: 600; border-radius: 6px; white-space: nowrap; box-sizing: border-box;">
+              ${label}
+            </span>
+          </div>
+        `;
       }
     },
     {
@@ -968,7 +1153,38 @@ export class AttendanceLeaveComponent implements OnInit {
   allRequests = signal<LeaveRequest[]>([]);
   isLoadingLeaveApprovals = signal<boolean>(true);
   approvalStatusFilter = signal<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('ALL');
-  pendingCount = computed(() => this.allRequests().filter(r => r.status === 'PENDING').length);
+
+  leaveApplicationsList = computed(() => {
+    if (this.isAdmin()) return this.allRequests();
+    const requests = new Map<number, LeaveRequest>();
+    for (const r of [...this.myRequests(), ...this.managerRequests()]) {
+      requests.set(r.id, r);
+    }
+    return [...requests.values()];
+  });
+
+  totalLeaveCount = computed(() => this.leaveApplicationsList().length);
+  pendingLeaveCount = computed(() => this.leaveApplicationsList().filter(r => r.status === 'PENDING').length);
+  approvedLeaveCount = computed(() => this.leaveApplicationsList().filter(r => r.status === 'APPROVED').length);
+  rejectedLeaveCount = computed(() => this.leaveApplicationsList().filter(r => r.status === 'REJECTED').length);
+  cancelledLeaveCount = computed(() => this.leaveApplicationsList().filter(r => r.status === 'CANCELLED').length);
+  pendingCount = computed(() => this.pendingLeaveCount());
+
+  setApprovalFilter(status: 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED') {
+    this.approvalStatusFilter.set(status);
+  }
+
+  clearAllLeaveFilters(): void {
+    this.leaveApplicationsSearch.set('');
+    this.approvalStatusFilter.set('ALL');
+    this.filterStartDate.set('');
+    this.filterEndDate.set('');
+    this.filterEmployeeQuery.set('');
+    this.filterLeaveTypeId.set('');
+    this.leaveStatusFilter.set('');
+    this.filterDatePreset.set('ALL');
+  }
+
   selectedApprovalIds = signal<number[]>([]);
   private approvalGridApi: any;
   readonly approvalRowSelection = {
@@ -990,7 +1206,10 @@ export class AttendanceLeaveComponent implements OnInit {
 
   // Keep a refresh or route change from launching the same expensive requests twice.
   private leaveApplicationLoading = false;
-  private adminDataLoading = false;
+  // Which admin dataset is in flight. Keyed by page, so switching from
+  // Balances to Leaves mid-load still fetches the requests instead of
+  // being dropped by the guard and leaving HR with an empty list.
+  private adminDataLoading: 'balances' | 'requests' | null = null;
   private managerDataLoading = false;
   private holidaysLoading = false;
   private myLeaveRequestsLoaded = false;
@@ -1022,6 +1241,32 @@ export class AttendanceLeaveComponent implements OnInit {
     if (n.includes('loss') || n.includes('unpaid') || n.includes('lwp')) return '#ef4444'; // red
     if (n.includes('eid') || n.includes('diwali') || n.includes('holiday') || n.includes('optional')) return '#8b5cf6'; // purple
     return '#3b82f6';
+  }
+
+  getLeaveTypeBgColor(name: string): string {
+    const n = (name || '').toLowerCase();
+    if (n.includes('sick')) return '#f0f9ff';
+    if (n.includes('casual')) return '#ecfdf5';
+    if (n.includes('earned') || n.includes('privilege') || n.includes('annual')) return '#eef2ff';
+    if (n.includes('maternity') || n.includes('paternity')) return '#fdf2f8';
+    if (n.includes('bereavement')) return '#f8fafc';
+    if (n.includes('compensatory') || n.includes('comp')) return '#fffbeb';
+    if (n.includes('loss') || n.includes('unpaid') || n.includes('lwp')) return '#fef2f2';
+    if (n.includes('eid') || n.includes('diwali') || n.includes('holiday') || n.includes('optional')) return '#f5f3ff';
+    return '#eff6ff';
+  }
+
+  getLeaveTypeBorderColor(name: string): string {
+    const n = (name || '').toLowerCase();
+    if (n.includes('sick')) return '#bae6fd';
+    if (n.includes('casual')) return '#a7f3d0';
+    if (n.includes('earned') || n.includes('privilege') || n.includes('annual')) return '#c7d2fe';
+    if (n.includes('maternity') || n.includes('paternity')) return '#fbcfe8';
+    if (n.includes('bereavement')) return '#e2e8f0';
+    if (n.includes('compensatory') || n.includes('comp')) return '#fde68a';
+    if (n.includes('loss') || n.includes('unpaid') || n.includes('lwp')) return '#fecaca';
+    if (n.includes('eid') || n.includes('diwali') || n.includes('holiday') || n.includes('optional')) return '#ddd6fe';
+    return '#bfdbfe';
   }
 
   getAvatarBgColor(str?: string): string {
@@ -2167,11 +2412,19 @@ export class AttendanceLeaveComponent implements OnInit {
   pivotedBalances = computed(() => {
     const balances = this.filteredBalanceRecords();
     const empMap = new Map<number, any>();
+    const employeesList = this.employees() || [];
+    const empLookup = new Map<number, any>(employeesList.map((e: any) => [e.id, e]));
 
     balances.forEach((b: any) => {
       if (!empMap.has(b.employeeId)) {
+        const fullEmp = empLookup.get(b.employeeId);
+        const emp = b.employee || fullEmp;
         empMap.set(b.employeeId, {
-          employee: b.employee ? `${b.employee.firstName} ${b.employee.lastName}` : 'Unknown',
+          employee: emp ? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() : 'Unknown',
+          employeeData: {
+            ...fullEmp,
+            ...b.employee
+          },
           employeeId: b.employeeId
         });
       }
@@ -2193,11 +2446,13 @@ export class AttendanceLeaveComponent implements OnInit {
       const employee = balance.employee;
       const name = `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim().toLowerCase();
       const employeeCode = String(employee?.employeeCode ?? '').toLowerCase();
+      const dept = String(employee?.department?.name ?? '').toLowerCase();
+      const des = String(employee?.designation?.name ?? '').toLowerCase();
       const leaveType = String(balance.leaveType?.name ?? '').toLowerCase();
       return (!selectedType || String(balance.leaveTypeId) === selectedType)
-        && (!term || name.includes(term) || employeeCode.includes(term) || String(balance.employeeId).includes(term))
+        && (!term || name.includes(term) || employeeCode.includes(term) || String(balance.employeeId).includes(term) || dept.includes(term) || des.includes(term))
         && (!search || name.includes(search) || employeeCode.includes(search)
-          || String(balance.employeeId).includes(search) || leaveType.includes(search));
+          || String(balance.employeeId).includes(search) || leaveType.includes(search) || dept.includes(search) || des.includes(search));
     });
   });
 
@@ -2208,9 +2463,40 @@ export class AttendanceLeaveComponent implements OnInit {
       {
         headerName: 'Employee',
         field: 'employee',
-        flex: 2,
-        minWidth: 150,
-        cellStyle: { textAlign: 'left', fontWeight: '600' },
+        flex: 1.8,
+        minWidth: 260,
+        pinned: 'left',
+        cellRenderer: (params: any) => {
+          const emp = params.data?.employeeData || params.data?.employee;
+          const name = typeof emp === 'object' 
+            ? `${emp?.firstName ?? ''} ${emp?.lastName ?? ''}`.trim() || 'Employee'
+            : (params.value || 'Employee');
+          const dept = emp?.department?.name || emp?.department || '';
+          const des = emp?.designation?.name || emp?.designation || '';
+          const sub = [des, dept].filter(Boolean).join(' · ') || 'General';
+          const code = emp?.employeeCode;
+          const codeBadge = code 
+            ? `<span style="font-size: 10px !important; font-weight: 600 !important; color: #0369a1 !important; background: #e0f2fe !important; border: 1px solid #bae6fd !important; border-radius: 4px !important; padding: 1px 5px !important; flex-shrink: 0 !important; line-height: 1.2 !important;">#${code}</span>` 
+            : '';
+          const safeName = (name || '').replace(/"/g, '&quot;');
+          const uiAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'Employee')}&background=3B82F6&color=fff&size=128&bold=true`;
+          const avatarSrc = emp?.avatarUrl || uiAvatarUrl;
+          return `
+            <div style="display: flex !important; align-items: center !important; gap: 10px !important; height: 100% !important; min-width: 0 !important; width: 100% !important;">
+              <img src="${avatarSrc}" 
+                   alt="${safeName}" 
+                   style="width: 36px !important; height: 36px !important; min-width: 36px !important; min-height: 36px !important; max-width: 36px !important; max-height: 36px !important; border-radius: 50% !important; object-fit: cover !important; flex-shrink: 0 !important; border: 1.5px solid #e2e8f0 !important; display: block !important;" 
+                   onerror="this.onerror=null; this.src='${uiAvatarUrl}';" />
+              <div style="min-width: 0 !important; flex: 1 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; justify-content: center !important; line-height: 1.25 !important;">
+                <div style="display: flex !important; align-items: center !important; gap: 6px !important; min-width: 0 !important;">
+                  <span style="font-size: 13px !important; font-weight: 600 !important; color: #0f172a !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;">${safeName}</span>
+                  ${codeBadge}
+                </div>
+                <div style="font-size: 11.5px !important; color: #64748B !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 2px !important;">${sub}</div>
+              </div>
+            </div>
+          `;
+        }
       }
     ];
 
@@ -2234,9 +2520,57 @@ export class AttendanceLeaveComponent implements OnInit {
         headerTooltip: `${type} · Available / total${suffix}`,
         field: type,
         flex: 1,
-        minWidth: 44,
-        wrapHeaderText: true,
-        autoHeaderHeight: true,
+        minWidth: 125,
+        sortable: true,
+        filter: true,
+        cellRenderer: (params: any) => {
+          const val = params.value;
+          if (val === undefined || val === null || val === '') {
+            return `<div style="display: flex; align-items: center; justify-content: center; height: 100%;"><span style="color: #cbd5e1; font-size: 12px;">—</span></div>`;
+          }
+          const parts = String(val).split('/');
+          if (parts.length < 2) {
+            return `<div style="display: flex; align-items: center; justify-content: center; height: 100%;"><span>${val}</span></div>`;
+          }
+          const avail = parseFloat(parts[0].trim());
+          const alloc = parseFloat(parts[1].trim());
+
+          let bg = '#f8fafc';
+          let border = '#e2e8f0';
+          let availColor = '#334155';
+          let allocColor = '#64748b';
+
+          if (avail < 0) {
+            bg = '#fef2f2';
+            border = '#fecaca';
+            availColor = '#dc2626';
+            allocColor = '#991b1b';
+          } else if (avail === 0 && alloc > 0) {
+            bg = '#fffbeb';
+            border = '#fde68a';
+            availColor = '#d97706';
+            allocColor = '#b45309';
+          } else if (avail > 0) {
+            bg = '#f0fdf4';
+            border = '#bbf7d0';
+            availColor = '#16a34a';
+            allocColor = '#475569';
+          } else if (alloc === 0 && avail === 0) {
+            bg = '#f8fafc';
+            border = '#f1f5f9';
+            availColor = '#94a3b8';
+            allocColor = '#cbd5e1';
+          }
+
+          return `
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; gap: 3px; height: 24px; line-height: 22px; padding: 0 10px; border-radius: 6px; font-size: 11.5px; background: ${bg}; border: 1px solid ${border}; box-sizing: border-box; white-space: nowrap;">
+                <strong style="color: ${availColor}; font-weight: 700;">${avail}</strong>
+                <span style="color: ${allocColor}; opacity: 0.8; font-size: 10.5px;">/ ${alloc}</span>
+              </span>
+            </div>
+          `;
+        }
       });
     });
 
@@ -2257,17 +2591,13 @@ export class AttendanceLeaveComponent implements OnInit {
   balanceSearch = signal('');
   balanceDefaultColDef: ColDef = {
     flex: 1,
-    minWidth: 44,
+    minWidth: 110,
     filter: true,
     sortable: true,
     resizable: true,
-    wrapHeaderText: true,
-    autoHeaderHeight: true,
-    cellStyle: { textAlign: 'center' },
   };
   balanceGridOptions: GridOptions = {
     theme: 'legacy' as const,
-    suppressHorizontalScroll: true,
   };
 
   // Leave lists run to hundreds of rows once historic leave is imported.
@@ -2664,16 +2994,17 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   loadAdminData() {
-    if (!this.isAdmin() || this.adminDataLoading) return;
-    this.adminDataLoading = true;
+    const isBalancesPage = this.leaveSection() === 'balances';
+    const kind = isBalancesPage ? 'balances' : 'requests';
+    if (!this.isAdmin() || this.adminDataLoading === kind) return;
+    this.adminDataLoading = kind;
     const year = new Date().getFullYear();
     this.isLoadingBalances.set(true);
     this.isLoadingLeaveApprovals.set(true);
     this.isLoadingEmployees.set(true);
-    const isBalancesPage = this.leaveSection() === 'balances';
     const pageData$ = isBalancesPage
       ? forkJoin({
-          balances: this.leavesService.getAllBalances(year, undefined, 200),
+          balances: this.leavesService.getAllBalances(year),
           employees: this.employeeService.getEmployeesBasicList(),
           leaveTypes: this.masterDataService.getLeaveTypes(),
         })
@@ -2695,13 +3026,13 @@ export class AttendanceLeaveComponent implements OnInit {
         this.isLoadingBalances.set(false);
         this.isLoadingLeaveApprovals.set(false);
         this.isLoadingEmployees.set(false);
-        this.adminDataLoading = false;
+        if (this.adminDataLoading === kind) this.adminDataLoading = null;
       },
       error: () => {
         this.isLoadingBalances.set(false);
         this.isLoadingLeaveApprovals.set(false);
         this.isLoadingEmployees.set(false);
-        this.adminDataLoading = false;
+        if (this.adminDataLoading === kind) this.adminDataLoading = null;
       },
     });
   }

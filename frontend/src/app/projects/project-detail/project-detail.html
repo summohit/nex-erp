@@ -2954,26 +2954,46 @@
               <div class="card-title">{{ issue.title }}</div>
 
               <div class="card-footer-meta flex items-center justify-between" *ngIf="issue.key || getIssueTimeSummary(issue) || (issue.members && issue.members.length > 0)">
-                <div class="flex items-center gap-2">
+                <div class="card-meta-left-group flex items-center gap-1.5 flex-wrap min-w-0">
                   <span class="card-key" *ngIf="issue.key">{{ issue.key }}</span>
                   
-                  <!-- Enhanced Time Badge -->
+                  <!-- Enhanced Circular Progress Time Badge -->
                   <ng-container *ngIf="getIssueTimeSummary(issue) as ts">
                     <div class="card-time-badge" 
                          [class.is-running]="ts.isRunning" 
-                         [class.is-over]="ts.isOver"
-                         [title]="ts.isRunning ? 'Timer active' : 'Time logged / estimated'">
-                      <span class="pulse-dot" *ngIf="ts.isRunning"></span>
-                      <svg lucideClock size="11"></svg>
-                      <span>{{ ts.display }}</span>
+                         [class.is-over]="ts.isOver || (taskBudget(issue)?.state === 'over')"
+                         [class.is-raised]="taskBudget(issue)?.state === 'raised'"
+                         [title]="ts.isRunning ? 'Timer active' : ('Time logged: ' + ts.display + (taskBudget(issue)?.percent !== null ? ' (' + taskBudget(issue)?.percent + '% used)' : ''))">
+                      
+                      <!-- Mini Circular Progress Ring -->
+                      <div class="card-time-circular-ring" *ngIf="issue.estimatedHours > 0 || taskBudget(issue)?.percent !== null; else noEstClock" [title]="(taskBudget(issue)?.percent ?? ts.percent ?? 0) + '% completed'">
+                        <svg viewBox="0 0 20 20" class="progress-ring-svg">
+                          <circle class="ring-track" cx="10" cy="10" r="7"></circle>
+                          <circle class="ring-progress" cx="10" cy="10" r="7"
+                                  stroke-dasharray="43.98"
+                                  [style.stroke-dashoffset]="43.98 - (43.98 * Math.min(100, (taskBudget(issue)?.percent ?? ts.percent ?? 0)) / 100)"></circle>
+                        </svg>
+                        <span class="pulse-dot" *ngIf="ts.isRunning"></span>
+                      </div>
+
+                      <ng-template #noEstClock>
+                        <span class="pulse-dot" *ngIf="ts.isRunning"></span>
+                        <svg lucideClock size="11" *ngIf="!ts.isRunning"></svg>
+                      </ng-template>
+
+                      <span class="time-text">{{ ts.display }}</span>
+
+                      <!-- Integrated Percentage Badge -->
+                      <ng-container *ngIf="taskBudget(issue) as tb">
+                        <span class="time-percent-badge" *ngIf="tb.percent !== null" [ngClass]="taskBudgetClass(issue)">
+                          {{ tb.percent }}%
+                        </span>
+                      </ng-container>
                     </div>
                   </ng-container>
 
-                  <!-- Hours used, as a share. Same helper the Tasks table
-                       reads, so a card and its row cannot disagree: red past
-                       the ceiling, orange when the ceiling was raised to get
-                       there. Nothing at all when the task has no estimate. -->
-                  <ng-container *ngIf="taskBudget(issue) as tb">
+                  <!-- Standalone budget pill fallback if no time summary -->
+                  <ng-container *ngIf="!getIssueTimeSummary(issue) && taskBudget(issue) as tb">
                     <span class="card-budget-pill" *ngIf="tb.percent !== null"
                           [ngClass]="taskBudgetClass(issue)"
                           [title]="tb.state === 'over'
@@ -2986,10 +3006,10 @@
                   </ng-container>
 
                   <!-- Comments Indicator -->
-                  <div *ngIf="issue._count?.comments > 0" title="{{ issue._count.comments }} comment(s)" style="display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #5e6c84; background: #f4f5f7; padding: 2px 6px; border-radius: 4px;">
+                  <div *ngIf="issue._count?.comments > 0" title="{{ issue._count.comments }} comment(s)" class="card-comment-badge">
                     <svg lucideMessageSquare size="11"></svg>
                     <span>{{ issue._count.comments }}</span>
-                    <span style="width: 6px; height: 6px; background: #1373e5; border-radius: 50%; margin-left: 2px; box-shadow: 0 0 0 2px #f4f5f7;" title="New unread comments"></span>
+                    <span class="comment-unread-dot" title="New unread comments"></span>
                   </div>
                 </div>
 

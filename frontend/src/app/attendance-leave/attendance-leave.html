@@ -231,6 +231,63 @@
   </div>
 
   <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() !== 'balances'">
+    <!-- Executive KPI Metric Cards -->
+    <div class="leave-kpi-grid" *ngIf="isAdmin() || isManager() || managerRequests().length > 0">
+      <div class="leave-kpi-card" [class.active]="approvalStatusFilter() === 'ALL'" (click)="setApprovalFilter('ALL')">
+        <div class="leave-kpi-header">
+          <span class="leave-kpi-label">Total Applications</span>
+          <div class="leave-kpi-icon-wrap total">
+            <svg lucideFile [size]="17"></svg>
+          </div>
+        </div>
+        <div class="leave-kpi-value-row">
+          <span class="leave-kpi-number">{{ totalLeaveCount() }}</span>
+          <span class="leave-kpi-subtext">All requests</span>
+        </div>
+      </div>
+
+      <div class="leave-kpi-card pending" [class.active]="approvalStatusFilter() === 'PENDING'" (click)="setApprovalFilter('PENDING')">
+        <div class="leave-kpi-header">
+          <span class="leave-kpi-label">Pending Review</span>
+          <div class="leave-kpi-icon-wrap pending">
+            <svg lucideClock [size]="17"></svg>
+          </div>
+        </div>
+        <div class="leave-kpi-value-row">
+          <span class="leave-kpi-number text-amber">{{ pendingLeaveCount() }}</span>
+          <span class="leave-kpi-badge pending" *ngIf="pendingLeaveCount() > 0">Needs Attention</span>
+          <span class="leave-kpi-subtext" *ngIf="pendingLeaveCount() === 0">All caught up</span>
+        </div>
+      </div>
+
+      <div class="leave-kpi-card approved" [class.active]="approvalStatusFilter() === 'APPROVED'" (click)="setApprovalFilter('APPROVED')">
+        <div class="leave-kpi-header">
+          <span class="leave-kpi-label">Approved</span>
+          <div class="leave-kpi-icon-wrap approved">
+            <svg lucideCheck [size]="17"></svg>
+          </div>
+        </div>
+        <div class="leave-kpi-value-row">
+          <span class="leave-kpi-number text-emerald">{{ approvedLeaveCount() }}</span>
+          <span class="leave-kpi-subtext">Active leaves</span>
+        </div>
+      </div>
+
+      <div class="leave-kpi-card rejected" [class.active]="approvalStatusFilter() === 'REJECTED'" (click)="setApprovalFilter('REJECTED')">
+        <div class="leave-kpi-header">
+          <span class="leave-kpi-label">Rejected</span>
+          <div class="leave-kpi-icon-wrap rejected">
+            <svg lucideX [size]="17"></svg>
+          </div>
+        </div>
+        <div class="leave-kpi-value-row">
+          <span class="leave-kpi-number text-rose">{{ rejectedLeaveCount() }}</span>
+          <span class="leave-kpi-subtext" *ngIf="cancelledLeaveCount() > 0">{{ cancelledLeaveCount() }} cancelled</span>
+          <span class="leave-kpi-subtext" *ngIf="cancelledLeaveCount() === 0">Declined requests</span>
+        </div>
+      </div>
+    </div>
+
     <div class="leave-list-toolbar">
       <div class="leave-list-actions">
         <button type="button" class="btn btn-primary leave-new-button" (click)="openRequestModal()">
@@ -247,17 +304,27 @@
           Export
         </button>
       </div>
-      <label class="leave-application-search">
-        <svg lucideSearch [size]="16" aria-hidden="true"></svg>
-        <input
-          type="search"
-          aria-label="Search leave applications"
-          placeholder="Search employee, date, duration, status, leave type, paid..."
-          [ngModel]="leaveApplicationsSearch()"
-          (ngModelChange)="leaveApplicationsSearch.set($event)">
-        <button type="button" *ngIf="leaveApplicationsSearch()" aria-label="Clear search"
-                (click)="leaveApplicationsSearch.set('')">×</button>
-      </label>
+
+      <div class="leave-search-filter-wrap">
+        <label class="leave-application-search">
+          <svg lucideSearch [size]="16" aria-hidden="true"></svg>
+          <input
+            type="search"
+            aria-label="Search leave applications"
+            placeholder="Search employee, date, duration, status, leave type..."
+            [ngModel]="leaveApplicationsSearch()"
+            (ngModelChange)="leaveApplicationsSearch.set($event)">
+          <button type="button" *ngIf="leaveApplicationsSearch()" aria-label="Clear search"
+                  (click)="leaveApplicationsSearch.set('')">×</button>
+        </label>
+
+        <button type="button" class="btn btn-outline leave-filter-btn" (click)="openLeaveFilters()" title="Advanced filters">
+          <svg lucideFilter [size]="15"></svg>
+          <span>Filters</span>
+          <span class="leave-filter-active-dot" *ngIf="hasActiveLeaveFilters()" aria-label="Filters active"></span>
+        </button>
+      </div>
+
       <div class="leave-view-toggle" role="group" aria-label="Leave request view">
         <button type="button" [class.active]="leaveViewMode() === 'list'" [attr.aria-pressed]="leaveViewMode() === 'list'"
                 aria-label="List view" title="List view" (click)="leaveViewMode.set('list')">
@@ -277,34 +344,37 @@
       <!-- Leave Requests -->
       <div class="widget-card">
         <div class="widget-header">
-          <h3>{{ leaveViewMode() === 'employee' ? 'My Leaves' : 'Leave Applications' }}</h3>
-          <span class="text-muted" *ngIf="isAdmin() && leaveViewMode() !== 'employee'">{{ filteredLeaveApplications().length }} applications</span>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #0f172a;">{{ leaveViewMode() === 'employee' ? 'My Leaves' : 'Leave Applications' }}</h3>
+            <span class="leave-count-pill" *ngIf="isAdmin() && leaveViewMode() !== 'employee'">{{ filteredLeaveApplications().length }} applications</span>
+          </div>
+          <button type="button" class="btn-clear-filters" *ngIf="hasActiveLeaveFilters()" (click)="clearAllLeaveFilters()">
+            <svg lucideX [size]="13"></svg>
+            <span>Reset filters</span>
+          </button>
         </div>
         <div class="approval-status-filters" *ngIf="isAdmin() && leaveViewMode() === 'list'">
-          <button class="status-filter-pill" [class.active]="approvalStatusFilter() === 'PENDING'" (click)="approvalStatusFilter.set('PENDING')">
-            <span class="filter-dot pending"></span> Pending
-            <span class="filter-count" *ngIf="pendingCount() > 0">{{ pendingCount() }}</span>
-          </button>
-          <button class="status-filter-pill" [class.active]="approvalStatusFilter() === 'APPROVED'" (click)="approvalStatusFilter.set('APPROVED')">
-            <span class="filter-dot approved"></span> Approved
-          </button>
-          <button class="status-filter-pill" [class.active]="approvalStatusFilter() === 'REJECTED'" (click)="approvalStatusFilter.set('REJECTED')">
-            <span class="filter-dot rejected"></span> Rejected
-          </button>
-          <button class="status-filter-pill" [class.active]="approvalStatusFilter() === 'CANCELLED'" (click)="approvalStatusFilter.set('CANCELLED')">
-            <span class="filter-dot cancelled"></span> Cancelled
-          </button>
-          <button class="status-filter-pill" [class.active]="approvalStatusFilter() === 'ALL'" (click)="approvalStatusFilter.set('ALL')">
+          <button type="button" class="status-filter-pill" [class.active]="approvalStatusFilter() === 'ALL'" (click)="setApprovalFilter('ALL')">
             All
+            <span class="filter-count all">{{ totalLeaveCount() }}</span>
+          </button>
+          <button type="button" class="status-filter-pill pending" [class.active]="approvalStatusFilter() === 'PENDING'" (click)="setApprovalFilter('PENDING')">
+            <span class="filter-dot pending"></span> Pending
+            <span class="filter-count pending" *ngIf="pendingLeaveCount() > 0">{{ pendingLeaveCount() }}</span>
+          </button>
+          <button type="button" class="status-filter-pill approved" [class.active]="approvalStatusFilter() === 'APPROVED'" (click)="setApprovalFilter('APPROVED')">
+            <span class="filter-dot approved"></span> Approved
+            <span class="filter-count approved">{{ approvedLeaveCount() }}</span>
+          </button>
+          <button type="button" class="status-filter-pill rejected" [class.active]="approvalStatusFilter() === 'REJECTED'" (click)="setApprovalFilter('REJECTED')">
+            <span class="filter-dot rejected"></span> Rejected
+            <span class="filter-count rejected">{{ rejectedLeaveCount() }}</span>
+          </button>
+          <button type="button" class="status-filter-pill cancelled" [class.active]="approvalStatusFilter() === 'CANCELLED'" (click)="setApprovalFilter('CANCELLED')">
+            <span class="filter-dot cancelled"></span> Cancelled
+            <span class="filter-count cancelled">{{ cancelledLeaveCount() }}</span>
           </button>
         </div>
-        <div *ngIf="isAdmin() && leaveViewMode() === 'list' && selectedApprovalIds().length" class="selected-approvals-toolbar">
-          <span>{{ selectedApprovalIds().length }} selected</span>
-          <button type="button" class="btn btn-primary" (click)="approveSelectedLeaveRequests()">Approve selected</button>
-          <button type="button" class="btn btn-outline" (click)="rejectSelectedLeaveRequests()">Reject selected</button>
-          <button type="button" class="btn btn-outline" (click)="clearApprovalSelection()">Clear selection</button>
-        </div>
-        
         <!-- Skeleton Loader for Leave Requests -->
         <div class="table-container mt-4" *ngIf="isLoadingLeaveApplications()">
           <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
@@ -344,9 +414,6 @@
             [paginationPageSize]="10"
             [paginationPageSizeSelector]="leavePageSizes"
             [gridOptions]="gridOptions"
-            [rowSelection]="isAdmin() ? approvalRowSelection : undefined"
-            (gridReady)="isAdmin() ? onApprovalsGridReady($event) : null"
-            (selectionChanged)="isAdmin() ? onApprovalSelectionChanged($event) : null"
             (cellClicked)="onCellClicked($event)">
           </ag-grid-angular>
         </div>
@@ -1208,15 +1275,31 @@
             {{ pivotedBalances().length }} employees
           </span>
         </div>
-        <label class="leave-balances-search">
-          <svg lucideSearch [size]="16" aria-hidden="true"></svg>
-          <input type="search" aria-label="Search employee leave balances"
-                 placeholder="Search employee or leave type..."
-                 [ngModel]="balanceSearch()"
-                 (ngModelChange)="balanceSearch.set($event)">
-          <button type="button" *ngIf="balanceSearch()" aria-label="Clear search"
-                  (click)="balanceSearch.set('')">×</button>
-        </label>
+        <div class="leave-balances-toolbar">
+          <label class="leave-balances-search">
+            <svg lucideSearch [size]="16" aria-hidden="true"></svg>
+            <input type="search" aria-label="Search employee leave balances"
+                   placeholder="Search employee by name, ID, department, or leave type..."
+                   [ngModel]="balanceSearch()"
+                   (ngModelChange)="balanceSearch.set($event)">
+            <button type="button" *ngIf="balanceSearch()" aria-label="Clear search"
+                    (click)="balanceSearch.set('')">×</button>
+          </label>
+          <div class="balance-legend-group">
+            <span class="balance-legend-item">
+              <span class="balance-legend-dot healthy"></span>
+              <span>Available</span>
+            </span>
+            <span class="balance-legend-item">
+              <span class="balance-legend-dot exhausted"></span>
+              <span>Exhausted</span>
+            </span>
+            <span class="balance-legend-item">
+              <span class="balance-legend-dot deficit"></span>
+              <span>Deficit</span>
+            </span>
+          </div>
+        </div>
         
         <!-- Skeleton Loader for Employee Leave Balances -->
         <div class="table-container mt-4" *ngIf="isLoadingBalances()">
@@ -1256,6 +1339,8 @@
             [rowData]="pivotedBalances()"
             [columnDefs]="dynamicColDefs()"
             [defaultColDef]="balanceDefaultColDef"
+            [rowHeight]="64"
+            [headerHeight]="48"
             [pagination]="true"
             [paginationPageSize]="10"
             [paginationPageSizeSelector]="leavePageSizes"

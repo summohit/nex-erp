@@ -15,6 +15,13 @@ const LEAVE_MENU_ROUTES = new Set([
   '/attendance/leave-quota',
 ]);
 
+// The self-service tabs attendanceLandingGuard sends Super Admin and HR on to /attendance/all.
+const ATTENDANCE_SELF_ROUTES = new Set([
+  '/attendance/attendance',
+  '/attendance/my-attendance',
+  '/attendance/timesheets',
+]);
+
 @Component({
   selector: 'app-sidebar',
   standalone: true,
@@ -114,6 +121,10 @@ export class SidebarComponent implements OnInit {
     if (!sub?.route) return false;
     const currentPath = this.router.url.split('?')[0];
     if (this.isMergedLeavesItem(sub)) return this.isLeaveRoute(currentPath);
+    // Super Admin and HR are redirected from the Attendance item's own route
+    // (/attendance/timesheets etc.) to the company-wide /attendance/all, so the
+    // item must light up there too or no sub-item looks selected.
+    if (currentPath === '/attendance/all' && ATTENDANCE_SELF_ROUTES.has(sub.route)) return true;
     return currentPath === sub.route;
   }
 
@@ -197,7 +208,7 @@ export class SidebarComponent implements OnInit {
           const hasActiveSubItem = item.subItems.some((sub: any) =>
             this.isMergedLeavesItem(sub)
               ? this.isLeaveRoute(currentPath)
-              : url.includes(sub.route),
+              : url.includes(sub.route) || this.isSubItemActive(sub),
           );
           if (hasActiveSubItem) {
             this.expandedMenu.set(item.id);

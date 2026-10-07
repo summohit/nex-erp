@@ -3128,3 +3128,22 @@
   font-weight: 600;
   margin-top: 1px;
 }
+
+.btn-attendance-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-attendance-filters:hover { border-color: #1373e5; color: #1373e5; }
+.filters-active-dot { width: 7px; height: 7px; border-radius: 50%; background: #1373e5; }
+.btn-attendance-reset { color: #dc2626; }
+.btn-attendance-reset:hover { border-color: #dc2626; color: #dc2626; background: #fef2f2; }

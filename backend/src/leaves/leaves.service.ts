@@ -100,11 +100,26 @@ export class LeavesService {
         ...(employeeId ? { employeeId } : {})
       },
       include: { 
-        employee: { select: { id: true, firstName: true, lastName: true } },
-        leaveType: true 
+        employee: { 
+          select: { 
+            id: true, 
+            firstName: true, 
+            lastName: true,
+            avatarUrl: true,
+            employeeCode: true,
+            department: { select: { id: true, name: true } },
+            designation: { select: { id: true, name: true } },
+          } 
+        },
+        // Only what the balances screen reads: the full LeaveType repeated on
+        // every row is the bulk of this payload.
+        leaveType: { select: { id: true, name: true, isPaid: true, allowHalfDay: true } }
       },
       orderBy: { employeeId: 'asc' },
-      take: limit,
+      // `limit` counted balance ROWS, so 200 rows at 8 leave types each showed
+      // only the first 25 employees. The company-wide list is one row per
+      // employee per type for a single year — return all of it.
+      ...(employeeId ? { take: limit } : {}),
     });
   }
 

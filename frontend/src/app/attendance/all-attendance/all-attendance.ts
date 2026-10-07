@@ -215,8 +215,11 @@ export class AllAttendanceComponent implements OnInit {
     { value: 'ON_TIME', label: 'On time' },
     { value: 'MISSING_OUT', label: 'Missed clock-out' }
   ];
-  get attendanceFilterGroups() {
-    return [
+  // computed, not a getter: a getter hands the drawer brand-new arrays on every
+  // change detection (the header clock ticks each second), so its *ngFor tore
+  // down and rebuilt every <select> — one <option> per employee — and the page
+  // froze the moment the drawer opened.
+  attendanceFilterGroups = computed(() => [
       {
         key: 'employee',
         label: 'Employee',
@@ -248,10 +251,12 @@ export class AllAttendanceComponent implements OnInit {
         placeholder: 'All Flags',
         options: this.flagOptions.filter((option) => option.value !== 'ALL'),
       },
-    ];
-  }
+  ]);
 
-  get attendanceFilterValues(): Record<string, string> {
+  /** Snapshot of the applied filters, taken when the drawer opens. */
+  attendanceFilterValues: Record<string, string> = {};
+
+  private currentFilterValues(): Record<string, string> {
     return {
       employee: this.filterEmployeeId ? String(this.filterEmployeeId) : '',
       department: this.filterDepartmentId ? String(this.filterDepartmentId) : '',
@@ -307,6 +312,7 @@ export class AllAttendanceComponent implements OnInit {
   openAttendanceFilters(event?: Event): void {
     event?.preventDefault();
     event?.stopPropagation();
+    this.attendanceFilterValues = this.currentFilterValues();
     this.filterDrawerOpen.set(true);
   }
 
