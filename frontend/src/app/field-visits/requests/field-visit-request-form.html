@@ -635,10 +635,9 @@
                 <span class="selected-subtext" [class.subtle]="!form.tasks.length">
                   @if (visitType() === 'GENERAL' && !selectedEmployeeIds().length) {
                     Pick who is going first — their general tasks are listed here
+                  } @else if (visitType() === 'GENERAL' && !form.tasks.length) {
+                    Pick their general tasks, or create one below — it is attached to this visit
                   } @else if (visitType() === 'PROJECT' && !selectedProjectId()) {
-                  @if (isGeneralVisit()) {
-                    General tasks created here are attached to this visit
-                  } @else if (!selectedProjectId()) {
                     Pick a project first — tasks come from that project's board
                   } @else if (form.tasks.length > 1) {
                     {{ form.tasks[0].key ? form.tasks[0].key + ' and ' + (form.tasks.length - 1) + ' more' : form.tasks[0].name }}

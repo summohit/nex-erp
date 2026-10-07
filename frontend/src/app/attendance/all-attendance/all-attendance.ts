@@ -50,6 +50,7 @@ export interface EmployeeMatrixRow {
   selector: 'app-all-attendance',
   standalone: true,
   imports: [
+    AttendanceFilterDrawerComponent,
     CommonModule, FormsModule,
     LucideCalendarClock, LucideRotateCcw, LucideSearch, LucideX,
     LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideCheck, LucideFilter, LucideDownload,

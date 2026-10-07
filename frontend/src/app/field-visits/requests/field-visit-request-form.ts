@@ -306,6 +306,9 @@ export class FieldVisitRequestFormComponent implements OnInit {
   visitType = signal<'PROJECT' | 'GENERAL'>('PROJECT');
 
   setVisitType(type: 'PROJECT' | 'GENERAL'): void {
+    // The "General" choice in the project dropdown and this toggle are one
+    // setting; keep them in step whichever way it was picked.
+    this.isGeneralVisit.set(type === 'GENERAL');
     if (this.visitType() === type) return;
     this.visitType.set(type);
     // The two kinds pick tasks from different places, so nothing picked
@@ -731,6 +734,9 @@ export class FieldVisitRequestFormComponent implements OnInit {
   }
 
   selectGeneralVisit(): void {
+    // Same as the Project | General toggle: a general visit picks from the
+    // people's general tasks, and can create new ones (below).
+    this.setVisitType('GENERAL');
     this.isGeneralVisit.set(true);
     this.selectedProjectId.set(null);
     this.form.projectId = null;
