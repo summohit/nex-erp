@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed, inject, HostListener } from '@angu
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HotToastService } from '@ngneat/hot-toast';
+import { Router } from '@angular/router';
 import {
   LucideCalendarClock, LucideRotateCcw, LucideSearch, LucideX,
   LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideCheck, LucideFilter, LucideDownload,
@@ -28,7 +29,7 @@ export interface DayMatrixStatus {
   dateStr: string;
   isWeekend: boolean;
   isFuture: boolean;
-  status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Empty';
+  status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Missed Clock Out' | 'Empty';
   tooltip: string;
   record?: AttendanceRecord;
   /** Why this day carries the status it does — shown on hover. */
@@ -44,6 +45,15 @@ export interface EmployeeMatrixRow {
   days: DayMatrixStatus[];
   totalPresent: number;
   totalWorkingDays: number;
+}
+
+interface WorkLocationBreakdown {
+  office: number;
+  onsite: number;
+  remote: number;
+  officePercent: number;
+  onsitePercent: number;
+  remotePercent: number;
 }
 
 @Component({
@@ -71,6 +81,7 @@ export class AllAttendanceComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
   private employeeService = inject(EmployeeService);
   private toast = inject(HotToastService);
+  private router = inject(Router);
 
   viewMode = signal<'grid' | 'table'>('grid');
   records = signal<AttendanceRecord[]>([]);
@@ -261,6 +272,11 @@ export class AllAttendanceComponent implements OnInit {
     this.load();
   }
 
+  /** Opens the employee-by-employee ranking without changing this matrix view. */
+  openAttendanceList(): void {
+    this.router.navigate(['/attendance/list']);
+  }
+
   load() {
     // filterMonth/filterYear are plain properties, so computed() signals can't see
     // them change. Bump this version so daysOfMonth (and the grid that derives from
@@ -423,7 +439,11 @@ export class AllAttendanceComponent implements OnInit {
 
   getBackendDateString(date: Date | string): string {
     const d = new Date(date);
-    return d.toISOString().split('T')[0];
+    // Attendance / roster dates are calendar days, not UTC instants. The API
+    // serializes a Postgres DATE at IST midnight, which is the preceding UTC
+    // evening. Calling toISOString() therefore moved Arshi's Monday off to
+    // Sunday in the matrix. Keep the employee's local calendar date instead.
+    return this.getLocalDateString(d);
   }
 
   getLocalDateString(date: Date): string {
@@ -513,7 +533,7 @@ export class AllAttendanceComponent implements OnInit {
 
     // When date filter is active, only show employees who have a record or are active on that date
     if (dateFilter) {
-      rows = rows.filter(row => row.days.some(day => day.record || !day.isFuture));
+      rows = rows.filter(row => row.days.some(day => day.record || !day.isFuture || day.status !== 'Empty'));
     }
 
     return rows;
@@ -594,9 +614,20 @@ export class AllAttendanceComponent implements OnInit {
         const key = `${emp.id}_${day.dateStr}`;
         const record = recordMap.get(key);
         const holiday = holidays.find(h => this.getBackendDateString(h.date) === day.dateStr);
-        const isDayOff = isWeeklyOff(day.date, weeklyOffs);
+        // An explicit standing-shift schedule is personal and therefore wins
+        // over the branch default. This keeps permanent Saturday/Sunday teams
+        // visible as working days without requiring weekly roster overrides.
+        const workingDays = String(emp.shift?.workingDays ?? '').trim();
+        const isDayOff = workingDays
+          ? !workingDays.split(',').map((value: string) => value.trim()).includes(this.dayName(day.date))
+          : isWeeklyOff(day.date, weeklyOffs);
+        // Historic WEEKLY_OFF rows were generated using the branch default.
+        // They must not keep Saturday/Sunday off after a person is moved to a
+        // permanent weekend shift. An explicit roster entry still wins.
+        const rosteredDayOff = record?.status === 'WEEKLY_OFF'
+          && (!!record.isRosteredDayOff || isDayOff);
 
-        let status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Empty' = 'Empty';
+        let status: DayMatrixStatus['status'] = 'Empty';
         let tooltip = '';
 
         // Planned approved leave and a rostered day off are meaningful before
@@ -605,7 +636,7 @@ export class AllAttendanceComponent implements OnInit {
         if (record && record.status === 'ON_LEAVE') {
           status = 'On Leave';
           tooltip = (record as any).leaveType ? `On Leave · ${(record as any).leaveType}` : 'On Leave';
-        } else if (record && record.status === 'WEEKLY_OFF') {
+        } else if (rosteredDayOff) {
           status = 'Day Off';
           tooltip = 'Rostered Day Off';
         } else if (day.isFuture && holiday) {
@@ -613,11 +644,26 @@ export class AllAttendanceComponent implements OnInit {
           // dot that reads like an ordinary working day.
           status = 'Holiday';
           tooltip = `${holiday.name || 'Holiday'} (upcoming)`;
+        } else if (day.isFuture && isDayOff) {
+          status = 'Day Off';
+          tooltip = 'Weekly Day Off';
         } else if (day.isFuture) {
           status = 'Empty';
           tooltip = `${day.dayNumber} ${day.weekdayStr} - Upcoming`;
+        } else if (record && record.fieldVisit && !record.clockIn) {
+          status = 'Present';
+          tooltip = `Scheduled field visit at ${record.fieldVisit.location || 'site'}`;
+          countsWorking = true;
         } else if (record && record.clockIn) {
-          if (holiday) {
+          if (this.needsClockOutApproval(record)) {
+            status = 'Missed Clock Out';
+            tooltip = record.clockOutApproval === 'REJECTED'
+              ? 'Clock-out approval rejected'
+              : 'Clock-out approval pending';
+          } else if (record.clockOutApproval === 'APPROVED') {
+            status = 'Present';
+            tooltip = 'Clock-out approved';
+          } else if (holiday) {
             // Worked a holiday (B1): recorded, never late or a half day —
             // nobody was expected in.
             status = 'Present';
@@ -668,7 +714,7 @@ export class AllAttendanceComponent implements OnInit {
         } else if (holiday || (record && record.status === 'HOLIDAY')) {
           status = 'Holiday';
           tooltip = (holiday && holiday.name) || 'Holiday';
-        } else if (isDayOff || (record && record.status === 'WEEKLY_OFF')) {
+        } else if (isDayOff) {
           status = 'Day Off';
           tooltip = 'Weekly Day Off';
         } else {
@@ -702,6 +748,10 @@ export class AllAttendanceComponent implements OnInit {
    * Calculates the best attendance records based on total present days,
    * punctuality (fewest late days), and total working days.
    */
+  private dayName(date: Date): string {
+    return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][date.getDay()];
+  }
+
   topPerformers = computed(() =>
     this.performersPeriod() === 'year'
       ? this.rankPerformers(this.yearGridRows())
@@ -710,6 +760,8 @@ export class AllAttendanceComponent implements OnInit {
 
   /** Whether Attendance Champions ranks the selected month or the whole year. */
   performersPeriod = signal<'month' | 'year'>('year');
+  /** Local month/year picker anchored to the Champions period button. */
+  championPeriodPickerOpen = signal(false);
   /** Every record of `yearRecordsFor` — only fetched once year mode is picked. */
   yearRecords = signal<AttendanceRecord[]>([]);
   yearLoading = signal(false);
@@ -719,6 +771,27 @@ export class AllAttendanceComponent implements OnInit {
   setPerformersPeriod(period: 'month' | 'year') {
     this.performersPeriod.set(period);
     if (period === 'year') this.loadYear();
+  }
+
+  toggleChampionPeriodPicker(event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.championPeriodPickerOpen.update((open) => !open);
+  }
+
+  setChampionMonth(value: number | string): void {
+    const month = Number(value);
+    if (month >= 1 && month <= 12) this.selectMonth(month);
+    this.performersPeriod.set('month');
+  }
+
+  setChampionYear(value: number | string): void {
+    const year = Number(value);
+    if (year > 1900) this.selectYear(year);
+  }
+
+  closeChampionPeriodPicker(): void {
+    this.championPeriodPickerOpen.set(false);
   }
 
   /**
@@ -934,9 +1007,39 @@ export class AllAttendanceComponent implements OnInit {
       early,
       missedClockOut,
       onTime,
-      onTimeRate
+      onTimeRate,
+      totalLocations: this.workLocationBreakdown(list),
+      presentLocations: this.workLocationBreakdown(list.filter(r => this.recordDayStatus(r) === 'Present')),
+      lateLocations: this.workLocationBreakdown(list.filter(r => r.isLate)),
+      halfDayLocations: this.workLocationBreakdown(list.filter(r => this.recordDayStatus(r) === 'Half Day')),
+      absentLocations: this.workLocationBreakdown(list.filter(r => this.recordDayStatus(r) === 'Absent')),
+      leaveLocations: this.workLocationBreakdown(list.filter(r => this.recordDayStatus(r) === 'On Leave')),
     };
   });
+
+  /**
+   * Work location is derived from the same attendance record that feeds the
+   * KPI. Field visits and approved on-site work take precedence; an ordinary
+   * outside-office clock is treated as work from home/remote, and an in-radius
+   * clock is office work. Percentages use the KPI's own record count.
+   */
+  private workLocationBreakdown(records: AttendanceRecord[]): WorkLocationBreakdown {
+    let office = 0;
+    let onsite = 0;
+    let remote = 0;
+    for (const record of records) {
+      if (!record.clockIn) continue;
+      if (record.isOnsite || record.fieldVisit) onsite++;
+      else if (record.clockInOutside || record.clockOutOutside) remote++;
+      else office++;
+    }
+    const denominator = records.length;
+    const percent = (count: number) => denominator ? Math.round((count / denominator) * 100) : 0;
+    return {
+      office, onsite, remote,
+      officePercent: percent(office), onsitePercent: percent(onsite), remotePercent: percent(remote),
+    };
+  }
 
   // Filtered & Sorted Records
   filteredRecords = computed(() => {
@@ -1280,6 +1383,8 @@ export class AllAttendanceComponent implements OnInit {
   // Mirrors the grid's day-cell classification for a single record.
   recordDayStatus(r: AttendanceRecord): string {
     if (r.clockIn) {
+      if (this.needsClockOutApproval(r)) return 'Missed Clock Out';
+      if (r.clockOutApproval === 'APPROVED') return 'Present';
       if (r.status === 'HALF_DAY') return 'Half Day';
       if (r.isLate) return 'Late';
       return 'Present';
@@ -1351,7 +1456,17 @@ export class AllAttendanceComponent implements OnInit {
   }
 
   isMissedClockOut(r: AttendanceRecord): boolean {
-    return !!r.clockOutReason || !!r.missedClockOut || (r.status === 'PRESENT' && !r.clockOut);
+    return this.needsClockOutApproval(r) || !!r.missedClockOut || (r.status === 'PRESENT' && !r.clockOut);
+  }
+
+  /** A clock-out pending or rejected review cannot yet count as Present. */
+  needsClockOutApproval(r: AttendanceRecord | null | undefined): boolean {
+    return r?.clockOutApproval === 'PENDING' || r?.clockOutApproval === 'REJECTED';
+  }
+
+  /** Keep the small clock marker once an approved (or legacy) clock-out is settled. */
+  showResolvedClockOutMarker(r: AttendanceRecord | null | undefined): boolean {
+    return !!r?.clockOutReason && !this.needsClockOutApproval(r);
   }
 
   recordMatchesStatus(r: AttendanceRecord): boolean {
@@ -1365,7 +1480,7 @@ export class AllAttendanceComponent implements OnInit {
   dayMatchesStatus(day: DayMatrixStatus): boolean {
     const f = this.filterStatus;
     if (!f) return true;
-    if (day.status === 'Empty' || (day.isFuture && !day.record)) return false;
+    if (day.status === 'Empty') return false;
     if (f === 'Overtime') return !!(day.record?.overtimeHours && day.record.overtimeHours > 0);
     if (f === 'Missed Clock Out') return !!day.record && this.isMissedClockOut(day.record);
     return day.status === f;
@@ -1534,7 +1649,7 @@ export class AllAttendanceComponent implements OnInit {
 
   // ── Custom Dynamic Cell Tooltip ──────────────────────────────────────────
   onCellMouseEnter(event: MouseEvent, day: DayMatrixStatus) {
-    if (day.isFuture || !day.tooltip) {
+    if (day.status === 'Empty' || !day.tooltip) {
       this.hoveredTooltip.set(null);
       return;
     }

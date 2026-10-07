@@ -18,6 +18,8 @@ export interface Employee {
   managerId?: number;
   department?: { id?: number; name: string };
   designation?: { id?: number; name: string };
+  shift?: { id: number; name: string; workingDays?: string | null } | null;
+  branch?: { id?: number; name?: string; weeklyOffs?: string | null } | null;
   user?: { email: string, role: string, avatarUrl?: string, status?: string };
   createdAt?: string;
   employeeCode?: string;

@@ -50,6 +50,16 @@ export class TasksController {
     return this.tasks.getTopTaskPerformers(req.user.companyId, req.user.role, windowDays);
   }
 
+  /**
+   * Estimated work already allocated to each person on one calendar day.
+   * The task composer uses this before assigning new work, rather than making
+   * a manager open every project board to see who has capacity.
+   */
+  @Get('assignee-workload')
+  async assigneeWorkload(@Request() req, @Query('date') date?: string) {
+    return this.tasks.getAssigneeWorkload(req.user.companyId, date || '');
+  }
+
   @Post()
   async create(@Request() req, @Body() body: any) {
     return this.tasks.createTask(req.user.companyId, req.user.employeeId, req.user.role, body);

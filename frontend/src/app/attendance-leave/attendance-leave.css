@@ -746,9 +746,25 @@
 .leave-calendar-header .btn-outline {
   width: 38px;
   height: 36px;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
   padding: 0;
   border-radius: 6px;
+}
+
+.calendar-month-arrow {
+  display: block;
+  font-family: Arial, sans-serif;
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1;
+  color: #334155;
+  transform: translateY(-1px);
+}
+
+.leave-calendar-header .btn-outline:hover .calendar-month-arrow {
+  color: #1373e5;
 }
 
 .leave-calendar-header h4 { min-width: 180px; margin: 0; text-align: center; }

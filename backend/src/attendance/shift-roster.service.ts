@@ -137,7 +137,7 @@ export class ShiftRosterService {
     const empIds = employees.map(e => e.id);
     if (!empIds.length) return { days, shifts: [], rows: [] };
 
-    const [entries, leaves, shifts] = await Promise.all([
+    const [entries, leaves, shifts, fieldVisitDays] = await Promise.all([
       this.prisma.shiftRosterEntry.findMany({
         where: { companyId, employeeId: { in: empIds }, date: { gte: start, lte: end } },
         include: { shift: true, project: { select: { id: true, name: true, address: true } } },
@@ -154,10 +154,34 @@ export class ShiftRosterService {
         include: { leaveType: { select: { name: true } } },
       }),
       this.prisma.shift.findMany({ where: { companyId }, orderBy: { name: 'asc' } }),
+      this.prisma.fieldVisitAttendance.findMany({
+        where: {
+          companyId,
+          employeeId: { in: empIds },
+          visitDate: { gte: start, lte: end },
+          request: { status: { in: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] } },
+        },
+        include: {
+          request: {
+            select: {
+              requestNumber: true, location: true, startTime: true, endTime: true,
+              project: { select: { id: true, name: true } },
+            },
+          },
+        },
+      }),
     ]);
 
     const entryBy = new Map<string, typeof entries[number]>();
     for (const e of entries) entryBy.set(`${e.employeeId}|${toKey(e.date)}`, e);
+
+    // The field-visit schedule is authoritative even if an employee has no
+    // standing shift. This makes an approved site assignment visible in the
+    // roster instead of falling through to an unassigned cell.
+    const fieldVisitBy = new Map<string, typeof fieldVisitDays[number]>();
+    for (const visit of fieldVisitDays) {
+      fieldVisitBy.set(`${visit.employeeId}|${toKey(visit.visitDate)}`, visit);
+    }
 
     // A multi-day leave covers every day between its start and end.
     const leaveBy = new Map<string, { name: string; isHalfDay: boolean }>();
@@ -188,6 +212,32 @@ export class ShiftRosterService {
           return { date: day, type: 'LEAVE', label: leave.name, isHalfDay: leave.isHalfDay };
         }
         const entry = entryBy.get(key);
+        const fieldVisit = fieldVisitBy.get(key);
+        if (fieldVisit) {
+          const resolvedShift = entry?.shift || emp.shift;
+          return {
+            date: day,
+            type: 'SHIFT',
+            entryId: entry?.id,
+            note: `Field visit ${fieldVisit.request.requestNumber}`,
+            isFieldVisit: true,
+            ...(resolvedShift ? {
+              shift: {
+                ...this.shiftBrief(resolvedShift),
+                startTime: fieldVisit.request.startTime || resolvedShift.startTime,
+                endTime: fieldVisit.request.endTime || resolvedShift.endTime,
+              },
+            } : {}),
+            onSite: {
+              projectId: fieldVisit.request.project?.id || null,
+              projectName: fieldVisit.request.project?.name || null,
+              address: fieldVisit.request.location,
+              approvalStatus: 'APPROVED',
+              startTime: fieldVisit.request.startTime,
+              endTime: fieldVisit.request.endTime,
+            },
+          };
+        }
         if (entry) {
           if (entry.isDayOff) return { date: day, type: 'DAY_OFF', entryId: entry.id, note: entry.note };
           const resolvedShift = entry.shift || emp.shift;
@@ -223,12 +273,14 @@ export class ShiftRosterService {
         // run that weekday, in which case the day is off by definition.
         if (emp.shift) {
           const dayName = DAY_NAMES[new Date(`${day}T00:00:00Z`).getUTCDay()];
-          const works = !emp.shift.workingDays || emp.shift.workingDays.split(',').includes(dayName);
+          const hasPermanentDays = !!emp.shift.workingDays?.trim();
+          const works = hasPermanentDays
+            ? emp.shift.workingDays!.split(',').map((value) => value.trim()).includes(dayName)
+            : !isBranchWeeklyOff(new Date(`${day}T00:00:00Z`), emp.branch?.weeklyOffs);
           // The branch's weekly offs too, e.g. 2nd and 4th Saturday. A shift
           // rostered on such a day (above) still wins — that is how someone
           // is put to work on an off Saturday.
-          const branchOff = !!emp.branch && isBranchWeeklyOff(new Date(`${day}T00:00:00Z`), emp.branch.weeklyOffs);
-          if (!works || branchOff) return { date: day, type: 'DAY_OFF', isDefault: true };
+          if (!works) return { date: day, type: 'DAY_OFF', isDefault: true };
           return { date: day, type: 'SHIFT', isDefault: true, shift: this.shiftBrief(emp.shift) };
         }
         return { date: day, type: 'UNASSIGNED' };
@@ -349,8 +401,10 @@ export class ShiftRosterService {
     const fromStanding = (): EffectiveShift => {
       if (!standing) return { source: 'NONE', shift: null, startTime: null, endTime: null, isDayOff: false, onsite: null };
       const dayName = DAY_NAMES[date.getUTCDay()];
-      const works = (!standing.workingDays || standing.workingDays.split(',').includes(dayName))
-        && !(branchWeeklyOffs != null && isBranchWeeklyOff(date, branchWeeklyOffs));
+      const hasPermanentDays = !!standing.workingDays?.trim();
+      const works = hasPermanentDays
+        ? standing.workingDays!.split(',').map((value) => value.trim()).includes(dayName)
+        : !(branchWeeklyOffs != null && isBranchWeeklyOff(date, branchWeeklyOffs));
       return {
         source: 'STANDING',
         shift: {

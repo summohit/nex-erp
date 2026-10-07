@@ -31,16 +31,15 @@ export interface LeaveActionCellParams extends ICellRendererParams {
   imports: [CommonModule, LucideMoreHorizontal, LucideEdit2, LucideCheckCircle, LucideXCircle, LucideX, LucidePaperclip, LucideInfo, LucideEye, LucideTrash2, MatMenuModule],
   template: `
     <div class="action-container" (click)="$event.stopPropagation()">
-      <button class="btn-view" (click)="view()" *ngIf="params.onView" title="View full details">
-        <svg lucideEye size="14"></svg>
-        <span>View</span>
-      </button>
-
       <button class="btn-icon" [matMenuTriggerFor]="menu" *ngIf="hasMenuItems()">
         <svg lucideMoreHorizontal size="16"></svg>
       </button>
 
       <mat-menu #menu="matMenu" panelClass="custom-action-menu">
+        <button mat-menu-item class="menu-item" (click)="view()" *ngIf="params.onView">
+          <svg lucideEye size="18" class="menu-icon"></svg>
+          <span class="menu-text">View details</span>
+        </button>
         <button mat-menu-item class="menu-item" (click)="viewReason()" *ngIf="params.data.status === 'REJECTED' && params.data.rejectionReason">
           <svg lucideInfo size="18" class="menu-icon"></svg>
           <span class="menu-text">View Reason</span>
@@ -82,25 +81,6 @@ export interface LeaveActionCellParams extends ICellRendererParams {
       align-items: center;
       gap: 4px;
       height: 100%;
-    }
-    .btn-view {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 4px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      color: #2563EB;
-      background: rgba(37, 99, 235, 0.08);
-      border: 1px solid rgba(37, 99, 235, 0.2);
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .btn-view:hover {
-      background: rgba(37, 99, 235, 0.16);
-      border-color: rgba(37, 99, 235, 0.4);
     }
     .btn-icon {
       background: none;
@@ -224,6 +204,7 @@ export class LeaveActionCellRendererComponent implements ICellRendererAngularCom
 
   hasMenuItems(): boolean {
     const d = this.params.data;
+    if (this.params.onView) return true;
     if (d.status === 'REJECTED' && d.rejectionReason) return true;
     if (this.params.onViewAttachment && d.attachmentUrl) return true;
     if (this.params.onEdit && d.status === 'PENDING' && this.isAllowed(this.params.canEdit)) return true;

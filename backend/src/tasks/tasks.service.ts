@@ -47,6 +47,76 @@ export class TasksService {
     private crm: CrmService,
   ) {}
 
+  /**
+   * Return each person's planned hours for a single UTC calendar date.
+   *
+   * An issue contributes its complete estimated-hours budget on every date in
+   * its scheduled range. This is deliberately the task's total allocation —
+   * not a synthetic per-day split — so a manager sees the real number of task
+   * hours currently assigned to a person before selecting them.
+   */
+  async getAssigneeWorkload(companyId: number, dateText: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
+      throw new BadRequestException('A valid workload date is required.');
+    }
+    const dayStart = new Date(`${dateText}T00:00:00.000Z`);
+    if (Number.isNaN(dayStart.getTime())) {
+      throw new BadRequestException('A valid workload date is required.');
+    }
+    const nextDay = new Date(dayStart);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+
+    const [issues, preSalesTasks] = await Promise.all([
+      this.prisma.issue.findMany({
+        where: {
+          companyId,
+          isArchived: false,
+          status: { notIn: CLOSED_STATUSES },
+          startDate: { lte: dayStart },
+          dueDate: { gte: dayStart },
+        },
+        select: {
+          assigneeId: true,
+          estimatedHours: true,
+          startDate: true,
+          dueDate: true,
+          members: { select: { employeeId: true } },
+        },
+      }),
+      this.prisma.preSalesTask.findMany({
+        where: {
+          companyId,
+          status: { not: 'COMPLETED' },
+          scheduledAt: { gte: dayStart, lt: nextDay },
+        },
+        select: { assignedToId: true, estimatedMinutes: true },
+      }),
+    ]);
+
+    const totals = new Map<number, number>();
+    const add = (employeeId: number | null | undefined, hours: number) => {
+      if (!employeeId || !Number.isFinite(hours) || hours <= 0) return;
+      totals.set(employeeId, (totals.get(employeeId) ?? 0) + hours);
+    };
+
+    for (const issue of issues) {
+      const totalHours = Number(issue.estimatedHours ?? 0);
+      const assignees = new Set<number>([
+        ...(issue.assigneeId ? [issue.assigneeId] : []),
+        ...issue.members.map((member) => member.employeeId),
+      ]);
+      assignees.forEach((employeeId) => add(employeeId, totalHours));
+    }
+    for (const task of preSalesTasks) add(task.assignedToId, Number(task.estimatedMinutes ?? 0) / 60);
+
+    return {
+      date: dateText,
+      hoursByEmployee: Object.fromEntries(
+        [...totals.entries()].map(([employeeId, hours]) => [employeeId, Math.round(hours * 100) / 100]),
+      ),
+    };
+  }
+
   // ── permissions ──────────────────────────────────────────────────────────
 
   /** Delegates to the shared rule — see task-permissions.ts. */

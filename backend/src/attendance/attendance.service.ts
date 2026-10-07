@@ -116,7 +116,15 @@ export class AttendanceService {
         const credited = await tx.compOffCredit.findUnique({ where: { attendanceId } });
         if (credited) return;
         await tx.compOffCredit.create({
-          data: { attendanceId, employeeId: attendance.employeeId, leaveTypeId: leaveType.id, year },
+          data: {
+            attendanceId,
+            companyId,
+            employeeId: attendance.employeeId,
+            leaveTypeId: leaveType.id,
+            date,
+            reason: 'ATTENDANCE_DAY_OFF',
+            year,
+          },
         });
         await tx.leaveBalance.upsert({
           where: { employeeId_leaveTypeId_year: { employeeId: attendance.employeeId, leaveTypeId: leaveType.id, year } },
@@ -1109,7 +1117,7 @@ export class AttendanceService {
     }
 
     const employees = await this.prisma.employee.findMany({
-      where: { companyId },
+      where: { companyId, user: { status: { not: 'SUSPENDED' } } },
       include: {
         department: true,
         designation: true,
@@ -1184,6 +1192,8 @@ export class AttendanceService {
             department: { select: { id: true, name: true } },
             designation: { select: { id: true, name: true } },
             user: { select: { email: true, role: true } },
+            shift: { select: { id: true, name: true, workingDays: true } },
+            branch: { select: { weeklyOffs: true } },
           },
         },
         project: {
@@ -1214,6 +1224,8 @@ export class AttendanceService {
         department: { select: { id: true, name: true } },
         designation: { select: { id: true, name: true } },
         user: { select: { email: true, role: true } },
+        shift: { select: { id: true, name: true, workingDays: true } },
+        branch: { select: { weeklyOffs: true } },
       } as const;
       const rangeStart = dateFilter.gte ?? new Date('1970-01-01T00:00:00.000Z');
       const rangeEnd = dateFilter.lte ?? new Date('9999-12-31T23:59:59.999Z');
@@ -1238,6 +1250,9 @@ export class AttendanceService {
         if (!actualDays.has(key)) markerDays.set(key, {
           id: -row.id, employeeId: row.employeeId, date: row.date, status: 'WEEKLY_OFF',
           clockIn: null, clockOut: null, isLate: false, isEarlyLeave: false, employee: row.employee,
+          // The client must distinguish this explicit roster override from a
+          // historic WEEKLY_OFF attendance row created under an old schedule.
+          isRosteredDayOff: true,
         });
       }
       // Leave is more informative than a coincident planned day off, so it
@@ -1276,6 +1291,16 @@ export class AttendanceService {
             project: { select: { id: true, name: true, key: true } },
           },
         },
+        employee: {
+          select: {
+            id: true, firstName: true, lastName: true, avatarUrl: true, employeeCode: true,
+            department: { select: { id: true, name: true } },
+            designation: { select: { id: true, name: true } },
+            user: { select: { email: true, role: true } },
+            shift: { select: { id: true, name: true, workingDays: true } },
+            branch: { select: { weeklyOffs: true } },
+          },
+        },
       },
     });
 
@@ -1283,6 +1308,24 @@ export class AttendanceService {
     for (const fv of fieldVisits) {
       const dKey = fv.visitDate.toISOString().slice(0, 10);
       fvByEmpDate.set(`${fv.employeeId}_${dKey}`, fv);
+    }
+
+    // A field-visit assignment is planned attendance too. Add a display-only
+    // record when the person has not clocked in yet, so the same approved visit
+    // is visible in both the roster and the attendance matrix. A real
+    // attendance row always wins once they clock in.
+    const attendanceKeys = new Set(
+      [...records, ...virtualRecords].map((row: any) => `${row.employeeId}_${row.date.toISOString().slice(0, 10)}`),
+    );
+    for (const fv of fieldVisits) {
+      const key = `${fv.employeeId}_${fv.visitDate.toISOString().slice(0, 10)}`;
+      if (attendanceKeys.has(key)) continue;
+      virtualRecords.push({
+        id: -(200000000 + fv.id), employeeId: fv.employeeId, date: fv.visitDate,
+        status: 'PRESENT', clockIn: null, clockOut: null, isLate: false, isEarlyLeave: false,
+        isOnsite: true, employee: fv.employee,
+      });
+      attendanceKeys.add(key);
     }
 
     const enhancedRecords = [...records, ...virtualRecords].map((r) => {

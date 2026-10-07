@@ -1,0 +1,26 @@
+.attendance-list-page { padding: 24px; background: #f8fafc; min-height: 100%; color: #172033; box-sizing: border-box; }
+.page-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.heading { display: flex; align-items: center; gap: 12px; }
+.heading h1 { margin: 0; font-size: 23px; font-weight: 800; }
+.heading p { margin: 4px 0 0; color: #64748b; font-size: 13px; }
+.back-button, .refresh-button, .clear-date { border: 1px solid #d7e1ee; background: #fff; color: #334155; border-radius: 8px; cursor: pointer; font-weight: 700; }
+.back-button { width: 38px; height: 38px; display: grid; place-items: center; }
+.refresh-button { padding: 9px 13px; display: inline-flex; align-items: center; gap: 7px; }
+.filter-card { display: flex; align-items: end; flex-wrap: wrap; gap: 14px; background: #fff; padding: 16px; border: 1px solid #e1e8f0; border-radius: 12px; margin-bottom: 14px; }
+.filter-field { display: grid; gap: 6px; min-width: 150px; }
+.filter-field label { font-size: 12px; font-weight: 700; color: #52647c; display: flex; align-items: center; gap: 5px; }
+.filter-field select, .filter-field input { height: 38px; padding: 0 10px; border: 1px solid #cfd9e5; border-radius: 7px; color: #1e293b; background: #fff; font: inherit; }
+.filter-field select:disabled { background: #f1f5f9; color: #94a3b8; }
+.date-field { min-width: 180px; }.clear-date { height: 38px; padding: 0 12px; }
+.summary-card { display: flex; align-items: center; gap: 8px; background: #eef6ff; color: #325679; border: 1px solid #d7eaff; border-radius: 10px; padding: 11px 14px; font-size: 13px; margin-bottom: 14px; }
+.summary-card strong { color: #0f5db3; }.ranking-note { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; color: #65758c; }
+.list-card { background: #fff; border: 1px solid #e1e8f0; border-radius: 12px; overflow: hidden; }
+.list-head, .rank-row { display: grid; grid-template-columns: 64px minmax(220px, 2.4fr) repeat(6, minmax(64px, .65fr)) minmax(160px, 1.3fr); align-items: center; gap: 10px; padding: 0 16px; }
+.list-head { min-height: 43px; background: #f8fafc; color: #60718a; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.rank-row { min-height: 76px; border-top: 1px solid #edf1f5; font-size: 13px; }.rank-row:hover { background: #fafcff; }
+.rank { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 50%; background: #f1f5f9; color: #52647c; font-weight: 800; }.rank.top-rank { background: #fff3c4; color: #a16207; }
+.employee { display: flex; align-items: center; min-width: 0; gap: 10px; }.employee img, .avatar-fallback { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; }.avatar-fallback { display: grid; place-items: center; background: #e0edff; color: #246bb2; font-weight: 800; }.employee div { overflow: hidden; }.employee strong, .employee small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.employee strong { color: #172033; }.employee small { color: #74849b; margin-top: 3px; font-size: 11.5px; }
+.metric { text-align: center; color: #52647c; font-variant-numeric: tabular-nums; }.metric.good { color: #11824b; font-weight: 700; }.metric.danger { color: #d14343; font-weight: 700; }.metric.warn { color: #b7791f; font-weight: 700; }
+.rate { display: flex; align-items: center; gap: 8px; }.rate-track { height: 7px; flex: 1; background: #e8edf2; border-radius: 999px; overflow: hidden; }.rate-track i { height: 100%; display: block; border-radius: inherit; background: #17a664; }.rate-track i.low { background: #ef9d24; }.rate b { min-width: 36px; font-size: 12px; color: #334155; }.loading-state, .empty-state { padding: 44px 16px; text-align: center; color: #718198; }.spinning { animation: spin 1s linear infinite; }@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 1050px) { .list-card { overflow-x: auto; }.list-head, .rank-row { min-width: 1030px; }.ranking-note { display: none; } }
+@media (max-width: 640px) { .attendance-list-page { padding: 16px; }.page-header { align-items: flex-start; }.heading h1 { font-size: 19px; }.refresh-button { font-size: 0; padding: 10px; }.filter-card { align-items: stretch; }.filter-field { flex: 1; min-width: 130px; }.date-field { flex-basis: 100%; } }

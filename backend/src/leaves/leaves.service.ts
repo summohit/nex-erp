@@ -6,6 +6,7 @@ import { FieldVisitActivationService } from '../field-visits/requests/field-visi
 import { ApprovalsService } from '../approvals/approvals.service';
 import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
 import { isHrAdmin, isSuperAdmin } from '../common/company-roles';
+import { istDateKey } from '../common/timezone.util';
 
 /** One employee's figures for a single leave type in the quota report. */
 export interface QuotaCell {
@@ -632,6 +633,11 @@ export class LeavesService {
     if (!request) throw new BadRequestException('Request not found or not authorized');
     if (request.status === 'REJECTED' || request.status === 'CANCELLED') {
       throw new BadRequestException('Request is already ' + request.status.toLowerCase());
+    }
+    // A self-service cancellation is allowed only before the leave begins.
+    // This uses the IST calendar day, not the server's clock timezone.
+    if (request.startDate <= istDateKey(new Date())) {
+      throw new BadRequestException('A leave request can only be cancelled before its start date');
     }
 
     return this.prisma.$transaction(async (tx) => {

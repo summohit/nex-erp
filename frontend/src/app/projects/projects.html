@@ -1732,14 +1732,14 @@
         <label class="form-label">Start Date <span class="req">*</span></label>
         <input type="date" class="enhanced-input" [class.has-error]="taskError('startDate')"
                [attr.max]="taskForm.dueDate || null"
-               [(ngModel)]="taskForm.startDate" (ngModelChange)="revalidateTask()" />
+               [(ngModel)]="taskForm.startDate" (ngModelChange)="onTaskScheduleDateChange()" />
         <span class="field-error" *ngIf="taskError('startDate') as m">{{ m }}</span>
       </div>
       <div class="form-group">
         <label class="form-label">{{ isPreSalesTarget ? 'Scheduled Date' : 'Due Date' }} <span class="req" *ngIf="!isPreSalesTarget">*</span></label>
         <input type="date" class="enhanced-input" [class.has-error]="taskError('dueDate')"
                [attr.min]="taskForm.startDate || null"
-               [(ngModel)]="taskForm.dueDate" (ngModelChange)="revalidateTask()" />
+               [(ngModel)]="taskForm.dueDate" (ngModelChange)="onTaskScheduleDateChange()" />
         <span class="field-error" *ngIf="taskError('dueDate') as m">{{ m }}</span>
       </div>
       <!-- A call or a site visit happens at a time, not on a day. -->
@@ -1870,6 +1870,10 @@
                   <span *ngIf="!emp.department?.name && emp.user?.email">{{ emp.user.email }}</span>
                 </div>
               </div>
+              <span class="assignee-workload" [class.has-work]="assigneeWorkloadHours(emp.id) > 0"
+                    [attr.title]="assigneeWorkloadDate() ? ('Estimated work assigned on ' + assigneeWorkloadDate()) : ''">
+                {{ assigneeWorkloadLabel(emp.id) }}
+              </span>
             </div>
 
             <div class="custom-dropdown-empty" *ngIf="filteredTaskAssignees().length === 0">

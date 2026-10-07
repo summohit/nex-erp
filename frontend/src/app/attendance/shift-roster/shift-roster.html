@@ -3,6 +3,11 @@
     <div class="header-content">
       <h1>Shift Roster</h1>
       <p>Who works which shift, day by day. Click any cell to change it.</p>
+      <div class="field-visit-total" title="Field visits in the displayed roster period">
+        <svg lucideMapPin size="15"></svg>
+        <strong>{{ fieldVisitCount() }}</strong>
+        <span>Field Visit{{ fieldVisitCount() === 1 ? '' : 's' }}</span>
+      </div>
     </div>
     <div class="header-actions">
       <input #rosterImport type="file" accept=".csv,text/csv" hidden (change)="importCsv($event)">

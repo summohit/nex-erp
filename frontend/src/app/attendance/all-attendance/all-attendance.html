@@ -12,9 +12,6 @@
 
     <div class="header-actions-group">
       <input #attendanceImport type="file" accept=".csv,text/csv" hidden (change)="importAttendanceCsv($event)">
-      <button class="btn-header-secondary" (click)="downloadAttendanceTemplate()" title="Download the attendance import template">
-        <span>Template</span>
-      </button>
       <button class="btn-header-secondary" (click)="attendanceImport.click()" title="Import attendance from CSV">
         <span>Import CSV</span>
       </button>
@@ -74,6 +71,11 @@
         <div class="stat-value">{{ stats().total }}</div>
         <span class="stat-subtext">{{ statsScopeLabel() }}</span>
       </div>
+      <div class="stat-location-breakdown">
+        <span>Office {{ stats().totalLocations.office }} ({{ stats().totalLocations.officePercent }}%)</span>
+        <span>On site {{ stats().totalLocations.onsite }} ({{ stats().totalLocations.onsitePercent }}%)</span>
+        <span>WFH {{ stats().totalLocations.remote }} ({{ stats().totalLocations.remotePercent }}%)</span>
+      </div>
     </div>
 
     <!-- Present & On-Time -->
@@ -85,6 +87,11 @@
         <span class="stat-label">Present</span>
         <div class="stat-value">{{ stats().present }}</div>
         <span class="stat-subtext">{{ stats().onTimeRate }}% on-time arrival rate</span>
+      </div>
+      <div class="stat-location-breakdown">
+        <span>Office {{ stats().presentLocations.office }} ({{ stats().presentLocations.officePercent }}%)</span>
+        <span>On site {{ stats().presentLocations.onsite }} ({{ stats().presentLocations.onsitePercent }}%)</span>
+        <span>WFH {{ stats().presentLocations.remote }} ({{ stats().presentLocations.remotePercent }}%)</span>
       </div>
     </div>
 
@@ -98,6 +105,11 @@
         <div class="stat-value">{{ stats().late }}</div>
         <span class="stat-subtext">Clocked in after shift start</span>
       </div>
+      <div class="stat-location-breakdown">
+        <span>Office {{ stats().lateLocations.office }} ({{ stats().lateLocations.officePercent }}%)</span>
+        <span>On site {{ stats().lateLocations.onsite }} ({{ stats().lateLocations.onsitePercent }}%)</span>
+        <span>WFH {{ stats().lateLocations.remote }} ({{ stats().lateLocations.remotePercent }}%)</span>
+      </div>
     </div>
 
     <!-- Half Day / Early Leave -->
@@ -109,6 +121,11 @@
         <span class="stat-label">Half Day</span>
         <div class="stat-value">{{ stats().halfDay }}</div>
         <span class="stat-subtext">{{ stats().early }} early departure flags</span>
+      </div>
+      <div class="stat-location-breakdown">
+        <span>Office {{ stats().halfDayLocations.office }} ({{ stats().halfDayLocations.officePercent }}%)</span>
+        <span>On site {{ stats().halfDayLocations.onsite }} ({{ stats().halfDayLocations.onsitePercent }}%)</span>
+        <span>WFH {{ stats().halfDayLocations.remote }} ({{ stats().halfDayLocations.remotePercent }}%)</span>
       </div>
     </div>
 
@@ -122,6 +139,11 @@
         <div class="stat-value">{{ stats().absent }}</div>
         <span class="stat-subtext">No clock-in recorded</span>
       </div>
+      <div class="stat-location-breakdown">
+        <span>Office {{ stats().absentLocations.office }} ({{ stats().absentLocations.officePercent }}%)</span>
+        <span>On site {{ stats().absentLocations.onsite }} ({{ stats().absentLocations.onsitePercent }}%)</span>
+        <span>WFH {{ stats().absentLocations.remote }} ({{ stats().absentLocations.remotePercent }}%)</span>
+      </div>
     </div>
 
     <!-- On Leave -->
@@ -133,6 +155,11 @@
         <span class="stat-label">On Leave</span>
         <div class="stat-value">{{ stats().onLeave }}</div>
         <span class="stat-subtext">{{ stats().missedClockOut }} missed clock-outs</span>
+      </div>
+      <div class="stat-location-breakdown">
+        <span>Office {{ stats().leaveLocations.office }} ({{ stats().leaveLocations.officePercent }}%)</span>
+        <span>On site {{ stats().leaveLocations.onsite }} ({{ stats().leaveLocations.onsitePercent }}%)</span>
+        <span>WFH {{ stats().leaveLocations.remote }} ({{ stats().leaveLocations.remotePercent }}%)</span>
       </div>
     </div>
   </div>
@@ -147,6 +174,26 @@
         <div>
           <div class="ph-title-row">
             <h3>Attendance Champions</h3>
+            <button type="button" class="ph-month-badge ph-month-filter-button" (click)="toggleChampionPeriodPicker($event)"
+                    title="Choose the attendance month or year" aria-haspopup="dialog" [attr.aria-expanded]="championPeriodPickerOpen()">
+              {{ performersPeriod() === 'year' ? 'Jan to Dec' : getSelectedMonthLabel() }} {{ filterYear }}
+              <svg lucideChevronDown [size]="12"></svg>
+            </button>
+            <div class="champion-period-picker" *ngIf="championPeriodPickerOpen()" (click)="$event.stopPropagation()">
+              <label>
+                <span>Month</span>
+                <select [ngModel]="filterMonth" (ngModelChange)="setChampionMonth($event)">
+                  <option *ngFor="let month of months" [ngValue]="month.value">{{ month.label }}</option>
+                </select>
+              </label>
+              <label>
+                <span>Year</span>
+                <select [ngModel]="filterYear" (ngModelChange)="setChampionYear($event)">
+                  <option *ngFor="let year of years" [ngValue]="year">{{ year }}</option>
+                </select>
+              </label>
+              <button type="button" class="champion-picker-done" (click)="closeChampionPeriodPicker()">Done</button>
+            </div>
             <span class="ph-month-badge">{{ performersPeriod() === 'year' ? 'Jan – Dec' : getSelectedMonthLabel() }} {{ filterYear }}</span>
           </div>
           <p class="ph-sub">Recognizing employees with the highest consistency, punctuality, and attendance rate</p>
@@ -157,6 +204,10 @@
           <button type="button" [class.active]="performersPeriod() === 'year'" (click)="setPerformersPeriod('year')">Year</button>
           <button type="button" [class.active]="performersPeriod() === 'month'" (click)="setPerformersPeriod('month')">Month</button>
         </div>
+        <button type="button" class="performance-list-button" (click)="openAttendanceList()" title="View the complete attendance performance ranking">
+          <svg lucideList [size]="15"></svg>
+          Performance List
+        </button>
         <span class="ph-pill"><svg lucideSparkles [size]="14"></svg> Top 3 Recognition</span>
       </div>
     </div>
@@ -240,7 +291,7 @@
         </button>
       </div>
       <!-- Filter Searchable Dropdowns -->
-      <div class="filter-dropdowns-group" *ngIf="false">
+      <div class="filter-dropdowns-group">
 
         <!-- 1. Month Dropdown (Searchable) -->
         <div class="searchable-filter-dropdown">
@@ -457,10 +508,15 @@
   <!-- Status legend -->
   <div class="status-legend" *ngIf="!isLoading()">
     <div class="legend-items-list">
-      <div
+      <button
+        type="button"
         *ngFor="let tag of statusTags"
         class="legend-item"
-        [attr.data-status]="tag.value">
+        [class.active]="filterStatus === tag.value"
+        [attr.data-status]="tag.value"
+        [attr.aria-pressed]="filterStatus === tag.value"
+        [title]="(filterStatus === tag.value ? 'Clear' : 'Show') + ' ' + tag.label + ' attendance'"
+        (click)="toggleStatusFilter(tag.value)">
         <div class="legend-icon-wrapper" [ngClass]="tag.bgClass">
           <svg *ngIf="tag.icon === 'check'" lucideCheck class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'star-half'" lucideStarHalf class="status-icon" [ngClass]="tag.iconClass"></svg>
@@ -473,7 +529,7 @@
           <svg *ngIf="tag.icon === 'timer-off'" lucideTimerOff class="status-icon" [ngClass]="tag.iconClass"></svg>
         </div>
         <span class="legend-label">{{ tag.label }}</span>
-      </div>
+      </button>
     </div>
   </div>
   </div>
@@ -526,7 +582,7 @@
             <td *ngFor="let day of row.days" class="col-day-cell" [class.is-weekend]="day.isWeekend"
                 [class.is-holiday]="day.status === 'Holiday'">
               <div class="day-cell-badge"
-                   [class.is-empty]="day.isFuture && day.status !== 'Holiday'"
+                   [class.is-empty]="day.status === 'Empty'"
                    (mouseenter)="onCellMouseEnter($event, day)"
                    (mouseleave)="onCellMouseLeave()"
                    (click)="openDayDetails(row.employee, day, day.record)"
@@ -538,10 +594,11 @@
                      'bg-leave': day.status === 'On Leave',
                      'bg-holiday': day.status === 'Holiday',
                      'bg-day-off': day.status === 'Day Off',
+                     'bg-clockoff-full': day.status === 'Missed Clock Out',
                      'cell-dimmed': filterStatus && !dayMatchesStatus(day),
                      'cell-highlighted': filterStatus && dayMatchesStatus(day)
                    }">
-                <ng-container *ngIf="!day.isFuture">
+                <ng-container *ngIf="day.status !== 'Empty'">
                   <svg *ngIf="day.status === 'Present'" lucideCheck class="status-present status-icon"></svg>
                   <svg *ngIf="day.status === 'Half Day'" lucideStarHalf class="status-half-day status-icon"></svg>
                   <svg *ngIf="day.status === 'Late'" lucideAlertCircle class="status-late status-icon"></svg>
@@ -549,12 +606,13 @@
                   <svg *ngIf="day.status === 'On Leave'" lucidePlane class="status-leave status-icon"></svg>
                   <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
                   <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
+                  <svg *ngIf="day.status === 'Missed Clock Out'" lucideTimerOff class="status-clockoff-full status-icon" title="Clock-out approval pending"></svg>
                   <span *ngIf="day.record?.fieldVisit || day.record?.isOnsite" class="day-fv-pin" title="Field Visit on site">🚗</span>
                   <span *ngIf="day.record?.clockInLat && !day.record?.fieldVisit && !day.record?.isOnsite" class="day-location-pin" title="GPS location logged">📍</span>
                   <svg *ngIf="day.record?.overtimeHours" lucideZap class="day-corner-symbol day-ot-symbol status-overtime" title="Overtime"></svg>
-                  <svg *ngIf="day.record?.clockOutReason" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" title="Missed clock out"></svg>
+                  <svg *ngIf="showResolvedClockOutMarker(day.record)" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" title="Approved clock-out"></svg>
                 </ng-container>
-                <span *ngIf="day.isFuture" class="future-dot">·</span>
+                <span *ngIf="day.isFuture && day.status === 'Empty'" class="future-dot">·</span>
               </div>
             </td>
 

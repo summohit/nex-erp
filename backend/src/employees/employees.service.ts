@@ -93,7 +93,8 @@ export class EmployeesService {
         // actually has — and a wrong day off is not cosmetic: a real working
         // day rendered as a day off hides an absence, and a day off rendered
         // as a working day invents one.
-        branch: { select: { id: true, name: true, weeklyOffs: true } }
+        branch: { select: { id: true, name: true, weeklyOffs: true } },
+        shift: { select: { id: true, name: true, workingDays: true } },
       },
       orderBy: { firstName: 'asc' }
     });

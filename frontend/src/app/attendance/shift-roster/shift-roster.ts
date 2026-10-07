@@ -421,6 +421,18 @@ export class ShiftRosterComponent implements OnInit {
     });
   });
 
+  /**
+   * One field visit is one employee/day roster cell. Count the complete
+   * filtered result rather than just the current pagination page, so the
+   * number at the top always agrees with the selected roster period.
+   */
+  fieldVisitCount = computed(() =>
+    this.visibleRows().reduce(
+      (total, row) => total + row.cells.filter((cell) => cell.isFieldVisit).length,
+      0,
+    ),
+  );
+
   rosterPageCount = computed(() => Math.max(1, Math.ceil(this.visibleRows().length / this.rosterPageSize())));
   rosterPageNumbers = computed(() => Array.from({ length: this.rosterPageCount() }, (_, index) => index + 1));
   pagedRows = computed(() => {

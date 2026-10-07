@@ -2201,6 +2201,10 @@ export class ProjectsComponent implements OnInit {
 
   taskPriorityDropdownOpen = signal(false);
   taskAssigneeDropdownOpen = signal(false);
+  /** Planned hours by employee for the date currently being scheduled. */
+  assigneeWorkload = signal<Record<string, number>>({});
+  assigneeWorkloadDate = signal('');
+  private workloadRequestDate = '';
 
   // Attachment upload states
   isUploadingAttachment = signal(false);
@@ -2340,6 +2344,9 @@ export class ProjectsComponent implements OnInit {
     this.preSalesInfo.set(null);
     this.taskSubmitted = false;
     this.taskErrors.set({});
+    this.assigneeWorkload.set({});
+    this.assigneeWorkloadDate.set('');
+    this.workloadRequestDate = '';
     this.isCreateTaskOpen.set(true);
     this.ensureTaskPickerData();
   }
@@ -2386,6 +2393,48 @@ export class ProjectsComponent implements OnInit {
     this.taskForm.assigneeIds = current.includes(employeeId)
       ? current.filter((id) => id !== employeeId)
       : [...current, employeeId];
+  }
+
+  /** Reload capacity when the task's schedule date changes. */
+  onTaskScheduleDateChange() {
+    this.revalidateTask();
+    const date = this.taskWorkloadDate();
+    if (!date) {
+      this.assigneeWorkload.set({});
+      this.assigneeWorkloadDate.set('');
+      this.workloadRequestDate = '';
+      return;
+    }
+    if (date === this.workloadRequestDate) return;
+    this.workloadRequestDate = date;
+    this.tasksService.getAssigneeWorkload(date).subscribe({
+      next: (result) => {
+        // A slower request for a previously selected date must not replace the
+        // availability numbers for the date now visible in the form.
+        if (this.workloadRequestDate !== date) return;
+        this.assigneeWorkload.set(result.hoursByEmployee || {});
+        this.assigneeWorkloadDate.set(result.date);
+      },
+      error: () => {
+        if (this.workloadRequestDate !== date) return;
+        this.assigneeWorkload.set({});
+        this.assigneeWorkloadDate.set('');
+      },
+    });
+  }
+
+  /** The start day for regular work; a pre-sales item is scheduled on its due day. */
+  taskWorkloadDate(): string {
+    return this.isPreSalesTarget ? this.taskForm.dueDate : (this.taskForm.startDate || this.taskForm.dueDate || '');
+  }
+
+  assigneeWorkloadHours(employeeId: number): number {
+    return Number(this.assigneeWorkload()[String(employeeId)] || 0);
+  }
+
+  assigneeWorkloadLabel(employeeId: number): string {
+    const hours = this.assigneeWorkloadHours(employeeId);
+    return `${Number.isInteger(hours) ? hours : hours.toFixed(1)}h assigned`;
   }
 
   removeTaskAssignee(employeeId: number, event?: Event) {
@@ -2643,6 +2692,7 @@ export class ProjectsComponent implements OnInit {
     this.taskForm.parentKind = kind;
     this.closeAllTaskDropdowns();
     this.revalidateTask();
+    this.onTaskScheduleDateChange();
   }
 
   /** A datetime-local value is interpreted in the employee's browser timezone. */
@@ -3351,6 +3401,7 @@ export class ProjectsComponent implements OnInit {
     this.isCreateTaskOpen.set(true);
     this.ensureTaskPickerData();
     this.loadPreSalesInfoFor(task.preSales.leadId);
+    this.onTaskScheduleDateChange();
   }
 
   /** A date input wants local YYYY-MM-DD; toISOString would shift the day. */

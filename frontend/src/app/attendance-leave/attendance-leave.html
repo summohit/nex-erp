@@ -89,8 +89,8 @@
                   <span class="day-num">{{ day.dayNumber }}</span>
                   <span class="day-week">{{ day.weekdayStr }}</span>
                 </div>
-                <div class="day-cell" [class.is-empty]="day.isFuture && day.status !== 'Holiday'"
-                     [title]="day.status === 'Holiday' ? day.tooltip : ''"
+                <div class="day-cell" [class.is-empty]="day.status === 'Empty'"
+                     [title]="day.tooltip"
                      (click)="openDayDetailsModal(day)"
                      style="cursor: pointer;"
                      [ngClass]="{
@@ -102,18 +102,14 @@
                        'bg-holiday': day.status === 'Holiday',
                        'bg-day-off': day.status === 'Day Off'
                      }">
-                  <!-- Upcoming holidays show their star too; other future days stay blank. -->
-                  <svg *ngIf="day.isFuture && day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
-                  <ng-container *ngIf="!day.isFuture">
-                    <svg *ngIf="day.status === 'Present'" lucideCheck class="status-present status-icon"></svg>
-                    <svg *ngIf="day.status === 'Half Day'" lucideStarHalf class="status-half-day status-icon"></svg>
-                    <svg *ngIf="day.status === 'Late'" lucideAlertCircle class="status-late status-icon"></svg>
-                    <svg *ngIf="day.status === 'Absent'" lucideX class="status-absent status-icon"></svg>
-                    <svg *ngIf="day.status === 'On Leave'" lucidePlane class="status-leave status-icon"></svg>
-                    <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
-                    <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
-                    <span *ngIf="day.clockInLat && day.clockInLng" class="day-location-pin" title="GPS location logged">📍</span>
-                  </ng-container>
+                  <svg *ngIf="day.status === 'Present'" lucideCheck class="status-present status-icon"></svg>
+                  <svg *ngIf="day.status === 'Half Day'" lucideStarHalf class="status-half-day status-icon"></svg>
+                  <svg *ngIf="day.status === 'Late'" lucideAlertCircle class="status-late status-icon"></svg>
+                  <svg *ngIf="day.status === 'Absent'" lucideX class="status-absent status-icon"></svg>
+                  <svg *ngIf="day.status === 'On Leave'" lucidePlane class="status-leave status-icon"></svg>
+                  <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
+                  <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
+                  <span *ngIf="day.clockInLat && day.clockInLng" class="day-location-pin" title="GPS location logged">📍</span>
                 </div>
               </div>
             </div>
@@ -358,11 +354,11 @@
         <section class="leave-calendar-view" *ngIf="!isLoadingLeaveApplications() && leaveViewMode() === 'calendar'">
           <header class="leave-calendar-header">
             <button type="button" class="btn btn-outline" aria-label="Previous month" (click)="stepLeaveCalendarMonth(-1)">
-              <svg lucideChevronLeft [size]="17"></svg>
+              <span class="calendar-month-arrow" aria-hidden="true">‹</span>
             </button>
             <h4>{{ leaveCalendarTitle() }}</h4>
             <button type="button" class="btn btn-outline" aria-label="Next month" (click)="stepLeaveCalendarMonth(1)">
-              <svg lucideChevronRight [size]="17"></svg>
+              <span class="calendar-month-arrow" aria-hidden="true">›</span>
             </button>
           </header>
           <div class="leave-calendar-grid">
@@ -1304,26 +1300,20 @@
         <h3 class="widget-title">Team Timeline</h3>
         <div class="period-selectors" style="display: flex; gap: 8px; align-items: center;">
           <span style="font-size: 12px; color: #64748b;">{{ timelineVisibleEmployees().length }} people</span>
-          <button type="button" class="btn btn-outline" (click)="timelineFilterDrawerOpen.set(true)">
-            <svg lucideFilter [size]="14"></svg> Filters
-          </button>
+          <label class="attendance-search">
+            <svg lucideSearch [size]="16" aria-hidden="true"></svg>
+            <input type="search" aria-label="Search employee" placeholder="Search employee or ID..."
+                   [ngModel]="timelineEmployeeQuery()" (ngModelChange)="timelineEmployeeQuery.set($event)">
+          </label>
+          <input type="date" class="form-control" style="width: auto; font-size: 13px;"
+                 [value]="timelineStartDate()" (change)="onTimelineStartDate($event)"
+                 aria-label="Timeline start date">
+          <span style="font-size: 12px; color: #64748b;">to</span>
+          <input type="date" class="form-control" style="width: auto; font-size: 13px;"
+                 [value]="timelineEndDate()" (change)="onTimelineEndDate($event)"
+                 aria-label="Timeline end date">
         </div>
       </div>
-      <app-attendance-filter-drawer
-        [open]="timelineFilterDrawerOpen()"
-        title="Team timeline filters"
-        description="Choose the timeline window and the team members to display."
-        [preset]="'CUSTOM'"
-        [startDate]="timelineStartDate()"
-        [endDate]="timelineEndDate()"
-        employeeLabel="Employee name or ID"
-        employeeHint="Search by employee name or staff ID."
-        [employeeQuery]="timelineEmployeeQuery()"
-        [filterGroups]="timelineFilterGroups"
-        [filterValues]="timelineFilterValues"
-        (closed)="timelineFilterDrawerOpen.set(false)"
-        (applied)="applyTimelineFilters($event)">
-      </app-attendance-filter-drawer>
 
       <div class="timeline-container">
         <div class="timeline-grid">

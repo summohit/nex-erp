@@ -181,6 +181,12 @@ export const routes: Routes = [
         loadComponent: () => import('./attendance/all-attendance/all-attendance').then(m => m.AllAttendanceComponent)
       },
       {
+        path: 'attendance/list',
+        canActivate: [companyAttendanceGuard, permissionGuard],
+        data: { module: 'attendance/all' },
+        loadComponent: () => import('./attendance/attendance-list/attendance-list').then(m => m.AttendanceListComponent)
+      },
+      {
         // §Att7. Above 'attendance/:tab' for the same reason the others are.
         path: 'attendance/shift-summary',
         canActivate: [permissionGuard],

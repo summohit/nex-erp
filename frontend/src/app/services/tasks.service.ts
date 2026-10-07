@@ -142,6 +142,12 @@ export interface TopPerformersResult {
   since: string;
 }
 
+export interface AssigneeWorkload {
+  date: string;
+  /** Employee id → planned hours for that date. */
+  hoursByEmployee: Record<string, number>;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TasksService {
   private http = inject(HttpClient);
@@ -179,6 +185,12 @@ export class TasksService {
   topPerformers(days = 30): Observable<TopPerformersResult> {
     return this.http.get<TopPerformersResult>(`${this.apiUrl}/top-performers`, {
       params: { days: String(days) },
+    });
+  }
+
+  getAssigneeWorkload(date: string): Observable<AssigneeWorkload> {
+    return this.http.get<AssigneeWorkload>(`${this.apiUrl}/assignee-workload`, {
+      params: { date },
     });
   }
 

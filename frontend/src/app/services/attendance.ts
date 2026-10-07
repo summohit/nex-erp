@@ -44,6 +44,9 @@ export interface AttendanceRecord {
   /** Live "session still open and overdue" flag; cleared once the day closes. */
   missedClockOut?: boolean;
   isOnsite?: boolean;
+  /** A clock made outside the employee's assigned office radius. */
+  clockInOutside?: boolean;
+  clockOutOutside?: boolean;
   project?: { id: number; name: string; key?: string } | null;
   fieldVisit?: {
     requestId?: number;
@@ -56,6 +59,8 @@ export interface AttendanceRecord {
     status?: string;
   } | null;
   employeeId: number;
+  /** True only for a planned, explicit Shift Roster day-off override. */
+  isRosteredDayOff?: boolean;
   employee?: any;
   logs?: any[];
 }

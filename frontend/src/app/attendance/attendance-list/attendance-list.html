@@ -1,0 +1,62 @@
+<div class="attendance-list-page">
+  <header class="page-header">
+    <div class="heading">
+      <button type="button" class="back-button" (click)="back()" aria-label="Back to attendance">
+        <svg lucideArrowLeft [size]="18"></svg>
+      </button>
+      <div>
+        <h1>Attendance List</h1>
+        <p>Employees ranked from best to worst attendance for {{ periodLabel() }}.</p>
+      </div>
+    </div>
+    <button type="button" class="refresh-button" (click)="load()" [disabled]="loading()">
+      <svg lucideRefreshCw [size]="15" [class.spinning]="loading()"></svg> Refresh
+    </button>
+  </header>
+
+  <section class="filter-card" aria-label="Attendance period filters">
+    <div class="filter-field">
+      <label for="attendance-month">Month</label>
+      <select id="attendance-month" [ngModel]="month()" (ngModelChange)="month.set(+$event); selectMonth()" [disabled]="!!selectedDate()">
+        <option *ngFor="let label of months; let index = index" [value]="index + 1">{{ label }}</option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="attendance-year">Year</label>
+      <select id="attendance-year" [ngModel]="year()" (ngModelChange)="year.set(+$event); selectMonth()" [disabled]="!!selectedDate()">
+        <option *ngFor="let value of years" [value]="value">{{ value }}</option>
+      </select>
+    </div>
+    <div class="filter-field date-field">
+      <label for="attendance-date"><svg lucideCalendarDays [size]="14"></svg> Specific date</label>
+      <input id="attendance-date" type="date" [ngModel]="selectedDate()" (ngModelChange)="selectedDate.set($event); onDateChange()">
+    </div>
+    <button *ngIf="selectedDate()" type="button" class="clear-date" (click)="selectedDate.set(''); load()">Show month</button>
+  </section>
+
+  <section class="summary-card">
+    <svg lucideUsers [size]="19"></svg>
+    <span><strong>{{ ranking().length }}</strong> employees with attendance records</span>
+    <span class="ranking-note"><svg lucideTrophy [size]="15"></svg> Ranked by attendance rate, then absences and late arrivals.</span>
+  </section>
+
+  <section class="list-card">
+    <div class="loading-state" *ngIf="loading()">Loading attendance…</div>
+    <ng-container *ngIf="!loading()">
+      <div class="list-head">
+        <span>Rank</span><span>Employee</span><span>Present</span><span>Half day</span><span>Absent</span><span>On leave</span><span>Late</span><span>Hours</span><span>Attendance</span>
+      </div>
+      <div class="rank-row" *ngFor="let row of ranking(); let index = index">
+        <div class="rank" [class.top-rank]="index < 3">{{ index + 1 }}</div>
+        <div class="employee">
+          <img *ngIf="row.avatarUrl" [src]="row.avatarUrl" [alt]="row.name">
+          <span *ngIf="!row.avatarUrl" class="avatar-fallback">{{ row.name.charAt(0) }}</span>
+          <div><strong>{{ row.name }}</strong><small>{{ row.designation }} <ng-container *ngIf="row.department !== '—'">· {{ row.department }}</ng-container></small></div>
+        </div>
+        <span class="metric good">{{ row.present }}</span><span class="metric">{{ row.halfDay }}</span><span class="metric danger">{{ row.absent }}</span><span class="metric">{{ row.onLeave }}</span><span class="metric warn">{{ row.late }}</span><span class="metric">{{ row.hours | number:'1.0-1' }}h</span>
+        <div class="rate"><div class="rate-track"><i [style.width.%]="row.rate || 0" [class.low]="(row.rate || 0) < 80"></i></div><b>{{ row.rate === null ? '—' : row.rate + '%' }}</b></div>
+      </div>
+      <div class="empty-state" *ngIf="!ranking().length">No attendance records found for this period.</div>
+    </ng-container>
+  </section>
+</div>

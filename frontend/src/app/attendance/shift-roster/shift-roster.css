@@ -24,6 +24,22 @@
   color: #64748B;
 }
 
+.field-visit-total {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.field-visit-total strong { font-size: 15px; color: #3730a3; }
+
 .header-actions {
   display: flex;
   gap: 10px;

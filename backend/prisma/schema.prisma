@@ -167,6 +167,34 @@ model User {
   deviceTokens             DeviceToken[]
 }
 
+/// One compensatory day off, earned by working a non-working day on a trip.
+///
+/// A ledger rather than a bare increment on LeaveBalance: re-approving a trip
+/// must not credit the same day twice, cancelling it or moving its dates must
+/// take back exactly what it gave, and "where did this Comp-Off day come from"
+/// should have an answer.
+model CompOffCredit {
+  id                  Int       @id @default(autoincrement())
+  companyId           Int
+  employeeId          Int
+  employee            Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId         Int
+  leaveType           LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  fieldVisitRequestId Int?
+  attendanceId        Int?      @unique
+  attendance          Attendance? @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  /// The non-working day that was worked.
+  date                DateTime? @db.Date
+  /// HOLIDAY | WEEK_OFF | DAY_OFF
+  reason              String?
+  days                Float     @default(1)
+  /// The balance year it was credited to — the year of `date`.
+  year                Int
+  createdAt           DateTime  @default(now())
+
+  @@unique([fieldVisitRequestId, employeeId, date])
+  @@index([employeeId])
+}
 
 /// One push destination: a browser, or an installation of the mobile app.
 ///
@@ -726,23 +754,6 @@ model LeaveBalance {
   updatedAt DateTime @updatedAt
 
   @@unique([employeeId, leaveTypeId, year])
-}
-
-/// A workday that earned one Comp Off. Keeping this separate from the balance
-/// makes the automatic credit auditable and, crucially, idempotent when a
-/// clock-out is edited, approved later, or attendance is imported again.
-model CompOffCredit {
-  id           Int        @id @default(autoincrement())
-  employeeId   Int
-  employee     Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  attendanceId Int        @unique
-  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
-  leaveTypeId  Int
-  leaveType    LeaveType  @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
-  year         Int
-  createdAt    DateTime   @default(now())
-
-  @@index([employeeId, year])
 }
 
 model LeaveRequest {

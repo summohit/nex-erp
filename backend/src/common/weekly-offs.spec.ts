@@ -33,19 +33,28 @@ describe('branch weekly offs', () => {
       id: 1, name: 'General Shift', startTime: '09:30', endTime: '18:30',
       bufferTimeMinutes: 15, workingDays: 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
     };
+    const noPermanentDays = { ...standing, workingDays: null };
 
-    it('makes a 2nd Saturday a day off for a Mon–Sat shift', () => {
+    // A shift with permanent working days is the roster's answer: a Mon–Sat
+    // shift works Saturdays whether or not the branch rule calls them off.
+    it('lets a Mon–Sat shift work the 2nd Saturday the branch rule calls off', () => {
       const r = ShiftRosterService.resolveEffectiveShift(null, standing, day('2026-10-10'), RULE);
-      expect(r.isDayOff).toBe(true);
-    });
-
-    it('keeps a 3rd Saturday a working day', () => {
-      const r = ShiftRosterService.resolveEffectiveShift(null, standing, day('2026-10-17'), RULE);
       expect(r.isDayOff).toBe(false);
     });
 
+    it('still gives the shift its own non-working days', () => {
+      const monFri = { ...standing, workingDays: 'Monday,Tuesday,Wednesday,Thursday,Friday' };
+      const r = ShiftRosterService.resolveEffectiveShift(null, monFri, day('2026-10-17'), RULE);
+      expect(r.isDayOff).toBe(true);
+    });
+
+    it('falls back to the branch rule when the shift has no permanent working days', () => {
+      expect(ShiftRosterService.resolveEffectiveShift(null, noPermanentDays, day('2026-10-10'), RULE).isDayOff).toBe(true);
+      expect(ShiftRosterService.resolveEffectiveShift(null, noPermanentDays, day('2026-10-03'), RULE).isDayOff).toBe(false);
+    });
+
     it('ignores the branch rule when the employee has no branch', () => {
-      const r = ShiftRosterService.resolveEffectiveShift(null, standing, day('2026-10-10'), null);
+      const r = ShiftRosterService.resolveEffectiveShift(null, noPermanentDays, day('2026-10-10'), null);
       expect(r.isDayOff).toBe(false);
     });
   });

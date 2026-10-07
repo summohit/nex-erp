@@ -50,6 +50,16 @@ describe('ShiftRosterService.getEffectiveShift', () => {
     expect(r.isDayOff).toBe(true);
   });
 
+  it('honours permanent weekend working days over a branch weekly-off', async () => {
+    const sunday = new Date('2026-09-13T00:00:00Z');
+    const weekendShift = { ...OFFICE, workingDays: 'Wednesday,Thursday,Friday,Saturday,Sunday' };
+
+    const r = await service.getEffectiveShift(10, sunday, weekendShift as any, '0,6');
+
+    expect(r.isDayOff).toBe(false);
+    expect(r.source).toBe('STANDING');
+  });
+
   it('reports NONE when the employee has no shift at all', async () => {
     const r = await service.getEffectiveShift(10, DATE, null);
     expect(r.source).toBe('NONE');

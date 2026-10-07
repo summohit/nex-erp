@@ -427,6 +427,11 @@ export class AttendanceLeaveComponent implements OnInit {
 
   canEditLeaveApplication = (request: LeaveRequest): boolean =>
     this.isAdmin() || this.myRequests().some((ownRequest) => ownRequest.id === request.id);
+
+  /** Employees may cancel only their own leave before it starts. The server
+   * repeats this check, so a crafted request cannot cancel somebody else's. */
+  canCancelLeaveApplication = (request: LeaveRequest): boolean =>
+    this.myRequests().some((ownRequest) => ownRequest.id === request.id);
   
   // Clock in widget
   math = Math;
@@ -631,10 +636,10 @@ export class AttendanceLeaveComponent implements OnInit {
           CANCELLED: '#94a3b8',
         };
         const reasonLink = status === 'REJECTED' && params.data.rejectionReason
-          ? `<div class="view-reason-link" style="font-size:11px;color:#1373e5;text-decoration:underline;margin-top:4px;cursor:pointer;">View Reason</div>`
+          ? `<button type="button" class="view-reason-link" title="${String(params.data.rejectionReason).replace(/\"/g, '&quot;')}" style="display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;padding:0;font-size:11px;color:#1373e5;text-decoration:underline;margin-top:4px;cursor:pointer;text-align:left;">Reason: ${String(params.data.rejectionReason).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</button>`
           : '';
-        return `<div style="display:flex;flex-direction:column;gap:4px;">
-          <span style="display:flex;align-items:center;gap:7px;">
+        return `<div style="display:flex;flex-direction:column;gap:4px;min-width:0;width:100%;overflow:hidden;">
+          <span style="display:flex;align-items:center;gap:7px;min-width:0;">
             <span style="width:9px;height:9px;border-radius:50%;background:${colors[status] || colors['PENDING']};"></span>
             ${status}
           </span>${reasonLink}
@@ -648,7 +653,10 @@ export class AttendanceLeaveComponent implements OnInit {
       flex: 0.9,
       cellRenderer: (params: any) => {
         if (!params.value) return '—';
-        return `<span style="display:inline-block;background:#e0f2fe;color:#0369a1;font-size:10px;font-weight:700;padding:3px 6px;border-radius:4px;">${params.value}</span>`;
+        const attachmentIcon = params.data?.attachmentUrl
+          ? `<a href="${params.data.attachmentUrl}" target="_blank" rel="noopener noreferrer" title="Open attachment" aria-label="Open attachment" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 24px;border:1px solid #bfdbfe;border-radius:6px;color:#2563eb;background:#eff6ff;text-decoration:none;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></a>`
+          : '';
+        return `<div style="display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;overflow:hidden;"><span style="display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#e0f2fe;color:#0369a1;font-size:10px;font-weight:700;padding:3px 6px;border-radius:4px;">${params.value}</span>${attachmentIcon}</div>`;
       }
     },
     {
@@ -884,11 +892,11 @@ export class AttendanceLeaveComponent implements OnInit {
         if (s === 'REJECTED') statusClass = 'status-rejected';
         
         const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason 
-          ? `<div class="view-reason-link" style="font-size: 10px; color: #1373e5; font-weight: 500; margin-top: 3px; cursor: pointer;">Reason: ${params.data.rejectionReason}</div>`
+          ? `<button type="button" class="view-reason-link" title="${String(params.data.rejectionReason).replace(/\"/g, '&quot;')}" style="display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;padding:0;font-size:10px;color:#1373e5;font-weight:500;margin-top:3px;cursor:pointer;text-align:left;">Reason: ${String(params.data.rejectionReason).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</button>`
           : '';
         return `
-          <div class="cell-stacked">
-            <span class="status-round ${statusClass}">
+          <div class="cell-stacked" style="min-width:0;width:100%;overflow:hidden;">
+            <span class="status-round ${statusClass}" style="max-width:100%;">
               <span class="status-dot"></span>
               ${s}
             </span>
@@ -904,10 +912,10 @@ export class AttendanceLeaveComponent implements OnInit {
       flex: 0.9,
       cellRenderer: (params: any) => {
         if (!params.value) return '—';
-        const attachmentLink = params.data.attachmentUrl
-          ? `<a href="${params.data.attachmentUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#2563EB;text-decoration:none;margin-top:3px;">Attachment</a>`
+        const attachmentIcon = params.data.attachmentUrl
+          ? `<a href="${params.data.attachmentUrl}" target="_blank" rel="noopener noreferrer" title="Open attachment" aria-label="Open attachment" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 24px;border:1px solid #bfdbfe;border-radius:6px;color:#2563eb;background:#eff6ff;text-decoration:none;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></a>`
           : '';
-        return `<div><span class="cat-badge cat-laptop">${params.value}</span>${attachmentLink}</div>`;
+        return `<div style="display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;overflow:hidden;"><span class="cat-badge cat-laptop" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${params.value}</span>${attachmentIcon}</div>`;
       }
     },
     {
@@ -936,7 +944,7 @@ export class AttendanceLeaveComponent implements OnInit {
         onApprove: (data: any) => this.approveLeaveRequest(data.id),
         onReject: (data: any) => this.openRejectModal(data.id),
         canEdit: (data: LeaveRequest) => this.canEditLeaveApplication(data),
-        canCancel: (data: LeaveRequest) => this.canEditLeaveApplication(data),
+        canCancel: (data: LeaveRequest) => this.canCancelLeaveApplication(data),
         canApprove: (data: LeaveRequest) => this.canApproveLeaveApplication(data),
         canReject: (data: LeaveRequest) => this.canApproveLeaveApplication(data),
         onViewAttachment: (data: any) => this.viewAttachment(data.attachmentUrl),
@@ -967,6 +975,9 @@ export class AttendanceLeaveComponent implements OnInit {
     mode: 'multiRow' as const,
     checkboxes: (params: any) => params.data?.status === 'PENDING',
     headerCheckbox: true,
+    // The header checkbox is a page action: with 10 rows on screen it must
+    // never silently select pending requests on later pages.
+    selectAll: 'currentPage' as const,
     enableClickSelection: false,
   };
   managerRequests = signal<LeaveRequest[]>([]);
@@ -982,6 +993,7 @@ export class AttendanceLeaveComponent implements OnInit {
   private adminDataLoading = false;
   private managerDataLoading = false;
   private holidaysLoading = false;
+  private myLeaveRequestsLoaded = false;
 
   // Whether the currently selected leave type allows half-day
   selectedLeaveTypeAllowsHalfDay = computed(() => {
@@ -1290,27 +1302,8 @@ export class AttendanceLeaveComponent implements OnInit {
   timelineEndDate = signal<string>(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]);
   timelineEmployees = signal<any[]>([]);
   teamTimelineData = signal<any[]>([]);
-  timelineFilterDrawerOpen = signal(false);
   timelineEmployeeQuery = signal('');
   timelineDepartmentFilter = signal('');
-
-  get timelineFilterGroups() {
-    const departments = [...new Set(
-      this.timelineEmployees()
-        .map((employee) => employee.department?.name)
-        .filter((name): name is string => !!name),
-    )].sort((a, b) => a.localeCompare(b));
-    return [{
-      key: 'department',
-      label: 'Department',
-      placeholder: 'All departments',
-      options: departments.map((name) => ({ value: name, label: name })),
-    }];
-  }
-
-  get timelineFilterValues(): Record<string, string> {
-    return { department: this.timelineDepartmentFilter() };
-  }
 
   timelineVisibleEmployees = computed(() => {
     const query = this.timelineEmployeeQuery().trim().toLowerCase();
@@ -2382,11 +2375,11 @@ export class AttendanceLeaveComponent implements OnInit {
 
     const dateString = this.getLocalDateString(day.date);
     const log = this.myHistory().find(l => this.getBackendDateString(l.date) === dateString);
-    const leave = this.myRequests().find(r => {
+    const leave = this.isViewingOwnAttendance ? this.myRequests().find(r => {
       const s = this.getBackendDateString(r.startDate);
       const e = this.getBackendDateString(r.endDate);
       return r.status === 'APPROVED' && dateString >= s && dateString <= e;
-    });
+    }) : undefined;
     const holiday = this.holidays().find(h => this.getBackendDateString(h.date) === dateString);
 
     let targetEmpName = 'My Attendance Log';
@@ -2607,7 +2600,20 @@ export class AttendanceLeaveComponent implements OnInit {
       }
       else if (this.leaveSection() === 'approvals' || this.leaveSection() === 'balances') this.loadAdminData();
       else if (this.leaveSection() === 'team-approvals') this.loadManagerData();
+    } else {
+      this.loadMyLeaveRequestsForGrid();
     }
+  }
+
+  private loadMyLeaveRequestsForGrid() {
+    if (this.myLeaveRequestsLoaded) return;
+    this.leavesService.getMyRequests().subscribe({
+      next: (requests: any) => {
+        this.myLeaveRequestsLoaded = true;
+        this.myRequests.set(requests);
+        this.generateGrid();
+      },
+    });
   }
 
   private loadLeaveApplicationData() {
@@ -2623,6 +2629,7 @@ export class AttendanceLeaveComponent implements OnInit {
       next: ({ balances, requests, leaveTypes }: any) => {
         this.myBalances.set(balances);
         this.myRequests.set(requests);
+        this.myLeaveRequestsLoaded = true;
         this.leaveTypes.set(leaveTypes);
       },
       error: () => {
@@ -2785,7 +2792,9 @@ export class AttendanceLeaveComponent implements OnInit {
     const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const hols = this.holidays();
     const logs = this.myHistory();
-    const reqs = this.myRequests().filter(r => r.status === 'APPROVED');
+    const reqs = this.isViewingOwnAttendance
+      ? this.myRequests().filter(r => r.status === 'APPROVED')
+      : [];
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
@@ -2810,24 +2819,31 @@ export class AttendanceLeaveComponent implements OnInit {
         ? hols.find(h => this.getBackendDateString(h.date) === dateString)
         : undefined;
 
+      const leave = reqs.find(r => {
+        const s = this.getBackendDateString(r.startDate);
+        const e = this.getBackendDateString(r.endDate);
+        return dateString >= s && dateString <= e;
+      });
+
       if (upcomingHoliday) {
         // An upcoming holiday is already known — show it instead of a blank
         // day that reads like an ordinary working day.
         status = 'Holiday';
         tooltip = `${upcomingHoliday.name} (upcoming)`;
       } else if (isFuture) {
-        status = 'Empty';
+        if (leave) {
+          status = 'On Leave';
+          tooltip = leave.leaveType.name;
+        } else if (isWeekend) {
+          status = 'Day Off';
+          tooltip = 'Weekend';
+        } else {
+          status = 'Empty';
+        }
       } else {
         // Find if holiday
         const holiday = hols.find(h => this.getBackendDateString(h.date) === dateString);
         
-        // Find if on leave
-        const leave = reqs.find(r => {
-          const s = this.getBackendDateString(r.startDate);
-          const e = this.getBackendDateString(r.endDate);
-          return dateString >= s && dateString <= e;
-        });
-
         // Find attendance
         const log = logs.find(l => this.getBackendDateString(l.date) === dateString);
 
@@ -3085,6 +3101,9 @@ export class AttendanceLeaveComponent implements OnInit {
 
   setTab(tab: string) {
     this.activeTab.set(tab);
+    if (tab === 'attendance') {
+      this.loadMyLeaveRequestsForGrid();
+    }
     if (tab === 'balances' || tab === 'approvals') {
       this.loadAdminData();
     }
@@ -3223,12 +3242,19 @@ export class AttendanceLeaveComponent implements OnInit {
     this.filterDrawerOpen.set(false);
   }
 
-  applyTimelineFilters(filters: AttendanceFilterValue): void {
-    this.timelineStartDate.set(filters.startDate);
-    this.timelineEndDate.set(filters.endDate);
-    this.timelineEmployeeQuery.set(filters.employeeQuery);
-    this.timelineDepartmentFilter.set(filters.filters['department'] || '');
-    this.timelineFilterDrawerOpen.set(false);
+  onTimelineStartDate(e: Event): void {
+    const value = (e.target as HTMLInputElement).value;
+    if (!value) return;
+    this.timelineStartDate.set(value);
+    if (value > this.timelineEndDate()) this.timelineEndDate.set(value);
+    this.loadTeamTimeline();
+  }
+
+  onTimelineEndDate(e: Event): void {
+    const value = (e.target as HTMLInputElement).value;
+    if (!value) return;
+    this.timelineEndDate.set(value);
+    if (value < this.timelineStartDate()) this.timelineStartDate.set(value);
     this.loadTeamTimeline();
   }
 
