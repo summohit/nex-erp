@@ -403,6 +403,10 @@ export class AttendanceService {
       );
     }
 
+    // A second (or later) session on a day already started. Lateness and the
+    // late-start half day belong to the FIRST clock-in only; see the update below.
+    const returning = !!existing;
+
     if (!existing) {
       existing = await this.prisma.attendance.create({
         data: {
@@ -450,8 +454,9 @@ export class AttendanceService {
     const updated = await this.prisma.attendance.update({
       where: { id: existing.id },
       data: {
-        status: existing.status === 'HALF_DAY' || isHalfDay ? 'HALF_DAY' : 'PRESENT',
-        isLate: existing.isLate || isLate,
+        ...(returning
+          ? this.returningStatus(existing, effective, onHoliday)
+          : { status: isHalfDay ? 'HALF_DAY' : 'PRESENT', isLate }),
         clockOut: null, // Reset clockOut on parent since they are active
         autoClockedOut: false, // reopened — the old cutoff no longer describes the day
         clockIn: existing.clockIn || now,
@@ -469,6 +474,24 @@ export class AttendanceService {
       include: { logs: true }
     });
     return this.withTotalHours(updated);
+  }
+
+  /**
+   * The day's status when somebody clocks back in.
+   *
+   * Lateness and the late-start half day are judged on the FIRST clock-in of
+   * the day — scoring the return instead marked anyone who stepped out (to a
+   * client site, say) and came back after the half-day boundary as a half day.
+   * And coming back cancels the "left early" half day the previous clock-out
+   * wrote; the next clock-out scores the day again.
+   */
+  private returningStatus(existing: any, effective: any, onHoliday: boolean) {
+    const lateStartHalfDay = !!effective.startTime && !onHoliday && !!existing.clockIn
+      && isHalfDayStart(existing.clockIn, effective.startTime, effective.shift?.halfDayTime, istTimeInstant);
+    const status = existing.isEarlyLeave
+      ? (lateStartHalfDay ? 'HALF_DAY' : 'PRESENT')
+      : (existing.status ?? 'PRESENT');
+    return { status, isLate: !!existing.isLate, isEarlyLeave: false };
   }
 
   /**

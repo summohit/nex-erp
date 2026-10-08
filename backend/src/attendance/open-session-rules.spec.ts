@@ -289,4 +289,44 @@ describe('an unclosed session from a previous day', () => {
       expect(prisma.attendance.findFirst).not.toHaveBeenCalled();
     });
   });
+  // Ansh, 7 Oct: clocked out at a client site at midday, clocked back in at the
+  // office. The midday clock-out had marked the day an early-leave half day,
+  // and coming back did not undo it.
+  describe('coming back after clocking out early', () => {
+    const tuesdayLeftEarly = (clockInAt: Date) => ({
+      id: 7, date: TUESDAY, clockIn: clockInAt, clockOut: ist(15, 12, 30),
+      status: 'HALF_DAY', isEarlyLeave: true, missedClockOut: false,
+      logs: [{ id: 103, clockIn: clockInAt, clockOut: ist(15, 12, 30) }],
+    });
+
+    beforeEach(() => jest.useFakeTimers().setSystemTime(ist(15, 14, 0)));
+
+    it('clears the early-leave half day', async () => {
+      prisma.attendance.findUnique.mockResolvedValue(tuesdayLeftEarly(ist(15, 9, 30)));
+      await service.clockIn(99, {});
+      expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({
+        status: 'PRESENT', isEarlyLeave: false, isLate: false,
+      });
+    });
+
+    // 14:00 is past any half-day boundary and hours after 09:30 — but it is a
+    // return, not the start of the day.
+    it('does not score the return as a late start', async () => {
+      prisma.attendance.findUnique.mockResolvedValue({ ...tuesdayLeftEarly(ist(15, 9, 30)), isEarlyLeave: false, status: 'PRESENT' });
+      await service.clockIn(99, {});
+      expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({ status: 'PRESENT', isLate: false });
+    });
+
+    it('keeps a half day the first clock-in earned', async () => {
+      roster.getEffectiveShift.mockResolvedValue({
+        source: 'STANDING',
+        shift: { id: 1, name: 'General Shift', bufferTimeMinutes: 15, halfDayTime: '13:00' },
+        startTime: '09:30', endTime: '18:30', isDayOff: false, onsite: null,
+      });
+      prisma.attendance.findUnique.mockResolvedValue({ ...tuesdayLeftEarly(ist(15, 13, 30)), isLate: true });
+      jest.setSystemTime(ist(15, 15, 0));
+      await service.clockIn(99, {});
+      expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({ status: 'HALF_DAY', isLate: true });
+    });
+  });
 });
