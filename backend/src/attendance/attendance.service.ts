@@ -147,7 +147,7 @@ export class AttendanceService {
     const now = new Date();
     const today = istDateKey(now);
 
-    return this.prisma.attendance.findUnique({
+    const record = await this.prisma.attendance.findUnique({
       where: {
         employeeId_date: {
           employeeId: employee.id,
@@ -155,7 +155,20 @@ export class AttendanceService {
         }
       },
       include: { logs: true }
-    }).then(r => this.withTotalHours(r));
+    });
+
+    // A night shift that started yesterday and is still running is "today"
+    // for the clock: show it, so the person sees Clock Out and their timer.
+    if (!record?.logs?.some((l) => !l.clockOut)) {
+      const lastNight = await this.findOpenSessionBefore(employee.id, today);
+      if (lastNight && await this.isOvernightContinuation(
+        await this.prisma.employee.findUnique({ where: { id: employee.id }, include: { shift: true, branch: true } }),
+        lastNight, today, now,
+      )) {
+        return { ...this.withTotalHours(lastNight), overnight: true };
+      }
+    }
+    return this.withTotalHours(record);
   }
 
   private withTotalHours(record: any) {
@@ -596,6 +609,30 @@ export class AttendanceService {
     });
   }
 
+  /** How long after a night shift's end its session still counts as running. */
+  private static readonly OVERNIGHT_GRACE_MS = 4 * 3600000;
+
+  /**
+   * A night shift still running: the session opened YESTERDAY, on a shift
+   * that crosses midnight (it ends at or before the time it starts), and it is
+   * not yet past that end time plus a grace period.
+   *
+   * Without this, a night shift clocked in at 20:00 belonged to a "previous
+   * day" from midnight on — the header could not see it (it only ever looked
+   * at today), so it offered Clock In instead of Clock Out, and closing it in
+   * the morning was treated as a forgotten clock-out needing a reason and an
+   * approval.
+   */
+  private async isOvernightContinuation(employee: any, session: { date: Date }, todayKey: Date, now: Date) {
+    if (todayKey.getTime() - session.date.getTime() !== 86400000) return false;
+    const effective = await this.roster.getEffectiveShift(
+      employee.id, session.date, employee.shift, employee.branch ? employee.branch.weeklyOffs ?? '' : null,
+    );
+    if (!effective?.startTime || !effective?.endTime || effective.endTime > effective.startTime) return false;
+    const end = istTimeInstant(now, effective.endTime);
+    return now.getTime() <= end.getTime() + AttendanceService.OVERNIGHT_GRACE_MS;
+  }
+
   /**
    * Close the open session — today's, or an earlier one left hanging.
    *
@@ -672,7 +709,8 @@ export class AttendanceService {
     // 23:50 clock-out of the same day is normal, 00:10 of the next is not,
     // and those are eleven times closer together than a fixed-hours rule
     // would treat them.
-    const isPreviousDay = existing.date.getTime() < todayKey.getTime();
+    const isPreviousDay = existing.date.getTime() < todayKey.getTime()
+      && !(await this.isOvernightContinuation(employee, existing, todayKey, now));
 
     const reason = (data?.reason ?? '').trim();
     if (isPreviousDay && !reason) {

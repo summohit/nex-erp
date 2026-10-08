@@ -329,4 +329,52 @@ describe('an unclosed session from a previous day', () => {
       expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({ status: 'HALF_DAY', isLate: true });
     });
   });
+  // Ajay, 7–8 Oct: night shift, clocked in at 20:00. In the morning the header
+  // offered Clock In (it only looked at today), and closing the session was
+  // treated as a forgotten clock-out needing a reason and an approval.
+  describe('a night shift that crosses midnight', () => {
+    const mondayNight = () => ({
+      id: 11, date: MONDAY, clockIn: ist(14, 20, 0), clockOut: null,
+      status: 'PRESENT', isEarlyLeave: false, missedClockOut: true, isLate: false,
+      logs: [{ id: 104, clockIn: ist(14, 20, 0), clockOut: null }],
+    });
+
+    beforeEach(() => {
+      roster.getEffectiveShift.mockResolvedValue({
+        source: 'ROSTER',
+        shift: { id: 2, name: 'Night Shift', bufferTimeMinutes: 15 },
+        startTime: '20:00', endTime: '08:00', isDayOff: false, onsite: null,
+      });
+      prisma.attendance.findUnique.mockResolvedValue(null);
+      prisma.attendance.findFirst.mockResolvedValue(mondayNight());
+    });
+
+    it('is shown as still running the next morning', async () => {
+      jest.useFakeTimers().setSystemTime(ist(15, 7, 45));
+      const today: any = await service.getTodayAttendance(99);
+      expect(today).toMatchObject({ id: 11, overnight: true });
+    });
+
+    it('closes in the morning without a reason or an approval', async () => {
+      jest.useFakeTimers().setSystemTime(ist(15, 8, 5));
+      await expect(service.clockOut(99, {})).resolves.toBeDefined();
+      const data = prisma.attendance.update.mock.calls.at(-1)[0].data;
+      expect(data.clockOutReason ?? null).toBeNull();
+      expect(data.status).toBe('PRESENT');
+    });
+
+    it('is a forgotten clock-out again once the shift is long over', async () => {
+      jest.useFakeTimers().setSystemTime(ist(15, 14, 0));
+      await expect(service.clockOut(99, {})).rejects.toBeInstanceOf(LateClockOutError);
+    });
+
+    it('does not stretch a day shift past midnight', async () => {
+      roster.getEffectiveShift.mockResolvedValue({
+        source: 'STANDING', shift: { id: 1, name: 'General Shift', bufferTimeMinutes: 15 },
+        startTime: '09:30', endTime: '18:30', isDayOff: false, onsite: null,
+      });
+      jest.useFakeTimers().setSystemTime(ist(15, 7, 45));
+      expect(await service.getTodayAttendance(99)).toBeNull();
+    });
+  });
 });
