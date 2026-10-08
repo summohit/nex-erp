@@ -256,6 +256,22 @@ def run_login(args: argparse.Namespace) -> int:
             browser.close()
             return 130
 
+        # Enter can arrive before the sign-in does: a pasted command's trailing
+        # newline, or a runner with no keyboard, answers input() at once and the
+        # session was saved logged out. So also wait for the browser itself to
+        # leave the login page (up to 5 minutes), whichever tab it happens in.
+        def signed_in() -> bool:
+            return any("login" not in (p.url or "") for p in context.pages)
+
+        if not signed_in():
+            print("Still on the login page; waiting for you to finish signing in...")
+            for _ in range(300):
+                if signed_in():
+                    break
+                page.wait_for_timeout(1000)
+            page.wait_for_timeout(2000)  # let the post-login redirect set its cookies
+        page = next((p for p in context.pages if "login" not in (p.url or "")), page)
+
         current = page.url
         context.storage_state(path=str(state_path))
         try:
