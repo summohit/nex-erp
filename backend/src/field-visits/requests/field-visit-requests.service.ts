@@ -587,16 +587,25 @@ export class FieldVisitRequestsService {
   // ─── Raising ───────────────────────────────────────────────────────────────
 
   /**
-   * FVR-0001, per company.
-   *
-   * Counting rows is how the rest of the app numbers things, and it is racy in
-   * one way: two requests raised in the same instant compute the same number.
-   * The unique index on (companyId, requestNumber) is what actually decides,
-   * so `create` retries with the next number up rather than taking a lock.
+   * FVR/MMYY/NN, resetting its sequence each calendar month just like project
+   * codes. The prefix stays distinct from project keys while the familiar
+   * monthly shape makes related records easier to scan.
    */
   private async nextRequestNumber(tx: any, companyId: number, offset = 0): Promise<string> {
-    const count = await tx.fieldVisitRequest.count({ where: { companyId } });
-    return `FVR-${String(count + 1 + offset).padStart(4, '0')}`;
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const base = `FVR/${month}${year}/`;
+    const existing = await tx.fieldVisitRequest.findMany({
+      where: { companyId, requestNumber: { startsWith: base } },
+      select: { requestNumber: true },
+    });
+    const max = existing.reduce((largest: number, request: { requestNumber: string }) => {
+      const parts = request.requestNumber.split('/');
+      const number = parts.length === 3 ? Number(parts[2]) : 0;
+      return Number.isFinite(number) ? Math.max(largest, number) : largest;
+    }, 0);
+    return `${base}${String(max + 1 + offset).padStart(2, '0')}`;
   }
 
   private isDuplicateNumber(error: any): boolean {

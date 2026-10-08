@@ -1,29 +1,6 @@
 <!-- Nothing to show until the task's hours are known. -->
 <div class="thrp" *ngIf="!loading() && data()">
 
-  <div class="thrp-head">
-    <div class="thrp-head-left">
-      <svg lucideClock size="14"></svg>
-      <span>Assigned hours</span>
-    </div>
-
-    <!-- The ceiling, spelled out. "4h assigned + 2h approved" is the whole
-         story of a task that has been extended once. -->
-    <div class="thrp-figures" *ngIf="hours() as h">
-      <span *ngIf="h.assigned == null" class="thrp-unbounded">No estimate set</span>
-      <ng-container *ngIf="h.assigned != null">
-        <span class="thrp-fig"><strong>{{ h.assigned }}h</strong> assigned</span>
-        <span class="thrp-fig" *ngIf="h.additional > 0">
-          <strong class="thrp-extra">+{{ h.additional }}h</strong> approved
-        </span>
-        <span class="thrp-fig"><strong>{{ h.logged }}h</strong> logged</span>
-        <span class="thrp-fig thrp-left" [class.thrp-none]="isExhausted()">
-          <strong>{{ h.remaining }}h</strong> left
-        </span>
-      </ng-container>
-    </div>
-  </div>
-
   <!-- Out of hours, with nothing pending: the one moment this matters. -->
   <div class="thrp-warn" *ngIf="isExhausted() && !openRequest() && canRequest() && !formOpen()">
     <svg lucideAlertTriangle size="14"></svg>

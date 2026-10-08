@@ -1,14 +1,14 @@
 import { Component, OnInit, inject, signal, computed, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucideMapPin, LucideRoute, LucidePlus, LucideSearch,
   LucideX, LucideCalendarDays, LucideUsers, LucideBuilding,
   LucideClock, LucideArrowRight, LucideCheckCircle2,
   LucideRotateCcw, LucideRefreshCw, LucideFilter, LucideCheck,
-  LucideChevronDown, LucideAlertTriangle,
+  LucideChevronDown, LucideAlertTriangle, LucideMoreHorizontal, LucideEdit2,
 } from '@lucide/angular';
 import { FieldVisitRequestsService, FieldVisitRequest, FieldVisitRequestTask } from '../../services/field-visit-requests';
 import { FieldVisitRequestFormComponent } from './field-visit-request-form';
@@ -40,7 +40,7 @@ const STATUS_LABELS: Record<string, string> = {
     LucideX, LucideCalendarDays, LucideUsers, LucideBuilding,
     LucideClock, LucideArrowRight, LucideCheckCircle2,
     LucideRotateCcw, LucideRefreshCw, LucideFilter, LucideCheck,
-    LucideChevronDown, LucideAlertTriangle,
+    LucideChevronDown, LucideAlertTriangle, LucideMoreHorizontal, LucideEdit2,
   ],
   templateUrl: './field-visit-requests-page.html',
   styleUrls: ['./field-visit-requests-page.css'],
@@ -49,10 +49,13 @@ export class FieldVisitRequestsPageComponent implements OnInit {
   private api = inject(FieldVisitRequestsService);
   private locationRequests = inject(VisitLocationRequestsService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private toast = inject(HotToastService);
   private dialog = inject(DialogService);
   /** Admins see every company visit; everyone else their own trips and projects. */
   readonly isCompanyWide = inject(RoleService).isAdmin;
+  /** Full request actions are reserved for Super Admins. */
+  readonly isSuperAdmin = inject(RoleService).isSuperAdmin;
 
   locationCapabilities = signal<VisitLocationRequestCapabilities | null>(null);
   isLocationFormOpen = signal(false);
@@ -96,15 +99,16 @@ export class FieldVisitRequestsPageComponent implements OnInit {
   isBulkLoading = signal(false);
 
   statusOptions = [
+    { status: 'PENDING_APPROVAL', label: 'Pending approval', color: '#d97706' },
     { status: 'APPROVED', label: 'Approved', color: '#16a34a' },
     { status: 'COMPLETED', label: 'Completed', color: '#4f46e5' },
-    { status: 'PENDING_APPROVAL', label: 'Pending approval', color: '#d97706' },
     { status: 'REJECTED', label: 'Rejected', color: '#dc2626' },
     { status: 'CANCELLED', label: 'Cancelled', color: '#94a3b8' },
   ];
 
   isFormOpen = signal(false);
   editing = signal<FieldVisitRequest | null>(null);
+  createProjectId = signal<number | null>(null);
 
   statuses = [
     { key: '', label: 'All' },
@@ -258,6 +262,16 @@ export class FieldVisitRequestsPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.route.queryParamMap.subscribe(params => {
+      const projectId = Number(params.get('projectId'));
+      if (params.get('new') === '1' && Number.isInteger(projectId) && projectId > 0) {
+        this.createProjectId.set(projectId);
+        this.editing.set(null);
+        this.isFormOpen.set(true);
+        // Prevent reopening the form every time this page refreshes its data.
+        void this.router.navigate([], { relativeTo: this.route, queryParams: { new: null, projectId: null }, queryParamsHandling: 'merge', replaceUrl: true });
+      }
+    });
     this.locationRequests.capabilities().subscribe({
       next: (capabilities) => this.locationCapabilities.set(capabilities),
       error: () => this.locationCapabilities.set(null),
@@ -625,6 +639,23 @@ export class FieldVisitRequestsPageComponent implements OnInit {
 
   /** Request id currently being approved/rejected from the table. */
   deciding = signal<number | null>(null);
+  activeActionMenuId = signal<number | null>(null);
+
+  toggleActionMenu(id: number, event: Event): void {
+    event.stopPropagation();
+    this.activeActionMenuId.update(open => open === id ? null : id);
+  }
+
+  cancelRow(r: FieldVisitRequest, event: Event): void {
+    event.stopPropagation();
+    if (!this.isSuperAdmin() || this.deciding()) return;
+    const reason = window.prompt(`Cancel ${r.requestNumber}? Add a reason if needed.`) || undefined;
+    this.deciding.set(r.id);
+    this.api.cancel(r.id, reason).subscribe({
+      next: () => { this.deciding.set(null); this.activeActionMenuId.set(null); this.toast.success(`${r.requestNumber} cancelled`); this.load(); },
+      error: (err) => { this.deciding.set(null); this.toast.error(this.messageOf(err)); },
+    });
+  }
 
   /** Approve straight from the table (the row itself still opens the detail). */
   approveRow(r: FieldVisitRequest, event?: Event, overrideDayOff = false): void {
@@ -677,12 +708,14 @@ export class FieldVisitRequestsPageComponent implements OnInit {
 
   openForm(request?: FieldVisitRequest): void {
     this.editing.set(request ?? null);
+    this.createProjectId.set(null);
     this.isFormOpen.set(true);
   }
 
   closeForm(): void {
     this.isFormOpen.set(false);
     this.editing.set(null);
+    this.createProjectId.set(null);
   }
 
   onSaved(): void {

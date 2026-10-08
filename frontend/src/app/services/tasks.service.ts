@@ -41,6 +41,8 @@ export interface MyTask {
   startDate: string | null;
   dueDate: string | null;
   estimatedHours: number | null;
+  /** Files attached to the task as evidence. */
+  evidenceCount?: number;
   /** The id of the project the issue lives in — null on a pre-sales row. This
    *  is what the STATUS dropdown keys off (it writes through the board's own
    *  endpoint) and what the row's socket room is joined on. */

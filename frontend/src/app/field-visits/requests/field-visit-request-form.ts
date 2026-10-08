@@ -89,6 +89,8 @@ export class FieldVisitRequestFormComponent implements OnInit {
   /** The trip being edited or changed; absent when raising a new one. */
   @Input() request: FieldVisitRequest | null = null;
   @Input() mode: FieldVisitFormMode = 'create';
+  /** Project selected before the create dialog opens (for project-board entry points). */
+  @Input() initialProjectId: number | null = null;
 
   @Output() saved = new EventEmitter<void>();
   @Output() closed = new EventEmitter<void>();
@@ -499,6 +501,11 @@ export class FieldVisitRequestFormComponent implements OnInit {
           fileName: a.fileName, fileUrl: a.fileUrl, fileSize: a.fileSize ?? undefined,
         })),
       };
+    } else if (this.initialProjectId != null && Number.isInteger(this.initialProjectId)) {
+      // A request raised from a project board must stay tied to that board;
+      // preselecting it also loads that board's task picker below.
+      this.selectedProjectId.set(this.initialProjectId);
+      this.form.projectId = this.initialProjectId;
     }
 
     this.loadLists();

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
-  LucidePlus, LucideX, LucideCheck, LucideLoader2, LucideClock, LucideAlertTriangle,
+  LucidePlus, LucideX, LucideCheck, LucideLoader2, LucideAlertTriangle,
 } from '@lucide/angular';
 import {
   TaskHoursRequestsService, TaskHoursRequestList,
@@ -27,7 +27,7 @@ import {
   standalone: true,
   imports: [
     CommonModule, FormsModule,
-    LucidePlus, LucideX, LucideCheck, LucideLoader2, LucideClock, LucideAlertTriangle,
+    LucidePlus, LucideX, LucideCheck, LucideLoader2, LucideAlertTriangle,
   ],
   templateUrl: './task-hours-request-panel.html',
   styleUrls: ['./task-hours-request-panel.css'],

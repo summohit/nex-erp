@@ -588,6 +588,32 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   // C1: the project's planned trips (FVR-…), alongside the app-logged visits.
   fvRequests = signal<FieldVisitRequest[]>([]);
   fvDeciding = signal<number | null>(null);
+  fvOpenMenuId = signal<number | null>(null);
+
+  isFvSuperAdmin(): boolean {
+    return this.roles.isSuperAdmin();
+  }
+
+  canEditFvRequest(request: FieldVisitRequest): boolean {
+    // Managers can retain only edit rights the server has explicitly granted.
+    // Review, rejection and cancellation remain Super Admin-only.
+    return this.isFvSuperAdmin() || !!request.canEdit;
+  }
+
+  toggleFvActions(id: number, event: Event) {
+    event.stopPropagation();
+    this.fvOpenMenuId.update(open => open === id ? null : id);
+  }
+
+  viewFvRequest(request: FieldVisitRequest) {
+    this.fvOpenMenuId.set(null);
+    this.router.navigate(['/field-visits/requests', request.id]);
+  }
+
+  editFvRequest(request: FieldVisitRequest) {
+    this.fvOpenMenuId.set(null);
+    this.router.navigate(['/field-visits/requests', request.id], { queryParams: { edit: 1 } });
+  }
 
   /**
    * C3: the sites this project has visited or planned, from its own requests.
@@ -626,7 +652,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   approveFvRequest(r: FieldVisitRequest, event: Event) {
     event.stopPropagation();
-    if (this.fvDeciding()) return;
+    if (!this.isFvSuperAdmin() || this.fvDeciding()) return;
     this.fvDeciding.set(r.id);
     this.fieldVisitRequestsApi.approve(r.id).subscribe({
       next: () => {
@@ -638,6 +664,29 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.fvDeciding.set(null);
         this.toast.error(err?.error?.message || 'Could not approve');
       },
+    });
+  }
+
+  rejectFvRequest(r: FieldVisitRequest, event: Event) {
+    event.stopPropagation();
+    if (!this.isFvSuperAdmin() || this.fvDeciding()) return;
+    const reason = prompt(`Why is ${r.requestNumber} being rejected?`);
+    if (!reason?.trim()) return;
+    this.fvDeciding.set(r.id);
+    this.fieldVisitRequestsApi.reject(r.id, reason.trim()).subscribe({
+      next: () => { this.fvDeciding.set(null); this.fvOpenMenuId.set(null); this.toast.success(`${r.requestNumber} rejected`); this.loadFieldVisitRequests(); },
+      error: (err: any) => { this.fvDeciding.set(null); this.toast.error(err?.error?.message || 'Could not reject request'); },
+    });
+  }
+
+  cancelFvRequest(r: FieldVisitRequest, event: Event) {
+    event.stopPropagation();
+    if (!this.isFvSuperAdmin() || this.fvDeciding()) return;
+    const reason = prompt(`Why is ${r.requestNumber} being cancelled?`) || undefined;
+    this.fvDeciding.set(r.id);
+    this.fieldVisitRequestsApi.cancel(r.id, reason).subscribe({
+      next: () => { this.fvDeciding.set(null); this.fvOpenMenuId.set(null); this.toast.success(`${r.requestNumber} cancelled`); this.loadFieldVisitRequests(); },
+      error: (err: any) => { this.fvDeciding.set(null); this.toast.error(err?.error?.message || 'Could not cancel request'); },
     });
   }
 
@@ -2048,6 +2097,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
           this.projectSocketSubscriptions = [];
         }
         this.projectId = +id;
+        this.pinnedTaskIds.set(this.readPinnedTaskIds());
         this.hasAccess.set(true);
         this.loadProjectDetails();
         this.loadBoardAndIssues();
@@ -3545,6 +3595,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.isDuplicateOpen.set(true);
   }
 
+  /** Opens the duplicate form directly from a board-card hover action. */
+  duplicateIssueFromCard(issue: any) {
+    this.selectedIssue.set(issue);
+    this.openDuplicateTask();
+  }
+
   closeDuplicateTask() {
     this.isDuplicateOpen.set(false);
   }
@@ -4103,6 +4159,42 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return state === 'over' ? 'budget-over' : state === 'raised' ? 'budget-raised' : '';
   }
 
+  /** The visual bar is capped at 100%; an overrun is communicated in its label. */
+  taskBudgetDisplayPercent(issue: any): number {
+    const { assigned, logged } = this.listTaskHours(issue);
+    if (assigned == null || assigned <= 0) return 0;
+    return Math.min(100, Math.max(0, (logged / assigned) * 100));
+  }
+
+  /** Downloads a self-contained, print-ready version of the project cover. */
+  downloadProjectCover() {
+    const project = this.project();
+    if (!project) return;
+
+    const escape = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!),
+    );
+    const name = escape(project.name || 'Project');
+    const key = escape(project.key || '—');
+    const representation = escape(project.onsiteRepresentation || 'Not specified');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${name} cover</title>
+      <style>body{margin:0;background:#2798d2;font-family:Arial,sans-serif}.cover{box-sizing:border-box;min-height:100vh;margin:0;border:42px solid #2798d2;padding:42px;background:#fff;text-align:center;display:flex;flex-direction:column;align-items:center}.brand{color:#2386c4;font-size:28px;font-weight:800;letter-spacing:1px;margin:8px 0 84px}.brand small{display:block;color:#1f3a5f;font-size:12px;letter-spacing:0}.name{font-size:42px;font-weight:800;max-width:900px}.key{font-size:34px;font-weight:700;margin:54px 0 76px}.representation{width:100%;max-width:900px;background:#2798d2;color:#fff;padding:34px 20px;box-sizing:border-box;font-size:22px;font-weight:700}.representation strong{display:block;background:#fff;color:#111;margin:22px auto 0;padding:16px;max-width:520px;font-size:30px}@media print{.cover{min-height:100vh}}</style></head><body><main class="cover"><div class="brand">CES TECH<small>Beyond IT Services, We Deliver Solutions</small></div><div class="name">${name}</div><div class="key">${key}</div><section class="representation">WE REPRESENT ON PROJECT ONSITE<strong>${representation}</strong></section></main></body></html>`;
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${String(project.key || project.name || 'project').replace(/[^a-z0-9_-]+/gi, '-')}-cover.html`;
+    // Safari and a number of managed Chromium builds ignore a click on an
+    // unattached anchor. Add it briefly and do not revoke the blob URL until
+    // the browser has had time to begin the download.
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    window.setTimeout(() => {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }, 1_000);
+  }
+
   listTaskHours(issue: any): { assigned: number | null; logged: number; remaining: number | null } {
     const loggedMin = (issue?.timeLogs || []).reduce(
       (sum: number, l: any) => sum + (l.durationMin || 0), 0,
@@ -4149,9 +4241,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     { field: 'key', headerName: 'ID', width: 160, pinned: 'left' },
     { field: 'title', headerName: 'Task', minWidth: 200, flex: 1, filter: true },
     { 
+      field: 'status',
       headerName: 'Status', 
       // Wide enough for the badge plus the approval buttons beside it.
       width: 260,
+      editable: () => this.canManageTask,
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: { values: ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'] },
       valueGetter: (params: any) => {
         const i = params.data;
         if (this.isAwaitingApproval(i)) return i.approvalState;
@@ -4324,7 +4420,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         const more = atts.length > 3
           ? `<span style="font-size:11px;color:#64748b;font-weight:600;">+${atts.length - 3}</span>`
           : '';
-        const count = `<span style="font-size:12px;color:#475569;font-weight:600;margin-left:2px;">${atts.length}</span>`;
+        const count = `<span style="font-size:12px;color:#475569;font-weight:700;margin-left:2px;">${atts.length} file${atts.length === 1 ? '' : 's'}</span>`;
 
         return `<div style="display:flex;align-items:center;gap:4px;height:100%;">${thumbs}${more}${count}</div>`;
       },
@@ -4360,12 +4456,24 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     },
     { 
       headerName: 'Action', 
-      width: 100, 
+      width: 54,
       pinned: 'right',
-      cellRenderer: () => {
-        return `<button style="background-color: #eff6ff; color: #2563eb; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#dbeafe'" onmouseout="this.style.backgroundColor='#eff6ff'">
-                  View
-                </button>`;
+      cellRenderer: (params: any) => {
+        const issue = params.data;
+        const canManage = this.canManageTask;
+        const canDelete = this.canDeleteTasks;
+        const pinned = this.isTaskPinned(issue?.id);
+        const menuStyle = 'position:absolute;z-index:50;top:30px;right:0;min-width:118px;padding:5px;border:1px solid #dbe3ee;border-radius:8px;background:#fff;box-shadow:0 8px 22px rgba(15,23,42,.16);';
+        const item = (label: string, action: string, danger = false) => `<button type="button" data-list-action="${action}" style="width:100%;padding:7px 8px;border:0;border-radius:5px;background:transparent;color:${danger ? '#b91c1c' : '#334155'};font:600 12px inherit;text-align:left;cursor:pointer;">${label}</button>`;
+        return `<details style="position:relative;display:inline-block;" onclick="event.stopPropagation()">
+          <summary title="Task actions" aria-label="Task actions" style="list-style:none;width:30px;height:28px;display:grid;place-items:center;border-radius:6px;color:#475569;cursor:pointer;font-weight:800;letter-spacing:1px;">•••</summary>
+          <div style="${menuStyle}">
+            ${item('View', 'view')}
+            ${canManage ? `${item('Edit', 'edit')}${item('Duplicate', 'duplicate')}` : ''}
+            ${item(pinned ? 'Unpin' : 'Pin', 'pin')}
+            ${canDelete ? item('Delete', 'delete', true) : ''}
+          </div>
+        </details>`;
       }
     }
   ];
@@ -4391,10 +4499,56 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const action = (event.event?.target as HTMLElement | undefined)
+      ?.closest?.('[data-list-action]')?.getAttribute('data-list-action');
+    if (action && event.data) {
+      this.handleListTaskAction(action, event.data);
+      return;
+    }
+
     const issue = event.data;
     if (issue) {
       this.openIssueDetails(issue);
     }
+  }
+
+  onListGridCellValueChanged(event: any) {
+    if (event.colDef?.field !== 'status' || event.newValue === event.oldValue || !this.canManageTask) return;
+    this.projectsService.updateIssue(this.projectId, event.data.id, { status: event.newValue }).subscribe({
+      next: (updated: any) => {
+        this.allIssues.update(items => items.map(i => i.id === updated.id ? { ...i, ...updated } : i));
+        this.toast.success('Task status updated');
+      },
+      error: (err: any) => {
+        event.node.setData({ ...event.data, status: event.oldValue });
+        this.toast.error(err?.error?.message || 'Could not update task status');
+      },
+    });
+  }
+
+  pinnedTaskIds = signal<number[]>(this.readPinnedTaskIds());
+
+  private readPinnedTaskIds(): number[] {
+    try { return JSON.parse(localStorage.getItem(`project-${this.projectId}-pinned-tasks`) || '[]'); }
+    catch { return []; }
+  }
+
+  isTaskPinned(id: number): boolean { return this.pinnedTaskIds().includes(id); }
+
+  private toggleTaskPin(issue: any) {
+    const next = this.isTaskPinned(issue.id)
+      ? this.pinnedTaskIds().filter(id => id !== issue.id)
+      : [...this.pinnedTaskIds(), issue.id];
+    this.pinnedTaskIds.set(next);
+    localStorage.setItem(`project-${this.projectId}-pinned-tasks`, JSON.stringify(next));
+    this.listGridApi?.refreshCells({ force: true });
+  }
+
+  private handleListTaskAction(action: string, issue: any) {
+    if (action === 'view' || action === 'edit') { this.openIssueDetails(issue); return; }
+    if (action === 'duplicate' && this.canManageTask) { this.selectedIssue.set(issue); this.openDuplicateTask(); return; }
+    if (action === 'pin') { this.toggleTaskPin(issue); return; }
+    if (action === 'delete' && this.canDeleteTasks) { this.selectedIssue.set(issue); this.deleteSelectedIssue(); }
   }
 
   listGridApi: any;

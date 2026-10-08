@@ -22,6 +22,31 @@
   </div>
 </ng-template>
 
+<ng-template #projectHealthTip let-p="p">
+  <div class="project-health-tip" [ngClass]="'health-' + projectCardHealth(p).color"
+       [title]="projectCardHealth(p).label + ': ' + projectCardHealth(p).tip">
+    <svg lucideInfo size="13"></svg>
+    <span>{{ projectCardHealth(p).label }}</span>
+  </div>
+</ng-template>
+
+<!-- The financial fields are deliberately shown only when the API has granted
+     this viewer access to the project's commercial data. -->
+<ng-template #projectBudget let-p="p">
+  <div class="project-card-budget" *ngIf="p.canViewFinancials && p.budgetAmount != null && p.budgetAmount > 0"
+       [class.over-budget]="p.budgetRemaining < 0"
+       [title]="(p.budgetUsed || 0) + ' used of ' + p.budgetAmount + '; ' + (p.budgetRemaining || 0) + ' left'">
+    <div class="project-card-budget-labels">
+      <span>Budget</span>
+      <span>{{ p.budgetUsed || 0 | currency:(p.currency || 'INR'):'symbol':'1.0-0' }} used · {{ (p.budgetRemaining || 0) | currency:(p.currency || 'INR'):'symbol':'1.0-0' }} left</span>
+    </div>
+    <div class="project-card-budget-track" role="progressbar" aria-label="Project budget used"
+         [attr.aria-valuemin]="0" [attr.aria-valuemax]="p.budgetAmount" [attr.aria-valuenow]="p.budgetUsed || 0">
+      <span class="project-card-budget-fill" [style.width.%]="projectBudgetBarWidth(p)"></span>
+    </div>
+  </div>
+</ng-template>
+
 <div class="boards-page">
   <!-- Search & Filter Control Bar -->
   <div class="hub-control-bar">
@@ -201,7 +226,7 @@
         class="board-card" 
         *ngFor="let p of starredProjects(); let i = index" 
         (click)="goToProject(p.id)">
-        <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
+        <div class="board-card-banner" [style.background]="projectCardBackground(p, i)">
           <div class="card-actions-wrapper">
             <button 
               type="button" 
@@ -237,6 +262,7 @@
             </button>
           </div>
           <ng-container *ngTemplateOutlet="teamStack; context: {p: p}"></ng-container>
+          <ng-container *ngTemplateOutlet="projectHealthTip; context: {p: p}"></ng-container>
         </div>
         <div class="board-card-footer">
           <span class="board-title">{{ p.name }}</span>
@@ -247,6 +273,7 @@
               <svg lucideUsers size="13"></svg> {{ p.members.length }}
             </button>
           </div>
+          <ng-container *ngTemplateOutlet="projectBudget; context: {p: p}"></ng-container>
         </div>
       </div>
     </div>
@@ -266,7 +293,7 @@
         class="board-card" 
         *ngFor="let p of recentlyViewedProjects(); let i = index" 
         (click)="goToProject(p.id)">
-        <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
+        <div class="board-card-banner" [style.background]="projectCardBackground(p, i)">
           <div class="card-actions-wrapper">
             <button 
               type="button" 
@@ -302,6 +329,7 @@
             </button>
           </div>
           <ng-container *ngTemplateOutlet="teamStack; context: {p: p}"></ng-container>
+          <ng-container *ngTemplateOutlet="projectHealthTip; context: {p: p}"></ng-container>
         </div>
         <div class="board-card-footer">
           <span class="board-title">{{ p.name }}</span>
@@ -312,6 +340,7 @@
               <svg lucideUsers size="13"></svg> {{ p.members.length }}
             </button>
           </div>
+          <ng-container *ngTemplateOutlet="projectBudget; context: {p: p}"></ng-container>
         </div>
       </div>
     </div>
@@ -517,7 +546,7 @@
             class="board-card"
             *ngFor="let p of filteredProjects(); let i = index"
             (click)="goToProject(p.id)">
-            <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
+            <div class="board-card-banner" [style.background]="projectCardBackground(p, i)">
               <div class="card-actions-wrapper">
                 <button
                   type="button"
@@ -554,6 +583,7 @@
               </div>
               <!-- Avatar stack overlaid on banner -->
               <ng-container *ngTemplateOutlet="teamStack; context: {p: p}"></ng-container>
+              <ng-container *ngTemplateOutlet="projectHealthTip; context: {p: p}"></ng-container>
             </div>
             <div class="board-card-footer">
               <span class="board-title">{{ p.name }}</span>
@@ -570,6 +600,7 @@
                   {{ p.members.length }}
                 </button>
               </div>
+              <ng-container *ngTemplateOutlet="projectBudget; context: {p: p}"></ng-container>
             </div>
           </div>
         </div>
@@ -1298,7 +1329,7 @@
       <div 
         class="board-card archived-card" 
         *ngFor="let p of archivedProjects(); let i = index">
-        <div class="board-card-banner" [style.background]="getGradient(p.color, i)">
+        <div class="board-card-banner" [style.background]="projectCardBackground(p, i)">
           <div class="archived-badge">Archived</div>
           <div class="card-actions-wrapper">
             <button 
@@ -1310,6 +1341,7 @@
               <span>Restore</span>
             </button>
           </div>
+          <ng-container *ngTemplateOutlet="projectHealthTip; context: {p: p}"></ng-container>
         </div>
         <div class="board-card-footer">
           <span class="board-title">{{ p.name }}</span>
@@ -1320,6 +1352,7 @@
               <svg lucideUsers size="13"></svg> {{ p.members.length }}
             </button>
           </div>
+          <ng-container *ngTemplateOutlet="projectBudget; context: {p: p}"></ng-container>
         </div>
       </div>
     </div>
@@ -2233,6 +2266,15 @@
           </div>
         </div>
 
+        <div class="cbm-field-group">
+          <label class="cbm-field-label">Onsite representation</label>
+          <div class="cbm-input-wrapper">
+            <input type="text" class="cbm-input" [(ngModel)]="projectForm.onsiteRepresentation"
+                   placeholder="e.g. ATS">
+          </div>
+          <span class="cbm-field-helper">Shown on the project cover sheet under “We represent on project onsite”.</span>
+        </div>
+
         <!-- Client / Contact (Searchable Select Box) -->
         <div class="cbm-field-group">
           <div class="cbm-field-label-row">
@@ -3135,6 +3177,15 @@
               [(ngModel)]="projectForm.summary"
               placeholder="What this project is and why it exists — the paragraph you would send someone joining it."></textarea>
           </div>
+        </div>
+
+        <div class="cbm-field-group">
+          <label class="cbm-field-label">Onsite representation</label>
+          <div class="cbm-input-wrapper">
+            <input type="text" class="cbm-input" [(ngModel)]="projectForm.onsiteRepresentation"
+                   placeholder="e.g. ATS">
+          </div>
+          <span class="cbm-field-helper">Shown on the project cover sheet under “We represent on project onsite”.</span>
         </div>
 
         <!-- Client / Contact (Searchable Select Box) -->

@@ -737,6 +737,7 @@ export class TasksService {
         // §6: the ticket this task was converted from, if any.
         projectTicket: { select: { id: true, ticketNumber: true } },
         assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        _count: { select: { attachments: true } },
         members: {
           select: {
             employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
@@ -793,6 +794,7 @@ export class TasksService {
         startDate: i.startDate,
         dueDate: i.dueDate,
         estimatedHours: i.estimatedHours,
+        evidenceCount: i._count.attachments,
         createdAt: i.createdAt ?? null,
         // The project the issue lives in — null on a pre-sales task, and the
         // system project on a general one. Drives i) the room the row joins so

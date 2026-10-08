@@ -116,10 +116,10 @@ function actions(prisma: any): string[] {
 }
 
 describe('raising a request', () => {
-  it('numbers it after the requests the company already has', async () => {
+  it('starts a monthly FVR sequence for the company', async () => {
     const { service, prisma } = makeService();
     await service.create(1, PM, 'EMPLOYEE', body() as any);
-    expect(prisma.fieldVisitRequest.create.mock.calls[0][0].data.requestNumber).toBe('FVR-0007');
+    expect(prisma.fieldVisitRequest.create.mock.calls[0][0].data.requestNumber).toMatch(/^FVR\/\d{4}\/01$/);
   });
 
   it('starts as a draft, and records who created it', async () => {
@@ -227,7 +227,7 @@ describe('raising a request', () => {
       .mockImplementationOnce((a: any) => Promise.resolve({ id: 10, ...a.data }));
 
     const created = await service.create(1, PM, 'EMPLOYEE', body() as any);
-    expect(created.requestNumber).toBe('FVR-0008');
+    expect(created.requestNumber).toMatch(/^FVR\/\d{4}\/02$/);
   });
 });
 

@@ -599,6 +599,13 @@
                 <svg lucideBanknote size="13"></svg> {{ project()?.billingType }}
               </span>
             </div>
+            <div class="project-cover-summary">
+              <span class="cover-summary-label">We represent on project onsite</span>
+              <strong>{{ project()?.onsiteRepresentation || 'Not specified' }}</strong>
+              <button type="button" class="cover-download-btn" (click)="downloadProjectCover()">
+                <svg lucideDownload size="15"></svg> Download cover
+              </button>
+            </div>
           </div>
         </div>
         <div class="summary-header-actions">
@@ -612,6 +619,19 @@
       </div>
 
       <!-- §PB6: the commercial read, above the delivery one. -->
+      <!-- A visible preview of the downloadable project cover. -->
+      <section class="project-cover-preview" aria-label="Project cover sheet">
+        <div class="cover-preview-paper">
+          <div class="cover-preview-brand">CES <span>TECH</span><small>Beyond IT Services, We Deliver Solutions</small></div>
+          <h2>{{ project()?.name || 'Project name' }}</h2>
+          <p class="cover-preview-code">{{ project()?.key || 'Project code' }}</p>
+          <div class="cover-preview-representation">
+            <span>We represent on project onsite</span>
+            <strong>{{ project()?.onsiteRepresentation || ' ' }}</strong>
+          </div>
+        </div>
+      </section>
+
       <div class="budget-kpi-row" *ngIf="projectSummary()?.budget as b">
         <div class="budget-kpi" [class.over]="b.percentUsed !== null && b.percentUsed > 100">
           <span class="budget-kpi-label">Budget</span>
@@ -1138,6 +1158,7 @@
         [rowClassRules]="listGridRowClassRules"
         [getRowStyle]="listGridGetRowStyle"
         (cellClicked)="onListGridCellClicked($event)"
+        (cellValueChanged)="onListGridCellValueChanged($event)"
         (gridReady)="onListGridReady($event)"
         [pagination]="true"
         [paginationPageSize]="10"
@@ -2304,19 +2325,32 @@
           <h3>Field visit requests</h3>
           <p>Trips planned for this project. Approved ones put their tasks on this board for everyone going.</p>
         </div>
-        <a class="pfv-new" routerLink="/field-visits/requests">+ New request</a>
+        <a class="pfv-new" [routerLink]="'/field-visits/requests'" [queryParams]="{ projectId: projectId, new: 1 }">+ New request</a>
       </div>
       <div class="pfv-empty" *ngIf="!fvRequests().length">No field visits planned for this project yet.</div>
       <div class="pfv-table" *ngIf="fvRequests().length">
-        <a class="pfv-row" *ngFor="let r of fvRequests()" [routerLink]="['/field-visits/requests', r.id]">
+        <div class="pfv-row" *ngFor="let r of fvRequests()">
           <span class="pfv-num">{{ r.requestNumber }}</span>
           <span class="pfv-site" [title]="r.location">{{ r.location }}</span>
           <span class="pfv-dates">{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'d MMM y' }}</span>
           <span class="pfv-meta">{{ r.members.length }} people · {{ r.tasks.length }} tasks</span>
           <span class="pfv-status" [class]="'pfv-st-' + r.status">{{ fvStatusLabel(r.status) }}</span>
+          <div class="pfv-actions" (click)="$event.stopPropagation()">
+            <button type="button" class="pfv-more" title="Request actions" aria-label="Request actions"
+                    (click)="toggleFvActions(r.id, $event)"><svg lucideMoreHorizontal size="18"></svg></button>
+            <div class="pfv-action-menu" *ngIf="fvOpenMenuId() === r.id">
+              <button type="button" (click)="viewFvRequest(r)"><svg lucideExternalLink size="14"></svg> View</button>
+              <button type="button" *ngIf="canEditFvRequest(r)" (click)="editFvRequest(r)"><svg lucideEdit2 size="14"></svg> Edit request</button>
+              <ng-container *ngIf="isFvSuperAdmin()">
+                <button type="button" *ngIf="r.status === 'PENDING_APPROVAL'" (click)="approveFvRequest(r, $event)"><svg lucideCheck size="14"></svg> Approve</button>
+                <button type="button" *ngIf="r.status === 'PENDING_APPROVAL'" class="danger" (click)="rejectFvRequest(r, $event)"><svg lucideX size="14"></svg> Reject</button>
+                <button type="button" *ngIf="r.status !== 'CANCELLED' && r.status !== 'COMPLETED'" class="danger" (click)="cancelFvRequest(r, $event)"><svg lucideXCircle size="14"></svg> Cancel</button>
+              </ng-container>
+            </div>
+          </div>
           <button *ngIf="r.canReview" type="button" class="pfv-approve" [disabled]="fvDeciding() === r.id"
                   (click)="approveFvRequest(r, $event)">{{ fvDeciding() === r.id ? '…' : 'Approve' }}</button>
-        </a>
+        </div>
       </div>
     </section>
 
@@ -3023,11 +3057,35 @@
                   </div>
                 </div>
               </div>
+
+              <!-- An estimate is an hours budget. Show consumption and remaining time on the card. -->
+              <ng-container *ngIf="listTaskHours(issue) as hours">
+                <div class="card-budget" *ngIf="hours.assigned !== null"
+                     [class.budget-over]="hours.logged > hours.assigned"
+                     [title]="hours.logged + 'h used of ' + hours.assigned + 'h; ' + hours.remaining + 'h left'">
+                  <div class="card-budget-labels">
+                    <span>Hours budget</span>
+                    <span>{{ hours.logged }}h used · {{ hours.remaining }}h left</span>
+                  </div>
+                  <div class="card-budget-track" role="progressbar" aria-label="Task hours budget used"
+                       [attr.aria-valuemin]="0" [attr.aria-valuemax]="hours.assigned" [attr.aria-valuenow]="hours.logged">
+                    <span class="card-budget-fill" [style.width.%]="taskBudgetDisplayPercent(issue)"></span>
+                  </div>
+                </div>
+              </ng-container>
             </div>
             
-            <button type="button" class="card-hover-edit-btn" (click)="$event.stopPropagation(); openIssueDetails(issue)">
-              <svg lucideEdit2 size="14"></svg>
-            </button>
+            <div class="card-hover-actions">
+              <button type="button" class="card-hover-action-btn" title="Edit task" aria-label="Edit task"
+                      (click)="$event.stopPropagation(); openIssueDetails(issue)">
+                <svg lucideEdit2 size="14"></svg>
+              </button>
+              <button type="button" class="card-hover-action-btn" *ngIf="canManageTask"
+                      title="Duplicate task" aria-label="Duplicate task"
+                      (click)="$event.stopPropagation(); duplicateIssueFromCard(issue)">
+                <svg lucideCopy size="14"></svg>
+              </button>
+            </div>
             </div>
           </ng-container>
         </div>
@@ -3411,7 +3469,7 @@
 
         <!-- Priority -->
         <div class="popover-container">
-          <button class="modal-action-btn" *ngIf="canManageTask" (click)="togglePopover('priority')">
+          <button class="modal-action-btn" *ngIf="false" (click)="togglePopover('priority')">
             <svg lucideZap size="14" class="btn-icon-svg"></svg>
             <span>Priority</span>
           </button>
@@ -3448,7 +3506,7 @@
 
         <!-- Labels -->
         <div class="popover-container">
-          <button class="modal-action-btn" *ngIf="canManageTask" (click)="togglePopover('labels')">
+          <button class="modal-action-btn" *ngIf="false" (click)="togglePopover('labels')">
             <svg lucideTag size="14" class="btn-icon-svg"></svg>
             <span>Labels</span>
           </button>
@@ -3560,7 +3618,7 @@
 
         <!-- Dates -->
         <div class="popover-container">
-          <button class="modal-action-btn" *ngIf="canManageTask" (click)="togglePopover('dates', $event)">
+          <button class="modal-action-btn" *ngIf="false" (click)="togglePopover('dates', $event)">
             <svg lucideClock size="14" class="btn-icon-svg"></svg>
             <span>Dates</span>
           </button>
@@ -3594,7 +3652,7 @@
 
         <!-- Members Popover -->
         <div class="popover-container">
-          <button class="modal-action-btn" *ngIf="canManageTask || !selectedIssue()" (click)="togglePopover('members')">
+          <button class="modal-action-btn" *ngIf="false" (click)="togglePopover('members')">
             <svg lucideUsers size="14" class="btn-icon-svg"></svg>
             <span>Members <span class="required-star">*</span></span>
           </button>
@@ -3872,7 +3930,7 @@
         </div>
 
         <!-- Labels Section -->
-        <div class="modal-attached-labels-section" *ngIf="selectedIssue()?.labels && selectedIssue()?.labels.length > 0">
+        <div class="modal-attached-labels-section" *ngIf="canManageTask || (selectedIssue()?.labels && selectedIssue()?.labels.length > 0)">
           <div class="section-label-subtitle">Labels</div>
           <div class="attached-labels-flex-row">
             <div class="attached-label-pill" *ngFor="let il of selectedIssue()?.labels" [style.background-color]="il.label?.color || il.color" [style.color]="getLabelTextColor(il.label?.color || il.color)" (click)="canManageTask && togglePopover('labels')">

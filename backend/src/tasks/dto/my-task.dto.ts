@@ -41,6 +41,8 @@ export interface MyTaskDto {
   startDate: Date | null;
   dueDate: Date | null;
   estimatedHours: number | null;
+  /** Number of files attached to this task as evidence. */
+  evidenceCount?: number;
   /** When the work was raised — My Tasks sorts newest-first on this. */
   createdAt: Date | null;
   /**

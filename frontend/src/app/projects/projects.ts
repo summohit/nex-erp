@@ -13,7 +13,7 @@ import {
   LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
   LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
   LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
-  LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity,
+  LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity, LucideInfo,
   LucideCopy
 } from '@lucide/angular';
 import { ProjectsService } from '../services/projects';
@@ -98,7 +98,7 @@ import { TaskTransferComponent } from '../shared/components/task-transfer/task-t
     LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
     LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
     LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
-    LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity,
+    LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity, LucideInfo,
     LucideCopy,
     AgGridModule
   ],
@@ -633,6 +633,13 @@ export class ProjectsComponent implements OnInit {
     this.filteredProjects().some((p: any) => p.canViewFinancials)
   );
 
+  /** Keep an over-budget project visually full while its label carries the overrun. */
+  projectBudgetBarWidth(project: any): number {
+    const total = Number(project?.budgetAmount) || 0;
+    const used = Number(project?.budgetUsed) || 0;
+    return total > 0 ? Math.min(100, Math.max(0, (used / total) * 100)) : 0;
+  }
+
   private money(value: number | null | undefined, row: any): string {
     if (!row?.canViewFinancials) return '<span class="cell-muted">—</span>';
     if (value == null) return '<span class="cell-muted">—</span>';
@@ -1140,6 +1147,7 @@ export class ProjectsComponent implements OnInit {
       architectIds: [] as number[],
       memberIds: [] as number[],
       address: '',
+      onsiteRepresentation: '',
       // ── Delivery (§4, §7, §9) ──
       category: '',
       priority: 'MEDIUM',
@@ -1905,6 +1913,7 @@ export class ProjectsComponent implements OnInit {
   });
 
   ngOnInit() {
+    this.configureTaskTableColumns();
     this.syncTabFromRoute();
 
     // Live sync with the board (§ tasks ↔ board): the socket only delivers
@@ -3212,6 +3221,11 @@ export class ProjectsComponent implements OnInit {
     }
 
     if (act) {
+      if (act === 'task-actions') return;
+      if (act === 'task-action') {
+        this.runTaskTableAction(hit!.getAttribute('data-task-action') || '', task);
+        return;
+      }
       if (act === 'task') { this.openTaskFromRegister(task); return; }
       if (act === 'project') { this.openProjectFromRegister(task); return; }
       if (act === 'board-status') { this.openMyTasksStatusMenu(task, hit); return; }
@@ -3721,6 +3735,109 @@ export class ProjectsComponent implements OnInit {
     { headerName: 'Action', field: 'actions', width: 82, minWidth: 76, sortable: false, filter: false, cellRenderer: () => '<button type="button" class="task-table-more" data-act="task" title="Open task">⋮</button>' },
   ];
 
+  /** Keep the delivery task table compact: faces identify owners faster than names. */
+  private configureTaskTableColumns(): void {
+    this.taskTableColDefs = this.taskTableColDefs.filter((column: any) => column.headerName !== 'Completed on');
+    this.taskTableColDefs = this.taskTableColDefs.map((column: any) => {
+      if (column.headerName !== 'Milestones') return column;
+      return {
+        headerName: 'Evidence', field: 'evidenceCount', width: 105, minWidth: 95, sortable: true,
+        valueGetter: (p: any) => Number(p.data?.evidenceCount || 0),
+        cellRenderer: (p: any) => {
+          const count = Number(p.value || 0);
+          return count
+            ? `<span class="task-evidence-count" title="${count} evidence attachment${count === 1 ? '' : 's'} uploaded by employees">${count}</span>`
+            : '<span class="task-evidence-empty">—</span>';
+        },
+      };
+    });
+    const assigneeColumn: any = this.taskTableColDefs.find((column: any) => column.headerName === 'Assigned to');
+    if (!assigneeColumn) return;
+
+    assigneeColumn.width = 112;
+    assigneeColumn.minWidth = 104;
+    assigneeColumn.valueGetter = undefined;
+    assigneeColumn.cellRenderer = (p: any) => {
+      const people = p.data?.assignees || [];
+      if (!people.length) return '<span class="task-assignee-empty">No assignee</span>';
+      const avatars = people.slice(0, 3).map((person: any, index: number) => {
+        const name = `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'Unassigned';
+        const initials = `${person.firstName?.[0] || ''}${person.lastName?.[0] || ''}`.toUpperCase() || 'U';
+        const avatar = person.avatarUrl
+          ? `<img src="${this.esc(person.avatarUrl)}" alt="${this.esc(name)}">`
+          : `<span class="task-assignee-initials">${this.esc(initials)}</span>`;
+        // The browser tooltip is rendered above the grid and cannot be clipped
+        // by AG Grid's scrolling viewport. Keeping only this one avoids a
+        // second, overlapping tooltip.
+        return `<span class="task-assignee-avatar" title="${this.esc(name)}" style="z-index:${3 - index}">${avatar}</span>`;
+      }).join('');
+      const remaining = people.length > 3
+        ? `<span class="task-assignee-more" title="${people.length - 3} more assignees">+${people.length - 3}</span>`
+        : '';
+      return `<div class="task-assignee-stack">${avatars}${remaining}</div>`;
+    };
+
+    const actionColumn: any = this.taskTableColDefs.find((column: any) => column.headerName === 'Action');
+    if (actionColumn) actionColumn.cellRenderer = (p: any) => {
+      const pinned = this.isTaskTablePinned(p.data?.id);
+      const item = (label: string, action: string, danger = false) => `<button type="button" data-act="task-action" data-task-action="${action}" class="task-table-action-item${danger ? ' danger' : ''}">${label}</button>`;
+      const menuId = `task-actions-${p.data?.source || 'task'}-${p.data?.id}`;
+      const anchor = `--${menuId}`;
+      return `<button type="button" class="task-table-action-trigger" style="anchor-name:${anchor}" data-act="task-actions" popovertarget="${menuId}" title="Task actions" aria-label="Task actions">⋮</button><div id="${menuId}" popover class="task-table-action-menu" style="position-anchor:${anchor};top:anchor(bottom);right:anchor(right);margin-top:5px">${item('View', 'view')}${item('Edit', 'edit')}${item('Duplicate', 'duplicate')}${item(pinned ? 'Unpin' : 'Pin', 'pin')}${this.isSuperAdmin ? item('Delete', 'delete', true) : ''}</div>`;
+    };
+
+    const statusColumn: any = this.taskTableColDefs.find((column: any) => column.headerName === 'Status');
+    if (statusColumn) statusColumn.cellRenderer = (p: any) => this.taskTableStatus(p.value, p.data?.projectId != null);
+  }
+
+  private taskTablePins = signal<number[]>(this.readTaskTablePins());
+
+  private readTaskTablePins(): number[] {
+    try { return JSON.parse(localStorage.getItem('my-tasks-pinned') || '[]'); }
+    catch { return []; }
+  }
+
+  private isTaskTablePinned(id: number | null | undefined): boolean {
+    return !!id && this.taskTablePins().includes(id);
+  }
+
+  private toggleTaskTablePin(task: MyTask): void {
+    const pins = this.taskTablePins();
+    const next = pins.includes(task.id) ? pins.filter(id => id !== task.id) : [...pins, task.id];
+    this.taskTablePins.set(next);
+    localStorage.setItem('my-tasks-pinned', JSON.stringify(next));
+    this.myTasksGridApi?.refreshCells({ force: true });
+    this.toast.success(pins.includes(task.id) ? 'Task unpinned' : 'Task pinned');
+  }
+
+  private runTaskTableAction(action: string, task: MyTask): void {
+    if (action === 'view') { this.openTaskFromRegister(task); return; }
+    if (action === 'edit') {
+      if (task.source === 'PRE_SALES') { this.openEditPreSalesTask(task); return; }
+      if (task.projectId != null) this.router.navigate(['/projects', task.projectId], { queryParams: { task: task.id, edit: 1 } });
+      return;
+    }
+    if (action === 'pin') { this.toggleTaskTablePin(task); return; }
+    if (action === 'duplicate') {
+      if (task.projectId == null) { this.toast.error('This task cannot be duplicated from the register'); return; }
+      this.projectsService.duplicateIssue(task.projectId, task.id, { title: `Copy of ${task.title || 'task'}` }).subscribe({
+        next: () => { this.toast.success('Task duplicated'); this.loadMyTasks(); },
+        error: (err: any) => this.toast.error(err?.error?.message || 'Could not duplicate task'),
+      });
+      return;
+    }
+    if (action === 'delete') {
+      if (!this.isSuperAdmin) return;
+      if (!window.confirm(`Delete “${task.title || 'this task'}”? This cannot be undone.`)) return;
+      if (task.source === 'PRE_SALES') { this.deletePreSalesTask(task); return; }
+      if (task.projectId == null) return;
+      this.projectsService.deleteIssue(task.projectId, task.id).subscribe({
+        next: () => { this.toast.success('Task deleted'); this.loadMyTasks(); },
+        error: (err: any) => this.toast.error(err?.error?.message || 'Could not delete task'),
+      });
+    }
+  }
+
   private taskTableDate(value: string | Date | null | undefined): string {
     return value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
   }
@@ -3730,11 +3847,13 @@ export class ProjectsComponent implements OnInit {
     return minutes < 60 ? `${Math.round(minutes)}s` : `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${Math.round(minutes % 60)}m` : ''}`;
   }
 
-  private taskTableStatus(value: string): string {
+  private taskTableStatus(value: string, editable = false): string {
     const status = String(value || 'TODO').toUpperCase();
     const labels: Record<string, string> = { TODO: 'Incomplete', IN_PROGRESS: 'In Progress', IN_REVIEW: 'In Review', DONE: 'Completed', CANCELLED: 'Cancelled' };
     const colors: Record<string, string> = { TODO: '#dc2626', IN_PROGRESS: '#0ea5e9', IN_REVIEW: '#8b5cf6', DONE: '#16a34a', CANCELLED: '#64748b' };
-    return `<span class="task-table-status"><i style="background:${colors[status] || '#64748b'}"></i>${labels[status] || status.replace(/_/g, ' ')}</span>`;
+    const label = labels[status] || status.replace(/_/g, ' ');
+    if (!editable) return `<span class="task-table-status"><i style="background:${colors[status] || '#64748b'}"></i>${label}</span>`;
+    return `<button type="button" class="task-table-status status-menu-btn" data-act="board-status" title="Change status"><i style="background:${colors[status] || '#64748b'}"></i>${label}<span class="status-menu-caret">⌄</span></button>`;
   }
 
   myTasksColDefs: ColDef[] = [
@@ -4008,6 +4127,45 @@ export class ProjectsComponent implements OnInit {
     return this.gradients[index % this.gradients.length];
   }
 
+  /** A project's health is intentionally more prominent than its chosen cover.
+   *  Commercial and schedule risks win over the normal workflow colour. */
+  projectCardHealth(project: any): { color: string; label: string; tip: string } {
+    const status = String(project?.status || '').toUpperCase();
+    const closed = ['COMPLETED', 'CLOSED', 'CANCELLED', 'ARCHIVED', 'FINISHED'].includes(status)
+      || project?.workStatus === 'FINISHED';
+    const deadlinePassed = !!project?.endDate && new Date(project.endDate).getTime() < new Date().setHours(0, 0, 0, 0);
+    const overBudget = !!project?.canViewFinancials && Number(project?.budgetRemaining) < 0;
+
+    if (!closed && (String(project?.priority || '').toUpperCase() === 'CRITICAL' || status === 'AT_RISK')) {
+      return { color: 'critical', label: 'Critical', tip: 'Critical or at-risk project — needs immediate attention.' };
+    }
+    if (!closed && overBudget) {
+      return { color: 'critical', label: 'Over budget', tip: 'Project spend has exceeded its approved budget.' };
+    }
+    if (!closed && deadlinePassed) {
+      const signoff = project?.closureStatus === 'SIGNOFF_PENDING';
+      return { color: 'critical', label: signoff ? 'Sign-off overdue' : 'Overdue', tip: signoff ? 'The project is awaiting sign-off after its deadline.' : 'The project deadline has passed.' };
+    }
+    if (status === 'ON_HOLD') return { color: 'on-hold', label: 'On hold', tip: 'Project is currently paused.' };
+    if (status === 'DRAFT') return { color: 'draft', label: 'Draft', tip: 'Project setup is still in progress.' };
+    if (status === 'ACTIVE' || status === 'IN_PROGRESS' || project?.closureStatus === 'WORK_PENDING') {
+      return { color: 'in-progress', label: 'In progress', tip: 'Project work is currently in progress.' };
+    }
+    return { color: 'on-track', label: 'On track', tip: 'Project is operating normally.' };
+  }
+
+  projectCardBackground(project: any, index: number): string {
+    const health = this.projectCardHealth(project).color;
+    const colors: Record<string, string> = {
+      critical: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+      'on-hold': 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+      'in-progress': 'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)',
+      'on-track': 'linear-gradient(135deg, #16a34a 0%, #059669 100%)',
+      draft: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+    };
+    return colors[health] || this.getGradient(project?.color, index);
+  }
+
   selectBg(bg: string) {
     this.selectedBg.set(bg);
   }
@@ -4048,6 +4206,7 @@ export class ProjectsComponent implements OnInit {
       architectIds: project.members?.filter((m: any) => m.role === 'TECHNICAL_ARCHITECT').map((m: any) => m.employeeId) || [],
       memberIds: project.members?.filter((m: any) => m.role === 'MEMBER').map((m: any) => m.employeeId) || [],
       address: project.address || '',
+      onsiteRepresentation: project.onsiteRepresentation || '',
       category: project.category || '',
       priority: project.priority || 'MEDIUM',
       departmentId: project.department?.id ?? project.departmentId ?? null,
@@ -4204,6 +4363,7 @@ export class ProjectsComponent implements OnInit {
         summary: this.projectForm.summary || null,
         color: bgValue,
         address: this.projectForm.address || null,
+        onsiteRepresentation: this.projectForm.onsiteRepresentation || null,
         billingType: this.projectForm.billingType,
         budgetAmount: this.projectForm.budgetAmount || null,
         hourlyRate: this.projectForm.hourlyRate || null,
@@ -4290,6 +4450,7 @@ export class ProjectsComponent implements OnInit {
       pmIds: this.projectForm.pmIds,
       memberIds: this.projectForm.memberIds,
       address: this.projectForm.address || null,
+      onsiteRepresentation: this.projectForm.onsiteRepresentation || null,
       category: this.projectForm.category || null,
       priority: this.projectForm.priority,
       departmentId: this.projectForm.departmentId || null,

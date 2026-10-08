@@ -280,14 +280,14 @@
             </th>
             }
             <th>Request</th>
+            <th class="status-cell-left">Status</th>
+            <th class="action-col action-col-left">Action</th>
             <th>Project</th>
-            <th>Site Location</th>
             <th>Scheduled Dates</th>
             <th class="num">Days</th>
             <th>Assigned to</th>
-            <th>Tasks</th>
-            <th>Status</th>
-            <th class="action-col"></th>
+            <th class="status-cell-right">Status</th>
+            <th class="action-col action-col-right">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -304,17 +304,58 @@
               <td class="req-cell">
                 <span class="request-tag">{{ r.requestNumber }}</span>
               </td>
+              <td class="status-cell status-cell-left" (click)="$event.stopPropagation()">
+                <div class="status-dropdown-wrap">
+                  <button type="button" class="status-dropdown-btn status-pill" [class]="'st-' + r.status"
+                          [disabled]="deciding() === r.id || !isSuperAdmin()"
+                          (click)="isSuperAdmin() && toggleStatusMenu(r, $event)"
+                          [title]="isSuperAdmin() ? 'Click to change status' : label(r.status)">
+                    <span class="status-dot"></span><span>{{ label(r.status) }}</span>
+                    @if (isSuperAdmin()) { <svg lucideChevronDown [size]="12" class="status-chevron" [class.rotated]="activeStatusMenuId() === r.id"></svg> }
+                  </button>
+                  @if (isSuperAdmin() && activeStatusMenuId() === r.id) {
+                    <div class="status-menu-popover" (click)="$event.stopPropagation()">
+                      <div class="status-menu-header">Change Status</div>
+                      @for (opt of statusOptions; track opt.status) {
+                        <button type="button" class="status-menu-item" [class.selected]="r.status === opt.status" (click)="onSelectStatus(r, opt.status, $event)">
+                          <span class="status-dot" [style.background-color]="opt.color"></span><span class="status-item-label">{{ opt.label }}</span>
+                          @if (r.status === opt.status) { <svg lucideCheck [size]="13" class="item-check-icon"></svg> }
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+              </td>
+              <td class="action-col action-col-left" (click)="$event.stopPropagation()">
+                <div class="row-actions">
+                  <button type="button" class="row-more" title="Request actions" (click)="toggleActionMenu(r.id, $event)"><svg lucideMoreHorizontal [size]="18"></svg></button>
+                  @if (activeActionMenuId() === r.id) {
+                    <div class="row-action-menu">
+                      <button type="button" (click)="openRequest(r)"><svg lucideArrowRight [size]="14"></svg> View</button>
+                      @if (r.canEdit || isSuperAdmin()) { <button type="button" (click)="openForm(r)"><svg lucideEdit2 [size]="14"></svg> Edit</button> }
+                      @if (isSuperAdmin()) {
+                        @if (r.status === 'PENDING_APPROVAL') { <button type="button" (click)="approveRow(r, $event)"><svg lucideCheck [size]="14"></svg> Approve</button><button type="button" class="danger" (click)="rejectRow(r, $event)"><svg lucideX [size]="14"></svg> Reject</button> }
+                        @if (r.status !== 'CANCELLED' && r.status !== 'COMPLETED') { <button type="button" class="danger" (click)="cancelRow(r, $event)"><svg lucideX [size]="14"></svg> Cancel</button> }
+                      }
+                    </div>
+                  }
+                </div>
+              </td>
               <td class="project-cell">
                 <button type="button" class="project-info row-link" (click)="openProject(r, $event)" title="Open project board">
                   <svg lucideBuilding [size]="14" class="cell-icon"></svg>
                   <span class="project-name" title="{{ r.project.name }}">{{ r.project.name }}</span>
                 </button>
-              </td>
-              <td class="site-cell">
-                <div class="site-info" title="{{ r.location }}">
-                  <svg lucideMapPin [size]="13" class="cell-icon site-icon"></svg>
-                  <span class="site-text">{{ r.location }}</span>
-                </div>
+                @if (r.tasks.length) {
+                  <div class="project-task-links">
+                    @for (task of r.tasks.slice(0, 2); track task.id) {
+                      <button type="button" class="project-task-link" [class.unlinked]="!task.issueId" (click)="openTask(r, task, $event)" [disabled]="!task.issueId" [title]="task.issueId ? 'Open task details' : 'Task is not yet linked to the board'">
+                        {{ task.name }}
+                      </button>
+                    }
+                    @if (r.tasks.length > 2) { <span class="more-tasks">+{{ r.tasks.length - 2 }} more</span> }
+                  </div>
+                }
               </td>
               <td class="date-cell nowrap">
                 <div class="date-info">
@@ -334,48 +375,35 @@
                 @if (r.members.length) {
                   <div class="assigned-people" title="{{ r.members.length }} member{{ r.members.length === 1 ? '' : 's' }} assigned">
                     @for (m of r.members.slice(0, 2); track m.id) {
-                      <span class="assigned-person">
+                      <span class="assigned-person" [attr.aria-label]="m.employee.firstName + ' ' + m.employee.lastName">
                         @if (m.employee.avatarUrl) {
                           <img [src]="m.employee.avatarUrl" [alt]="m.employee.firstName + ' ' + m.employee.lastName" />
                         } @else {
                           <span class="assigned-avatar-fallback">{{ (m.employee.firstName?.[0] || '') + (m.employee.lastName?.[0] || '') }}</span>
                         }
-                        <span>{{ m.employee.firstName }} {{ m.employee.lastName }}</span>
+                        <span class="assignee-tooltip" role="tooltip">{{ m.employee.firstName }} {{ m.employee.lastName }}</span>
                       </span>
                     }
                     @if (r.members.length > 2) { <span class="more-people">+{{ r.members.length - 2 }}</span> }
                   </div>
                 } @else { <span class="cell-empty">No one assigned</span> }
               </td>
-              <td class="tasks-cell">
-                @if (r.tasks.length) {
-                  <div class="visit-task-list">
-                    @for (task of r.tasks.slice(0, 2); track task.id) {
-                      <button type="button" class="visit-task-link" [class.unlinked]="!task.issueId" (click)="openTask(r, task, $event)" [disabled]="!task.issueId" [title]="task.issueId ? 'Open task details' : 'This task is not yet linked to a board task'">
-                        <span class="visit-task-name">{{ task.name }}</span>
-                        <span class="visit-task-project">{{ r.project.name }}</span>
-                      </button>
-                    }
-                    @if (r.tasks.length > 2) { <span class="more-tasks">+{{ r.tasks.length - 2 }} more</span> }
-                  </div>
-                } @else { <span class="cell-empty">No tasks</span> }
-              </td>
-              <td class="status-cell" (click)="$event.stopPropagation()">
+              <td class="status-cell status-cell-right" (click)="$event.stopPropagation()">
                 <div class="status-dropdown-wrap">
                   <button type="button" 
                           class="status-dropdown-btn status-pill" 
                           [class]="'st-' + r.status"
-                          [disabled]="deciding() === r.id || !isCompanyWide()"
-                          (click)="isCompanyWide() && toggleStatusMenu(r, $event)"
-                          [title]="isCompanyWide() ? 'Click to change status' : label(r.status)">
+                          [disabled]="deciding() === r.id || !isSuperAdmin()"
+                          (click)="isSuperAdmin() && toggleStatusMenu(r, $event)"
+                          [title]="isSuperAdmin() ? 'Click to change status' : label(r.status)">
                     <span class="status-dot"></span>
                     <span>{{ label(r.status) }}</span>
-                    @if (isCompanyWide()) {
+                    @if (isSuperAdmin()) {
                       <svg lucideChevronDown [size]="12" class="status-chevron" [class.rotated]="activeStatusMenuId() === r.id"></svg>
                     }
                   </button>
 
-                  @if (isCompanyWide() && activeStatusMenuId() === r.id) {
+                  @if (isSuperAdmin() && activeStatusMenuId() === r.id) {
                     <div class="status-menu-popover" (click)="$event.stopPropagation()">
                       <div class="status-menu-header">Change Status</div>
                       @for (opt of statusOptions; track opt.status) {
@@ -394,9 +422,28 @@
                   }
                 </div>
               </td>
-              <td class="action-col">
-                <div class="row-arrow">
-                  <svg lucideArrowRight [size]="15"></svg>
+              <td class="action-col action-col-right">
+                <div class="row-actions" (click)="$event.stopPropagation()">
+                  <button type="button" class="row-more" title="Request actions" (click)="toggleActionMenu(r.id, $event)">
+                    <svg lucideMoreHorizontal [size]="18"></svg>
+                  </button>
+                  @if (activeActionMenuId() === r.id) {
+                    <div class="row-action-menu">
+                      <button type="button" (click)="openRequest(r)"><svg lucideArrowRight [size]="14"></svg> View</button>
+                      @if (r.canEdit || isSuperAdmin()) {
+                        <button type="button" (click)="openForm(r)"><svg lucideEdit2 [size]="14"></svg> Edit</button>
+                      }
+                      @if (isSuperAdmin()) {
+                        @if (r.status === 'PENDING_APPROVAL') {
+                          <button type="button" (click)="approveRow(r, $event)"><svg lucideCheck [size]="14"></svg> Approve</button>
+                          <button type="button" class="danger" (click)="rejectRow(r, $event)"><svg lucideX [size]="14"></svg> Reject</button>
+                        }
+                        @if (r.status !== 'CANCELLED' && r.status !== 'COMPLETED') {
+                          <button type="button" class="danger" (click)="cancelRow(r, $event)"><svg lucideX [size]="14"></svg> Cancel</button>
+                        }
+                      }
+                    </div>
+                  }
                 </div>
               </td>
             </tr>
@@ -419,6 +466,7 @@
   <app-field-visit-request-form
     [request]="editing()"
     [mode]="editing() ? 'edit' : 'create'"
+    [initialProjectId]="createProjectId()"
     (saved)="onSaved()"
     (closed)="closeForm()">
   </app-field-visit-request-form>

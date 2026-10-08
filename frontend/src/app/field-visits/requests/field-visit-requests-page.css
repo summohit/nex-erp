@@ -377,12 +377,13 @@
 
 .table-card {
   padding: 0;
-  overflow: auto;
+  overflow: visible;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .fvr-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 13.5px;
 }
@@ -441,9 +442,11 @@
   border: 1px solid #c7d2fe;
 }
 
-.project-cell {
-  max-width: 220px;
-}
+.project-cell { max-width: none; }
+.project-task-links { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin: 4px 0 0 21px; min-width: 0; }
+.project-task-link { max-width: 100%; padding: 0; border: 0; background: transparent; color: #4f46e5; font-size: 11px; font-weight: 600; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.project-task-link:hover { color: #3730a3; text-decoration: underline; }
+.project-task-link:disabled, .project-task-link.unlinked { color: #94a3b8; cursor: default; text-decoration: none; }
 
 .project-info {
   display: flex;
@@ -471,9 +474,7 @@
   text-overflow: ellipsis;
 }
 
-.site-cell {
-  max-width: 220px;
-}
+.site-cell { max-width: none; }
 
 .site-info {
   display: flex;
@@ -536,13 +537,18 @@
   border: 1px solid #e9d5ff;
 }
 
-.assignees-cell { min-width: 180px; }
-.assigned-people { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.assigned-person { display: inline-flex; align-items: center; gap: 5px; min-width: 0; color: #334155; font-size: 12px; font-weight: 600; white-space: nowrap; }
-.assigned-person img, .assigned-avatar-fallback { width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%; object-fit: cover; }
+.assignees-cell { min-width: 0; overflow: hidden; }
+.assigned-people { display: flex; align-items: center; gap: 0; min-width: 0; }
+.assigned-person { position: relative; display: inline-flex; margin-left: -5px; z-index: 1; }
+.assigned-person:first-child { margin-left: 0; }
+.assigned-person:hover { z-index: 4; }
+.assigned-person img, .assigned-avatar-fallback { width: 28px; height: 28px; flex: 0 0 28px; border: 2px solid #fff; border-radius: 50%; object-fit: cover; box-shadow: 0 1px 3px rgba(15,23,42,.16); }
 .assigned-avatar-fallback { display: inline-flex; align-items: center; justify-content: center; background: #e0e7ff; color: #4338ca; font-size: 9px; font-weight: 800; }
+.assignee-tooltip { position: absolute; z-index: 20; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(3px); padding: 6px 9px; border-radius: 7px; background: #0f172a; color: #fff; box-shadow: 0 5px 16px rgba(15,23,42,.24); font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .14s ease, transform .14s ease, visibility .14s ease; }
+.assignee-tooltip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #0f172a; }
+.assigned-person:hover .assignee-tooltip, .assigned-person:focus-within .assignee-tooltip { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
 .more-people, .more-tasks { flex: 0 0 auto; color: #64748b; font-size: 11px; font-weight: 700; }
-.tasks-cell { min-width: 190px; }
+.tasks-cell { min-width: 0; overflow: hidden; }
 .visit-task-list { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
 .visit-task-link { display: flex; flex-direction: column; align-items: flex-start; max-width: 100%; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
 .visit-task-link:hover .visit-task-name { color: #4f46e5; text-decoration: underline; }
@@ -614,7 +620,7 @@
 .st-COMPLETED .status-dot { background: #4f46e5; }
 
 .action-col {
-  width: 36px;
+  width: 42px;
   padding-right: 16px !important;
   white-space: nowrap;
 }
@@ -641,6 +647,36 @@
   justify-content: center;
   transition: all 0.15s ease;
 }
+
+/* The request list must remain in one viewport width. Long project, location,
+   people and task names truncate in their cells instead of growing a page-wide
+   scroller. The optional checkbox column is included in these proportions. */
+.fvr-table th, .fvr-table td { overflow: visible; box-sizing: border-box; }
+.fvr-table .select-col { width: 3%; }
+.status-cell-left, .action-col-left {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+.fvr-table th:nth-child(2), .fvr-table td:nth-child(2) { width: 9%; }
+.fvr-table th:nth-child(5), .fvr-table td:nth-child(5) { width: 27%; }
+.fvr-table th:nth-child(6), .fvr-table td:nth-child(6) { width: 19%; }
+.fvr-table th:nth-child(7), .fvr-table td:nth-child(7) { width: 5%; }
+.fvr-table th:nth-child(8), .fvr-table td:nth-child(8) { width: 110px; min-width: 110px; max-width: 110px; }
+.fvr-table th:nth-child(9), .fvr-table td:nth-child(9) { width: 150px; min-width: 150px; max-width: 150px; }
+.fvr-table th:nth-child(10), .fvr-table td:nth-child(10) { width: 54px; min-width: 54px; max-width: 54px; }
+.fvr-table .action-col { min-width: 54px; padding-left: 4px !important; padding-right: 4px !important; text-align: center; }
+.row-actions { position: relative; display: flex; justify-content: center; }
+.row-more { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #64748b; cursor: pointer; }
+.row-more:hover { background: #eef2ff; color: #4f46e5; }
+.row-action-menu { position: absolute; z-index: 40; top: 33px; right: 0; min-width: 132px; padding: 5px; border: 1px solid #dbe3ee; border-radius: 9px; background: #fff; box-shadow: 0 10px 24px rgba(15,23,42,.16); }
+.row-action-menu button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px; border: 0; border-radius: 6px; background: transparent; color: #334155; font: 600 12px inherit; text-align: left; cursor: pointer; }
+.row-action-menu button:hover { background: #f1f5f9; }
+.row-action-menu button.danger { color: #b91c1c; }
+.row-action-menu button.danger:hover { background: #fef2f2; }
 
 /* ── Empty & Loading States ──────────────────────────────────────────────── */
 .loading-card,
