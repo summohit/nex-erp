@@ -39,7 +39,7 @@ describe('FieldVisitRequestsController', () => {
 
   it('forwards the employee id, not the user id, when approving', () => {
     controller.approve(req, 9);
-    expect(requests.approve).toHaveBeenCalledWith(1, 71, 'ADMIN', 9, { overrideDayOff: false });
+    expect(requests.approve).toHaveBeenCalledWith(1, 71, 'ADMIN', 9, { overrideDayOff: false }, undefined, undefined);
   });
 
   it('passes a null employee id through rather than falling back to sub', () => {
@@ -47,7 +47,7 @@ describe('FieldVisitRequestsController', () => {
     // where it is refused — silently substituting `sub` would make it look
     // like employee 501.
     controller.approve({ user: { sub: 501, companyId: 1, role: 'ADMIN' } }, 9);
-    expect(requests.approve).toHaveBeenCalledWith(1, null, 'ADMIN', 9, { overrideDayOff: false });
+    expect(requests.approve).toHaveBeenCalledWith(1, null, 'ADMIN', 9, { overrideDayOff: false }, undefined, undefined);
   });
 
   it('carries the rejection reason', () => {

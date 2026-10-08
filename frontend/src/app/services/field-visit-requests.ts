@@ -179,7 +179,7 @@ export class FieldVisitRequestsService {
   }
 
   /** overrideDayOff: roster the people on site over their rostered days off. */
-  approve(id: number, opts: { overrideDayOff?: boolean } = {}) {
+  approve(id: number, opts: { overrideDayOff?: boolean; edits?: Record<string, any>; editReason?: string } = {}) {
     return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/approve`, opts);
   }
 

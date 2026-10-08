@@ -1,3 +1,4 @@
+import { diffFields, recordApprovalEdit, requireEditReason } from '../../common/approval-edits';
 import {
   BadRequestException,
   ForbiddenException,
@@ -162,6 +163,8 @@ export class VisitLocationRequestsService {
     requestId: number,
     decision: 'APPROVED' | 'REJECTED',
     reason?: string,
+    edits?: { name?: string; address?: string | null; latitude?: number | null; longitude?: number | null },
+    editReason?: string,
   ) {
     if (!isCompanyAdmin(role)) {
       throw new ForbiddenException(
@@ -222,11 +225,32 @@ export class VisitLocationRequestsService {
       return rejected;
     }
 
+    // Edit & approve: the administrator's corrections become the saved site.
+    const next: Record<string, any> = {};
+    if (edits) {
+      if (edits.name !== undefined) {
+        next.name = String(edits.name).trim();
+        if (!next.name) throw new BadRequestException('The location name cannot be empty');
+      }
+      if (edits.address !== undefined) next.address = edits.address == null ? null : String(edits.address).trim() || null;
+      for (const k of ['latitude', 'longitude'] as const) {
+        if (edits[k] === undefined) continue;
+        const v = edits[k] == null || (edits[k] as any) === '' ? null : Number(edits[k]);
+        if (v != null && !Number.isFinite(v)) throw new BadRequestException(`${k} must be a number`);
+        next[k] = v;
+      }
+      if (next.latitude != null && Math.abs(next.latitude) > 90) throw new BadRequestException('Latitude must be between -90 and 90');
+      if (next.longitude != null && Math.abs(next.longitude) > 180) throw new BadRequestException('Longitude must be between -180 and 180');
+    }
+    const changes = diffFields(request, next);
+    requireEditReason(changes, editReason);
+    const site = { ...request, ...Object.fromEntries(Object.keys(changes).map((k) => [k, next[k]])) };
+
     const approved = await this.prisma.$transaction(async (tx) => {
       const duplicate = await tx.visitLocation.findFirst({
         where: {
           companyId,
-          name: { equals: request.name, mode: 'insensitive' },
+          name: { equals: site.name, mode: 'insensitive' },
         },
         select: { id: true },
       });
@@ -235,10 +259,10 @@ export class VisitLocationRequestsService {
 
       const location = await tx.visitLocation.create({
         data: {
-          name: request.name,
-          address: request.address,
-          latitude: request.latitude,
-          longitude: request.longitude,
+          name: site.name,
+          address: site.address,
+          latitude: site.latitude,
+          longitude: site.longitude,
           position: request.position,
           leadContactId: request.leadContactId,
           companyId,
@@ -249,6 +273,7 @@ export class VisitLocationRequestsService {
       return tx.visitLocationRequest.update({
         where: { id: requestId },
         data: {
+          ...Object.fromEntries(Object.keys(changes).map((k) => [k, next[k]])),
           status: 'APPROVED',
           reviewedById: reviewerId,
           reviewedAt: new Date(),
@@ -256,6 +281,13 @@ export class VisitLocationRequestsService {
           visitLocationId: location.id,
         },
         select: this.SELECT,
+      }).then(async (saved) => {
+        await recordApprovalEdit(tx, {
+          companyId, actorEmployeeId: reviewerId,
+          entityType: 'VisitLocationRequest', entityId: requestId,
+          changes, reason: editReason,
+        });
+        return saved;
       });
     });
 

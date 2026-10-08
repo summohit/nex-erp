@@ -88,7 +88,11 @@ export class IssuesController {
     @Req() req,
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('id', ParseIntPipe) id: number,
-    @Body() data: { action: 'APPROVE' | 'REJECT'; reason?: string },
+    @Body() data: {
+      action: 'APPROVE' | 'REJECT'; reason?: string;
+      edits?: { title?: string; priority?: string; startDate?: string | null; dueDate?: string | null; estimatedHours?: number | null };
+      editReason?: string;
+    },
   ) {
     return this.issuesService.reviewIssueApproval(
       req.user.companyId, projectId, id, data,

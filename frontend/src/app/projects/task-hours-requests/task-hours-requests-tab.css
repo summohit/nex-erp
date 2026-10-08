@@ -2812,3 +2812,25 @@
 .ta-clear { border: none; background: none; color: #2563eb; font-weight: 600; font-size: 13px; cursor: pointer; }
 .ta-showing { font-size: 12.5px; color: #64748b; white-space: nowrap; }
 .ta-none { text-align: center; color: #64748b; padding: 22px 12px !important; }
+
+/* ── Edit & approve ─────────────────────────────────────────────────────── */
+.prq-btn.edit { background: #fff; color: #4f46e5; border: 1px solid #c7d2fe; }
+.prq-btn.edit:hover { background: #eef2ff; border-color: #a5b4fc; }
+.ta-icon-btn.edit { color: #4f46e5; }
+.ea-modal { max-width: 560px; width: calc(100vw - 32px); }
+.ea-close { margin-left: auto; border: 0; background: transparent; color: #64748b; cursor: pointer; padding: 4px; border-radius: 6px; }
+.ea-close:hover { background: #f1f5f9; }
+.ea-body { display: flex; flex-direction: column; gap: 14px; }
+.ea-intro { margin: 0; font-size: 13px; color: #64748b; line-height: 1.5; }
+.ea-field { display: flex; flex-direction: column; gap: 6px; }
+.ea-field label { font-size: 12px; font-weight: 600; color: #334155; }
+.ea-field input, .ea-field select, .ea-field textarea {
+  width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit; font-size: 13px;
+  border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #0f172a;
+}
+.ea-field textarea { resize: vertical; }
+.ea-field input:focus, .ea-field select:focus, .ea-field textarea:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+.ea-field.ea-changed input, .ea-field.ea-changed select, .ea-field.ea-changed textarea { border-color: #f59e0b; background: #fffbeb; }
+.ea-hint { font-size: 11.5px; color: #94a3b8; }
+.ea-reason label { color: #b45309; }
+.ea-req { color: #dc2626; }

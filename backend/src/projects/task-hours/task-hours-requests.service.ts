@@ -285,7 +285,7 @@ export class TaskHoursRequestsService {
     role: string,
     requestId: number,
     decision: 'APPROVED' | 'REJECTED',
-    data: { approvedHours?: unknown; reason?: string } = {},
+    data: { approvedHours?: unknown; reason?: string; editReason?: string } = {},
   ) {
     const request = await this.prisma.taskHoursRequest.findFirst({
       where: { id: requestId, companyId },
@@ -374,7 +374,8 @@ export class TaskHoursRequestsService {
         await tx.taskHoursRequestActivity.create({
           data: {
             requestId, action: 'HOURS_MODIFIED',
-            detail: `${request.requestedHours}h requested → ${approvedHours}h approved`,
+            detail: `${request.requestedHours}h requested → ${approvedHours}h approved`
+              + (data?.editReason?.trim() ? ` — ${data.editReason.trim()}` : ''),
             oldValue: String(request.requestedHours),
             newValue: String(approvedHours),
             actorId: reviewerEmployeeId as number,

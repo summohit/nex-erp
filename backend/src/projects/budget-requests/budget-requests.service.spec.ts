@@ -314,3 +314,44 @@ describe('the created status and the reviewable status agree', () => {
     );
   });
 });
+
+describe('edit & approve', () => {
+  it('grants the edited figure, keeps the ask, and audits the change', async () => {
+    const { service, prisma } = makeService({ auditLog: { create: jest.fn().mockResolvedValue({}) } });
+    const saved = await service.review(
+      1, 90, 'ADMIN', 5, 'APPROVED', undefined,
+      { additionalHours: 300 }, 'Phase 2 moved to next quarter',
+    );
+    expect(prisma.project.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ estimatedHours: 2300, budgetAmount: 1_200_000 }),
+    }));
+    expect(saved).toEqual(expect.objectContaining({ hoursBefore: 2000, hoursAfter: 2300 }));
+    // The request row is not rewritten: what was asked for survives.
+    expect(prisma.projectBudgetRequest.update.mock.calls[0][0].data.additionalHours).toBeUndefined();
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'APPROVAL_EDITED', entityType: 'ProjectBudgetRequest', entityId: '5',
+        oldValue: { additionalHours: 500 },
+        newValue: { additionalHours: 300, _reason: 'Phase 2 moved to next quarter' },
+      }),
+    });
+  });
+
+  it('insists on a reason when a figure changes', async () => {
+    const { service } = makeService({ auditLog: { create: jest.fn() } });
+    await expect(service.review(1, 90, 'ADMIN', 5, 'APPROVED', undefined, { additionalBudget: 100_000 }))
+      .rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('treats unchanged figures as a plain approval, with nothing audited', async () => {
+    const { service, prisma } = makeService({ auditLog: { create: jest.fn() } });
+    await service.review(1, 90, 'ADMIN', 5, 'APPROVED', undefined, { additionalHours: 500 });
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a granted figure that is not positive', async () => {
+    const { service } = makeService({ auditLog: { create: jest.fn() } });
+    await expect(service.review(1, 90, 'ADMIN', 5, 'APPROVED', undefined, { additionalHours: -5 }, 'x'))
+      .rejects.toBeInstanceOf(BadRequestException);
+  });
+});

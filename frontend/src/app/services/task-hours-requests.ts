@@ -77,7 +77,7 @@ export class TaskHoursRequestsService {
   review(
     id: number,
     decision: 'APPROVED' | 'REJECTED',
-    data: { approvedHours?: number | null; reason?: string } = {},
+    data: { approvedHours?: number | null; reason?: string; editReason?: string } = {},
   ) {
     return this.http.patch<TaskHoursRequest>(
       `${this.api}/task-hours-requests/${id}/review`, { decision, ...data },

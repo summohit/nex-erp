@@ -99,9 +99,12 @@ export class ProjectsService {
    * decides whether finished work is done, this one decides whether the task
    * should exist. They sound alike and mean opposite things.
    */
-  reviewIssueApproval(projectId: number, issueId: number, action: 'APPROVE' | 'REJECT', reason?: string) {
+  reviewIssueApproval(
+    projectId: number, issueId: number, action: 'APPROVE' | 'REJECT', reason?: string,
+    edits?: Record<string, any>, editReason?: string,
+  ) {
     return this.http.post<any>(
-      `${this.apiUrl}/${projectId}/issues/${issueId}/approval`, { action, reason },
+      `${this.apiUrl}/${projectId}/issues/${issueId}/approval`, { action, reason, edits, editReason },
     );
   }
 
@@ -150,9 +153,12 @@ export class ProjectsService {
     return this.http.get<ScopeRequest[]>(`${environment.apiUrl}/scope-requests/pending`);
   }
 
-  reviewScopeRequest(id: number, decision: 'APPROVED' | 'REJECTED', note?: string) {
+  reviewScopeRequest(
+    id: number, decision: 'APPROVED' | 'REJECTED', note?: string,
+    edits?: { title?: string; scope?: string; body?: string }, editReason?: string,
+  ) {
     return this.http.post<ScopeRequest>(
-      `${environment.apiUrl}/scope-requests/${id}/review`, { decision, note },
+      `${environment.apiUrl}/scope-requests/${id}/review`, { decision, note, edits, editReason },
     );
   }
 

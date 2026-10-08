@@ -49,7 +49,11 @@ export class VisitLocationRequestsController {
   review(
     @Req() req,
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { decision: 'APPROVED' | 'REJECTED'; reason?: string },
+    @Body() body: {
+      decision: 'APPROVED' | 'REJECTED'; reason?: string;
+      edits?: { name?: string; address?: string | null; latitude?: number | null; longitude?: number | null };
+      editReason?: string;
+    },
   ) {
     return this.requests.review(
       req.user.companyId,
@@ -58,6 +62,8 @@ export class VisitLocationRequestsController {
       id,
       body?.decision,
       body?.reason,
+      body?.edits,
+      body?.editReason,
     );
   }
 }

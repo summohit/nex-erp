@@ -1,3 +1,4 @@
+import { describeChanges, diffFields, recordApprovalEdit, requireEditReason } from '../../common/approval-edits';
 import {
   Injectable, BadRequestException, ForbiddenException, NotFoundException,
 } from '@nestjs/common';
@@ -123,6 +124,8 @@ export class ScopeRequestsService {
     role: string | undefined,
     reviewerEmployeeId: number | null,
     note?: string,
+    edits?: { title?: string; scope?: string; body?: string },
+    editReason?: string,
   ) {
     if (!isCompanyAdmin(role)) {
       throw new ForbiddenException('Only an administrator decides project requests.');
@@ -136,30 +139,68 @@ export class ScopeRequestsService {
 
     const request = await this.prisma.projectScopeRequest.findFirst({
       where: { id: requestId, companyId },
-      select: { id: true, title: true, status: true, raisedById: true, projectId: true },
+      select: {
+        id: true, title: true, status: true, raisedById: true, projectId: true,
+        scope: true, body: true,
+      },
     });
     if (!request) throw new NotFoundException('Request not found');
     if (request.status !== SCOPE_REQUEST_STATUS.PENDING) {
       throw new BadRequestException(`This request is already ${request.status.toLowerCase()}.`);
     }
 
-    const updated = await this.prisma.projectScopeRequest.update({
-      where: { id: requestId },
-      data: {
-        status: decision,
-        decisionNote: trimmed || null,
-        reviewedById: reviewerEmployeeId,
-        reviewedAt: new Date(),
-      },
-      select: this.SELECT,
+    // Edit & approve: only on an approval, and only the fields sent.
+    const next: { title?: string; scope?: string; body?: string } = {};
+    if (decision === 'APPROVED' && edits) {
+      if (edits.title !== undefined) {
+        next.title = String(edits.title).trim();
+        if (!next.title) throw new BadRequestException('The title cannot be empty.');
+      }
+      if (edits.scope !== undefined) {
+        if (!['IN_SCOPE', 'OUT_OF_SCOPE'].includes(edits.scope)) {
+          throw new BadRequestException('Scope must be IN_SCOPE or OUT_OF_SCOPE.');
+        }
+        next.scope = edits.scope;
+      }
+      if (edits.body !== undefined) {
+        next.body = sanitiseRichText(String(edits.body));
+        if (!hasVisibleText(next.body)) {
+          throw new BadRequestException('The description cannot be empty.');
+        }
+      }
+    }
+    const changes = diffFields(request, next);
+    requireEditReason(changes, editReason);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const saved = await tx.projectScopeRequest.update({
+        where: { id: requestId },
+        data: {
+          ...Object.fromEntries(Object.keys(changes).map((k) => [k, (next as any)[k]])),
+          status: decision,
+          decisionNote: trimmed || null,
+          reviewedById: reviewerEmployeeId,
+          reviewedAt: new Date(),
+        },
+        select: this.SELECT,
+      });
+      await recordApprovalEdit(tx, {
+        companyId, actorEmployeeId: reviewerEmployeeId,
+        entityType: 'ProjectScopeRequest', entityId: requestId,
+        changes, reason: editReason,
+      });
+      return saved;
     });
+    const edited = Object.keys(changes).length
+      ? ` with changes (${describeChanges(changes, { title: 'title', scope: 'scope', body: 'description' })}): ${editReason!.trim()}`
+      : '';
 
     if (request.raisedById !== reviewerEmployeeId) {
       await this.notifications.notifyEmployees([request.raisedById], {
         companyId,
         title: decision === 'APPROVED' ? 'Request approved' : 'Request rejected',
         message: decision === 'APPROVED'
-          ? `"${request.title}" was approved.`
+          ? `"${request.title}" was approved${edited}.`
           : `"${request.title}" was rejected: ${trimmed}`,
         type: 'PROJECT',
         linkUrl: `/projects/${request.projectId}`,

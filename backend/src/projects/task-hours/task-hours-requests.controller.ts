@@ -49,7 +49,7 @@ export class TaskHoursRequestsController {
   review(
     @Req() req,
     @Param('requestId', ParseIntPipe) requestId: number,
-    @Body() body: { decision: 'APPROVED' | 'REJECTED'; approvedHours?: number; reason?: string },
+    @Body() body: { decision: 'APPROVED' | 'REJECTED'; approvedHours?: number; reason?: string; editReason?: string },
   ) {
     return this.requests.review(
       req.user.companyId, req.user.employeeId ?? null, req.user.role,

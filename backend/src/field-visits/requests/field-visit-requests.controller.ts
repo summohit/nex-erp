@@ -5,7 +5,7 @@ import { AuthGuard } from '../../auth/auth.guard';
 import { FieldVisitRequestsService } from './field-visit-requests.service';
 // `import type` because emitDecoratorMetadata would otherwise try to emit a
 // runtime reference to an interface that does not exist at runtime.
-import type { FieldVisitRequestInput } from './field-visit-requests.service';
+import type { FieldVisitApprovalEdits, FieldVisitRequestInput } from './field-visit-requests.service';
 
 /**
  * Field Visit Requests (§1–§3): raised by the project manager, ruled on by an
@@ -91,11 +91,12 @@ export class FieldVisitRequestsController {
   approve(
     @Req() req,
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { overrideDayOff?: boolean } = {},
+    @Body() body: { overrideDayOff?: boolean; edits?: FieldVisitApprovalEdits; editReason?: string } = {},
   ) {
     return this.requests.approve(
       req.user.companyId, req.user.employeeId ?? null, req.user.role, id,
       { overrideDayOff: body?.overrideDayOff === true },
+      body?.edits, body?.editReason,
     );
   }
 

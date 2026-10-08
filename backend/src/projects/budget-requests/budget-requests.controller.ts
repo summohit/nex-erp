@@ -43,11 +43,16 @@ export class BudgetRequestsController {
   review(
     @Req() req,
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { decision: 'APPROVED' | 'REJECTED'; reason?: string },
+    @Body() body: {
+      decision: 'APPROVED' | 'REJECTED'; reason?: string;
+      /** Edit & approve: what is actually granted, when it differs from the ask. */
+      edits?: { additionalHours?: number | null; additionalBudget?: number | null };
+      editReason?: string;
+    },
   ) {
     return this.requests.review(
       req.user.companyId, req.user.employeeId ?? null, req.user.role,
-      id, body?.decision, body?.reason,
+      id, body?.decision, body?.reason, body?.edits, body?.editReason,
     );
   }
 

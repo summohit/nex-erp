@@ -38,11 +38,16 @@ export class ScopeRequestsController {
   review(
     @Req() req,
     @Param('id', ParseIntPipe) id: number,
-    @Body() data: { decision: 'APPROVED' | 'REJECTED'; note?: string },
+    @Body() data: {
+      decision: 'APPROVED' | 'REJECTED'; note?: string;
+      /** Edit & approve: the administrator's corrected wording or classification. */
+      edits?: { title?: string; scope?: string; body?: string };
+      editReason?: string;
+    },
   ) {
     return this.scopeRequests.review(
       req.user.companyId, id, data.decision, req.user.role,
-      req.user.employeeId ?? null, data.note,
+      req.user.employeeId ?? null, data.note, data.edits, data.editReason,
     );
   }
 }

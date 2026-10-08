@@ -47,10 +47,13 @@ function sameValue(next: unknown, current: unknown): boolean {
 }
 import { assertWithinAllowedHours, remainingHours, HoursExceeded } from '../../tasks/task-hours';
 import { resolveProjectViewer, taskVisibilityFilter, mayChangeAnyTask, seesEveryTask, PROJECT_ROLE } from '../project-roles';
-import { isSuperAdmin } from '../../common/company-roles';
+import { isSuperAdmin, isCompanyAdmin } from '../../common/company-roles';
+import { describeChanges, diffFields, recordApprovalEdit, requireEditReason } from '../../common/approval-edits';
 import {
   APPROVAL_STATE, decideApproval, isAwaitingApproval, needsApprovalOnCreate,
 } from '../../approvals/two-step-approval';
+
+const ISSUE_EDIT_LABELS = { title: 'title', priority: 'priority', startDate: 'start', dueDate: 'due', estimatedHours: 'estimate (h)' };
 
 @Injectable()
 export class IssuesService {
@@ -508,9 +511,63 @@ export class IssuesService {
    * approval means in the state the task is in, is two-step-approval.ts — this
    * method only records the answer.
    */
+  /**
+   * Edit & approve for a task waiting on approval. Administrators only — a
+   * technical reviewer's approval passes the task on, so their edit would be
+   * approving their own change. Edits only land when the approval is final.
+   */
+  private approvalEdits(
+    issue: { title: string; priority: string; startDate: Date | null; dueDate: Date | null; estimatedHours: number | null },
+    edits: { title?: string; priority?: string; startDate?: string | null; dueDate?: string | null; estimatedHours?: number | null } | undefined,
+    role?: string,
+  ) {
+    if (!edits || !Object.keys(edits).length) return { data: {}, changes: {} };
+    if (!isCompanyAdmin(role)) {
+      throw new ForbiddenException('Only an administrator can change a task while approving it.');
+    }
+    const next: Record<string, any> = {};
+    if (edits.title !== undefined) {
+      next.title = String(edits.title).trim();
+      if (!next.title) throw new BadRequestException('The task title cannot be empty.');
+    }
+    if (edits.priority !== undefined) {
+      if (!['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(String(edits.priority))) {
+        throw new BadRequestException('Priority must be CRITICAL, HIGH, MEDIUM or LOW.');
+      }
+      next.priority = edits.priority;
+    }
+    for (const k of ['startDate', 'dueDate'] as const) {
+      if (edits[k] === undefined) continue;
+      if (!edits[k]) { next[k] = null; continue; }
+      const d = new Date(edits[k] as string);
+      if (isNaN(d.getTime())) throw new BadRequestException(`${k} is not a valid date.`);
+      next[k] = d;
+    }
+    const start = next.startDate !== undefined ? next.startDate : issue.startDate;
+    const due = next.dueDate !== undefined ? next.dueDate : issue.dueDate;
+    if (start && due && due < start) throw new BadRequestException('The due date cannot be before the start date.');
+    if (edits.estimatedHours !== undefined) {
+      const h = edits.estimatedHours == null ? null : Number(edits.estimatedHours);
+      if (h != null && (!Number.isFinite(h) || h <= 0)) {
+        throw new BadRequestException('The estimate must be a positive number of hours.');
+      }
+      next.estimatedHours = h;
+    }
+    const changes = diffFields(issue, next);
+    return {
+      data: Object.fromEntries(Object.keys(changes).map((k) => [k, next[k]])),
+      changes,
+    };
+  }
+
   async reviewIssueApproval(
     companyId: number, projectId: number, issueId: number,
-    data: { action: 'APPROVE' | 'REJECT'; reason?: string },
+    data: {
+      action: 'APPROVE' | 'REJECT'; reason?: string;
+      /** Edit & approve (administrators only): the task as it should be approved. */
+      edits?: { title?: string; priority?: string; startDate?: string | null; dueDate?: string | null; estimatedHours?: number | null };
+      editReason?: string;
+    },
     actorEmployeeId: number | null, role?: string,
   ) {
     const issue = await this.prisma.issue.findFirst({
@@ -518,6 +575,7 @@ export class IssuesService {
       select: {
         id: true, key: true, title: true, approvalState: true,
         approvalRequestedById: true,
+        priority: true, startDate: true, dueDate: true, estimatedHours: true,
       },
     });
     if (!issue) throw new NotFoundException('Task not found');
@@ -535,6 +593,12 @@ export class IssuesService {
     // have no way to answer.
     if (rejecting && !reason) {
       throw new BadRequestException('Say why this task is being rejected.');
+    }
+
+    const edits = this.approvalEdits(issue, rejecting ? undefined : data.edits, role);
+    requireEditReason(edits.changes, data.editReason);
+    if (Object.keys(edits.changes).length && decision.step !== 'ADMIN') {
+      throw new BadRequestException('Changes can only be made with the final, administrator approval.');
     }
 
     const now = new Date();
@@ -561,6 +625,7 @@ export class IssuesService {
               technicalApprovedAt: now,
             }
           : {
+              ...edits.data,
               approvalState: APPROVAL_STATE.APPROVED,
               adminApprovedById: actorEmployeeId,
               adminApprovedAt: now,
@@ -579,6 +644,25 @@ export class IssuesService {
         actorId: actorEmployeeId as number,
       },
     });
+    const editNote = Object.keys(edits.changes).length
+      ? ` Approved with changes (${describeChanges(edits.changes, ISSUE_EDIT_LABELS)}): ${data.editReason!.trim()}.`
+      : '';
+    if (editNote) {
+      for (const [field, c] of Object.entries(edits.changes)) {
+        await this.prisma.issueActivity.create({
+          data: {
+            action: 'APPROVAL_EDITED', issueId, field,
+            oldValue: c.from == null ? null : String(c.from instanceof Date ? c.from.toISOString() : c.from),
+            newValue: c.to == null ? null : String(c.to instanceof Date ? c.to.toISOString() : c.to),
+            actorId: actorEmployeeId as number,
+          },
+        });
+      }
+      await recordApprovalEdit(this.prisma, {
+        companyId, actorEmployeeId, entityType: 'Issue', entityId: issueId,
+        changes: edits.changes, reason: data.editReason,
+      });
+    }
 
     if (issue.approvalRequestedById && issue.approvalRequestedById !== actorEmployeeId) {
       await this.notificationsService.notifyEmployees([issue.approvalRequestedById], {
@@ -587,7 +671,7 @@ export class IssuesService {
         message: rejecting
           ? `${issue.key} "${issue.title}" needs changes: ${reason}. Edit it and send it back for approval.`
           : updated.approvalState === APPROVAL_STATE.APPROVED
-            ? `${issue.key} "${issue.title}" is approved and ready to work on.`
+            ? `${issue.key} "${issue.title}" is approved and ready to work on.${editNote}`
             : `${issue.key} "${issue.title}" passed technical review and is with an administrator.`,
         type: 'TASK',
         linkUrl: `/projects/${projectId}`,

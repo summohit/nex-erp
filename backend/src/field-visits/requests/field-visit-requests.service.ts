@@ -1,3 +1,4 @@
+import { describeChanges, diffFields, recordApprovalEdit, requireEditReason } from '../../common/approval-edits';
 import {
   Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException,
 } from '@nestjs/common';
@@ -30,6 +31,17 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * outstanding work done, so review and finished work are not on offer.
  */
 const GENERAL_TASK_STATUSES = ['TODO', 'IN_PROGRESS'];
+
+/** What an administrator may correct while approving a pending visit. */
+export interface FieldVisitApprovalEdits {
+  location?: string;
+  startDate?: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+}
+
+const FV_EDIT_LABELS = { location: 'site', startDate: 'from', endDate: 'to', startTime: 'clock-in', endTime: 'clock-out' };
 
 export interface FieldVisitRequestInput {
   /**
@@ -880,9 +892,79 @@ export class FieldVisitRequestsService {
   async approve(
     companyId: number, reviewerId: number | null, role: string, id: number,
     opts: { overrideDayOff?: boolean } = {},
+    edits?: FieldVisitApprovalEdits,
+    editReason?: string,
   ) {
-    const request = await this.requireDecidable(companyId, reviewerId, role, id);
+    let request = await this.requireDecidable(companyId, reviewerId, role, id);
+    if (edits && Object.keys(edits).length) {
+      const applied = await this.applyApprovalEdits(companyId, reviewerId, request, edits, editReason);
+      // Approve what was just saved: the schedule and tasks are built from it.
+      if (applied) request = await this.loadForDecision(companyId, id);
+    }
     return this.commitApproval(companyId, request, reviewerId, '', opts);
+  }
+
+  /**
+   * Edit & approve: the administrator corrects the site, dates or hours of a
+   * pending visit as part of approving it. Members and tasks are not edited
+   * here — changing who goes is a different request, not a correction.
+   * Returns false when nothing actually changed.
+   */
+  private async applyApprovalEdits(
+    companyId: number, reviewerId: number | null, request: any,
+    edits: FieldVisitApprovalEdits, editReason?: string,
+  ): Promise<boolean> {
+    const next: Record<string, any> = {};
+    if (edits.location !== undefined) {
+      next.location = String(edits.location ?? '').trim();
+      if (!next.location) throw new BadRequestException('Name the site — it is what everyone reads on the schedule');
+    }
+    if (edits.startDate !== undefined) next.startDate = this.parseDay(edits.startDate, 'Start date');
+    if (edits.endDate !== undefined) next.endDate = this.parseDay(edits.endDate, 'End date');
+    if (edits.startTime !== undefined) next.startTime = this.parseTime(edits.startTime, 'Expected clock-in');
+    if (edits.endTime !== undefined) next.endTime = this.parseTime(edits.endTime, 'Expected clock-out');
+
+    const startDate = next.startDate ?? request.startDate;
+    const endDate = next.endDate ?? request.endDate;
+    if (endDate < startDate) throw new BadRequestException('The visit cannot end before it starts');
+    const startTime = next.startTime ?? request.startTime;
+    const endTime = next.endTime ?? request.endTime;
+    if (endTime <= startTime) {
+      throw new BadRequestException('The expected clock-out has to be after the clock-in');
+    }
+
+    const changes = diffFields(request, next);
+    if (!Object.keys(changes).length) return false;
+    requireEditReason(changes, editReason);
+
+    const data: Record<string, any> = Object.fromEntries(Object.keys(changes).map((k) => [k, next[k]]));
+    if (changes.startDate || changes.endDate) data.visitDays = this.spanInDays(startDate, endDate);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.fieldVisitRequest.update({ where: { id: request.id }, data });
+      await tx.fieldVisitRequestActivity.create({
+        data: {
+          requestId: request.id, action: 'UPDATED',
+          detail: `Changed on approval (${describeChanges(changes, FV_EDIT_LABELS)}): ${editReason!.trim()}`,
+          actorId: reviewerId as number,
+        },
+      });
+      await recordApprovalEdit(tx, {
+        companyId, actorEmployeeId: reviewerId,
+        entityType: 'FieldVisitRequest', entityId: request.id,
+        changes, reason: editReason,
+      });
+    });
+    if (request.raisedById && request.raisedById !== reviewerId) {
+      await this.notifications.notifyEmployees([request.raisedById], {
+        companyId,
+        title: 'Field visit changed on approval',
+        message: `${request.requestNumber ?? 'Your field visit'} was approved with changes (${describeChanges(changes, FV_EDIT_LABELS)}): ${editReason!.trim()}`,
+        type: 'PROJECT',
+        linkUrl: '/field-visits',
+      });
+    }
+    return true;
   }
 
   /**

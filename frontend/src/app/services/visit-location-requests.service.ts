@@ -58,10 +58,14 @@ export class VisitLocationRequestsService {
     id: number,
     decision: 'APPROVED' | 'REJECTED',
     reason?: string,
+    edits?: { name?: string; address?: string | null; latitude?: number | null; longitude?: number | null },
+    editReason?: string,
   ): Observable<VisitLocationRequest> {
     return this.http.post<VisitLocationRequest>(`${this.apiUrl}/${id}/review`, {
       decision,
       reason,
+      edits,
+      editReason,
     });
   }
 }

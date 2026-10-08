@@ -36,6 +36,7 @@ import {
   LucidePaperclip,
   LucideCheckSquare,
   LucideLayers,
+  LucidePencil,
 } from '@lucide/angular';
 import {
   TaskHoursRequestsService,
@@ -45,6 +46,7 @@ import {
 import { ProjectsService, ScopeRequest } from '../../services/projects';
 import { BudgetRequestsService, BudgetRequest } from '../../services/budget-requests';
 import { DialogService } from '../../shared/services/dialog.service';
+import { AuthService } from '../../services/auth.service';
 import { DialogHostComponent } from '../../shared/components/dialog-host/dialog-host.component';
 import {
   VisitLocationRequest,
@@ -109,6 +111,7 @@ export type RequestSortOption = 'newest' | 'oldest' | 'hours-desc' | 'hours-asc'
     LucidePaperclip,
     LucideCheckSquare,
     LucideLayers,
+    LucidePencil,
   ],
   templateUrl: './task-hours-requests-tab.html',
   styleUrls: ['./task-hours-requests-tab.css'],
@@ -123,6 +126,7 @@ export class TaskHoursRequestsTabComponent {
   private fieldVisitApi = inject(FieldVisitRequestsService);
   private route = inject(ActivatedRoute);
   private dialog = inject(DialogService);
+  private auth = inject(AuthService);
 
   /** Which kind of decision is on screen. */
   requestType = signal<ProjectRequestType>('HOURS');
@@ -1144,4 +1148,177 @@ export class TaskHoursRequestsTabComponent {
     const kb = bytes / 1024;
     return kb < 1024 ? `${Math.round(kb)} KB` : `${(kb / 1024).toFixed(1)} MB`;
   }
+
+  // ── Edit & approve ───────────────────────────────────────────────────────
+  // An administrator corrects a request and approves it in one step. Their
+  // edit is the decision, so it is not sent for a second approval; the server
+  // keeps what was asked for and logs every change with the reason given.
+
+  /** Administrators only: anyone else's edit would be approving their own change. */
+  isAdmin = computed(() => ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes(this.auth.currentUser()?.role));
+
+  editApproval = signal<EditApprovalState | null>(null);
+
+  openEditApprove(type: ProjectRequestType, item: any) {
+    const day = (v: any) => (v ? String(v).slice(0, 10) : '');
+    let title = 'Edit & approve';
+    let fields: EditApprovalField[] = [];
+    switch (type) {
+      case 'HOURS':
+        title = `Edit & approve: ${item.issue?.key ?? ''} extra hours`;
+        fields = [{ key: 'approvedHours', label: 'Hours to grant', kind: 'number', value: item.requestedHours, original: item.requestedHours, hint: `Requested ${item.requestedHours}h` }];
+        break;
+      case 'BUDGET':
+        title = 'Edit & approve: budget request';
+        fields = [
+          { key: 'additionalHours', label: 'Extra hours to grant', kind: 'number', value: item.additionalHours, original: item.additionalHours, hint: item.additionalHours != null ? `Requested ${item.additionalHours}h` : 'None requested' },
+          { key: 'additionalBudget', label: 'Extra budget to grant', kind: 'number', value: item.additionalBudget, original: item.additionalBudget, hint: item.additionalBudget != null ? `Requested ${item.additionalBudget}` : 'None requested' },
+        ];
+        break;
+      case 'SCOPE':
+        title = 'Edit & approve: scope request';
+        fields = [
+          { key: 'title', label: 'Title', kind: 'text', value: item.title, original: item.title },
+          { key: 'scope', label: 'Scope', kind: 'select', value: item.scope, original: item.scope, options: [{ value: 'IN_SCOPE', label: 'In scope' }, { value: 'OUT_OF_SCOPE', label: 'Out of scope' }] },
+          { key: 'body', label: 'Description', kind: 'textarea', value: item.body, original: item.body },
+        ];
+        break;
+      case 'TASKS':
+        title = `Edit & approve: ${item.key ?? 'task'}`;
+        fields = [
+          { key: 'title', label: 'Title', kind: 'text', value: item.title, original: item.title },
+          { key: 'priority', label: 'Priority', kind: 'select', value: item.priority, original: item.priority, options: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map((p) => ({ value: p, label: p.charAt(0) + p.slice(1).toLowerCase() })) },
+          { key: 'startDate', label: 'Start date', kind: 'date', value: day(item.startDate), original: day(item.startDate) },
+          { key: 'dueDate', label: 'Due date', kind: 'date', value: day(item.dueDate), original: day(item.dueDate) },
+          { key: 'estimatedHours', label: 'Estimate (hours)', kind: 'number', value: item.estimatedHours, original: item.estimatedHours },
+        ];
+        break;
+      case 'VISIT_LOCATIONS':
+        title = 'Edit & approve: visit location';
+        fields = [
+          { key: 'name', label: 'Name', kind: 'text', value: item.name, original: item.name },
+          { key: 'address', label: 'Address', kind: 'textarea', value: item.address ?? '', original: item.address ?? '' },
+          { key: 'latitude', label: 'Latitude', kind: 'number', value: item.latitude, original: item.latitude },
+          { key: 'longitude', label: 'Longitude', kind: 'number', value: item.longitude, original: item.longitude },
+        ];
+        break;
+      case 'FIELD_VISITS':
+        title = `Edit & approve: ${item.requestNumber ?? 'field visit'}`;
+        fields = [
+          { key: 'location', label: 'Site', kind: 'text', value: item.location, original: item.location },
+          { key: 'startDate', label: 'From', kind: 'date', value: day(item.startDate), original: day(item.startDate) },
+          { key: 'endDate', label: 'To', kind: 'date', value: day(item.endDate), original: day(item.endDate) },
+          { key: 'startTime', label: 'Expected clock-in', kind: 'time', value: item.startTime, original: item.startTime },
+          { key: 'endTime', label: 'Expected clock-out', kind: 'time', value: item.endTime, original: item.endTime },
+        ];
+        break;
+    }
+    this.editApproval.set({ type, item, title, fields, reason: '', busy: false });
+  }
+
+  closeEditApprove() {
+    if (!this.editApproval()?.busy) this.editApproval.set(null);
+  }
+
+  setEditField(key: string, value: any) {
+    const st = this.editApproval();
+    if (!st) return;
+    this.editApproval.set({ ...st, fields: st.fields.map((f) => (f.key === key ? { ...f, value } : f)) });
+  }
+
+  setEditReason(reason: string) {
+    const st = this.editApproval();
+    if (st) this.editApproval.set({ ...st, reason });
+  }
+
+  /** Only what the administrator actually changed is sent. */
+  editedFields(st: EditApprovalState | null): Record<string, any> {
+    if (!st) return {};
+    const out: Record<string, any> = {};
+    for (const f of st.fields) {
+      const norm = (v: any) => (v == null ? '' : String(v).trim());
+      if (norm(f.value) === norm(f.original)) continue;
+      out[f.key] = f.kind === 'number'
+        ? (f.value === '' || f.value == null ? null : Number(f.value))
+        : f.kind === 'date' ? (f.value || null) : f.value;
+    }
+    return out;
+  }
+
+  editChangedCount = computed(() => Object.keys(this.editedFields(this.editApproval())).length);
+
+  submitEditApprove() {
+    const st = this.editApproval();
+    if (!st || st.busy) return;
+    const edits = this.editedFields(st);
+    const changed = Object.keys(edits).length > 0;
+    const editReason = st.reason.trim();
+    if (changed && !editReason) {
+      this.toast.error('Say why you changed the request — the requester sees this');
+      return;
+    }
+    const reasonArg = changed ? editReason : undefined;
+    this.editApproval.set({ ...st, busy: true });
+
+    const done = (msg: string, reload: () => void) => ({
+      next: () => {
+        this.toast.success(changed ? `${msg} with your changes` : msg);
+        this.editApproval.set(null);
+        reload();
+      },
+      error: (err: any) => {
+        this.toast.error(err?.error?.message || 'Could not record that decision');
+        const cur = this.editApproval();
+        if (cur) this.editApproval.set({ ...cur, busy: false });
+      },
+    });
+
+    const it = st.item;
+    switch (st.type) {
+      case 'HOURS':
+        this.api.review(it.id, 'APPROVED', {
+          approvedHours: edits['approvedHours'] ?? it.requestedHours, editReason: reasonArg,
+        }).subscribe(done('Hours approved', () => this.load()));
+        break;
+      case 'BUDGET':
+        this.budgetApi.review(it.id, 'APPROVED', undefined, changed ? edits : undefined, reasonArg)
+          .subscribe(done('Budget request approved', () => this.loadOthers('BUDGET')));
+        break;
+      case 'SCOPE':
+        this.projectsApi.reviewScopeRequest(it.id, 'APPROVED', undefined, changed ? edits : undefined, reasonArg)
+          .subscribe(done('Scope request approved', () => this.loadOthers('SCOPE')));
+        break;
+      case 'TASKS':
+        this.projectsApi.reviewIssueApproval(it.projectId, it.id, 'APPROVE', undefined, changed ? edits : undefined, reasonArg)
+          .subscribe(done(`${it.key ?? 'Task'} approved`, () => this.loadOthers('TASKS')));
+        break;
+      case 'VISIT_LOCATIONS':
+        this.locationApi.review(it.id, 'APPROVED', undefined, changed ? edits : undefined, reasonArg)
+          .subscribe(done('Location approved', () => this.loadOthers('VISIT_LOCATIONS')));
+        break;
+      case 'FIELD_VISITS':
+        this.fieldVisitApi.approve(it.id, changed ? { edits, editReason: reasonArg } : {})
+          .subscribe(done(`${it.requestNumber ?? 'Field visit'} approved`, () => this.loadFieldVisits()));
+        break;
+    }
+  }
+}
+
+export interface EditApprovalField {
+  key: string;
+  label: string;
+  kind: 'text' | 'textarea' | 'number' | 'date' | 'time' | 'select';
+  value: any;
+  original: any;
+  hint?: string;
+  options?: { value: string; label: string }[];
+}
+
+export interface EditApprovalState {
+  type: ProjectRequestType;
+  item: any;
+  title: string;
+  fields: EditApprovalField[];
+  reason: string;
+  busy: boolean;
 }

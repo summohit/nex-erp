@@ -864,6 +864,7 @@
             <td class="ta-actions-col">
               <button type="button" class="ta-icon-btn" title="View details" (click)="openTaskDetails(t)"><svg lucideEye size="14"></svg></button>
               <button type="button" class="ta-icon-btn reject" title="Reject" (click)="decideTaskApproval(t, 'REJECT')"><svg lucideX size="14"></svg></button>
+              <button type="button" class="ta-icon-btn edit" *ngIf="isAdmin()" title="Edit &amp; approve" (click)="openEditApprove('TASKS', t)"><svg lucidePencil size="14"></svg></button>
               <button type="button" class="ta-icon-btn approve" title="Approve" (click)="decideTaskApproval(t, 'APPROVE')"><svg lucideCheck size="14"></svg></button>
             </td>
           </tr>
@@ -913,6 +914,9 @@
         </button>
         <button type="button" class="prq-btn reject" (click)="decideTaskApproval(t, 'REJECT')">
           <svg lucideX size="14"></svg> Reject
+        </button>
+<button type="button" class="prq-btn edit" *ngIf="isAdmin()" (click)="openEditApprove('TASKS', t)" title="Change the request, then approve it">
+          <svg lucidePencil size="14"></svg> Edit &amp; Approve
         </button>
         <button type="button" class="prq-btn approve" (click)="decideTaskApproval(t, 'APPROVE')">
           <svg lucideCheck size="14"></svg> Approve
@@ -975,6 +979,9 @@
         <button type="button" class="prq-btn reject" (click)="decideBudgetRequest(b, 'REJECTED')">
           <svg lucideX size="14"></svg> Reject
         </button>
+<button type="button" class="prq-btn edit" *ngIf="isAdmin()" (click)="openEditApprove('BUDGET', b)" title="Change the request, then approve it">
+          <svg lucidePencil size="14"></svg> Edit &amp; Approve
+        </button>
         <button type="button" class="prq-btn approve" (click)="decideBudgetRequest(b, 'APPROVED')">
           <svg lucideCheck size="14"></svg> Approve
         </button>
@@ -1030,6 +1037,9 @@
         <span class="prq-footer-spacer"></span>
         <button type="button" class="prq-btn reject" (click)="decideFieldVisit(r, 'REJECTED')">
           <svg lucideX size="14"></svg> Reject
+        </button>
+<button type="button" class="prq-btn edit" *ngIf="isAdmin()" (click)="openEditApprove('FIELD_VISITS', r)" title="Change the request, then approve it">
+          <svg lucidePencil size="14"></svg> Edit &amp; Approve
         </button>
         <button type="button" class="prq-btn approve" (click)="decideFieldVisit(r, 'APPROVED')">
           <svg lucideCheck size="14"></svg> Approve
@@ -1091,6 +1101,9 @@
       <div class="prq-actions">
         <button type="button" class="prq-btn reject" (click)="decideScopeRequest(r, 'REJECTED')">
           <svg lucideX size="14"></svg> Reject
+        </button>
+<button type="button" class="prq-btn edit" *ngIf="isAdmin()" (click)="openEditApprove('SCOPE', r)" title="Change the request, then approve it">
+          <svg lucidePencil size="14"></svg> Edit &amp; Approve
         </button>
         <button type="button" class="prq-btn approve" (click)="decideScopeRequest(r, 'APPROVED')">
           <svg lucideCheck size="14"></svg> Approve
@@ -1188,6 +1201,9 @@
           (click)="decideVisitLocation(request, 'REJECTED')"
         >
           <svg lucideX size="14"></svg> Reject
+        </button>
+        <button type="button" class="prq-btn edit" (click)="openEditApprove('VISIT_LOCATIONS', request)" title="Change the location, then approve it">
+          <svg lucidePencil size="14"></svg> Edit &amp; Approve
         </button>
         <button
           type="button"
@@ -1611,8 +1627,50 @@
         <button type="button" class="prq-btn reject" (click)="decideVisitFromModal(v, 'REJECTED')">
           <svg lucideX size="14"></svg> Reject
         </button>
+<button type="button" class="prq-btn edit" *ngIf="isAdmin()" (click)="closeVisitDetails(); openEditApprove('FIELD_VISITS', v)" title="Change the request, then approve it">
+          <svg lucidePencil size="14"></svg> Edit &amp; Approve
+        </button>
         <button type="button" class="prq-btn approve" (click)="decideVisitFromModal(v, 'APPROVED')">
           <svg lucideCheck size="14"></svg> Approve
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Edit & approve (administrators) ─────────────────────────────────── -->
+  <div class="prq-modal-backdrop" *ngIf="editApproval() as ea" (click)="closeEditApprove()">
+    <div class="prq-modal ea-modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" [attr.aria-label]="ea.title">
+      <div class="prq-modal-header">
+        <h2>{{ ea.title }}</h2>
+        <button type="button" class="ea-close" (click)="closeEditApprove()" aria-label="Close"><svg lucideX size="16"></svg></button>
+      </div>
+      <div class="prq-modal-body ea-body">
+        <p class="ea-intro">Change what needs changing, then approve. Your edit is the decision — it is not sent for another approval. The original request is kept in the history.</p>
+        <div class="ea-field" *ngFor="let f of ea.fields" [class.ea-changed]="(f.value ?? '') + '' !== (f.original ?? '') + ''">
+          <label [attr.for]="'ea-' + f.key">{{ f.label }}</label>
+          <ng-container [ngSwitch]="f.kind">
+            <textarea *ngSwitchCase="'textarea'" [id]="'ea-' + f.key" rows="4" [ngModel]="f.value" (ngModelChange)="setEditField(f.key, $event)"></textarea>
+            <select *ngSwitchCase="'select'" [id]="'ea-' + f.key" [ngModel]="f.value" (ngModelChange)="setEditField(f.key, $event)">
+              <option *ngFor="let o of f.options" [ngValue]="o.value">{{ o.label }}</option>
+            </select>
+            <input *ngSwitchCase="'number'" type="number" step="any" min="0" [id]="'ea-' + f.key" [ngModel]="f.value" (ngModelChange)="setEditField(f.key, $event)" />
+            <input *ngSwitchCase="'date'" type="date" [id]="'ea-' + f.key" [ngModel]="f.value" (ngModelChange)="setEditField(f.key, $event)" />
+            <input *ngSwitchCase="'time'" type="time" [id]="'ea-' + f.key" [ngModel]="f.value" (ngModelChange)="setEditField(f.key, $event)" />
+            <input *ngSwitchDefault type="text" [id]="'ea-' + f.key" [ngModel]="f.value" (ngModelChange)="setEditField(f.key, $event)" />
+          </ng-container>
+          <span class="ea-hint" *ngIf="f.hint">{{ f.hint }}</span>
+        </div>
+        <div class="ea-field ea-reason" *ngIf="editChangedCount() > 0">
+          <label for="ea-reason">Why did you change it? <span class="ea-req">*</span></label>
+          <textarea id="ea-reason" rows="2" placeholder="The requester sees this with the approval" [ngModel]="ea.reason" (ngModelChange)="setEditReason($event)"></textarea>
+        </div>
+      </div>
+      <div class="prq-modal-footer">
+        <button type="button" class="prq-btn btn-secondary" (click)="closeEditApprove()" [disabled]="ea.busy">Cancel</button>
+        <div class="prq-footer-spacer"></div>
+        <button type="button" class="prq-btn approve" (click)="submitEditApprove()" [disabled]="ea.busy || (editChangedCount() > 0 && !ea.reason.trim())">
+          <svg lucideCheck size="14"></svg>
+          {{ ea.busy ? 'Saving…' : editChangedCount() > 0 ? 'Save changes & approve (' + editChangedCount() + ')' : 'Approve as requested' }}
         </button>
       </div>
     </div>

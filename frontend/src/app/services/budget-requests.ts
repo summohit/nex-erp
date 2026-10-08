@@ -77,9 +77,13 @@ export class BudgetRequestsService {
     return this.http.post<BudgetRequest>(`${this.api}/projects/${projectId}/budget-requests`, data);
   }
 
-  review(id: number, decision: 'APPROVED' | 'REJECTED', reason?: string) {
+  /** `edits` + `editReason`: an administrator's edit & approve (granted figures). */
+  review(
+    id: number, decision: 'APPROVED' | 'REJECTED', reason?: string,
+    edits?: { additionalHours?: number | null; additionalBudget?: number | null }, editReason?: string,
+  ) {
     return this.http.post<BudgetRequest>(`${this.api}/budget-requests/${id}/review`, {
-      decision, reason,
+      decision, reason, edits, editReason,
     });
   }
 

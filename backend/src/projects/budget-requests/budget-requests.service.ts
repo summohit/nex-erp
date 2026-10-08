@@ -1,3 +1,4 @@
+import { diffFields, recordApprovalEdit, requireEditReason } from '../../common/approval-edits';
 import {
   Injectable, NotFoundException, ForbiddenException, BadRequestException,
 } from '@nestjs/common';
@@ -182,6 +183,8 @@ export class BudgetRequestsService {
     requestId: number,
     decision: 'APPROVED' | 'REJECTED',
     reason?: string,
+    edits?: { additionalHours?: number | null; additionalBudget?: number | null },
+    editReason?: string,
   ) {
     // An administrator alone. The technical architect's step belongs to task
     // creation and nowhere else: a budget increase asks whether the company
@@ -219,6 +222,20 @@ export class BudgetRequestsService {
       });
     }
 
+    // Edit & approve. The ask stays in additionalHours / additionalBudget; what
+    // was granted is hoursAfter − hoursBefore, so both survive on the row.
+    const granted = {
+      additionalHours: edits && edits.additionalHours !== undefined
+        ? this.grantedFigure(edits.additionalHours, 'hours') : request.additionalHours,
+      additionalBudget: edits && edits.additionalBudget !== undefined
+        ? this.grantedFigure(edits.additionalBudget, 'budget') : request.additionalBudget,
+    };
+    const changes = diffFields(request, granted);
+    requireEditReason(changes, editReason);
+    if (granted.additionalHours == null && granted.additionalBudget == null) {
+      throw new BadRequestException('Grant some hours or some budget, or reject the request');
+    }
+
     return this.prisma.$transaction(async (tx) => {
       // Read inside the transaction: the figures recorded must be the ones
       // actually moved, not what the project held when the request was raised
@@ -234,20 +251,26 @@ export class BudgetRequestsService {
       // A null "before" with an increase asked for starts from zero, which is
       // the only sensible reading of "add 500 to nothing".
       const hoursAfter =
-        request.additionalHours == null
+        granted.additionalHours == null
           ? hoursBefore
-          : (hoursBefore ?? 0) + request.additionalHours;
+          : (hoursBefore ?? 0) + granted.additionalHours;
       const budgetAfter =
-        request.additionalBudget == null
+        granted.additionalBudget == null
           ? budgetBefore
-          : (budgetBefore ?? 0) + request.additionalBudget;
+          : (budgetBefore ?? 0) + granted.additionalBudget;
 
       await tx.project.update({
         where: { id: request.projectId },
         data: {
-          ...(request.additionalHours != null && { estimatedHours: hoursAfter }),
-          ...(request.additionalBudget != null && { budgetAmount: budgetAfter }),
+          ...(granted.additionalHours != null && { estimatedHours: hoursAfter }),
+          ...(granted.additionalBudget != null && { budgetAmount: budgetAfter }),
         },
+      });
+
+      await recordApprovalEdit(tx, {
+        companyId, actorEmployeeId: reviewerEmployeeId,
+        entityType: 'ProjectBudgetRequest', entityId: requestId,
+        changes, reason: editReason,
       });
 
       return tx.projectBudgetRequest.update({
@@ -262,6 +285,16 @@ export class BudgetRequestsService {
         select: this.SELECT,
       });
     });
+  }
+
+  /** A granted figure: a positive number, or null for "none of this kind". */
+  private grantedFigure(v: number | null, what: string): number | null {
+    if (v == null) return null;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new BadRequestException(`The approved ${what} must be a positive number`);
+    }
+    return n;
   }
 
   /** A PM withdrawing their own request before anybody has ruled on it. */
