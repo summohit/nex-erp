@@ -1124,7 +1124,7 @@
       <div class="modal-footer" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding-top: 16px; border-top: 1px solid #f1f5f9;">
         <button class="btn btn-outline" (click)="closeLeaveDetail()" style="width: max-content; height: 38px;">Close</button>
         
-        <button *ngIf="leave.status === 'PENDING' && (isAdmin() || isManager())" 
+        <button *ngIf="leave.status === 'PENDING' && canApproveLeaveApplication(leave)" 
                 class="btn btn-outline" 
                 (click)="closeLeaveDetail(); openRejectModal(leave.id)"
                 style="height: 38px; display: flex; align-items: center; gap: 6px; border-color: #fca5a5; color: #dc2626; background: #fff;">
@@ -1132,7 +1132,7 @@
           Reject
         </button>
         
-        <button *ngIf="leave.status === 'PENDING' && (isAdmin() || isManager())" 
+        <button *ngIf="leave.status === 'PENDING' && canApproveLeaveApplication(leave)" 
                 class="btn btn-primary" 
                 (click)="closeLeaveDetail(); approveLeaveRequest(leave.id)"
                 style="height: 38px; display: flex; align-items: center; gap: 6px; background: #16a34a; border-color: #16a34a; color: white; font-weight: 600;">

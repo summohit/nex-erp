@@ -421,9 +421,12 @@ export class AttendanceLeaveComponent implements OnInit {
       || (!this.isAdmin() && this.isLoadingManagerRequests()),
   );
 
+  // A manager decides their team's leave, never their own: the request has to
+  // be one of the reportees' (managerRequests), not one of myRequests.
   canApproveLeaveApplication = (request: LeaveRequest): boolean =>
     this.isAdmin()
-    || (this.isManager() && !this.myRequests().some((ownRequest) => ownRequest.id === request.id));
+    || (this.managerRequests().some((teamRequest) => teamRequest.id === request.id)
+      && !this.myRequests().some((ownRequest) => ownRequest.id === request.id));
 
   canEditLeaveApplication = (request: LeaveRequest): boolean =>
     this.isAdmin() || this.myRequests().some((ownRequest) => ownRequest.id === request.id);
@@ -507,9 +510,17 @@ export class AttendanceLeaveComponent implements OnInit {
     return role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'HR';
   });
 
+  /**
+   * A reporting manager: anyone with people reporting to them. MIRA has no
+   * MANAGER login role — managers hold an ordinary role (EMPLOYEE etc.) and
+   * are managers through the reporting line, which is exactly what
+   * managerRequests() is loaded from. Keyed on the role alone, a reporting
+   * manager saw their team's leave but had no Approve/Reject, although the
+   * server (isEmployeeInHierarchy) lets them decide it.
+   */
   isManager = computed(() => {
     const role = this.authService.currentUser()?.role;
-    return role === 'MANAGER';
+    return role === 'MANAGER' || this.managerRequests().length > 0;
   });
 
   attendanceColDefs: ColDef[] = [
