@@ -1199,9 +1199,9 @@ export class ProjectsComponent implements OnInit {
   }
 
   myProjects = computed(() => {
-    // Admins get all projects from backend (no membership filter on server); non-admins are already filtered
-    if (this.isAdmin) return this.projects();
-    return this.projects().filter(p => !!this.myMemberOf(p));
+    // The API already limits this list to projects the caller may see. Filtering
+    // it again by membership hides projects granted through Delivery > View All.
+    return this.projects();
   });
 
   // Filtered lists

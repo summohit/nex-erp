@@ -16,6 +16,8 @@ interface PermissionCategory extends PermissionNode {
   isExpanded: boolean;
   subItems: PermissionNode[];
   viewAllEnabled?: boolean;
+  viewAllLabel?: string;
+  viewAllHint?: string;
 }
 
 @Component({
@@ -37,7 +39,7 @@ export class PermissionsComponent implements OnInit {
   isLoadingDepartments = false;
   savingDeptId: number | null = null;
   
-  roles = ['SUPERADMIN', 'ADMIN', 'HR', 'FINANCE', 'SALES', 'EMPLOYEE', 'OFFICE_STAFF'];
+  roles = ['SUPERADMIN', 'ADMIN', 'HR', 'FINANCE', 'OPERATIONS_MANAGER', 'SALES', 'EMPLOYEE', 'OFFICE_STAFF'];
 
   // Tab 2: Matrix
   selectedRole = 'HR';
@@ -63,8 +65,10 @@ export class PermissionsComponent implements OnInit {
       ]
     },
     {
-      id: 'projects', title: 'Projects', isExpanded: true, enabled: false,
-      subItems: []
+      id: 'projects', title: 'Delivery', isExpanded: true, enabled: false,
+      subItems: [], viewAllEnabled: false,
+      viewAllLabel: 'View All Projects',
+      viewAllHint: 'Grants all-project visibility to users with this account role or a department configured with this default role.'
     },
     {
       id: 'performance', title: 'Performance', isExpanded: true, enabled: false,
@@ -332,11 +336,11 @@ export class PermissionsComponent implements OnInit {
     category.isExpanded = !category.isExpanded;
   }
 
-  toggleViewAllLeads(category: PermissionCategory, enabled: boolean) {
+  toggleViewAll(category: PermissionCategory, enabled: boolean) {
     category.viewAllEnabled = enabled;
     this.permissionsService.setPermission(this.selectedRole, category.id, 'VIEW_ALL', enabled).subscribe({
       next: () => {
-        this.toast.success(`View All Leads ${enabled ? 'enabled' : 'disabled'} for ${this.selectedRole}`);
+        this.toast.success(`${category.viewAllLabel} ${enabled ? 'enabled' : 'disabled'} for ${this.selectedRole}`);
       },
       error: () => {
         category.viewAllEnabled = !enabled;

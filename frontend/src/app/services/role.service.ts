@@ -11,6 +11,7 @@ export type CompanyRole =
   | 'ADMIN'
   | 'HR'
   | 'FINANCE'
+  | 'OPERATIONS_MANAGER'
   | 'SALES'
   | 'OFFICE_STAFF'
   | 'EMPLOYEE';

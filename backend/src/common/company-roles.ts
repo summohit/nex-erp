@@ -17,6 +17,7 @@ export type CompanyRole =
   | 'ADMIN'
   | 'HR'
   | 'FINANCE'
+  | 'OPERATIONS_MANAGER'
   | 'SALES'
   | 'OFFICE_STAFF'
   | 'EMPLOYEE';
@@ -39,6 +40,11 @@ export function isSuperAdmin(role?: string | null): boolean {
 export function isCompanyAdmin(role?: string | null): boolean {
   const r = normaliseRole(role);
   return r === 'SUPERADMIN' || r === 'ADMIN';
+}
+
+/** Company-wide project visibility is granted separately through VIEW_ALL. */
+export function canViewOrganisationProjects(role?: string | null): boolean {
+  return isCompanyAdmin(role);
 }
 
 /** Administration plus the people function. */

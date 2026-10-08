@@ -88,7 +88,7 @@
     <div class="permissions-content">
       <div class="content-header">
         <h2>{{ selectedRole }} Permissions</h2>
-        <p>Manage which sidebar menus and sub-menus users with the <strong>{{ selectedRole }}</strong> role can access.</p>
+        <p>Manage which sections users with the <strong>{{ selectedRole }}</strong> role can access, including whether Delivery shows every company project.</p>
       </div>
 
       <div class="loading-state" *ngIf="isLoadingMatrix">
@@ -132,17 +132,17 @@
               </label>
             </div>
 
-            <!-- View All Leads (CRM only) -->
+            <!-- Optional company-wide visibility for Delivery and CRM. -->
             <div class="action-item" *ngIf="cat.viewAllEnabled !== undefined">
               <div class="action-info">
-                <span class="action-label">View All Leads & Follow-Ups</span>
-                <span class="action-hint">Without this, {{ selectedRole }} only sees leads (and their follow-ups) they created or are assigned to.</span>
+                <span class="action-label">{{ cat.viewAllLabel || 'View All Leads & Follow-Ups' }}</span>
+                <span class="action-hint">{{ cat.viewAllHint || 'Without this, this role only sees leads (and their follow-ups) they created or are assigned to.' }}</span>
               </div>
               <label class="toggle-switch">
                 <input
                   type="checkbox"
                   [ngModel]="cat.viewAllEnabled"
-                  (ngModelChange)="toggleViewAllLeads(cat, $event)">
+                  (ngModelChange)="toggleViewAll(cat, $event)">
                 <span class="slider"></span>
               </label>
             </div>

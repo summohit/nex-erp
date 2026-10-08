@@ -12,7 +12,7 @@ import {
  */
 
 const viewer = (over: any = {}) => ({
-  employeeId: 60, companyRole: 'EMPLOYEE', projectRole: null, isOwner: false, ...over,
+  employeeId: 60, companyRole: 'EMPLOYEE', canViewAllProjects: false, projectRole: null, isOwner: false, ...over,
 });
 
 describe('who sees every task', () => {
@@ -82,6 +82,8 @@ describe('reading the viewer off the database', () => {
     projectMember: {
       findFirst: jest.fn().mockResolvedValue(memberRole ? { role: memberRole } : null),
     },
+    employee: { findUnique: jest.fn().mockResolvedValue(null) },
+    rolePermission: { findFirst: jest.fn().mockResolvedValue(null) },
   });
 
   it('recognises the owner by the project lead', async () => {
@@ -102,6 +104,52 @@ describe('reading the viewer off the database', () => {
     const v = await resolveProjectViewer(p as any, 1, 3, null, 'EMPLOYEE');
     expect(p.projectMember.findFirst).not.toHaveBeenCalled();
     expect(seesEveryTask(v)).toBe(false);
+  });
+
+  it('grants company-wide read access when the role has VIEW_ALL for projects', async () => {
+    const p = prisma(70, null);
+    p.rolePermission.findFirst.mockResolvedValue({ id: 4 });
+    const v = await resolveProjectViewer(p as any, 1, 3, 60, 'OPERATIONS_MANAGER');
+
+    expect(p.rolePermission.findFirst).toHaveBeenCalledWith({
+      where: {
+        role: { in: ['OPERATIONS_MANAGER'] },
+        module: 'projects',
+        action: 'VIEW_ALL',
+        companyId: 1,
+      },
+      select: { id: true },
+    });
+    expect(seesEveryTask(v)).toBe(true);
+    expect(mayChangeAnyTask(v)).toBe(false);
+  });
+
+  it('does not grant company-wide read access to an Operations Manager without VIEW_ALL', async () => {
+    const v = await resolveProjectViewer(prisma(70, null) as any, 1, 3, 60, 'OPERATIONS_MANAGER');
+    expect(seesEveryTask(v)).toBe(false);
+  });
+
+  it('honours the department default-role grant when it differs from the account role', async () => {
+    const p = prisma(70, null);
+    p.employee.findUnique.mockResolvedValue({ department: { defaultRole: 'SALES' } });
+    p.rolePermission.findFirst.mockResolvedValue({ id: 5 });
+
+    const v = await resolveProjectViewer(p as any, 1, 3, 60, 'OPERATIONS_MANAGER');
+
+    expect(p.employee.findUnique).toHaveBeenCalledWith({
+      where: { id: 60 },
+      select: { department: { select: { defaultRole: true } } },
+    });
+    expect(p.rolePermission.findFirst).toHaveBeenCalledWith({
+      where: {
+        role: { in: ['OPERATIONS_MANAGER', 'SALES'] },
+        module: 'projects',
+        action: 'VIEW_ALL',
+        companyId: 1,
+      },
+      select: { id: true },
+    });
+    expect(seesEveryTask(v)).toBe(true);
   });
 });
 

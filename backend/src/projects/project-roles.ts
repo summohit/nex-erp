@@ -6,7 +6,7 @@
  * and the answer must be identical in all three. A board that hides a task the
  * reports tab then shows is not a permission, it is a decoration.
  */
-import { isCompanyAdmin, isSuperAdmin, normaliseRole } from '../common/company-roles';
+import { canViewOrganisationProjects, isCompanyAdmin, isSuperAdmin, normaliseRole } from '../common/company-roles';
 
 
 /** The roles a ProjectMember row can hold. */
@@ -29,6 +29,8 @@ export interface ProjectViewer {
   employeeId: number | null;
   /** The role on their user account. */
   companyRole: string;
+  /** Whether the role has the explicit, read-only company-wide Delivery grant. */
+  canViewAllProjects: boolean;
   /** Their ProjectMember.role on this project, when they are on it. */
   projectRole: string | null;
   /** Project.leadId — the owner. */
@@ -40,6 +42,8 @@ export async function resolveProjectViewer(
   prisma: {
     project: { findFirst: Function };
     projectMember: { findFirst: Function };
+    employee: { findUnique: Function };
+    rolePermission: { findFirst: Function };
   },
   companyId: number,
   projectId: number,
@@ -57,13 +61,49 @@ export async function resolveProjectViewer(
         select: { role: true },
       })
     : null;
+  const employee = employeeId
+    ? await prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { department: { select: { defaultRole: true } } },
+      })
+    : null;
+  const canViewAllProjects = await hasCompanyWideProjectAccess(
+    prisma,
+    companyId,
+    companyRole,
+    employee?.department?.defaultRole,
+  );
 
   return {
     employeeId: employeeId ?? null,
     companyRole: companyRole ?? 'EMPLOYEE',
+    canViewAllProjects,
     projectRole: membership?.role ?? null,
     isOwner: !!employeeId && project?.leadId === employeeId,
   };
+}
+
+/** Company admins always see all projects; other roles need the explicit grant. */
+export async function hasCompanyWideProjectAccess(
+  prisma: { rolePermission: { findFirst: Function } },
+  companyId: number,
+  role?: string | null,
+  departmentRole?: string | null,
+): Promise<boolean> {
+  if (canViewOrganisationProjects(role)) return true;
+  const roles = [...new Set([role, departmentRole].filter((value): value is string => !!value))];
+  if (roles.length === 0) return false;
+
+  const permission = await prisma.rolePermission.findFirst({
+    where: {
+      role: { in: roles },
+      module: 'projects',
+      action: 'VIEW_ALL',
+      companyId,
+    },
+    select: { id: true },
+  });
+  return !!permission;
 }
 
 /**
@@ -74,7 +114,7 @@ export async function resolveProjectViewer(
  * ADMIN role — sees the tasks they are actually on.
  */
 export function seesEveryTask(viewer: ProjectViewer): boolean {
-  if (isCompanyAdmin(viewer.companyRole)) return true;
+  if (viewer.canViewAllProjects || canViewOrganisationProjects(viewer.companyRole)) return true;
   if (viewer.isOwner) return true;
   return viewer.projectRole === PROJECT_ROLE.MANAGER
     || viewer.projectRole === PROJECT_ROLE.ARCHITECT;
