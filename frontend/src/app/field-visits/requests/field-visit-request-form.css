@@ -34,6 +34,35 @@
   overflow: hidden;
 }
 
+/* Remains immediately above the actions at the bottom of the planning modal. */
+.leave-availability-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 24px 12px;
+  padding: 11px 13px;
+  border: 1px solid #fbbf24;
+  border-left: 4px solid #f59e0b;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.leave-availability-warning svg { flex: 0 0 auto; margin-top: 1px; color: #d97706; }
+.leave-availability-warning strong,
+.leave-availability-warning span { display: block; }
+.leave-availability-warning span { margin-top: 2px; }
+.leave-availability-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 24px 12px;
+  color: #475569;
+  font-size: 13px;
+}
+.leave-availability-check.failed { color: #b91c1c; }
+
 @keyframes slideUpModal {
   from { opacity: 0; transform: translateY(16px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }

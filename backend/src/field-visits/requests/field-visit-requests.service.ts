@@ -585,6 +585,29 @@ export class FieldVisitRequestsService {
     });
   }
 
+  /** Approved leave overlapping people and dates selected in the planning form. */
+  async availability(companyId: number, employeeIds: number[], startDate?: string, endDate?: string) {
+    const ids = [...new Set(employeeIds.filter(Number.isInteger))];
+    const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
+    const end = endDate ? new Date(`${endDate}T00:00:00.000Z`) : null;
+    if (!ids.length || !start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return [];
+
+    const leaves = await this.prisma.leaveRequest.findMany({
+      where: {
+        employeeId: { in: ids }, status: 'APPROVED', deletedAt: null,
+        startDate: { lte: end }, endDate: { gte: start }, employee: { companyId },
+      },
+      select: { employeeId: true, startDate: true, endDate: true },
+      orderBy: [{ startDate: 'asc' }],
+    });
+    // Return only the portion that makes the person unavailable for this trip.
+    return leaves.map((leave) => ({
+      ...leave,
+      startDate: leave.startDate < start ? start : leave.startDate,
+      endDate: leave.endDate > end ? end : leave.endDate,
+    }));
+  }
+
   /** The §11 audit trail: who created, approved, rejected or cancelled it. */
   async timeline(companyId: number, role: string, employeeId: number | null, id: number) {
     await this.getOne(companyId, role, employeeId, id);

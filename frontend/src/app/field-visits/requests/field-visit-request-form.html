@@ -984,6 +984,26 @@
       }
     </div>
 
+    @if (isCheckingAvailability()) {
+      <div class="leave-availability-check" role="status">
+        <svg lucideLoader [size]="17" class="spin-icon"></svg>
+        Checking selected team availability…
+      </div>
+    } @else if (availabilityCheckFailed()) {
+      <div class="leave-availability-check failed" role="alert">
+        <svg lucideCircleAlert [size]="17"></svg>
+        Leave availability could not be checked. Please refresh and try again.
+      </div>
+    } @else if (leaveConflicts().length > 0) {
+      <div class="leave-availability-warning" role="alert">
+        <svg lucideCircleAlert [size]="19"></svg>
+        <div>
+          <strong>Choose an alternative,this person is not available for the selected dates</strong>
+          <span>Approved leave overlaps this visit: {{ leaveConflictMessage() }}. Choose another team member or different visit dates.</span>
+        </div>
+      </div>
+    }
+
     <!-- Modal Footer -->
     <div class="modal-foot">
       <button class="ghost-btn cancel-btn" type="button" (click)="close()">Cancel</button>

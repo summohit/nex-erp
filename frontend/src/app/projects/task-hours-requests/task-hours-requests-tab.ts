@@ -71,9 +71,8 @@ export type RequestTabFilter = 'AWAITING' | 'HISTORY' | 'APPROVED' | 'REJECTED' 
  */
 export type ProjectRequestType = 'HOURS' | 'TASKS' | 'BUDGET' | 'SCOPE' | 'VISIT_LOCATIONS' | 'FIELD_VISITS' | 'TICKETS';
 export type RequestSortOption = 'newest' | 'oldest' | 'hours-desc' | 'hours-asc';
-export type ApprovalDateRange = 'ALL' | 'TODAY' | 'THIS_WEEK' | 'LAST_WEEK' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR' | 'LAST_YEAR';
+export type ApprovalDateRange = 'ALL' | 'TODAY' | 'THIS_WEEK' | 'LAST_WEEK' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR' | 'LAST_YEAR' | 'CUSTOM';
 type QueueKpi = { label: string; value: string | number; detail: string; tone: 'amber' | 'emerald' | 'rose' | 'indigo' };
-
 @Component({
   selector: 'app-task-hours-requests-tab',
   standalone: true,
@@ -154,6 +153,8 @@ export class TaskHoursRequestsTabComponent {
   requestType = signal<ProjectRequestType>('HOURS');
   /** One date filter shared by every Delivery approval queue. */
   approvalDateRange = signal<ApprovalDateRange>('ALL');
+  customApprovalStart = signal('');
+  customApprovalEnd = signal('');
   readonly approvalDateRanges: { value: ApprovalDateRange; label: string }[] = [
     { value: 'ALL', label: 'Any date' },
     { value: 'TODAY', label: 'Today' },
@@ -163,11 +164,17 @@ export class TaskHoursRequestsTabComponent {
     { value: 'LAST_MONTH', label: 'Last month' },
     { value: 'THIS_YEAR', label: 'This year' },
     { value: 'LAST_YEAR', label: 'Last year' },
+    { value: 'CUSTOM', label: 'Custom range' },
   ];
 
   setApprovalDateRange(value: string): void {
     this.approvalDateRange.set(value as ApprovalDateRange);
     this.selectedTaskIds.set(new Set());
+  }
+
+  setCustomApprovalDate(which: 'start' | 'end', value: string): void {
+    if (which === 'start') this.customApprovalStart.set(value);
+    else this.customApprovalEnd.set(value);
   }
 
   private matchesApprovalDate(value: string | Date | null | undefined): boolean {
@@ -177,6 +184,14 @@ export class TaskHoursRequestsTabComponent {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return false;
     date.setHours(0, 0, 0, 0);
+
+    if (range === 'CUSTOM') {
+      const start = this.customApprovalStart() ? new Date(`${this.customApprovalStart()}T00:00:00`) : null;
+      const end = this.customApprovalEnd() ? new Date(`${this.customApprovalEnd()}T00:00:00`) : null;
+      if (start && !Number.isNaN(start.getTime()) && date < start) return false;
+      if (end && !Number.isNaN(end.getTime()) && date > end) return false;
+      return true;
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -220,6 +235,7 @@ export class TaskHoursRequestsTabComponent {
     const pq = this.taskProjectQuery().trim().toLowerCase();
     const uq = this.taskPersonQuery().trim().toLowerCase();
     const when = this.taskWhen();
+    const sharedProjectId = this.otherSelectedProject();
 
     const dayMs = 86_400_000;
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -227,6 +243,7 @@ export class TaskHoursRequestsTabComponent {
 
     return this.taskApprovals().filter((t) => {
       if (!this.matchesApprovalDate(t.createdAt || t.startDate || t.dueDate)) return false;
+      if (sharedProjectId !== 'ALL' && String(this.projectIdFor(t)) !== sharedProjectId) return false;
       if (pq) {
         const name = String(t.project?.name ?? '').toLowerCase();
         const key = String(t.project?.key ?? '').toLowerCase();
@@ -281,17 +298,124 @@ export class TaskHoursRequestsTabComponent {
   ticketRequests = signal<ProjectTicket[]>([]);
   locationCapabilities = signal<VisitLocationRequestCapabilities | null>(null);
   loadingOthers = signal(false);
+  /** Shared lightweight filters for queues whose APIs return actionable rows only. */
+  otherSearchQuery = signal('');
+  otherSortBy = signal<'newest' | 'oldest'>('newest');
+  otherSelectedProject = signal('ALL');
+  deliveryProjects = signal<{ id: number; name: string; key?: string | null }[]>([]);
+  deliveryRequesters = signal<{ id: number; name: string }[]>([]);
+  isLoadingDeliveryProjects = signal(false);
+  projectPicker = signal<'hours' | 'other' | null>(null);
+  filterPicker = signal<'requester' | 'date' | 'hoursSort' | 'otherSort' | 'taskWhen' | null>(null);
+  projectPickerQuery = signal('');
+  deliveryProjectOptions = computed(() => {
+    const projects = new Map<number, { id: number; name: string; key?: string | null }>();
+    const add = (project: any) => {
+      const id = Number(project?.id);
+      if (!Number.isInteger(id) || id <= 0) return;
+      projects.set(id, { id, name: project.name || `Project ${id}`, key: project.key ?? null });
+    };
+    this.deliveryProjects().forEach(add);
+    this.requests().forEach((request: any) => add(request.issue?.project));
+    this.taskApprovals().forEach((request: any) => add(request.project));
+    this.budgetRequests().forEach((request: any) => add(request.project));
+    this.scopeRequests().forEach((request: any) => add(request.project));
+    this.fieldVisitRequests().forEach((request: any) => add(request.project));
+    return [...projects.values()].sort((a, b) => a.name.localeCompare(b.name));
+  });
+  filteredDeliveryProjects = computed(() => {
+    const query = this.projectPickerQuery().trim().toLowerCase();
+    const projects = this.deliveryProjectOptions();
+    return !query ? projects : projects.filter((project) =>
+      `${project.name} ${project.key ?? ''}`.toLowerCase().includes(query));
+  });
 
   filteredBudgetRequests = computed(() =>
-    this.budgetRequests().filter((request: any) => this.matchesApprovalDate(request.createdAt || request.requestedAt)));
+    this.filterOtherQueue(this.budgetRequests(), (request: any) => request.createdAt || request.requestedAt));
   filteredScopeRequests = computed(() =>
-    this.scopeRequests().filter((request: any) => this.matchesApprovalDate(request.createdAt || request.submittedAt)));
+    this.filterOtherQueue(this.scopeRequests(), (request: any) => request.createdAt || request.submittedAt));
   filteredVisitLocationRequests = computed(() =>
-    this.visitLocationRequests().filter((request: any) => this.matchesApprovalDate(request.createdAt || request.submittedAt)));
+    this.filterOtherQueue(this.visitLocationRequests(), (request: any) => request.createdAt || request.submittedAt));
   filteredTicketRequests = computed(() =>
-    this.ticketRequests().filter((t) => this.matchesApprovalDate(t.createdAt)));
+    this.filterOtherQueue(this.ticketRequests() as any[], (ticket: any) => ticket.createdAt));
   filteredFieldVisitRequests = computed(() =>
-    this.fieldVisitRequests().filter((request: any) => this.matchesApprovalDate(request.submittedAt || request.createdAt || request.startDate)));
+    this.filterOtherQueue(this.fieldVisitRequests(), (request: any) => request.submittedAt || request.createdAt || request.startDate));
+
+  private filterOtherQueue<T extends Record<string, any>>(rows: T[], dateFor: (row: T) => any): T[] {
+    const query = this.otherSearchQuery().trim().toLowerCase();
+    const projectId = this.otherSelectedProject();
+    const result = rows.filter((row) =>
+      this.matchesApprovalDate(dateFor(row))
+      && (projectId === 'ALL' || String(this.projectIdFor(row)) === projectId)
+      && (!query || JSON.stringify(row).toLowerCase().includes(query)));
+    return result.sort((a, b) => {
+      const aDate = new Date(dateFor(a) || 0).getTime();
+      const bDate = new Date(dateFor(b) || 0).getTime();
+      return this.otherSortBy() === 'oldest' ? aDate - bDate : bDate - aDate;
+    });
+  }
+
+  private projectIdFor(row: any): number | null {
+    return row.projectId ?? row.project?.id ?? row.issue?.project?.id ?? null;
+  }
+
+  otherQueueCount(): number {
+    switch (this.requestType()) {
+      case 'TASKS': return this.taskApprovals().length;
+      case 'BUDGET': return this.budgetRequests().length;
+      case 'SCOPE': return this.scopeRequests().length;
+      case 'VISIT_LOCATIONS': return this.visitLocationRequests().length;
+      case 'FIELD_VISITS': return this.fieldVisitRequests().length;
+      default: return 0;
+    }
+  }
+
+  clearOtherFilters(): void {
+    this.otherSearchQuery.set('');
+    this.otherSortBy.set('newest');
+    this.otherSelectedProject.set('ALL');
+    this.approvalDateRange.set('ALL');
+    this.customApprovalStart.set('');
+    this.customApprovalEnd.set('');
+  }
+
+  toggleProjectPicker(kind: 'hours' | 'other'): void {
+    this.projectPicker.set(this.projectPicker() === kind ? null : kind);
+    this.projectPickerQuery.set('');
+    this.filterPicker.set(null);
+  }
+
+  toggleFilterPicker(kind: 'requester' | 'date' | 'hoursSort' | 'otherSort' | 'taskWhen'): void {
+    this.filterPicker.set(this.filterPicker() === kind ? null : kind);
+    this.projectPicker.set(null);
+  }
+
+  chooseFilterPicker(kind: 'requester' | 'date' | 'hoursSort' | 'otherSort' | 'taskWhen', value: string): void {
+    if (kind === 'requester') this.onRequesterChange(value);
+    else if (kind === 'date') this.setApprovalDateRange(value);
+    else if (kind === 'hoursSort') this.onSortChange(value as RequestSortOption);
+    else if (kind === 'otherSort') this.otherSortBy.set(value as 'newest' | 'oldest');
+    else this.setTaskFilter('when', value);
+    this.filterPicker.set(null);
+  }
+
+  dateRangeLabel(): string { return this.approvalDateRanges.find((item) => item.value === this.approvalDateRange())?.label ?? 'Any date'; }
+  requesterLabel(): string { return this.selectedRequester() === 'ALL' ? 'All Requesters' : this.availableRequesters().find((item) => String(item.id) === this.selectedRequester())?.name ?? 'All Requesters'; }
+  hoursSortLabel(): string { return ({ newest: 'Newest First', oldest: 'Oldest First', 'hours-desc': 'Most Hours Requested', 'hours-asc': 'Least Hours Requested' } as any)[this.sortBy()]; }
+  otherSortLabel(): string { return this.otherSortBy() === 'oldest' ? 'Oldest First' : 'Newest First'; }
+  taskWhenLabel(): string { return ({ ALL: 'Any date', TODAY: 'Today', NEXT_30: 'Next 30 days', NEXT_60: 'Next 60 days', FUTURE: 'Future (after today)' } as any)[this.taskWhen()]; }
+
+  chooseDeliveryProject(kind: 'hours' | 'other', id: string): void {
+    if (kind === 'hours') this.selectedProject.set(id);
+    else this.otherSelectedProject.set(id);
+    this.projectPicker.set(null);
+  }
+
+  deliveryProjectLabel(id: string): string {
+    if (id === 'ALL') return 'All Projects';
+    const project = this.deliveryProjectOptions().find((item) => String(item.id) === id);
+    return project ? `${project.name}${project.key ? ` (${project.key})` : ''}` : 'All Projects';
+  }
 
   /** Raw requests loaded from the server */
   requests = signal<TaskHoursRequest[]>([]);
@@ -320,27 +444,15 @@ export class TaskHoursRequestsTabComponent {
   // ── Metrics & Computed KPI Summaries ───────────────────────────────────────
   openRequests = computed(() => this.requests().filter((r) => r.status === 'REQUESTED'));
   openCount = computed(() => this.openRequests().length);
-  openHours = computed(() =>
-    this.openRequests().reduce((sum, r) => sum + (r.requestedHours || 0), 0),
-  );
 
   approvedRequests = computed(() => this.requests().filter((r) => r.status === 'APPROVED'));
   approvedCount = computed(() => this.approvedRequests().length);
-  approvedHours = computed(() =>
-    this.approvedRequests().reduce((sum, r) => sum + (r.approvedHours ?? r.requestedHours ?? 0), 0),
-  );
 
   rejectedRequests = computed(() => this.requests().filter((r) => r.status === 'REJECTED'));
   rejectedCount = computed(() => this.rejectedRequests().length);
-  rejectedHours = computed(() =>
-    this.rejectedRequests().reduce((sum, r) => sum + (r.requestedHours || 0), 0),
-  );
 
   historyRequests = computed(() => this.requests().filter((r) => r.status !== 'REQUESTED'));
   historyCount = computed(() => this.historyRequests().length);
-  historyHours = computed(() =>
-    this.historyRequests().reduce((sum, r) => sum + (r.requestedHours || 0), 0),
-  );
 
   totalCount = computed(() => this.requests().length);
   totalHours = computed(() => this.requests().reduce((sum, r) => sum + (r.requestedHours || 0), 0));
@@ -358,6 +470,7 @@ export class TaskHoursRequestsTabComponent {
 
   availableRequesters = computed(() => {
     const map = new Map<string, { id: number; name: string }>();
+    for (const requester of this.deliveryRequesters()) map.set(String(requester.id), requester);
     for (const r of this.requests()) {
       if (r.requestedBy) {
         map.set(String(r.requestedBy.id), {
@@ -457,6 +570,7 @@ export class TaskHoursRequestsTabComponent {
 
   constructor() {
     this.load();
+    this.loadDeliveryProjects();
     // Loaded up front so the tab badge shows how many trips are waiting
     // before anyone clicks into it.
     this.loadFieldVisits();
@@ -467,6 +581,44 @@ export class TaskHoursRequestsTabComponent {
       this.requestType.set(type);
       if (type !== 'HOURS') this.loadOthers(type);
     });
+  }
+
+  /** Complete company project list for the shared Delivery filter, not only
+   * projects that happen to have a currently-pending approval. */
+  private loadDeliveryProjects(): void {
+    this.isLoadingDeliveryProjects.set(true);
+    this.api.filterOptions().subscribe({
+      next: ({ projects, requesters }) => {
+        this.deliveryProjects.set((projects || [])
+        .filter((project: any) => Number.isInteger(Number(project?.id)) && Number(project.id) > 0)
+        .map((project: any) => ({ id: Number(project.id), name: project.name || `Project ${project.id}`, key: project.key ?? null }))
+        .sort((a, b) => a.name.localeCompare(b.name)));
+        this.deliveryRequesters.set(requesters || []);
+      },
+      error: () => { this.deliveryProjects.set([]); this.deliveryRequesters.set([]); this.isLoadingDeliveryProjects.set(false); },
+      complete: () => this.isLoadingDeliveryProjects.set(false),
+    });
+  }
+
+  /** Populate picker choices as soon as any approval response arrives. This is
+   * also a reliable fallback when the wider project-list permission is denied. */
+  private mergeDeliveryFilterOptions(rows: any[]): void {
+    const projects = new Map(this.deliveryProjects().map((project) => [project.id, project]));
+    const requesters = new Map(this.deliveryRequesters().map((person) => [person.id, person]));
+    for (const row of rows || []) {
+      const project = row.project ?? row.issue?.project;
+      const projectId = Number(project?.id ?? row.projectId);
+      if (Number.isInteger(projectId) && projectId > 0) {
+        projects.set(projectId, { id: projectId, name: project?.name || `Project ${projectId}`, key: project?.key ?? null });
+      }
+      const requester = row.approvalRequestedBy ?? row.requestedBy ?? row.raisedBy;
+      const requesterId = Number(requester?.id);
+      if (Number.isInteger(requesterId) && requesterId > 0) {
+        requesters.set(requesterId, { id: requesterId, name: `${requester.firstName ?? ''} ${requester.lastName ?? ''}`.trim() || `Employee ${requesterId}` });
+      }
+    }
+    this.deliveryProjects.set([...projects.values()].sort((a, b) => a.name.localeCompare(b.name)));
+    this.deliveryRequesters.set([...requesters.values()].sort((a, b) => a.name.localeCompare(b.name)));
   }
 
   private isRequestType(value: string | null): value is ProjectRequestType {
@@ -480,6 +632,7 @@ export class TaskHoursRequestsTabComponent {
     this.api.listAll({ status: 'ALL' }).subscribe({
       next: (rows) => {
         this.requests.set(rows || []);
+        this.mergeDeliveryFilterOptions(rows || []);
         this.loading.set(false);
       },
       error: (err) => {
@@ -527,6 +680,8 @@ export class TaskHoursRequestsTabComponent {
     this.selectedProject.set('ALL');
     this.selectedRequester.set('ALL');
     this.approvalDateRange.set('ALL');
+    this.customApprovalStart.set('');
+    this.customApprovalEnd.set('');
     this.sortBy.set('newest');
     this.activeTab.set(this.openCount() > 0 ? 'AWAITING' : 'ALL');
   }
@@ -759,6 +914,7 @@ export class TaskHoursRequestsTabComponent {
       this.projectsApi.getPendingTaskApprovals().subscribe({
         next: (rows) => {
           this.taskApprovals.set(rows || []);
+          this.mergeDeliveryFilterOptions(rows || []);
           // Keep only selections that are still waiting.
           const live = new Set((rows || []).map((r: any) => r.id));
           this.selectedTaskIds.update((set) => new Set([...set].filter((id) => live.has(id))));
@@ -773,6 +929,7 @@ export class TaskHoursRequestsTabComponent {
       this.budgetApi.pending().subscribe({
         next: (rows) => {
           this.budgetRequests.set(rows || []);
+          this.mergeDeliveryFilterOptions(rows || []);
           done();
         },
         error: () => {
@@ -784,6 +941,7 @@ export class TaskHoursRequestsTabComponent {
       this.projectsApi.getPendingScopeRequests().subscribe({
         next: (rows) => {
           this.scopeRequests.set(rows || []);
+          this.mergeDeliveryFilterOptions(rows || []);
           done();
         },
         error: () => {
@@ -890,7 +1048,6 @@ export class TaskHoursRequestsTabComponent {
       { label: 'Visit Days', value: rows.reduce((sum, r) => sum + (r.visitDays ?? 0), 0), detail: 'Total proposed field time', tone: 'rose' },
     ];
   }
-
   // ── Task approvals ────────────────────────────────────────────────────────
 
   approvalStageLabel(issue: any): string {
@@ -1089,6 +1246,8 @@ export class TaskHoursRequestsTabComponent {
 
   @HostListener('document:keydown.escape')
   onEscapeKey() {
+    this.projectPicker.set(null);
+    this.filterPicker.set(null);
     if (this.viewingVisit()) {
       this.closeVisitDetails();
       return;
@@ -1096,6 +1255,14 @@ export class TaskHoursRequestsTabComponent {
     if (this.viewingTask()) {
       this.closeTaskDetails();
     }
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('.delivery-project-select, .thr-select-wrap, .task-date-picker')) return;
+    this.projectPicker.set(null);
+    this.filterPicker.set(null);
   }
 
   async decideFromModal(issue: any, action: 'APPROVE' | 'REJECT') {

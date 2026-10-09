@@ -22,6 +22,12 @@ export class TaskHoursRequestsController {
     );
   }
 
+  /** Project and requester choices use the exact same visibility as the queue. */
+  @Get('task-hours-requests/filter-options')
+  filterOptions(@Req() req) {
+    return this.requests.filterOptions(req.user.companyId, req.user.role, req.user.employeeId ?? null);
+  }
+
   @Get('task-hours-requests/:requestId/timeline')
   timeline(@Req() req, @Param('requestId', ParseIntPipe) requestId: number) {
     return this.requests.timeline(req.user.companyId, requestId);

@@ -14,7 +14,7 @@ import {
   LucideCircleAlert, LucideChevronUp,
 } from '@lucide/angular';
 import {
-  FieldVisitRequestsService, FieldVisitRequest, FieldVisitRequestInput,
+  FieldVisitRequestsService, FieldVisitRequest, FieldVisitRequestInput, FieldVisitLeaveConflict,
 } from '../../services/field-visit-requests';
 import { ProjectsService } from '../../services/projects';
 import { TasksService } from '../../services/tasks.service';
@@ -407,6 +407,10 @@ export class FieldVisitRequestFormComponent implements OnInit {
   // Searchable Employee picker state
   selectedEmployeeIds = signal<number[]>([]);
   employeeSearchQuery = signal('');
+  leaveConflicts = signal<FieldVisitLeaveConflict[]>([]);
+  isCheckingAvailability = signal(false);
+  availabilityCheckFailed = signal(false);
+  private availabilityRequest = 0;
 
   // ── Project task picker ────────────────────────────────────────────────
   /** The selected project's own tasks, loaded when the project is picked. */
@@ -515,6 +519,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
     if (this.visitType() === 'PROJECT' && this.selectedProjectId()) {
       this.loadProjectTasks(this.selectedProjectId()!);
     }
+    this.refreshAvailability();
   }
 
   /** The projects and people the form picks from. */
@@ -627,6 +632,50 @@ export class FieldVisitRequestFormComponent implements OnInit {
       this.toast.error(complaint);
     }
     this.lastDateComplaint = complaint;
+    this.refreshAvailability();
+  }
+
+  /** Re-check approved leave whenever the planned dates or team changes. */
+  private refreshAvailability(): void {
+    const employeeIds = this.selectedEmployeeIds();
+    const { startDate, endDate } = this.form;
+    const request = ++this.availabilityRequest;
+    const validRange = startDate && endDate
+      && !Number.isNaN(Date.parse(`${startDate}T00:00:00Z`))
+      && !Number.isNaN(Date.parse(`${endDate}T00:00:00Z`))
+      && startDate <= endDate;
+    if (!employeeIds.length || !validRange) {
+      this.leaveConflicts.set([]);
+      this.isCheckingAvailability.set(false);
+      this.availabilityCheckFailed.set(false);
+      return;
+    }
+
+    this.isCheckingAvailability.set(true);
+    this.availabilityCheckFailed.set(false);
+    this.api.availability(employeeIds, startDate, endDate).subscribe({
+      next: (conflicts) => {
+        if (request !== this.availabilityRequest) return;
+        this.leaveConflicts.set(conflicts || []);
+        this.isCheckingAvailability.set(false);
+      },
+      error: () => {
+        if (request !== this.availabilityRequest) return;
+        this.leaveConflicts.set([]);
+        this.isCheckingAvailability.set(false);
+        this.availabilityCheckFailed.set(true);
+      },
+    });
+  }
+
+  leaveConflictMessage(): string {
+    const people = new Map(this.employees().map((employee) => [employee.id, employee.name]));
+    return this.leaveConflicts().map((conflict) => {
+      const name = people.get(conflict.employeeId) || `Employee ${conflict.employeeId}`;
+      const from = conflict.startDate.slice(0, 10);
+      const to = conflict.endDate.slice(0, 10);
+      return `${name}: ${from === to ? from : `${from} to ${to}`}`;
+    }).join('; ');
   }
 
   /**
@@ -1066,11 +1115,13 @@ export class FieldVisitRequestFormComponent implements OnInit {
     const updated = Array.from(set);
     this.selectedEmployeeIds.set(updated);
     this.form.employeeIds = updated;
+    this.refreshAvailability();
   }
 
   clearSelectedEmployees(): void {
     this.selectedEmployeeIds.set([]);
     this.form.employeeIds = [];
+    this.refreshAvailability();
   }
 
   toggleEmployee(id: number): void {
@@ -1080,6 +1131,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
       : [...current, id];
     this.selectedEmployeeIds.set(updated);
     this.form.employeeIds = updated;
+    this.refreshAvailability();
   }
 
   isPicked(id: number): boolean {

@@ -468,4 +468,25 @@ export class TaskHoursRequestsService {
       select: this.SELECT,
     });
   }
+
+  /** Filter choices must not use the general project list: a project lead may
+   * approve requests without also being recorded as an ordinary project member. */
+  async filterOptions(companyId: number, role: string, employeeId: number | null) {
+    const requests = await this.listAll(companyId, role, employeeId, { status: 'ALL' });
+    const projects = new Map<number, { id: number; name: string; key: string | null }>();
+    const requesters = new Map<number, { id: number; name: string }>();
+    for (const request of requests) {
+      const project = request.issue?.project;
+      if (project) projects.set(project.id, { id: project.id, name: project.name, key: project.key ?? null });
+      const requester = request.requestedBy;
+      if (requester) requesters.set(requester.id, {
+        id: requester.id,
+        name: `${requester.firstName ?? ''} ${requester.lastName ?? ''}`.trim() || `Employee ${requester.id}`,
+      });
+    }
+    return {
+      projects: [...projects.values()].sort((a, b) => a.name.localeCompare(b.name)),
+      requesters: [...requesters.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  }
 }

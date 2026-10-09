@@ -122,6 +122,12 @@ export interface FieldVisitActivity {
   actor: FieldVisitPerson;
 }
 
+export interface FieldVisitLeaveConflict {
+  employeeId: number;
+  startDate: string;
+  endDate: string;
+}
+
 export interface FieldVisitRequestInput {
   /** GENERAL visits belong to no project; their scope is the people's general tasks. */
   visitType?: 'PROJECT' | 'GENERAL';
@@ -202,6 +208,12 @@ export class FieldVisitRequestsService {
   getGeneralTasks(employeeIds: number[]) {
     return this.http.get<any[]>(`${this.apiUrl}/general-tasks`, {
       params: { employeeIds: employeeIds.join(',') },
+    });
+  }
+
+  availability(employeeIds: number[], startDate: string, endDate: string) {
+    return this.http.get<FieldVisitLeaveConflict[]>(`${this.apiUrl}/availability`, {
+      params: { employeeIds: employeeIds.join(','), startDate, endDate },
     });
   }
 

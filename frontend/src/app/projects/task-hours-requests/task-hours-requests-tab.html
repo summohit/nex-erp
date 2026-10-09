@@ -134,117 +134,10 @@
     </button>
   </div>
 
-  <div class="prq-date-filter">
-    <svg lucideCalendar size="16"></svg>
-    <label for="delivery-approval-date-range">Date range</label>
-    <select id="delivery-approval-date-range" [value]="approvalDateRange()" (change)="setApprovalDateRange($any($event.target).value)">
-      <option *ngFor="let range of approvalDateRanges" [value]="range.value">{{ range.label }}</option>
-    </select>
-  </div>
-
-  <!-- Every delivery queue gets the same four-card summary shell. The copy and
-       numbers change with the selected request type, so the KPIs stay useful. -->
-  <div class="thr-kpi-grid" *ngIf="requestType() !== 'HOURS' && !loadingOthers()">
-    <div class="thr-kpi-card" *ngFor="let kpi of currentQueueKpis(); let i = index" [class]="'thr-kpi-card kpi-' + kpi.tone">
-      <div class="thr-kpi-icon-wrap" [class]="'thr-kpi-icon-wrap bg-' + kpi.tone + '-soft'">
-        <svg *ngIf="i === 0" lucideClock size="20"></svg>
-        <svg *ngIf="i === 1" lucideCheckCircle2 size="20"></svg>
-        <svg *ngIf="i === 2" lucideLayers size="20"></svg>
-        <svg *ngIf="i === 3" lucideInfo size="20"></svg>
-      </div>
-      <div class="thr-kpi-content">
-        <span class="thr-kpi-label">{{ kpi.label }}</span>
-        <div class="thr-kpi-num-row">
-          <span class="thr-kpi-value" [class]="'thr-kpi-value text-' + kpi.tone">{{ kpi.value }}</span>
-        </div>
-        <span class="thr-kpi-sub">{{ kpi.detail }}</span>
-      </div>
-    </div>
-  </div>
-
   <!-- The hours queue keeps its own purpose-built body: a baseline, a
        ceiling and an approved-hours figure are what that decision turns
        on, and none of the other three has them. -->
   <ng-container *ngIf="requestType() === 'HOURS'">
-    <!-- KPI Summary Metrics Grid (Interactive Filters) -->
-    <div class="thr-kpi-grid">
-      <!-- Card 1: Awaiting Decision -->
-      <div
-        class="thr-kpi-card kpi-amber"
-        [class.active]="activeTab() === 'AWAITING'"
-        (click)="setActiveTab('AWAITING')"
-      >
-        <div class="thr-kpi-icon-wrap bg-amber-soft">
-          <svg lucideClock size="20"></svg>
-        </div>
-        <div class="thr-kpi-content">
-          <span class="thr-kpi-label">Awaiting Decision</span>
-          <div class="thr-kpi-num-row">
-            <span class="thr-kpi-value text-amber">{{ openCount() }}</span>
-            <span class="thr-kpi-badge badge-amber">Action Needed</span>
-          </div>
-          <span class="thr-kpi-sub">{{ openHours() | number: '1.0-1' }}h pending review</span>
-        </div>
-      </div>
-
-      <!-- Card 2: Approved -->
-      <div
-        class="thr-kpi-card kpi-emerald"
-        [class.active]="activeTab() === 'APPROVED'"
-        (click)="setActiveTab('APPROVED')"
-      >
-        <div class="thr-kpi-icon-wrap bg-emerald-soft">
-          <svg lucideCheckCircle2 size="20"></svg>
-        </div>
-        <div class="thr-kpi-content">
-          <span class="thr-kpi-label">Approved Requests</span>
-          <div class="thr-kpi-num-row">
-            <span class="thr-kpi-value text-emerald">{{ approvedCount() }}</span>
-            <span class="thr-kpi-badge badge-emerald">Granted</span>
-          </div>
-          <span class="thr-kpi-sub">{{ approvedHours() | number: '1.0-1' }}h authorized</span>
-        </div>
-      </div>
-
-      <!-- Card 3: Rejected / Declined -->
-      <div
-        class="thr-kpi-card kpi-rose"
-        [class.active]="activeTab() === 'REJECTED'"
-        (click)="setActiveTab('REJECTED')"
-      >
-        <div class="thr-kpi-icon-wrap bg-rose-soft">
-          <svg lucideXCircle size="20"></svg>
-        </div>
-        <div class="thr-kpi-content">
-          <span class="thr-kpi-label">Declined Requests</span>
-          <div class="thr-kpi-num-row">
-            <span class="thr-kpi-value text-rose">{{ rejectedCount() }}</span>
-            <span class="thr-kpi-badge badge-rose">Refused</span>
-          </div>
-          <span class="thr-kpi-sub">{{ rejectedHours() | number: '1.0-1' }}h requested</span>
-        </div>
-      </div>
-
-      <!-- Card 4: Decision History -->
-      <div
-        class="thr-kpi-card kpi-indigo"
-        [class.active]="activeTab() === 'HISTORY'"
-        (click)="setActiveTab('HISTORY')"
-      >
-        <div class="thr-kpi-icon-wrap bg-indigo-soft">
-          <svg lucideHistory size="20"></svg>
-        </div>
-        <div class="thr-kpi-content">
-          <span class="thr-kpi-label">Decision History</span>
-          <div class="thr-kpi-num-row">
-            <span class="thr-kpi-value text-indigo">{{ historyCount() }}</span>
-            <span class="thr-kpi-badge badge-indigo">Settled</span>
-          </div>
-          <span class="thr-kpi-sub">Audited decisions</span>
-        </div>
-      </div>
-    </div>
-
     <!-- Multi-Filter & Search Toolbar -->
     <div class="thr-controls-card">
       <!-- View Mode Tabs -->
@@ -330,44 +223,36 @@
         <!-- Dropdown Filters Group -->
         <div class="thr-dropdown-group">
           <!-- Project Filter -->
-          <div class="thr-select-wrap">
-            <svg lucideFolderKanban size="15" class="thr-select-icon"></svg>
-            <select
-              [ngModel]="selectedProject()"
-              (ngModelChange)="onProjectChange($event)"
-              class="thr-select"
-            >
-              <option value="ALL">All Projects</option>
-              <option *ngFor="let p of availableProjects()" [value]="p.id">
-                {{ p.name }} ({{ p.key }})
-              </option>
-            </select>
+          <div class="thr-select-wrap delivery-project-select">
+            <button type="button" class="project-picker-trigger" [class.open]="projectPicker() === 'hours'" (click)="toggleProjectPicker('hours')" aria-haspopup="listbox" [attr.aria-expanded]="projectPicker() === 'hours'">
+              <svg lucideFolderKanban size="15"></svg><span>{{ deliveryProjectLabel(selectedProject()) }}</span><svg lucideChevronDown size="16"></svg>
+            </button>
+            @if (projectPicker() === 'hours') {
+              <div class="project-picker-menu" role="listbox">
+                <input type="search" [ngModel]="projectPickerQuery()" (ngModelChange)="projectPickerQuery.set($event)" placeholder="Search projects…" autofocus />
+                <div class="project-picker-options"><button type="button" [class.selected]="selectedProject() === 'ALL'" (click)="chooseDeliveryProject('hours', 'ALL')"><span>All Projects</span><svg *ngIf="selectedProject() === 'ALL'" lucideCheck size="15"></svg></button><button type="button" *ngFor="let p of filteredDeliveryProjects()" [class.selected]="selectedProject() === String(p.id)" (click)="chooseDeliveryProject('hours', String(p.id))"><span>{{ p.name }}<small *ngIf="p.key">{{ p.key }}</small></span><svg *ngIf="selectedProject() === String(p.id)" lucideCheck size="15"></svg></button><p class="project-picker-empty" *ngIf="!filteredDeliveryProjects().length">{{ isLoadingDeliveryProjects() ? 'Loading projects…' : 'No projects match your search.' }}</p></div>
+              </div>
+            }
           </div>
 
           <!-- Requester Filter -->
           <div class="thr-select-wrap">
-            <svg lucideUser size="15" class="thr-select-icon"></svg>
-            <select
-              [ngModel]="selectedRequester()"
-              (ngModelChange)="onRequesterChange($event)"
-              class="thr-select"
-            >
-              <option value="ALL">All Requesters</option>
-              <option *ngFor="let r of availableRequesters()" [value]="r.id">
-                {{ r.name }}
-              </option>
-            </select>
+            <button type="button" class="filter-picker-trigger" (click)="toggleFilterPicker('requester')"><svg lucideUser size="15"></svg><span>{{ requesterLabel() }}</span><svg lucideChevronDown size="16"></svg></button>
+            @if (filterPicker() === 'requester') { <div class="filter-picker-menu"><button type="button" [class.selected]="selectedRequester() === 'ALL'" (click)="chooseFilterPicker('requester', 'ALL')">All Requesters</button><button type="button" *ngFor="let r of availableRequesters()" [class.selected]="selectedRequester() === String(r.id)" (click)="chooseFilterPicker('requester', String(r.id))">{{ r.name }}</button></div> }
           </div>
+
+          <div class="thr-select-wrap">
+            <button type="button" class="filter-picker-trigger" (click)="toggleFilterPicker('date')"><svg lucideCalendar size="15"></svg><span>{{ dateRangeLabel() }}</span><svg lucideChevronDown size="16"></svg></button>
+            @if (filterPicker() === 'date') { <div class="filter-picker-menu"><button type="button" *ngFor="let range of approvalDateRanges" [class.selected]="approvalDateRange() === range.value" (click)="chooseFilterPicker('date', range.value)">{{ range.label }}</button></div> }
+          </div>
+          @if (approvalDateRange() === 'CUSTOM') {
+            <div class="custom-date-range"><input type="date" aria-label="From date" [value]="customApprovalStart()" (change)="setCustomApprovalDate('start', $any($event.target).value)" /><span>to</span><input type="date" aria-label="To date" [value]="customApprovalEnd()" (change)="setCustomApprovalDate('end', $any($event.target).value)" /></div>
+          }
 
           <!-- Sorting -->
           <div class="thr-select-wrap">
-            <svg lucideArrowUpDown size="15" class="thr-select-icon"></svg>
-            <select [ngModel]="sortBy()" (ngModelChange)="onSortChange($event)" class="thr-select">
-              <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="hours-desc">Most Hours Requested</option>
-              <option value="hours-asc">Least Hours Requested</option>
-            </select>
+            <button type="button" class="filter-picker-trigger" (click)="toggleFilterPicker('hoursSort')"><svg lucideArrowUpDown size="15"></svg><span>{{ hoursSortLabel() }}</span><svg lucideChevronDown size="16"></svg></button>
+            @if (filterPicker() === 'hoursSort') { <div class="filter-picker-menu"><button type="button" *ngFor="let option of [{v:'newest',l:'Newest First'},{v:'oldest',l:'Oldest First'},{v:'hours-desc',l:'Most Hours Requested'},{v:'hours-asc',l:'Least Hours Requested'}]" [class.selected]="sortBy() === option.v" (click)="chooseFilterPicker('hoursSort', option.v)">{{ option.l }}</button></div> }
           </div>
 
           <!-- Clear Filters Button -->
@@ -853,6 +738,47 @@
   </ng-container>
 
   <!-- ── Loading / empty, shared by the three new queues ──────────────────── -->
+  <!-- Same approval toolbar across every Delivery queue. These queues currently
+       provide actionable rows only, so the historical status tabs are visible
+       but unavailable instead of suggesting data that has not been loaded. -->
+  <ng-container *ngIf="requestType() !== 'HOURS'">
+    <div class="thr-controls-card delivery-shared-controls">
+      <div class="thr-view-tabs" role="tablist" aria-label="Approval status">
+        <button type="button" class="thr-tab-btn active" role="tab" aria-selected="true"><svg lucideClock size="15"></svg><span>Awaiting Decision</span><span class="thr-tab-pill pill-warn">{{ otherQueueCount() }}</span></button>
+        <button type="button" class="thr-tab-btn" disabled title="This queue loads actionable requests only"><svg lucideHistory size="15"></svg><span>Decision History</span><span class="thr-tab-pill">0</span></button>
+        <button type="button" class="thr-tab-btn" disabled title="This queue loads actionable requests only"><svg lucideCheckCircle2 size="15"></svg><span>Approved</span><span class="thr-tab-pill">0</span></button>
+        <button type="button" class="thr-tab-btn" disabled title="This queue loads actionable requests only"><svg lucideXCircle size="15"></svg><span>Declined</span><span class="thr-tab-pill">0</span></button>
+        <button type="button" class="thr-tab-btn" disabled title="This queue loads actionable requests only"><svg lucideSlidersHorizontal size="15"></svg><span>All Requests</span><span class="thr-tab-pill">{{ otherQueueCount() }}</span></button>
+      </div>
+      <div class="thr-filter-row">
+        <div class="thr-search-box">
+          <svg lucideSearch size="16" class="thr-search-icon"></svg>
+          <input type="search" class="thr-search-input" [ngModel]="otherSearchQuery()" (ngModelChange)="otherSearchQuery.set($event)" placeholder="Search by project, requester, task, site or reference…" />
+          <button type="button" class="thr-search-clear" *ngIf="otherSearchQuery()" (click)="otherSearchQuery.set('')" title="Clear search"><svg lucideX size="14"></svg></button>
+        </div>
+        <div class="thr-dropdown-group">
+          <div class="thr-select-wrap delivery-project-select">
+            <button type="button" class="project-picker-trigger" [class.open]="projectPicker() === 'other'" (click)="toggleProjectPicker('other')" aria-haspopup="listbox" [attr.aria-expanded]="projectPicker() === 'other'">
+              <svg lucideFolderKanban size="15"></svg><span>{{ deliveryProjectLabel(otherSelectedProject()) }}</span><svg lucideChevronDown size="16"></svg>
+            </button>
+            @if (projectPicker() === 'other') {
+              <div class="project-picker-menu" role="listbox">
+                <input type="search" [ngModel]="projectPickerQuery()" (ngModelChange)="projectPickerQuery.set($event)" placeholder="Search projects…" autofocus />
+                <div class="project-picker-options"><button type="button" [class.selected]="otherSelectedProject() === 'ALL'" (click)="chooseDeliveryProject('other', 'ALL')"><span>All Projects</span><svg *ngIf="otherSelectedProject() === 'ALL'" lucideCheck size="15"></svg></button><button type="button" *ngFor="let p of filteredDeliveryProjects()" [class.selected]="otherSelectedProject() === String(p.id)" (click)="chooseDeliveryProject('other', String(p.id))"><span>{{ p.name }}<small *ngIf="p.key">{{ p.key }}</small></span><svg *ngIf="otherSelectedProject() === String(p.id)" lucideCheck size="15"></svg></button><p class="project-picker-empty" *ngIf="!filteredDeliveryProjects().length">{{ isLoadingDeliveryProjects() ? 'Loading projects…' : 'No projects match your search.' }}</p></div>
+              </div>
+            }
+          </div>
+          <div class="thr-select-wrap"><button type="button" class="filter-picker-trigger" (click)="toggleFilterPicker('date')"><svg lucideCalendar size="15"></svg><span>{{ dateRangeLabel() }}</span><svg lucideChevronDown size="16"></svg></button>@if (filterPicker() === 'date') { <div class="filter-picker-menu"><button type="button" *ngFor="let range of approvalDateRanges" [class.selected]="approvalDateRange() === range.value" (click)="chooseFilterPicker('date', range.value)">{{ range.label }}</button></div> }</div>
+          @if (approvalDateRange() === 'CUSTOM') {
+            <div class="custom-date-range"><input type="date" aria-label="From date" [value]="customApprovalStart()" (change)="setCustomApprovalDate('start', $any($event.target).value)" /><span>to</span><input type="date" aria-label="To date" [value]="customApprovalEnd()" (change)="setCustomApprovalDate('end', $any($event.target).value)" /></div>
+          }
+          <div class="thr-select-wrap"><button type="button" class="filter-picker-trigger" (click)="toggleFilterPicker('otherSort')"><svg lucideArrowUpDown size="15"></svg><span>{{ otherSortLabel() }}</span><svg lucideChevronDown size="16"></svg></button>@if (filterPicker() === 'otherSort') { <div class="filter-picker-menu"><button type="button" [class.selected]="otherSortBy() === 'newest'" (click)="chooseFilterPicker('otherSort', 'newest')">Newest First</button><button type="button" [class.selected]="otherSortBy() === 'oldest'" (click)="chooseFilterPicker('otherSort', 'oldest')">Oldest First</button></div> }</div>
+          <button type="button" class="thr-btn-clear" *ngIf="otherSearchQuery() || otherSelectedProject() !== 'ALL' || approvalDateRange() !== 'ALL' || otherSortBy() !== 'newest'" (click)="clearOtherFilters()"><svg lucideX size="14"></svg><span>Reset</span></button>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+
   <div class="prq-loading" *ngIf="requestType() !== 'HOURS' && loadingOthers()">
     <svg lucideLoader2 size="20" class="thr-spinning"></svg>
     <span>Loading…</span>
@@ -877,13 +803,7 @@
                [value]="taskProjectQuery()" (input)="setTaskFilter('project', $any($event.target).value)" />
         <input type="search" class="ta-filter-input" placeholder="Person (assigned, member or raised by)…"
                [value]="taskPersonQuery()" (input)="setTaskFilter('person', $any($event.target).value)" />
-        <select class="ta-filter-select" [value]="taskWhen()" (change)="setTaskFilter('when', $any($event.target).value)">
-          <option value="ALL">Any date</option>
-          <option value="TODAY">Today</option>
-          <option value="NEXT_30">Next 30 days</option>
-          <option value="NEXT_60">Next 60 days</option>
-          <option value="FUTURE">Future (after today)</option>
-        </select>
+        <div class="task-date-picker"><button type="button" class="filter-picker-trigger" (click)="toggleFilterPicker('taskWhen')"><svg lucideCalendar size="15"></svg><span>{{ taskWhenLabel() }}</span><svg lucideChevronDown size="16"></svg></button>@if (filterPicker() === 'taskWhen') { <div class="filter-picker-menu"><button type="button" *ngFor="let option of [{v:'ALL',l:'Any date'},{v:'TODAY',l:'Today'},{v:'NEXT_30',l:'Next 30 days'},{v:'NEXT_60',l:'Next 60 days'},{v:'FUTURE',l:'Future (after today)'}]" [class.selected]="taskWhen() === option.v" (click)="chooseFilterPicker('taskWhen', option.v)">{{ option.l }}</button></div> }</div>
         <button type="button" class="ta-clear" *ngIf="hasTaskFilters()" (click)="clearTaskFilters()">Clear</button>
         <span class="ta-showing">Showing {{ filteredTaskApprovals().length }} of {{ taskApprovals().length }}</span>
       </div>
