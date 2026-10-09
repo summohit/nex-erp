@@ -155,7 +155,7 @@ export class FieldVisitRequestDetailComponent implements OnInit {
 
   /** Whether that distance was inside the radius this trip was approved with. */
   wasInside(km?: number | null): boolean {
-    const radius = this.request()?.geofenceRadiusM ?? 500;
+    const radius = this.request()?.geofenceRadiusM ?? 1000;
     return km != null && Math.round(km * 1000) <= radius;
   }
 

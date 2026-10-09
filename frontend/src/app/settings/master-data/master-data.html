@@ -683,7 +683,7 @@
                 <label class="geofence-toggle" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
                   <input type="checkbox" [(ngModel)]="formData.officeGeofence" style="margin-top:3px;width:16px;height:16px;">
                   <span>
-                    <strong>Office geofence (500 m)</strong>
+                    <strong>Office geofence (100 m)</strong>
                     <span class="help-text" style="display:block;">Staff on this shift must clock in and out within the branch radius. Outside it they give a reason, which an administrator reviews. Turn on for office shifts (General Shift) only.</span>
                   </span>
                 </label>
@@ -751,16 +751,16 @@
         </div>
         <div class="form-group" *ngIf="activeTab() === 'branches'">
           <label>Geofence Radius (meters)</label>
-          <input type="number" class="form-control" [(ngModel)]="formData.geofenceRadius" placeholder="e.g. 500">
+          <input type="number" class="form-control" [(ngModel)]="formData.geofenceRadius" placeholder="e.g. 100">
         </div>
-        <!-- B3: the office pin the 500 m clock-in/out check measures from. -->
+        <!-- B3: the office pin the clock-in/out check measures from. -->
         <div class="form-group full-width" *ngIf="activeTab() === 'branches'">
           <div class="loc-card">
             <div class="loc-head">
               <div class="loc-icon"><svg lucideMapPin [size]="16"></svg></div>
               <div class="loc-title">
                 <strong>Office location</strong>
-                <span>The point the {{ formData.geofenceRadius || 500 }} m clock-in / clock-out check is measured from</span>
+                <span>The point the {{ formData.geofenceRadius || 100 }} m clock-in / clock-out check is measured from</span>
               </div>
               <span class="loc-status" [class.set]="formData.latitude != null && formData.longitude != null">
                 {{ formData.latitude != null && formData.longitude != null ? 'Pin set' : 'No pin · check off' }}

@@ -664,7 +664,7 @@ model Branch {
   isActive       Boolean    @default(true)
   companyId      Int
   company        Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  geofenceRadius Int?       @default(500) // meters
+  geofenceRadius Int?       @default(100) // meters
   allowedIps     String? // Comma-separated list of allowed IPs
   employees      Employee[]
   jobs           Job[]
@@ -4314,8 +4314,8 @@ model FieldVisitRequest {
   /// On the row rather than a constant in the clock-in code: the radius a day
   /// was judged against has to stay readable afterwards, so changing the
   /// company's rule cannot retroactively move the line under days already
-  /// clocked. 500 is the rule as specified; nothing in the UI edits it yet.
-  geofenceRadiusM Int @default(500)
+  /// clocked. 1 km is the rule as specified; nothing in the UI edits it yet.
+  geofenceRadiusM Int @default(1000)
 
   /// A change to an already-approved trip, waiting for the same approval the
   /// trip itself had (§10).

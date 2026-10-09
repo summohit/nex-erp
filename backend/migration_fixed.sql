@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS "Branch" (
     "weeklyOffs" TEXT NOT NULL DEFAULT '0',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "companyId" INTEGER NOT NULL,
-    "geofenceRadius" INTEGER DEFAULT 500,
+    "geofenceRadius" INTEGER DEFAULT 100,
     "allowedIps" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

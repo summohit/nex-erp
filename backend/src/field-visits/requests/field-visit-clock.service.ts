@@ -34,7 +34,7 @@ export interface ClockData {
 /**
  * Clocking a day of an approved field visit (§5, §6).
  *
- * The rule this exists for: a clock-in counts only from within 500 metres of
+ * The rule this exists for: a clock-in counts only from within 1 kilometre of
  * the site the request was approved for. The radius lives on the request, so
  * the distance a day was judged against stays readable afterwards, and the
  * measured distance is stored whether or not it passed — a marginal clock-in
@@ -149,12 +149,12 @@ export class FieldVisitClockService {
     });
   }
 
-  // ─── The 500 metres ────────────────────────────────────────────────────────
+  // ─── The 1 kilometre ───────────────────────────────────────────────────────
 
   /**
    * How far off the site they are, refusing anything beyond the radius (§6).
    *
-   * Rounded to the nearest metre before the comparison so that exactly 500 m
+   * Rounded to the nearest metre before the comparison so that exactly 1 km
    * is inside, as the spec says it is, rather than turned away by the last
    * bits of a floating-point division.
    */
@@ -165,7 +165,7 @@ export class FieldVisitClockService {
 
     const distanceKm = haversineKm(request.latitude, request.longitude, lat, lng);
     const distanceM = Math.round(distanceKm * 1000);
-    const radiusM = request.geofenceRadiusM ?? 500;
+    const radiusM = request.geofenceRadiusM ?? 1000;
 
     if (distanceM > radiusM) {
       throw new GeofenceRefusal(
@@ -312,7 +312,7 @@ export class FieldVisitClockService {
             `Could not ${what} — too far from the site`,
             `${day.request.requestNumber} at ${day.request.location}:`
             + ` you were ${this.spokenDistance(error.distanceM)} away,`
-            + ` outside the ${day.request.geofenceRadiusM ?? 500} m radius.`,
+            + ` outside the ${day.request.geofenceRadiusM ?? 1000} m radius.`,
             'WARNING',
             this.LINK,
             employee.companyId,

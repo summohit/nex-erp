@@ -16,7 +16,7 @@ export interface FieldVisitSite {
   location: string;
   latitude: number;
   longitude: number;
-  /** The radius this day is judged against — 500m unless the request says otherwise. */
+  /** The radius this day is judged against — 1km unless the request says otherwise. */
   geofenceRadiusM: number;
   startTime: string;
   endTime: string;

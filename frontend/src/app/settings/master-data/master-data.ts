@@ -1240,7 +1240,7 @@ export class MasterDataComponent implements OnInit {
     departmentId: 0,
     canEditProfiles: false,
     address: '', startTime: '09:00', endTime: '18:00', weeklyOffs: '0',
-    geofenceRadius: 500, allowedIps: '',
+    geofenceRadius: 100, allowedIps: '',
     isActive: true,
     defaultDays: 0, isPaid: true, encashable: false, encashmentLimit: 0,
     accrualFrequency: 'NONE', accrualAmount: 0,
@@ -1533,7 +1533,7 @@ export class MasterDataComponent implements OnInit {
       this.formData = {
         id: 0, name: '', departmentId: 0, canEditProfiles: false,
         address: '', startTime: '09:00', endTime: '18:00', weeklyOffs: '0',
-        geofenceRadius: 500, allowedIps: '',
+        geofenceRadius: 100, allowedIps: '',
         isActive: true,
         defaultDays: 0, isPaid: true, encashable: false, encashmentLimit: 0,
         accrualFrequency: 'NONE', accrualAmount: 0,

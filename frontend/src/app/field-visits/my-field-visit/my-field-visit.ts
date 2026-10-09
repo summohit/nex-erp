@@ -149,7 +149,7 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
     return Math.round(haversineM(site.latitude, site.longitude, here.lat, here.lng));
   });
 
-  radiusM = computed(() => this.day()?.request.geofenceRadiusM ?? 500);
+  radiusM = computed(() => this.day()?.request.geofenceRadiusM ?? 1000);
 
   withinSite = computed(() => {
     const d = this.distanceM();
