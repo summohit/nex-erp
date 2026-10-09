@@ -435,8 +435,16 @@
             <div class="leave-calendar-day" *ngFor="let day of leaveCalendarCells()" [class.outside-month]="!day.inMonth">
               <span class="leave-calendar-date">{{ day.date | date:'d' }}</span>
               <button type="button" class="leave-calendar-event" *ngFor="let request of day.requests"
-                      (click)="openLeaveDetail(request)" [title]="request.leaveType.name + ' · ' + request.status">
-                {{ request.leaveType.name }}
+                      [class.is-pending]="request.status === 'PENDING'"
+                      [class.is-rejected]="request.status === 'REJECTED' || request.status === 'CANCELLED'"
+                      (click)="openLeaveDetail(request)"
+                      [title]="calendarPersonName(request) + ' · ' + request.leaveType.name + ' · ' + request.status">
+                <img *ngIf="request.employee?.avatarUrl" class="lce-avatar" [src]="request.employee?.avatarUrl" alt="">
+                <span *ngIf="!request.employee?.avatarUrl" class="lce-avatar lce-initials">{{ calendarInitials(request) }}</span>
+                <span class="lce-text">
+                  <span class="lce-name">{{ calendarPersonName(request) }}</span>
+                  <span class="lce-type">{{ request.leaveType.name }}</span>
+                </span>
               </button>
             </div>
           </div>
@@ -1950,53 +1958,92 @@
 
   <!-- Regularization Modal -->
   <div class="drawer-overlay" *ngIf="isRegularizationModalOpen()" (click)="closeRegularizationModal()">
-    <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 500px;">
-      <div class="drawer-header">
-        <h2>Request Regularization</h2>
-        <button class="btn-icon" (click)="closeRegularizationModal()">
-          <svg lucideX size="20"></svg>
+    <div class="drawer-content reg-drawer-container" (click)="$event.stopPropagation()">
+      <div class="drawer-header reg-drawer-header">
+        <div class="reg-header-titles">
+          <h2>Request Regularization</h2>
+          <p class="reg-header-sub">Submit missed punches or adjustments for approval</p>
+        </div>
+        <button class="btn-icon reg-close-btn" (click)="closeRegularizationModal()" aria-label="Close" title="Close">
+          <svg lucideX size="18"></svg>
         </button>
       </div>
-      <div class="drawer-body">
-        <p class="reg-hint">Missed more than one day? Add each one below and send them together.</p>
+      <div class="drawer-body reg-drawer-body">
+        <div class="reg-info-banner">
+          <div class="reg-info-icon">
+            <svg lucideCalendar size="15"></svg>
+          </div>
+          <span class="reg-info-text">
+            Missed more than one day? Add multiple dates below to submit them together in a single request.
+          </span>
+        </div>
+
         <div class="reg-day" *ngFor="let d of regularizationForm.days; let i = index">
           <div class="reg-day-head">
-            <span class="reg-day-num">Day {{ i + 1 }}</span>
+            <div class="reg-day-badge">
+              <span class="reg-day-dot"></span>
+              <span class="reg-day-num">Day {{ i + 1 }}</span>
+            </div>
             <button type="button" class="reg-day-remove" *ngIf="regularizationForm.days.length > 1"
                     (click)="removeRegularizationDay(i)" title="Remove this day">
-              <svg lucideX size="14"></svg>
+              <svg lucideTrash2 size="13"></svg>
+              <span>Remove</span>
             </button>
           </div>
           <div class="form-group mb-3">
-            <label>Date <span style="color: #919192;">*</span></label>
-            <input type="date" class="form-control" [(ngModel)]="d.date"
+            <label class="reg-label">Date <span class="required-star">*</span></label>
+            <input type="date" class="form-control reg-input" [(ngModel)]="d.date"
+                   [class.has-error]="showFormErrors() && (!d.date || isDuplicateRegularizationDay(i))"
                    [style.border-color]="showFormErrors() && (!d.date || isDuplicateRegularizationDay(i)) ? '#dc2626' : ''">
-            <span class="reg-error" *ngIf="isDuplicateRegularizationDay(i)">This day is already in the list.</span>
-          </div>
-          <div class="grid-2-col">
-            <div class="form-group">
-              <label>Proposed Clock In</label>
-              <input type="time" class="form-control" [(ngModel)]="d.proposedClockIn">
+            <div class="reg-error-box" *ngIf="isDuplicateRegularizationDay(i)">
+              <svg lucideAlertCircle size="13"></svg>
+              <span>This day is already in the list.</span>
             </div>
-            <div class="form-group">
-              <label>Proposed Clock Out</label>
-              <input type="time" class="form-control" [(ngModel)]="d.proposedClockOut">
+          </div>
+          <div class="grid-2-col reg-times-grid">
+            <div class="form-group mb-0">
+              <label class="reg-label">Proposed Clock In</label>
+              <input type="time" class="form-control reg-input" [(ngModel)]="d.proposedClockIn">
+            </div>
+            <div class="form-group mb-0">
+              <label class="reg-label">Proposed Clock Out</label>
+              <input type="time" class="form-control reg-input" [(ngModel)]="d.proposedClockOut">
             </div>
           </div>
         </div>
-        <button type="button" class="reg-add-day" (click)="addRegularizationDay()" *ngIf="regularizationForm.days.length < 31">
-          + Add another date
+
+        <button type="button" class="reg-add-day-btn" (click)="addRegularizationDay()" *ngIf="regularizationForm.days.length < 31">
+          <div class="reg-add-icon-circle">
+            <svg lucidePlus size="14"></svg>
+          </div>
+          <span class="reg-add-text">Add another date</span>
+          <span class="reg-add-count" *ngIf="regularizationForm.days.length > 1">({{ regularizationForm.days.length }}/31)</span>
         </button>
-        <div class="form-group mb-4">
-          <label>Reason <span style="color: #919192;">*</span></label>
-          <textarea class="form-control" [(ngModel)]="regularizationForm.reason" rows="3" placeholder="Why are you regularizing? (applies to every day above)" [style.border-color]="showFormErrors() && !regularizationForm.reason ? '#919192' : ''"></textarea>
+
+        <div class="form-group reg-reason-group">
+          <div class="reg-reason-header">
+            <label class="reg-label">Reason for Request <span class="required-star">*</span></label>
+            <span class="reg-label-hint">Required</span>
+          </div>
+          <textarea class="form-control reg-textarea" [(ngModel)]="regularizationForm.reason" rows="3"
+                    placeholder="Why are you regularizing? (e.g. biometric punch missed, onsite client visit, network issue)"
+                    [class.has-error]="showFormErrors() && !regularizationForm.reason"
+                    [style.border-color]="showFormErrors() && !regularizationForm.reason ? '#dc2626' : ''"></textarea>
+          <span class="reg-field-help">This reason applies to all days in this request.</span>
         </div>
       </div>
-      <div class="drawer-footer">
-        <button class="btn btn-primary" (click)="submitRegularization()" [disabled]="isSubmittingRequest()" style="width: 100%;">
-          {{ isSubmittingRequest() ? 'Submitting...' : regularizationForm.days.length > 1 ? 'Submit ' + regularizationForm.days.length + ' Days' : 'Submit Request' }}
-        </button>
-        <button class="btn btn-outline" (click)="closeRegularizationModal()" style="width: 100%; margin-top: 8px;">Cancel</button>
+      <div class="drawer-footer reg-drawer-footer">
+        <div class="reg-footer-actions">
+          <button type="button" class="btn btn-outline reg-btn-cancel" (click)="closeRegularizationModal()">
+            Cancel
+          </button>
+          <button type="button" class="btn btn-primary reg-btn-submit" (click)="submitRegularization()" [disabled]="isSubmittingRequest()">
+            <svg lucideCheck size="16" *ngIf="!isSubmittingRequest()"></svg>
+            <span>
+              {{ isSubmittingRequest() ? 'Submitting...' : regularizationForm.days.length > 1 ? 'Submit ' + regularizationForm.days.length + ' Days' : 'Submit Request' }}
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

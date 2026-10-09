@@ -362,6 +362,18 @@ export class AttendanceLeaveComponent implements OnInit {
     ),
   );
 
+  /** Whose leave a calendar entry is: "Karan V.", or "You" for your own. */
+  calendarPersonName(r: LeaveRequest): string {
+    const e: any = (r as any).employee;
+    if (!e?.firstName) return 'You';
+    return `${e.firstName}${e.lastName ? ' ' + e.lastName.charAt(0) + '.' : ''}`;
+  }
+
+  calendarInitials(r: LeaveRequest): string {
+    const e: any = (r as any).employee;
+    return `${e?.firstName?.charAt(0) ?? ''}${e?.lastName?.charAt(0) ?? ''}`.toUpperCase() || '?';
+  }
+
   // Newest application first — what just came in is what needs looking at.
   // Ordering by leave date put a leave applied for weeks ago at the top just
   // because it was far in the future.
