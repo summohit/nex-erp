@@ -3716,3 +3716,14 @@
 /* Team Timeline holidays */
 .timeline-day-header.holiday-col, .timeline-cell.holiday-col { background: #FFFBEB; }
 .timeline-day-header .day-hol { display:block; font-size:9px; font-weight:700; letter-spacing:.05em; color:#B45309; }
+
+/* Regularization: several days in one request */
+.reg-hint { margin: 0 0 12px; font-size: 13px; color: #64748b; }
+.reg-day { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; background: #f8fafc; }
+.reg-day-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.reg-day-num { font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .04em; }
+.reg-day-remove { border: 0; background: transparent; color: #94a3b8; cursor: pointer; padding: 4px; border-radius: 6px; display: inline-flex; }
+.reg-day-remove:hover { background: #fee2e2; color: #dc2626; }
+.reg-error { font-size: 12px; color: #dc2626; }
+.reg-add-day { width: 100%; padding: 10px; margin-bottom: 16px; border: 1px dashed #93c5fd; border-radius: 10px; background: #eff6ff; color: #1d4ed8; font-weight: 600; cursor: pointer; }
+.reg-add-day:hover { background: #dbeafe; }

@@ -1958,28 +1958,43 @@
         </button>
       </div>
       <div class="drawer-body">
-        <div class="form-group mb-4">
-          <label>Date <span style="color: #919192;">*</span></label>
-          <input type="date" class="form-control" [(ngModel)]="regularizationForm.date" [style.border-color]="showFormErrors() && !regularizationForm.date ? '#919192' : ''">
-        </div>
-        <div class="grid-2-col mb-4">
-          <div class="form-group">
-            <label>Proposed Clock In</label>
-            <input type="time" class="form-control" [(ngModel)]="regularizationForm.proposedClockIn">
+        <p class="reg-hint">Missed more than one day? Add each one below and send them together.</p>
+        <div class="reg-day" *ngFor="let d of regularizationForm.days; let i = index">
+          <div class="reg-day-head">
+            <span class="reg-day-num">Day {{ i + 1 }}</span>
+            <button type="button" class="reg-day-remove" *ngIf="regularizationForm.days.length > 1"
+                    (click)="removeRegularizationDay(i)" title="Remove this day">
+              <svg lucideX size="14"></svg>
+            </button>
           </div>
-          <div class="form-group">
-            <label>Proposed Clock Out</label>
-            <input type="time" class="form-control" [(ngModel)]="regularizationForm.proposedClockOut">
+          <div class="form-group mb-3">
+            <label>Date <span style="color: #919192;">*</span></label>
+            <input type="date" class="form-control" [(ngModel)]="d.date"
+                   [style.border-color]="showFormErrors() && (!d.date || isDuplicateRegularizationDay(i)) ? '#dc2626' : ''">
+            <span class="reg-error" *ngIf="isDuplicateRegularizationDay(i)">This day is already in the list.</span>
+          </div>
+          <div class="grid-2-col">
+            <div class="form-group">
+              <label>Proposed Clock In</label>
+              <input type="time" class="form-control" [(ngModel)]="d.proposedClockIn">
+            </div>
+            <div class="form-group">
+              <label>Proposed Clock Out</label>
+              <input type="time" class="form-control" [(ngModel)]="d.proposedClockOut">
+            </div>
           </div>
         </div>
+        <button type="button" class="reg-add-day" (click)="addRegularizationDay()" *ngIf="regularizationForm.days.length < 31">
+          + Add another date
+        </button>
         <div class="form-group mb-4">
           <label>Reason <span style="color: #919192;">*</span></label>
-          <textarea class="form-control" [(ngModel)]="regularizationForm.reason" rows="3" placeholder="Why are you regularizing?" [style.border-color]="showFormErrors() && !regularizationForm.reason ? '#919192' : ''"></textarea>
+          <textarea class="form-control" [(ngModel)]="regularizationForm.reason" rows="3" placeholder="Why are you regularizing? (applies to every day above)" [style.border-color]="showFormErrors() && !regularizationForm.reason ? '#919192' : ''"></textarea>
         </div>
       </div>
       <div class="drawer-footer">
         <button class="btn btn-primary" (click)="submitRegularization()" [disabled]="isSubmittingRequest()" style="width: 100%;">
-          {{ isSubmittingRequest() ? 'Submitting...' : 'Submit Request' }}
+          {{ isSubmittingRequest() ? 'Submitting...' : regularizationForm.days.length > 1 ? 'Submit ' + regularizationForm.days.length + ' Days' : 'Submit Request' }}
         </button>
         <button class="btn btn-outline" (click)="closeRegularizationModal()" style="width: 100%; margin-top: 8px;">Cancel</button>
       </div>

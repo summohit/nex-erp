@@ -1544,12 +1544,11 @@ export class AttendanceLeaveComponent implements OnInit {
   myRegularizations = signal<any[]>([]);
   pendingRegularizations = signal<any[]>([]);
   isRegularizationModalOpen = signal<boolean>(false);
-  regularizationForm = {
-    date: '',
-    proposedClockIn: '',
-    proposedClockOut: '',
-    reason: ''
-  };
+  /** One or more days, each with its own times, and one reason for all. */
+  regularizationForm: {
+    days: { date: string; proposedClockIn: string; proposedClockOut: string }[];
+    reason: string;
+  } = { days: [{ date: '', proposedClockIn: '', proposedClockOut: '' }], reason: '' };
 
   // Reject Modal
   isRejectModalOpen = signal<boolean>(false);
@@ -1960,10 +1959,8 @@ export class AttendanceLeaveComponent implements OnInit {
 
   openRegularizationModal(dateStr?: string) {
     this.regularizationForm = {
-      date: dateStr || '',
-      proposedClockIn: '',
-      proposedClockOut: '',
-      reason: ''
+      days: [{ date: dateStr || '', proposedClockIn: '', proposedClockOut: '' }],
+      reason: '',
     };
     this.showFormErrors.set(false);
     this.isRegularizationModalOpen.set(true);
@@ -1973,26 +1970,53 @@ export class AttendanceLeaveComponent implements OnInit {
     this.isRegularizationModalOpen.set(false);
   }
 
+  addRegularizationDay() {
+    if (this.regularizationForm.days.length >= 31) return;
+    const last = this.regularizationForm.days[this.regularizationForm.days.length - 1];
+    // Same hours as the day above: several missed days are usually one shift.
+    this.regularizationForm.days.push({ date: '', proposedClockIn: last?.proposedClockIn ?? '', proposedClockOut: last?.proposedClockOut ?? '' });
+  }
+
+  removeRegularizationDay(i: number) {
+    if (this.regularizationForm.days.length > 1) this.regularizationForm.days.splice(i, 1);
+  }
+
+  /** A day picked twice — the server refuses it, so say so first. */
+  isDuplicateRegularizationDay(i: number): boolean {
+    const d = this.regularizationForm.days[i]?.date;
+    return !!d && this.regularizationForm.days.findIndex((x) => x.date === d) !== i;
+  }
+
   submitRegularization() {
     this.showFormErrors.set(true);
-    if (!this.regularizationForm.date || !this.regularizationForm.reason) return;
+    const days = this.regularizationForm.days;
+    if (!this.regularizationForm.reason.trim() || days.some((d) => !d.date)
+      || days.some((_, i) => this.isDuplicateRegularizationDay(i))) return;
 
     this.isSubmittingRequest.set(true);
+    // The times are IST wall-clock. Without the offset the server — which does
+    // not run in India — read 09:30 in its own time zone.
+    const at = (date: string, time: string) => (time ? `${date}T${time}:00+05:30` : undefined);
     const data = {
-      ...this.regularizationForm,
-      proposedClockIn: this.regularizationForm.proposedClockIn ? `${this.regularizationForm.date}T${this.regularizationForm.proposedClockIn}:00` : undefined,
-      proposedClockOut: this.regularizationForm.proposedClockOut ? `${this.regularizationForm.date}T${this.regularizationForm.proposedClockOut}:00` : undefined
+      reason: this.regularizationForm.reason.trim(),
+      entries: days.map((d) => ({
+        date: d.date,
+        proposedClockIn: at(d.date, d.proposedClockIn),
+        proposedClockOut: at(d.date, d.proposedClockOut),
+      })),
     };
 
     this.attendanceService.requestRegularization(data as any).subscribe({
       next: () => {
-        this.toast.success('Regularization request submitted');
+        this.toast.success(days.length > 1
+          ? `Regularization requested for ${days.length} days`
+          : 'Regularization request submitted');
         this.closeRegularizationModal();
         this.attendanceService.getMyRegularizations().subscribe((res: any) => this.myRegularizations.set(res));
         this.isSubmittingRequest.set(false);
       },
-      error: () => {
-        this.toast.error('Failed to submit request');
+      error: (err) => {
+        this.toast.error(err?.error?.message || 'Failed to submit request');
         this.isSubmittingRequest.set(false);
       }
     });

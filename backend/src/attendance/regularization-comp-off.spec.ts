@@ -48,3 +48,52 @@ describe('approving a regularization', () => {
     expect(grant).not.toHaveBeenCalled();
   });
 });
+
+describe('requesting several days at once', () => {
+  function make() {
+    const created: any[] = [];
+    const prisma: any = {
+      employee: { findUnique: jest.fn().mockResolvedValue({ id: 10, companyId: 1, firstName: 'Nitin', lastName: 'C', manager: null }) },
+      attendanceRegularization: { create: jest.fn((a: any) => { created.push(a.data); return a.data; }) },
+      $transaction: jest.fn(async (ops: any[]) => Promise.all(ops)),
+    };
+    const notifications: any = { notifyApprovers: jest.fn().mockResolvedValue(undefined) };
+    return { service: new AttendanceService(prisma, notifications, {} as any, {} as any), created, notifications };
+  }
+
+  it('saves one row per day, with one reason and one alert', async () => {
+    const { service, created, notifications } = make();
+    await service.requestRegularization(5, {
+      reason: 'Worked on non-working days',
+      entries: [
+        { date: '2026-07-12', proposedClockIn: '2026-07-12T09:30:00+05:30', proposedClockOut: '2026-07-12T18:30:00+05:30' },
+        { date: '2026-09-27' },
+        { date: '2026-10-02' },
+      ],
+    });
+    expect(created.map((c) => c.date.toISOString().slice(0, 10))).toEqual(['2026-07-12', '2026-09-27', '2026-10-02']);
+    expect(created.every((c) => c.reason === 'Worked on non-working days')).toBe(true);
+    expect(created[0].proposedClockIn.toISOString()).toBe('2026-07-12T04:00:00.000Z');
+    expect(notifications.notifyApprovers).toHaveBeenCalledTimes(1);
+    expect(notifications.notifyApprovers.mock.calls[0][0].message).toMatch(/3 days/);
+  });
+
+  it('refuses the same day twice', async () => {
+    const { service } = make();
+    await expect(service.requestRegularization(5, { reason: 'x', entries: [{ date: '2026-09-27' }, { date: '2026-09-27' }] }))
+      .rejects.toThrow(/twice/);
+  });
+
+  it('refuses a clock-out before the clock-in', async () => {
+    const { service } = make();
+    await expect(service.requestRegularization(5, {
+      reason: 'x', entries: [{ date: '2026-09-27', proposedClockIn: '2026-09-27T18:00:00+05:30', proposedClockOut: '2026-09-27T09:00:00+05:30' }],
+    })).rejects.toThrow(/after clock-in/);
+  });
+
+  it('still takes the single-day form', async () => {
+    const { service, created } = make();
+    await service.requestRegularization(5, { date: '2026-09-27', reason: 'Forgot' });
+    expect(created).toHaveLength(1);
+  });
+});

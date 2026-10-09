@@ -126,7 +126,10 @@ export class AttendanceController {
   }
 
   @Post('regularization')
-  requestRegularization(@Request() req, @Body() data: { date: string, proposedClockIn?: string, proposedClockOut?: string, reason: string }) {
+  requestRegularization(@Request() req, @Body() data: {
+    date?: string, proposedClockIn?: string, proposedClockOut?: string, reason: string,
+    entries?: Array<{ date: string, proposedClockIn?: string, proposedClockOut?: string }>,
+  }) {
     return this.attendanceService.requestRegularization(req.user.sub, data);
   }
 

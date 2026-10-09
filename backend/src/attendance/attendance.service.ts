@@ -1068,22 +1068,56 @@ export class AttendanceService {
     });
   }
 
-  async requestRegularization(userId: number, data: { date: string, proposedClockIn?: string, proposedClockOut?: string, reason: string }) {
+  /**
+   * One regularization, or several days in one go.
+   *
+   * `entries` lets somebody who missed several days (three non-working days
+   * worked, say) send them together rather than filling the form three times.
+   * Each day is still its own row, so HR can approve one and reject another.
+   * A plain { date, ... } body is the single-day form and behaves as before.
+   */
+  async requestRegularization(userId: number, data: {
+    date?: string, proposedClockIn?: string, proposedClockOut?: string, reason: string,
+    entries?: Array<{ date: string, proposedClockIn?: string, proposedClockOut?: string }>,
+  }) {
     const employee = await this.prisma.employee.findUnique({
       where: { userId },
       include: { manager: { select: { userId: true } } },
     });
     if (!employee) throw new BadRequestException('Employee not found');
-    const date = new Date(data.date);
-    const created = await this.prisma.attendanceRegularization.create({
-      data: {
-        employeeId: employee.id,
-        date,
-        proposedClockIn: data.proposedClockIn ? new Date(data.proposedClockIn) : null,
-        proposedClockOut: data.proposedClockOut ? new Date(data.proposedClockOut) : null,
-        reason: data.reason
+
+    const reason = String(data?.reason ?? '').trim();
+    if (!reason) throw new BadRequestException('Say why you are regularizing.');
+    const entries = Array.isArray(data?.entries) && data.entries.length
+      ? data.entries
+      : [{ date: data?.date as string, proposedClockIn: data?.proposedClockIn, proposedClockOut: data?.proposedClockOut }];
+    if (entries.length > 31) throw new BadRequestException('Up to 31 days can be sent in one request.');
+
+    const days = entries.map((e) => {
+      if (!e?.date || !/^\d{4}-\d{2}-\d{2}/.test(e.date)) throw new BadRequestException('Every day needs a date.');
+      const inAt = e.proposedClockIn ? new Date(e.proposedClockIn) : null;
+      const outAt = e.proposedClockOut ? new Date(e.proposedClockOut) : null;
+      if ((inAt && isNaN(inAt.getTime())) || (outAt && isNaN(outAt.getTime()))) {
+        throw new BadRequestException(`${e.date.slice(0, 10)}: the clock-in or clock-out time is not valid.`);
       }
+      if (inAt && outAt && outAt <= inAt) {
+        throw new BadRequestException(`${e.date.slice(0, 10)}: clock-out has to be after clock-in.`);
+      }
+      return { date: new Date(`${e.date.slice(0, 10)}T00:00:00.000Z`), inAt, outAt };
     });
+    const keys = days.map((d) => d.date.getTime());
+    if (new Set(keys).size !== keys.length) throw new BadRequestException('The same day is listed twice.');
+
+    const createdAll = await this.prisma.$transaction(days.map((d) =>
+      this.prisma.attendanceRegularization.create({
+        data: { employeeId: employee.id, date: d.date, proposedClockIn: d.inAt, proposedClockOut: d.outAt, reason },
+      }),
+    ));
+    const created = createdAll.length === 1 ? createdAll[0] : createdAll;
+    const date = days[0].date;
+    const when = days.length === 1
+      ? date.toISOString().split('T')[0]
+      : `${days.length} days (${days.map((d) => d.date.toISOString().slice(0, 10)).join(', ')})`;
 
     // The request lands in a queue nobody polls, so tell the approvers it exists.
     // Never let a notification failure roll back a saved request.
@@ -1095,7 +1129,7 @@ export class AttendanceService {
         managerUserId: employee.manager?.userId ?? null,
         excludeUserId: userId,
         title: 'Attendance Regularization Request',
-        message: `${name} has requested a correction for ${date.toISOString().split('T')[0]}.`,
+        message: `${name} has requested a correction for ${when}.`,
         type: 'ACTION_REQUIRED',
         linkUrl: '/attendance/approvals',
       })
