@@ -1115,16 +1115,15 @@ export class AttendanceService {
       const attendance = await this.prisma.attendance.findUnique({
         where: { employeeId_date: { employeeId: regularization.employeeId, date: regularization.date } }
       });
-      if (attendance) {
-        await this.prisma.attendance.update({
+      const saved = attendance
+        ? await this.prisma.attendance.update({
           where: { id: attendance.id },
           data: {
             clockIn: regularization.proposedClockIn || attendance.clockIn,
             clockOut: regularization.proposedClockOut || attendance.clockOut
           }
-        });
-      } else {
-        await this.prisma.attendance.create({
+        })
+        : await this.prisma.attendance.create({
           data: {
             employeeId: regularization.employeeId,
             date: regularization.date,
@@ -1133,7 +1132,11 @@ export class AttendanceService {
             status: 'PRESENT'
           }
         });
-      }
+      // A day worked on a Sunday, holiday or day off earns comp-off however it
+      // got recorded. Only a live clock-out used to credit it, so somebody who
+      // could not clock in that day and had it regularized got the day but not
+      // the comp-off. Idempotent: one credit per attendance day.
+      await this.grantCompOffIfEligible(saved.id);
     }
     
     const updated = await this.prisma.attendanceRegularization.update({
