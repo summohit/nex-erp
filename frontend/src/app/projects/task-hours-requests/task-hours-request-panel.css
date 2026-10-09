@@ -1,4 +1,4 @@
-/* The additional-hours panel on the task detail (§3).
+/* The additional-task-hours panel on the task detail (§3).
    Sits directly under Time Tracking, so it borrows that section's spacing and
    keeps its own visual weight low — it is a footnote to the hours above it
    until the task actually runs out. */

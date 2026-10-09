@@ -37,6 +37,7 @@ import {
   LucideCheckSquare,
   LucideLayers,
   LucidePencil,
+  LucideEllipsis,
 } from '@lucide/angular';
 import {
   TaskHoursRequestsService,
@@ -54,6 +55,7 @@ import {
   VisitLocationRequestsService,
 } from '../../services/visit-location-requests.service';
 import { FieldVisitRequest, FieldVisitRequestsService } from '../../services/field-visit-requests';
+import { RoleService } from '../../services/role.service';
 
 export type RequestTabFilter = 'AWAITING' | 'HISTORY' | 'APPROVED' | 'REJECTED' | 'ALL';
 
@@ -68,6 +70,8 @@ export type RequestTabFilter = 'AWAITING' | 'HISTORY' | 'APPROVED' | 'REJECTED' 
  */
 export type ProjectRequestType = 'HOURS' | 'TASKS' | 'BUDGET' | 'SCOPE' | 'VISIT_LOCATIONS' | 'FIELD_VISITS';
 export type RequestSortOption = 'newest' | 'oldest' | 'hours-desc' | 'hours-asc';
+export type ApprovalDateRange = 'ALL' | 'TODAY' | 'THIS_WEEK' | 'LAST_WEEK' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR' | 'LAST_YEAR';
+type QueueKpi = { label: string; value: string | number; detail: string; tone: 'amber' | 'emerald' | 'rose' | 'indigo' };
 
 @Component({
   selector: 'app-task-hours-requests-tab',
@@ -112,6 +116,7 @@ export type RequestSortOption = 'newest' | 'oldest' | 'hours-desc' | 'hours-asc'
     LucideCheckSquare,
     LucideLayers,
     LucidePencil,
+    LucideEllipsis,
   ],
   templateUrl: './task-hours-requests-tab.html',
   styleUrls: ['./task-hours-requests-tab.css'],
@@ -127,9 +132,71 @@ export class TaskHoursRequestsTabComponent {
   private route = inject(ActivatedRoute);
   private dialog = inject(DialogService);
   private auth = inject(AuthService);
+  private roles = inject(RoleService);
+  readonly isSuperAdmin = this.roles.isSuperAdmin;
+
+  /** Editing in this console is deliberately reserved for the company owner,
+   * and disappears the moment an approver has recorded a decision. */
+  canEditApprovalRequest(status: string | null | undefined): boolean {
+    return this.isSuperAdmin() && ['REQUESTED', 'PENDING', 'PENDING_APPROVAL', 'PENDING_TECHNICAL', 'PENDING_ADMIN'].includes(String(status));
+  }
+
+  openLocationRequestEditor(): void {
+    this.toast.info('Open this request from the Visit Locations form to edit it.');
+  }
+
+  hoursActionMenuId = signal<number | null>(null);
+  toggleHoursActionMenu(id: number) { this.hoursActionMenuId.update(open => open === id ? null : id); }
 
   /** Which kind of decision is on screen. */
   requestType = signal<ProjectRequestType>('HOURS');
+  /** One date filter shared by every Delivery approval queue. */
+  approvalDateRange = signal<ApprovalDateRange>('ALL');
+  readonly approvalDateRanges: { value: ApprovalDateRange; label: string }[] = [
+    { value: 'ALL', label: 'Any date' },
+    { value: 'TODAY', label: 'Today' },
+    { value: 'THIS_WEEK', label: 'This week' },
+    { value: 'LAST_WEEK', label: 'Last week' },
+    { value: 'THIS_MONTH', label: 'This month' },
+    { value: 'LAST_MONTH', label: 'Last month' },
+    { value: 'THIS_YEAR', label: 'This year' },
+    { value: 'LAST_YEAR', label: 'Last year' },
+  ];
+
+  setApprovalDateRange(value: string): void {
+    this.approvalDateRange.set(value as ApprovalDateRange);
+    this.selectedTaskIds.set(new Set());
+  }
+
+  private matchesApprovalDate(value: string | Date | null | undefined): boolean {
+    const range = this.approvalDateRange();
+    if (range === 'ALL') return true;
+    if (!value) return false;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return false;
+    date.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+    if (range === 'TODAY') return date.getTime() === today.getTime();
+    if (range === 'THIS_WEEK') return date >= startOfWeek && date < endOfWeek;
+    if (range === 'LAST_WEEK') {
+      const lastWeekStart = new Date(startOfWeek); lastWeekStart.setDate(startOfWeek.getDate() - 7);
+      return date >= lastWeekStart && date < startOfWeek;
+    }
+    if (range === 'THIS_MONTH') return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth();
+    if (range === 'LAST_MONTH') {
+      const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      return date.getFullYear() === previousMonth.getFullYear() && date.getMonth() === previousMonth.getMonth();
+    }
+    if (range === 'THIS_YEAR') return date.getFullYear() === today.getFullYear();
+    return date.getFullYear() === today.getFullYear() - 1;
+  }
 
   taskApprovals = signal<any[]>([]);
 
@@ -157,6 +224,7 @@ export class TaskHoursRequestsTabComponent {
     const t0 = today.getTime();
 
     return this.taskApprovals().filter((t) => {
+      if (!this.matchesApprovalDate(t.createdAt || t.startDate || t.dueDate)) return false;
       if (pq) {
         const name = String(t.project?.name ?? '').toLowerCase();
         const key = String(t.project?.key ?? '').toLowerCase();
@@ -209,6 +277,15 @@ export class TaskHoursRequestsTabComponent {
   fieldVisitRequests = signal<FieldVisitRequest[]>([]);
   locationCapabilities = signal<VisitLocationRequestCapabilities | null>(null);
   loadingOthers = signal(false);
+
+  filteredBudgetRequests = computed(() =>
+    this.budgetRequests().filter((request: any) => this.matchesApprovalDate(request.createdAt || request.requestedAt)));
+  filteredScopeRequests = computed(() =>
+    this.scopeRequests().filter((request: any) => this.matchesApprovalDate(request.createdAt || request.submittedAt)));
+  filteredVisitLocationRequests = computed(() =>
+    this.visitLocationRequests().filter((request: any) => this.matchesApprovalDate(request.createdAt || request.submittedAt)));
+  filteredFieldVisitRequests = computed(() =>
+    this.fieldVisitRequests().filter((request: any) => this.matchesApprovalDate(request.submittedAt || request.createdAt || request.startDate)));
 
   /** Raw requests loaded from the server */
   requests = signal<TaskHoursRequest[]>([]);
@@ -291,6 +368,7 @@ export class TaskHoursRequestsTabComponent {
       this.searchQuery().trim().length > 0 ||
       this.selectedProject() !== 'ALL' ||
       this.selectedRequester() !== 'ALL' ||
+      this.approvalDateRange() !== 'ALL' ||
       this.sortBy() !== 'newest' ||
       this.activeTab() !== 'AWAITING'
     );
@@ -299,6 +377,8 @@ export class TaskHoursRequestsTabComponent {
   // ── Filtered & Sorted Request List ────────────────────────────────────────
   filteredRequests = computed(() => {
     let list = [...this.requests()];
+
+    list = list.filter((request) => this.matchesApprovalDate(request.createdAt));
 
     // 1. Status / View Tab Filter
     const tab = this.activeTab();
@@ -397,7 +477,7 @@ export class TaskHoursRequestsTabComponent {
       },
       error: (err) => {
         this.loading.set(false);
-        this.toast.error(err?.error?.message || 'Could not load additional hours requests');
+        this.toast.error(err?.error?.message || 'Could not load additional task hours requests');
       },
     });
   }
@@ -439,6 +519,7 @@ export class TaskHoursRequestsTabComponent {
     this.searchQuery.set('');
     this.selectedProject.set('ALL');
     this.selectedRequester.set('ALL');
+    this.approvalDateRange.set('ALL');
     this.sortBy.set('newest');
     this.activeTab.set(this.openCount() > 0 ? 'AWAITING' : 'ALL');
   }
@@ -540,7 +621,7 @@ export class TaskHoursRequestsTabComponent {
           delete n[r.id];
           return n;
         });
-        this.toast.success(`Declined additional hours on ${r.issue.key}`);
+        this.toast.success(`Declined additional task hours on ${r.issue.key}`);
         this.load();
       },
       error: (err) => {
@@ -608,7 +689,7 @@ export class TaskHoursRequestsTabComponent {
   /** What the hero says, so the page describes whichever queue is open. */
   readonly TYPE_META: Record<ProjectRequestType, { title: string; blurb: string }> = {
     HOURS: {
-      title: 'Additional Hours Requests',
+      title: 'Additional Task Hours Requests',
       blurb:
         'Review effort extension requests from delivery teams, authorize task scope adjustments, and audit historical time allocations.',
     },
@@ -728,6 +809,57 @@ export class TaskHoursRequestsTabComponent {
     if (type === 'SCOPE') return this.scopeRequests().length;
     if (type === 'FIELD_VISITS') return this.fieldVisitRequests().length;
     return this.visitLocationRequests().filter((request) => request.status === 'PENDING').length;
+  }
+
+  /** The four summary cards intentionally describe the queue on screen, rather
+   * than repeating generic approval counts as people move between tabs. */
+  currentQueueKpis(): QueueKpi[] {
+    const unique = (values: Array<number | null | undefined>) => new Set(values.filter((v): v is number => v != null)).size;
+    if (this.requestType() === 'TASKS') {
+      const rows = this.taskApprovals();
+      return [
+        { label: 'Awaiting Decision', value: rows.length, detail: 'Tasks needing a decision', tone: 'amber' },
+        { label: 'Technical Review', value: rows.filter((r) => r.approvalState === 'PENDING_TECHNICAL').length, detail: 'Awaiting architect', tone: 'indigo' },
+        { label: 'Administrator Review', value: rows.filter((r) => r.approvalState !== 'PENDING_TECHNICAL').length, detail: 'Ready for administrator', tone: 'emerald' },
+        { label: 'Projects Affected', value: unique(rows.map((r) => r.projectId ?? r.project?.id)), detail: 'Delivery plans represented', tone: 'rose' },
+      ];
+    }
+    if (this.requestType() === 'BUDGET') {
+      const rows = this.budgetRequests();
+      const money = rows.reduce((sum, r) => sum + (r.additionalBudget ?? 0), 0);
+      const hours = rows.reduce((sum, r) => sum + (r.additionalHours ?? 0), 0);
+      return [
+        { label: 'Awaiting Decision', value: rows.length, detail: 'Budget changes awaiting review', tone: 'amber' },
+        { label: 'Additional Budget', value: money.toLocaleString(), detail: 'Requested across this queue', tone: 'emerald' },
+        { label: 'Additional Task Hours', value: `${hours.toFixed(1)}h`, detail: 'Requested delivery capacity', tone: 'indigo' },
+        { label: 'Projects Affected', value: unique(rows.map((r) => r.project?.id)), detail: 'Projects with a request', tone: 'rose' },
+      ];
+    }
+    if (this.requestType() === 'SCOPE') {
+      const rows = this.scopeRequests();
+      return [
+        { label: 'Awaiting Decision', value: rows.length, detail: 'Scope calls awaiting review', tone: 'amber' },
+        { label: 'In Scope', value: rows.filter((r) => r.scope === 'IN_SCOPE').length, detail: 'Raised as included work', tone: 'emerald' },
+        { label: 'Out of Scope', value: rows.filter((r) => r.scope === 'OUT_OF_SCOPE').length, detail: 'Raised as a change', tone: 'rose' },
+        { label: 'Projects Affected', value: unique(rows.map((r) => r.projectId)), detail: 'Projects needing clarity', tone: 'indigo' },
+      ];
+    }
+    if (this.requestType() === 'VISIT_LOCATIONS') {
+      const rows = this.visitLocationRequests();
+      return [
+        { label: 'Awaiting Decision', value: rows.filter((r) => r.status === 'PENDING').length, detail: 'Locations needing review', tone: 'amber' },
+        { label: 'Geocoded', value: rows.filter((r) => r.latitude != null && r.longitude != null).length, detail: 'With a map coordinate', tone: 'emerald' },
+        { label: 'Client Linked', value: rows.filter((r) => !!r.leadContact).length, detail: 'Attached to a client contact', tone: 'indigo' },
+        { label: 'All Proposals', value: rows.length, detail: 'Locations in this queue', tone: 'rose' },
+      ];
+    }
+    const rows = this.fieldVisitRequests();
+    return [
+      { label: 'Awaiting Decision', value: rows.length, detail: 'Trips needing approval', tone: 'amber' },
+      { label: 'People Travelling', value: rows.reduce((sum, r) => sum + (r.members?.length ?? 0), 0), detail: 'Assigned across proposed trips', tone: 'emerald' },
+      { label: 'Tasks Planned', value: rows.reduce((sum, r) => sum + (r.tasks?.length ?? 0), 0), detail: 'Work items to activate', tone: 'indigo' },
+      { label: 'Visit Days', value: rows.reduce((sum, r) => sum + (r.visitDays ?? 0), 0), detail: 'Total proposed field time', tone: 'rose' },
+    ];
   }
 
   // ── Task approvals ────────────────────────────────────────────────────────

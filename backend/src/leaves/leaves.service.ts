@@ -570,16 +570,25 @@ export class LeavesService {
     return result;
   }
 
-  async updateRequest(userId: number, requestId: number, data: { startDate?: string, endDate?: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
+  /** Editing a leave request changes its dates and therefore its approval
+   * context. It is intentionally reserved for the company owner. */
+  async updateRequest(userId: number, role: string, requestId: number, data: { startDate?: string, endDate?: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
+    if (!isSuperAdmin(role)) {
+      throw new ForbiddenException('Only a Super Admin can edit leave requests');
+    }
     const employee = await this.prisma.employee.findUnique({ where: { userId } });
     if (!employee) throw new BadRequestException('Employee not found');
 
     const request = await this.prisma.leaveRequest.findFirst({
-      where: { id: requestId, employeeId: employee.id, deletedAt: null }
+      where: { id: requestId, employee: { companyId: employee.companyId }, deletedAt: null }
     });
 
     if (!request) throw new BadRequestException('Request not found or not authorized');
-    if (request.status !== 'PENDING') throw new BadRequestException('Only pending requests can be edited');
+    // A Super Admin may correct a rejected application from the Actions menu,
+    // but approved/cancelled leave must keep its accounting and audit history.
+    if (!['PENDING', 'REJECTED'].includes(request.status)) {
+      throw new BadRequestException('Only pending or rejected requests can be edited');
+    }
 
     const updateData: any = {};
     if (data.startDate) updateData.startDate = new Date(data.startDate);
@@ -635,14 +644,23 @@ export class LeavesService {
   }
 
   async cancelRequest(userId: number, requestId: number) {
-    const employee = await this.prisma.employee.findUnique({ 
-      where: { userId },
-      include: { branch: true }
+    const actor = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, employee: { select: { id: true, companyId: true } } },
     });
-    if (!employee) throw new BadRequestException('Employee not found');
+    if (!actor?.employee) throw new BadRequestException('Employee not found');
+
+    const mayCancelForAnyone = isSuperAdmin(actor.role);
 
     const request = await this.prisma.leaveRequest.findFirst({
-      where: { id: requestId, employeeId: employee.id, deletedAt: null }
+      where: {
+        id: requestId,
+        deletedAt: null,
+        ...(mayCancelForAnyone
+          ? { employee: { companyId: actor.employee.companyId } }
+          : { employeeId: actor.employee.id }),
+      },
+      include: { employee: { include: { branch: true } } },
     });
 
     if (!request) throw new BadRequestException('Request not found or not authorized');
@@ -664,7 +682,7 @@ export class LeavesService {
       if (request.status === 'APPROVED') {
         const start = new Date(request.startDate);
         const end = new Date(request.endDate);
-        const diffDays = this.calculateWorkingDays(start, end, employee.branch?.weeklyOffs || '0', request.isHalfDay, await this.getHolidayDates(employee.companyId, start, end));
+        const diffDays = this.calculateWorkingDays(start, end, request.employee.branch?.weeklyOffs || '0', request.isHalfDay, await this.getHolidayDates(request.employee.companyId, start, end));
         
         await tx.leaveBalance.updateMany({
           where: {
@@ -683,7 +701,7 @@ export class LeavesService {
         // leave took them off — see restoreStandingShiftAfterLeave.
         await this.fieldVisits.restoreStandingShiftAfterLeave(tx, {
           employeeId: request.employeeId,
-          companyId: employee.companyId,
+          companyId: request.employee.companyId,
           from: start,
           to: end,
         });

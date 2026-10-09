@@ -78,9 +78,9 @@ export function assertWithinAllowedHours(
   throw new HoursExceeded(
     left > 0
       ? `Only ${fmt(left)}h of the ${fmt(allowed)}h assigned to this task are left. ` +
-        `Request additional hours to log more.`
+        `Request additional task hours to log more.`
       : `All ${fmt(allowed)}h assigned to this task have been logged. ` +
-        `Request additional hours to log more.`,
+        `Request additional task hours to log more.`,
     allowed,
     round2(alreadyLogged),
     requested,

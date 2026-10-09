@@ -48,7 +48,7 @@ export interface LeaveActionCellParams extends ICellRendererParams {
           <svg lucidePaperclip size="18" class="menu-icon"></svg>
           <span class="menu-text">View Attachment</span>
         </button>
-        <button mat-menu-item class="menu-item" (click)="edit()" *ngIf="params.onEdit && params.data.status === 'PENDING' && isAllowed(params.canEdit)">
+        <button mat-menu-item class="menu-item" (click)="edit()" *ngIf="params.onEdit && isAllowed(params.canEdit)">
           <svg lucideEdit2 size="18" class="menu-icon"></svg>
           <span class="menu-text">Edit</span>
         </button>
@@ -231,7 +231,7 @@ export class LeaveActionCellRendererComponent implements ICellRendererAngularCom
     if (this.params.onView) return true;
     if (d.status === 'REJECTED' && d.rejectionReason) return true;
     if (this.params.onViewAttachment && d.attachmentUrl) return true;
-    if (this.params.onEdit && d.status === 'PENDING' && this.isAllowed(this.params.canEdit)) return true;
+    if (this.params.onEdit && this.isAllowed(this.params.canEdit)) return true;
     if (this.params.onCancel && !this.isPastStartDate(d.startDate) && d.status !== 'CANCELLED' && d.status !== 'REJECTED' && this.isAllowed(this.params.canCancel)) return true;
     if (this.params.onApprove && d.status === 'PENDING' && this.isAllowed(this.params.canApprove)) return true;
     if (this.params.onReject && d.status === 'PENDING' && this.isAllowed(this.params.canReject)) return true;

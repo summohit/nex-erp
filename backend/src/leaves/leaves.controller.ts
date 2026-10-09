@@ -92,7 +92,7 @@ export class LeavesController {
 
   @Put('requests/:id')
   updateRequest(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { startDate?: string, endDate?: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
-    return this.leavesService.updateRequest(req.user.sub, id, data);
+    return this.leavesService.updateRequest(req.user.sub, req.user.role, id, data);
   }
 
   @Put('requests/:id/cancel')

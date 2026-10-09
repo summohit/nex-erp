@@ -1077,7 +1077,7 @@ export class IssuesService {
      *
      * The ceiling only means anything if the person it constrains cannot lift
      * it. An employee who can retype ESTIMATED from 2 to 40 never needs to
-     * request additional hours at all, and the whole approval flow becomes
+     * request additional task hours at all, and the whole approval flow becomes
      * decoration -- so this is refused for anyone but the people who assign
      * the work and rule on those requests.
      *
@@ -1089,7 +1089,7 @@ export class IssuesService {
       if (!(await this.mayManageTask(companyId, projectId, employeeId, role))) {
         throw new ForbiddenException(
           'Only the project manager can change the hours assigned to a task. ' +
-          'Raise an additional-hours request instead.',
+          'Raise an additional task hours request instead.',
         );
       }
     }
@@ -1396,7 +1396,7 @@ export class IssuesService {
    * call -- otherwise every constraint placed on the task can be lifted by the
    * person it constrains.
    *
-   * Deliberately the same set that approves additional-hours requests. If the
+   * Deliberately the same set that approves additional task hours requests. If the
    * two differed, somebody could grant themselves hours through whichever door
    * was left open.
    */
@@ -1578,7 +1578,7 @@ export class IssuesService {
       const allowed = (hoursState.estimatedHours ?? 0) + hoursState.additionalHours;
       throw new BadRequestException(
         `All ${allowed}h assigned to this task have been logged. ` +
-        `Request additional hours before starting the timer again.`,
+        `Request additional task hours before starting the timer again.`,
       );
     }
 

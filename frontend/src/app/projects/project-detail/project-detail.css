@@ -11235,6 +11235,23 @@ input[type=text], input[type=email], input[type=password] {
 .list-task-action-menu button.danger { color: #b91c1c; }
 .list-task-action-menu button.danger:hover { background: #fef2f2; }
 
+/* Project board › Tasks: the browser popover joins the top layer, so actions
+   remain visible above the grid, pagination and board switcher. */
+.project-board-action-trigger { display:grid; place-items:center; width:36px; height:34px; padding:0; border:1px solid #d7e0ed; border-radius:8px; background:#fff; color:#475569; box-shadow:0 1px 2px rgba(15,23,42,.05); cursor:pointer; transition:color .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease,transform .16s ease; }
+.project-board-action-trigger span { display:block; font-size:16px; font-weight:800; letter-spacing:1px; line-height:1; transform:translateY(-1px); }
+.project-board-action-trigger:hover, .project-board-action-trigger:focus-visible { color:#1d4ed8; border-color:#2563eb; background:#f8fbff; box-shadow:0 4px 12px rgba(37,99,235,.14); outline:none; transform:translateY(-1px); }
+.project-board-action-menu { position:fixed; z-index:2147483647; box-sizing:border-box; width:148px; margin:0; padding:6px; border:1px solid #dbe3ee; border-radius:10px; background:#fff; box-shadow:0 14px 30px rgba(15,23,42,.20); }
+.project-board-action-item { display:block; width:100%; padding:8px 9px; border:0; border-radius:6px; background:transparent; color:#334155; font:600 12px inherit; text-align:left; cursor:pointer; }
+.project-board-action-item:hover { background:#f1f5f9; }
+.project-board-action-item.danger { color:#b91c1c; }
+.project-board-action-item.danger:hover { background:#fef2f2; }
+
+/* The compact board task columns fit the available canvas; never reserve a
+   second scrollbar inside the project board task grid. */
+:host ::ng-deep .project-board-task-grid .ag-body-horizontal-scroll,
+:host ::ng-deep .project-board-task-grid .ag-body-vertical-scroll { display:none !important; }
+:host ::ng-deep .project-board-task-grid .ag-center-cols-viewport { overflow-x:hidden !important; overflow-y:hidden !important; }
+
 /* Project › Field Visits: requests + locations (C1, C3) */
 .pfv-section { border:1px solid #e2e8f0; border-radius:14px; padding:16px 18px; margin-bottom:18px; background:#fff; }
 .pfv-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; }

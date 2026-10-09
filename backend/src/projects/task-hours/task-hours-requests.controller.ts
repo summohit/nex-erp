@@ -5,7 +5,7 @@ import { AuthGuard } from '../../auth/auth.guard';
 import { TaskHoursRequestsService } from './task-hours-requests.service';
 
 /**
- * Additional-hours requests on a task (§3) and the tracking view over all of
+ * Additional task-hours requests on a task (§3) and the tracking view over all of
  * them (§4).
  */
 @UseGuards(AuthGuard)

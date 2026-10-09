@@ -4238,13 +4238,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   };
 
   listGridColDefs: ColDef[] = [
-    { field: 'key', headerName: 'ID', width: 160, pinned: 'left' },
-    { field: 'title', headerName: 'Task', minWidth: 200, flex: 1, filter: true },
+    { field: 'key', headerName: 'ID', width: 135, pinned: 'left' },
+    { field: 'title', headerName: 'Task', width: 330, minWidth: 260, filter: true },
     { 
       field: 'status',
       headerName: 'Status', 
       // Wide enough for the badge plus the approval buttons beside it.
-      width: 260,
+      width: 175,
       editable: () => this.canManageTask,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: { values: ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'] },
@@ -4290,7 +4290,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     { 
       field: 'priority', 
       headerName: 'Priority', 
-      width: 130,
+      width: 115,
       cellRenderer: (params: any) => {
         const val = params.value || '';
         let color = '#94a3b8';
@@ -4306,7 +4306,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     },
     { 
       headerName: 'Assignee', 
-      width: 160, 
+      width: 110,
       cellRenderer: (params: any) => {
         const issue = params.data;
         if (!issue) return '';
@@ -4371,6 +4371,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     {
       headerName: 'Used',
       width: 120,
+      hide: true,
       type: 'numericColumn',
       valueGetter: (params: any) => this.taskBudget(params.data).percent,
       cellRenderer: (params: any) => {
@@ -4399,6 +4400,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     {
       headerName: 'Evidence',
       width: 150,
+      hide: true,
       sortable: true,
       valueGetter: (params: any) => this.listTaskEvidence(params.data).length,
       cellRenderer: (params: any) => {
@@ -4426,18 +4428,23 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       },
     },
 
-    { 
-      headerName: 'Due Date', 
-      width: 150, 
-      valueGetter: (params: any) => {
-        if (!params.data || (!params.data.dueDate && !params.data.startDate)) return '';
-        return this.formatDisplayDueDate(params.data);
-      }
+    {
+      headerName: 'Start Date',
+      width: 140,
+      minWidth: 135,
+      valueGetter: (params: any) => this.formatTaskListDateTime(params.data?.startDate),
+    },
+    {
+      headerName: 'Due Date',
+      width: 190,
+      minWidth: 180,
+      valueGetter: (params: any) => this.formatTaskListDateTime(params.data?.dueDate),
     },
     { 
       field: 'createdAt', 
       headerName: 'Created At', 
       width: 140, 
+      hide: true,
       valueGetter: (params: any) => {
         if (!params.data?.createdAt) return '';
         const d = new Date(params.data.createdAt);
@@ -4448,6 +4455,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       field: 'updatedAt', 
       headerName: 'Updated At', 
       width: 140, 
+      hide: true,
       valueGetter: (params: any) => {
         if (!params.data?.updatedAt) return '';
         const d = new Date(params.data.updatedAt);
@@ -4456,24 +4464,23 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     },
     { 
       headerName: 'Action', 
-      width: 54,
+      width: 82,
       pinned: 'right',
       cellRenderer: (params: any) => {
         const issue = params.data;
         const canManage = this.canManageTask;
         const canDelete = this.canDeleteTasks;
         const pinned = this.isTaskPinned(issue?.id);
-        const menuStyle = 'position:absolute;z-index:50;top:30px;right:0;min-width:118px;padding:5px;border:1px solid #dbe3ee;border-radius:8px;background:#fff;box-shadow:0 8px 22px rgba(15,23,42,.16);';
-        const item = (label: string, action: string, danger = false) => `<button type="button" data-list-action="${action}" style="width:100%;padding:7px 8px;border:0;border-radius:5px;background:transparent;color:${danger ? '#b91c1c' : '#334155'};font:600 12px inherit;text-align:left;cursor:pointer;">${label}</button>`;
-        return `<details style="position:relative;display:inline-block;" onclick="event.stopPropagation()">
-          <summary title="Task actions" aria-label="Task actions" style="list-style:none;width:30px;height:28px;display:grid;place-items:center;border-radius:6px;color:#475569;cursor:pointer;font-weight:800;letter-spacing:1px;">•••</summary>
-          <div style="${menuStyle}">
+        const menuId = `project-board-task-actions-${issue?.id}`;
+        const item = (label: string, action: string, danger = false) => `<button type="button" data-list-action="${action}" class="project-board-action-item${danger ? ' danger' : ''}">${label}</button>`;
+        const positionMenu = `const menu=document.getElementById('${menuId}');const rect=this.getBoundingClientRect();if(menu){menu.style.left=Math.max(8,rect.right-148)+'px';menu.style.top=(rect.bottom+6)+'px';}`;
+        return `<button type="button" class="project-board-action-trigger" popovertarget="${menuId}" title="Task actions" aria-label="Task actions" onclick="${positionMenu}event.stopPropagation()"><span aria-hidden="true">•••</span></button>
+          <div id="${menuId}" popover class="project-board-action-menu">
             ${item('View', 'view')}
             ${canManage ? `${item('Edit', 'edit')}${item('Duplicate', 'duplicate')}` : ''}
             ${item(pinned ? 'Unpin' : 'Pin', 'pin')}
             ${canDelete ? item('Delete', 'delete', true) : ''}
-          </div>
-        </details>`;
+          </div>`;
       }
     }
   ];
@@ -6196,6 +6203,15 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       return `${s.getDate()} ${months[s.getMonth()]}`;
     }
     return '';
+  }
+
+  /** Compact single-date rendering for the Project Board task table. */
+  private formatTaskListDateTime(value: string | Date | null | undefined): string {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${date.getDate()} ${months[date.getMonth()]}, ${this.formatTimeToHHMM(date)}`;
   }
 
   saveIssue() {

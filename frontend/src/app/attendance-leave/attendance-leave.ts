@@ -429,12 +429,17 @@ export class AttendanceLeaveComponent implements OnInit {
       && !this.myRequests().some((ownRequest) => ownRequest.id === request.id));
 
   canEditLeaveApplication = (request: LeaveRequest): boolean =>
-    this.isAdmin() || this.myRequests().some((ownRequest) => ownRequest.id === request.id);
+    (this.authService.currentUser()?.role === 'SUPERADMIN'
+      || this.authService.currentUser()?.role === 'SUPER_ADMIN')
+    && (request.status === 'PENDING' || request.status === 'REJECTED');
 
   /** Employees may cancel only their own leave before it starts. The server
-   * repeats this check, so a crafted request cannot cancel somebody else's. */
+   * repeats this check. A Super Admin may cancel an eligible request from the
+   * approvals queue, preserving it as a cancelled record rather than deleting it. */
   canCancelLeaveApplication = (request: LeaveRequest): boolean =>
-    this.myRequests().some((ownRequest) => ownRequest.id === request.id);
+    this.authService.currentUser()?.role === 'SUPERADMIN'
+    || this.authService.currentUser()?.role === 'SUPER_ADMIN'
+    || this.myRequests().some((ownRequest) => ownRequest.id === request.id);
   
   // Clock in widget
   math = Math;
@@ -496,11 +501,14 @@ export class AttendanceLeaveComponent implements OnInit {
    * than `isAdmin`, which admits ADMIN and HR. The server enforces the same
    * rule; this only decides whether the button is worth showing.
    */
-  canDeleteLeave = computed(() => this.authService.currentUser()?.role === 'SUPERADMIN');
+  canDeleteLeave = computed(() => {
+    const role = this.authService.currentUser()?.role;
+    return role === 'SUPERADMIN' || role === 'SUPER_ADMIN';
+  });
 
   isAdmin = computed(() => {
     const role = this.authService.currentUser()?.role;
-    return role === 'ADMIN' || role === 'HR' || role === 'SUPERADMIN';
+    return role === 'ADMIN' || role === 'HR' || role === 'SUPERADMIN' || role === 'SUPER_ADMIN';
   });
 
   /** The employee picker exposes colleagues' attendance, so it follows the
@@ -791,9 +799,10 @@ export class AttendanceLeaveComponent implements OnInit {
         onView: (data: any) => this.openLeaveDetail(data),
         onEdit: (data: any) => this.editLeaveRequest(data),
         onCancel: (data: any) => this.cancelLeaveRequest(data.id),
+        canEdit: (data: LeaveRequest) => this.canEditLeaveApplication(data),
+        canCancel: (data: LeaveRequest) => this.canCancelLeaveApplication(data),
         onViewAttachment: (data: any) => this.viewAttachment(data.attachmentUrl),
-        onViewReason: (data: any) => this.openRejectionReasonModal(data.rejectionReason),
-        onDelete: this.canDeleteLeave() ? (data: any) => this.deleteLeaveRequest(data) : undefined
+        onViewReason: (data: any) => this.openRejectionReasonModal(data.rejectionReason)
       }
     }
   ];
@@ -1144,8 +1153,7 @@ export class AttendanceLeaveComponent implements OnInit {
         canApprove: (data: LeaveRequest) => this.canApproveLeaveApplication(data),
         canReject: (data: LeaveRequest) => this.canApproveLeaveApplication(data),
         onViewAttachment: (data: any) => this.viewAttachment(data.attachmentUrl),
-        onViewReason: (data: any) => this.openRejectionReasonModal(data.rejectionReason),
-        onDelete: this.canDeleteLeave() ? (data: any) => this.deleteLeaveRequest(data) : undefined
+        onViewReason: (data: any) => this.openRejectionReasonModal(data.rejectionReason)
       }
     }
   ];

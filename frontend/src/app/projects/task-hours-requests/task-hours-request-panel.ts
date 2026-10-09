@@ -91,7 +91,7 @@ export class TaskHoursRequestPanelComponent {
   submit() {
     const requestedHours = Number(this.form.requestedHours);
     if (!Number.isFinite(requestedHours) || requestedHours <= 0) {
-      this.toast.error('Enter how many additional hours you need');
+      this.toast.error('Enter how many additional task hours you need');
       return;
     }
     const reason = this.form.reason.trim();

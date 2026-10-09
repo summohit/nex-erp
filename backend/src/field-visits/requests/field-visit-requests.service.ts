@@ -7,7 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { FieldVisitActivationService } from './field-visit-activation.service';
 import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY } from '../field-visit-status';
-import { CompanyRole, isCompanyAdmin } from '../../common/company-roles';
+import { CompanyRole, isCompanyAdmin, isSuperAdmin } from '../../common/company-roles';
 import { canCreateTask } from '../../tasks/task-permissions';
 
 /**
@@ -532,8 +532,10 @@ export class FieldVisitRequestsService {
       || (project.isGeneral && request.raisedBy?.id === employeeId);
     return {
       ...request,
-      canEdit: request.status === FIELD_VISIT_STATUS.DRAFT
-        && mayRaise,
+      // The Super Admin can correct a request while reviewing it. Other
+      // pending requests remain frozen so the decision matches what was filed.
+      canEdit: (request.status === FIELD_VISIT_STATUS.DRAFT && mayRaise)
+        || (request.status === FIELD_VISIT_STATUS.PENDING && isSuperAdmin(role)),
       canSubmit: request.status === FIELD_VISIT_STATUS.DRAFT
         && mayRaise,
       canReview: request.status === FIELD_VISIT_STATUS.PENDING
@@ -725,7 +727,9 @@ export class FieldVisitRequestsService {
     });
     if (!existing) throw new NotFoundException('Field visit request not found');
 
-    if (existing.status !== FIELD_VISIT_STATUS.DRAFT) {
+    const superAdminEditingPending = existing.status === FIELD_VISIT_STATUS.PENDING
+      && isSuperAdmin(role);
+    if (existing.status !== FIELD_VISIT_STATUS.DRAFT && !superAdminEditingPending) {
       throw new BadRequestException(
         existing.status === FIELD_VISIT_STATUS.PENDING
           ? 'This request is with an approver — withdraw it to a draft before editing'
@@ -735,7 +739,9 @@ export class FieldVisitRequestsService {
 
     const { project, fields, employeeIds, tasks, attachments } =
       await this.normalize(companyId, data);
-    if (!(await this.mayRaise(companyId, project, role, employeeId)) && existing.raisedById !== employeeId) {
+    if (!isSuperAdmin(role)
+      && !(await this.mayRaise(companyId, project, role, employeeId))
+      && existing.raisedById !== employeeId) {
       throw new ForbiddenException('You cannot edit this field visit request');
     }
 

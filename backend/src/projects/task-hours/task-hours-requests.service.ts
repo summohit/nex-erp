@@ -7,7 +7,7 @@ import { allowedHours, remainingHours } from '../../tasks/task-hours';
 import { isCompanyAdmin } from '../../common/company-roles';
 
 /**
- * Additional-hours requests on a task, and their activity timeline (§3, §4).
+ * Additional task-hours requests on a task, and their activity timeline (§3, §4).
  *
  * The task-level counterpart to BudgetRequestsService. The shape is
  * deliberately the same — raise, review, and a record of both — but the
@@ -171,7 +171,7 @@ export class TaskHoursRequestsService {
 
     const requestedHours = Number(data?.requestedHours);
     if (!Number.isFinite(requestedHours) || requestedHours <= 0) {
-      throw new BadRequestException('Ask for a positive number of additional hours');
+      throw new BadRequestException('Ask for a positive number of additional task hours');
     }
 
     const reason = (data?.reason || '').trim();
@@ -185,7 +185,7 @@ export class TaskHoursRequestsService {
     });
     if (open) {
       throw new BadRequestException(
-        'There is already an additional-hours request awaiting a decision on this task',
+        'There is already an additional task hours request awaiting a decision on this task',
       );
     }
 
@@ -239,7 +239,7 @@ export class TaskHoursRequestsService {
     const reached = await this.notifications.notifyEmployees(approvers, {
       companyId,
       excludeEmployeeId: requesterId,
-      title: 'Additional hours requested',
+      title: 'Additional task hours requested',
       message: `${who} asked for ${request.requestedHours}h more on ${issue.key} — ${issue.title}.`,
       type: 'ACTION_REQUIRED',
       linkUrl: this.REQUESTS_LINK,
@@ -250,7 +250,7 @@ export class TaskHoursRequestsService {
     // than let it age silently.
     if (reached === 0) {
       this.logger.warn(
-        `Additional-hours request ${request.id} on ${issue.key} reached no approver — ` +
+        `Additional task hours request ${request.id} on ${issue.key} reached no approver — ` +
         `project ${issue.project?.id} has no lead or project manager other than the requester.`,
       );
     }
@@ -264,7 +264,7 @@ export class TaskHoursRequestsService {
     await this.notifications.notifyEmployees([request.requestedBy?.id], {
       companyId,
       excludeEmployeeId: reviewerId,
-      title: decision === 'APPROVED' ? 'Additional hours approved' : 'Additional hours declined',
+      title: decision === 'APPROVED' ? 'Additional task hours approved' : 'Additional task hours declined',
       message: `${issue.key} — ${issue.title}: ${detail}`,
       type: decision === 'APPROVED' ? 'SUCCESS' : 'WARNING',
       linkUrl: `/projects/${issue.project?.id}?task=${issue.id}`,
@@ -295,7 +295,7 @@ export class TaskHoursRequestsService {
 
     const issue = await this.loadIssue(companyId, request.issueId);
     if (!this.mayApprove(issue, role, reviewerEmployeeId)) {
-      throw new ForbiddenException('Only the project manager approves additional hours');
+      throw new ForbiddenException('Only the project manager approves additional task hours');
     }
     if (reviewerEmployeeId != null && request.requestedById === reviewerEmployeeId) {
       throw new ForbiddenException('You cannot approve your own request for more hours');

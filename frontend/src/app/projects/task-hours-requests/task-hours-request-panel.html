@@ -19,13 +19,13 @@
   <!-- Raise one -->
   <button type="button" class="thrp-ask" *ngIf="canRequest() && !openRequest() && !formOpen()"
           (click)="openForm()">
-    <svg lucidePlus size="13"></svg> Request additional hours
+    <svg lucidePlus size="13"></svg> Request additional task hours
   </button>
 
   <div class="thrp-form" *ngIf="formOpen()">
     <div class="thrp-form-row">
       <label>
-        <span>Additional hours</span>
+        <span>Additional task hours</span>
         <input type="number" min="0.25" step="0.25" [(ngModel)]="form.requestedHours"
                placeholder="e.g. 2" class="thrp-input" />
       </label>
