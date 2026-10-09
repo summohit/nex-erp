@@ -43,6 +43,8 @@ export interface ClockPayload {
   issueId?: number;
   lat: number;
   lng: number;
+  /** The browser's accuracy radius, in metres — the server allows for it. */
+  accuracy?: number;
 }
 
 @Injectable({ providedIn: 'root' })

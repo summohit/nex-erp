@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/com
 import { PrismaService } from '../prisma/prisma.service';
 import { istDateKey, istTimeInstant } from '../common/timezone.util';
 import { LateClockOutError, OpenSessionError, OutsideOfficeError } from './open-session.error';
-import { haversineKm } from '../common/geo.util';
+import { haversineKm, distanceAllowingAccuracyM } from '../common/geo.util';
 import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY } from '../field-visits/field-visit-status';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShiftRosterService, EffectiveShift } from './shift-roster.service';
@@ -306,7 +306,7 @@ export class AttendanceService {
 
   async clockIn(
     userId: number,
-    data: { lat?: number, lng?: number, ipAddress?: string, outsideReason?: string, outsideProofUrl?: string },
+    data: { lat?: number, lng?: number, accuracy?: number, ipAddress?: string, outsideReason?: string, outsideProofUrl?: string },
     options?: { fieldVisit?: FieldVisitClockContext },
   ) {
     const employee = await this.prisma.employee.findUnique({ 
@@ -523,7 +523,7 @@ export class AttendanceService {
     employee: { companyId: number; branch?: any },
     effective: EffectiveShift,
     exempt: boolean,
-    data: { lat?: number; lng?: number },
+    data: { lat?: number; lng?: number; accuracy?: number },
   ): Promise<{ outside: boolean; distanceKm: number | null; branchName: string; radiusM: number } | null> {
     if (exempt || !effective.shift?.officeGeofence) return null;
 
@@ -542,7 +542,9 @@ export class AttendanceService {
       return { outside: true, distanceKm: null, branchName: branch.name, radiusM };
     }
     const distanceKm = haversineKm(branch.latitude, branch.longitude, data.lat, data.lng);
-    return { outside: distanceKm * 1000 > radiusM, distanceKm, branchName: branch.name, radiusM };
+    // Inside when the office is within the fix's own margin of error (capped).
+    const outside = distanceAllowingAccuracyM(distanceKm, data.accuracy) > radiusM;
+    return { outside, distanceKm, branchName: branch.name, radiusM };
   }
 
   /** The Attendance fields one outside-office clock writes, or none. */
@@ -653,7 +655,7 @@ export class AttendanceService {
   async clockOut(
     userId: number,
     data: {
-      lat?: number, lng?: number, reason?: string, proofUrl?: string,
+      lat?: number, lng?: number, accuracy?: number, reason?: string, proofUrl?: string,
       outsideReason?: string, outsideProofUrl?: string,
     },
     options?: { fieldVisit?: FieldVisitClockContext },

@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { GeolocationService } from '../shared/services/geolocation.service';
 
 export interface Shift {
   id: number;
@@ -105,6 +106,7 @@ export interface ShiftPeriodSummary {
 })
 export class AttendanceService {
   private http = inject(HttpClient);
+  private geo = inject(GeolocationService);
   private apiUrl = `${environment.apiUrl}/attendance`;
 
   importAttendance(rows: Array<{ employeeId: number; date: string; status?: string; clockIn?: string; clockOut?: string }>) {
@@ -148,7 +150,9 @@ export class AttendanceService {
 
   /** `outsideReason` answers OUTSIDE_OFFICE_REASON_REQUIRED (B3). */
   clockIn(lat?: number, lng?: number, outsideReason?: string, outsideProofUrl?: string) {
-    return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-in`, { lat, lng, outsideReason, outsideProofUrl });
+    // The fix's accuracy travels with it, so the server can allow for it.
+    const accuracy = this.geo.accuracyFor(lat, lng);
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-in`, { lat, lng, accuracy, outsideReason, outsideProofUrl });
   }
 
   /**
@@ -160,8 +164,9 @@ export class AttendanceService {
     lat?: number, lng?: number, reason?: string, proofUrl?: string,
     outsideReason?: string, outsideProofUrl?: string,
   ) {
+    const accuracy = this.geo.accuracyFor(lat, lng);
     return this.http.post<AttendanceRecord>(`${this.apiUrl}/clock-out`, {
-      lat, lng, reason, proofUrl, outsideReason, outsideProofUrl,
+      lat, lng, accuracy, reason, proofUrl, outsideReason, outsideProofUrl,
     });
   }
 

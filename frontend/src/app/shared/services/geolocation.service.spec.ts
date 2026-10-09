@@ -54,22 +54,23 @@ describe('GeolocationService', () => {
     expect(getCurrentPosition).toHaveBeenCalledTimes(1);
   });
 
-  it('asks for a bounded, cache-tolerant fix first', async () => {
+  // A quick low-accuracy fix comes from mobile towers on a phone — kilometres
+  // out — so GPS is asked for first.
+  it('asks for a fresh, precise fix first', async () => {
     script('ok');
     await service.getPosition();
     expect(getCurrentPosition.mock.calls[0][2]).toMatchObject({
-      enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000,
+      enableHighAccuracy: true, timeout: 15_000, maximumAge: 0,
     });
   });
 
-  // The first call is what wakes the OS location service, so a timeout or an
-  // "unavailable" is worth one more, harder, attempt.
+  // When GPS cannot answer, a rough fix is still better than none.
   it.each(['unavailable', 'timeout'] as const)('retries once after %s', async (first) => {
     script(first, 'ok');
     const result = await service.getPosition();
     expect(result.ok).toBe(true);
     expect(getCurrentPosition).toHaveBeenCalledTimes(2);
-    expect(getCurrentPosition.mock.calls[1][2]).toMatchObject({ enableHighAccuracy: true, maximumAge: 0 });
+    expect(getCurrentPosition.mock.calls[1][2]).toMatchObject({ enableHighAccuracy: false, maximumAge: 60_000 });
   });
 
   // Asking again cannot fix a permission, only annoy.
@@ -114,7 +115,7 @@ describe('GeolocationService', () => {
   describe('locateForClock', () => {
     it('hands back the coordinates without asking anything when it works', async () => {
       script('ok');
-      expect(await service.locateForClock()).toEqual({ lat: 28.6, lng: 77.2 });
+      expect(await service.locateForClock()).toEqual({ lat: 28.6, lng: 77.2, accuracy: 20 });
       expect(confirm).not.toHaveBeenCalled();
     });
 
@@ -137,7 +138,7 @@ describe('GeolocationService', () => {
     it('tries again when asked, and uses the position it then gets', async () => {
       script('denied', 'ok');
       confirm.mockResolvedValueOnce(true);
-      expect(await service.locateForClock()).toEqual({ lat: 28.6, lng: 77.2 });
+      expect(await service.locateForClock()).toEqual({ lat: 28.6, lng: 77.2, accuracy: 20 });
       expect(confirm).toHaveBeenCalledTimes(1);
     });
   });
@@ -175,6 +176,34 @@ describe('GeolocationService', () => {
     it('recognises an iPad that reports itself as a Mac', () => {
       withUserAgent(MAC_SAFARI, 5);
       expect(service.describeFailure('DENIED').message).toMatch(/While Using the App/);
+    });
+  });
+  // People in the office were shown "12 km away": a rough tower-based fix taken
+  // as exact. Now they are told how to turn on precise location first.
+  describe('a rough fix', () => {
+    const rough = { coords: { latitude: 28.6, longitude: 77.2, accuracy: 4000 } };
+
+    it('explains how to turn on precise location before clocking', async () => {
+      getCurrentPosition.mockImplementation((ok: any) => ok(rough));
+      confirm.mockResolvedValue(false);
+      expect(await service.locateForClock()).toEqual({ lat: 28.6, lng: 77.2, accuracy: 4000 });
+      expect(confirm.mock.calls[0][1]).toBe('Your location is not precise');
+      expect(confirm.mock.calls[0][0]).toMatch(/4\.0 km/);
+    });
+
+    it('tries again when asked', async () => {
+      getCurrentPosition
+        .mockImplementationOnce((ok: any) => ok(rough))
+        .mockImplementation((ok: any) => ok(fix));
+      confirm.mockResolvedValueOnce(true);
+      expect(await service.locateForClock()).toEqual({ lat: 28.6, lng: 77.2, accuracy: 20 });
+    });
+
+    it('lets the accuracy travel with the coordinates', async () => {
+      script('ok');
+      await service.locateForClock();
+      expect(service.accuracyFor(28.6, 77.2)).toBe(20);
+      expect(service.accuracyFor(1, 2)).toBeUndefined();
     });
   });
 });

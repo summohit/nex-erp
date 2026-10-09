@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { AttendanceService } from '../../attendance/attendance.service';
 import { NotificationsService } from '../../notifications/notifications.service';
-import { haversineKm } from '../../common/geo.util';
+import { haversineKm, distanceAllowingAccuracyM } from '../../common/geo.util';
 import { istDateKey } from '../../common/timezone.util';
 import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY, OPEN_VISIT_DAYS } from '../field-visit-status';
 
@@ -26,6 +26,8 @@ export interface ClockData {
   issueId?: number;
   lat?: number;
   lng?: number;
+  /** The browser's own accuracy radius for lat/lng, in metres. */
+  accuracy?: number;
   ipAddress?: string;
   /** Only read when closing a previous day's session. */
   reason?: string;
@@ -158,7 +160,7 @@ export class FieldVisitClockService {
    * is inside, as the spec says it is, rather than turned away by the last
    * bits of a floating-point division.
    */
-  private measureFromSite(request: any, lat?: number, lng?: number): number {
+  private measureFromSite(request: any, lat?: number, lng?: number, accuracy?: number): number {
     if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
       throw new BadRequestException('Your location is required to clock in or out of a field visit.');
     }
@@ -167,7 +169,7 @@ export class FieldVisitClockService {
     const distanceM = Math.round(distanceKm * 1000);
     const radiusM = request.geofenceRadiusM ?? 1000;
 
-    if (distanceM > radiusM) {
+    if (Math.round(distanceAllowingAccuracyM(distanceKm, accuracy)) > radiusM) {
       throw new GeofenceRefusal(
         `You are outside the approved Field Visit location. Please move within ${radiusM} metres`
         + ` of the site to Clock In/Clock Out. You are ${this.spokenDistance(distanceM)} from ${request.location}.`,
@@ -254,7 +256,7 @@ export class FieldVisitClockService {
 
     const issueId = await this.resolveTask(day.request.id, employee.id, data?.issueId);
     const distanceKm = await this.measureOrTell(
-      employee.id, day, data?.lat, data?.lng, 'clock in',
+      employee.id, day, data?.lat, data?.lng, 'clock in', data?.accuracy,
     );
 
     // Attendance first, and deliberately not in a transaction with the day
@@ -296,10 +298,10 @@ export class FieldVisitClockService {
    */
   private async measureOrTell(
     employeeId: number, day: any, lat: number | undefined, lng: number | undefined,
-    what: string,
+    what: string, accuracy?: number,
   ): Promise<number> {
     try {
-      return this.measureFromSite(day.request, lat, lng);
+      return this.measureFromSite(day.request, lat, lng, accuracy);
     } catch (error) {
       if (error instanceof GeofenceRefusal) {
         const employee = await this.prisma.employee.findUnique({
@@ -339,7 +341,7 @@ export class FieldVisitClockService {
     // The same radius on the way out. Leaving the site and closing the day
     // from the road is exactly what the rule is there to catch.
     const distanceKm = await this.measureOrTell(
-      employee.id, day, data?.lat, data?.lng, 'clock out',
+      employee.id, day, data?.lat, data?.lng, 'clock out', data?.accuracy,
     );
 
     await this.attendance.clockOut(

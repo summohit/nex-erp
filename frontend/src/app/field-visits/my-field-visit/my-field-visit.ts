@@ -189,6 +189,7 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
       issueId: this.selectedTaskId() ?? undefined,
       lat: here.lat,
       lng: here.lng,
+      accuracy: here.accuracyM ?? undefined,
     }).subscribe({
       next: () => { this.isWorking.set(false); this.load(); },
       error: (err) => { this.error.set(this.messageOf(err)); this.isWorking.set(false); },
@@ -206,6 +207,7 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
       requestId: day.request.id,
       lat: here.lat,
       lng: here.lng,
+      accuracy: here.accuracyM ?? undefined,
     }).subscribe({
       next: () => { this.isWorking.set(false); this.load(); },
       error: (err) => { this.error.set(this.messageOf(err)); this.isWorking.set(false); },

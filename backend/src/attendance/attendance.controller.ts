@@ -44,14 +44,14 @@ export class AttendanceController {
   }
 
   @Post('clock-in')
-  clockIn(@Request() req, @Body() data: { lat?: number, lng?: number, outsideReason?: string, outsideProofUrl?: string }) {
+  clockIn(@Request() req, @Body() data: { lat?: number, lng?: number, accuracy?: number, outsideReason?: string, outsideProofUrl?: string }) {
     const ipAddress = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.ip;
     return this.attendanceService.clockIn(req.user.sub, { ...data, ipAddress });
   }
 
   @Post('clock-out')
   clockOut(@Request() req, @Body() data: {
-    lat?: number, lng?: number, reason?: string, proofUrl?: string,
+    lat?: number, lng?: number, accuracy?: number, reason?: string, proofUrl?: string,
     outsideReason?: string, outsideProofUrl?: string,
   }) {
     return this.attendanceService.clockOut(req.user.sub, data);
