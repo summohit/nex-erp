@@ -399,11 +399,67 @@ export class ShiftRosterComponent implements OnInit {
     });
   }
 
+  hasActiveLegendFilter = computed(() => {
+    return !!this.rosterShiftFilter() || !!this.rosterStateFilter();
+  });
+
+  isShiftFilterActive(shiftId: number | string): boolean {
+    return this.rosterShiftFilter() === String(shiftId);
+  }
+
+  isStateFilterActive(state: string): boolean {
+    return this.rosterStateFilter() === state;
+  }
+
+  toggleShiftFilter(shiftId: number | string): void {
+    const sId = String(shiftId);
+    if (this.rosterShiftFilter() === sId) {
+      this.rosterShiftFilter.set('');
+    } else {
+      this.rosterShiftFilter.set(sId);
+      this.rosterStateFilter.set('');
+    }
+    this.rosterPage.set(1);
+  }
+
+  toggleStateFilter(state: string): void {
+    if (this.rosterStateFilter() === state) {
+      this.rosterStateFilter.set('');
+    } else {
+      this.rosterStateFilter.set(state);
+      this.rosterShiftFilter.set('');
+    }
+    this.rosterPage.set(1);
+  }
+
+  clearLegendFilter(): void {
+    this.rosterShiftFilter.set('');
+    this.rosterStateFilter.set('');
+    this.rosterPage.set(1);
+  }
+
+  isCellMatchingFilter(cell: RosterCell): boolean {
+    const shiftId = this.rosterShiftFilter();
+    const state = this.rosterStateFilter();
+    if (!shiftId && !state) return true;
+
+    if (shiftId) {
+      return String(cell.shift?.id ?? '') === shiftId && !cell.isFieldVisit;
+    }
+
+    if (state === 'FIELD_VISIT') {
+      return !!cell.isFieldVisit;
+    }
+    if (state === 'ONSITE_PENDING') {
+      return cell.onSite?.approvalStatus === 'PENDING';
+    }
+    return cell.type === state;
+  }
+
   visibleRows = computed(() => {
     const q = this.search().toLowerCase().trim();
     const employeeId = this.filterEmployeeId();
-    const shiftId = this.rosterShiftFilter();
-    const state = this.rosterStateFilter();
+    const hasLegend = this.hasActiveLegendFilter();
     return this.grid().rows.filter((row) => {
       const matchesEmployee = !q
         || row.employee.name.toLowerCase().includes(q)
@@ -412,12 +468,8 @@ export class ShiftRosterComponent implements OnInit {
         || (row.employee.designation || '').toLowerCase().includes(q)
         || (row.employee.department || '').toLowerCase().includes(q);
       const matchesSelectedEmployee = employeeId === null || row.employee.id === employeeId;
-      const matchesShift = !shiftId || row.cells.some((cell) => String(cell.shift?.id ?? '') === shiftId);
-      const matchesState = !state || row.cells.some((cell) => {
-        if (state === 'ONSITE_PENDING') return cell.onSite?.approvalStatus === 'PENDING';
-        return cell.type === state;
-      });
-      return matchesEmployee && matchesSelectedEmployee && matchesShift && matchesState;
+      const matchesLegend = !hasLegend || row.cells.some((cell) => this.isCellMatchingFilter(cell));
+      return matchesEmployee && matchesSelectedEmployee && matchesLegend;
     });
   });
 
@@ -427,8 +479,12 @@ export class ShiftRosterComponent implements OnInit {
    * number at the top always agrees with the selected roster period.
    */
   fieldVisitCount = computed(() =>
-    this.visibleRows().reduce(
-      (total, row) => total + row.cells.filter((cell) => cell.isFieldVisit).length,
+    this.grid().rows.reduce(
+      (total, row) => {
+        const matchesEmployee = this.filterEmployeeId() === null || row.employee.id === this.filterEmployeeId();
+        if (!matchesEmployee) return total;
+        return total + row.cells.filter((cell) => cell.isFieldVisit).length;
+      },
       0,
     ),
   );

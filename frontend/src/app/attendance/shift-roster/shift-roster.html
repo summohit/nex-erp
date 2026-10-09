@@ -3,7 +3,13 @@
     <div class="header-content">
       <h1>Shift Roster</h1>
       <p>Who works which shift, day by day. Click any cell to change it.</p>
-      <div class="field-visit-total" title="Field visits in the displayed roster period">
+      <div class="field-visit-total"
+           [class.is-active]="isStateFilterActive('FIELD_VISIT')"
+           (click)="toggleStateFilter('FIELD_VISIT')"
+           role="button"
+           tabindex="0"
+           (keydown.enter)="toggleStateFilter('FIELD_VISIT')"
+           title="Click to filter by Field Visits in the displayed roster period">
         <svg lucideMapPin size="15"></svg>
         <strong>{{ fieldVisitCount() }}</strong>
         <span>Field Visit{{ fieldVisitCount() === 1 ? '' : 's' }}</span>
@@ -82,15 +88,69 @@
     </div>
 
     <!-- Legend -->
-    <div class="legend">
-      <span *ngFor="let s of grid().shifts" class="legend-chip"
-            [style.background]="s.colorCode || '#94A3B8'">
+    <div class="legend" [class.has-active-filter]="hasActiveLegendFilter()">
+      <button *ngFor="let s of grid().shifts"
+              type="button"
+              class="legend-chip"
+              [class.is-active]="isShiftFilterActive(s.id)"
+              [style.background]="s.colorCode || '#94A3B8'"
+              (click)="toggleShiftFilter(s.id)"
+              [attr.aria-pressed]="isShiftFilterActive(s.id)"
+              [title]="isShiftFilterActive(s.id) ? 'Click to clear ' + s.name + ' filter' : 'Filter by ' + s.name">
+        <svg lucideCheck size="11" *ngIf="isShiftFilterActive(s.id)" class="chip-check-icon"></svg>
         <ng-container *ngIf="s.shortCode">{{ s.shortCode }} : </ng-container>{{ s.name }}
-      </span>
-      <span class="legend-chip chip-neutral">Day Off</span>
-      <span class="legend-chip chip-leave-legend">On Leave</span>
-      <span class="legend-chip chip-field-visit-legend">📍 Field Visit</span>
-      <span class="legend-chip chip-pending-legend" *ngIf="pendingOnsite().length > 0">⏳ On-site — pending approval</span>
+      </button>
+
+      <button type="button"
+              class="legend-chip chip-neutral"
+              [class.is-active]="isStateFilterActive('DAY_OFF')"
+              (click)="toggleStateFilter('DAY_OFF')"
+              [attr.aria-pressed]="isStateFilterActive('DAY_OFF')"
+              [title]="isStateFilterActive('DAY_OFF') ? 'Click to clear Day Off filter' : 'Filter by Day Off'">
+        <svg lucideCheck size="11" *ngIf="isStateFilterActive('DAY_OFF')" class="chip-check-icon"></svg>
+        <span>Day Off</span>
+      </button>
+
+      <button type="button"
+              class="legend-chip chip-leave-legend"
+              [class.is-active]="isStateFilterActive('LEAVE')"
+              (click)="toggleStateFilter('LEAVE')"
+              [attr.aria-pressed]="isStateFilterActive('LEAVE')"
+              [title]="isStateFilterActive('LEAVE') ? 'Click to clear On Leave filter' : 'Filter by On Leave'">
+        <svg lucideCheck size="11" *ngIf="isStateFilterActive('LEAVE')" class="chip-check-icon"></svg>
+        <span>On Leave</span>
+      </button>
+
+      <button type="button"
+              class="legend-chip chip-field-visit-legend"
+              [class.is-active]="isStateFilterActive('FIELD_VISIT')"
+              (click)="toggleStateFilter('FIELD_VISIT')"
+              [attr.aria-pressed]="isStateFilterActive('FIELD_VISIT')"
+              [title]="isStateFilterActive('FIELD_VISIT') ? 'Click to clear Field Visit filter' : 'Filter by Field Visit'">
+        <svg lucideCheck size="11" *ngIf="isStateFilterActive('FIELD_VISIT')" class="chip-check-icon"></svg>
+        <span>📍 Field Visit</span>
+      </button>
+
+      <button type="button"
+              class="legend-chip chip-pending-legend"
+              *ngIf="pendingOnsite().length > 0"
+              [class.is-active]="isStateFilterActive('ONSITE_PENDING')"
+              (click)="toggleStateFilter('ONSITE_PENDING')"
+              [attr.aria-pressed]="isStateFilterActive('ONSITE_PENDING')"
+              [title]="isStateFilterActive('ONSITE_PENDING') ? 'Click to clear pending approval filter' : 'Filter by On-site pending'">
+        <svg lucideCheck size="11" *ngIf="isStateFilterActive('ONSITE_PENDING')" class="chip-check-icon"></svg>
+        <span>⏳ On-site — pending approval</span>
+      </button>
+
+      <button type="button"
+              *ngIf="hasActiveLegendFilter()"
+              class="legend-clear-btn"
+              (click)="clearLegendFilter()"
+              title="Clear active filter">
+        <svg lucideX size="12"></svg>
+        <span>Clear filter</span>
+      </button>
+
       <span class="legend-note">Faded cells are the employee's standing shift, not a rostered one.</span>
     </div>
   </div>
@@ -158,6 +218,7 @@
 
             <td *ngFor="let cell of row.cells; trackBy: trackCell"
                 class="day-cell"
+                [class.is-dimmed]="hasActiveLegendFilter() && !isCellMatchingFilter(cell)"
                 [class.is-weekend]="dayLabel(cell.date).isWeekend"
                 [class.is-today]="dayLabel(cell.date).isToday"
                 [title]="cellTitle(row, cell)"
@@ -202,7 +263,12 @@
 
           <tr *ngIf="!visibleRows().length">
             <td [attr.colspan]="displayDays().length + 1" class="empty-state">
-              No employees match these filters.
+              <div class="empty-state-content">
+                <span>No employees match these filters.</span>
+                <button type="button" *ngIf="hasActiveLegendFilter()" class="btn-clear-inline" (click)="clearLegendFilter()">
+                  Clear shift filter
+                </button>
+              </div>
             </td>
           </tr>
         </ng-container>
