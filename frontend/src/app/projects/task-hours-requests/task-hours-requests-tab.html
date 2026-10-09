@@ -464,7 +464,7 @@
             <td><a class="prq-key clickable" [routerLink]="['/projects', r.issue?.project?.id]" [queryParams]="{ task: r.issue?.id }">{{ r.issue?.key }}</a></td>
             <td class="ta-task"><a class="ta-title clickable" [routerLink]="['/projects', r.issue?.project?.id]" [queryParams]="{ task: r.issue?.id }">{{ r.issue?.title }}</a><a class="ta-project-under clickable" [routerLink]="['/projects', r.issue?.project?.id]">{{ r.issue?.project?.name }}</a></td>
             <td class="ta-muted">{{ r.issue?.project?.name || '—' }}</td>
-            <td class="ta-raised-by"><div class="ta-person-avatar"><img *ngIf="r.requestedBy?.avatarUrl" [src]="r.requestedBy.avatarUrl" alt=""><span *ngIf="!r.requestedBy?.avatarUrl">{{ r.requestedBy ? (r.requestedBy.firstName || '?').slice(0,1) + (r.requestedBy.lastName || '').slice(0,1) : '?' }}</span><span class="ta-person-tooltip">{{ fullName(r.requestedBy) }}</span></div></td>
+            <td class="ta-raised-by"><div class="ta-person-avatar"><img *ngIf="r.requestedBy?.avatarUrl" [src]="r.requestedBy?.avatarUrl" alt=""><span *ngIf="!r.requestedBy?.avatarUrl">{{ r.requestedBy ? (r.requestedBy.firstName || '?').slice(0,1) + (r.requestedBy.lastName || '').slice(0,1) : '?' }}</span><span class="ta-person-tooltip">{{ fullName(r.requestedBy) }}</span></div></td>
             <td><strong>{{ r.requestedHours }}h</strong></td>
             <td class="ta-muted ta-wide-cell">{{ r.reason }}</td>
             <td><span class="ta-stage">{{ r.status === 'REQUESTED' ? 'Awaiting decision' : r.status }}</span></td>
@@ -725,15 +725,15 @@
             </div>
 
             <div class="thr-drawer-diff" *ngIf="approvedHoursDraft != null">
-              <span *ngIf="approvedHoursDraft < r.requestedHours" class="text-amber">
-                Granting {{ approvedHoursDraft }}h ({{ r.requestedHours - approvedHoursDraft }}h
+              <span *ngIf="(approvedHoursDraft ?? 0) < r.requestedHours" class="text-amber">
+                Granting {{ approvedHoursDraft }}h ({{ r.requestedHours - (approvedHoursDraft ?? 0) }}h
                 less than requested)
               </span>
               <span *ngIf="approvedHoursDraft === r.requestedHours" class="text-emerald">
                 Granting full requested amount ({{ r.requestedHours }}h)
               </span>
-              <span *ngIf="approvedHoursDraft > r.requestedHours" class="text-indigo">
-                Granting {{ approvedHoursDraft }}h (+{{ approvedHoursDraft - r.requestedHours }}h
+              <span *ngIf="(approvedHoursDraft ?? 0) > r.requestedHours" class="text-indigo">
+                Granting {{ approvedHoursDraft }}h (+{{ (approvedHoursDraft ?? 0) - r.requestedHours }}h
                 above requested)
               </span>
             </div>

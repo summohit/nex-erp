@@ -24,7 +24,7 @@ export interface TaskHoursRequest {
   rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
-  requestedBy: { id: number; firstName: string; lastName: string } | null;
+  requestedBy: { id: number; firstName: string; lastName: string; avatarUrl?: string | null } | null;
   reviewedBy: { id: number; firstName: string; lastName: string } | null;
   issue: {
     id: number; key: string; title: string;
