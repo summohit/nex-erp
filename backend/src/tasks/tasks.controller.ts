@@ -32,11 +32,13 @@ export class TasksController {
     @Query('includeReported') includeReported?: string,
     @Query('includeDone') includeDone?: string,
     @Query('scope') scope?: string,
+    @Query('assigneeId') assigneeId?: string,
   ) {
     return this.tasks.getMyTasks(req.user.companyId, req.user.employeeId, req.user.role, {
       includeReported: includeReported === 'true',
       includeDone: includeDone === 'true',
       scope: scope === 'all' ? 'all' : scope === 'created' ? 'created' : 'mine',
+      assigneeId: assigneeId ? Number(assigneeId) : undefined,
     });
   }
 

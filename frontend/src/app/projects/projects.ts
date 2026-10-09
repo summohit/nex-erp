@@ -2854,9 +2854,13 @@ export class ProjectsComponent implements OnInit {
     // §Tasks1: alongside the list, not instead of it. Fails quietly on its own.
     this.loadTopPerformers();
     this.myTasksLoading.set(true);
+    // In the company-wide view, one person's tasks are fetched from the server
+    // rather than picked out of the first 200 it sent.
+    const assignee = this.myTasksScope() === 'all' && this.tfAssignee() !== 'ALL' ? Number(this.tfAssignee()) : undefined;
     this.tasksService.getMyTasks({
       includeDone: this.myTasksShowDone(),
       scope: this.myTasksScope(),
+      assigneeId: assignee,
     }).subscribe({
       next: (res) => {
         this.myTasks.set(res.items || []);
@@ -2967,6 +2971,19 @@ export class ProjectsComponent implements OnInit {
 
   taskAssigneeList = computed(() => {
     const byId = new Map<number, { id: number; name: string; email?: string; avatarUrl?: string | null }>();
+    // Everyone view: every employee can be picked, not only the people who
+    // happen to be in the first 200 tasks loaded.
+    if (this.myTasksScope() === 'all') {
+      for (const e of this.employees()) {
+        if (!e?.id) continue;
+        byId.set(e.id, {
+          id: e.id,
+          name: `${e.firstName || ''} ${e.lastName || ''}`.trim() || `User #${e.id}`,
+          email: e.email || e.user?.email || '',
+          avatarUrl: e.avatarUrl || e.profilePicture || null,
+        });
+      }
+    }
     for (const t of this.myTasks()) {
       for (const a of t.assignees || []) {
         if (!byId.has(a.id)) {
@@ -3013,9 +3030,11 @@ export class ProjectsComponent implements OnInit {
   }
 
   selectTfAssignee(id: string | number) {
+    const changed = this.tfAssignee() !== String(id);
     this.tfAssignee.set(String(id));
     this.tfAssigneeDropdownOpen.set(false);
     this.tfAssigneeSearchQuery.set('');
+    if (changed && this.myTasksScope() === 'all') this.loadMyTasks();
   }
 
   selectTfProject(p: string) {
@@ -3062,9 +3081,13 @@ export class ProjectsComponent implements OnInit {
   );
 
   clearTaskFilters() {
+    // A person picked in the Everyone view was fetched from the server, so
+    // clearing them has to fetch the whole list back.
+    const refetch = this.myTasksScope() === 'all' && this.tfAssignee() !== 'ALL';
     this.tfProject.set('ALL');
     this.tfProjectCode.set('ALL');
     this.tfAssignee.set('ALL');
+    if (refetch) queueMicrotask(() => this.loadMyTasks());
     this.tfStatus.set('ALL');
     this.tfPriority.set('ALL');
     this.tfMilestone.set('ALL');

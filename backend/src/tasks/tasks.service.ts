@@ -701,9 +701,14 @@ export class TasksService {
     companyId: number,
     employeeId: number,
     role: string | undefined,
-    opts: { includeReported?: boolean; includeDone?: boolean; scope?: TaskScope } = {},
+    opts: { includeReported?: boolean; includeDone?: boolean; scope?: TaskScope; assigneeId?: number } = {},
   ): Promise<{ items: MyTaskDto[]; truncated: boolean; scope: TaskScope }> {
     const everyone = opts.scope === 'all' && (role === 'SUPERADMIN' || role === 'ADMIN');
+    // One person's work inside the company-wide view. Applied here, before the
+    // per-source cap: filtering after it hid anybody whose tasks were not in
+    // the first 200 — an admin looking for HR's tasks found nobody to pick.
+    const onePerson = everyone && Number.isInteger(opts.assigneeId) && (opts.assigneeId as number) > 0
+      ? (opts.assigneeId as number) : null;
     // Anyone may see what they themselves raised; no role check needed.
     const created = !everyone && opts.scope === 'created';
 
@@ -718,7 +723,9 @@ export class TasksService {
         companyId,
         isArchived: false,
         ...(opts.includeDone ? {} : { status: { notIn: CLOSED_STATUSES } }),
-        ...(everyone ? {} : created ? { reporterId: employeeId } : { OR: mine }),
+        ...(everyone
+          ? (onePerson ? { OR: [{ assigneeId: onePerson }, { members: { some: { employeeId: onePerson } } }] } : {})
+          : created ? { reporterId: employeeId } : { OR: mine }),
       },
       select: {
         id: true, key: true, title: true, status: true, priority: true,
@@ -822,7 +829,12 @@ export class TasksService {
       isAdmin: role === 'SUPERADMIN' || role === 'ADMIN',
     });
 
-    const all = [...items, ...preSales];
+    const all = [
+      ...items,
+      ...(onePerson
+        ? preSales.filter((t: any) => (t.assignees || []).some((a: any) => a?.id === onePerson) || t.assignee?.id === onePerson)
+        : preSales),
+    ];
     // Newest first: what was assigned most recently earns the top of the list
     // and undated rows trail behind rather than jumping the queue. This is the
     // answer to "my board work is beside my deal work" — both halves of the
