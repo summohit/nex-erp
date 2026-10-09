@@ -393,6 +393,11 @@ export class MenusService implements OnModuleInit {
     // own, so it is granted alongside the profile rather than via RolePermission.
     allowedModules.add('settings/security');
 
+    // HR publishes company announcements. Notice Board posting is enforced by
+    // the Notices service; this grant makes the board visible in HR's sidebar
+    // even when no explicit RolePermission row exists yet.
+    if (roleName === 'HR') allowedModules.add('notices');
+
     // The Delivery section's children all ride on the single 'projects'
     // permission. Renaming the sidebar entry must not quietly revoke access:
     // every role that could reach Projects before can reach all of Delivery
