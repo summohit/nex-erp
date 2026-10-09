@@ -7,19 +7,80 @@
         <h2>Out-of-office clock-ins &amp; clock-outs</h2>
         <p>General Shift staff who clocked more than the office radius away. Approving accepts it; rejecting only flags the day.</p>
       </div>
-      <span class="geo-count">{{ visibleGeoRows().length }} pending</span>
+      <span class="geo-count">{{ geoRows().length }} pending</span>
     </div>
 
-    <div class="geo-empty" *ngIf="!visibleGeoRows().length">Nothing waiting — everyone clocked from the office.</div>
+    <!-- Filters -->
+    <div class="geo-filters">
+      <input class="geo-input geo-search" type="search" placeholder="Search name, code, department, reason…"
+             [ngModel]="geoSearch()" (ngModelChange)="setGeoFilter('search', $event)">
+      <select class="geo-input" [ngModel]="geoDept()" (ngModelChange)="setGeoFilter('dept', $event)">
+        <option value="">All departments</option>
+        <option *ngFor="let d of geoDepartments()" [value]="d">{{ d }}</option>
+      </select>
+      <select class="geo-input" [ngModel]="geoType()" (ngModelChange)="setGeoFilter('type', $event)">
+        <option value="ALL">Clock-in &amp; clock-out</option>
+        <option value="IN">Clock-in outside</option>
+        <option value="OUT">Clock-out outside</option>
+      </select>
+      <select class="geo-input" [ngModel]="geoDistance()" (ngModelChange)="setGeoFilter('distance', $event)">
+        <option value="ALL">Any distance</option>
+        <option value="LT1">Under 1 km</option>
+        <option value="1TO10">1 – 10 km</option>
+        <option value="10TO100">10 – 100 km</option>
+        <option value="GT100">Over 100 km</option>
+        <option value="NOGPS">No GPS</option>
+      </select>
+      <label class="geo-date">From <input class="geo-input" type="date" [ngModel]="geoFrom()" (ngModelChange)="setGeoFilter('from', $event)"></label>
+      <label class="geo-date">To <input class="geo-input" type="date" [ngModel]="geoTo()" (ngModelChange)="setGeoFilter('to', $event)"></label>
+      <select class="geo-input" [ngModel]="geoSort()" (ngModelChange)="setGeoFilter('sort', $event)">
+        <option value="OLDEST">Oldest first</option>
+        <option value="NEWEST">Newest first</option>
+        <option value="FARTHEST">Farthest first</option>
+      </select>
+      <button type="button" class="geo-reset" *ngIf="geoHasFilters()" (click)="resetGeoFilters()">Reset</button>
+    </div>
 
-    <article class="geo-card" *ngFor="let r of visibleGeoRows()">
+    <!-- Bulk bar -->
+    <div class="geo-bulk" *ngIf="geoPageRows().length">
+      <label class="geo-check-all">
+        <input type="checkbox" [checked]="geoAllOnPageSelected()" (change)="toggleGeoPage()">
+        Select all on this page
+      </label>
+      <span class="geo-range">Showing {{ geoRangeLabel() }}</span>
+      <div class="geo-bulk-actions" *ngIf="geoSelected().size">
+        <span class="geo-sel-count">{{ geoSelected().size }} selected</span>
+        <button type="button" class="geo-btn reject" [disabled]="geoBulkBusy()" (click)="decideGeofenceBulk('REJECT')">Reject selected</button>
+        <button type="button" class="geo-btn approve" [disabled]="geoBulkBusy()" (click)="decideGeofenceBulk('APPROVE')">
+          {{ geoBulkBusy() ? 'Saving…' : 'Approve selected' }}
+        </button>
+      </div>
+    </div>
+
+    <div class="geo-empty" *ngIf="!geoFiltered().length">
+      {{ geoRows().length ? 'Nothing matches these filters.' : 'Nothing waiting — everyone clocked from the office.' }}
+    </div>
+
+    <article class="geo-card" *ngFor="let r of geoPageRows()" [class.is-selected]="geoSelected().has(r.id)">
+      <input type="checkbox" class="geo-row-check" [checked]="geoSelected().has(r.id)" (change)="toggleGeoRow(r.id)"
+             [attr.aria-label]="'Select ' + employeeName(r)">
       <div class="geo-who">
-        <strong>{{ employeeName(r) }}</strong>
-        <span>{{ r.employee?.designation || r.employee?.department?.name || '' }}</span>
+        <img *ngIf="r.employee?.avatarUrl" class="geo-avatar" [src]="r.employee.avatarUrl" alt="">
+        <span *ngIf="!r.employee?.avatarUrl" class="geo-avatar geo-initials">{{ geoInitials(r) }}</span>
+        <div class="geo-who-text">
+          <strong>{{ employeeName(r) }}</strong>
+          <span>{{ r.employee?.employeeCode ? '#' + r.employee.employeeCode + ' · ' : '' }}{{ r.employee?.designation?.name || '' }}</span>
+          <span class="geo-dept" *ngIf="r.employee?.department?.name">{{ r.employee.department.name }}</span>
+        </div>
       </div>
       <div class="geo-day">
         <span class="geo-date">{{ formatDate(r.date) }}</span>
-        <span class="geo-dist">{{ geoSummary(r) }}</span>
+        <span class="geo-chips">
+          <span *ngIf="r.clockInOutside" class="geo-km" [ngClass]="geoKmClass(r.clockInDistanceKm)">
+            In · {{ r.clockInDistanceKm == null ? 'no GPS' : (r.clockInDistanceKm | number:'1.0-2') + ' km' }}</span>
+          <span *ngIf="r.clockOutOutside" class="geo-km" [ngClass]="geoKmClass(r.clockOutDistanceKm)">
+            Out · {{ r.clockOutDistanceKm == null ? 'no GPS' : (r.clockOutDistanceKm | number:'1.0-2') + ' km' }}</span>
+        </span>
       </div>
       <div class="geo-reasons">
         <p *ngIf="r.clockInOutsideReason"><b>Clock-in:</b> {{ r.clockInOutsideReason }}
@@ -28,12 +89,19 @@
           <a *ngIf="r.clockOutOutsideProofUrl" [href]="r.clockOutOutsideProofUrl" target="_blank" rel="noopener">View attachment</a></p>
       </div>
       <div class="geo-actions">
-        <button type="button" class="geo-btn reject" [disabled]="geoBusyId() === r.id" (click)="decideGeofence(r, 'REJECT')">Reject</button>
-        <button type="button" class="geo-btn approve" [disabled]="geoBusyId() === r.id" (click)="decideGeofence(r, 'APPROVE')">
+        <button type="button" class="geo-btn reject" [disabled]="geoBusyId() === r.id || geoBulkBusy()" (click)="decideGeofence(r, 'REJECT')">Reject</button>
+        <button type="button" class="geo-btn approve" [disabled]="geoBusyId() === r.id || geoBulkBusy()" (click)="decideGeofence(r, 'APPROVE')">
           {{ geoBusyId() === r.id ? 'Saving…' : 'Approve' }}
         </button>
       </div>
     </article>
+
+    <!-- Pagination: 100 per page -->
+    <div class="geo-pager" *ngIf="geoPageCount() > 1">
+      <button type="button" (click)="goGeoPage(geoPage() - 1)" [disabled]="geoPage() <= 1">‹ Previous</button>
+      <span>Page {{ geoPage() }} of {{ geoPageCount() }}</span>
+      <button type="button" (click)="goGeoPage(geoPage() + 1)" [disabled]="geoPage() >= geoPageCount()">Next ›</button>
+    </div>
   </section>
 
   <!-- ── 1. Access Check In Flight ─────────────────────────────────────────── -->

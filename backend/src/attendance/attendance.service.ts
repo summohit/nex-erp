@@ -987,7 +987,7 @@ export class AttendanceService {
         employee: {
           select: {
             id: true, firstName: true, lastName: true, avatarUrl: true,
-            employeeCode: true, designation: true,
+            employeeCode: true, designation: { select: { id: true, name: true } }, // the name, not the relation: the card printed [object Object]
             department: { select: { id: true, name: true } },
           },
         },

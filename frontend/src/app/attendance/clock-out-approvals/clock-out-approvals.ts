@@ -106,6 +106,149 @@ export class ClockOutApprovalsComponent implements OnInit {
   geoBusyId = signal<number | null>(null);
   visibleGeoRows = computed(() => this.geoRows().filter(row => this.matchesFilter(row)));
 
+  // The out-of-office queue's own filters, page and selection. It can run to
+  // a hundred rows, so it needs more than the page-wide search.
+  geoSearch = signal('');
+  geoDept = signal('');
+  geoType = signal<'ALL' | 'IN' | 'OUT'>('ALL');
+  geoDistance = signal<'ALL' | 'NOGPS' | 'LT1' | '1TO10' | '10TO100' | 'GT100'>('ALL');
+  geoFrom = signal('');
+  geoTo = signal('');
+  geoSort = signal<'OLDEST' | 'NEWEST' | 'FARTHEST'>('OLDEST');
+  geoPage = signal(1);
+  readonly GEO_PAGE_SIZE = 100;
+  geoSelected = signal<Set<number>>(new Set());
+  geoBulkBusy = signal(false);
+
+  geoDepartments = computed(() => [...new Set(this.geoRows()
+    .map((r) => r.employee?.department?.name).filter(Boolean))].sort() as string[]);
+
+  /** The farthest the person was, in or out; null when there was no GPS. */
+  geoMaxKm(r: any): number | null {
+    const kms = [r.clockInOutside ? r.clockInDistanceKm : null, r.clockOutOutside ? r.clockOutDistanceKm : null]
+      .filter((k) => k != null) as number[];
+    return kms.length ? Math.max(...kms) : null;
+  }
+
+  geoFiltered = computed(() => {
+    const q = this.geoSearch().trim().toLowerCase();
+    const dept = this.geoDept(), type = this.geoType(), band = this.geoDistance();
+    const from = this.geoFrom(), to = this.geoTo();
+    const rows = this.visibleGeoRows().filter((r) => {
+      if (q) {
+        const hay = `${this.employeeName(r)} ${r.employee?.employeeCode ?? ''} ${r.employee?.designation?.name ?? ''} `
+          + `${r.employee?.department?.name ?? ''} ${r.clockInOutsideReason ?? ''} ${r.clockOutOutsideReason ?? ''}`;
+        if (!hay.toLowerCase().includes(q)) return false;
+      }
+      if (dept && r.employee?.department?.name !== dept) return false;
+      if (type === 'IN' && !r.clockInOutside) return false;
+      if (type === 'OUT' && !r.clockOutOutside) return false;
+      const km = this.geoMaxKm(r);
+      if (band === 'NOGPS' && km != null) return false;
+      if (band === 'LT1' && !(km != null && km < 1)) return false;
+      if (band === '1TO10' && !(km != null && km >= 1 && km < 10)) return false;
+      if (band === '10TO100' && !(km != null && km >= 10 && km < 100)) return false;
+      if (band === 'GT100' && !(km != null && km >= 100)) return false;
+      const day = String(r.date ?? '').slice(0, 10);
+      if (from && day < from) return false;
+      if (to && day > to) return false;
+      return true;
+    });
+    const sort = this.geoSort();
+    return [...rows].sort((a, b) => sort === 'FARTHEST'
+      ? (this.geoMaxKm(b) ?? -1) - (this.geoMaxKm(a) ?? -1)
+      : sort === 'NEWEST' ? String(b.date).localeCompare(String(a.date)) : String(a.date).localeCompare(String(b.date)));
+  });
+
+  geoPageCount = computed(() => Math.max(1, Math.ceil(this.geoFiltered().length / this.GEO_PAGE_SIZE)));
+  geoPageRows = computed(() => {
+    const page = Math.min(this.geoPage(), this.geoPageCount());
+    return this.geoFiltered().slice((page - 1) * this.GEO_PAGE_SIZE, page * this.GEO_PAGE_SIZE);
+  });
+  geoRangeLabel = computed(() => {
+    const total = this.geoFiltered().length;
+    if (!total) return '0';
+    const page = Math.min(this.geoPage(), this.geoPageCount());
+    const start = (page - 1) * this.GEO_PAGE_SIZE + 1;
+    return `${start}–${Math.min(total, page * this.GEO_PAGE_SIZE)} of ${total}`;
+  });
+  geoHasFilters = computed(() => !!(this.geoSearch() || this.geoDept() || this.geoType() !== 'ALL'
+    || this.geoDistance() !== 'ALL' || this.geoFrom() || this.geoTo()));
+  geoAllOnPageSelected = computed(() => {
+    const rows = this.geoPageRows();
+    return rows.length > 0 && rows.every((r) => this.geoSelected().has(r.id));
+  });
+
+  /** Any filter change starts again at page one with nothing selected. */
+  setGeoFilter(which: string, value: any) {
+    ({ search: this.geoSearch, dept: this.geoDept, type: this.geoType, distance: this.geoDistance,
+      from: this.geoFrom, to: this.geoTo, sort: this.geoSort } as any)[which].set(value);
+    this.geoPage.set(1);
+    this.geoSelected.set(new Set());
+  }
+
+  resetGeoFilters() {
+    for (const k of ['search', 'dept', 'from', 'to']) this.setGeoFilter(k, '');
+    this.setGeoFilter('type', 'ALL');
+    this.setGeoFilter('distance', 'ALL');
+  }
+
+  goGeoPage(p: number) {
+    this.geoPage.set(Math.min(Math.max(1, p), this.geoPageCount()));
+    this.geoSelected.set(new Set());
+  }
+
+  toggleGeoRow(id: number) {
+    const next = new Set(this.geoSelected());
+    next.has(id) ? next.delete(id) : next.add(id);
+    this.geoSelected.set(next);
+  }
+
+  toggleGeoPage() {
+    this.geoSelected.set(this.geoAllOnPageSelected() ? new Set() : new Set(this.geoPageRows().map((r) => r.id)));
+  }
+
+  geoInitials(r: any): string {
+    return `${r.employee?.firstName?.[0] ?? ''}${r.employee?.lastName?.[0] ?? ''}`.toUpperCase() || '?';
+  }
+
+  geoKmClass(km: number | null): string {
+    if (km == null) return 'km-none';
+    return km < 1 ? 'km-near' : km < 10 ? 'km-mid' : km < 100 ? 'km-far' : 'km-xfar';
+  }
+
+  /** Approve or reject every ticked row; one reason covers all the rejections. */
+  async decideGeofenceBulk(action: 'APPROVE' | 'REJECT'): Promise<void> {
+    const ids = [...this.geoSelected()];
+    if (!ids.length || this.geoBulkBusy()) return;
+    let note: string | undefined;
+    if (action === 'REJECT') {
+      const typed = await this.dialog.prompt(
+        `Rejecting ${ids.length} out-of-office clock${ids.length === 1 ? '' : 's'}. The days stay as recorded and are flagged; this reason is shown to each person.`,
+        'Reason for rejection',
+        { placeholder: 'e.g. Clock in on arrival at the office, not while travelling', confirmLabel: `Reject ${ids.length}`, required: true },
+      );
+      if (!typed?.trim()) return;
+      note = typed.trim();
+    } else {
+      const ok = await this.dialog.confirm(`Approve ${ids.length} out-of-office clock${ids.length === 1 ? '' : 's'}?`, 'Approve selected', 'Approve', 'Cancel');
+      if (!ok) return;
+    }
+    this.geoBulkBusy.set(true);
+    let done = 0, failed = 0;
+    for (const id of ids) {
+      try {
+        await firstValueFrom(this.attendanceService.reviewGeofence(id, action, note));
+        done++;
+      } catch { failed++; }
+    }
+    this.geoBulkBusy.set(false);
+    this.geoSelected.set(new Set());
+    this.loadGeofence();
+    if (failed) this.toast.error(`${done} ${action === 'APPROVE' ? 'approved' : 'rejected'}, ${failed} could not be saved`);
+    else this.toast.success(`${done} ${action === 'APPROVE' ? 'approved' : 'rejected'}`);
+  }
+
   private matchesFilter(row: any): boolean {
     const query = this.search().trim().toLowerCase();
     const name = this.employeeName(row).toLowerCase();
