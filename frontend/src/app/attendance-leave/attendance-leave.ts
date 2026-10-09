@@ -362,15 +362,19 @@ export class AttendanceLeaveComponent implements OnInit {
     ),
   );
 
+  // Newest application first — what just came in is what needs looking at.
+  // Ordering by leave date put a leave applied for weeks ago at the top just
+  // because it was far in the future.
+  private newestAppliedFirst = (a: LeaveRequest, b: LeaveRequest) =>
+    String((b as any).createdAt ?? '').localeCompare(String((a as any).createdAt ?? '')) || b.id - a.id;
+
   filteredLeaveApplications = computed(() => {
-    if (this.isAdmin()) return this.filteredRequests();
+    if (this.isAdmin()) return [...this.filteredRequests()].sort(this.newestAppliedFirst);
     const requests = new Map<number, LeaveRequest>();
     for (const request of [...this.filteredMyRequests(), ...this.filteredManagerRequests()]) {
       requests.set(request.id, request);
     }
-    return [...requests.values()].sort((a, b) =>
-      b.startDate.localeCompare(a.startDate) || b.id - a.id,
-    );
+    return [...requests.values()].sort(this.newestAppliedFirst);
   });
 
   myLeaveQuotaRows = computed(() => {
