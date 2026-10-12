@@ -108,6 +108,50 @@ export class ClockOutApprovalsComponent implements OnInit {
 
   // The out-of-office queue's own filters, page and selection. It can run to
   activeQueueTab = signal<'GEO' | 'LATE'>('GEO');
+
+  // ── Quick date range, shared by both queues ──
+  quickRange = signal<'ALL' | 'TODAY' | '30' | '60' | '90' | 'CUSTOM'>('ALL');
+  customFrom = signal('');
+  customTo = signal('');
+
+  private ymd(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  /** Today / last 30 / 60 / 90 days / custom — applied to both tabs at once. */
+  setQuickRange(range: 'ALL' | 'TODAY' | '30' | '60' | '90' | 'CUSTOM') {
+    this.quickRange.set(range);
+    let from = '', to = '';
+    if (range === 'TODAY') { from = to = this.ymd(new Date()); }
+    else if (range === '30' || range === '60' || range === '90') {
+      const start = new Date(); start.setDate(start.getDate() - (Number(range) - 1));
+      from = this.ymd(start); to = this.ymd(new Date());
+    } else if (range === 'CUSTOM') { from = this.customFrom(); to = this.customTo(); }
+    this.applyRange(from, to);
+  }
+
+  setCustomRange(which: 'from' | 'to', value: string) {
+    (which === 'from' ? this.customFrom : this.customTo).set(value || '');
+    this.quickRange.set('CUSTOM');
+    this.applyRange(this.customFrom(), this.customTo());
+  }
+
+  private applyRange(from: string, to: string) {
+    this.geoFrom.set(from); this.geoTo.set(to);
+    this.filterStartDate.set(from); this.filterEndDate.set(to);
+    this.filterDatePreset.set(from || to ? 'CUSTOM' : 'ALL');
+  }
+
+  // ── Habitual late-comers KPI: 5+ late days in the last 30 ──
+  offenders = signal<{ employee: any; lateDays: number; lastLate: string }[]>([]);
+  offendersOpen = signal(false);
+
+  loadOffenders(): void {
+    this.attendanceService.getLateOffenders(30, 5).subscribe({
+      next: (res) => this.offenders.set(res?.offenders || []),
+      error: () => this.offenders.set([]),
+    });
+  }
   geoTab = signal<'ALL' | 'IN' | 'OUT' | 'BOTH' | 'FAR'>('ALL');
   lateViewMode = signal<'table' | 'cards'>('table');
 
@@ -237,6 +281,7 @@ export class ClockOutApprovalsComponent implements OnInit {
     this.setGeoFilter('type', 'ALL');
     this.setGeoFilter('distance', 'ALL');
     this.geoTab.set('ALL');
+    this.quickRange.set('ALL');
   }
 
   goGeoPage(p: number) {
@@ -373,7 +418,7 @@ export class ClockOutApprovalsComponent implements OnInit {
     this.attendanceService.canApproveClockOuts().subscribe({
       next: (res) => {
         this.canApprove.set(!!res?.canApprove);
-        if (res?.canApprove) this.load();
+        if (res?.canApprove) { this.load(); this.loadOffenders(); }
       },
       error: () => this.canApprove.set(false),
     });
@@ -488,6 +533,7 @@ export class ClockOutApprovalsComponent implements OnInit {
     this.filterTab.set('ALL');
     this.filterStartDate.set('');
     this.filterEndDate.set('');
+    this.quickRange.set('ALL');
     this.filterDatePreset.set('ALL');
     this.filterDepartment.set('');
     this.filterProofStatus.set('');

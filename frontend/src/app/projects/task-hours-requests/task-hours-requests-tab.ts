@@ -56,6 +56,7 @@ import {
 } from '../../services/visit-location-requests.service';
 import { FieldVisitRequest, FieldVisitRequestsService } from '../../services/field-visit-requests';
 import { RoleService } from '../../services/role.service';
+import { ProjectTicketsService, ProjectTicket } from '../../services/project-tickets';
 
 export type RequestTabFilter = 'AWAITING' | 'HISTORY' | 'APPROVED' | 'REJECTED' | 'ALL';
 
@@ -68,7 +69,7 @@ export type RequestTabFilter = 'AWAITING' | 'HISTORY' | 'APPROVED' | 'REJECTED' 
  * carries a scope call and its evidence. Flattening them to a common shape
  * would hide the thing each decision actually turns on.
  */
-export type ProjectRequestType = 'HOURS' | 'TASKS' | 'BUDGET' | 'SCOPE' | 'VISIT_LOCATIONS' | 'FIELD_VISITS';
+export type ProjectRequestType = 'HOURS' | 'TASKS' | 'BUDGET' | 'SCOPE' | 'VISIT_LOCATIONS' | 'FIELD_VISITS' | 'TICKETS';
 export type RequestSortOption = 'newest' | 'oldest' | 'hours-desc' | 'hours-asc';
 export type ApprovalDateRange = 'ALL' | 'TODAY' | 'THIS_WEEK' | 'LAST_WEEK' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR' | 'LAST_YEAR';
 type QueueKpi = { label: string; value: string | number; detail: string; tone: 'amber' | 'emerald' | 'rose' | 'indigo' };
@@ -133,6 +134,7 @@ export class TaskHoursRequestsTabComponent {
   private dialog = inject(DialogService);
   private auth = inject(AuthService);
   private roles = inject(RoleService);
+  private ticketsApi = inject(ProjectTicketsService);
   readonly isSuperAdmin = this.roles.isSuperAdmin;
 
   /** Editing in this console is deliberately reserved for the company owner,
@@ -275,6 +277,8 @@ export class TaskHoursRequestsTabComponent {
   visitLocationRequests = signal<VisitLocationRequest[]>([]);
   /** Field visit requests awaiting a decision this viewer may make. */
   fieldVisitRequests = signal<FieldVisitRequest[]>([]);
+  /** Project tickets awaiting an administrator, across every project (§29). */
+  ticketRequests = signal<ProjectTicket[]>([]);
   locationCapabilities = signal<VisitLocationRequestCapabilities | null>(null);
   loadingOthers = signal(false);
 
@@ -284,6 +288,8 @@ export class TaskHoursRequestsTabComponent {
     this.scopeRequests().filter((request: any) => this.matchesApprovalDate(request.createdAt || request.submittedAt)));
   filteredVisitLocationRequests = computed(() =>
     this.visitLocationRequests().filter((request: any) => this.matchesApprovalDate(request.createdAt || request.submittedAt)));
+  filteredTicketRequests = computed(() =>
+    this.ticketRequests().filter((t) => this.matchesApprovalDate(t.createdAt)));
   filteredFieldVisitRequests = computed(() =>
     this.fieldVisitRequests().filter((request: any) => this.matchesApprovalDate(request.submittedAt || request.createdAt || request.startDate)));
 
@@ -454,6 +460,7 @@ export class TaskHoursRequestsTabComponent {
     // Loaded up front so the tab badge shows how many trips are waiting
     // before anyone clicks into it.
     this.loadFieldVisits();
+    this.loadOthers('TICKETS');
     this.route.queryParamMap.subscribe((params) => {
       const type = params.get('type');
       if (!this.isRequestType(type)) return;
@@ -464,7 +471,7 @@ export class TaskHoursRequestsTabComponent {
 
   private isRequestType(value: string | null): value is ProjectRequestType {
     return (
-      value != null && ['HOURS', 'TASKS', 'BUDGET', 'SCOPE', 'VISIT_LOCATIONS', 'FIELD_VISITS'].includes(value)
+      value != null && ['HOURS', 'TASKS', 'BUDGET', 'SCOPE', 'VISIT_LOCATIONS', 'FIELD_VISITS', 'TICKETS'].includes(value)
     );
   }
 
@@ -713,6 +720,11 @@ export class TaskHoursRequestsTabComponent {
       blurb:
         'Trips raised by project managers, waiting on an administrator. Approving assigns the tasks and schedules attendance for everyone on the visit.',
     },
+    TICKETS: {
+      title: 'Project Tickets',
+      blurb:
+        'Requirements recorded by project managers, often the client\u2019s. Approving one turns it into a task on that project; rejecting needs a reason.',
+    },
     VISIT_LOCATIONS: {
       title: 'Visit Location Requests',
       blurb:
@@ -781,6 +793,13 @@ export class TaskHoursRequestsTabComponent {
       });
     } else if (type === 'FIELD_VISITS') {
       this.loadFieldVisits(done);
+    } else if (type === 'TICKETS') {
+      // The cross-project queue is the administrators' (§29); anyone else gets
+      // a refusal, which simply leaves the tab empty.
+      this.ticketsApi.pending().subscribe({
+        next: (rows) => { this.ticketRequests.set(rows || []); done(); },
+        error: () => { this.ticketRequests.set([]); done(); },
+      });
     } else if (type === 'VISIT_LOCATIONS') {
       forkJoin({
         capabilities: this.locationApi.capabilities(),
@@ -808,6 +827,7 @@ export class TaskHoursRequestsTabComponent {
     if (type === 'BUDGET') return this.budgetRequests().length;
     if (type === 'SCOPE') return this.scopeRequests().length;
     if (type === 'FIELD_VISITS') return this.fieldVisitRequests().length;
+    if (type === 'TICKETS') return this.ticketRequests().length;
     return this.visitLocationRequests().filter((request) => request.status === 'PENDING').length;
   }
 
@@ -851,6 +871,15 @@ export class TaskHoursRequestsTabComponent {
         { label: 'Geocoded', value: rows.filter((r) => r.latitude != null && r.longitude != null).length, detail: 'With a map coordinate', tone: 'emerald' },
         { label: 'Client Linked', value: rows.filter((r) => !!r.leadContact).length, detail: 'Attached to a client contact', tone: 'indigo' },
         { label: 'All Proposals', value: rows.length, detail: 'Locations in this queue', tone: 'rose' },
+      ];
+    }
+    if (this.requestType() === 'TICKETS') {
+      const rows = this.ticketRequests();
+      return [
+        { label: 'Awaiting Decision', value: rows.length, detail: 'Tickets needing a decision', tone: 'amber' },
+        { label: 'Critical / High', value: rows.filter((r) => r.priority === 'CRITICAL' || r.priority === 'HIGH').length, detail: 'Urgent requirements', tone: 'rose' },
+        { label: 'Estimated Hours', value: `${rows.reduce((s, r) => s + (r.estimatedHours ?? 0), 0).toFixed(1)}h`, detail: 'If all become tasks', tone: 'indigo' },
+        { label: 'Projects Affected', value: unique(rows.map((r) => r.project?.id)), detail: 'Projects with a ticket', tone: 'emerald' },
       ];
     }
     const rows = this.fieldVisitRequests();
@@ -1152,6 +1181,34 @@ export class TaskHoursRequestsTabComponent {
 
   scopeLabel(scope: string): string {
     return scope === 'OUT_OF_SCOPE' ? 'Out of scope' : 'In scope';
+  }
+
+  async decideTicket(ticket: ProjectTicket, decision: 'APPROVED' | 'REJECTED') {
+    let reason: string | undefined;
+    if (decision === 'REJECTED') {
+      const typed = await this.dialog.prompt(
+        `Why is "${ticket.title}" being rejected?`,
+        'Reject Ticket',
+        { placeholder: 'e.g. Not part of this phase', confirmLabel: 'Reject ticket', required: true },
+      );
+      if (!typed || !typed.trim()) return;
+      reason = typed.trim();
+    } else {
+      const ok = await this.dialog.confirm(
+        `Approve ${ticket.ticketNumber} "${ticket.title}"? It becomes a task on ${ticket.project?.name ?? 'the project'}.`,
+        'Approve Ticket',
+        'Approve',
+        'Cancel',
+      );
+      if (!ok) return;
+    }
+    this.ticketsApi.review(ticket.id, decision, reason).subscribe({
+      next: () => {
+        this.toast.success(decision === 'APPROVED' ? 'Ticket approved — task created' : 'Ticket rejected');
+        this.loadOthers('TICKETS');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not save the decision'),
+    });
   }
 
   async decideScopeRequest(request: ScopeRequest, decision: 'APPROVED' | 'REJECTED') {

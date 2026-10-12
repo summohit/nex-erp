@@ -889,6 +889,46 @@ export class AttendanceService {
     });
   }
 
+  /**
+   * Habitual late-comers: people clocked in late on `minLate` or more days in
+   * the last `days` days, worst first. Shown to whoever may approve late
+   * clock-outs — the same people who already see this queue.
+   */
+  async getLateOffenders(
+    companyId: number, role?: string | null, employeeId?: number | null,
+    days = 30, minLate = 5,
+  ) {
+    await this.assertMayApproveClockOut(companyId, role, employeeId);
+    const span = Math.min(Math.max(Math.round(days) || 30, 1), 366);
+    const threshold = Math.max(Math.round(minLate) || 5, 1);
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - (span - 1));
+
+    const groups = await this.prisma.attendance.groupBy({
+      by: ['employeeId'],
+      where: { isLate: true, date: { gte: since }, employee: { companyId } },
+      _count: { _all: true },
+      _max: { date: true },
+    });
+    const hits = groups.filter((g) => g._count._all >= threshold);
+    if (!hits.length) return { days: span, minLate: threshold, offenders: [] };
+
+    const people = await this.prisma.employee.findMany({
+      where: { id: { in: hits.map((g) => g.employeeId) }, companyId },
+      select: {
+        id: true, firstName: true, lastName: true, avatarUrl: true, employeeCode: true,
+        designation: { select: { name: true } }, department: { select: { name: true } },
+      },
+    });
+    const byId = new Map(people.map((p) => [p.id, p]));
+    const offenders = hits
+      .filter((g) => byId.has(g.employeeId))
+      .map((g) => ({ employee: byId.get(g.employeeId)!, lateDays: g._count._all, lastLate: g._max.date }))
+      .sort((a, b) => b.lateDays - a.lateDays);
+    return { days: span, minLate: threshold, offenders };
+  }
+
   /** What an employee is still waiting on, for their own attendance screen. */
   async getMyClockOutApprovals(userId: number) {
     const employee = await this.prisma.employee.findUnique({ where: { userId } });

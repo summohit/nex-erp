@@ -28,6 +28,52 @@
     </button>
   </div>
 
+  <!-- ── Quick date range (both tabs) + habitual late-comers ──────────────── -->
+  <div class="coa-quickbar" *ngIf="geoCanApprove() || canApprove() === true">
+    <div class="coa-ranges">
+      <span class="coa-ranges-label">Dates</span>
+      <button type="button" class="coa-range" [class.on]="quickRange() === 'ALL'" (click)="setQuickRange('ALL')">All</button>
+      <button type="button" class="coa-range" [class.on]="quickRange() === 'TODAY'" (click)="setQuickRange('TODAY')">Today</button>
+      <button type="button" class="coa-range" [class.on]="quickRange() === '30'" (click)="setQuickRange('30')">Last 30 days</button>
+      <button type="button" class="coa-range" [class.on]="quickRange() === '60'" (click)="setQuickRange('60')">Last 60 days</button>
+      <button type="button" class="coa-range" [class.on]="quickRange() === '90'" (click)="setQuickRange('90')">Last 90 days</button>
+      <button type="button" class="coa-range" [class.on]="quickRange() === 'CUSTOM'" (click)="setQuickRange('CUSTOM')">Custom</button>
+      <ng-container *ngIf="quickRange() === 'CUSTOM'">
+        <input type="date" class="coa-range-date" [ngModel]="customFrom()" (ngModelChange)="setCustomRange('from', $event)" aria-label="From date">
+        <span class="date-to">to</span>
+        <input type="date" class="coa-range-date" [ngModel]="customTo()" (ngModelChange)="setCustomRange('to', $event)" aria-label="To date">
+      </ng-container>
+    </div>
+
+    <button type="button" class="coa-offender-kpi" *ngIf="canApprove() === true" (click)="offendersOpen.set(!offendersOpen())"
+            [class.has]="offenders().length > 0" title="Clocked in late on 5 or more days in the last 30 days">
+      <span class="coa-offender-num">{{ offenders().length }}</span>
+      <span class="coa-offender-text">
+        <b>Habitual late-comers</b>
+        <small>5+ late days in last 30 days · {{ offendersOpen() ? 'Hide' : 'View' }}</small>
+      </span>
+    </button>
+  </div>
+
+  <div class="coa-offenders" *ngIf="offendersOpen() && canApprove() === true">
+    <p class="coa-offenders-empty" *ngIf="!offenders().length">Nobody has been late on 5 or more days in the last 30 days.</p>
+    <table class="coa-offenders-table" *ngIf="offenders().length">
+      <thead><tr><th>Employee</th><th>Department</th><th class="num">Late days (30d)</th><th>Last late</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let o of offenders()">
+          <td>
+            <span class="coa-off-name">{{ o.employee.firstName }} {{ o.employee.lastName }}</span>
+            <small *ngIf="o.employee.employeeCode"> #{{ o.employee.employeeCode }}</small>
+            <div class="coa-off-sub" *ngIf="o.employee.designation?.name">{{ o.employee.designation.name }}</div>
+          </td>
+          <td>{{ o.employee.department?.name || '—' }}</td>
+          <td class="num"><span class="coa-off-count" [class.severe]="o.lateDays >= 10">{{ o.lateDays }}</span></td>
+          <td>{{ o.lastLate | date:'dd-MM-yyyy' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
   <!-- ── Tab 1: Out-of-Office Clock-ins & Clock-outs ───────────────────────── -->
   <section class="geo-section" *ngIf="geoCanApprove() && activeQueueTab() === 'GEO'">
     <!-- Header Card -->

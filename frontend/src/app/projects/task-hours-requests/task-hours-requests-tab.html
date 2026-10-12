@@ -122,6 +122,16 @@
         countFor('FIELD_VISITS')
       }}</span>
     </button>
+    <button
+      type="button"
+      class="prq-type-tab"
+      [class.active]="requestType() === 'TICKETS'"
+      (click)="setRequestType('TICKETS')"
+    >
+      <svg lucideFileText size="15"></svg>
+      <span>Project Tickets</span>
+      <span class="prq-type-count" *ngIf="countFor('TICKETS') > 0">{{ countFor('TICKETS') }}</span>
+    </button>
   </div>
 
   <div class="prq-date-filter">
@@ -1165,6 +1175,54 @@
           <svg lucidePencil size="14"></svg> Edit &amp; Approve
         </button>
         <button type="button" class="prq-btn approve" (click)="decideScopeRequest(r, 'APPROVED')">
+          <svg lucideCheck size="14"></svg> Approve
+        </button>
+      </div>
+    </article>
+  </ng-container>
+
+  <!-- ── Project tickets (§29) ────────────────────────────────────────────── -->
+  <ng-container *ngIf="requestType() === 'TICKETS' && !loadingOthers()">
+    <div class="prq-empty" *ngIf="!filteredTicketRequests().length">
+      <svg lucideCheckCircle2 size="30"></svg>
+      <h3>No tickets waiting</h3>
+      <p>Tickets raised on a project's Tickets tab appear here for approval.</p>
+    </div>
+
+    <article class="prq-card" *ngFor="let t of filteredTicketRequests()">
+      <div class="prq-card-head">
+        <div class="prq-card-ident">
+          <span class="prq-project" *ngIf="t.project">
+            <svg lucideFolderKanban size="13"></svg> {{ t.project.name }}
+          </span>
+          <span class="prq-scope-chip" [class.out]="t.priority === 'CRITICAL' || t.priority === 'HIGH'">
+            {{ t.ticketNumber }} · {{ t.priority | titlecase }}
+          </span>
+        </div>
+        <span class="prq-stage"> <svg lucideClock size="13"></svg> Awaiting administrator </span>
+      </div>
+
+      <h4 class="prq-title">{{ t.title }}</h4>
+
+      <div class="prq-meta">
+        <span *ngIf="t.raisedBy">Raised by {{ t.raisedBy.firstName }} {{ t.raisedBy.lastName }}</span>
+        <span>{{ t.createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
+        <span *ngIf="t.proposedAssignee">For {{ t.proposedAssignee.firstName }} {{ t.proposedAssignee.lastName }}</span>
+        <span *ngIf="t.estimatedHours">{{ t.estimatedHours }}h estimated</span>
+        <span *ngIf="t.startDate || t.dueDate">
+          {{ t.startDate ? (t.startDate | date:'dd-MM-yyyy') : '—' }}<span class="date-to">to</span>{{ t.dueDate ? (t.dueDate | date:'dd-MM-yyyy') : '—' }}
+        </span>
+      </div>
+
+      <!-- Angular sanitises this. Never bypassSecurityTrustHtml. -->
+      <div class="prq-body" *ngIf="t.description" [innerHTML]="t.description"></div>
+
+      <div class="prq-actions">
+        <a class="prq-btn view-details" *ngIf="t.project" [routerLink]="['/projects', t.project.id]">Open project</a>
+        <button type="button" class="prq-btn reject" *ngIf="isAdmin()" (click)="decideTicket(t, 'REJECTED')">
+          <svg lucideX size="14"></svg> Reject
+        </button>
+        <button type="button" class="prq-btn approve" *ngIf="isAdmin()" (click)="decideTicket(t, 'APPROVED')">
           <svg lucideCheck size="14"></svg> Approve
         </button>
       </div>

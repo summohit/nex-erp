@@ -89,6 +89,15 @@ export class AttendanceController {
     );
   }
 
+  /** Habitual late-comers (5+ late days in 30 by default), for the queue's KPI. */
+  @Get('late-offenders')
+  getLateOffenders(@Request() req, @Query('days') days?: string, @Query('minLate') minLate?: string) {
+    return this.attendanceService.getLateOffenders(
+      req.user.companyId, req.user.role, req.user.employeeId ?? null,
+      days ? Number(days) : 30, minLate ? Number(minLate) : 5,
+    );
+  }
+
   /** Whether to show the queue at all, so the client need not guess. */
   @Get('clock-out/can-approve')
   async canApproveClockOut(@Request() req) {

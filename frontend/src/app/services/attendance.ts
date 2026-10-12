@@ -109,6 +109,12 @@ export class AttendanceService {
   private geo = inject(GeolocationService);
   private apiUrl = `${environment.apiUrl}/attendance`;
 
+  /** People late on `minLate`+ days in the last `days` days, worst first. */
+  getLateOffenders(days = 30, minLate = 5) {
+    return this.http.get<{ days: number; minLate: number; offenders: { employee: any; lateDays: number; lastLate: string }[] }>(
+      `${this.apiUrl}/late-offenders`, { params: { days: String(days), minLate: String(minLate) } });
+  }
+
   importAttendance(rows: Array<{ employeeId: number; date: string; status?: string; clockIn?: string; clockOut?: string }>) {
     return this.http.post<{ imported: number; skipped: number }>(`${this.apiUrl}/import`, { rows });
   }
