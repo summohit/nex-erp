@@ -30,6 +30,7 @@ import TeamLeaveScreen from '../screens/Team/TeamLeaveScreen';
 import MyShiftScreen from '../screens/Team/MyShiftScreen';
 import NoticesScreen from '../screens/Team/NoticesScreen';
 import MyTasksScreen from '../screens/Team/MyTasksScreen';
+import WeeklyTimesheetScreen from '../screens/Team/WeeklyTimesheetScreen';
 import ApprovalsScreen from '../screens/Team/ApprovalsScreen';
 import TeamAttendanceScreen from '../screens/Team/TeamAttendanceScreen';
 import PermissionOnboardingScreen, { PERMISSIONS_ONBOARDED_KEY } from '../screens/Onboarding/PermissionOnboardingScreen';
@@ -172,6 +173,7 @@ export default function AppNavigator() {
             <Stack.Screen name="MyShift" component={MyShiftScreen} />
             <Stack.Screen name="Notices" component={NoticesScreen} />
             <Stack.Screen name="MyTasks" component={MyTasksScreen} />
+            <Stack.Screen name="WeeklyTimesheet" component={WeeklyTimesheetScreen} />
             <Stack.Screen name="Approvals" component={ApprovalsScreen} />
             <Stack.Screen name="TeamAttendance" component={TeamAttendanceScreen} />
           </>
