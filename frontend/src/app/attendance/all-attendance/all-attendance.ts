@@ -111,6 +111,12 @@ export class AllAttendanceComponent implements OnInit {
      * for a reason for the missed clock-out. Showed in the day modal.
      */
     missedClockOutReason: string | null;
+    /** B3: clocks made away from the office — distance, reason and ruling. */
+    outsideOffice: {
+      lines: { label: string; km: string; reason: string }[];
+      state: string;
+      proofUrl: string | null;
+    } | null;
   } | null>(null);
   isDetailsModalOpen = signal(false);
   /** Floating tooltip state positioned dynamically to avoid table overflow clipping. */
@@ -1629,10 +1635,23 @@ export class AllAttendanceComponent implements OnInit {
       durationStr,
       isToday: this.getLocalDateString(new Date(day.date)) === this.getLocalDateString(new Date()),
       autoClockedOut: !!record?.autoClockedOut,
-      missedClockOutReason: record?.clockOutReason ?? null
+      missedClockOutReason: record?.clockOutReason ?? null,
+      outsideOffice: this.outsideOfficeNote(record)
     });
 
     this.isDetailsModalOpen.set(true);
+  }
+
+  private outsideOfficeNote(record: any): NonNullable<ReturnType<typeof this.selectedDayDetails>>['outsideOffice'] {
+    if (!record || !(record.clockInOutside || record.clockOutOutside)) return null;
+    const km = (v: number | null) => (v == null ? 'no GPS' : `${Number(v).toFixed(2)} km away`);
+    const lines: { label: string; km: string; reason: string }[] = [];
+    if (record.clockInOutside) lines.push({ label: 'Clock in', km: km(record.clockInDistanceKm), reason: record.clockInOutsideReason || '—' });
+    if (record.clockOutOutside) lines.push({ label: 'Clock out', km: km(record.clockOutDistanceKm), reason: record.clockOutOutsideReason || '—' });
+    const state = record.geofenceApproval === 'APPROVED' ? 'Approved'
+      : record.geofenceApproval === 'REJECTED' ? `Rejected${record.geofenceReviewNote ? ' — ' + record.geofenceReviewNote : ''}`
+      : 'Pending approval';
+    return { lines, state, proofUrl: record.clockInOutsideProofUrl || record.clockOutOutsideProofUrl || null };
   }
 
   closeDayDetailsModal() {

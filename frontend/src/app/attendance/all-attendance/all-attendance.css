@@ -3147,3 +3147,10 @@
 .filters-active-dot { width: 7px; height: 7px; border-radius: 50%; background: #1373e5; }
 .btn-attendance-reset { color: #dc2626; }
 .btn-attendance-reset:hover { border-color: #dc2626; color: #dc2626; background: #fef2f2; }
+
+.outside-office-note {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+.outside-office-note svg { color: #ea580c; }
+.outside-office-note .note-reason { display: block; }

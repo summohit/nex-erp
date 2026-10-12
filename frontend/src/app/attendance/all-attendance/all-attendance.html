@@ -900,6 +900,15 @@
         </span>
       </div>
 
+      <div class="missed-clockout-note outside-office-note" *ngIf="selectedDayDetails()?.outsideOffice as oo">
+        <svg lucideMapPin [size]="15"></svg>
+        <span>
+          <span class="note-title">Outside office · {{ oo.state }}</span>
+          <span class="note-reason" *ngFor="let l of oo.lines">{{ l.label }} ({{ l.km }}): “{{ l.reason }}”</span>
+          <a *ngIf="oo.proofUrl" class="note-reason" [href]="oo.proofUrl" target="_blank" rel="noopener">View attachment</a>
+        </span>
+      </div>
+
       <!-- Punch History Timeline -->
       <div class="punch-sessions-container">
         <ng-container *ngIf="selectedDayDetails()?.logs && selectedDayDetails()!.logs.length > 0; else noPunches">
