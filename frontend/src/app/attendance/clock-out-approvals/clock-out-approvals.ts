@@ -8,7 +8,7 @@ import {
   LucideAlertCircle, LucideRefreshCw, LucideCalendarDays, LucideSearch,
   LucideCheckCircle2, LucideAlertTriangle, LucideExternalLink,
   LucideLayers, LucideSparkles, LucideBuilding, LucideArrowUpDown,
-  LucideCheckCheck
+  LucideCheckCheck, LucideMapPin, LucideFilter, LucideList, LucideGrid
 } from '@lucide/angular';
 import { AttendanceService } from '../../services/attendance';
 import { DialogService } from '../../shared/services/dialog.service';
@@ -31,7 +31,7 @@ import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDateP
     LucideAlertCircle, LucideRefreshCw, LucideCalendarDays, LucideSearch,
     LucideCheckCircle2, LucideAlertTriangle, LucideExternalLink,
     LucideLayers, LucideSparkles, LucideBuilding, LucideArrowUpDown,
-    LucideCheckCheck
+    LucideCheckCheck, LucideMapPin, LucideFilter, LucideList, LucideGrid
     , AttendanceFilterDrawerComponent
   ],
   templateUrl: './clock-out-approvals.html',
@@ -104,9 +104,13 @@ export class ClockOutApprovalsComponent implements OnInit {
   geoCanApprove = signal(false);
   geoRows = signal<any[]>([]);
   geoBusyId = signal<number | null>(null);
-  visibleGeoRows = computed(() => this.geoRows().filter(row => this.matchesFilter(row)));
+  visibleGeoRows = computed(() => this.geoRows());
 
   // The out-of-office queue's own filters, page and selection. It can run to
+  activeQueueTab = signal<'GEO' | 'LATE'>('GEO');
+  geoTab = signal<'ALL' | 'IN' | 'OUT' | 'BOTH' | 'FAR'>('ALL');
+  lateViewMode = signal<'table' | 'cards'>('table');
+
   // a hundred rows, so it needs more than the page-wide search.
   geoSearch = signal('');
   geoDept = signal('');
@@ -123,6 +127,14 @@ export class ClockOutApprovalsComponent implements OnInit {
   geoDepartments = computed(() => [...new Set(this.geoRows()
     .map((r) => r.employee?.department?.name).filter(Boolean))].sort() as string[]);
 
+  geoInCount = computed(() => this.visibleGeoRows().filter((r) => r.clockInOutside).length);
+  geoOutCount = computed(() => this.visibleGeoRows().filter((r) => r.clockOutOutside).length);
+  geoBothCount = computed(() => this.visibleGeoRows().filter((r) => r.clockInOutside && r.clockOutOutside).length);
+  geoFarCount = computed(() => this.visibleGeoRows().filter((r) => {
+    const km = this.geoMaxKm(r);
+    return km != null && km >= 100;
+  }).length);
+
   /** The farthest the person was, in or out; null when there was no GPS. */
   geoMaxKm(r: any): number | null {
     const kms = [r.clockInOutside ? r.clockInDistanceKm : null, r.clockOutOutside ? r.clockOutDistanceKm : null]
@@ -130,14 +142,42 @@ export class ClockOutApprovalsComponent implements OnInit {
     return kms.length ? Math.max(...kms) : null;
   }
 
+  setGeoTab(tab: 'ALL' | 'IN' | 'OUT' | 'BOTH' | 'FAR') {
+    this.geoTab.set(tab);
+    if (tab === 'ALL') {
+      this.geoType.set('ALL');
+      this.geoDistance.set('ALL');
+    } else if (tab === 'IN') {
+      this.geoType.set('IN');
+      this.geoDistance.set('ALL');
+    } else if (tab === 'OUT') {
+      this.geoType.set('OUT');
+      this.geoDistance.set('ALL');
+    } else if (tab === 'BOTH') {
+      this.geoType.set('ALL');
+      this.geoDistance.set('ALL');
+    } else if (tab === 'FAR') {
+      this.geoType.set('ALL');
+      this.geoDistance.set('GT100');
+    }
+    this.geoPage.set(1);
+    this.geoSelected.set(new Set());
+  }
+
   geoFiltered = computed(() => {
     const q = this.geoSearch().trim().toLowerCase();
     const dept = this.geoDept(), type = this.geoType(), band = this.geoDistance();
     const from = this.geoFrom(), to = this.geoTo();
+    const currentTab = this.geoTab();
     const rows = this.visibleGeoRows().filter((r) => {
+      if (currentTab === 'BOTH' && (!r.clockInOutside || !r.clockOutOutside)) return false;
+      if (currentTab === 'FAR') {
+        const km = this.geoMaxKm(r);
+        if (km == null || km < 100) return false;
+      }
       if (q) {
-        const hay = `${this.employeeName(r)} ${r.employee?.employeeCode ?? ''} ${r.employee?.designation?.name ?? ''} `
-          + `${r.employee?.department?.name ?? ''} ${r.clockInOutsideReason ?? ''} ${r.clockOutOutsideReason ?? ''}`;
+        const hay = `${this.employeeName(r)} ${r.employee?.employeeCode ?? ''} ${this.employeeDesignation(r)} `
+          + `${this.employeeDepartment(r)} ${r.clockInOutsideReason ?? ''} ${r.clockOutOutsideReason ?? ''}`;
         if (!hay.toLowerCase().includes(q)) return false;
       }
       if (dept && r.employee?.department?.name !== dept) return false;
@@ -173,7 +213,7 @@ export class ClockOutApprovalsComponent implements OnInit {
     return `${start}–${Math.min(total, page * this.GEO_PAGE_SIZE)} of ${total}`;
   });
   geoHasFilters = computed(() => !!(this.geoSearch() || this.geoDept() || this.geoType() !== 'ALL'
-    || this.geoDistance() !== 'ALL' || this.geoFrom() || this.geoTo()));
+    || this.geoDistance() !== 'ALL' || this.geoFrom() || this.geoTo() || this.geoTab() !== 'ALL'));
   geoAllOnPageSelected = computed(() => {
     const rows = this.geoPageRows();
     return rows.length > 0 && rows.every((r) => this.geoSelected().has(r.id));
@@ -183,6 +223,11 @@ export class ClockOutApprovalsComponent implements OnInit {
   setGeoFilter(which: string, value: any) {
     ({ search: this.geoSearch, dept: this.geoDept, type: this.geoType, distance: this.geoDistance,
       from: this.geoFrom, to: this.geoTo, sort: this.geoSort } as any)[which].set(value);
+    if (which === 'type') {
+      if (value === 'IN') this.geoTab.set('IN');
+      else if (value === 'OUT') this.geoTab.set('OUT');
+      else this.geoTab.set('ALL');
+    }
     this.geoPage.set(1);
     this.geoSelected.set(new Set());
   }
@@ -191,6 +236,7 @@ export class ClockOutApprovalsComponent implements OnInit {
     for (const k of ['search', 'dept', 'from', 'to']) this.setGeoFilter(k, '');
     this.setGeoFilter('type', 'ALL');
     this.setGeoFilter('distance', 'ALL');
+    this.geoTab.set('ALL');
   }
 
   goGeoPage(p: number) {
@@ -309,10 +355,20 @@ export class ClockOutApprovalsComponent implements OnInit {
   ngOnInit(): void {
     this.attendanceService.canApproveGeofence().subscribe({
       next: (res) => {
-        this.geoCanApprove.set(!!res?.canApprove);
-        if (res?.canApprove) this.loadGeofence();
+        const canGeo = !!res?.canApprove;
+        this.geoCanApprove.set(canGeo);
+        if (canGeo) {
+          this.loadGeofence();
+        } else if (this.activeQueueTab() === 'GEO') {
+          this.activeQueueTab.set('LATE');
+        }
       },
-      error: () => this.geoCanApprove.set(false),
+      error: () => {
+        this.geoCanApprove.set(false);
+        if (this.activeQueueTab() === 'GEO') {
+          this.activeQueueTab.set('LATE');
+        }
+      },
     });
     this.attendanceService.canApproveClockOuts().subscribe({
       next: (res) => {
@@ -355,13 +411,23 @@ export class ClockOutApprovalsComponent implements OnInit {
 
     if (q) {
       list = list.filter((r) => {
-        const name = `${r.employee?.firstName ?? ''} ${r.employee?.lastName ?? ''}`.toLowerCase();
+        const name = this.employeeName(r).toLowerCase();
+        const firstName = String(r.employee?.firstName ?? '').toLowerCase();
+        const lastName = String(r.employee?.lastName ?? '').toLowerCase();
+        const empId = String(r.employee?.id ?? r.employeeId ?? '').toLowerCase();
+        const empCode = String(r.employee?.employeeCode ?? '').toLowerCase();
+        const dept = this.employeeDepartment(r).toLowerCase();
+        const desig = this.employeeDesignation(r).toLowerCase();
+        const reason = String(r.clockOutReason ?? '').toLowerCase();
+
         return name.includes(q)
-          || String(r.employee?.id ?? r.employeeId ?? '').includes(q)
-          || (r.employee?.employeeCode ?? '').toLowerCase().includes(q)
-          || (r.employee?.department?.name ?? '').toLowerCase().includes(q)
-          || (r.employee?.designation ?? '').toLowerCase().includes(q)
-          || (r.clockOutReason ?? '').toLowerCase().includes(q);
+          || firstName.includes(q)
+          || lastName.includes(q)
+          || empId.includes(q)
+          || empCode.includes(q)
+          || dept.includes(q)
+          || desig.includes(q)
+          || reason.includes(q);
       });
     }
 
@@ -381,6 +447,23 @@ export class ClockOutApprovalsComponent implements OnInit {
       return order === 'OLDEST' ? dateA - dateB : dateB - dateA;
     });
   });
+
+  hasActiveLateFilters = computed(() => {
+    return !!(
+      this.search().trim() ||
+      this.filterTab() !== 'ALL' ||
+      this.filterStartDate() ||
+      this.filterEndDate() ||
+      this.filterDepartment() ||
+      this.filterProofStatus()
+    );
+  });
+
+  switchTab(tab: 'GEO' | 'LATE'): void {
+    this.activeQueueTab.set(tab);
+    this.clearFilters();
+    this.resetGeoFilters();
+  }
 
   applyAttendanceFilters(filters: AttendanceFilterValue): void {
     this.filterStartDate.set(filters.startDate);
@@ -412,6 +495,20 @@ export class ClockOutApprovalsComponent implements OnInit {
 
   employeeName(row: any): string {
     return `${row.employee?.firstName ?? ''} ${row.employee?.lastName ?? ''}`.trim() || 'Unknown employee';
+  }
+
+  employeeDesignation(row: any): string {
+    const d = row?.employee?.designation;
+    if (typeof d === 'string') return d.trim() || 'Staff Member';
+    if (d && typeof d === 'object') return d.name || 'Staff Member';
+    return 'Staff Member';
+  }
+
+  employeeDepartment(row: any): string {
+    const d = row?.employee?.department;
+    if (typeof d === 'string') return d.trim();
+    if (d && typeof d === 'object') return d.name || '';
+    return '';
   }
 
   initials(row: any): string {

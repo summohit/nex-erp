@@ -1,29 +1,149 @@
 <div class="coa-page page-container">
 
-  <!-- ── B3: Out-of-office clock-ins / clock-outs (General Shift, 100 m) ──── -->
-  <section class="geo-section" *ngIf="geoCanApprove()">
-    <div class="geo-head">
-      <div>
-        <h2>Out-of-office clock-ins &amp; clock-outs</h2>
-        <p>General Shift staff who clocked more than the office radius away. Approving accepts it; rejecting only flags the day.</p>
+  <!-- ── Main Queue Switcher Tabs (2 Tabs) ─────────────────────────────────── -->
+  <div class="coa-main-tabs" *ngIf="geoCanApprove() || canApprove() === true">
+    <button 
+      type="button" 
+      class="coa-main-tab-btn" 
+      *ngIf="geoCanApprove()"
+      [class.active]="activeQueueTab() === 'GEO'"
+      (click)="switchTab('GEO')">
+      <svg lucideMapPin [size]="17"></svg>
+      <span>Out-of-Office Approvals</span>
+      <span class="tab-badge warning" *ngIf="geoRows().length > 0">{{ geoRows().length }}</span>
+      <span class="tab-badge" *ngIf="geoRows().length === 0">0</span>
+    </button>
+
+    <button 
+      type="button" 
+      class="coa-main-tab-btn" 
+      *ngIf="canApprove() === true || canApprove() === null"
+      [class.active]="activeQueueTab() === 'LATE'"
+      (click)="switchTab('LATE')">
+      <svg lucideClock [size]="17"></svg>
+      <span>Late Clock-out Approvals</span>
+      <span class="tab-badge danger" *ngIf="staleCount() > 0">{{ totalCount() }}</span>
+      <span class="tab-badge info" *ngIf="staleCount() === 0 && totalCount() > 0">{{ totalCount() }}</span>
+      <span class="tab-badge" *ngIf="totalCount() === 0">0</span>
+    </button>
+  </div>
+
+  <!-- ── Tab 1: Out-of-Office Clock-ins & Clock-outs ───────────────────────── -->
+  <section class="geo-section" *ngIf="geoCanApprove() && activeQueueTab() === 'GEO'">
+    <!-- Header Card -->
+    <div class="page-header-card coa-header-card geo-header-card">
+      <div class="header-title-group">
+        <div class="header-icon-badge geo-badge-icon">
+          <svg lucideMapPin [size]="22"></svg>
+        </div>
+        <div class="header-text-wrap">
+          <div class="header-title-row">
+            <h1>Out-of-office clock-ins &amp; clock-outs</h1>
+            <span class="attendance-count-pill pending" *ngIf="geoRows().length > 0">
+              <svg lucideMapPin [size]="13"></svg>
+              <span>{{ geoRows().length }} Pending Review</span>
+            </span>
+            <span class="attendance-count-pill success" *ngIf="geoRows().length === 0">
+              <svg lucideCheckCircle2 [size]="13"></svg>
+              <span>Queue Clear</span>
+            </span>
+          </div>
+          <p class="header-subtitle">
+            General Shift staff who clocked outside the authorized office boundary radius. Approving accepts the punch; rejecting flags the record.
+          </p>
+        </div>
       </div>
-      <span class="geo-count">{{ geoRows().length }} pending</span>
+
+      <div class="header-actions-group">
+        <button 
+          type="button" 
+          class="btn-header-secondary" 
+          (click)="loadGeofence()" 
+          title="Reload out-of-office approval queue">
+          <svg lucideRefreshCw [size]="15"></svg>
+          <span>Refresh</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Filters -->
-    <div class="geo-filters">
-      <input class="geo-input geo-search" type="search" placeholder="Search name, code, department, reason…"
-             [ngModel]="geoSearch()" (ngModelChange)="setGeoFilter('search', $event)">
-      <select class="geo-input" [ngModel]="geoDept()" (ngModelChange)="setGeoFilter('dept', $event)">
+    <!-- Sub-Filter Quick Tabs / Pills -->
+    <div class="coa-toolbar-card geo-pills-bar">
+      <div class="coa-filter-pills">
+        <button 
+          type="button" 
+          class="filter-pill" 
+          [class.active]="geoTab() === 'ALL'" 
+          (click)="setGeoTab('ALL')">
+          <span>All</span>
+          <span class="count-badge">{{ visibleGeoRows().length }}</span>
+        </button>
+        <button 
+          type="button" 
+          class="filter-pill" 
+          [class.active]="geoTab() === 'IN'" 
+          (click)="setGeoTab('IN')">
+          <span>Clock-in Outside</span>
+          <span class="count-badge" [class.highlight]="geoInCount() > 0">{{ geoInCount() }}</span>
+        </button>
+        <button 
+          type="button" 
+          class="filter-pill" 
+          [class.active]="geoTab() === 'OUT'" 
+          (click)="setGeoTab('OUT')">
+          <span>Clock-out Outside</span>
+          <span class="count-badge" [class.highlight]="geoOutCount() > 0">{{ geoOutCount() }}</span>
+        </button>
+        <button 
+          type="button" 
+          class="filter-pill" 
+          [class.active]="geoTab() === 'BOTH'" 
+          (click)="setGeoTab('BOTH')">
+          <span>Both In &amp; Out</span>
+          <span class="count-badge" [class.highlight]="geoBothCount() > 0">{{ geoBothCount() }}</span>
+        </button>
+        <button 
+          type="button" 
+          class="filter-pill pill-urgent" 
+          [class.active]="geoTab() === 'FAR'" 
+          (click)="setGeoTab('FAR')">
+          <span>&gt;100 km Extreme</span>
+          <span class="count-badge danger" *ngIf="geoFarCount() > 0">{{ geoFarCount() }}</span>
+          <span class="count-badge" *ngIf="geoFarCount() === 0">0</span>
+        </button>
+      </div>
+
+      <div class="coa-toolbar-right">
+        <span class="coa-visible-count">
+          Showing <strong>{{ geoFiltered().length }}</strong> of {{ geoRows().length }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Detailed Filters Toolbar -->
+    <div class="geo-filters-bar">
+      <div class="geo-search-wrap">
+        <svg lucideSearch [size]="15" class="geo-search-ico"></svg>
+        <input 
+          class="geo-input geo-search" 
+          type="search" 
+          placeholder="Search name, code, department, reason…"
+          [ngModel]="geoSearch()" 
+          (ngModelChange)="setGeoFilter('search', $event)">
+        <button 
+          type="button" 
+          class="btn-clear-search" 
+          *ngIf="geoSearch()" 
+          (click)="setGeoFilter('search', '')">
+          <svg lucideX [size]="13"></svg>
+        </button>
+      </div>
+
+      <select class="geo-input geo-select" [ngModel]="geoDept()" (ngModelChange)="setGeoFilter('dept', $event)">
         <option value="">All departments</option>
         <option *ngFor="let d of geoDepartments()" [value]="d">{{ d }}</option>
       </select>
-      <select class="geo-input" [ngModel]="geoType()" (ngModelChange)="setGeoFilter('type', $event)">
-        <option value="ALL">Clock-in &amp; clock-out</option>
-        <option value="IN">Clock-in outside</option>
-        <option value="OUT">Clock-out outside</option>
-      </select>
-      <select class="geo-input" [ngModel]="geoDistance()" (ngModelChange)="setGeoFilter('distance', $event)">
+
+      <select class="geo-input geo-select" [ngModel]="geoDistance()" (ngModelChange)="setGeoFilter('distance', $event)">
         <option value="ALL">Any distance</option>
         <option value="LT1">Under 1 km</option>
         <option value="1TO10">1 – 10 km</option>
@@ -31,540 +151,829 @@
         <option value="GT100">Over 100 km</option>
         <option value="NOGPS">No GPS</option>
       </select>
-      <label class="geo-date">From <input class="geo-input" type="date" [ngModel]="geoFrom()" (ngModelChange)="setGeoFilter('from', $event)"></label>
-      <label class="geo-date">To <input class="geo-input" type="date" [ngModel]="geoTo()" (ngModelChange)="setGeoFilter('to', $event)"></label>
-      <select class="geo-input" [ngModel]="geoSort()" (ngModelChange)="setGeoFilter('sort', $event)">
+
+      <div class="geo-date-group">
+        <label class="geo-date">From <input class="geo-input geo-date-input" type="date" [ngModel]="geoFrom()" (ngModelChange)="setGeoFilter('from', $event)"></label>
+        <label class="geo-date">To <input class="geo-input geo-date-input" type="date" [ngModel]="geoTo()" (ngModelChange)="setGeoFilter('to', $event)"></label>
+      </div>
+
+      <select class="geo-input geo-select" [ngModel]="geoSort()" (ngModelChange)="setGeoFilter('sort', $event)">
         <option value="OLDEST">Oldest first</option>
         <option value="NEWEST">Newest first</option>
         <option value="FARTHEST">Farthest first</option>
       </select>
-      <button type="button" class="geo-reset" *ngIf="geoHasFilters()" (click)="resetGeoFilters()">Reset</button>
+
+      <button type="button" class="geo-reset" *ngIf="geoHasFilters()" (click)="resetGeoFilters()">
+        <svg lucideRefreshCw [size]="13"></svg>
+        <span>Reset</span>
+      </button>
     </div>
 
-    <!-- Bulk bar -->
+    <!-- Bulk Action Bar -->
     <div class="geo-bulk" *ngIf="geoPageRows().length">
       <label class="geo-check-all">
         <input type="checkbox" [checked]="geoAllOnPageSelected()" (change)="toggleGeoPage()">
-        Select all on this page
+        <span>Select all on this page</span>
       </label>
       <span class="geo-range">Showing {{ geoRangeLabel() }}</span>
       <div class="geo-bulk-actions" *ngIf="geoSelected().size">
         <span class="geo-sel-count">{{ geoSelected().size }} selected</span>
-        <button type="button" class="geo-btn reject" [disabled]="geoBulkBusy()" (click)="decideGeofenceBulk('REJECT')">Reject selected</button>
+        <button type="button" class="geo-btn reject" [disabled]="geoBulkBusy()" (click)="decideGeofenceBulk('REJECT')">
+          <svg lucideX [size]="14"></svg>
+          <span>Reject selected</span>
+        </button>
         <button type="button" class="geo-btn approve" [disabled]="geoBulkBusy()" (click)="decideGeofenceBulk('APPROVE')">
-          {{ geoBulkBusy() ? 'Saving…' : 'Approve selected' }}
+          <svg lucideCheck [size]="14" *ngIf="!geoBulkBusy()"></svg>
+          <svg lucideRefreshCw [size]="14" class="spin-anim" *ngIf="geoBulkBusy()"></svg>
+          <span>{{ geoBulkBusy() ? 'Saving…' : 'Approve selected' }}</span>
         </button>
       </div>
     </div>
 
-    <div class="geo-empty" *ngIf="!geoFiltered().length">
-      {{ geoRows().length ? 'Nothing matches these filters.' : 'Nothing waiting — everyone clocked from the office.' }}
+    <!-- Empty State -->
+    <div class="coa-empty-card" *ngIf="!geoFiltered().length">
+      <div class="coa-empty-icon muted">
+        <svg lucideMapPin [size]="36" *ngIf="geoRows().length"></svg>
+        <svg lucideCheckCircle2 [size]="40" *ngIf="!geoRows().length"></svg>
+      </div>
+      <h3>{{ geoRows().length ? 'No matching records found' : 'Queue is all clear!' }}</h3>
+      <p>{{ geoRows().length ? 'Nothing matches these filters. Try adjusting your search query, department, or distance band.' : 'Nothing waiting — all staff clocked from within authorized office premises.' }}</p>
+      <button type="button" class="btn-clear-filter" *ngIf="geoHasFilters()" (click)="resetGeoFilters()">Reset Filters</button>
     </div>
 
-    <article class="geo-card" *ngFor="let r of geoPageRows()" [class.is-selected]="geoSelected().has(r.id)">
-      <input type="checkbox" class="geo-row-check" [checked]="geoSelected().has(r.id)" (change)="toggleGeoRow(r.id)"
-             [attr.aria-label]="'Select ' + employeeName(r)">
-      <div class="geo-who">
-        <img *ngIf="r.employee?.avatarUrl" class="geo-avatar" [src]="r.employee.avatarUrl" alt="">
-        <span *ngIf="!r.employee?.avatarUrl" class="geo-avatar geo-initials">{{ geoInitials(r) }}</span>
-        <div class="geo-who-text">
-          <strong>{{ employeeName(r) }}</strong>
-          <span>{{ r.employee?.employeeCode ? '#' + r.employee.employeeCode + ' · ' : '' }}{{ r.employee?.designation?.name || '' }}</span>
-          <span class="geo-dept" *ngIf="r.employee?.department?.name">{{ r.employee.department.name }}</span>
+    <!-- Table Card Container -->
+    <div class="table-card-container geo-table-card" *ngIf="geoFiltered().length > 0">
+      <div class="table-scroll-wrapper">
+        <table class="attendance-table geo-table">
+          <thead>
+            <tr>
+              <th class="th-check">
+                <input 
+                  type="checkbox" 
+                  [checked]="geoAllOnPageSelected()" 
+                  (change)="toggleGeoPage()"
+                  aria-label="Select all on this page">
+              </th>
+              <th class="th-emp">Employee</th>
+              <th class="th-date">Date &amp; Shift</th>
+              <th class="th-dist">Distance &amp; Type</th>
+              <th class="th-reason">Reason &amp; Evidence</th>
+              <th class="th-actions text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr 
+              *ngFor="let r of geoPageRows()" 
+              [class.row-selected]="geoSelected().has(r.id)"
+              [class.busy-row]="geoBusyId() === r.id">
+              
+              <!-- Checkbox -->
+              <td class="td-check">
+                <input 
+                  type="checkbox" 
+                  class="geo-row-check" 
+                  [checked]="geoSelected().has(r.id)" 
+                  (change)="toggleGeoRow(r.id)"
+                  [attr.aria-label]="'Select ' + employeeName(r)">
+              </td>
+
+              <!-- Employee -->
+              <td class="td-emp">
+                <div class="employee-cell">
+                  <div class="avatar-circle" [style.background-color]="getAvatarColor(employeeName(r))">
+                    <img *ngIf="r.employee?.avatarUrl" [src]="r.employee.avatarUrl" [alt]="employeeName(r)">
+                    <span *ngIf="!r.employee?.avatarUrl">{{ geoInitials(r) }}</span>
+                  </div>
+                  <div class="employee-info">
+                    <div class="emp-name-text">{{ employeeName(r) }}</div>
+                    <div class="emp-subtext">
+                      <span *ngIf="r.employee?.employeeCode">#{{ r.employee.employeeCode }} &middot; </span>
+                      <span>{{ employeeDesignation(r) }}</span>
+                    </div>
+                    <span class="emp-dept-pill" *ngIf="employeeDepartment(r)">
+                      <svg lucideBuilding [size]="10"></svg>
+                      <span>{{ employeeDepartment(r) }}</span>
+                    </span>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Date & Shift -->
+              <td class="td-date">
+                <div class="date-cell-wrap">
+                  <span class="date-primary">{{ formatDate(r.date) }}</span>
+                  <span class="shift-subtext">{{ r.shift?.name || 'General Shift' }}</span>
+                </div>
+              </td>
+
+              <!-- Distance & Punch Type -->
+              <td class="td-dist">
+                <div class="geo-chips-cell">
+                  <span *ngIf="r.clockInOutside" class="geo-km in-badge" [ngClass]="geoKmClass(r.clockInDistanceKm)">
+                    <svg lucideMapPin [size]="11"></svg>
+                    <span>In &middot; {{ r.clockInDistanceKm == null ? 'no GPS' : (r.clockInDistanceKm | number:'1.0-2') + ' km' }}</span>
+                  </span>
+                  <span *ngIf="r.clockOutOutside" class="geo-km out-badge" [ngClass]="geoKmClass(r.clockOutDistanceKm)">
+                    <svg lucideMapPin [size]="11"></svg>
+                    <span>Out &middot; {{ r.clockOutDistanceKm == null ? 'no GPS' : (r.clockOutDistanceKm | number:'1.0-2') + ' km' }}</span>
+                  </span>
+                </div>
+              </td>
+
+              <!-- Reason & Evidence -->
+              <td class="td-reason">
+                <div class="geo-reasons-cell">
+                  <div class="reason-line" *ngIf="r.clockInOutsideReason || r.clockInOutsideProofUrl">
+                    <span class="reason-prefix in-prefix">In:</span>
+                    <span class="reason-text">{{ r.clockInOutsideReason || 'No remark stated' }}</span>
+                    <a *ngIf="r.clockInOutsideProofUrl" [href]="r.clockInOutsideProofUrl" target="_blank" rel="noopener" class="geo-proof-link">
+                      <svg lucidePaperclip [size]="12"></svg>
+                      <span>View proof</span>
+                    </a>
+                  </div>
+                  <div class="reason-line" *ngIf="r.clockOutOutsideReason || r.clockOutOutsideProofUrl">
+                    <span class="reason-prefix out-prefix">Out:</span>
+                    <span class="reason-text">{{ r.clockOutOutsideReason || 'No remark stated' }}</span>
+                    <a *ngIf="r.clockOutOutsideProofUrl" [href]="r.clockOutOutsideProofUrl" target="_blank" rel="noopener" class="geo-proof-link">
+                      <svg lucidePaperclip [size]="12"></svg>
+                      <span>View proof</span>
+                    </a>
+                  </div>
+                  <div class="reason-none" *ngIf="!r.clockInOutsideReason && !r.clockInOutsideProofUrl && !r.clockOutOutsideReason && !r.clockOutOutsideProofUrl">
+                    <span class="text-muted">No explanation provided</span>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Actions -->
+              <td class="td-actions text-right">
+                <div class="geo-actions">
+                  <button 
+                    type="button" 
+                    class="geo-btn reject" 
+                    [disabled]="geoBusyId() === r.id || geoBulkBusy()" 
+                    (click)="decideGeofence(r, 'REJECT')"
+                    title="Reject punch">
+                    <svg lucideX [size]="13"></svg>
+                    <span>Reject</span>
+                  </button>
+                  <button 
+                    type="button" 
+                    class="geo-btn approve" 
+                    [disabled]="geoBusyId() === r.id || geoBulkBusy()" 
+                    (click)="decideGeofence(r, 'APPROVE')"
+                    title="Approve punch">
+                    <svg lucideCheck [size]="13" *ngIf="geoBusyId() !== r.id"></svg>
+                    <svg lucideRefreshCw [size]="13" class="spin-anim" *ngIf="geoBusyId() === r.id"></svg>
+                    <span>{{ geoBusyId() === r.id ? 'Saving…' : 'Approve' }}</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="geo-table-footer" *ngIf="geoPageCount() > 1">
+        <span class="pager-info">Showing {{ geoRangeLabel() }}</span>
+        <div class="geo-pager">
+          <button type="button" (click)="goGeoPage(geoPage() - 1)" [disabled]="geoPage() <= 1">
+            ‹ Previous
+          </button>
+          <span>Page {{ geoPage() }} of {{ geoPageCount() }}</span>
+          <button type="button" (click)="goGeoPage(geoPage() + 1)" [disabled]="geoPage() >= geoPageCount()">
+            Next ›
+          </button>
         </div>
       </div>
-      <div class="geo-day">
-        <span class="geo-date">{{ formatDate(r.date) }}</span>
-        <span class="geo-chips">
-          <span *ngIf="r.clockInOutside" class="geo-km" [ngClass]="geoKmClass(r.clockInDistanceKm)">
-            In · {{ r.clockInDistanceKm == null ? 'no GPS' : (r.clockInDistanceKm | number:'1.0-2') + ' km' }}</span>
-          <span *ngIf="r.clockOutOutside" class="geo-km" [ngClass]="geoKmClass(r.clockOutDistanceKm)">
-            Out · {{ r.clockOutDistanceKm == null ? 'no GPS' : (r.clockOutDistanceKm | number:'1.0-2') + ' km' }}</span>
-        </span>
-      </div>
-      <div class="geo-reasons">
-        <p *ngIf="r.clockInOutsideReason"><b>Clock-in:</b> {{ r.clockInOutsideReason }}
-          <a *ngIf="r.clockInOutsideProofUrl" [href]="r.clockInOutsideProofUrl" target="_blank" rel="noopener">View attachment</a></p>
-        <p *ngIf="r.clockOutOutsideReason"><b>Clock-out:</b> {{ r.clockOutOutsideReason }}
-          <a *ngIf="r.clockOutOutsideProofUrl" [href]="r.clockOutOutsideProofUrl" target="_blank" rel="noopener">View attachment</a></p>
-      </div>
-      <div class="geo-actions">
-        <button type="button" class="geo-btn reject" [disabled]="geoBusyId() === r.id || geoBulkBusy()" (click)="decideGeofence(r, 'REJECT')">Reject</button>
-        <button type="button" class="geo-btn approve" [disabled]="geoBusyId() === r.id || geoBulkBusy()" (click)="decideGeofence(r, 'APPROVE')">
-          {{ geoBusyId() === r.id ? 'Saving…' : 'Approve' }}
-        </button>
-      </div>
-    </article>
-
-    <!-- Pagination: 100 per page -->
-    <div class="geo-pager" *ngIf="geoPageCount() > 1">
-      <button type="button" (click)="goGeoPage(geoPage() - 1)" [disabled]="geoPage() <= 1">‹ Previous</button>
-      <span>Page {{ geoPage() }} of {{ geoPageCount() }}</span>
-      <button type="button" (click)="goGeoPage(geoPage() + 1)" [disabled]="geoPage() >= geoPageCount()">Next ›</button>
     </div>
   </section>
 
-  <!-- ── 1. Access Check In Flight ─────────────────────────────────────────── -->
-  <div class="coa-status-card coa-checking" *ngIf="canApprove() === null">
-    <div class="coa-spin-wrapper">
-      <svg lucideRefreshCw [size]="24" class="spin-anim"></svg>
-    </div>
-    <div class="coa-status-info">
-      <h3>Checking permissions</h3>
-      <p>Verifying your administrative access to the clock-out approval queue…</p>
-    </div>
-  </div>
+  <!-- ── Tab 2: Late Clock-out Approvals Queue ───────────────────────────── -->
+  <ng-container *ngIf="activeQueueTab() === 'LATE'">
 
-  <!-- ── 2. Access Denied State ────────────────────────────────────────────── -->
-  <div class="coa-status-card coa-denied" *ngIf="canApprove() === false">
-    <div class="coa-denied-icon">
-      <svg lucideAlertCircle [size]="32"></svg>
-    </div>
-    <div class="coa-status-info">
-      <h3>Not on the approval roster</h3>
-      <p>
-        Late and forgotten clock-outs are reviewed by Super Admins or HR managers, plus
-        individuals explicitly designated on the approval list.
-      </p>
-      <div class="coa-denied-hint">
-        Please contact your system Super Admin if you need review authority for this queue.
+    <!-- ── 1. Access Check In Flight ─────────────────────────────────────────── -->
+    <div class="coa-status-card coa-checking" *ngIf="canApprove() === null">
+      <div class="coa-spin-wrapper">
+        <svg lucideRefreshCw [size]="24" class="spin-anim"></svg>
+      </div>
+      <div class="coa-status-info">
+        <h3>Checking permissions</h3>
+        <p>Verifying your administrative access to the clock-out approval queue…</p>
       </div>
     </div>
-  </div>
 
-  <!-- ── 3. Authorized Approver View ────────────────────────────────────────── -->
-  <ng-container *ngIf="canApprove() === true">
-
-    <!-- Enhanced Page Header Card -->
-    <div class="page-header-card coa-header-card">
-      <div class="header-title-group">
-        <div class="header-icon-badge">
-          <svg lucideClock [size]="22"></svg>
+    <!-- ── 2. Access Denied State ────────────────────────────────────────────── -->
+    <div class="coa-status-card coa-denied" *ngIf="canApprove() === false">
+      <div class="coa-denied-icon">
+        <svg lucideAlertCircle [size]="32"></svg>
+      </div>
+      <div class="coa-status-info">
+        <h3>Not on the approval roster</h3>
+        <p>
+          Late and forgotten clock-outs are reviewed by Super Admins or HR managers, plus
+          individuals explicitly designated on the approval list.
+        </p>
+        <div class="coa-denied-hint">
+          Please contact your system Super Admin if you need review authority for this queue.
         </div>
-        <div class="header-text-wrap">
-          <div class="header-title-row">
-            <h1>Late Clock-out Approvals</h1>
-            
-            <!-- Dynamic Status Badges -->
-            <span class="attendance-count-pill success" *ngIf="totalCount() === 0">
-              <svg lucideCheckCircle2 [size]="13"></svg>
-              <span>Queue Clear</span>
-            </span>
+      </div>
+    </div>
 
-            <span class="attendance-count-pill urgent" *ngIf="staleCount() > 0">
-              <svg lucideAlertTriangle [size]="13"></svg>
-              <span>{{ staleCount() }} Urgent (&ge;7 Days)</span>
-            </span>
+    <!-- ── 3. Authorized Approver View ────────────────────────────────────────── -->
+    <ng-container *ngIf="canApprove() === true">
 
-            <span class="attendance-count-pill pending" *ngIf="totalCount() > 0 && staleCount() === 0">
-              <svg lucideClock [size]="13"></svg>
-              <span>{{ totalCount() }} Pending Review</span>
-            </span>
+      <!-- Enhanced Page Header Card -->
+      <div class="page-header-card coa-header-card">
+        <div class="header-title-group">
+          <div class="header-icon-badge">
+            <svg lucideClock [size]="22"></svg>
           </div>
-          <p class="header-subtitle">
-            Days closed out of an earlier session. Until reviewed, records remain in limbo and will not count towards attendance or monthly payroll.
-          </p>
-        </div>
-      </div>
+          <div class="header-text-wrap">
+            <div class="header-title-row">
+              <h1>Late Clock-out Approvals</h1>
+              
+              <!-- Dynamic Status Badges -->
+              <span class="attendance-count-pill success" *ngIf="totalCount() === 0">
+                <svg lucideCheckCircle2 [size]="13"></svg>
+                <span>Queue Clear</span>
+              </span>
 
-      <div class="header-actions-group">
-        <button type="button" class="btn-header-secondary" (click)="filterDrawerOpen.set(true)">
-          <svg lucideSearch [size]="15"></svg>
-          <span>Filters<span *ngIf="activeApprovalFilterCount"> ({{ activeApprovalFilterCount }})</span></span>
-        </button>
-        <!-- Batch Approve All Visible Button -->
-        <button 
-          type="button" 
-          class="btn-header-primary" 
-          *ngIf="visibleRows().length > 1"
-          (click)="approveAllVisible()" 
-          [disabled]="isBatchApproving() || isLoading() || busyId() !== null"
-          title="Approve all currently displayed requests">
-          <svg lucideCheckCheck [size]="16" *ngIf="!isBatchApproving()"></svg>
-          <svg lucideRefreshCw [size]="16" class="spin-anim" *ngIf="isBatchApproving()"></svg>
-          <span>{{ isBatchApproving() ? 'Approving All…' : 'Approve All Shown (' + visibleRows().length + ')' }}</span>
-        </button>
+              <span class="attendance-count-pill urgent" *ngIf="staleCount() > 0">
+                <svg lucideAlertTriangle [size]="13"></svg>
+                <span>{{ staleCount() }} Urgent (&ge;7 Days)</span>
+              </span>
 
-        <!-- Refresh Button -->
-        <button 
-          type="button" 
-          class="btn-header-secondary" 
-          (click)="load()" 
-          [disabled]="isLoading() || isBatchApproving()" 
-          title="Reload the approval queue">
-          <svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoading()"></svg>
-          <span>Refresh</span>
-        </button>
-      </div>
-      <app-attendance-filter-drawer
-        [open]="filterDrawerOpen()"
-        title="Approval queue filters"
-        description="Find overdue requests by employee, date, department, or evidence."
-        employeeLabel="Employee, ID, or clock-out reason"
-        employeePlaceholder="Search employee or reason"
-        employeeHint="Also matches employee ID, department, designation, and reason."
-        [filterGroups]="approvalFilterGroups"
-        [filterValues]="approvalFilterValues"
-        [startDate]="filterStartDate()"
-        [endDate]="filterEndDate()"
-        [employeeQuery]="search()"
-        [preset]="filterDatePreset()"
-        (closed)="filterDrawerOpen.set(false)"
-        (applied)="applyAttendanceFilters($event)">
-      </app-attendance-filter-drawer>
-    </div>
-
-    <!-- ── Interactive KPI Stats Cards ────────────────────────────────────── -->
-    <div class="stats-row coa-stats-grid">
-      <!-- Total In Queue -->
-      <div 
-        class="stat-card stat-indigo" 
-        [class.active-card]="filterTab() === 'ALL'" 
-        (click)="setFilterTab('ALL')" 
-        title="Show all pending requests">
-        <div class="stat-icon-wrapper">
-          <svg lucideInbox [size]="22"></svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-label">Total In Queue</span>
-          <div class="stat-value">{{ totalCount() }}</div>
-          <span class="stat-subtext">Awaiting administrative decision</span>
-        </div>
-      </div>
-
-      <!-- Urgent / Stale (≥ 7 Days) -->
-      <div 
-        class="stat-card stat-rose" 
-        [class.active-card]="filterTab() === 'URGENT'" 
-        (click)="setFilterTab('URGENT')" 
-        title="Filter requests waiting 7 or more days">
-        <div class="stat-icon-wrapper">
-          <svg lucideAlertTriangle [size]="22"></svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-label">Urgent (&ge;7 Days)</span>
-          <div class="stat-value">{{ staleCount() }}</div>
-          <span class="stat-subtext">May delay month-end payroll</span>
-        </div>
-      </div>
-
-      <!-- Recent (< 7 Days) -->
-      <div 
-        class="stat-card stat-amber" 
-        [class.active-card]="filterTab() === 'RECENT'" 
-        (click)="setFilterTab('RECENT')" 
-        title="Filter requests submitted under 7 days ago">
-        <div class="stat-icon-wrapper">
-          <svg lucideClock [size]="22"></svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-label">Recent (&lt;7 Days)</span>
-          <div class="stat-value">{{ recentCount() }}</div>
-          <span class="stat-subtext">Within standard review window</span>
-        </div>
-      </div>
-
-      <!-- With Supporting Proof -->
-      <div 
-        class="stat-card stat-green" 
-        [class.active-card]="filterTab() === 'HAS_PROOF'" 
-        (click)="setFilterTab('HAS_PROOF')" 
-        title="Filter requests with attached documentation">
-        <div class="stat-icon-wrapper">
-          <svg lucidePaperclip [size]="22"></svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-label">With Attached Proof</span>
-          <div class="stat-value">{{ proofCount() }}</div>
-          <span class="stat-subtext">Has supporting screenshot or document</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Filter & Search Toolbar ────────────────────────────────────────── -->
-    <div class="coa-toolbar-card">
-      <div class="coa-search-box">
-        <svg lucideSearch [size]="16" class="search-icon"></svg>
-        <input 
-          type="text" 
-          placeholder="Search by employee name, code, designation, or reason…" 
-          [ngModel]="search()" 
-          (ngModelChange)="search.set($event)">
-        <button 
-          type="button" 
-          class="btn-clear-search" 
-          *ngIf="search()" 
-          (click)="search.set('')" 
-          title="Clear search">
-          <svg lucideX [size]="14"></svg>
-        </button>
-      </div>
-
-      <div class="coa-filter-pills">
-        <button 
-          type="button" 
-          class="filter-pill" 
-          [class.active]="filterTab() === 'ALL'" 
-          (click)="setFilterTab('ALL')">
-          <span>All</span>
-          <span class="count-badge">{{ totalCount() }}</span>
-        </button>
-
-        <button 
-          type="button" 
-          class="filter-pill pill-urgent" 
-          [class.active]="filterTab() === 'URGENT'" 
-          (click)="setFilterTab('URGENT')">
-          <span>Urgent</span>
-          <span class="count-badge danger" *ngIf="staleCount() > 0">{{ staleCount() }}</span>
-          <span class="count-badge" *ngIf="staleCount() === 0">0</span>
-        </button>
-
-        <button 
-          type="button" 
-          class="filter-pill" 
-          [class.active]="filterTab() === 'RECENT'" 
-          (click)="setFilterTab('RECENT')">
-          <span>Recent</span>
-          <span class="count-badge">{{ recentCount() }}</span>
-        </button>
-
-        <button 
-          type="button" 
-          class="filter-pill" 
-          [class.active]="filterTab() === 'HAS_PROOF'" 
-          (click)="setFilterTab('HAS_PROOF')">
-          <span>With Proof</span>
-          <span class="count-badge">{{ proofCount() }}</span>
-        </button>
-      </div>
-
-      <div class="coa-toolbar-right">
-        <!-- Sort Toggle -->
-        <button 
-          type="button" 
-          class="btn-sort-toggle" 
-          (click)="toggleSortOrder()" 
-          [title]="sortOrder() === 'OLDEST' ? 'Sorting oldest first (click to change)' : 'Sorting newest first (click to change)'">
-          <svg lucideArrowUpDown [size]="14"></svg>
-          <span>{{ sortOrder() === 'OLDEST' ? 'Oldest First' : 'Newest First' }}</span>
-        </button>
-
-        <span class="coa-visible-count">
-          Showing <strong>{{ visibleRows().length }}</strong> of {{ rows().length }}
-        </span>
-      </div>
-    </div>
-
-    <!-- ── Loading Skeleton State ─────────────────────────────────────────── -->
-    <div class="coa-skeleton-list" *ngIf="isLoading() && !rows().length">
-      <div class="coa-skeleton-card" *ngFor="let i of [1, 2, 3]">
-        <div class="sk-header">
-          <div class="sk-avatar"></div>
-          <div class="sk-lines">
-            <div class="sk-line sk-w40"></div>
-            <div class="sk-line sk-w25"></div>
-          </div>
-        </div>
-        <div class="sk-body">
-          <div class="sk-chip"></div>
-          <div class="sk-chip"></div>
-          <div class="sk-chip"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Empty Queue Triumph State ──────────────────────────────────────── -->
-    <div class="coa-empty-card" *ngIf="!isLoading() && !rows().length">
-      <div class="coa-empty-glow">
-        <div class="coa-empty-circle">
-          <svg lucideCheckCircle2 [size]="44"></svg>
-        </div>
-      </div>
-      <h2>All Caught Up!</h2>
-      <p class="coa-empty-desc">
-        Every late clock-out request has been settled. No attendance records are currently waiting in limbo or blocked from payroll.
-      </p>
-
-      <div class="coa-empty-tip">
-        <div class="tip-icon"><svg lucideSparkles [size]="16"></svg></div>
-        <div class="tip-text">
-          When an employee closes a shift from an earlier calendar day, their explanation and logs will automatically appear here for review.
-        </div>
-      </div>
-
-      <button type="button" class="btn-empty-refresh" (click)="load()">
-        <svg lucideRefreshCw [size]="15"></svg>
-        <span>Check for New Requests</span>
-      </button>
-    </div>
-
-    <!-- ── No Search Results State ────────────────────────────────────────── -->
-    <div class="coa-empty-card subtle" *ngIf="!isLoading() && rows().length && !visibleRows().length">
-      <div class="coa-empty-icon muted">
-        <svg lucideSearch [size]="32"></svg>
-      </div>
-      <h3>No matching records found</h3>
-      <p>No late clock-out requests match your current search query or active filter.</p>
-      <button type="button" class="btn-clear-filter" (click)="clearFilters()">
-        <span>Reset Filters</span>
-      </button>
-    </div>
-
-    <!-- ── Active Request Cards List ──────────────────────────────────────── -->
-    <div class="coa-cards-list" *ngIf="visibleRows().length > 0">
-      <article 
-        class="coa-review-card" 
-        *ngFor="let row of visibleRows()"
-        [class.stale-card]="isStale(row)"
-        [class.busy-card]="busyId() === row.id">
-
-        <!-- Top Accent Bar for Urgency -->
-        <div class="coa-card-accent-bar" [class.urgent]="isStale(row)"></div>
-
-        <div class="coa-card-content">
-          <!-- Card Header: Employee Info & Urgency Badge -->
-          <div class="coa-card-header">
-            <div class="coa-user-profile">
-              <div class="coa-avatar-ring" [style.background-color]="getAvatarColor(employeeName(row))">
-                <img *ngIf="row.employee?.avatarUrl" [src]="row.employee.avatarUrl" [alt]="employeeName(row)">
-                <span *ngIf="!row.employee?.avatarUrl">{{ initials(row) }}</span>
-              </div>
-              <div class="coa-user-details">
-                <div class="coa-user-name-row">
-                  <h3 class="coa-user-name">{{ employeeName(row) }}</h3>
-                  <span class="coa-emp-code" *ngIf="row.employee?.employeeCode">{{ row.employee.employeeCode }}</span>
-                  <span class="coa-dept-tag" *ngIf="row.employee?.department?.name">
-                    <svg lucideBuilding [size]="11"></svg>
-                    <span>{{ row.employee.department.name }}</span>
-                  </span>
-                </div>
-                <div class="coa-user-sub">
-                  <span>{{ row.employee?.designation || 'Staff Member' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Urgency / Waiting Badge -->
-            <div class="coa-urgency-wrapper">
-              <div class="coa-waiting-badge" [class.urgent]="isStale(row)">
-                <svg lucideAlertTriangle [size]="13" *ngIf="isStale(row)"></svg>
-                <svg lucideClock [size]="13" *ngIf="!isStale(row)"></svg>
-                <span *ngIf="isStale(row)">Urgent &middot; Waiting {{ waitingDays(row) }} days</span>
-                <span *ngIf="!isStale(row)">Waiting {{ waitingDays(row) }} {{ waitingDays(row) === 1 ? 'day' : 'days' }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Session Metadata Chips Grid -->
-          <div class="coa-session-grid">
-            <!-- Shift Date -->
-            <div class="coa-info-chip">
-              <div class="chip-label">
-                <svg lucideCalendarDays [size]="13"></svg>
-                <span>Shift Date</span>
-              </div>
-              <div class="chip-val bold">{{ formatDate(row.date) }}</div>
-            </div>
-
-            <!-- Assigned Shift -->
-            <div class="coa-info-chip" *ngIf="row.shift?.name">
-              <div class="chip-label">
-                <svg lucideLayers [size]="13"></svg>
-                <span>Assigned Shift</span>
-              </div>
-              <div class="chip-val">{{ row.shift.name }}</div>
-            </div>
-
-            <!-- Punched Clock In & Out -->
-            <div class="coa-info-chip times-chip">
-              <div class="chip-label">
+              <span class="attendance-count-pill pending" *ngIf="totalCount() > 0 && staleCount() === 0">
                 <svg lucideClock [size]="13"></svg>
-                <span>Punched In &rarr; Out</span>
-              </div>
-              <div class="chip-val">
-                <span class="time-in">{{ formatTime(row.clockIn) }}</span>
-                <span class="time-arrow">&rarr;</span>
-                <span class="time-out">{{ formatTime(row.clockOut) }}</span>
-              </div>
+                <span>{{ totalCount() }} Pending Review</span>
+              </span>
             </div>
-
-            <!-- Session Duration Span -->
-            <div class="coa-info-chip duration-chip">
-              <div class="chip-label">
-                <svg lucideClock [size]="13"></svg>
-                <span>Logged Duration</span>
-              </div>
-              <div class="chip-val highlight">{{ sessionDuration(row) }}</div>
-            </div>
-          </div>
-
-          <!-- Employee Explanation / Reason -->
-          <div class="coa-reason-block">
-            <div class="reason-header">
-              <span class="reason-tag">Employee's Stated Reason</span>
-            </div>
-            <div class="reason-content" *ngIf="row.clockOutReason">
-              &ldquo;{{ row.clockOutReason }}&rdquo;
-            </div>
-            <div class="reason-content none" *ngIf="!row.clockOutReason">
-              No explanation was submitted by the employee.
-            </div>
-          </div>
-
-          <!-- Proof Document Attachment -->
-          <div class="coa-attachment-row">
-            <a 
-              class="coa-proof-link" 
-              *ngIf="row.clockOutProofUrl" 
-              [href]="row.clockOutProofUrl" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              title="Open supporting proof in a new browser tab">
-              <svg lucidePaperclip [size]="15"></svg>
-              <span>View Attached Proof Document</span>
-              <svg lucideExternalLink [size]="13" class="ext-ico"></svg>
-            </a>
-
-            <div class="coa-proof-none" *ngIf="!row.clockOutProofUrl">
-              <svg lucidePaperclip [size]="14"></svg>
-              <span>No supporting document attached</span>
-            </div>
-          </div>
-
-          <!-- Actions Footer -->
-          <div class="coa-card-actions">
-            <div class="coa-record-id">
-              Record #{{ row.id }} &middot; Logged {{ formatDate(row.clockOut || row.date) }}
-            </div>
-
-            <div class="coa-btn-group">
-              <button 
-                type="button" 
-                class="btn-coa-reject" 
-                (click)="reject(row)" 
-                [disabled]="busyId() !== null || isBatchApproving()"
-                title="Reject this clock-out (you will be prompted to provide a reason)">
-                <svg lucideX [size]="15"></svg>
-                <span>Reject</span>
-              </button>
-
-              <button 
-                type="button" 
-                class="btn-coa-approve" 
-                (click)="approve(row)" 
-                [disabled]="busyId() !== null || isBatchApproving()"
-                title="Approve this clock-out and credit attendance to payroll">
-                <svg lucideCheck [size]="16" *ngIf="busyId() !== row.id"></svg>
-                <svg lucideRefreshCw [size]="15" class="spin-anim" *ngIf="busyId() === row.id"></svg>
-                <span>{{ busyId() === row.id ? 'Approving…' : 'Approve Clock-out' }}</span>
-              </button>
-            </div>
+            <p class="header-subtitle">
+              Days closed out of an earlier session. Until reviewed, records remain in limbo and will not count towards attendance or monthly payroll.
+            </p>
           </div>
         </div>
 
-      </article>
-    </div>
+        <div class="header-actions-group">
+          <button type="button" class="btn-header-secondary" (click)="filterDrawerOpen.set(true)">
+            <svg lucideSearch [size]="15"></svg>
+            <span>Filters<span *ngIf="activeApprovalFilterCount"> ({{ activeApprovalFilterCount }})</span></span>
+          </button>
+          <!-- Batch Approve All Visible Button -->
+          <button 
+            type="button" 
+            class="btn-header-primary" 
+            *ngIf="visibleRows().length > 1"
+            (click)="approveAllVisible()" 
+            [disabled]="isBatchApproving() || isLoading() || busyId() !== null"
+            title="Approve all currently displayed requests">
+            <svg lucideCheckCheck [size]="16" *ngIf="!isBatchApproving()"></svg>
+            <svg lucideRefreshCw [size]="16" class="spin-anim" *ngIf="isBatchApproving()"></svg>
+            <span>{{ isBatchApproving() ? 'Approving All…' : 'Approve All Shown (' + visibleRows().length + ')' }}</span>
+          </button>
 
+          <!-- Refresh Button -->
+          <button 
+            type="button" 
+            class="btn-header-secondary" 
+            (click)="load()" 
+            [disabled]="isLoading() || isBatchApproving()" 
+            title="Reload the approval queue">
+            <svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoading()"></svg>
+            <span>Refresh</span>
+          </button>
+        </div>
+        <app-attendance-filter-drawer
+          [open]="filterDrawerOpen()"
+          title="Approval queue filters"
+          description="Find overdue requests by employee, date, department, or evidence."
+          employeeLabel="Employee, ID, or clock-out reason"
+          employeePlaceholder="Search employee or reason"
+          employeeHint="Also matches employee ID, department, designation, and reason."
+          [filterGroups]="approvalFilterGroups"
+          [filterValues]="approvalFilterValues"
+          [startDate]="filterStartDate()"
+          [endDate]="filterEndDate()"
+          [employeeQuery]="search()"
+          [preset]="filterDatePreset()"
+          (closed)="filterDrawerOpen.set(false)"
+          (applied)="applyAttendanceFilters($event)">
+        </app-attendance-filter-drawer>
+      </div>
+
+      <!-- ── Interactive KPI Stats Cards ────────────────────────────────────── -->
+      <div class="stats-row coa-stats-grid">
+        <!-- Total In Queue -->
+        <div 
+          class="stat-card stat-indigo" 
+          [class.active-card]="filterTab() === 'ALL'" 
+          (click)="setFilterTab('ALL')" 
+          title="Show all pending requests">
+          <div class="stat-icon-wrapper">
+            <svg lucideInbox [size]="22"></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Total In Queue</span>
+            <div class="stat-value">{{ totalCount() }}</div>
+            <span class="stat-subtext">Awaiting administrative decision</span>
+          </div>
+        </div>
+
+        <!-- Urgent / Stale (≥ 7 Days) -->
+        <div 
+          class="stat-card stat-rose" 
+          [class.active-card]="filterTab() === 'URGENT'" 
+          (click)="setFilterTab('URGENT')" 
+          title="Filter requests waiting 7 or more days">
+          <div class="stat-icon-wrapper">
+            <svg lucideAlertTriangle [size]="22"></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Urgent (&ge;7 Days)</span>
+            <div class="stat-value">{{ staleCount() }}</div>
+            <span class="stat-subtext">May delay month-end payroll</span>
+          </div>
+        </div>
+
+        <!-- Recent (< 7 Days) -->
+        <div 
+          class="stat-card stat-amber" 
+          [class.active-card]="filterTab() === 'RECENT'" 
+          (click)="setFilterTab('RECENT')" 
+          title="Filter requests submitted under 7 days ago">
+          <div class="stat-icon-wrapper">
+            <svg lucideClock [size]="22"></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Recent (&lt;7 Days)</span>
+            <div class="stat-value">{{ recentCount() }}</div>
+            <span class="stat-subtext">Within standard review window</span>
+          </div>
+        </div>
+
+        <!-- With Supporting Proof -->
+        <div 
+          class="stat-card stat-green" 
+          [class.active-card]="filterTab() === 'HAS_PROOF'" 
+          (click)="setFilterTab('HAS_PROOF')" 
+          title="Filter requests with attached documentation">
+          <div class="stat-icon-wrapper">
+            <svg lucidePaperclip [size]="22"></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">With Attached Proof</span>
+            <div class="stat-value">{{ proofCount() }}</div>
+            <span class="stat-subtext">Has supporting screenshot or document</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Filter & Search Toolbar ────────────────────────────────────────── -->
+      <div class="coa-toolbar-card">
+        <div class="coa-search-box">
+          <svg lucideSearch [size]="16" class="search-icon"></svg>
+          <input 
+            type="text" 
+            placeholder="Search by employee name, code, designation, or reason…" 
+            [ngModel]="search()" 
+            (ngModelChange)="search.set($event)">
+          <button 
+            type="button" 
+            class="btn-clear-search" 
+            *ngIf="search()" 
+            (click)="search.set('')" 
+            title="Clear search">
+            <svg lucideX [size]="14"></svg>
+          </button>
+        </div>
+
+        <div class="coa-filter-pills">
+          <button 
+            type="button" 
+            class="filter-pill" 
+            [class.active]="filterTab() === 'ALL'" 
+            (click)="setFilterTab('ALL')">
+            <span>All</span>
+            <span class="count-badge">{{ totalCount() }}</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="filter-pill pill-urgent" 
+            [class.active]="filterTab() === 'URGENT'" 
+            (click)="setFilterTab('URGENT')">
+            <span>Urgent</span>
+            <span class="count-badge danger" *ngIf="staleCount() > 0">{{ staleCount() }}</span>
+            <span class="count-badge" *ngIf="staleCount() === 0">0</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="filter-pill" 
+            [class.active]="filterTab() === 'RECENT'" 
+            (click)="setFilterTab('RECENT')">
+            <span>Recent</span>
+            <span class="count-badge">{{ recentCount() }}</span>
+          </button>
+
+          <button 
+            type="button" 
+            class="filter-pill" 
+            [class.active]="filterTab() === 'HAS_PROOF'" 
+            (click)="setFilterTab('HAS_PROOF')">
+            <span>With Proof</span>
+            <span class="count-badge">{{ proofCount() }}</span>
+          </button>
+        </div>
+
+        <div class="coa-toolbar-right">
+          <!-- View Mode Toggle (Table / Cards) -->
+          <div class="btn-group-toggle">
+            <button 
+              type="button" 
+              class="btn-view-toggle" 
+              [class.active]="lateViewMode() === 'table'"
+              (click)="lateViewMode.set('table')"
+              title="Table View">
+              <svg lucideList [size]="15"></svg>
+              <span>Table</span>
+            </button>
+            <button 
+              type="button" 
+              class="btn-view-toggle" 
+              [class.active]="lateViewMode() === 'cards'"
+              (click)="lateViewMode.set('cards')"
+              title="Cards View">
+              <svg lucideGrid [size]="15"></svg>
+              <span>Cards</span>
+            </button>
+          </div>
+
+          <!-- Sort Toggle -->
+          <button 
+            type="button" 
+            class="btn-sort-toggle" 
+            (click)="toggleSortOrder()" 
+            [title]="sortOrder() === 'OLDEST' ? 'Sorting oldest first (click to change)' : 'Sorting newest first (click to change)'">
+            <svg lucideArrowUpDown [size]="14"></svg>
+            <span>{{ sortOrder() === 'OLDEST' ? 'Oldest First' : 'Newest First' }}</span>
+          </button>
+
+          <!-- Reset Filters Button -->
+          <button 
+            type="button" 
+            class="btn-toolbar-reset" 
+            *ngIf="hasActiveLateFilters()" 
+            (click)="clearFilters()"
+            title="Reset search and filters">
+            <svg lucideRefreshCw [size]="13"></svg>
+            <span>Reset</span>
+          </button>
+
+          <span class="coa-visible-count">
+            Showing <strong>{{ visibleRows().length }}</strong> of {{ rows().length }}
+          </span>
+        </div>
+      </div>
+
+      <!-- ── Loading Skeleton State ─────────────────────────────────────────── -->
+      <div class="coa-skeleton-list" *ngIf="isLoading() && !rows().length">
+        <div class="coa-skeleton-card" *ngFor="let i of [1, 2, 3]">
+          <div class="sk-header">
+            <div class="sk-avatar"></div>
+            <div class="sk-lines">
+              <div class="sk-line sk-w40"></div>
+              <div class="sk-line sk-w25"></div>
+            </div>
+          </div>
+          <div class="sk-body">
+            <div class="sk-chip"></div>
+            <div class="sk-chip"></div>
+            <div class="sk-chip"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Empty Queue Triumph State ──────────────────────────────────────── -->
+      <div class="coa-empty-card" *ngIf="!isLoading() && !rows().length">
+        <div class="coa-empty-glow">
+          <div class="coa-empty-circle">
+            <svg lucideCheckCircle2 [size]="44"></svg>
+          </div>
+        </div>
+        <h2>All Caught Up!</h2>
+        <p class="coa-empty-desc">
+          Every late clock-out request has been settled. No attendance records are currently waiting in limbo or blocked from payroll.
+        </p>
+
+        <div class="coa-empty-tip">
+          <div class="tip-icon"><svg lucideSparkles [size]="16"></svg></div>
+          <div class="tip-text">
+            When an employee closes a shift from an earlier calendar day, their explanation and logs will automatically appear here for review.
+          </div>
+        </div>
+
+        <button type="button" class="btn-empty-refresh" (click)="load()">
+          <svg lucideRefreshCw [size]="15"></svg>
+          <span>Check for New Requests</span>
+        </button>
+      </div>
+
+      <!-- ── No Search Results State ────────────────────────────────────────── -->
+      <div class="coa-empty-card subtle" *ngIf="!isLoading() && rows().length && !visibleRows().length">
+        <div class="coa-empty-icon muted">
+          <svg lucideSearch [size]="32"></svg>
+        </div>
+        <h3>No matching records found</h3>
+        <p>No late clock-out requests match your current search query or active filter.</p>
+        <button type="button" class="btn-clear-filter" (click)="clearFilters()">
+          <span>Reset Filters</span>
+        </button>
+      </div>
+
+      <!-- ── Tabular View for Late Clock-outs ───────────────────────────────── -->
+      <div class="table-card-container late-table-card" *ngIf="visibleRows().length > 0 && lateViewMode() === 'table'">
+        <div class="table-scroll-wrapper">
+          <table class="attendance-table late-table">
+            <thead>
+              <tr>
+                <th class="th-emp">Employee</th>
+                <th class="th-date">Shift Date</th>
+                <th class="th-punches">Session Punches</th>
+                <th class="th-duration">Logged Duration</th>
+                <th class="th-reason">Stated Reason &amp; Proof</th>
+                <th class="th-status">Urgency</th>
+                <th class="th-actions text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr 
+                *ngFor="let row of visibleRows()" 
+                [class.stale-row]="isStale(row)"
+                [class.busy-row]="busyId() === row.id">
+                
+                <!-- Employee -->
+                <td class="td-emp">
+                  <div class="employee-cell">
+                    <div class="avatar-circle" [style.background-color]="getAvatarColor(employeeName(row))">
+                      <img *ngIf="row.employee?.avatarUrl" [src]="row.employee.avatarUrl" [alt]="employeeName(row)">
+                      <span *ngIf="!row.employee?.avatarUrl">{{ initials(row) }}</span>
+                    </div>
+                    <div class="employee-info">
+                      <div class="emp-name-text">{{ employeeName(row) }}</div>
+                      <div class="emp-subtext">
+                        <span *ngIf="row.employee?.employeeCode">#{{ row.employee.employeeCode }} &middot; </span>
+                        <span>{{ employeeDesignation(row) }}</span>
+                      </div>
+                      <span class="emp-dept-pill" *ngIf="employeeDepartment(row)">
+                        <svg lucideBuilding [size]="10"></svg>
+                        <span>{{ employeeDepartment(row) }}</span>
+                      </span>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Date -->
+                <td class="td-date">
+                  <div class="date-cell-wrap">
+                    <span class="date-primary">{{ formatDate(row.date) }}</span>
+                    <span class="shift-subtext" *ngIf="row.shift?.name">{{ row.shift.name }}</span>
+                  </div>
+                </td>
+
+                <!-- Punches -->
+                <td class="td-punches">
+                  <div class="punch-times-cell">
+                    <span class="time-in">{{ formatTime(row.clockIn) }}</span>
+                    <span class="time-arrow">&rarr;</span>
+                    <span class="time-out">{{ formatTime(row.clockOut) }}</span>
+                  </div>
+                </td>
+
+                <!-- Duration -->
+                <td class="td-duration">
+                  <span class="duration-badge">{{ sessionDuration(row) }}</span>
+                </td>
+
+                <!-- Reason & Proof -->
+                <td class="td-reason">
+                  <div class="late-reason-cell">
+                    <div class="late-reason-text" *ngIf="row.clockOutReason">
+                      &ldquo;{{ row.clockOutReason }}&rdquo;
+                    </div>
+                    <div class="late-reason-none" *ngIf="!row.clockOutReason">
+                      <span class="text-muted">No explanation provided</span>
+                    </div>
+                    <a 
+                      *ngIf="row.clockOutProofUrl" 
+                      [href]="row.clockOutProofUrl" 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      class="geo-proof-link">
+                      <svg lucidePaperclip [size]="12"></svg>
+                      <span>View Proof</span>
+                      <svg lucideExternalLink [size]="11"></svg>
+                    </a>
+                  </div>
+                </td>
+
+                <!-- Status / Waiting -->
+                <td class="td-status">
+                  <div class="coa-waiting-badge" [class.urgent]="isStale(row)">
+                    <svg lucideAlertTriangle [size]="12" *ngIf="isStale(row)"></svg>
+                    <svg lucideClock [size]="12" *ngIf="!isStale(row)"></svg>
+                    <span *ngIf="isStale(row)">Urgent &middot; {{ waitingDays(row) }}d</span>
+                    <span *ngIf="!isStale(row)">Waiting {{ waitingDays(row) }}d</span>
+                  </div>
+                </td>
+
+                <!-- Actions -->
+                <td class="td-actions text-right">
+                  <div class="geo-actions">
+                    <button 
+                      type="button" 
+                      class="geo-btn reject" 
+                      (click)="reject(row)" 
+                      [disabled]="busyId() !== null || isBatchApproving()"
+                      title="Reject clock-out">
+                      <svg lucideX [size]="13"></svg>
+                      <span>Reject</span>
+                    </button>
+                    <button 
+                      type="button" 
+                      class="geo-btn approve" 
+                      (click)="approve(row)" 
+                      [disabled]="busyId() !== null || isBatchApproving()"
+                      title="Approve clock-out">
+                      <svg lucideCheck [size]="13" *ngIf="busyId() !== row.id"></svg>
+                      <svg lucideRefreshCw [size]="13" class="spin-anim" *ngIf="busyId() === row.id"></svg>
+                      <span>{{ busyId() === row.id ? 'Approving…' : 'Approve' }}</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── Active Request Cards List (Cards View) ────────────────────────── -->
+      <div class="coa-cards-list" *ngIf="visibleRows().length > 0 && lateViewMode() === 'cards'">
+        <article 
+          class="coa-review-card" 
+          *ngFor="let row of visibleRows()"
+          [class.stale-card]="isStale(row)"
+          [class.busy-card]="busyId() === row.id">
+
+          <!-- Top Accent Bar for Urgency -->
+          <div class="coa-card-accent-bar" [class.urgent]="isStale(row)"></div>
+
+          <div class="coa-card-content">
+            <!-- Card Header: Employee Info & Urgency Badge -->
+            <div class="coa-card-header">
+              <div class="coa-user-profile">
+                <div class="coa-avatar-ring" [style.background-color]="getAvatarColor(employeeName(row))">
+                  <img *ngIf="row.employee?.avatarUrl" [src]="row.employee.avatarUrl" [alt]="employeeName(row)">
+                  <span *ngIf="!row.employee?.avatarUrl">{{ initials(row) }}</span>
+                </div>
+                <div class="coa-user-details">
+                  <div class="coa-user-name-row">
+                    <h3 class="coa-user-name">{{ employeeName(row) }}</h3>
+                    <span class="coa-emp-code" *ngIf="row.employee?.employeeCode">{{ row.employee.employeeCode }}</span>
+                    <span class="coa-dept-tag" *ngIf="employeeDepartment(row)">
+                      <svg lucideBuilding [size]="11"></svg>
+                      <span>{{ employeeDepartment(row) }}</span>
+                    </span>
+                  </div>
+                  <div class="coa-user-sub">
+                    <span>{{ employeeDesignation(row) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Urgency / Waiting Badge -->
+              <div class="coa-urgency-wrapper">
+                <div class="coa-waiting-badge" [class.urgent]="isStale(row)">
+                  <svg lucideAlertTriangle [size]="13" *ngIf="isStale(row)"></svg>
+                  <svg lucideClock [size]="13" *ngIf="!isStale(row)"></svg>
+                  <span *ngIf="isStale(row)">Urgent &middot; Waiting {{ waitingDays(row) }} days</span>
+                  <span *ngIf="!isStale(row)">Waiting {{ waitingDays(row) }} {{ waitingDays(row) === 1 ? 'day' : 'days' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Session Metadata Chips Grid -->
+            <div class="coa-session-grid">
+              <!-- Shift Date -->
+              <div class="coa-info-chip">
+                <div class="chip-label">
+                  <svg lucideCalendarDays [size]="13"></svg>
+                  <span>Shift Date</span>
+                </div>
+                <div class="chip-val bold">{{ formatDate(row.date) }}</div>
+              </div>
+
+              <!-- Assigned Shift -->
+              <div class="coa-info-chip" *ngIf="row.shift?.name">
+                <div class="chip-label">
+                  <svg lucideLayers [size]="13"></svg>
+                  <span>Assigned Shift</span>
+                </div>
+                <div class="chip-val">{{ row.shift.name }}</div>
+              </div>
+
+              <!-- Punched Clock In & Out -->
+              <div class="coa-info-chip times-chip">
+                <div class="chip-label">
+                  <svg lucideClock [size]="13"></svg>
+                  <span>Punched In &rarr; Out</span>
+                </div>
+                <div class="chip-val">
+                  <span class="time-in">{{ formatTime(row.clockIn) }}</span>
+                  <span class="time-arrow">&rarr;</span>
+                  <span class="time-out">{{ formatTime(row.clockOut) }}</span>
+                </div>
+              </div>
+
+              <!-- Session Duration Span -->
+              <div class="coa-info-chip duration-chip">
+                <div class="chip-label">
+                  <svg lucideClock [size]="13"></svg>
+                  <span>Logged Duration</span>
+                </div>
+                <div class="chip-val highlight">{{ sessionDuration(row) }}</div>
+              </div>
+            </div>
+
+            <!-- Employee Explanation / Reason -->
+            <div class="coa-reason-block">
+              <div class="reason-header">
+                <span class="reason-tag">Employee's Stated Reason</span>
+              </div>
+              <div class="reason-content" *ngIf="row.clockOutReason">
+                &ldquo;{{ row.clockOutReason }}&rdquo;
+              </div>
+              <div class="reason-content none" *ngIf="!row.clockOutReason">
+                No explanation was submitted by the employee.
+              </div>
+            </div>
+
+            <!-- Proof Document Attachment -->
+            <div class="coa-attachment-row">
+              <a 
+                class="coa-proof-link" 
+                *ngIf="row.clockOutProofUrl" 
+                [href]="row.clockOutProofUrl" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                title="Open supporting proof in a new browser tab">
+                <svg lucidePaperclip [size]="15"></svg>
+                <span>View Attached Proof Document</span>
+                <svg lucideExternalLink [size]="13" class="ext-ico"></svg>
+              </a>
+
+              <div class="coa-proof-none" *ngIf="!row.clockOutProofUrl">
+                <svg lucidePaperclip [size]="14"></svg>
+                <span>No supporting document attached</span>
+              </div>
+            </div>
+
+            <!-- Actions Footer -->
+            <div class="coa-card-actions">
+              <div class="coa-record-id">
+                Record #{{ row.id }} &middot; Logged {{ formatDate(row.clockOut || row.date) }}
+              </div>
+
+              <div class="coa-btn-group">
+                <button 
+                  type="button" 
+                  class="btn-coa-reject" 
+                  (click)="reject(row)" 
+                  [disabled]="busyId() !== null || isBatchApproving()"
+                  title="Reject this clock-out (you will be prompted to provide a reason)">
+                  <svg lucideX [size]="15"></svg>
+                  <span>Reject</span>
+                </button>
+
+                <button 
+                  type="button" 
+                  class="btn-coa-approve" 
+                  (click)="approve(row)" 
+                  [disabled]="busyId() !== null || isBatchApproving()"
+                  title="Approve this clock-out and credit attendance to payroll">
+                  <svg lucideCheck [size]="16" *ngIf="busyId() !== row.id"></svg>
+                  <svg lucideRefreshCw [size]="15" class="spin-anim" *ngIf="busyId() === row.id"></svg>
+                  <span>{{ busyId() === row.id ? 'Approving…' : 'Approve Clock-out' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </article>
+      </div>
+
+    </ng-container>
   </ng-container>
 </div>
