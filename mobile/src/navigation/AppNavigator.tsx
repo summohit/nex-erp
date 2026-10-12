@@ -21,7 +21,8 @@ import CRMScreen from '../screens/CRM/CRMScreen';
 import NotificationsScreen from '../screens/Notifications/NotificationsScreen';
 import PayslipsScreen from '../screens/Payslips/PayslipsScreen';
 import SplashScreen from '../components/SplashScreen';
-import FieldVisitScreen from '../screens/FieldVisit/FieldVisitScreen';
+import FieldVisitsScreen from '../screens/FieldVisit/FieldVisitsScreen';
+import FieldVisitRequestForm from '../screens/FieldVisit/FieldVisitRequestForm';
 import HardwareRequestScreen from '../screens/Assets/HardwareRequestScreen';
 import TicketsScreen from '../screens/Tickets/TicketsScreen';
 import SecurityScreen from '../screens/Security/SecurityScreen';
@@ -162,7 +163,8 @@ export default function AppNavigator() {
             <Stack.Screen name="CRM" component={CRMScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="Payslips" component={PayslipsScreen} />
-            <Stack.Screen name="FieldVisit" component={FieldVisitScreen} />
+            <Stack.Screen name="FieldVisit" component={FieldVisitsScreen} />
+            <Stack.Screen name="FieldVisitRequestForm" component={FieldVisitRequestForm} />
             <Stack.Screen name="HardwareRequests" component={HardwareRequestScreen} />
             <Stack.Screen name="Tickets" component={TicketsScreen} />
             <Stack.Screen name="Security" component={SecurityScreen} />
