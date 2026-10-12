@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppScreen from '../../components/AppScreen';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { Globe, Kanban, List, GanttChart, Calendar, Paperclip, BarChart, Archive, Users, Lock } from 'lucide-react-native';
+import { Globe, Kanban, List, GanttChart, Calendar, Paperclip, BarChart, Archive, Users, Lock, MessageSquare, Ticket } from 'lucide-react-native';
 import { useProjectStore } from '../../store/projectStore';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { projectService } from '../../api/projectService';
@@ -17,6 +17,8 @@ import AttachmentsTab from './tabs/AttachmentsTab';
 import ReportsTab from './tabs/ReportsTab';
 import ArchivedTab from './tabs/ArchivedTab';
 import FieldVisitsTab from './tabs/FieldVisitsTab';
+import DiscussionsTab from './tabs/DiscussionsTab';
+import TicketsTab from './tabs/TicketsTab';
 import { GradientBanner, PulseSkeleton } from '../../components/SharedUI';
 
 const TABS = [
@@ -26,6 +28,8 @@ const TABS = [
   { id: 'roadmap',      label: 'Roadmap',  icon: GanttChart },
   { id: 'calendar',     label: 'Calendar', icon: Calendar },
   { id: 'fieldvisits',  label: 'Visits',   icon: Users },
+  { id: 'discussions',  label: 'Discussions', icon: MessageSquare },
+  { id: 'tickets',      label: 'Tickets',  icon: Ticket },
   { id: 'attachments',  label: 'Files',    icon: Paperclip },
   { id: 'reports',      label: 'Reports',  icon: BarChart },
   { id: 'archived',     label: 'Archived', icon: Archive },
@@ -39,6 +43,8 @@ function TabContent({ activeTab, projectId }: { activeTab: string; projectId: nu
     case 'roadmap':     return <RoadmapTab />;
     case 'calendar':    return <CalendarTab />;
     case 'fieldvisits': return <FieldVisitsTab projectId={projectId} />;
+    case 'discussions': return <DiscussionsTab projectId={projectId} />;
+    case 'tickets':     return <TicketsTab projectId={projectId} />;
     case 'attachments': return <AttachmentsTab />;
     case 'reports':     return <ReportsTab />;
     case 'archived':    return <ArchivedTab />;
