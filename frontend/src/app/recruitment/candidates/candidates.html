@@ -770,6 +770,15 @@
             </button>
           </div>
 
+          <!-- HR's switch for the auto-built salary table (Annexure); off by default -->
+          <label class="annexure-toggle" *ngIf="app.status === 'OFFERED' || app.status === 'HIRED' || app.status === 'ONBOARDED'">
+            <input type="checkbox" [checked]="!!app.includeSalaryAnnexure" (change)="toggleSalaryAnnexure(app, $any($event.target).checked)">
+            <span>
+              <b>Include salary annexure in offer letter</b>
+              <small>Applies to letters generated from now on. Click Regenerate Letter after changing it.</small>
+            </span>
+          </label>
+
           <!-- Revise CTC / joining date, then regenerate to print the new terms -->
           <button
             type="button"

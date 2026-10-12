@@ -5050,3 +5050,8 @@
 .status-btn.cancel:hover {
   background: #fee2e2;
 }
+
+.annexure-toggle { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer; }
+.annexure-toggle input { margin-top: 3px; width: 16px; height: 16px; accent-color: #2563eb; }
+.annexure-toggle b { display: block; font-size: 13.5px; color: #0f172a; }
+.annexure-toggle small { display: block; font-size: 12px; color: #64748b; }

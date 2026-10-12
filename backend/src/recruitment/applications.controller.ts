@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Request, Query, ParseIntPipe } from '@nestjs/common';
 import { ApplicationsService } from './applications.service';
 import { OfferLettersService } from './offer-letters.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -109,6 +109,12 @@ export class ApplicationsController {
   @Put(':id/annexure')
   saveAnnexure(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: any) {
     return this.applicationsService.saveAnnexure(id, req.user.companyId, body);
+  }
+
+  /** Whether newly generated offer letters include the salary annexure table. */
+  @Patch(':id/offer-options')
+  setOfferOptions(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('includeSalaryAnnexure') include: boolean) {
+    return this.applicationsService.setIncludeSalaryAnnexure(id, req.user.companyId, include === true);
   }
 
   /** Discard a candidate's customised CTC structure. */

@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface JobApplication {
+  includeSalaryAnnexure?: boolean;
   id: number;
   jobId: number;
   companyId: number;
@@ -130,6 +131,12 @@ export class CandidatesService {
   /** Discard the customised structure and rebuild from the company standard. */
   resetAnnexure(applicationId: number): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/${applicationId}/annexure`);
+  }
+
+  /** Include the salary annexure table in newly generated offer letters or not. */
+  setIncludeSalaryAnnexure(applicationId: number, include: boolean) {
+    return this.http.patch<{ id: number; includeSalaryAnnexure: boolean }>(
+      `${this.apiUrl}/${applicationId}/offer-options`, { includeSalaryAnnexure: include });
   }
 
   getOfferLetter(applicationId: number): Observable<any> {

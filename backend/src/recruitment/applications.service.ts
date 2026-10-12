@@ -684,6 +684,17 @@ export class ApplicationsService {
     };
   }
 
+  /** HR's per-candidate switch: annexure table in newly generated letters or not. */
+  async setIncludeSalaryAnnexure(id: number, companyId: number, include: boolean) {
+    const found = await this.prisma.jobApplication.findFirst({ where: { id, companyId }, select: { id: true } });
+    if (!found) throw new NotFoundException('Application not found');
+    return this.prisma.jobApplication.update({
+      where: { id },
+      data: { includeSalaryAnnexure: include },
+      select: { id: true, includeSalaryAnnexure: true },
+    });
+  }
+
   async generateAnnexure(id: number, companyId: number) {
     const application = await this.findOne(id, companyId);
     if (!application.offeredSalary) {

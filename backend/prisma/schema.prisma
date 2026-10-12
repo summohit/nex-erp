@@ -1491,6 +1491,9 @@ model JobApplication {
   /// shared template deliberately does NOT reach a letter somebody has already
   /// tailored. Clearing it puts the candidate back on the template.
   offerLetterBody        String?      @db.Text
+  /// Whether newly generated offer letters carry the auto-built salary
+  /// annexure table. Off unless HR ticks it in Application Details.
+  includeSalaryAnnexure  Boolean      @default(false)
   aiScore                Int?
   aiSummary              String?      @db.Text
   isAiScored             Boolean      @default(false)

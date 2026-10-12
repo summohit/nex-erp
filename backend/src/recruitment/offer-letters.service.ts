@@ -778,8 +778,12 @@ export class OfferLettersService {
 
   private applySalaryTable(body: string, salaryTableHtml: string): string {
     if (!salaryTableHtml) {
-      this.logger.warn('No salary table to substitute; the letter will print without an annexure.');
-      return body;
+      // Annexure switched off for this candidate: take the placeholder out
+      // rather than print it.
+      return body
+        .replace(new RegExp(`<p\\b[^>]*>(?:\\s|&nbsp;|<br\\s*/?>)*${SALARY_TABLE_TOKEN}(?:\\s|&nbsp;|<br\\s*/?>)*</p>`, 'gi'), '')
+        .replace(/{{\s*salaryTable\s*}}/g, '')
+        .split(SALARY_TABLE_TOKEN).join('');
     }
 
     // An editor leaves the token in a paragraph of its own — <p>##SALARY_TABLE##
@@ -1354,9 +1358,15 @@ export class OfferLettersService {
     const templateHtml = chosen?.body || settings?.offerLetterTemplateHtml || DEFAULT_OFFER_LETTER_TEMPLATE;
     const merged = this.mergeTemplate(templateHtml, fields);
 
-    const salaryTableHtml = breakup.length
-      ? this.renderSalaryTable(breakup)
-      : '<p><em>Salary details to be shared separately.</em></p>';
+    // HR decides per candidate (Application Details) whether the annexure goes
+    // in at all. `false` only: the template preview passes a sample with no
+    // such field and should still show the table.
+    const omitAnnexure = application?.includeSalaryAnnexure === false;
+    const salaryTableHtml = omitAnnexure
+      ? ''
+      : breakup.length
+        ? this.renderSalaryTable(breakup)
+        : '<p><em>Salary details to be shared separately.</em></p>';
     // The table is HTML, so it is substituted after the plain scalar merge — in
     // both syntaxes, since a Letter Template uses ##TAGS##.
     // When the caller is going to hand this to an editor, the token stays put:
@@ -1376,7 +1386,7 @@ export class OfferLettersService {
     // A template with no placeholder printed no annexure at all — the live
     // "Offer Letter" template is one. Same rule as an edited body
     // (applySalaryTable): a misplaced annexure beats a vanished one.
-    if (withTable === merged) {
+    if (withTable === merged && !omitAnnexure) {
       this.logger.warn('Offer letter template has no salary-table placeholder; appending the annexure at the end.');
       withTable = `${merged}${tableReplacement}`;
     }

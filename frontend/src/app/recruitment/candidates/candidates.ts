@@ -1578,6 +1578,17 @@ export class CandidatesComponent implements OnInit {
    * the CTC, joining date or address can be revised. The status dropdown only
    * fires on a change, so without this there was no way back into these fields.
    */
+  toggleSalaryAnnexure(app: any, include: boolean) {
+    this.candidatesService.setIncludeSalaryAnnexure(app.id, include).subscribe({
+      next: (res) => {
+        app.includeSalaryAnnexure = res.includeSalaryAnnexure;
+        this.selectedApp.set({ ...(this.selectedApp() as any), includeSalaryAnnexure: res.includeSalaryAnnexure });
+        this.toast.success(include ? 'Annexure will be included — regenerate the letter' : 'Annexure will be left out — regenerate the letter');
+      },
+      error: (err) => this.toast.error(err?.error?.message || 'Could not save the setting'),
+    });
+  }
+
   editOfferTerms() {
     const app = this.selectedApp();
     if (!app) return;
