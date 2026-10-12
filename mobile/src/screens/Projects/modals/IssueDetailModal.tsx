@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import TaskPlanningCard from './TaskPlanningCard';
 import {
   View,
   Text,
@@ -1180,6 +1181,14 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                 </View>
               </View>
             </View>
+
+            <TaskPlanningCard
+              issue={issue}
+              projectId={projectId || issue?.projectId}
+              canManage={perms.isOwner || perms.isPM}
+              canAssignHours={perms.isOwner || perms.isPM}
+              onChanged={() => setRenderTrigger((n) => n + 1)}
+            />
 
             {/* Description Section */}
             <View style={styles.card}>
