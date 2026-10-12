@@ -16,7 +16,7 @@ interface ProjectStoreState {
   toggleStar: (id: number) => Promise<void>;
   archiveProject: (id: number, force?: boolean) => Promise<void>;
   unarchiveProject: (id: number) => Promise<void>;
-  createIssue: (projectId: number, data: any) => Promise<void>;
+  createIssue: (projectId: number, data: any) => Promise<any>;
   updateIssue: (projectId: number, issueId: number, data: any) => Promise<void>;
   updateIssueStatus: (projectId: number, issueId: number, status: string) => Promise<void>;
   updateIssueColumn: (projectId: number, issueId: number, columnId: number) => Promise<void>;
@@ -192,6 +192,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       set((state) => ({
         currentIssues: [...state.currentIssues, newIssue]
       }));
+      return newIssue;
     } catch (error) {
       console.error('Failed to create issue', error);
       throw error;

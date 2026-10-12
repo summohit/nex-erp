@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform, FlatList, RefreshControl, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform, FlatList, RefreshControl, Animated, Image, Modal, Alert, ActivityIndicator } from 'react-native';
 import { useProjectStore } from '../../../store/projectStore';
 import { AlertCircle, CheckCircle, Clock, Plus, ArrowDown, Minus, ArrowUp, Flame, MessageSquare } from 'lucide-react-native';
 import IssueFormModal from '../modals/IssueFormModal';
@@ -20,7 +20,10 @@ const getMemberInitials = (emp: any) => {
 };
 
 export default function BoardTab() {
-  const { currentProject, currentBoard, currentIssues, createIssue, fetchProjectDetails, isLoading } = useProjectStore();
+  const { currentProject, currentBoard, currentIssues, createIssue, fetchProjectDetails, updateIssueColumn, isLoading } = useProjectStore();
+  /** The card whose "Move to…" sheet is open (long-press on the board). */
+  const [moving, setMoving] = useState<any>(null);
+  const [moveBusy, setMoveBusy] = useState(false);
 
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<any>(null);
@@ -95,6 +98,43 @@ export default function BoardTab() {
     
     return map;
   }, [currentIssues, columns]);
+
+  /**
+   * Why a card can't go to a column, or null if it can. The same rules the
+   * task's own status picker applies: one step at a time, and Review / Done
+   * only for the people allowed to put it there.
+   */
+  const moveBlockReason = (issue: any, col: any): string | null => {
+    if (issue.columnId === col.id) return 'Here now';
+    if (!perms.isStatusMoveBlocked(issue, col.id)) return null;
+    if ((perms.isReviewColumn(col.id) || perms.isDoneOrArchiveColumn(col.id)) && !perms.canMoveIntoReviewOrDone(issue, col.id)) {
+      return perms.isAssigneePM(issue) ? 'Only the project owner' : 'Only PM / owner / manager';
+    }
+    return 'One step at a time';
+  };
+
+  const moveTo = async (issue: any, col: any) => {
+    // Review and Done need proof from most people; that upload lives in the
+    // task itself, so hand over to it rather than move without proof.
+    const needsProof = (perms.isReviewColumn(col.id) || perms.isDoneOrArchiveColumn(col.id)) && !perms.canSkipProof;
+    if (needsProof) {
+      setMoving(null);
+      Alert.alert('Proof needed', `Moving to ${col.name} needs proof attached. Open the task to attach it and move it there.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open task', onPress: () => openIssueDetails(issue) },
+      ]);
+      return;
+    }
+    setMoveBusy(true);
+    try {
+      await updateIssueColumn(currentProject.id, issue.id, col.id);
+      setMoving(null);
+    } catch (e: any) {
+      Alert.alert('Could not move', e?.response?.data?.message || 'Please try again.');
+    } finally {
+      setMoveBusy(false);
+    }
+  };
 
   const openIssueDetails = (issue: any) => {
     setSelectedIssue(issue);
@@ -209,6 +249,8 @@ export default function BoardTab() {
         style={styles.issueCard}
         activeOpacity={0.7}
         onPress={() => openIssueDetails(item)}
+        onLongPress={() => setMoving(item)}
+        delayLongPress={350}
       >
           {item.coverUrl && (
             <Image 
@@ -382,9 +424,31 @@ export default function BoardTab() {
         onClose={() => setCreateModalVisible(false)}
         initialColumnId={createColumnId}
         onSubmit={async (data) => {
-          await createIssue(currentProject.id, data);
+          return createIssue(currentProject.id, data);
         }}
       />
+
+      {/* Long-press: move the card without opening it */}
+      <Modal visible={!!moving} transparent animationType="fade" onRequestClose={() => setMoving(null)}>
+        <TouchableOpacity style={styles.moveBackdrop} activeOpacity={1} onPress={() => !moveBusy && setMoving(null)}>
+          <View style={styles.moveSheet}>
+            <Text style={styles.moveTitle} numberOfLines={2}>Move {moving?.key ? `${moving.key} · ` : ''}{moving?.title}</Text>
+            {moveBusy ? <ActivityIndicator style={{ marginVertical: 24 }} color="#2563EB" /> : columns.map((col: any) => {
+              const blocked = moving ? moveBlockReason(moving, col) : null;
+              return (
+                <TouchableOpacity key={col.id} style={[styles.moveRow, !!blocked && { opacity: 0.45 }]} disabled={!!blocked} onPress={() => moveTo(moving, col)}>
+                  <View style={[styles.moveDot, { backgroundColor: col.color || '#94A3B8' }]} />
+                  <Text style={styles.moveName}>{col.name}</Text>
+                  {!!blocked && <Text style={styles.moveWhy}>{blocked}</Text>}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity style={styles.moveOpen} onPress={() => { const m = moving; setMoving(null); openIssueDetails(m); }}>
+              <Text style={styles.moveOpenText}>Open task</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Issue Detail Modal */}
       <IssueDetailModal
@@ -398,6 +462,15 @@ export default function BoardTab() {
 }
 
 const styles = StyleSheet.create({
+  moveBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
+  moveSheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, paddingBottom: 34 },
+  moveTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A', marginBottom: 10 },
+  moveRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  moveDot: { width: 10, height: 10, borderRadius: 5 },
+  moveName: { flex: 1, fontSize: 15, color: '#0F172A', fontWeight: '600' },
+  moveWhy: { fontSize: 12, color: '#64748B' },
+  moveOpen: { marginTop: 14, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
+  moveOpenText: { color: '#0F172A', fontWeight: '600' },
   container: {
     flex: 1,
     backgroundColor: 'transparent',

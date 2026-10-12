@@ -3,22 +3,51 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvo
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, AlertCircle, ArrowDown, Minus, ArrowUp, Flame } from 'lucide-react-native';
 
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useProjectStore } from '../../../store/projectStore';
+import { apiClient } from '../../../api/apiClient';
+import { projectService } from '../../../api/projectService';
+
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const nice = (s: string | null) => (s ? new Date(`${s}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Pick a date');
+const fullName = (e: any) => `${e?.firstName ?? ''} ${e?.lastName ?? ''}`.trim();
 
 interface IssueFormModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (data: any) => Promise<void>;
+  /** Creates the task and returns it, so its members can be added after. */
+  onSubmit: (data: any) => Promise<any>;
   initialColumnId?: number;
 }
 
 export default function IssueFormModal({ visible, onClose, onSubmit, initialColumnId }: IssueFormModalProps) {
   const insets = useSafeAreaInsets();
   const currentBoard = useProjectStore(state => state.currentBoard);
+  const currentProject = useProjectStore(state => state.currentProject);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('MEDIUM');
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [dueDate, setDueDate] = useState<string | null>(null);
+  const [estimatedHours, setEstimatedHours] = useState('');
+  const [memberIds, setMemberIds] = useState<number[]>([]);
+  const [smeId, setSmeId] = useState<number | null>(null);
+  const [prerequisites, setPrerequisites] = useState('');
+  const [phaseId, setPhaseId] = useState<number | null>(null);
+  const [milestoneId, setMilestoneId] = useState<number | null>(null);
+  const [phases, setPhases] = useState<any[]>([]);
+  const [milestones, setMilestones] = useState<any[]>([]);
+  const [dateTarget, setDateTarget] = useState<'start' | 'due' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // The same lists the web's task drawer offers (§import template): any
+  // project member can be on the task; the SME is a PM or technical architect,
+  // defaulting to the PM.
+  const projectMembers: any[] = (currentProject?.members || []).filter((m: any) => m.employee);
+  const smeOptions = projectMembers
+    .filter((m: any) => m.role === 'PROJECT_MANAGER' || m.role === 'TECHNICAL_ARCHITECT')
+    .sort((a: any, b: any) => (a.role === 'PROJECT_MANAGER' ? -1 : 0) - (b.role === 'PROJECT_MANAGER' ? -1 : 0));
+  const defaultSmeId = smeOptions[0]?.employee?.id ?? currentProject?.leadId ?? null;
   const [error, setError] = useState<string | null>(null);
 
   // Reset form when modal opens
@@ -27,27 +56,75 @@ export default function IssueFormModal({ visible, onClose, onSubmit, initialColu
       setTitle('');
       setDescription('');
       setPriority('MEDIUM');
+      setStartDate(null);
+      setDueDate(null);
+      setEstimatedHours('');
+      setMemberIds([]);
+      setSmeId(defaultSmeId);
+      setPrerequisites('');
+      setMilestoneId(null);
       setError(null);
       setIsSubmitting(false);
+      apiClient.get('/master-data/project-phases', { params: { activeOnly: true } })
+        .then(({ data }) => { setPhases(data || []); setPhaseId((data || [])[0]?.id ?? null); })
+        .catch(() => setPhases([]));
+      if (currentProject?.id) {
+        // Not everyone may read milestones; the picker just stays hidden then.
+        apiClient.get(`/projects/${currentProject.id}/milestones`)
+          .then(({ data }) => setMilestones(data?.milestones || []))
+          .catch(() => setMilestones([]));
+      }
     }
   }, [visible]);
 
+  /** The web's required fields, in its order (project-detail isFieldInvalid). */
+  const missing = (): string | null => {
+    if (!title.trim()) return 'Title is required';
+    if (!memberIds.length) return 'Add at least one member';
+    if (!startDate) return 'Start date is required';
+    if (!dueDate) return 'Due date is required';
+    if (dueDate < startDate) return 'Due date cannot be before the start date';
+    if (!prerequisites.trim()) return 'Pre-requisite is required';
+    if (!smeId) return 'SME / Govern is required';
+    if (!(Number(estimatedHours) > 0)) return 'Estimated hours must be more than 0';
+    if (!description.trim()) return 'Description is required';
+    return null;
+  };
+
   const handleSubmit = async () => {
-    if (!title.trim()) {
-      setError('Title is required');
+    const problem = missing();
+    if (problem) {
+      setError(problem);
       return;
     }
-    
+
     setIsSubmitting(true);
     setError(null);
     
     try {
-      await onSubmit({
+      const created = await onSubmit({
         title: title.trim(),
         description: description.trim(),
+        type: 'TASK',
         priority,
-        columnId: initialColumnId
+        columnId: initialColumnId,
+        startDate,
+        dueDate,
+        estimatedHours: Number(estimatedHours),
+        prerequisites: prerequisites.trim(),
+        smeId,
+        phaseId,
+        milestoneId,
+        assigneeId: memberIds[0],
       });
+      // As the web does: the task is created with its first member as the
+      // assignee, then every chosen member is put on it.
+      const newId = created?.id ?? created?.issue?.id;
+      if (newId && currentProject?.id) {
+        await Promise.allSettled(memberIds.map((id) =>
+          projectService.toggleIssueMember(currentProject.id, newId, id)));
+        useProjectStore.getState().fetchProjectDetails(currentProject.id);
+      }
       onClose();
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to create task');
@@ -117,7 +194,7 @@ export default function IssueFormModal({ visible, onClose, onSubmit, initialColu
               autoFocus
             />
 
-            <Text style={styles.label}>Description</Text>
+            <Text style={styles.label}>Description <Text style={styles.required}>*</Text></Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Add details..."
@@ -156,6 +233,113 @@ export default function IssueFormModal({ visible, onClose, onSubmit, initialColu
               })}
             </View>
 
+            <Text style={styles.label}>Members <Text style={styles.required}>*</Text></Text>
+            <View style={styles.chips}>
+              {projectMembers.map((m: any) => {
+                const on = memberIds.includes(m.employee.id);
+                return (
+                  <TouchableOpacity key={m.employee.id} style={[styles.chip, on && styles.chipOn]}
+                    onPress={() => setMemberIds((ids) => (on ? ids.filter((i) => i !== m.employee.id) : [...ids, m.employee.id]))}>
+                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{on ? '✓ ' : ''}{fullName(m.employee)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {projectMembers.length === 0 && <Text style={styles.hint}>This project has no members yet. Add them from the project's team first.</Text>}
+            </View>
+
+            <View style={styles.twoCol}>
+              <View style={styles.col}>
+                <Text style={styles.label}>Start date <Text style={styles.required}>*</Text></Text>
+                <TouchableOpacity style={styles.input} onPress={() => setDateTarget('start')}>
+                  <Text style={[styles.pickText, !startDate && styles.placeholder]}>{nice(startDate)}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.col}>
+                <Text style={styles.label}>Due date <Text style={styles.required}>*</Text></Text>
+                <TouchableOpacity style={styles.input} onPress={() => setDateTarget('due')}>
+                  <Text style={[styles.pickText, !dueDate && styles.placeholder]}>{nice(dueDate)}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <Text style={styles.label}>Estimated hours <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 8"
+              placeholderTextColor="#94A3B8"
+              keyboardType="decimal-pad"
+              value={estimatedHours}
+              onChangeText={(v) => setEstimatedHours(v.replace(/[^0-9.]/g, ''))}
+            />
+
+            <Text style={styles.label}>SME / Govern <Text style={styles.required}>*</Text></Text>
+            <View style={styles.chips}>
+              {smeOptions.map((m: any) => {
+                const on = smeId === m.employee.id;
+                return (
+                  <TouchableOpacity key={m.employee.id} style={[styles.chip, on && styles.chipOn]} onPress={() => setSmeId(m.employee.id)}>
+                    <Text style={[styles.chipText, on && styles.chipTextOn]}>
+                      {fullName(m.employee)} · {m.role === 'PROJECT_MANAGER' ? 'PM' : 'Tech Architect'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {smeOptions.length === 0 && <Text style={styles.hint}>No PM or technical architect on this project — ask the project owner to add one.</Text>}
+            </View>
+
+            <Text style={styles.label}>Pre-requisite <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="What must be ready before this can start?"
+              placeholderTextColor="#94A3B8"
+              value={prerequisites}
+              onChangeText={setPrerequisites}
+              multiline
+              textAlignVertical="top"
+            />
+
+            {phases.length > 0 && (
+              <>
+                <Text style={styles.label}>Phase</Text>
+                <View style={styles.chips}>
+                  {phases.map((ph: any) => (
+                    <TouchableOpacity key={ph.id} style={[styles.chip, phaseId === ph.id && styles.chipOn]} onPress={() => setPhaseId(ph.id)}>
+                      <Text style={[styles.chipText, phaseId === ph.id && styles.chipTextOn]}>{ph.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {milestones.length > 0 && (
+              <>
+                <Text style={styles.label}>Milestone</Text>
+                <View style={styles.chips}>
+                  <TouchableOpacity style={[styles.chip, milestoneId == null && styles.chipOn]} onPress={() => setMilestoneId(null)}>
+                    <Text style={[styles.chipText, milestoneId == null && styles.chipTextOn]}>No milestone</Text>
+                  </TouchableOpacity>
+                  {milestones.map((ms: any) => (
+                    <TouchableOpacity key={ms.id} style={[styles.chip, milestoneId === ms.id && styles.chipOn]} onPress={() => setMilestoneId(ms.id)}>
+                      <Text style={[styles.chipText, milestoneId === ms.id && styles.chipTextOn]}>{ms.name || ms.title}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+
+            <DateTimePickerModal
+              isVisible={!!dateTarget}
+              mode="date"
+              minimumDate={dateTarget === 'due' && startDate ? new Date(`${startDate}T00:00:00`) : undefined}
+              date={new Date(`${(dateTarget === 'due' ? dueDate || startDate : startDate) || ymd(new Date())}T00:00:00`)}
+              onConfirm={(d) => {
+                const v = ymd(d);
+                if (dateTarget === 'start') { setStartDate(v); if (dueDate && dueDate < v) setDueDate(v); } else setDueDate(v);
+                setDateTarget(null);
+              }}
+              onCancel={() => setDateTarget(null)}
+            />
+
             <View style={styles.statusDisplay}>
               <Text style={styles.statusLabel}>Will be added to:</Text>
               <View style={styles.statusBadge}>
@@ -177,10 +361,10 @@ export default function IssueFormModal({ visible, onClose, onSubmit, initialColu
             <TouchableOpacity
               style={[
                 styles.submitBtn,
-                (!title.trim() || isSubmitting) && styles.submitBtnDisabled
+                isSubmitting && styles.submitBtnDisabled
               ]}
               onPress={handleSubmit}
-              disabled={!title.trim() || isSubmitting}
+              disabled={isSubmitting}
             >
               {isSubmitting ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
@@ -196,6 +380,16 @@ export default function IssueFormModal({ visible, onClose, onSubmit, initialColu
 }
 
 const styles = StyleSheet.create({
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
+  chipOn: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  chipText: { fontSize: 13, color: '#475569', fontWeight: '500' },
+  chipTextOn: { color: '#1D4ED8', fontWeight: '700' },
+  hint: { fontSize: 12, color: '#94A3B8' },
+  twoCol: { flexDirection: 'row', gap: 10 },
+  col: { flex: 1 },
+  pickText: { fontSize: 15, color: '#0F172A' },
+  placeholder: { color: '#94A3B8' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.5)',
