@@ -9,11 +9,13 @@ import {
   RefreshControl,
   ActivityIndicator,
   Animated,
+  Alert,
+  Platform,
 } from 'react-native';
 import AppScreen from '../../components/AppScreen';
 import Svg, { Circle } from 'react-native-svg';
 import { useAuthStore } from '../../store/authStore';
-import { useDashboardStore } from '../../store/dashboardStore';
+import { useDashboardStore, getCurrentLocation, requestLocationPermission } from '../../store/dashboardStore';
 import { notificationService, AppNotification } from '../../api/notificationService';
 import { useFieldVisitStore } from '../../store/fieldVisitStore';
 import { formatElapsed } from '../../utils/haversine';
@@ -141,6 +143,9 @@ function getNotificationIcon(title?: string, message?: string) {
   return { Icon: Bell, bg: '#F8FAFC', color: '#64748B' };
 }
 
+/** Above this (metres), a fix is a guess from towers or Wi-Fi rather than GPS. */
+const IMPRECISE_M = 150;
+
 export default function DashboardScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuthStore();
@@ -250,17 +255,66 @@ export default function DashboardScreen() {
    */
   const [lateClockOut, setLateClockOut] = useState<{ visible: boolean; day?: string }>({ visible: false });
 
+  /** The outside-office refusal: ask why, then retry with the same fix. */
+  const [outside, setOutside] = useState<{ visible: boolean; direction?: 'in' | 'out'; message?: string }>({ visible: false });
+
+  /**
+   * GPS first; if the phone could only guess (towers / Wi-Fi), say how to turn
+   * on precise location before the guess is judged against the office pin.
+   * Resolves true to go ahead with the fix, false to stop.
+   */
+  const locatePrecisely = async (): Promise<boolean> => {
+    if (!(await requestLocationPermission())) {
+      setFeedback({ visible: true, type: 'error', title: 'Location needed', message: 'Allow location for MIRA in your phone settings to clock in.' });
+      return false;
+    }
+    for (;;) {
+      let fix;
+      try { fix = await getCurrentLocation(); } catch {
+        setFeedback({ visible: true, type: 'error', title: 'No location', message: 'Turn on Location (GPS) and try again.' });
+        return false;
+      }
+      useDashboardStore.setState({ lastFix: fix });
+      if (fix.accuracy <= IMPRECISE_M) return true;
+      const off = fix.accuracy >= 1000 ? `${(fix.accuracy / 1000).toFixed(1)} km` : `${Math.round(fix.accuracy)} m`;
+      const steps = Platform.OS === 'ios'
+        ? 'iPhone: Settings → Privacy & Security → Location Services → ON → MIRA → "While Using the App" and turn ON "Precise Location".'
+        : 'Android: pull down quick settings and turn Location ON. Then Settings → Location → Location services → Google Location Accuracy → ON. App info → MIRA → Permissions → Location → Allow, with "Use precise location" ON.';
+      const choice = await new Promise<'retry' | 'go' | 'stop'>((resolve) =>
+        Alert.alert(
+          'Your location is not precise',
+          `Your phone could only guess your position to within about ${off}, so you may be shown outside the office even when you are inside.\n\n${steps}\n\nStep near a window if you are deep inside the building.`,
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve('stop') },
+            { text: 'Continue anyway', onPress: () => resolve('go') },
+            { text: 'Try again', onPress: () => resolve('retry') },
+          ],
+        ));
+      if (choice === 'go') return true;
+      if (choice === 'stop') return false;
+    }
+  };
+
   const handleAttendanceToggle = async () => {
     try {
+      if (!(await locatePrecisely())) return;
       if (todayAttendance?.clockIn && !todayAttendance?.clockOut) {
-        await clockOut();
+        await clockOut(undefined, undefined, undefined, undefined, true);
         setFeedback({ visible: true, type: 'success', title: 'Shift Ended', message: 'You have clocked out successfully.' });
       } else {
-        await clockIn();
+        await clockIn(undefined, true);
         setFeedback({ visible: true, type: 'success', title: 'Shift Started', message: 'You have clocked in successfully.' });
       }
     } catch (err: any) {
       const refusal = clockRefusal(err);
+
+      // More than the office radius away on an office shift: the server
+      // allows it with a reason that an administrator reviews. Before this
+      // the app had no way to give one, so those people could not clock at all.
+      if (refusal.code === CLOCK_ERROR.OUTSIDE_OFFICE) {
+        setOutside({ visible: true, direction: refusal.direction, message: refusal.message });
+        return;
+      }
 
       // "That is a previous day — why now?" Ask, then retry with the answer.
       if (refusal.code === CLOCK_ERROR.LATE_REASON_REQUIRED) {
@@ -288,6 +342,23 @@ export default function DashboardScreen() {
       }
 
       setFeedback({ visible: true, type: 'error', title: 'Action Failed', message: refusal.message || err?.message || 'Failed to update attendance' });
+    }
+  };
+
+  /** Retry the same clock, with the same fix, and the reason the server asked for. */
+  const submitOutside = async (reason: string) => {
+    const direction = outside.direction;
+    setOutside({ visible: false });
+    try {
+      if (direction === 'out') await clockOut(undefined, undefined, undefined, reason, true);
+      else await clockIn(reason, true);
+      setFeedback({
+        visible: true, type: 'success',
+        title: direction === 'out' ? 'Shift Ended' : 'Shift Started',
+        message: 'Recorded as outside the office — an administrator will review your reason.',
+      });
+    } catch (err: any) {
+      setFeedback({ visible: true, type: 'error', title: 'Action Failed', message: clockRefusal(err).message || err?.message || 'Failed to update attendance' });
     }
   };
 
@@ -915,6 +986,16 @@ export default function DashboardScreen() {
         title={feedback.title}
         message={feedback.message}
         onClose={() => setFeedback(prev => ({ ...prev, visible: false }))}
+      />
+
+      <LateClockOutModal
+        visible={outside.visible}
+        submitting={isClockingIn}
+        title="Outside the office"
+        message={`${outside.message || 'You are outside the office radius.'}`}
+        placeholder="e.g. At the client site for a meeting"
+        onCancel={() => setOutside({ visible: false })}
+        onSubmit={submitOutside}
       />
 
       <LateClockOutModal

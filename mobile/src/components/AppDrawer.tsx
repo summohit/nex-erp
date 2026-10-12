@@ -712,6 +712,7 @@ function StaticMenuFallback({
         { id: 'notifications', title: 'Notifications', icon: 'bell', screen: 'Notifications', badge: unreadCount },
         { id: 'my-tasks', title: 'Tasks', icon: 'check-square', screen: 'MyTasks' },
         { id: 'approvals', title: 'Approvals', icon: 'user-check', screen: 'Approvals' },
+        { id: 'team-attendance', title: 'Team Attendance', icon: 'calendar-days', screen: 'TeamAttendance' },
         { id: 'my-shift', title: 'My Shift', icon: 'clock', screen: 'MyShift' },
         { id: 'team-leave', title: 'Team Leave', icon: 'users', screen: 'TeamLeave' },
         { id: 'notices', title: 'Notice Board', icon: 'megaphone', screen: 'Notices' },

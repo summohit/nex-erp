@@ -48,6 +48,26 @@ export default function MyTasksScreen() {
   const [picker, setPicker] = useState(false);
   const [people, setPeople] = useState<PersonLite[]>([]);
   const [peopleQuery, setPeopleQuery] = useState('');
+  // "Request more hours" on the open task.
+  const [askHours, setAskHours] = useState(false);
+  const [hours, setHours] = useState('');
+  const [hoursReason, setHoursReason] = useState('');
+  const [sendingHours, setSendingHours] = useState(false);
+
+  const sendHours = async () => {
+    const h = Number(hours);
+    if (!open || !(h > 0) || !hoursReason.trim()) return;
+    setSendingHours(true);
+    try {
+      await workService.requestHours(open.id, h, hoursReason.trim());
+      setAskHours(false); setHours(''); setHoursReason('');
+      Alert.alert('Request sent', `${h} more hour${h === 1 ? '' : 's'} requested on ${open.refKey}. You will be notified when it is decided.`);
+    } catch (e: any) {
+      Alert.alert('Could not send', e?.response?.data?.message || 'Please try again.');
+    } finally {
+      setSendingHours(false);
+    }
+  };
 
   useEffect(() => {
     workService.getCapabilities().then((c) => setIsAdmin(c.isAdmin)).catch(() => {});
@@ -198,8 +218,28 @@ export default function MyTasksScreen() {
                   ].map(([k, v]) => (
                     <View key={k} style={styles.kv}><Text style={styles.k}>{k}</Text><Text style={styles.v}>{v}</Text></View>
                   ))}
+                  {open.source !== 'PRE_SALES' && !['DONE', 'CANCELLED'].includes(open.status) && (askHours ? (
+                    <View style={styles.hoursBox}>
+                      <Text style={styles.hoursTitle}>Request more hours</Text>
+                      <TextInput style={styles.search} placeholder="Extra hours, e.g. 4" keyboardType="decimal-pad" value={hours} onChangeText={setHours} />
+                      <TextInput style={[styles.search, styles.hoursReason]} placeholder="Why do you need them?" value={hoursReason} onChangeText={setHoursReason} multiline />
+                      <View style={styles.sheetActions}>
+                        <TouchableOpacity style={[styles.btn, styles.btnGhost]} onPress={() => setAskHours(false)}>
+                          <Text style={styles.btnGhostText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.btn, styles.btnPrimary, (!(Number(hours) > 0) || !hoursReason.trim() || sendingHours) && { opacity: 0.5 }]}
+                          disabled={!(Number(hours) > 0) || !hoursReason.trim() || sendingHours} onPress={sendHours}>
+                          {sendingHours ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnPrimaryText}>Send request</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <TouchableOpacity style={styles.hoursLink} onPress={() => setAskHours(true)}>
+                      <Text style={styles.hoursLinkText}>⏱ Request more hours</Text>
+                    </TouchableOpacity>
+                  ))}
                   <View style={styles.sheetActions}>
-                    <TouchableOpacity style={[styles.btn, styles.btnGhost]} onPress={() => setOpen(null)}>
+                    <TouchableOpacity style={[styles.btn, styles.btnGhost]} onPress={() => { setAskHours(false); setOpen(null); }}>
                       <Text style={styles.btnGhostText}>Close</Text>
                     </TouchableOpacity>
                     {open.source === 'PROJECT' && open.projectId != null && (
@@ -299,6 +339,11 @@ const styles = StyleSheet.create({
   btnGhostText: { fontWeight: '600', color: '#334155' },
   btnPrimary: { backgroundColor: theme.colors.primary },
   btnPrimaryText: { fontWeight: '700', color: '#fff' },
+  hoursBox: { marginTop: 14, gap: 8 },
+  hoursTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.textPrimary },
+  hoursReason: { height: 70, paddingTop: 8, textAlignVertical: 'top' },
+  hoursLink: { marginTop: 14, paddingVertical: 10, alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF' },
+  hoursLinkText: { color: theme.colors.primaryText, fontWeight: '700' },
   pickerWrap: { flex: 1, backgroundColor: '#fff', paddingTop: 54, paddingHorizontal: 16, gap: 10 },
   pickerHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },

@@ -14,6 +14,8 @@ interface DashboardState {
   todayAttendance: AttendanceRecord | null;
   attendanceHistory: AttendanceRecord[];
   isClockingIn: boolean;
+  /** The fix the last clock attempt used, reused when it is retried with a reason. */
+  lastFix: Fix | null;
   leaveBalances: LeaveBalance[];
   projects: any[];
   notifications: AppNotification[];
@@ -22,13 +24,14 @@ interface DashboardState {
   error: string | null;
 
   fetchDashboardData: () => Promise<void>;
-  clockIn: (lat?: number, lng?: number) => Promise<void>;
-  clockOut: (lat?: number, lng?: number, reason?: string) => Promise<void>;
+  /** `outsideReason`: the answer to the server's outside-office refusal. */
+  clockIn: (outsideReason?: string, useLastFix?: boolean) => Promise<void>;
+  clockOut: (lat?: number, lng?: number, reason?: string, outsideReason?: string, useLastFix?: boolean) => Promise<void>;
   markNotificationRead: (id: number) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
 }
 
-const requestLocationPermission = async (): Promise<boolean> => {
+export const requestLocationPermission = async (): Promise<boolean> => {
   if (Platform.OS === 'ios') {
     Geolocation.requestAuthorization('whenInUse');
     return true; 
@@ -55,21 +58,30 @@ const requestLocationPermission = async (): Promise<boolean> => {
   return false;
 };
 
-const getCurrentLocation = (): Promise<{ lat: number; lng: number }> => {
-  return new Promise((resolve, reject) => {
+/** A fix from the phone, with how far off it may be (metres). */
+export type Fix = { lat: number; lng: number; accuracy: number };
+
+const readPosition = (highAccuracy: boolean): Promise<Fix> =>
+  new Promise((resolve, reject) => {
     Geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-      },
-      (error) => {
-        reject(error);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy ?? 9999 }),
+      reject,
+      highAccuracy
+        ? { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        : { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
     );
   });
+
+/**
+ * GPS first, fresh; a network fix only when GPS cannot answer. A cached or
+ * tower-based reading put people sitting in the office "12 km away".
+ */
+export const getCurrentLocation = async (): Promise<Fix> => {
+  try {
+    return await readPosition(true);
+  } catch {
+    return readPosition(false);
+  }
 };
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
@@ -77,6 +89,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   todayAttendance: null,
   attendanceHistory: [],
   isClockingIn: false,
+  lastFix: null,
   leaveBalances: [],
   projects: [],
   notifications: [],
@@ -121,13 +134,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
-  clockIn: async () => {
+  clockIn: async (outsideReason?: string, useLastFix?: boolean) => {
     set({ isClockingIn: true, error: null });
     try {
       const hasPermission = await requestLocationPermission();
       if (!hasPermission) throw new Error('Location permission is required.');
-      const coords = await getCurrentLocation();
-      const record = await attendanceService.clockIn(coords.lat, coords.lng);
+      const coords = get().lastFix && (useLastFix || outsideReason) ? get().lastFix! : await getCurrentLocation();
+      set({ lastFix: coords });
+      const record = await attendanceService.clockIn(coords.lat, coords.lng, Math.round(coords.accuracy), outsideReason);
       set({ todayAttendance: record, isClockingIn: false });
       useTimesheetStore.getState().fetchData();
     } catch (error: any) {
@@ -142,13 +156,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
    * with LATE_CLOCK_OUT_REASON_REQUIRED — when the session being closed belongs
    * to a previous day; the screen prompts and calls this again with the answer.
    */
-  clockOut: async (lat?: number, lng?: number, reason?: string) => {
+  clockOut: async (lat?: number, lng?: number, reason?: string, outsideReason?: string, useLastFix?: boolean) => {
     set({ isClockingIn: true, error: null });
     try {
       const hasPermission = await requestLocationPermission();
       if (!hasPermission) throw new Error('Location permission is required.');
-      const coords = await getCurrentLocation();
-      const record = await attendanceService.clockOut(coords.lat, coords.lng, reason);
+      const coords = get().lastFix && (useLastFix || outsideReason || reason) ? get().lastFix! : await getCurrentLocation();
+      set({ lastFix: coords });
+      const record = await attendanceService.clockOut(coords.lat, coords.lng, reason, Math.round(coords.accuracy), outsideReason);
       set({ todayAttendance: record, isClockingIn: false });
       useTimesheetStore.getState().fetchData();
     } catch (error: any) {

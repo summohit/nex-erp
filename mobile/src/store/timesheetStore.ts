@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { attendanceService, AttendanceRecord } from '../api/attendanceService';
+import { attendanceService, AttendanceRecord, RegularizationRequest } from '../api/attendanceService';
 import { leaveService, LeaveRequest } from '../api/leaveService';
 
 interface TimesheetState {
@@ -12,7 +12,7 @@ interface TimesheetState {
   error: string | null;
   fetchData: (month?: Date) => Promise<void>;
   changeMonth: (date: Date) => Promise<void>;
-  requestRegularization: (data: { date: string; proposedClockIn?: string; proposedClockOut?: string; reason: string }) => Promise<boolean>;
+  requestRegularization: (data: RegularizationRequest) => Promise<boolean>;
 }
 
 export const useTimesheetStore = create<TimesheetState>((set, get) => ({
@@ -71,7 +71,8 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
       set({ regularizations: regs, isLoading: false });
       return true;
     } catch (error: any) {
-      set({ error: error.message || 'Failed to submit regularization', isLoading: false });
+      // The server's sentence ("The same day is listed twice") over axios's.
+      set({ error: error?.response?.data?.message || error.message || 'Failed to submit regularization', isLoading: false });
       return false;
     }
   }

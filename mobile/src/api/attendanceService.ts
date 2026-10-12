@@ -12,6 +12,8 @@ export const CLOCK_ERROR = {
   OPEN_PREVIOUS_SESSION: 'OPEN_PREVIOUS_SESSION',
   /** Closing a previous day after midnight — say why. */
   LATE_REASON_REQUIRED: 'LATE_CLOCK_OUT_REASON_REQUIRED',
+  /** More than the office radius away on an office shift — give a reason. */
+  OUTSIDE_OFFICE: 'OUTSIDE_OFFICE_REASON_REQUIRED',
 } as const;
 
 export interface ClockRefusal {
@@ -19,6 +21,8 @@ export interface ClockRefusal {
   /** The day whose session is still open, as YYYY-MM-DD. */
   openSessionDate?: string;
   message?: string;
+  direction?: 'in' | 'out';
+  distanceKm?: number | null;
 }
 
 /**
@@ -32,8 +36,18 @@ export function clockRefusal(error: any): ClockRefusal {
   return {
     code: body.code,
     openSessionDate: body.openSessionDate,
+    direction: body.direction,
+    distanceKm: body.distanceKm,
     message: Array.isArray(body.message) ? body.message[0] : body.message,
   };
+}
+
+export interface RegularizationRequest {
+  reason: string;
+  date?: string;
+  proposedClockIn?: string;
+  proposedClockOut?: string;
+  entries?: { date: string; proposedClockIn?: string; proposedClockOut?: string }[];
 }
 
 export interface AttendanceRecord {
@@ -51,8 +65,9 @@ export const attendanceService = {
     return response.data;
   },
   
-  clockIn: async (lat?: number, lng?: number): Promise<AttendanceRecord> => {
-    const response = await apiClient.post('/attendance/clock-in', { lat, lng });
+  /** `accuracy` (metres) lets the server allow for an imprecise fix. */
+  clockIn: async (lat?: number, lng?: number, accuracy?: number, outsideReason?: string): Promise<AttendanceRecord> => {
+    const response = await apiClient.post('/attendance/clock-in', { lat, lng, accuracy, outsideReason });
     return response.data;
   },
   
@@ -61,8 +76,8 @@ export const attendanceService = {
    * belongs to a previous IST day. The server decides and refuses with
    * LATE_CLOCK_OUT_REASON_REQUIRED; the app asks, then retries with the answer.
    */
-  clockOut: async (lat?: number, lng?: number, reason?: string): Promise<AttendanceRecord> => {
-    const response = await apiClient.post('/attendance/clock-out', { lat, lng, reason });
+  clockOut: async (lat?: number, lng?: number, reason?: string, accuracy?: number, outsideReason?: string): Promise<AttendanceRecord> => {
+    const response = await apiClient.post('/attendance/clock-out', { lat, lng, reason, accuracy, outsideReason });
     return response.data;
   },
   
@@ -83,7 +98,8 @@ export const attendanceService = {
     return response.data;
   },
 
-  requestRegularization: async (data: { date: string; proposedClockIn?: string; proposedClockOut?: string; reason: string }): Promise<any> => {
+  /** One day ({ date, ... }) or several ({ entries: [...] }), with one reason. */
+  requestRegularization: async (data: RegularizationRequest): Promise<any> => {
     const response = await apiClient.post('/attendance/regularization', data);
     return response.data;
   },

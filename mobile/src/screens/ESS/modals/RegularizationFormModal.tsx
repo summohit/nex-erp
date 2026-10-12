@@ -23,7 +23,8 @@ function formatTime(date: Date): string {
 
 export default function RegularizationFormModal({ visible, onClose, onSuccess }: Props) {
   const insets = useSafeAreaInsets();
-  const [date, setDate] = useState('');
+  /** One or more days; the same in/out times and reason apply to each. */
+  const [dates, setDates] = useState<string[]>([]);
   const [reason, setReason] = useState('');
   const [inTime, setInTime] = useState('');
   const [outTime, setOutTime] = useState('');
@@ -33,16 +34,16 @@ export default function RegularizationFormModal({ visible, onClose, onSuccess }:
   const { requestRegularization, isLoading, error } = useTimesheetStore();
 
   const handleSubmit = async () => {
-    if (!date || !reason) {
-      Alert.alert('Missing Fields', 'Please fill out date and reason.');
+    if (!dates.length || !reason.trim()) {
+      Alert.alert('Missing Fields', 'Pick at least one date and give a reason.');
       return;
     }
-    const isoDate = new Date(date).toISOString();
+    // Times are IST wall-clock, whatever zone the phone is set to.
+    const at = (d: string, t: string) => (t ? `${d}T${t}:00+05:30` : undefined);
+    const sorted = [...dates].sort();
     const success = await requestRegularization({
-      date: isoDate,
-      proposedClockIn: inTime ? new Date(`${date}T${inTime}:00`).toISOString() : undefined,
-      proposedClockOut: outTime ? new Date(`${date}T${outTime}:00`).toISOString() : undefined,
-      reason,
+      reason: reason.trim(),
+      entries: sorted.map((d) => ({ date: d, proposedClockIn: at(d, inTime), proposedClockOut: at(d, outTime) })),
     });
     if (success) {
       onSuccess();
@@ -51,7 +52,7 @@ export default function RegularizationFormModal({ visible, onClose, onSuccess }:
   };
 
   const handleClose = () => {
-    setDate('');
+    setDates([]);
     setReason('');
     setInTime('');
     setOutTime('');
@@ -97,14 +98,14 @@ export default function RegularizationFormModal({ visible, onClose, onSuccess }:
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
               {/* Date */}
-              <Text style={styles.label}>Date *</Text>
+              <Text style={styles.label}>Dates * <Text style={styles.hint}>(tap several days to send them together)</Text></Text>
               <TouchableOpacity
                 style={styles.inputBox}
                 onPress={() => setShowCalendar(v => !v)}
                 activeOpacity={0.7}
               >
-                <Text style={date ? styles.inputText : styles.placeholderText}>
-                  {date || 'Select Date'}
+                <Text style={dates.length ? styles.inputText : styles.placeholderText} numberOfLines={2}>
+                  {dates.length ? `${dates.length} day${dates.length > 1 ? 's' : ''}: ${[...dates].sort().join(', ')}` : 'Select Dates'}
                 </Text>
                 <CalendarIcon size={18} color="#94A3B8" />
               </TouchableOpacity>
@@ -113,16 +114,21 @@ export default function RegularizationFormModal({ visible, onClose, onSuccess }:
                 <View style={styles.calendarWrapper}>
                   <Calendar
                     onDayPress={(day: any) => {
-                      setDate(day.dateString);
-                      setShowCalendar(false);
+                      // Toggle: tap again to remove a day.
+                      setDates((prev) => prev.includes(day.dateString)
+                        ? prev.filter((d) => d !== day.dateString)
+                        : prev.length >= 31 ? prev : [...prev, day.dateString]);
                     }}
-                    markedDates={{ [date]: { selected: true, selectedColor: '#1373e5' } }}
+                    markedDates={Object.fromEntries(dates.map((d) => [d, { selected: true, selectedColor: '#1373e5' }]))}
                     theme={{ todayTextColor: '#1373e5', arrowColor: '#1373e5' }}
                   />
+                  <TouchableOpacity style={styles.doneBtn} onPress={() => setShowCalendar(false)}>
+                    <Text style={styles.doneText}>Done{dates.length ? ` (${dates.length})` : ''}</Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
-              {/* Time pickers */}
+              {/* Time pickers — the same hours for every day picked */}
               <View style={styles.row}>
                 <View style={styles.flexHalf}>
                   <Text style={styles.label}>Proposed In Time</Text>
@@ -180,7 +186,7 @@ export default function RegularizationFormModal({ visible, onClose, onSuccess }:
               >
                 {isLoading
                   ? <ActivityIndicator color="#FFFFFF" />
-                  : <Text style={styles.submitBtnText}>Submit Request</Text>
+                  : <Text style={styles.submitBtnText}>{dates.length > 1 ? `Submit ${dates.length} Days` : 'Submit Request'}</Text>
                 }
               </TouchableOpacity>
             </View>
@@ -204,6 +210,9 @@ export default function RegularizationFormModal({ visible, onClose, onSuccess }:
 }
 
 const styles = StyleSheet.create({
+  hint: { fontSize: 12, fontWeight: '400', color: '#94A3B8' },
+  doneBtn: { alignSelf: 'flex-end', marginTop: 8, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#1373e5' },
+  doneText: { color: '#fff', fontWeight: '700' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.4)',

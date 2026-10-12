@@ -17,6 +17,10 @@ interface Props {
   submitting?: boolean;
   onCancel: () => void;
   onSubmit: (reason: string) => void;
+  /** Reused for the outside-office reason: override the wording. */
+  title?: string;
+  message?: string;
+  placeholder?: string;
 }
 
 /**
@@ -27,7 +31,7 @@ interface Props {
  * dismissible by tapping outside: losing a typed explanation to a stray tap
  * means typing it again.
  */
-export default function LateClockOutModal({ visible, day, submitting, onCancel, onSubmit }: Props) {
+export default function LateClockOutModal({ visible, day, submitting, onCancel, onSubmit, title, message, placeholder }: Props) {
   const [reason, setReason] = useState('');
 
   // Clear between openings, so yesterday's explanation is not pre-filled for
@@ -45,16 +49,16 @@ export default function LateClockOutModal({ visible, day, submitting, onCancel, 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.card}>
-          <Text style={styles.title}>Reason for late clock-out</Text>
+          <Text style={styles.title}>{title || 'Reason for late clock-out'}</Text>
           <Text style={styles.body}>
-            {day
+            {message ? message : day
               ? `You are clocking out for ${formatDay(day)}, a previous day. Please say why — it is saved against that day's record.`
               : 'You are clocking out for a previous day. Please say why — it is saved against that day’s record.'}
           </Text>
 
           <TextInput
             style={styles.input}
-            placeholder="e.g. Left the site in a hurry and forgot to clock out"
+            placeholder={placeholder || 'e.g. Left the site in a hurry and forgot to clock out'}
             placeholderTextColor="#94a3b8"
             value={reason}
             onChangeText={setReason}

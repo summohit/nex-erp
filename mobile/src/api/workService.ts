@@ -88,6 +88,12 @@ export const workService = {
     return { items: (data?.items || []) as MyTask[], truncated: !!data?.truncated, scope: (data?.scope || opts.scope) as TaskScope };
   },
 
+  /** Ask for more hours on a task; goes to the task's approver. */
+  async requestHours(issueId: number, requestedHours: number, reason: string) {
+    const { data } = await apiClient.post(`/issues/${issueId}/hours-requests`, { requestedHours, reason });
+    return data;
+  },
+
   async getEmployees(): Promise<PersonLite[]> {
     const { data } = await apiClient.get('/employees/basic-list');
     return data || [];
