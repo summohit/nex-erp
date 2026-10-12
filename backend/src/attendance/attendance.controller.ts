@@ -122,7 +122,7 @@ export class AttendanceController {
 
   @Get('regularization/pending')
   getPendingRegularizations(@Request() req) {
-    return this.attendanceService.getPendingRegularizations(req.user.companyId);
+    return this.attendanceService.getPendingRegularizations(req.user.companyId, req.user.role, req.user.employeeId ?? null);
   }
 
   @Post('regularization')
@@ -135,7 +135,9 @@ export class AttendanceController {
 
   @Post('regularization/:id/resolve')
   resolveRegularization(@Request() req, @Param('id') id: string, @Body() data: { status: string, rejectionReason?: string }) {
-    return this.attendanceService.resolveRegularization(+id, req.user.sub, data.status, data.rejectionReason);
+    return this.attendanceService.resolveRegularization(+id, req.user.sub, data.status, data.rejectionReason, {
+      companyId: req.user.companyId, role: req.user.role, employeeId: req.user.employeeId ?? null,
+    });
   }
 
   @Get('team/timeline')

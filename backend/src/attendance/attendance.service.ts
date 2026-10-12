@@ -879,7 +879,7 @@ export class AttendanceService {
         employee: {
           select: {
             id: true, firstName: true, lastName: true, avatarUrl: true,
-            employeeCode: true, designation: true,
+            employeeCode: true, designation: { select: { id: true, name: true } },
             department: { select: { id: true, name: true } },
           },
         },
@@ -1060,12 +1060,63 @@ export class AttendanceService {
     });
   }
 
-  async getPendingRegularizations(companyId: number) {
+  /**
+   * The regularization queue, for whoever may decide it.
+   *
+   * It used to answer anybody, for the whole company, with every column of
+   * every employee row. Now: HR and administrators see the company, a manager
+   * sees the people below them in the reporting line, anyone else sees
+   * nothing — and only the fields the queue shows are sent.
+   */
+  async getPendingRegularizations(companyId: number, role?: string | null, employeeId?: number | null) {
+    let scope: any = { companyId };
+    if (!isHrAdmin(role)) {
+      const team = employeeId ? await this.teamBelow(companyId, employeeId) : [];
+      if (!team.length) return [];
+      scope = { companyId, id: { in: team } };
+    }
     return this.prisma.attendanceRegularization.findMany({
-      where: { employee: { companyId }, status: 'PENDING' },
-      include: { employee: true },
+      where: { employee: scope, status: 'PENDING' },
+      include: {
+        employee: {
+          select: {
+            id: true, firstName: true, lastName: true, avatarUrl: true, employeeCode: true, userId: true,
+            designation: { select: { name: true } }, department: { select: { name: true } },
+          },
+        },
+      },
       orderBy: { date: 'desc' }
     });
+  }
+
+  /** Everyone below this employee in the reporting line, any depth. */
+  private async teamBelow(companyId: number, managerId: number): Promise<number[]> {
+    const all: number[] = [];
+    let frontier = [managerId];
+    for (let depth = 0; frontier.length && depth < 15; depth++) {
+      const next = await this.prisma.employee.findMany({
+        where: { companyId, managerId: { in: frontier } }, select: { id: true },
+      });
+      frontier = next.map((e) => e.id).filter((id) => !all.includes(id) && id !== managerId);
+      all.push(...frontier);
+    }
+    return all;
+  }
+
+  /** HR / admin for the company; a manager for their own team; never yourself. */
+  private async assertMayDecideRegularization(
+    companyId: number, role: string | null | undefined, approverEmployeeId: number | null | undefined,
+    subject: { companyId: number; id: number },
+  ) {
+    if (subject.companyId !== companyId) throw new ForbiddenException('Not your company');
+    if (approverEmployeeId && subject.id === approverEmployeeId) {
+      throw new ForbiddenException('You cannot approve your own regularization.');
+    }
+    if (isHrAdmin(role)) return;
+    const team = approverEmployeeId ? await this.teamBelow(companyId, approverEmployeeId) : [];
+    if (!team.includes(subject.id)) {
+      throw new ForbiddenException('Only HR, an administrator or their manager can decide this regularization.');
+    }
   }
 
   /**
@@ -1138,12 +1189,22 @@ export class AttendanceService {
     return created;
   }
 
-  async resolveRegularization(id: number, approverUserId: number, status: string, rejectionReason?: string) {
+  async resolveRegularization(
+    id: number, approverUserId: number, status: string, rejectionReason?: string,
+    actor?: { companyId: number; role?: string | null; employeeId?: number | null },
+  ) {
     const regularization = await this.prisma.attendanceRegularization.findUnique({
       where: { id },
       include: { employee: true }
     });
     if (!regularization) throw new BadRequestException('Regularization not found');
+    // Approving writes attendance and can credit comp-off, so it is checked
+    // here, not left to whoever can reach the endpoint.
+    if (!actor) throw new ForbiddenException('Not allowed');
+    await this.assertMayDecideRegularization(actor.companyId, actor.role, actor.employeeId, regularization.employee);
+    if (!['APPROVED', 'REJECTED'].includes(status)) throw new BadRequestException('Status must be APPROVED or REJECTED');
+    if (regularization.status !== 'PENDING') throw new BadRequestException(`This request is already ${String(regularization.status).toLowerCase()}`);
+    if (status === 'REJECTED' && !rejectionReason?.trim()) throw new BadRequestException('Say why it is rejected.');
     
     if (status === 'APPROVED') {
       const attendance = await this.prisma.attendance.findUnique({

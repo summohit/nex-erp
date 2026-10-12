@@ -9,8 +9,10 @@ describe('approving a regularization', () => {
   const reg = {
     id: 1, employeeId: 10, date: new Date('2026-09-27T00:00:00Z'),
     proposedClockIn: new Date('2026-09-27T04:00:00Z'), proposedClockOut: new Date('2026-09-27T13:00:00Z'),
-    employee: { userId: 5 },
+    employee: { userId: 5, id: 10, companyId: 1 },
+    status: 'PENDING',
   };
+  const HR = { companyId: 1, role: 'HR', employeeId: 3 };
 
   function make(existing: any) {
     const prisma: any = {
@@ -18,6 +20,7 @@ describe('approving a regularization', () => {
         findUnique: jest.fn().mockResolvedValue(reg),
         update: jest.fn().mockResolvedValue({ ...reg, status: 'APPROVED' }),
       },
+      employee: { findMany: jest.fn().mockResolvedValue([]) },
       attendance: {
         findUnique: jest.fn().mockResolvedValue(existing),
         create: jest.fn().mockResolvedValue({ id: 77 }),
@@ -32,19 +35,47 @@ describe('approving a regularization', () => {
 
   it('checks the new day for comp-off', async () => {
     const { service, grant } = make(null);
-    await service.resolveRegularization(1, 99, 'APPROVED').catch(() => {});
+    await service.resolveRegularization(1, 99, 'APPROVED', undefined, HR).catch(() => {});
     expect(grant).toHaveBeenCalledWith(77);
   });
 
   it('checks an existing day it corrects', async () => {
     const { service, grant } = make({ id: 55, clockIn: null, clockOut: null });
-    await service.resolveRegularization(1, 99, 'APPROVED').catch(() => {});
+    await service.resolveRegularization(1, 99, 'APPROVED', undefined, HR).catch(() => {});
     expect(grant).toHaveBeenCalledWith(55);
+  });
+
+  // Anyone could approve anyone's regularization — and approval writes
+  // attendance and can credit comp-off.
+  it('refuses somebody who is neither HR nor the manager', async () => {
+    const { service, grant } = make(null);
+    await expect(service.resolveRegularization(1, 99, 'APPROVED', undefined, { companyId: 1, role: 'EMPLOYEE', employeeId: 50 }))
+      .rejects.toThrow(/Only HR/);
+    expect(grant).not.toHaveBeenCalled();
+  });
+
+  it('refuses approving your own', async () => {
+    const { service } = make(null);
+    await expect(service.resolveRegularization(1, 99, 'APPROVED', undefined, { companyId: 1, role: 'HR', employeeId: 10 }))
+      .rejects.toThrow(/your own/);
+  });
+
+  it('refuses another company', async () => {
+    const { service } = make(null);
+    await expect(service.resolveRegularization(1, 99, 'APPROVED', undefined, { companyId: 2, role: 'HR', employeeId: 3 }))
+      .rejects.toThrow(/company/);
+  });
+
+  it('lets the manager of the person decide', async () => {
+    const { service, prisma, grant } = make(null);
+    prisma.employee.findMany.mockResolvedValueOnce([{ id: 10 }]).mockResolvedValue([]);
+    await service.resolveRegularization(1, 99, 'APPROVED', undefined, { companyId: 1, role: 'EMPLOYEE', employeeId: 7 }).catch(() => {});
+    expect(grant).toHaveBeenCalledWith(77);
   });
 
   it('credits nothing when the request is rejected', async () => {
     const { service, grant } = make(null);
-    await service.resolveRegularization(1, 99, 'REJECTED', 'No proof').catch(() => {});
+    await service.resolveRegularization(1, 99, 'REJECTED', 'No proof', HR).catch(() => {});
     expect(grant).not.toHaveBeenCalled();
   });
 });

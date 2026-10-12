@@ -28,6 +28,8 @@ import SecurityScreen from '../screens/Security/SecurityScreen';
 import TeamLeaveScreen from '../screens/Team/TeamLeaveScreen';
 import MyShiftScreen from '../screens/Team/MyShiftScreen';
 import NoticesScreen from '../screens/Team/NoticesScreen';
+import MyTasksScreen from '../screens/Team/MyTasksScreen';
+import ApprovalsScreen from '../screens/Team/ApprovalsScreen';
 import PermissionOnboardingScreen, { PERMISSIONS_ONBOARDED_KEY } from '../screens/Onboarding/PermissionOnboardingScreen';
 
 // How long the branded splash stays up at minimum, so its animation reads as
@@ -166,6 +168,8 @@ export default function AppNavigator() {
             <Stack.Screen name="TeamLeave" component={TeamLeaveScreen} />
             <Stack.Screen name="MyShift" component={MyShiftScreen} />
             <Stack.Screen name="Notices" component={NoticesScreen} />
+            <Stack.Screen name="MyTasks" component={MyTasksScreen} />
+            <Stack.Screen name="Approvals" component={ApprovalsScreen} />
           </>
         )}
       </Stack.Navigator>
