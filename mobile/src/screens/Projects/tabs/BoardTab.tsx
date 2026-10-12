@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform, FlatList, RefreshControl, Animated, Image, Modal, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform, FlatList, RefreshControl, Animated, Image, Modal, Alert, ActivityIndicator, TextInput } from 'react-native';
+import { useAuthStore } from '../../../store/authStore';
 import { useProjectStore } from '../../../store/projectStore';
 import { AlertCircle, CheckCircle, Clock, Plus, ArrowDown, Minus, ArrowUp, Flame, MessageSquare } from 'lucide-react-native';
 import IssueFormModal from '../modals/IssueFormModal';
@@ -21,6 +22,71 @@ const getMemberInitials = (emp: any) => {
 
 export default function BoardTab() {
   const { currentProject, currentBoard, currentIssues, createIssue, fetchProjectDetails, updateIssueColumn, isLoading } = useProjectStore();
+  const myEmployeeId = useAuthStore((s) => s.user?.employeeId);
+
+  // ── Board filters (the web board's filter bar) ──
+  type DueFilter = 'OVERDUE' | 'TODAY' | 'WEEK' | 'NO_DATE';
+  const [query, setQuery] = useState('');
+  const [onlyMine, setOnlyMine] = useState(false);
+  const [due, setDue] = useState<DueFilter | null>(null);
+  const [memberIds, setMemberIds] = useState<number[]>([]);
+  const [labelIds, setLabelIds] = useState<number[]>([]);
+  const [phaseIds, setPhaseIds] = useState<number[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const extraCount = memberIds.length + labelIds.length + phaseIds.length;
+  const anyFilter = !!query.trim() || onlyMine || !!due || extraCount > 0;
+  const clearFilters = () => { setQuery(''); setOnlyMine(false); setDue(null); setMemberIds([]); setLabelIds([]); setPhaseIds([]); };
+
+  const memberIdsOf = (i: any): number[] => [
+    ...(i.assigneeId ? [i.assigneeId] : []),
+    ...((i.members || []).map((m: any) => m.employeeId ?? m.employee?.id)),
+  ].filter(Boolean);
+
+  /** What the filter sheet offers: only values that occur on this board. */
+  const filterOptions = useMemo(() => {
+    const people = new Map<number, string>();
+    const labels = new Map<number, { name: string; color?: string }>();
+    const phases = new Map<number, string>();
+    (currentIssues || []).forEach((i: any) => {
+      if (i.isArchived) return;
+      (i.members || []).forEach((m: any) => {
+        const e = m.employee; const id = m.employeeId ?? e?.id;
+        if (id && e) people.set(id, `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim());
+      });
+      if (i.assignee?.id) people.set(i.assignee.id, `${i.assignee.firstName ?? ''} ${i.assignee.lastName ?? ''}`.trim());
+      (i.labels || []).forEach((l: any) => { const lab = l.label || l; if (lab?.id) labels.set(lab.id, { name: lab.name, color: lab.color }); });
+      if (i.phase?.id) phases.set(i.phase.id, i.phase.name);
+    });
+    const byName = (a: any, b: any) => a.name.localeCompare(b.name);
+    return {
+      people: [...people].map(([id, name]) => ({ id, name })).sort(byName),
+      labels: [...labels].map(([id, v]) => ({ id, ...v })).sort(byName),
+      phases: [...phases].map(([id, name]) => ({ id, name })).sort(byName),
+    };
+  }, [currentIssues]);
+
+  const passes = (i: any): boolean => {
+    const q = query.trim().toLowerCase();
+    if (q && !(`${i.title ?? ''} ${i.key ?? ''}`.toLowerCase().includes(q))) return false;
+    const people = memberIdsOf(i);
+    if (onlyMine && !(myEmployeeId && people.includes(myEmployeeId))) return false;
+    if (memberIds.length && !people.some((id) => memberIds.includes(id))) return false;
+    if (labelIds.length && !(i.labels || []).some((l: any) => labelIds.includes((l.label || l)?.id))) return false;
+    if (phaseIds.length && !(i.phase?.id && phaseIds.includes(i.phase.id))) return false;
+    if (due) {
+      if (due === 'NO_DATE') return !i.dueDate;
+      if (!i.dueDate) return false;
+      const d = new Date(i.dueDate); d.setHours(23, 59, 59, 999);
+      const now = new Date(); const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+      if (due === 'OVERDUE') return d < now && i.status !== 'DONE' && !i.completed;
+      if (due === 'TODAY') return d >= startToday && d.getTime() - startToday.getTime() < 86400000;
+      if (due === 'WEEK') return d >= startToday && d.getTime() - startToday.getTime() < 7 * 86400000;
+    }
+    return true;
+  };
+  const toggleId = (set: React.Dispatch<React.SetStateAction<number[]>>, id: number) =>
+    set((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+
   /** The card whose "Move to…" sheet is open (long-press on the board). */
   const [moving, setMoving] = useState<any>(null);
   const [moveBusy, setMoveBusy] = useState(false);
@@ -76,7 +142,7 @@ export default function BoardTab() {
     const map: Record<string, any[]> = {};
     columns.forEach((col: any) => { map[col.id.toString()] = []; });
     
-    currentIssues.forEach(issue => {
+    currentIssues.filter(passes).forEach(issue => {
       // Prefer mapping by columnId
       if (issue.columnId && map[issue.columnId.toString()]) {
         map[issue.columnId.toString()].push(issue);
@@ -97,7 +163,7 @@ export default function BoardTab() {
     });
     
     return map;
-  }, [currentIssues, columns]);
+  }, [currentIssues, columns, query, onlyMine, due, memberIds, labelIds, phaseIds, myEmployeeId]);
 
   /**
    * Why a card can't go to a column, or null if it can. The same rules the
@@ -357,6 +423,61 @@ export default function BoardTab() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.filterBar}>
+        <TextInput
+          style={styles.search}
+          placeholder="Search tasks or keys"
+          placeholderTextColor="#94A3B8"
+          value={query}
+          onChangeText={setQuery}
+        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+          <FilterChip label="My tasks" on={onlyMine} onPress={() => setOnlyMine(!onlyMine)} />
+          <FilterChip label="Overdue" on={due === 'OVERDUE'} onPress={() => setDue(due === 'OVERDUE' ? null : 'OVERDUE')} />
+          <FilterChip label="Due today" on={due === 'TODAY'} onPress={() => setDue(due === 'TODAY' ? null : 'TODAY')} />
+          <FilterChip label="Due this week" on={due === 'WEEK'} onPress={() => setDue(due === 'WEEK' ? null : 'WEEK')} />
+          <FilterChip label="No due date" on={due === 'NO_DATE'} onPress={() => setDue(due === 'NO_DATE' ? null : 'NO_DATE')} />
+          <FilterChip label={extraCount ? `More filters (${extraCount})` : 'More filters'} on={extraCount > 0} onPress={() => setFiltersOpen(true)} />
+          {anyFilter && <FilterChip label="Clear" on={false} onPress={clearFilters} />}
+        </ScrollView>
+        {anyFilter && (
+          <Text style={styles.filterNote}>
+            Showing {Object.values(issuesByColumnId).reduce((n, l) => n + l.length, 0)} of {currentIssues.filter((i: any) => !i.isArchived).length} tasks
+          </Text>
+        )}
+      </View>
+
+      <Modal visible={filtersOpen} transparent animationType="slide" onRequestClose={() => setFiltersOpen(false)}>
+        <View style={styles.moveBackdrop}>
+          <View style={[styles.moveSheet, { maxHeight: '80%' }]}>
+            <View style={styles.sheetHead}>
+              <Text style={styles.moveTitle}>Filter the board</Text>
+              <TouchableOpacity onPress={() => setFiltersOpen(false)}><Text style={styles.done}>Done</Text></TouchableOpacity>
+            </View>
+            <ScrollView>
+              <Text style={styles.sheetLabel}>Members</Text>
+              <View style={styles.wrap}>
+                {filterOptions.people.map((p) => <FilterChip key={p.id} label={p.name} on={memberIds.includes(p.id)} onPress={() => toggleId(setMemberIds, p.id)} />)}
+                {!filterOptions.people.length && <Text style={styles.filterNote}>Nobody is assigned yet.</Text>}
+              </View>
+              {filterOptions.labels.length > 0 && <Text style={styles.sheetLabel}>Labels</Text>}
+              <View style={styles.wrap}>
+                {filterOptions.labels.map((l) => <FilterChip key={l.id} label={l.name} color={l.color} on={labelIds.includes(l.id)} onPress={() => toggleId(setLabelIds, l.id)} />)}
+              </View>
+              {filterOptions.phases.length > 0 && <Text style={styles.sheetLabel}>Phase</Text>}
+              <View style={styles.wrap}>
+                {filterOptions.phases.map((p) => <FilterChip key={p.id} label={p.name} on={phaseIds.includes(p.id)} onPress={() => toggleId(setPhaseIds, p.id)} />)}
+              </View>
+              {extraCount > 0 && (
+                <TouchableOpacity style={styles.moveOpen} onPress={() => { setMemberIds([]); setLabelIds([]); setPhaseIds([]); }}>
+                  <Text style={styles.moveOpenText}>Clear these</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false} 
@@ -462,6 +583,19 @@ export default function BoardTab() {
 }
 
 const styles = StyleSheet.create({
+  filterBar: { paddingHorizontal: 16, paddingTop: 10, gap: 8 },
+  search: { height: 40, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#fff', paddingHorizontal: 12, color: '#0F172A' },
+  chipRow: { gap: 8, paddingRight: 16 },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  fChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#fff', maxWidth: 220 },
+  fChipOn: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  fChipText: { fontSize: 12.5, color: '#475569', fontWeight: '600' },
+  fChipTextOn: { color: '#1D4ED8' },
+  fDot: { width: 8, height: 8, borderRadius: 4 },
+  filterNote: { fontSize: 12, color: '#64748B' },
+  sheetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sheetLabel: { fontSize: 13, fontWeight: '700', color: '#0F172A', marginTop: 14, marginBottom: 8 },
+  done: { color: '#2563EB', fontWeight: '700', fontSize: 15 },
   moveBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
   moveSheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, paddingBottom: 34 },
   moveTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A', marginBottom: 10 },
@@ -767,3 +901,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
+
+function FilterChip({ label, on, onPress, color }: { label: string; on: boolean; onPress: () => void; color?: string }) {
+  return (
+    <TouchableOpacity onPress={onPress} style={[styles.fChip, on && styles.fChipOn]}>
+      {!!color && <View style={[styles.fDot, { backgroundColor: color }]} />}
+      <Text style={[styles.fChipText, on && styles.fChipTextOn]} numberOfLines={1}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
