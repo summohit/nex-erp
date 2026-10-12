@@ -1972,3 +1972,13 @@ body.nav-scroll-lock {
   opacity: 1 !important;
   transform: scale(1.08) !important;
 }
+
+/* The word between the two dates of a range: "16-10-2026 to 22-10-2026". */
+.date-to {
+  display: inline-block;
+  margin: 0 7px;
+  color: #94a3b8;
+  font-size: 0.85em;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
