@@ -360,7 +360,7 @@
               <td class="date-cell nowrap">
                 <div class="date-info">
                   <svg lucideCalendarDays [size]="13" class="cell-icon"></svg>
-                  <span>{{ r.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(r.startDate | date:'dd-MM-yyyy') !== (r.endDate | date:'dd-MM-yyyy')"> – {{ r.endDate | date:'dd-MM-yyyy' }}</ng-container></span>
+                  <span>{{ r.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(r.startDate | date:'dd-MM-yyyy') !== (r.endDate | date:'dd-MM-yyyy')"> to {{ r.endDate | date:'dd-MM-yyyy' }}</ng-container></span>
                   @if (isPastVisit(r)) {
                     <span class="past-visit-tag" [class.past-overdue]="r.status === 'PENDING_APPROVAL'" [title]="r.status === 'PENDING_APPROVAL' ? 'Trip date has passed without approval' : 'Previous/past visit'">
                       {{ r.status === 'PENDING_APPROVAL' ? 'Past date' : 'Past' }}

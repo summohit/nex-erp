@@ -308,7 +308,7 @@
         </div>
         <div>
           <h3>My Calendar</h3>
-          <span class="card-header-sub">{{ (dashboard()?.common?.myCalendar?.weekStart | date:'dd-MM-yyyy') }} – {{ (dashboard()?.common?.myCalendar?.weekEnd | date:'dd-MM-yyyy') }}</span>
+          <span class="card-header-sub">{{ (dashboard()?.common?.myCalendar?.weekStart | date:'dd-MM-yyyy') }} to {{ (dashboard()?.common?.myCalendar?.weekEnd | date:'dd-MM-yyyy') }}</span>
         </div>
       </div>
     </div>
@@ -646,7 +646,7 @@
                     <span class="font-semibold">{{ req.employee?.firstName }} {{ req.employee?.lastName }}</span>
                   </td>
                   <td><span class="badge-subtle">{{ req.leaveType?.name }}</span></td>
-                  <td>{{ req.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(req.startDate | date:'dd-MM-yyyy') !== (req.endDate | date:'dd-MM-yyyy')"> – {{ req.endDate | date:'dd-MM-yyyy' }}</ng-container></td>
+                  <td>{{ req.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(req.startDate | date:'dd-MM-yyyy') !== (req.endDate | date:'dd-MM-yyyy')"> to {{ req.endDate | date:'dd-MM-yyyy' }}</ng-container></td>
                   <td><span class="status-pill" [ngClass]="req.status.toLowerCase()">{{ req.status }}</span></td>
                   <td style="text-align: right;">
                     <div class="action-btn-group">

@@ -20,7 +20,7 @@
           </button>
           <div class="ts-week-label">
             <svg lucideCalendarDays size="15"></svg>
-            <span>{{ weekStart() | date:'dd-MM-yyyy' }}<ng-container *ngIf="(weekStart() | date:'dd-MM-yyyy') !== (weekEnd() | date:'dd-MM-yyyy')"> – {{ weekEnd() | date:'dd-MM-yyyy' }}</ng-container></span>
+            <span>{{ weekStart() | date:'dd-MM-yyyy' }}<ng-container *ngIf="(weekStart() | date:'dd-MM-yyyy') !== (weekEnd() | date:'dd-MM-yyyy')"> to {{ weekEnd() | date:'dd-MM-yyyy' }}</ng-container></span>
           </div>
           <button class="ts-nav-btn" (click)="nextWeek()" title="Next week">
             <svg lucideChevronRight size="16"></svg>
