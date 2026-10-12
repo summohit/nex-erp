@@ -67,7 +67,9 @@ export class TimesheetsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    return this.timesheets.getWeek(req.user.companyId, employeeId, startDate, endDate);
+    return this.timesheets.getWeekForViewer(
+      req.user.companyId, req.user.employeeId ?? null, req.user.role, employeeId, startDate, endDate,
+    );
   }
 
   @Post('submit')

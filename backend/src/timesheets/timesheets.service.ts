@@ -283,6 +283,33 @@ export class TimesheetsService {
   }
 
   /**
+   * Someone else's week, for a viewer allowed to see it: admins and finance
+   * (who already list everyone), or a project manager for a person on — or
+   * logging time to — one of their projects that week, the same people the
+   * TEAM view lists. Being in the same company is not enough: a week carries
+   * every task note, and colleagues should not read each other's.
+   */
+  async getWeekForViewer(
+    companyId: number,
+    viewerEmployeeId: number | null,
+    role: string,
+    employeeId: number,
+    startDateStr: string,
+    endDateStr: string,
+  ) {
+    const allowed =
+      viewerEmployeeId === employeeId ||
+      this.FINANCE_ROLES.includes(role) ||
+      (await this.visibleEmployeeIds(
+        companyId, viewerEmployeeId, 'TEAM',
+        new Date(`${startDateStr}T00:00:00`), new Date(`${endDateStr}T23:59:59.999`),
+        { employeeId },
+      )).includes(employeeId);
+    if (!allowed) throw new ForbiddenException("You can't view this person's timesheet");
+    return this.getWeek(companyId, employeeId, startDateStr, endDateStr);
+  }
+
+  /**
    * Submit a day for review.
    *
    * Re-submitting an already-submitted or rejected day updates the row rather
