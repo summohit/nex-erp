@@ -1,8 +1,9 @@
-import { Component, signal, inject, OnInit, computed, DestroyRef, HostListener } from '@angular/core';
+import { Component, signal, inject, OnInit, computed, DestroyRef, HostListener, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, ActivatedRoute, NavigationEnd } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { AgGridModule } from 'ag-grid-angular';
 import { ColDef } from 'ag-grid-community';
@@ -492,6 +493,19 @@ export class ProjectsComponent implements OnInit {
   isCreateModalOpen = signal(false);
   isSubmitted = signal(false);
   editingProjectId = signal<number | null>(null);
+  /**
+   * Edit-only mode: a project's Summary embeds this component to open the
+   * very same edit form over its own page. Nothing else of the boards page is
+   * rendered or loaded; closing the form tells the host whether it saved.
+   */
+  @Input() editOnlyProjectId: number | null = null;
+  @Output() editClosed = new EventEmitter<boolean>();
+  /** Which field the host wants in view and highlighted when the form opens. */
+  @Input() editFocus: 'budget' | 'hours' | 'code' | null = null;
+  /** Project code in the edit form (super admin only); compared with the original on save. */
+  editKey = '';
+  private originalKey = '';
+  private editSaved = false;
   teamModalProject = signal<any | null>(null);
 
   openTeamModal(project: any, event?: Event) {
@@ -1731,6 +1745,18 @@ export class ProjectsComponent implements OnInit {
    * an existing project the missing field is usually one they never filled in
    * and would not think to look for.
    */
+  /** Scroll a field of the open form into view, mark it, and put the cursor in it. */
+  private highlightEditField(field: string) {
+    setTimeout(() => {
+      const group = document.querySelector(`[data-edit-field="${field}"]`) as HTMLElement | null;
+      if (!group) return;
+      group.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      group.classList.add('cbm-field-highlight');
+      (group.querySelector('input, select, textarea') as HTMLElement | null)?.focus({ preventScroll: true });
+      setTimeout(() => group.classList.remove('cbm-field-highlight'), 4000);
+    }, 250);
+  }
+
   private focusFirstInvalidField() {
     const first = this.REQUIRED_FIELDS.find(f => f.isMissing());
     if (!first) return;
@@ -1913,6 +1939,21 @@ export class ProjectsComponent implements OnInit {
   });
 
   ngOnInit() {
+    if (this.editOnlyProjectId) {
+      // Only what the form's pickers need, then the form itself.
+      this.loadClients();
+      this.loadDepartments();
+      this.loadLeadContacts();
+      this.loadEmployees();
+      this.projectsService.getProject(this.editOnlyProjectId).subscribe({
+        next: (p: any) => {
+          this.openEditModal(p, undefined as any);
+          if (this.editFocus) this.highlightEditField(this.editFocus);
+        },
+        error: () => { this.toast.error('Could not open the project for editing'); this.editClosed.emit(false); },
+      });
+      return;
+    }
     this.configureTaskTableColumns();
     this.syncTabFromRoute();
 
@@ -4213,6 +4254,8 @@ export class ProjectsComponent implements OnInit {
     this.stagedFiles.set([]);
     this.cancelRename();
     this.loadExistingDocuments(project.id);
+    this.editKey = project.key || '';
+    this.originalKey = project.key || '';
     this.projectForm = {
       ...this.emptyProjectForm(),
       name: project.name,
@@ -4424,6 +4467,10 @@ export class ProjectsComponent implements OnInit {
 
   closeCreateModal() {
     this.isCreateModalOpen.set(false);
+    if (this.editOnlyProjectId) {
+      this.editClosed.emit(this.editSaved);
+      this.editSaved = false;
+    }
     this.closeAllModalDropdowns();
     this.pmSearchQuery.set('');
     this.architectSearchQuery.set('');
@@ -4485,18 +4532,57 @@ export class ProjectsComponent implements OnInit {
     };
 
     if (this.editingProjectId()) {
-      this.projectsService.updateProject(this.editingProjectId()!, payload).subscribe({
+      this.saveEdit(payload);
+    } else {
+      this.createFromForm(payload);
+    }
+  }
+
+  /**
+   * An edit. A changed project code goes first, on its own endpoint: it renames
+   * every task ID too, so it is confirmed with the count and done before the
+   * rest of the form is saved.
+   */
+  private async saveEdit(payload: any) {
+    const id = this.editingProjectId()!;
+    const newKey = (this.editKey || '').trim().toUpperCase();
+    if (this.isSuperAdmin && newKey && newKey !== this.originalKey) {
+      try {
+        const preview = await firstValueFrom(this.projectsService.previewKeyChange(id, newKey));
+        if (!preview.ok) { this.toast.error(preview.problem || 'That code cannot be used'); return; }
+        const ok = await this.dialog.confirm(
+          `Change the project code from ${preview.oldKey} to ${preview.newKey}? ` +
+          `${preview.taskCount} task ID${preview.taskCount === 1 ? '' : 's'} will be renumbered too ` +
+          `(e.g. ${preview.oldKey}-1 → ${preview.newKey}-1). Old task IDs written in comments, exports or messages will no longer match.`,
+          'Change project code', 'Change code', 'Cancel');
+        if (!ok) return;
+        const res = await firstValueFrom(this.projectsService.changeProjectKey(id, newKey));
+        this.originalKey = res.newKey;
+        this.toast.success(`Project code changed · ${res.tasksRenamed} task IDs renumbered`);
+      } catch (err: any) {
+        this.toast.error(err?.error?.message || 'Could not change the project code');
+        return;
+      }
+    }
+    this.projectsService.updateProject(id, payload).subscribe({
         next: () => {
           // Files staged while editing were previously dropped on the floor —
           // only the create path uploaded them.
           this.uploadStagedFiles(this.editingProjectId()!, () => {
-            this.loadProjects();
+            if (this.editOnlyProjectId) {
+              this.editSaved = true;
+              this.toast.success('Project updated');
+            } else {
+              this.loadProjects();
+            }
             this.closeCreateModal();
           });
         },
         error: (err) => this.toast.error(err?.error?.message || 'Error updating project')
       });
-    } else {
+  }
+
+  private createFromForm(payload: any) {
       this.projectsService.createProject(payload).subscribe({
         next: (res) => {
           this.loadProjects();
@@ -4510,7 +4596,6 @@ export class ProjectsComponent implements OnInit {
         },
         error: (err) => this.toast.error(err?.error?.message || 'Error creating project')
       });
-    }
   }
 
   archiveBoard(project: any, force: boolean, event: Event) {

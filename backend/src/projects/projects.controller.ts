@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Patch, Body, Req, UseGuards, Param, ParseIntPipe, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Patch, Body, Req, UseGuards, Param, ParseIntPipe, Query, UseInterceptors, UploadedFile, ForbiddenException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProjectsService } from './projects.service';
 import { ProjectAiService } from './project-ai.service';
@@ -159,6 +159,26 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number
   ) {
     return this.projectsService.unarchiveProject(req.user.companyId, id);
+  }
+
+  /** What changing the project code would rename (super admin). */
+  @Get(':id/key-change')
+  previewKeyChange(@Req() req, @Param('id', ParseIntPipe) id: number, @Query('key') key: string) {
+    this.assertSuperAdmin(req);
+    return this.projectsService.previewProjectKeyChange(req.user.companyId, id, key);
+  }
+
+  /** Change the project code and every task ID that carries it (super admin). */
+  @Patch(':id/key')
+  changeKey(@Req() req, @Param('id', ParseIntPipe) id: number, @Body('key') key: string) {
+    this.assertSuperAdmin(req);
+    return this.projectsService.changeProjectKey(req.user.companyId, id, key, req.user.employeeId ?? null);
+  }
+
+  private assertSuperAdmin(req: any) {
+    if (!['SUPERADMIN', 'SUPER_ADMIN'].includes(req.user?.role)) {
+      throw new ForbiddenException('Only a super admin can change a project code');
+    }
   }
 
   @Put(':id')

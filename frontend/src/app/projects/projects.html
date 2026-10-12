@@ -47,6 +47,7 @@
   </div>
 </ng-template>
 
+<ng-container *ngIf="!editOnlyProjectId">
 <div class="boards-page">
   <!-- Search & Filter Control Bar -->
   <div class="hub-control-bar">
@@ -1358,6 +1359,7 @@
     </div>
   </div>
 </div>
+</ng-container>
 
 <!-- Archive Warning Modal -->
 <div class="awm-overlay" *ngIf="showArchiveWarningModal" (click)="closeArchiveModal()">
@@ -2253,6 +2255,13 @@
           </div>
         </div>
 
+        <!-- Project code: super admin, edit only. Renames every task ID too. -->
+        <div class="cbm-field-group" data-edit-field="code" *ngIf="editingProjectId() && isSuperAdmin">
+          <label class="cbm-field-label">Project Code</label>
+          <input type="text" class="cbm-input" [(ngModel)]="editKey" maxlength="30" placeholder="e.g. CES/0926/10" style="text-transform: uppercase; font-family: ui-monospace, monospace;">
+          <small class="cbm-field-hint" style="color:#64748b;font-size:12px;">Changing it renumbers every task ID on this board (e.g. CES/0926/10-5 → NEW-5). You'll be asked to confirm.</small>
+        </div>
+
         <!-- §1: the project summary. Sits under the title because it answers
              the same question the title only hints at: what is this. -->
         <div class="cbm-field-group">
@@ -2980,7 +2989,7 @@
             </select>
           </div>
 
-          <div class="cbm-field-group">
+          <div class="cbm-field-group" data-edit-field="budget">
             <label class="cbm-field-label">Project Budget</label>
             <input type="number" class="cbm-input" [(ngModel)]="projectForm.budgetAmount" placeholder="e.g. 1000000">
           </div>
@@ -2996,7 +3005,7 @@
         </div>
 
         <div class="cbm-fields-grid-2">
-          <div class="cbm-field-group">
+          <div class="cbm-field-group" data-edit-field="hours">
             <label class="cbm-field-label">Estimated Hours</label>
             <input type="number" class="cbm-input" [(ngModel)]="projectForm.estimatedHours" placeholder="e.g. 2000">
           </div>

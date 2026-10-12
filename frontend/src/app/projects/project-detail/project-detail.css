@@ -11454,3 +11454,34 @@ input[type=text], input[type=email], input[type=password] {
   border-left: 4px solid #f43f5e !important;
 }
 
+
+/* Summary header: details fill the left, actions sit in one tidy column on
+   the right instead of wrapping underneath and leaving the right side empty. */
+.summary-header-banner { flex-wrap: nowrap; align-items: stretch; }
+.summary-header-left { flex: 1 1 auto; }
+.summary-header-left .project-cover-summary { width: 100%; box-sizing: border-box; }
+.summary-header-actions {
+  flex: 0 0 190px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  padding-left: 20px;
+  border-left: 1px solid #eef2f7;
+}
+.summary-header-actions .btn-summary-action { justify-content: center; }
+@media (max-width: 900px) {
+  .summary-header-banner { flex-wrap: wrap; }
+  .summary-header-actions { flex: 1 1 100%; flex-direction: row; flex-wrap: wrap; padding-left: 0; border-left: 0; }
+}
+.summary-header-left .summary-project-meta { flex: 1 1 auto; }
+
+.budget-kpi { position: relative; }
+.budget-kpi-edit {
+  position: absolute; top: 12px; right: 12px;
+  width: 30px; height: 30px; display: grid; place-items: center;
+  border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #64748b; cursor: pointer;
+  opacity: .75; transition: all .15s ease;
+}
+.budget-kpi:hover .budget-kpi-edit { opacity: 1; }
+.budget-kpi-edit:hover { color: #4f46e5; border-color: #c7d2fe; background: #eef2ff; }
+.summary-key-edit { position: static; width: 26px; height: 26px; opacity: 1; }

@@ -1640,6 +1640,10 @@ model Project {
   category      String? // free-text project category (e.g. "Implementation and Deployment")
   progress      Int? // 0-100 completion percentage
   address       String?     @db.Text // On-site work location for this project, set at creation
+  /// Who represents the company on site ("We represent on project onsite"),
+  /// shown on the Summary and printed on the project cover. The form always
+  /// sent it; until this column existed the server dropped it.
+  onsiteRepresentation String? @db.Text
   /// THE project status: DRAFT, ACTIVE, ON_HOLD, AT_RISK, COMPLETED, CLOSED,
   /// CANCELLED. Named `workStatus` for history — it held
   /// NOT_STARTED/IN_PROGRESS/FINISHED before the Delivery module widened it.

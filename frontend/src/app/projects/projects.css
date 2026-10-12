@@ -6848,3 +6848,14 @@
 .task-initial-time-log .enhanced-textarea { width: 100%; min-height: 58px; margin-top: 2px; resize: vertical; }
 @media (max-width: 780px) { .task-form-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .task-initial-time-log-head { flex-direction: column; } .task-form-grid-4 { grid-template-columns: 1fr; } }
+
+
+/* A field the user came to edit from a project's Summary card. */
+.cbm-field-highlight {
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px #a5b4fc, 0 0 0 7px rgba(99, 102, 241, 0.15);
+  background: #eef2ff;
+  transition: box-shadow .3s ease, background .3s ease;
+  animation: cbmFieldPulse 1.2s ease-in-out 2;
+}
+@keyframes cbmFieldPulse { 50% { box-shadow: 0 0 0 3px #6366f1, 0 0 0 9px rgba(99, 102, 241, 0.25); } }

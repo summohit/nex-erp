@@ -182,6 +182,17 @@ export class ProjectsService {
     return this.http.put<any>(`${this.apiUrl}/${id}`, data);
   }
 
+  /** Super admin: what changing the project code would rename. */
+  previewKeyChange(id: number, key: string) {
+    return this.http.get<{ oldKey: string; newKey: string; taskCount: number; ok: boolean; problem: string | null }>(
+      `${this.apiUrl}/${id}/key-change`, { params: { key } });
+  }
+
+  /** Super admin: change the project code and every task ID that carries it. */
+  changeProjectKey(id: number, key: string) {
+    return this.http.patch<{ oldKey: string; newKey: string; tasksRenamed: number }>(`${this.apiUrl}/${id}/key`, { key });
+  }
+
   createAiProject(data: { name: string, description?: string }) {
     return this.http.post<any>(`${this.apiUrl}/ai-onboarding`, data);
   }

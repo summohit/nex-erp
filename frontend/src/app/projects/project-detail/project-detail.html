@@ -577,6 +577,7 @@
             <div class="summary-title-row">
               <h2 class="summary-project-title">{{ project()?.name || 'Project Overview' }}</h2>
               <span class="summary-key-badge" *ngIf="project()?.key">{{ project()?.key }}</span>
+              <button type="button" class="budget-kpi-edit summary-key-edit" *ngIf="isFvSuperAdmin()" (click)="openProjectEdit('code')" title="Change project code"><svg lucidePencil size="13"></svg></button>
               <span class="summary-status-badge" [class]="(project()?.status || 'ACTIVE').toLowerCase()">
                 {{ project()?.status || 'ACTIVE' }}
               </span>
@@ -615,6 +616,11 @@
           <button type="button" class="btn-summary-action" (click)="setProjectTab('list')">
             <svg lucideList size="15"></svg> View Tasks
           </button>
+          <!-- Same form as the board card's Edit button, for the super admin. -->
+          <button type="button" class="btn-summary-action" *ngIf="isFvSuperAdmin()"
+                  (click)="openProjectEdit(null)">
+            <svg lucidePencil size="15"></svg> Edit project
+          </button>
         </div>
       </div>
 
@@ -634,6 +640,7 @@
 
       <div class="budget-kpi-row" *ngIf="projectSummary()?.budget as b">
         <div class="budget-kpi" [class.over]="b.percentUsed !== null && b.percentUsed > 100">
+          <button type="button" class="budget-kpi-edit" *ngIf="isFvSuperAdmin()" (click)="openProjectEdit('budget')" title="Edit budget"><svg lucidePencil size="14"></svg></button>
           <span class="budget-kpi-label">Budget</span>
           <span class="budget-kpi-val">{{ b.currency }} {{ b.total | number:'1.0-0' }}</span>
           <span class="budget-kpi-sub" *ngIf="b.approvedExtra > 0">
@@ -652,12 +659,14 @@
         </div>
 
         <div class="budget-kpi" [class.over]="b.remaining < 0">
+          <button type="button" class="budget-kpi-edit" *ngIf="isFvSuperAdmin()" (click)="openProjectEdit('budget')" title="Edit budget"><svg lucidePencil size="14"></svg></button>
           <span class="budget-kpi-label">{{ b.remaining < 0 ? 'Over budget by' : 'Remaining' }}</span>
           <span class="budget-kpi-val">{{ b.currency }} {{ (b.remaining < 0 ? -b.remaining : b.remaining) | number:'1.0-0' }}</span>
           <span class="budget-kpi-sub">{{ b.remaining < 0 ? 'Agreed budget exceeded' : 'Left to spend' }}</span>
         </div>
 
         <div class="budget-kpi" [class.over]="b.hours.percentUsed !== null && b.hours.percentUsed > 100">
+          <button type="button" class="budget-kpi-edit" *ngIf="isFvSuperAdmin()" (click)="openProjectEdit('hours')" title="Edit planned hours"><svg lucidePencil size="14"></svg></button>
           <span class="budget-kpi-label">Hours</span>
           <span class="budget-kpi-val">{{ b.hours.logged | number:'1.0-1' }}<span class="budget-kpi-of"> / {{ b.hours.total | number:'1.0-0' }}</span></span>
           <span class="budget-kpi-sub" *ngIf="b.hours.percentUsed !== null">{{ b.hours.percentUsed }}% of planned</span>
@@ -5553,3 +5562,6 @@
 
 <app-task-transfer *ngIf="taskTransferOpen()" [projectId]="projectId" [projectName]="project()?.name || ''"
                    (closed)="taskTransferOpen.set(false)" (imported)="reloadAfterImport()"></app-task-transfer>
+
+<!-- The board card's own Edit form, opened over this page (super admin). -->
+<app-projects *ngIf="editProjectOpen()" [editOnlyProjectId]="projectId" [editFocus]="editProjectFocus()" (editClosed)="onProjectEditClosed($event)"></app-projects>

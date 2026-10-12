@@ -3,6 +3,7 @@ import { forkJoin, of } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ProjectsComponent } from '../projects';
 import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule, CdkDragEnd } from '@angular/cdk/drag-drop';
@@ -54,7 +55,7 @@ import { JiraDatePickerComponent } from '../../shared/components/jira-date-picke
 @Component({
   selector: 'app-project-detail',
   standalone: true,
-  imports: [TaskTransferComponent, JiraDatePickerComponent, RouterLink, 
+  imports: [ProjectsComponent, TaskTransferComponent, JiraDatePickerComponent, RouterLink, 
     CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
     TicketsTabComponent, BudgetRequestsTabComponent, DiscussionsTabComponent,
     TaskHoursRequestPanelComponent,
@@ -589,6 +590,18 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   fvRequests = signal<FieldVisitRequest[]>([]);
   fvDeciding = signal<number | null>(null);
   fvOpenMenuId = signal<number | null>(null);
+
+  /** The Summary's "Edit project": the boards page's edit form, embedded. */
+  editProjectOpen = signal(false);
+  editProjectFocus = signal<'budget' | 'hours' | 'code' | null>(null);
+  openProjectEdit(focus: 'budget' | 'hours' | 'code' | null) {
+    this.editProjectFocus.set(focus);
+    this.editProjectOpen.set(true);
+  }
+  onProjectEditClosed(saved: boolean) {
+    this.editProjectOpen.set(false);
+    if (saved) this.loadProjectDetails();
+  }
 
   isFvSuperAdmin(): boolean {
     return this.roles.isSuperAdmin();

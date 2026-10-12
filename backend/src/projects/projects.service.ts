@@ -157,6 +157,7 @@ export class ProjectsService {
         color: data.color || '#2563eb',
         icon: data.icon || 'folder',
         address: data.address ?? null,
+        onsiteRepresentation: data.onsiteRepresentation?.trim() || null,
         startDate: data.startDate ? new Date(data.startDate) : null,
         endDate: data.endDate ? new Date(data.endDate) : null,
         billingType: data.billingType || 'NON_BILLABLE',
@@ -1082,6 +1083,7 @@ export class ProjectsService {
           description: data.description,
           summary: data.summary ?? null,
           address: data.address ?? null,
+          onsiteRepresentation: data.onsiteRepresentation?.trim() || null,
           companyId,
           leadId,
           status: 'DRAFT',
@@ -2221,6 +2223,76 @@ export class ProjectsService {
     return { success: true };
   }
 
+  // ── Changing a project's code (super admin) ──────────────────────────────
+  //
+  // The code is the prefix of every task ID on the project ("CES/0926/10-5"),
+  // so it is changed together with them, in one transaction: a board never
+  // shows two prefixes, and a failure leaves both exactly as they were.
+  // Links use numeric ids and keep working; text that quoted an old task ID
+  // (comments, exports, messages) is not rewritten. Expense claims keep the
+  // code they were filed under as text but stay linked by project id.
+
+  private normaliseProjectKey(raw: string): string {
+    const key = String(raw ?? '').trim().toUpperCase();
+    if (!key) throw new BadRequestException('Enter a project code');
+    if (key.length > 30) throw new BadRequestException('A project code can be at most 30 characters');
+    if (!/^[A-Z0-9][A-Z0-9/_.-]*$/.test(key)) {
+      throw new BadRequestException('Use only letters, numbers and / _ . - in a project code');
+    }
+    return key;
+  }
+
+  /** What a code change would do, before anyone commits to it. */
+  async previewProjectKeyChange(companyId: number, projectId: number, rawKey: string) {
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId }, select: { id: true, key: true } });
+    if (!project) throw new NotFoundException('Project not found');
+    const key = this.normaliseProjectKey(rawKey);
+    const taskCount = await this.prisma.issue.count({ where: { projectId, key: { startsWith: `${project.key}-` } } });
+    const problem = await this.projectKeyProblem(companyId, projectId, project.key, key);
+    return { oldKey: project.key, newKey: key, taskCount, ok: !problem, problem };
+  }
+
+  private async projectKeyProblem(companyId: number, projectId: number, oldKey: string, key: string): Promise<string | null> {
+    if (key === oldKey) return 'That is already this project\'s code';
+    const taken = await this.prisma.project.findFirst({ where: { companyId, key, id: { not: projectId } }, select: { name: true } });
+    if (taken) return `"${key}" is already the code of ${taken.name}`;
+    // Task IDs are unique across the company, so the new prefix must be free.
+    const clash = await this.prisma.issue.findFirst({
+      where: { companyId, key: { startsWith: `${key}-` }, projectId: { not: projectId } },
+      select: { key: true },
+    });
+    if (clash) return `Task ID ${clash.key} already uses "${key}" — pick another code`;
+    return null;
+  }
+
+  async changeProjectKey(companyId: number, projectId: number, rawKey: string, actorEmployeeId: number | null) {
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId }, select: { id: true, key: true } });
+    if (!project) throw new NotFoundException('Project not found');
+    const key = this.normaliseProjectKey(rawKey);
+    const problem = await this.projectKeyProblem(companyId, projectId, project.key, key);
+    if (problem) throw new ConflictException(problem);
+
+    const oldKey = project.key;
+    return this.prisma.$transaction(async (tx) => {
+      const issues = await tx.issue.findMany({
+        where: { projectId, key: { startsWith: `${oldKey}-` } },
+        select: { id: true, key: true },
+      });
+      await tx.project.update({ where: { id: projectId }, data: { key } });
+      for (const i of issues) {
+        await tx.issue.update({ where: { id: i.id }, data: { key: key + i.key.slice(oldKey.length) } });
+      }
+      await tx.auditLog.create({
+        data: {
+          companyId, actorId: actorEmployeeId, action: 'PROJECT_CODE_CHANGED',
+          entityType: 'Project', entityId: String(projectId),
+          oldValue: { key: oldKey }, newValue: { key, tasksRenamed: issues.length },
+        },
+      });
+      return { oldKey, newKey: key, tasksRenamed: issues.length };
+    }, { timeout: 60000 });
+  }
+
   async updateProject(companyId: number, id: number, data: any) {
     const project = await this.prisma.project.findUnique({
       where: { id, companyId }
@@ -2234,6 +2306,7 @@ export class ProjectsService {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.address !== undefined) updateData.address = data.address ?? null;
+    if (data.onsiteRepresentation !== undefined) updateData.onsiteRepresentation = String(data.onsiteRepresentation ?? '').trim() || null;
     if (data.color !== undefined) updateData.color = data.color;
     if (data.icon !== undefined) updateData.icon = data.icon;
     if (data.startDate !== undefined) updateData.startDate = data.startDate ? new Date(data.startDate) : null;
