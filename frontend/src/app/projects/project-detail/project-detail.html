@@ -2333,7 +2333,7 @@
         <div class="pfv-row" *ngFor="let r of fvRequests()">
           <span class="pfv-num">{{ r.requestNumber }}</span>
           <span class="pfv-site" [title]="r.location">{{ r.location }}</span>
-          <span class="pfv-dates">{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'dd-MM-yyyy' }}</span>
+          <span class="pfv-dates">{{ r.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(r.startDate | date:'dd-MM-yyyy') !== (r.endDate | date:'dd-MM-yyyy')"> – {{ r.endDate | date:'dd-MM-yyyy' }}</ng-container></span>
           <span class="pfv-meta">{{ r.members.length }} people · {{ r.tasks.length }} tasks</span>
           <span class="pfv-status" [class]="'pfv-st-' + r.status">{{ fvStatusLabel(r.status) }}</span>
           <div class="pfv-actions" (click)="$event.stopPropagation()">

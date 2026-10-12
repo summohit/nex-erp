@@ -661,13 +661,21 @@
   padding: 0 !important;
   border: 0 !important;
 }
-.fvr-table th:nth-child(2), .fvr-table td:nth-child(2) { width: 9%; }
-.fvr-table th:nth-child(5), .fvr-table td:nth-child(5) { width: 27%; }
-.fvr-table th:nth-child(6), .fvr-table td:nth-child(6) { width: 19%; }
-.fvr-table th:nth-child(7), .fvr-table td:nth-child(7) { width: 5%; }
-.fvr-table th:nth-child(8), .fvr-table td:nth-child(8) { width: 110px; min-width: 110px; max-width: 110px; }
-.fvr-table th:nth-child(9), .fvr-table td:nth-child(9) { width: 150px; min-width: 150px; max-width: 150px; }
-.fvr-table th:nth-child(10), .fvr-table td:nth-child(10) { width: 54px; min-width: 54px; max-width: 54px; }
+/* Widths follow the column, whether or not the company-wide checkbox column is shown. */
+.fvr-table.with-select th:nth-child(2), .fvr-table.with-select td:nth-child(2) { width: 9%; }
+.fvr-table:not(.with-select) th:nth-child(1), .fvr-table:not(.with-select) td:nth-child(1) { width: 9%; }
+.fvr-table.with-select th:nth-child(5), .fvr-table.with-select td:nth-child(5) { width: 27%; }
+.fvr-table:not(.with-select) th:nth-child(4), .fvr-table:not(.with-select) td:nth-child(4) { width: 27%; }
+.fvr-table.with-select th:nth-child(6), .fvr-table.with-select td:nth-child(6) { width: 19%; }
+.fvr-table:not(.with-select) th:nth-child(5), .fvr-table:not(.with-select) td:nth-child(5) { width: 19%; }
+.fvr-table.with-select th:nth-child(7), .fvr-table.with-select td:nth-child(7) { width: 5%; }
+.fvr-table:not(.with-select) th:nth-child(6), .fvr-table:not(.with-select) td:nth-child(6) { width: 5%; }
+.fvr-table.with-select th:nth-child(8), .fvr-table.with-select td:nth-child(8) { width: 110px; min-width: 110px; max-width: 110px; }
+.fvr-table:not(.with-select) th:nth-child(7), .fvr-table:not(.with-select) td:nth-child(7) { width: 110px; min-width: 110px; max-width: 110px; }
+.fvr-table.with-select th:nth-child(9), .fvr-table.with-select td:nth-child(9) { width: 150px; min-width: 150px; max-width: 150px; }
+.fvr-table:not(.with-select) th:nth-child(8), .fvr-table:not(.with-select) td:nth-child(8) { width: 150px; min-width: 150px; max-width: 150px; }
+.fvr-table.with-select th:nth-child(10), .fvr-table.with-select td:nth-child(10) { width: 54px; min-width: 54px; max-width: 54px; }
+.fvr-table:not(.with-select) th:nth-child(9), .fvr-table:not(.with-select) td:nth-child(9) { width: 54px; min-width: 54px; max-width: 54px; }
 .fvr-table .action-col { min-width: 54px; padding-left: 4px !important; padding-right: 4px !important; text-align: center; }
 .row-actions { position: relative; display: flex; justify-content: center; }
 .row-more { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #64748b; cursor: pointer; }
