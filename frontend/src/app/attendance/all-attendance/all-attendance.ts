@@ -1547,7 +1547,7 @@ export class AllAttendanceComponent implements OnInit {
       ...data.map(r => [
         `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(),
         r.employee?.department?.name || '—',
-        new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        new Date(r.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-'),
         r.status || '', this.formatTime(r.clockIn), this.formatTime(r.clockOut),
         this.calculateWorkHours(r.clockIn, r.clockOut).text,
         r.isLate ? 'Yes' : 'No', r.isEarlyLeave ? 'Yes' : 'No',

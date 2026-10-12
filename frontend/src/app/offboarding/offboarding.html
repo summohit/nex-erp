@@ -41,8 +41,8 @@
           <tr *ngFor="let res of resignations()">
             <td>{{ res.employee?.user?.email }}</td>
             <td class="truncate">{{ res.reason }}</td>
-            <td>{{ res.intendedLastWorkingDay | date:'mediumDate' }}</td>
-            <td>{{ res.approvedLastWorkingDay ? (res.approvedLastWorkingDay | date:'mediumDate') : '-' }}</td>
+            <td>{{ res.intendedLastWorkingDay | date:'dd-MM-yyyy' }}</td>
+            <td>{{ res.approvedLastWorkingDay ? (res.approvedLastWorkingDay | date:'dd-MM-yyyy') : '-' }}</td>
             <td>
               <span class="badge" [ngClass]="'badge-' + res.status.toLowerCase()">
                 {{ res.status }}
@@ -123,7 +123,7 @@
         <tbody>
           <tr *ngFor="let item of interviews()">
             <td>{{ item.employee?.id }}</td>
-            <td>{{ item.completedAt | date:'mediumDate' }}</td>
+            <td>{{ item.completedAt | date:'dd-MM-yyyy' }}</td>
             <td>{{ item.rating }}</td>
             <td>{{ item.interviewer?.email }}</td>
             <td class="truncate">{{ item.feedback }}</td>

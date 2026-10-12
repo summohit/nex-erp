@@ -326,7 +326,7 @@ export class LeadContactProfileComponent implements OnInit {
     const ts = upcoming[0] ?? -1;
     if (ts === -1) return '—';
     const d = new Date(ts);
-    return `${d.toLocaleDateString()}${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    return `${d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')}${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   }
 
   // ═══════════════════════════════════════════
@@ -536,7 +536,7 @@ export class LeadContactProfileComponent implements OnInit {
         this.escapeCsv(l.contactName || ''),
         this.escapeCsv([l.email, l.phone].filter(Boolean).join(' | ')),
         l.value != null ? l.value : '',
-        l.expectedCloseDate ? new Date(l.expectedCloseDate).toLocaleDateString() : '',
+        l.expectedCloseDate ? new Date(l.expectedCloseDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '',
         this.nextFollowUp(l),
         this.escapeCsv(this.employeeName(l.assignedTo)),
         this.escapeCsv(this.employeeName(l.addedBy)),

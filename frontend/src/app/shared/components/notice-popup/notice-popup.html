@@ -27,8 +27,8 @@
             {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'CES Tech Administration' }}
           </span>
           <span class="notice-modal-meta">
-            {{ n.publishedAt | date:'MMMM d, y' }}
-            <ng-container *ngIf="n.expiresAt"> · Valid until {{ n.expiresAt | date:'mediumDate' }}</ng-container>
+            {{ n.publishedAt | date:'dd-MM-yyyy' }}
+            <ng-container *ngIf="n.expiresAt"> · Valid until {{ n.expiresAt | date:'dd-MM-yyyy' }}</ng-container>
           </span>
         </div>
       </div>

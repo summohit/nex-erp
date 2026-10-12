@@ -107,7 +107,7 @@ export class AttendanceListComponent implements OnInit {
   }
 
   periodLabel(): string {
-    if (this.selectedDate()) return new Date(`${this.selectedDate()}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+    if (this.selectedDate()) return new Date(`${this.selectedDate()}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
     return `${this.months[this.month() - 1]} ${this.year()}`;
   }
 

@@ -361,7 +361,7 @@
                   <svg lucideCalendar size="13"></svg>
                 </div>
                 <div class="date-text-stack">
-                  <span class="date-primary">{{ l.createdAt | date: 'mediumDate' }}</span>
+                  <span class="date-primary">{{ l.createdAt | date: 'dd-MM-yyyy' }}</span>
                   <span class="date-secondary">{{ l.createdAt | date: 'shortTime' }}</span>
                 </div>
               </div>
@@ -844,7 +844,7 @@
             </span>
             <span class="date-tag">
               <svg lucideCalendar size="12"></svg>
-              <span>Issued {{ viewLetter()?.createdAt | date: 'mediumDate' }}</span>
+              <span>Issued {{ viewLetter()?.createdAt | date: 'dd-MM-yyyy' }}</span>
             </span>
           </div>
         </div>
@@ -877,7 +877,7 @@
             </div>
             <div class="fact">
               <span class="fact-label">Joining date</span>
-              <span class="fact-value">{{ vl.joiningDate ? (vl.joiningDate | date: 'mediumDate') : '—' }}</span>
+              <span class="fact-value">{{ vl.joiningDate ? (vl.joiningDate | date: 'dd-MM-yyyy') : '—' }}</span>
             </div>
           </div>
 
@@ -885,20 +885,20 @@
             <div class="sig-head">
               <svg lucideCheck size="14"></svg>
               <strong>Signed by {{ vl.signatureName }}</strong>
-              <span *ngIf="vl.signedAt"> on {{ vl.signedAt | date: 'medium' }}</span>
+              <span *ngIf="vl.signedAt"> on {{ vl.signedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
             </div>
             <img *ngIf="vl.signatureImage" [src]="vl.signatureImage" alt="Signature" class="sig-image" />
             <div class="sig-meta">
               <span *ngIf="vl.signatureType">Method: {{ vl.signatureType | lowercase }}</span>
               <span *ngIf="vl.signatureIp"> · IP {{ vl.signatureIp }}</span>
-              <span *ngIf="vl.viewedAt"> · First opened {{ vl.viewedAt | date: 'short' }}</span>
+              <span *ngIf="vl.viewedAt"> · First opened {{ vl.viewedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
             </div>
           </div>
 
           <div class="signature-box awaiting" *ngIf="!vl.isSigned">
             <strong>{{ vl.offerStatus === 'DECLINED' ? 'Declined by the candidate' : 'Not yet signed' }}</strong>
             <div class="sig-meta">
-              Status {{ vl.offerStatus }}<span *ngIf="vl.viewedAt"> · opened {{ vl.viewedAt | date: 'short' }}</span>.
+              Status {{ vl.offerStatus }}<span *ngIf="vl.viewedAt"> · opened {{ vl.viewedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>.
               Manage this offer from the candidate record in Recruitment.
             </div>
           </div>

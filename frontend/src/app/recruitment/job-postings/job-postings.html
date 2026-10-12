@@ -117,7 +117,7 @@
           </div>
           <div class="stat-box">
             <span class="stat-label">Posted Date</span>
-            <span class="stat-val">{{ job.postedDate | date:'mediumDate' }}</span>
+            <span class="stat-val">{{ job.postedDate | date:'dd-MM-yyyy' }}</span>
           </div>
         </div>
 
@@ -375,7 +375,7 @@
           <!-- Always visible, so the closing rule is clear before choosing. -->
           <small class="field-hint">
             <ng-container *ngIf="jobForm.endDate && !jobForm.neverExpires">
-              Closes automatically after {{ jobForm.endDate | date:'mediumDate' }}.
+              Closes automatically after {{ jobForm.endDate | date:'dd-MM-yyyy' }}.
             </ng-container>
             <ng-container *ngIf="!jobForm.endDate || jobForm.neverExpires">
               No end date — the posting stays open until you close it manually.

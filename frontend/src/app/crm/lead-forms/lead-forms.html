@@ -58,7 +58,7 @@
               <td><span class="table-user-name">{{ form.fields?.length ?? 0 }} <span class="table-user-sub">&middot; {{ enabledFieldCount(form) }} enabled</span></span></td>
               <td><span class="table-user-name">{{ form._count?.leadsCreated ?? 0 }}</span></td>
               <td><span class="status-pill {{ statusClass(form.status) }}">{{ form.status }}</span></td>
-              <td><div class="table-user-sub">{{ form.createdAt | date:'mediumDate' }}</div></td>
+              <td><div class="table-user-sub">{{ form.createdAt | date:'dd-MM-yyyy' }}</div></td>
               <td><div class="table-actions-group lf-actions-wrap">
                 <button type="button" class="btn-action-icon" title="Edit / Build" (click)="editForm(form.id)"><svg lucideEdit2 size="15"></svg></button>
                 <button type="button" class="btn-action-icon" title="Copy public link" (click)="copyText(siteUrl + '/lead-form/' + form.formKey, 'Public link copied.')"><svg lucideLink2 size="15"></svg></button>

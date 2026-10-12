@@ -2137,7 +2137,7 @@
               {{ preSalesStatusWord(h.newStatus) }}
             </span>
             <span class="ps-timeline-from" *ngIf="h.previousStatus">from {{ preSalesStatusWord(h.previousStatus) }}</span>
-            <span class="ps-timeline-when">{{ h.createdAt | date:'dd MMM yyyy, h:mm a' }}</span>
+            <span class="ps-timeline-when">{{ h.createdAt | date:'dd-MM-yyyy, h:mm a' }}</span>
           </div>
           <div class="ps-timeline-who" *ngIf="h.changedBy">{{ personName(h.changedBy) }}</div>
           <p class="ps-timeline-remark" *ngIf="h.remark">{{ h.remark }}</p>

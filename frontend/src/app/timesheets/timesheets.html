@@ -20,7 +20,7 @@
           </button>
           <div class="ts-week-label">
             <svg lucideCalendarDays size="15"></svg>
-            <span>{{ weekStart() | date:'d MMM' }} – {{ weekEnd() | date:'d MMM y' }}</span>
+            <span>{{ weekStart() | date:'d MMM' }} – {{ weekEnd() | date:'dd-MM-yyyy' }}</span>
           </div>
           <button class="ts-nav-btn" (click)="nextWeek()" title="Next week">
             <svg lucideChevronRight size="16"></svg>
@@ -1052,10 +1052,10 @@
 
       <dl class="ts-modal-grid">
         <dt>Start time</dt>
-        <dd>{{ open.entry.startedAt | date:'d MMM y, h:mm a' }}</dd>
+        <dd>{{ open.entry.startedAt | date:'dd-MM-yyyy, h:mm a' }}</dd>
 
         <dt>End time</dt>
-        <dd *ngIf="open.entry.endedAt">{{ open.entry.endedAt | date:'d MMM y, h:mm a' }}</dd>
+        <dd *ngIf="open.entry.endedAt">{{ open.entry.endedAt | date:'dd-MM-yyyy, h:mm a' }}</dd>
         <dd *ngIf="!open.entry.endedAt" class="ts-dim">Still running</dd>
 
         <dt>Total hours</dt>

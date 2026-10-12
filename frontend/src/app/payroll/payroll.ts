@@ -1552,7 +1552,7 @@ export class PayrollComponent implements OnInit {
       minWidth: 130,
       valueFormatter: (params: any) => {
         if (!params.value) return '-';
-        return new Date(params.value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        return new Date(params.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
       }
     },
     {
@@ -1632,7 +1632,7 @@ export class PayrollComponent implements OnInit {
       minWidth: 130,
       valueFormatter: (params: any) => {
         if (!params.value) return '-';
-        return new Date(params.value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        return new Date(params.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
       }
     },
     {

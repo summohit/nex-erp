@@ -92,7 +92,7 @@
         </div>
         <div class="stat-chip-body">
           <span class="chip-label">Client Since</span>
-          <span class="chip-value">{{ client.createdAt | date:'mediumDate' }}</span>
+          <span class="chip-value">{{ client.createdAt | date:'dd-MM-yyyy' }}</span>
         </div>
       </div>
     </div>
@@ -160,7 +160,7 @@
               <div class="tile-icon"><svg lucideCalendar size="16"></svg></div>
               <div class="tile-content">
                 <span class="tile-label">Client Since</span>
-                <span class="tile-value">{{ client.createdAt | date:'longDate' }}</span>
+                <span class="tile-value">{{ client.createdAt | date:'dd-MM-yyyy' }}</span>
               </div>
             </div>
 
@@ -511,7 +511,7 @@
                   </span>
                 </td>
                 <td>
-                  <span class="date-text">{{ project.createdAt | date:'mediumDate' }}</span>
+                  <span class="date-text">{{ project.createdAt | date:'dd-MM-yyyy' }}</span>
                 </td>
                 <td class="text-right">
                   <a [routerLink]="['/projects', project.id]" class="btn-action-icon">

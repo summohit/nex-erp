@@ -385,12 +385,12 @@
             <div class="nb-timeline-meta">
               <span class="nb-meta-item">
                 <svg lucideCalendar size="12"></svg>
-                <span>Posted {{ n.publishedAt | date:'mediumDate' }}</span>
+                <span>Posted {{ n.publishedAt | date:'dd-MM-yyyy' }}</span>
               </span>
               <span class="nb-meta-sep" *ngIf="n.expiresAt">·</span>
               <span class="nb-meta-item" *ngIf="n.expiresAt">
                 <svg lucideClock size="12"></svg>
-                <span>Valid until {{ n.expiresAt | date:'mediumDate' }}</span>
+                <span>Valid until {{ n.expiresAt | date:'dd-MM-yyyy' }}</span>
               </span>
             </div>
           </div>

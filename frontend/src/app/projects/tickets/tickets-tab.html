@@ -255,16 +255,16 @@
 
           <span class="tk-meta-item" *ngIf="t.startDate">
             <svg lucideCalendar size="13"></svg>
-            starts {{ t.startDate | date:'d MMM y' }}
+            starts {{ t.startDate | date:'dd-MM-yyyy' }}
           </span>
 
           <span class="tk-meta-item" *ngIf="t.dueDate">
             <svg lucideCalendar size="13"></svg>
-            due {{ t.dueDate | date:'d MMM y' }}
+            due {{ t.dueDate | date:'dd-MM-yyyy' }}
           </span>
 
           <span class="tk-meta-item tk-dim">
-            raised by {{ fullName(t.raisedBy) }} · {{ t.createdAt | date:'d MMM y' }}
+            raised by {{ fullName(t.raisedBy) }} · {{ t.createdAt | date:'dd-MM-yyyy' }}
           </span>
         </div>
 

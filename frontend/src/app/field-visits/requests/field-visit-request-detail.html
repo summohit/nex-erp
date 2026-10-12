@@ -47,7 +47,7 @@
           <span class="meta-dot">·</span>
           <span class="meta-item">
             <svg lucideCalendar [size]="13"></svg>
-            {{ request()!.createdAt | date:'d MMM y' }}
+            {{ request()!.createdAt | date:'dd-MM-yyyy' }}
           </span>
           @if (request()!.reviewedBy) {
             <span class="meta-dot">·</span>
@@ -169,7 +169,7 @@
             </div>
             <div class="fact-content">
               <span class="fact-label">Dates</span>
-              <span class="fact-value">{{ request()!.startDate | date:'d MMM y' }} – {{ request()!.endDate | date:'d MMM y' }}</span>
+              <span class="fact-value">{{ request()!.startDate | date:'dd-MM-yyyy' }} – {{ request()!.endDate | date:'dd-MM-yyyy' }}</span>
             </div>
           </div>
 
@@ -320,7 +320,7 @@
                 <svg lucideFileText [size]="18" class="file-icon"></svg>
                 <div class="attachment-info">
                   <span class="file-name">{{ a.fileName }}</span>
-                  <span class="file-meta">{{ a.createdAt | date:'d MMM y' }}</span>
+                  <span class="file-meta">{{ a.createdAt | date:'dd-MM-yyyy' }}</span>
                 </div>
                 <svg lucideDownload [size]="14" class="dl-icon"></svg>
               </a>
@@ -372,7 +372,7 @@
                     </div>
                   </td>
                   <td class="nowrap">
-                    <span class="date-text">{{ d.visitDate | date:'d MMM y' }}</span>
+                    <span class="date-text">{{ d.visitDate | date:'dd-MM-yyyy' }}</span>
                     @if (d.isHoliday) { <span class="holiday-tag">Holiday</span> }
                   </td>
                   <td>
@@ -557,7 +557,7 @@
                     </div>
                     <span class="actor-name">{{ personName(a.actor) }}</span>
                   </div>
-                  <span class="tl-timestamp">{{ a.createdAt | date:'d MMM y, h:mm a' }}</span>
+                  <span class="tl-timestamp">{{ a.createdAt | date:'dd-MM-yyyy, h:mm a' }}</span>
                 </div>
                 @if (a.detail) {
                   <p class="tl-detail-msg">{{ a.detail }}</p>

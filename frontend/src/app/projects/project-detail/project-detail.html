@@ -977,7 +977,7 @@
                       {{ act.issue?.key }}: {{ act.issue?.title }}
                     </span>
                   </p>
-                  <span class="activity-time">{{ act.createdAt | date:'mediumDate' }} • {{ act.createdAt | date:'shortTime' }}</span>
+                  <span class="activity-time">{{ act.createdAt | date:'dd-MM-yyyy' }} • {{ act.createdAt | date:'shortTime' }}</span>
                 </div>
               </div>
               <div class="summary-empty-state" *ngIf="!projectSummary()?.recentActivity?.length">
@@ -1705,7 +1705,7 @@
 
           <div class="scope-card-timestamp">
             <svg lucideClock size="13"></svg>
-            <span [title]="r.createdAt | date:'d MMM y, HH:mm'">{{ getScopeRelativeTime(r.createdAt) }}</span>
+            <span [title]="r.createdAt | date:'dd-MM-yyyy, h:mm a'">{{ getScopeRelativeTime(r.createdAt) }}</span>
           </div>
         </div>
 
@@ -1723,7 +1723,7 @@
               {{ r.raisedBy ? (r.raisedBy.firstName + ' ' + r.raisedBy.lastName) : 'Unknown requester' }}
             </span>
             <span class="scope-author-date">
-              submitted on {{ r.createdAt | date:'d MMM y, HH:mm' }}
+              submitted on {{ r.createdAt | date:'dd-MM-yyyy, h:mm a' }}
             </span>
           </div>
         </div>
@@ -1761,7 +1761,7 @@
             <div class="decision-title">
               <strong>{{ r.status === 'APPROVED' ? 'Approved' : 'Rejected' }}</strong>
               <span *ngIf="r.reviewedBy" class="reviewer-name">by {{ r.reviewedBy.firstName }} {{ r.reviewedBy.lastName }}</span>
-              <span *ngIf="r.reviewedAt" class="reviewer-date">({{ r.reviewedAt | date:'d MMM y, HH:mm' }})</span>
+              <span *ngIf="r.reviewedAt" class="reviewer-date">({{ r.reviewedAt | date:'dd-MM-yyyy, h:mm a' }})</span>
             </div>
             <p class="decision-reason" *ngIf="r.decisionNote">{{ r.decisionNote }}</p>
           </div>
@@ -2254,7 +2254,7 @@
            </ng-template>
 
            <div class="att-meta-sub">
-             <span>{{ att.createdAt | date:'MMM d, y' }}</span>
+             <span>{{ att.createdAt | date:'dd-MM-yyyy' }}</span>
              <span *ngIf="att.fileSize">{{ (att.fileSize / 1024 / 1024) | number:'1.1-2' }} MB</span>
              <!-- §2: who uploaded it. Shown for task attachments too, not just
                   project documents — evidence is only evidence if you can tell
@@ -2333,7 +2333,7 @@
         <div class="pfv-row" *ngFor="let r of fvRequests()">
           <span class="pfv-num">{{ r.requestNumber }}</span>
           <span class="pfv-site" [title]="r.location">{{ r.location }}</span>
-          <span class="pfv-dates">{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'d MMM y' }}</span>
+          <span class="pfv-dates">{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'dd-MM-yyyy' }}</span>
           <span class="pfv-meta">{{ r.members.length }} people · {{ r.tasks.length }} tasks</span>
           <span class="pfv-status" [class]="'pfv-st-' + r.status">{{ fvStatusLabel(r.status) }}</span>
           <div class="pfv-actions" (click)="$event.stopPropagation()">
@@ -2407,7 +2407,7 @@
               {{ visit.employee?.firstName }} {{ visit.employee?.lastName }}
             </div>
             <div style="font-size: 12px; color: #5e6c84;">
-              {{ visit.startTime | date:'MMM d, y · h:mm a' }}
+              {{ visit.startTime | date:'dd-MM-yyyy, h:mm a' }}
             </div>
           </div>
         </div>
@@ -2698,7 +2698,7 @@
                   {{ activity.oldValue }} <svg lucideArrowRight size="10"></svg> {{ activity.newValue }}
                 </div>
                 <div style="font-size: 12px; color: #8590a2; margin-top: 6px;">
-                  {{ activity.createdAt | date:'medium' }}
+                  {{ activity.createdAt | date:'dd-MM-yyyy, h:mm a' }}
                 </div>
               </div>
             </div>
@@ -4644,7 +4644,7 @@
       <div class="lightbox-title-row">
         <div class="lightbox-filename">{{ previewAttachment()?.fileName }}</div>
         <div class="lightbox-meta">
-          <span *ngIf="previewAttachment()?.createdAt">Added {{ previewAttachment()?.createdAt | date:'d MMM yyyy, HH:mm' }}</span>
+          <span *ngIf="previewAttachment()?.createdAt">Added {{ previewAttachment()?.createdAt | date:'dd-MM-yyyy, h:mm a' }}</span>
           <span *ngIf="previewAttachment()?.fileSize"> • {{ formatFileSize(previewAttachment()?.fileSize) }}</span>
         </div>
       </div>
@@ -5091,7 +5091,7 @@
         </div>
         <div>
           <div style="font-size: 15px; font-weight: 700; color: #172b4d;">{{ visit.employee?.firstName }} {{ visit.employee?.lastName }}</div>
-          <div style="font-size: 12.5px; color: #5e6c84; margin-top: 1px;">{{ visit.startTime | date:'EEE, MMM d, y' }}</div>
+          <div style="font-size: 12.5px; color: #5e6c84; margin-top: 1px;">{{ visit.startTime | date:'EEE, dd-MM-yyyy' }}</div>
         </div>
       </div>
       <span [style.background]="fieldVisitStatusColor(visit.status).bg" [style.color]="fieldVisitStatusColor(visit.status).text" style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 20px; font-size: 11.5px; font-weight: 700; white-space: nowrap; flex-shrink: 0;">

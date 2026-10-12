@@ -959,7 +959,7 @@ export class ProjectsComponent implements OnInit {
         headerName: 'Start date',
         field: 'startDate',
         width: 130,
-        valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+        valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '—'
       },
       {
         // Labelled Deadline per §2.1; `endDate` is the column that has always
@@ -967,7 +967,7 @@ export class ProjectsComponent implements OnInit {
         headerName: 'Deadline',
         field: 'endDate',
         width: 130,
-        valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+        valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '—'
       },
       {
         headerName: '',
@@ -3862,7 +3862,7 @@ export class ProjectsComponent implements OnInit {
   }
 
   private taskTableDate(value: string | Date | null | undefined): string {
-    return value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+    return value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '—';
   }
 
   private taskTableDuration(value: number | null | undefined): string {
@@ -4047,7 +4047,7 @@ export class ProjectsComponent implements OnInit {
       cellRenderer: (p: any) => {
         if (!p.value) return '<span style="color:#94a3b8;">—</span>';
         const d = new Date(p.value);
-        const str = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        const str = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
         if (p.data?.isOverdue && p.data?.status !== 'DONE' && p.data?.status !== 'CANCELLED') {
           return `<span style="color: #1373e5; font-weight: 700; font-size: 12px;">${str}</span>`;
         }

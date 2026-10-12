@@ -57,7 +57,7 @@
         </div>
         <div class="stat-chip">
           <div class="stat-chip-icon icon-since"><svg lucideCalendar size="18"></svg></div>
-          <div class="stat-chip-body"><span class="chip-label">Added</span><span class="chip-value">{{ contact.createdAt | date:'mediumDate' }}</span></div>
+          <div class="stat-chip-body"><span class="chip-label">Added</span><span class="chip-value">{{ contact.createdAt | date:'dd-MM-yyyy' }}</span></div>
         </div>
       </div>
 
@@ -192,7 +192,7 @@
                   <td><div class="table-user-name">{{ lead.contactName || '—' }}</div><div class="table-user-sub" *ngIf="lead.companyName">{{ lead.companyName }}</div></td>
                   <td><div class="contact-details-cell"><span *ngIf="lead.email">{{ lead.email }}</span><span *ngIf="lead.phone" class="phone-sub">{{ lead.phone }}</span><span class="no-data-dash" *ngIf="!lead.email && !lead.phone">—</span></div></td>
                   <td><span class="amount-cell" *ngIf="lead.value != null">{{ lead.value | currency:(lead.currency || 'INR') }}</span><span class="no-data-dash" *ngIf="lead.value == null">—</span></td>
-                  <td><div class="table-user-sub">{{ (lead.expectedCloseDate | date:'mediumDate') || '—' }}</div></td>
+                  <td><div class="table-user-sub">{{ (lead.expectedCloseDate | date:'dd-MM-yyyy') || '—' }}</div></td>
                   <td><div class="table-user-sub">{{ nextFollowUp(lead) }}</div></td>
                   <td><span class="table-user-name">{{ employeeName(lead.assignedTo) }}</span></td>
                   <td><span class="table-user-name">{{ employeeName(lead.addedBy) }}</span></td>
@@ -246,7 +246,7 @@
                   <td><span class="followup-type-pill {{ noteTypeClass(n.type) }}">{{ noteTypeLabel(n.type) }}</span></td>
                   <td><div class="table-user-sub note-detail-cell">{{ n.content || '—' }}</div></td>
                   <td><span class="table-user-name">{{ employeeName(n.createdBy) }}</span></td>
-                  <td><div class="table-user-sub">{{ n.createdAt | date:'mediumDate' }}</div></td>
+                  <td><div class="table-user-sub">{{ n.createdAt | date:'dd-MM-yyyy' }}</div></td>
                   <td><div class="table-actions-group">
                     <button type="button" class="btn-action-icon" title="View" (click)="openViewNote(n)"><svg lucideEye size="15"></svg></button>
                     <button type="button" class="btn-action-icon" title="Edit" (click)="openEditNote(n)"><svg lucideEdit size="15"></svg></button>
@@ -421,7 +421,7 @@
         <div class="view-note-meta">
           <span class="followup-type-pill {{ noteTypeClass(viewingNote.type) }}">{{ noteTypeLabel(viewingNote.type) }}</span>
           <span class="view-note-meta-item">by <strong>{{ employeeName(viewingNote.createdBy) }}</strong></span>
-          <span class="view-note-meta-item">{{ viewingNote.createdAt | date:'medium' }}</span>
+          <span class="view-note-meta-item">{{ viewingNote.createdAt | date:'dd-MM-yyyy, h:mm a' }}</span>
         </div>
         <p class="view-note-content">{{ viewingNote.content || 'No detail provided for this note.' }}</p>
       </div>

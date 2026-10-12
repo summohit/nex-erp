@@ -1,6 +1,7 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter, withNavigationErrorHandler } from '@angular/router';
 import { routes } from './app.routes';
+import { DATE_PIPE_DEFAULT_OPTIONS } from '@angular/common';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { authInterceptor } from './interceptors/auth.interceptor';
 import { provideHotToastConfig } from '@ngneat/hot-toast';
@@ -28,6 +29,8 @@ if (typeof window !== 'undefined') {
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    // House date format: 12-10-2026. A bare `| date` uses this.
+    { provide: DATE_PIPE_DEFAULT_OPTIONS, useValue: { dateFormat: 'dd-MM-yyyy' } },
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withNavigationErrorHandler((e) => reloadOnStaleBuild(e.error))),

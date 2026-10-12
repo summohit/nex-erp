@@ -48,7 +48,7 @@
                <svg lucideTrendingUp size="12"></svg> {{ goal.okr.title }}
             </span>
             <span *ngIf="goal.dueDate" class="due-badge">
-              <svg lucideClock size="13"></svg> {{ goal.dueDate | date:'mediumDate' }}
+              <svg lucideClock size="13"></svg> {{ goal.dueDate | date:'dd-MM-yyyy' }}
             </span>
             <button class="delete-btn" title="Delete Goal" (click)="deleteGoal(goal.id)">
               <svg lucideTrash size="15"></svg>

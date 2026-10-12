@@ -875,8 +875,8 @@
                 </td>
                 <td><span class="effort-pill-enhanced"><svg lucideClock class="icon-xs mr-1"></svg>{{ task.estimatedEffort }}h</span></td>
                 <td><span class="days-pill-enhanced">{{ task.workingDays || '-' }}d</span></td>
-                <td><span class="date-pill-enhanced" *ngIf="task.startDate"><svg lucideCalendar class="icon-xs mr-1"></svg>{{ task.startDate | date:'mediumDate' }}</span></td>
-                <td><span class="date-pill-enhanced" *ngIf="task.endDate"><svg lucideCalendar class="icon-xs mr-1"></svg>{{ task.endDate | date:'mediumDate' }}</span></td>
+                <td><span class="date-pill-enhanced" *ngIf="task.startDate"><svg lucideCalendar class="icon-xs mr-1"></svg>{{ task.startDate | date:'dd-MM-yyyy' }}</span></td>
+                <td><span class="date-pill-enhanced" *ngIf="task.endDate"><svg lucideCalendar class="icon-xs mr-1"></svg>{{ task.endDate | date:'dd-MM-yyyy' }}</span></td>
                 <td><span class="dependency-tag-enhanced" *ngIf="task.dependencies"><svg lucideLink class="icon-xs mr-1"></svg>{{ task.dependencies }}</span><span *ngIf="!task.dependencies" class="text-muted text-xs">-</span></td>
                 <td><span class="text-xs text-muted remarks-cell" title="{{ task.remarks }}">{{ task.remarks || '-' }}</span></td>
               </tr>

@@ -248,7 +248,7 @@
             <div class="time-cell">
               <div class="schedule-time-row" [class.text-overdue]="isOverdue(fu)" [class.text-today]="isToday(fu.scheduledAt)">
                 <svg lucideClock size="14"></svg>
-                <span class="time-text">{{ fu.scheduledAt | date:'mediumDate' }}, {{ fu.scheduledAt | date:'shortTime' }}</span>
+                <span class="time-text">{{ fu.scheduledAt | date:'dd-MM-yyyy' }}, {{ fu.scheduledAt | date:'shortTime' }}</span>
               </div>
               <span class="relative-pill pill-overdue" *ngIf="isOverdue(fu)">Overdue</span>
               <span class="relative-pill pill-today" *ngIf="isToday(fu.scheduledAt)">Today</span>
@@ -353,7 +353,7 @@
       <div class="fu-card-meta">
         <div class="meta-row schedule-row" [class.text-overdue]="isOverdue(fu)" [class.text-today]="isToday(fu.scheduledAt)">
           <svg lucideCalendarClock size="15"></svg>
-          <span>{{ fu.scheduledAt | date:'mediumDate' }} at {{ fu.scheduledAt | date:'shortTime' }}</span>
+          <span>{{ fu.scheduledAt | date:'dd-MM-yyyy' }} at {{ fu.scheduledAt | date:'shortTime' }}</span>
         </div>
       </div>
 
@@ -433,7 +433,7 @@
         <div class="ldm-metric-divider" *ngIf="selectedLead.expectedCloseDate"></div>
         <div class="ldm-metric-item" *ngIf="selectedLead.expectedCloseDate">
           <div class="ldm-value-label">Target Close Date</div>
-          <div class="ldm-metric-val">{{selectedLead.expectedCloseDate | date:'dd MMM yyyy'}}</div>
+          <div class="ldm-metric-val">{{selectedLead.expectedCloseDate | date:'dd-MM-yyyy'}}</div>
         </div>
         <div class="ldm-metric-divider" *ngIf="selectedLead.source"></div>
         <div class="ldm-metric-item" *ngIf="selectedLead.source">
@@ -589,7 +589,7 @@
                 <svg lucideCalendar size="15"></svg>
               </div>
               <div class="owner-info-text">
-                <span class="owner-name">{{selectedLead.createdAt | date:'dd MMM yyyy'}}</span>
+                <span class="owner-name">{{selectedLead.createdAt | date:'dd-MM-yyyy'}}</span>
                 <span class="owner-designation">{{selectedLead.createdAt | date:'hh:mm a'}}</span>
               </div>
             </div>
@@ -669,7 +669,7 @@
               <div class="timeline-meta-bar">
                 <div class="meta-item">
                   <svg lucideCalendar size="12"></svg>
-                  <span>Scheduled: {{ h.scheduledAt | date:'mediumDate' }} at {{ h.scheduledAt | date:'shortTime' }}</span>
+                  <span>Scheduled: {{ h.scheduledAt | date:'dd-MM-yyyy' }} at {{ h.scheduledAt | date:'shortTime' }}</span>
                 </div>
               </div>
             </div>
@@ -757,7 +757,7 @@
       <div class="last-remark-box" *ngIf="!editingFollowUp && previousFollowUpNote?.notes">
         <div class="last-remark-label">
           <svg lucideMessageSquare size="13"></svg>
-          <span>Last Remark ({{ previousFollowUpNote?.scheduledAt | date:'mediumDate' }})</span>
+          <span>Last Remark ({{ previousFollowUpNote?.scheduledAt | date:'dd-MM-yyyy' }})</span>
         </div>
         <p class="last-remark-text">"{{ previousFollowUpNote?.notes }}"</p>
       </div>

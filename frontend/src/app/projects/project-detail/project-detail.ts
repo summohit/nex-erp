@@ -3343,7 +3343,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (diffHr < 24) return `${diffHr}h ago`;
     const diffDay = Math.floor(diffHr / 24);
     if (diffDay < 7) return `${diffDay}d ago`;
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
   }
 
   setScopeFormType(type: 'OUT_OF_SCOPE' | 'IN_SCOPE') {
@@ -4448,7 +4448,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       valueGetter: (params: any) => {
         if (!params.data?.createdAt) return '';
         const d = new Date(params.data.createdAt);
-        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
       }
     },
     { 
@@ -4459,7 +4459,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       valueGetter: (params: any) => {
         if (!params.data?.updatedAt) return '';
         const d = new Date(params.data.updatedAt);
-        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
       }
     },
     { 
@@ -4706,7 +4706,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   private exportDate(date: Date | null): string {
     if (!date || isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
   }
 
   /** TODO → "To Do": the stored value is not what a client should read. */

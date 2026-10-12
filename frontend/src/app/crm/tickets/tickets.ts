@@ -344,12 +344,12 @@ export class TicketsComponent implements OnInit {
       headerName: 'DEADLINE',
       width: 110,
       minWidth: 105,
-      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '—',
       cellRenderer: (p: any) => {
         if (!p.value) return '—';
         const date = new Date(p.value);
         const today = new Date();
-        const str = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const str = date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
         if (date < today && p.data?.status !== 'RESOLVED' && p.data?.status !== 'CLOSED') {
           return `<span style="color: #dc2626; font-weight: 600;">${str}</span>`;
         }
@@ -361,11 +361,11 @@ export class TicketsComponent implements OnInit {
       headerName: 'CREATED',
       width: 110,
       minWidth: 105,
-      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '—',
       cellRenderer: (p: any) => {
         if (!p.value) return '—';
         const d = new Date(p.value);
-        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
         const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         return `<span title="Created on ${dateStr} at ${timeStr}">${dateStr}</span>`;
       }
@@ -375,11 +375,11 @@ export class TicketsComponent implements OnInit {
       headerName: 'RESOLVED',
       width: 115,
       minWidth: 105,
-      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '—',
       cellRenderer: (p: any) => {
         if (!p.value) return '<span class="text-muted">—</span>';
         const d = new Date(p.value);
-        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
         const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         return `<span class="resolved-date-cell" style="color: #059669; font-weight: 600;" title="Resolved on ${dateStr} at ${timeStr}">${dateStr}</span>`;
       }
@@ -389,11 +389,11 @@ export class TicketsComponent implements OnInit {
       headerName: 'CLOSED',
       width: 105,
       minWidth: 100,
-      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '—',
       cellRenderer: (p: any) => {
         if (!p.value) return '<span class="text-muted">—</span>';
         const d = new Date(p.value);
-        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
         const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         return `<span title="Closed on ${dateStr} at ${timeStr}">${dateStr}</span>`;
       }
@@ -454,7 +454,7 @@ export class TicketsComponent implements OnInit {
       ...this.newTicket,
       type: 'ATTENDANCE_ISSUE',
       attendanceDate: valid,
-      title: valid ? `Attendance issue on ${new Date(valid + 'T00:00:00').toLocaleDateString()}` : '',
+      title: valid ? `Attendance issue on ${new Date(valid + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')}` : '',
     } as Partial<Ticket>;
   }
 

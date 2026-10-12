@@ -26,7 +26,7 @@
             <h1>My Field Visit</h1>
             <span class="date-chip">
               <svg lucideCalendar [size]="13"></svg>
-              {{ today | date:'EEEE, d MMM y' }}
+              {{ today | date:'EEE, dd-MM-yyyy' }}
             </span>
           </div>
           <p>Clock in and out from the site. You must be within the approved radius.</p>
@@ -68,7 +68,7 @@
         <svg lucideCalendar [size]="14"></svg>
         <div>
           <span class="ee-day">{{ today | date:'EEEE' }}</span>
-          <span class="ee-full">{{ today | date:'d MMM y' }}</span>
+          <span class="ee-full">{{ today | date:'dd-MM-yyyy' }}</span>
         </div>
       </div>
     </div>

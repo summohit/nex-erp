@@ -338,7 +338,7 @@ export class JobDetailComponent implements OnInit {
       app.status || 'APPLIED',
       `"${app.experienceYears || ''}"`,
       `"${app.noticePeriod || ''}"`,
-      app.createdAt ? new Date(app.createdAt).toLocaleDateString() : ''
+      app.createdAt ? new Date(app.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : ''
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');

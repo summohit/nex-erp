@@ -414,7 +414,7 @@ export class AssetsComponent implements OnInit {
     if (!d) return '-';
     const date = new Date(d);
     if (isNaN(date.getTime())) return '-';
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
   }
 
   outstandingOf(t: InventoryTransaction): number {
@@ -1018,7 +1018,7 @@ export class AssetsComponent implements OnInit {
       headerName: 'Submitted Date',
       field: 'createdAt',
       flex: 1,
-      valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
+      valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '-'
     },
     {
       headerName: 'Status',

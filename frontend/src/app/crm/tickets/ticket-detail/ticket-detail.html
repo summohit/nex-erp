@@ -197,7 +197,7 @@
         <div class="meta-item" *ngIf="ticket.dueDate">
           <span class="meta-label">Deadline</span>
           <div class="meta-value-box">
-            <span class="meta-value-text" [class.text-danger]="isOverdue(ticket.dueDate)">{{ ticket.dueDate | date:'mediumDate' }}</span>
+            <span class="meta-value-text" [class.text-danger]="isOverdue(ticket.dueDate)">{{ ticket.dueDate | date:'dd-MM-yyyy' }}</span>
           </div>
         </div>
 
@@ -205,7 +205,7 @@
         <div class="meta-item">
           <span class="meta-label">Created Date</span>
           <div class="meta-value-box">
-            <span class="meta-value-text">{{ ticket.createdAt | date:'mediumDate' }}</span>
+            <span class="meta-value-text">{{ ticket.createdAt | date:'dd-MM-yyyy' }}</span>
           </div>
         </div>
 
@@ -213,7 +213,7 @@
         <div class="meta-item" *ngIf="ticket.closedAt">
           <span class="meta-label">Closed Date</span>
           <div class="meta-value-box">
-            <span class="meta-value-text">{{ ticket.closedAt | date:'mediumDate' }}</span>
+            <span class="meta-value-text">{{ ticket.closedAt | date:'dd-MM-yyyy' }}</span>
           </div>
         </div>
 
@@ -221,7 +221,7 @@
         <div class="meta-item" *ngIf="ticket.resolvedAt">
           <span class="meta-label">Resolved Date</span>
           <div class="meta-value-box">
-            <span class="meta-value-text text-green">{{ ticket.resolvedAt | date:'mediumDate' }}</span>
+            <span class="meta-value-text text-green">{{ ticket.resolvedAt | date:'dd-MM-yyyy' }}</span>
           </div>
         </div>
       </div>

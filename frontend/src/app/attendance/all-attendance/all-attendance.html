@@ -755,7 +755,7 @@
             <!-- Date -->
             <td>
               <div class="date-cell">
-                <span class="date-primary">{{ r.date | date:'mediumDate' }}</span>
+                <span class="date-primary">{{ r.date | date:'dd-MM-yyyy' }}</span>
                 <span class="date-weekday">{{ r.date | date:'EEE' }}</span>
               </div>
             </td>
@@ -865,7 +865,7 @@
       <div class="session-date-status-bar">
         <div class="date-info">
           <span class="date-label">Date</span>
-          <span class="date-val">{{ selectedDayDetails()?.date | date:'fullDate' }}</span>
+          <span class="date-val">{{ selectedDayDetails()?.date | date:'EEE, dd-MM-yyyy' }}</span>
         </div>
         <span class="status-round" [ngClass]="{
           'status-approved': selectedDayDetails()?.status === 'Present',

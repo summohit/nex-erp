@@ -209,7 +209,7 @@
         <span *ngIf="!visit.employee?.avatarUrl" class="avatar-lg avatar-fallback">{{ initials(visit) }}</span>
         <div>
           <div class="drawer-name">{{ visit.employee?.firstName }} {{ visit.employee?.lastName }}</div>
-          <div class="drawer-sub">{{ visit.startTime | date:'EEE, MMM d, y' }}</div>
+          <div class="drawer-sub">{{ visit.startTime | date:'EEE, dd-MM-yyyy' }}</div>
         </div>
       </div>
       <div class="drawer-header-right">

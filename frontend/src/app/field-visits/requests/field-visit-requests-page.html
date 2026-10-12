@@ -360,7 +360,7 @@
               <td class="date-cell nowrap">
                 <div class="date-info">
                   <svg lucideCalendarDays [size]="13" class="cell-icon"></svg>
-                  <span>{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'d MMM y' }}</span>
+                  <span>{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'dd-MM-yyyy' }}</span>
                   @if (isPastVisit(r)) {
                     <span class="past-visit-tag" [class.past-overdue]="r.status === 'PENDING_APPROVAL'" [title]="r.status === 'PENDING_APPROVAL' ? 'Trip date has passed without approval' : 'Previous/past visit'">
                       {{ r.status === 'PENDING_APPROVAL' ? 'Past date' : 'Past' }}

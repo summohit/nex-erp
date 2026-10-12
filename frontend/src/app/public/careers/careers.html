@@ -67,7 +67,7 @@
           <div class="job-meta-row">
             <span class="meta-item"><svg lucideMapPin size="14"></svg> {{ job.location }}</span>
             <span class="meta-item" *ngIf="job.experienceYears"><svg lucideBriefcase size="14"></svg> {{ job.experienceYears }}</span>
-            <span class="meta-item"><svg lucideClock size="14"></svg> Posted {{ job.postedDate | date:'mediumDate' }}</span>
+            <span class="meta-item"><svg lucideClock size="14"></svg> Posted {{ job.postedDate | date:'dd-MM-yyyy' }}</span>
             <span class="meta-item" *ngIf="job.minSalary"><svg lucideBriefcase size="14"></svg> ₹{{ job.minSalary | number }} - ₹{{ job.maxSalary | number }}</span>
           </div>
 

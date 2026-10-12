@@ -27,7 +27,7 @@
               <span>{{ disc.author?.firstName }} {{ disc.author?.lastName }}</span>
             </div>
             <span>&bull;</span>
-            <span>{{ disc.createdAt | date:'mediumDate' }}</span>
+            <span>{{ disc.createdAt | date:'dd-MM-yyyy' }}</span>
           </div>
         </div>
         <div class="discussion-stats">
@@ -86,7 +86,7 @@
           <img *ngIf="selectedDiscussion()?.author?.avatarUrl" [src]="selectedDiscussion()?.author?.avatarUrl" class="w-6 h-6 rounded-full object-cover">
           <span class="font-semibold text-gray-800">{{ selectedDiscussion()?.author?.firstName }} {{ selectedDiscussion()?.author?.lastName }}</span>
           <span>&bull;</span>
-          <span>{{ selectedDiscussion()?.createdAt | date:'medium' }}</span>
+          <span>{{ selectedDiscussion()?.createdAt | date:'dd-MM-yyyy, h:mm a' }}</span>
         </div>
 
         <div class="rich-text-content" [innerHTML]="getSafeHtml(selectedDiscussion()?.content)"></div>
@@ -108,7 +108,7 @@
               <img *ngIf="comment.author?.avatarUrl" [src]="comment.author.avatarUrl" class="w-5 h-5 rounded-full object-cover">
               <span class="comment-author">{{ comment.author?.firstName }} {{ comment.author?.lastName }}</span>
             </div>
-            <span class="comment-time">{{ comment.createdAt | date:'short' }}</span>
+            <span class="comment-time">{{ comment.createdAt | date:'dd-MM-yyyy, h:mm a' }}</span>
           </div>
           <div class="rich-text-content" [innerHTML]="getSafeHtml(comment.content)"></div>
         </div>

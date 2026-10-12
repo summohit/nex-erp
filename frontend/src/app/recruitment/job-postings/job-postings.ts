@@ -245,7 +245,7 @@ export class JobPostingsComponent implements OnInit {
       valueFormatter: (params: any) => {
         if (!params.value) return '';
         const d = new Date(params.value);
-        return d.toLocaleDateString();
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
       }
     },
     {
@@ -254,7 +254,7 @@ export class JobPostingsComponent implements OnInit {
       valueFormatter: (params: any) => {
         if (!params.value) return '—';
         const d = new Date(params.value);
-        return d.toLocaleDateString();
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
       }
     },
     {

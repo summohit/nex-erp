@@ -123,7 +123,7 @@
 
           <div class="schedule-date-tag">
             <svg lucideCalendar size="13"></svg>
-            <span>{{ interview.scheduledAt | date:'mediumDate' }}</span>
+            <span>{{ interview.scheduledAt | date:'dd-MM-yyyy' }}</span>
           </div>
         </div>
 
@@ -306,7 +306,7 @@
       </div>
       <div class="cand-modal-date">
         <svg lucideCalendar size="13"></svg>
-        <span>{{ selectedInterview()?.scheduledAt | date:'mediumDate' }}</span>
+        <span>{{ selectedInterview()?.scheduledAt | date:'dd-MM-yyyy' }}</span>
       </div>
     </div>
 

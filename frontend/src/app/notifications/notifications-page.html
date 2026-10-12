@@ -134,7 +134,7 @@
           <span class="type-tag" [ngClass]="typeClass(n.type)">{{ formatType(n.type) }}</span>
         </div>
         <p class="notif-message">{{ n.message }}</p>
-        <span class="notif-time">{{ n.createdAt | date:'MMM d, y · h:mm a' }}</span>
+        <span class="notif-time">{{ n.createdAt | date:'dd-MM-yyyy, h:mm a' }}</span>
       </div>
 
       <div class="notif-row-actions">

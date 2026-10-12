@@ -43,7 +43,7 @@
         </div>
         <div class="stat-chip">
           <div class="stat-chip-icon icon-since"><svg lucideCalendar size="18"></svg></div>
-          <div class="stat-chip-body"><span class="chip-label">Created</span><span class="chip-value">{{ lead.createdAt | date:'mediumDate' }}</span></div>
+          <div class="stat-chip-body"><span class="chip-label">Created</span><span class="chip-value">{{ lead.createdAt | date:'dd-MM-yyyy' }}</span></div>
         </div>
         <div class="stat-chip">
           <div class="stat-chip-icon icon-lost"><svg lucideX size="18"></svg></div>
@@ -82,7 +82,7 @@
           </div>
           <div class="next-followup-box" *ngIf="nextFollowUpInfo" [class.is-overdue]="nextFollowUpInfo.isOverdue">
             <span class="nf-label"><svg lucideClock size="13"></svg> Next Follow Up</span>
-            <span class="nf-date">{{ nextFollowUpInfo.date | date:'medium' }}</span>
+            <span class="nf-date">{{ nextFollowUpInfo.date | date:'dd-MM-yyyy, h:mm a' }}</span>
           </div>
         </div>
         <div class="info-tiles-grid">
@@ -93,7 +93,7 @@
           <div class="info-tile"><div class="tile-icon"><svg lucideTarget size="16"></svg></div><div class="tile-content"><span class="tile-label">Lead Category</span><span class="tile-value">{{ lead.dealCategory || '—' }}</span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucideUserCheck size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Agent</span><span class="tile-value">{{ assignedName }}</span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucideUserCheck size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Watcher</span><span class="tile-value watcher-cell"><span class="mini-avatar" *ngIf="lead.addedBy?.avatarUrl"><img [src]="lead.addedBy.avatarUrl" alt=""></span><span class="mini-avatar initials" *ngIf="!lead.addedBy?.avatarUrl">{{ getInitials(addedByName) }}</span><span class="watcher-name">{{ addedByName || '—' }}<span class="watcher-role" *ngIf="lead.addedBy?.designation?.name">{{ lead.addedBy.designation.name }}</span></span></span></div></div>
-          <div class="info-tile"><div class="tile-icon"><svg lucideCalendar size="16"></svg></div><div class="tile-content"><span class="tile-label">Close Date</span><span class="tile-value">{{ (lead.expectedCloseDate | date:'mediumDate') || '—' }}</span></div></div>
+          <div class="info-tile"><div class="tile-icon"><svg lucideCalendar size="16"></svg></div><div class="tile-content"><span class="tile-label">Close Date</span><span class="tile-value">{{ (lead.expectedCloseDate | date:'dd-MM-yyyy') || '—' }}</span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucideDollarSign size="16"></svg></div><div class="tile-content"><span class="tile-label">Deal Value</span><span class="tile-value" *ngIf="lead.value != null">{{ lead.value | currency:(lead.currency || 'INR') }}</span><span class="tile-value" *ngIf="lead.value == null">—</span></div></div>
           <div class="info-tile"><div class="tile-icon"><svg lucideFileText size="16"></svg></div><div class="tile-content"><span class="tile-label">Products</span><span class="tile-value">{{ lead.subjectLine || lead.description || '—' }}</span></div></div>
         </div>
@@ -202,7 +202,7 @@
                   <td data-label="Type"><span class="category-pill">{{ (f.fileType || '—').split('/').pop() }}</span></td>
                   <td data-label="Size">{{ formatFileSize(f.fileSize) }}</td>
                   <td data-label="Uploaded By"><span class="table-user-name">{{ employeeName(f.uploadedBy) }}</span></td>
-                  <td data-label="Date">{{ f.createdAt | date:'mediumDate' }}</td>
+                  <td data-label="Date">{{ f.createdAt | date:'dd-MM-yyyy' }}</td>
                   <td data-label="Action"><div class="table-actions-group">
                     <button class="btn-action-icon" title="View" (click)="downloadFile(f)"><svg lucideEye [size]="15"></svg></button>
                     <button class="btn-action-icon" title="Download" (click)="downloadFile(f)"><svg lucideDownload [size]="15"></svg></button>
@@ -283,7 +283,7 @@
                              [class.text-overdue]="isFollowUpOverdue(fu.scheduledAt)"
                              [class.text-today]="isFollowUpToday(fu.scheduledAt)">
                           <svg lucideClock size="14"></svg>
-                          <span class="time-text">{{ fu.scheduledAt | date:'mediumDate' }}, {{ fu.scheduledAt | date:'shortTime' }}</span>
+                          <span class="time-text">{{ fu.scheduledAt | date:'dd-MM-yyyy' }}, {{ fu.scheduledAt | date:'shortTime' }}</span>
                         </div>
                         <span class="relative-pill pill-overdue" *ngIf="isFollowUpOverdue(fu.scheduledAt)">Overdue</span>
                         <span class="relative-pill pill-today" *ngIf="isFollowUpToday(fu.scheduledAt)">Today</span>
@@ -382,8 +382,8 @@
                     </div>
                   </td>
                   <td data-label="Total"><span class="amount-cell">{{ q.total | currency:(q.currency || 'INR') }}</span></td>
-                  <td data-label="Date">{{ q.date | date:'mediumDate' }}</td>
-                  <td data-label="Valid Till">{{ q.validUntil | date:'mediumDate' }}</td>
+                  <td data-label="Date">{{ q.date | date:'dd-MM-yyyy' }}</td>
+                  <td data-label="Valid Till">{{ q.validUntil | date:'dd-MM-yyyy' }}</td>
                   <td data-label="Status"><span class="followup-type-pill {{ dealStatusPill(q.status) }}">{{ q.status }}</span></td>
                   <td data-label="Deal Status"><span class="deal-status-badge {{ dealStatusPill(q.status) }}">{{ dealStatusLabel(q.status) }}</span></td>
                   <td data-label="Action"><div class="table-actions-group">
@@ -457,7 +457,7 @@
               <tbody>
                 <tr *ngFor="let n of notes">
                   <td data-label="Note Detail"><div class="table-user-name note-cell">{{ n.content }}</div><div class="table-user-sub">by {{ employeeName(n.createdBy) }}</div></td>
-                  <td data-label="Created">{{ n.createdAt | date:'medium' }}</td>
+                  <td data-label="Created">{{ n.createdAt | date:'dd-MM-yyyy, h:mm a' }}</td>
                   <td data-label="Action"><div class="table-actions-group">
                     <button class="btn-action-icon" title="View" (click)="openEditNote(n)"><svg lucideEye [size]="15"></svg></button>
                     <button class="btn-action-icon" title="Edit" (click)="openEditNote(n)"><svg lucideEdit2 [size]="15"></svg></button>
@@ -498,7 +498,7 @@
                   <span class="activity-desc">{{ h.description }}</span>
                 </div>
                 <div class="activity-meta">
-                  <span class="activity-time">{{ h.createdAt | date:'dd-MM-yyyy hh:mm a' }}</span>
+                  <span class="activity-time">{{ h.createdAt | date:'dd-MM-yyyy, h:mm a' }}</span>
                   <button class="btn-text-sm" *ngIf="h.metadata" (click)="toggleActivityDetails(h.id)">{{ showActivityDetailsId === h.id ? 'Hide Details' : 'View Details' }}</button>
                 </div>
                 <div class="activity-details" *ngIf="showActivityDetailsId === h.id && h.metadata">
@@ -564,7 +564,7 @@
                     <span class="ps-meta-dot">•</span>
                     <span class="ps-meta-item">
                       <svg lucideCalendar size="12"></svg>
-                      <span>{{ r.createdAt | date:'dd MMM yyyy, h:mm a' }}</span>
+                      <span>{{ r.createdAt | date:'dd-MM-yyyy, h:mm a' }}</span>
                     </span>
                   </div>
                 </div>
@@ -653,7 +653,7 @@
                 </div>
                 <div class="ps-meta-pill">
                   <svg lucideCalendar size="12"></svg>
-                  <span><span class="ps-meta-label">Added:</span> {{ m.createdAt | date:'dd MMM yyyy' }}</span>
+                  <span><span class="ps-meta-label">Added:</span> {{ m.createdAt | date:'dd-MM-yyyy' }}</span>
                 </div>
                 <!-- Terms the person is engaged under. Absent on members added
                      before this existed, hence the condition. -->
@@ -1163,7 +1163,7 @@
                 <div class="fum-card pending-card" *ngFor="let f of getUpcomingFollowUps()">
                   <div class="fum-card-top">
                     <div class="fum-card-type-badge" [ngStyle]="{'background': getFollowUpTypeBadge(f.type).bg, 'color': getFollowUpTypeBadge(f.type).color}">{{ getFollowUpTypeBadge(f.type).label }}</div>
-                    <div class="fum-time-pill"><svg lucideClock size="12"></svg><span>{{ f.scheduledAt | date:'dd MMM yyyy, h:mm a' }}</span></div>
+                    <div class="fum-time-pill"><svg lucideClock size="12"></svg><span>{{ f.scheduledAt | date:'dd-MM-yyyy, h:mm a' }}</span></div>
                   </div>
                   <h4 class="fum-card-title">{{ f.title }}</h4>
                   <div class="fum-card-meta">
@@ -1187,7 +1187,7 @@
                 <div class="fum-card completed-card" *ngFor="let f of getPastFollowUps()">
                   <div class="fum-card-top">
                     <div class="fum-card-type-badge" [ngStyle]="{'background': getFollowUpTypeBadge(f.type).bg, 'color': getFollowUpTypeBadge(f.type).color}">{{ getFollowUpTypeBadge(f.type).label }}</div>
-                    <span class="fum-date-sub">{{ f.scheduledAt | date:'dd MMM yyyy, h:mm a' }}</span>
+                    <span class="fum-date-sub">{{ f.scheduledAt | date:'dd-MM-yyyy, h:mm a' }}</span>
                   </div>
                   <h4 class="fum-card-title">{{ f.title }}</h4>
                   <p class="fum-card-notes" *ngIf="f.notes">{{ f.notes }}</p>

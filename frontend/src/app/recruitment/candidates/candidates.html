@@ -490,7 +490,7 @@
           <svg lucideFileText size="16" class="icon"></svg>
           <div class="text">
             <label>Date of Birth</label>
-            <span>{{app.dateOfBirth | date:'longDate'}}</span>
+            <span>{{app.dateOfBirth | date:'dd-MM-yyyy'}}</span>
           </div>
         </div>
         <div class="info-item" *ngIf="app.gender">
@@ -831,12 +831,12 @@
             <div class="esign-signed-box" *ngIf="ol.status === 'ACCEPTED'">
               <div class="signed-line">
                 <strong>{{ ol.signatureName || selectedApp()?.fullName }}</strong> signed this offer
-                <span *ngIf="ol.respondedAt"> on {{ ol.respondedAt | date: 'medium' }}</span>
+                <span *ngIf="ol.respondedAt"> on {{ ol.respondedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
               </div>
               <div class="signed-meta">
                 <span *ngIf="ol.signatureType">Signature: {{ ol.signatureType | lowercase }}</span>
                 <span *ngIf="ol.signatureIp">· IP {{ ol.signatureIp }}</span>
-                <span *ngIf="ol.viewedAt">· First opened {{ ol.viewedAt | date: 'short' }}</span>
+                <span *ngIf="ol.viewedAt">· First opened {{ ol.viewedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
               </div>
               <div class="signed-meta">
                 The assigned recruiter and administrators were notified by email and in-app.
@@ -845,7 +845,7 @@
 
             <div class="esign-declined-box" *ngIf="ol.status === 'DECLINED'">
               <strong>{{ selectedApp()?.fullName }} declined this offer</strong>
-              <span *ngIf="ol.respondedAt"> on {{ ol.respondedAt | date: 'medium' }}</span>
+              <span *ngIf="ol.respondedAt"> on {{ ol.respondedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
             </div>
 
             <p class="esign-hint" *ngIf="ol.status !== 'ACCEPTED' && ol.status !== 'DECLINED'">
@@ -889,8 +889,8 @@
             </div>
 
             <div class="esign-timeline" *ngIf="ol.viewedAt || ol.respondedAt">
-              <span *ngIf="ol.viewedAt"><strong>Viewed:</strong> {{ ol.viewedAt | date:'medium' }}</span>
-              <span *ngIf="ol.respondedAt"><strong>{{ ol.status === 'ACCEPTED' ? 'Signed' : 'Responded' }}:</strong> {{ ol.respondedAt | date:'medium' }}</span>
+              <span *ngIf="ol.viewedAt"><strong>Viewed:</strong> {{ ol.viewedAt | date:'dd-MM-yyyy, h:mm a' }}</span>
+              <span *ngIf="ol.respondedAt"><strong>{{ ol.status === 'ACCEPTED' ? 'Signed' : 'Responded' }}:</strong> {{ ol.respondedAt | date:'dd-MM-yyyy, h:mm a' }}</span>
             </div>
           </div>
         </div>
@@ -1030,7 +1030,7 @@
           </div>
           <div class="i-details">
             <div class="i-row">
-              <svg lucideClock size="14"></svg> {{interview.scheduledAt | date:'medium'}} ({{interview.durationMins}}m)
+              <svg lucideClock size="14"></svg> {{interview.scheduledAt | date:'dd-MM-yyyy, h:mm a'}} ({{interview.durationMins}}m)
             </div>
             <div class="i-row" *ngIf="interview.interviewer">
               <svg lucideUsers size="14"></svg> Interviewer: {{interview.interviewer.firstName}} {{interview.interviewer.lastName}}

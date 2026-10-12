@@ -369,17 +369,17 @@
             <!-- Start Date -->
             <div class="ms-meta-chip" *ngIf="m.startDate">
               <svg lucideCalendar size="12" class="ms-meta-icon"></svg>
-              <span>Starts {{ m.startDate | date: 'mediumDate' }}</span>
+              <span>Starts {{ m.startDate | date: 'dd-MM-yyyy' }}</span>
             </div>
 
             <!-- Due Date / Completed Date -->
             <div class="ms-meta-chip" *ngIf="m.dueDate && m.status !== 'COMPLETED'">
               <svg lucideCalendar size="12" class="ms-meta-icon"></svg>
-              <span>Due {{ m.dueDate | date: 'mediumDate' }}</span>
+              <span>Due {{ m.dueDate | date: 'dd-MM-yyyy' }}</span>
             </div>
             <div class="ms-meta-chip ms-meta-done" *ngIf="m.completedAt || (m.status === 'COMPLETED' && m.dueDate)">
               <svg lucideCheckCircle2 size="12" class="ms-meta-icon"></svg>
-              <span>Completed {{ (m.completedAt || m.dueDate) | date: 'mediumDate' }}</span>
+              <span>Completed {{ (m.completedAt || m.dueDate) | date: 'dd-MM-yyyy' }}</span>
             </div>
           </div>
         </div>

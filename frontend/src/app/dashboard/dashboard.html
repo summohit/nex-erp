@@ -113,7 +113,7 @@
 
           <span class="dash-notice-date">
             <svg lucideCalendar size="12"></svg>
-            {{ n.publishedAt | date:'MMM d, y' }}
+            {{ n.publishedAt | date:'dd-MM-yyyy' }}
           </span>
         </div>
 
@@ -308,7 +308,7 @@
         </div>
         <div>
           <h3>My Calendar</h3>
-          <span class="card-header-sub">{{ (dashboard()?.common?.myCalendar?.weekStart | date:'dd MMM') }} – {{ (dashboard()?.common?.myCalendar?.weekEnd | date:'dd MMM yyyy') }}</span>
+          <span class="card-header-sub">{{ (dashboard()?.common?.myCalendar?.weekStart | date:'dd MMM') }} – {{ (dashboard()?.common?.myCalendar?.weekEnd | date:'dd-MM-yyyy') }}</span>
         </div>
       </div>
     </div>
@@ -506,7 +506,7 @@
                 <span class="people-role">{{ a.employee?.designation || 'Team member' }}</span>
                 <p class="appreciation-summary">{{ a.summary }}</p>
               </div>
-              <span class="appreciation-date">{{ a.givenDate | date:'dd MMM yyyy' }}</span>
+              <span class="appreciation-date">{{ a.givenDate | date:'dd-MM-yyyy' }}</span>
             </div>
           </div>
           <div class="widget-loading" *ngIf="isLoadingMetrics()"><span class="widget-spinner"></span><span>Loading…</span></div>
@@ -646,7 +646,7 @@
                     <span class="font-semibold">{{ req.employee?.firstName }} {{ req.employee?.lastName }}</span>
                   </td>
                   <td><span class="badge-subtle">{{ req.leaveType?.name }}</span></td>
-                  <td>{{ req.startDate | date:'shortDate' }} – {{ req.endDate | date:'shortDate' }}</td>
+                  <td>{{ req.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(req.startDate | date:'dd-MM-yyyy') !== (req.endDate | date:'dd-MM-yyyy')"> – {{ req.endDate | date:'dd-MM-yyyy' }}</ng-container></td>
                   <td><span class="status-pill" [ngClass]="req.status.toLowerCase()">{{ req.status }}</span></td>
                   <td style="text-align: right;">
                     <div class="action-btn-group">
@@ -1190,8 +1190,8 @@
             {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'CES Tech Administration' }}
           </span>
           <span class="notice-modal-meta">
-            {{ n.publishedAt | date:'MMMM d, y' }}
-            <ng-container *ngIf="n.expiresAt"> · Valid until {{ n.expiresAt | date:'mediumDate' }}</ng-container>
+            {{ n.publishedAt | date:'dd-MM-yyyy' }}
+            <ng-container *ngIf="n.expiresAt"> · Valid until {{ n.expiresAt | date:'dd-MM-yyyy' }}</ng-container>
           </span>
         </div>
       </div>

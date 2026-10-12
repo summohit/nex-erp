@@ -165,10 +165,10 @@
         </div>
 
         <div class="br-meta">
-          <span>Requested by {{ fullName(r.requestedBy) }} · {{ r.createdAt | date:'d MMM y' }}</span>
+          <span>Requested by {{ fullName(r.requestedBy) }} · {{ r.createdAt | date:'dd-MM-yyyy' }}</span>
           <span *ngIf="r.reviewedAt">
             · {{ statusLabel(r.status) | lowercase }} by {{ fullName(r.reviewedBy) }}
-            on {{ r.reviewedAt | date:'d MMM y' }}
+            on {{ r.reviewedAt | date:'dd-MM-yyyy' }}
           </span>
         </div>
 

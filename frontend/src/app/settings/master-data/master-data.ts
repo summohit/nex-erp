@@ -1201,7 +1201,7 @@ export class MasterDataComponent implements OnInit {
 
   holidayColDefs: ColDef[] = [
     { field: 'name', headerName: 'Holiday Name' },
-    { field: 'date', headerName: 'Date', valueFormatter: (p) => new Date(p.value).toLocaleDateString() },
+    { field: 'date', headerName: 'Date', valueFormatter: (p) => new Date(p.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') },
     { 
       headerName: 'Actions', width: 120, flex: 0, sortable: false, filter: false,
       cellRenderer: ActionCellRendererComponent,
@@ -1214,7 +1214,7 @@ export class MasterDataComponent implements OnInit {
 
   blackoutColDefs: ColDef[] = [
     { field: 'reason', headerName: 'Reason' },
-    { field: 'date', headerName: 'Date', valueFormatter: (p) => new Date(p.value).toLocaleDateString() },
+    { field: 'date', headerName: 'Date', valueFormatter: (p) => new Date(p.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') },
     { field: 'departmentId', headerName: 'Department', valueFormatter: (p) => p.value ? (this.departments().find(d => d.id === p.value)?.name ?? 'Unknown') : 'All Departments' },
     { 
       headerName: 'Actions', width: 120, flex: 0, sortable: false, filter: false,

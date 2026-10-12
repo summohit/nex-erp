@@ -687,13 +687,13 @@
               <svg lucideCalendar size="13"></svg>
               <span>
                 <ng-container *ngIf="onsiteCtx()?.source === 'cell'">
-                  <ng-container *ngIf="onsiteForm.span === 'day'">{{ onsiteForm.start | date:'mediumDate' }}</ng-container>
+                  <ng-container *ngIf="onsiteForm.span === 'day'">{{ onsiteForm.start | date:'dd-MM-yyyy' }}</ng-container>
                   <ng-container *ngIf="onsiteForm.span === 'range'">
-                    {{ onsiteForm.start | date:'mediumDate' }} → {{ onsiteForm.end | date:'mediumDate' }}
+                    {{ onsiteForm.start | date:'dd-MM-yyyy' }} → {{ onsiteForm.end | date:'dd-MM-yyyy' }}
                   </ng-container>
                 </ng-container>
                 <ng-container *ngIf="onsiteCtx()?.source === 'bulk'">
-                  {{ bulkForm.start | date:'mediumDate' }} → {{ bulkForm.end | date:'mediumDate' }}
+                  {{ bulkForm.start | date:'dd-MM-yyyy' }} → {{ bulkForm.end | date:'dd-MM-yyyy' }}
                 </ng-container>
               </span>
             </span>

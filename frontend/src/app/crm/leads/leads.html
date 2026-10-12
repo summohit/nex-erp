@@ -929,7 +929,7 @@
               <ng-container *ngIf="showNextFollowUpInTable(lead)">
                 <div *ngIf="getNextFollowUpDate(lead) as fuDate" class="table-followup-cell" [class.overdue]="isFollowUpOverdue(fuDate)">
                   <svg lucideCalendarClock size="12"></svg>
-                  <span>{{ fuDate | date:'dd MMM yyyy' }}</span>
+                  <span>{{ fuDate | date:'dd-MM-yyyy' }}</span>
                 </div>
                 <span *ngIf="!getNextFollowUpDate(lead)" class="no-data-dash">&mdash;</span>
               </ng-container>
@@ -1043,7 +1043,7 @@
                                    [class.text-overdue]="isFollowUpOverdue(fu.scheduledAt)"
                                    [class.text-today]="isFollowUpToday(fu.scheduledAt)">
                                 <svg lucideClock size="14"></svg>
-                                <span class="time-text">{{ fu.scheduledAt | date:'mediumDate' }}, {{ fu.scheduledAt | date:'shortTime' }}</span>
+                                <span class="time-text">{{ fu.scheduledAt | date:'dd-MM-yyyy' }}, {{ fu.scheduledAt | date:'shortTime' }}</span>
                               </div>
                               <span class="relative-pill pill-overdue" *ngIf="isFollowUpOverdue(fu.scheduledAt)">Overdue</span>
                               <span class="relative-pill pill-today" *ngIf="isFollowUpToday(fu.scheduledAt)">Today</span>
@@ -1389,7 +1389,7 @@
             <td>
               <div class="created-date-cell">
                 <svg lucideCalendar size="12"></svg>
-                <span>{{ contact.createdAt | date:'mediumDate' }}</span>
+                <span>{{ contact.createdAt | date:'dd-MM-yyyy' }}</span>
               </div>
             </td>
 
@@ -1512,7 +1512,7 @@
         <div class="ldm-metric-divider" *ngIf="selectedLead.expectedCloseDate"></div>
         <div class="ldm-metric-item" *ngIf="selectedLead.expectedCloseDate">
           <div class="ldm-value-label">Target Close Date</div>
-          <div class="ldm-metric-val">{{selectedLead.expectedCloseDate | date:'dd MMM yyyy'}}</div>
+          <div class="ldm-metric-val">{{selectedLead.expectedCloseDate | date:'dd-MM-yyyy'}}</div>
         </div>
         <div class="ldm-metric-divider" *ngIf="selectedLead.source"></div>
         <div class="ldm-metric-item" *ngIf="selectedLead.source">
@@ -1667,7 +1667,7 @@
                 <svg lucideCalendar size="15"></svg>
               </div>
               <div class="owner-info-text">
-                <span class="owner-name">{{selectedLead.createdAt | date:'dd MMM yyyy'}}</span>
+                <span class="owner-name">{{selectedLead.createdAt | date:'dd-MM-yyyy'}}</span>
                 <span class="owner-designation">{{selectedLead.createdAt | date:'h:mm a'}}</span>
               </div>
             </div>
@@ -1693,7 +1693,7 @@
             <span *ngIf="!m.employee?.avatarUrl" class="ldm-ps-avatar">{{ preSalesMemberInitials(m) }}</span>
             <div class="ldm-ps-member-id">
               <span class="ldm-ps-name">{{ preSalesMemberName(m) }}</span>
-              <span class="ldm-ps-sub">Added by {{ preSalesMemberName(m.assignedBy) }} · {{ m.createdAt | date:'dd MMM yyyy' }}</span>
+              <span class="ldm-ps-sub">Added by {{ preSalesMemberName(m.assignedBy) }} · {{ m.createdAt | date:'dd-MM-yyyy' }}</span>
               <span class="ldm-ps-remark" *ngIf="m.remark">{{ m.remark }}</span>
             </div>
           </div>
@@ -1740,8 +1740,8 @@
                   <span class="ldm-prop-version" [class.superseded]="q.status === 'SUPERSEDED'">v{{ q.version || 1 }}</span>
                 </td>
                 <td class="ldm-prop-amount">{{ q.total | currency:(q.currency || 'INR'):'symbol-narrow':'1.0-2' }}</td>
-                <td>{{ q.date | date:'dd MMM yyyy' }}</td>
-                <td>{{ q.validUntil | date:'dd MMM yyyy' }}</td>
+                <td>{{ q.date | date:'dd-MM-yyyy' }}</td>
+                <td>{{ q.validUntil | date:'dd-MM-yyyy' }}</td>
                 <td><span class="ldm-prop-status ldm-prop-status-{{ (q.status || '') | lowercase }}">{{ q.status }}</span></td>
                 <td class="ldm-prop-action-col">
                   <span class="ldm-prop-busy" *ngIf="busyProposalId === q.id" title="Preparing the PDF…">
@@ -2692,7 +2692,7 @@
                 </div>
                 <div class="fum-time-pill">
                   <svg lucideClock size="12"></svg>
-                  <span>{{f.scheduledAt | date:'dd MMM yyyy, h:mm a'}}</span>
+                  <span>{{f.scheduledAt | date:'dd-MM-yyyy, h:mm a'}}</span>
                 </div>
               </div>
 
@@ -2740,7 +2740,7 @@
                 <div class="fum-card-type-badge" [ngStyle]="{'background': getFollowUpTypeBadge(f.type).bg, 'color': getFollowUpTypeBadge(f.type).color}">
                   {{getFollowUpTypeBadge(f.type).label}}
                 </div>
-                <span class="fum-date-sub">{{f.scheduledAt | date:'dd MMM yyyy, h:mm a'}}</span>
+                <span class="fum-date-sub">{{f.scheduledAt | date:'dd-MM-yyyy, h:mm a'}}</span>
               </div>
 
               <h4 class="fum-card-title">{{f.title}}</h4>
@@ -2943,7 +2943,7 @@
                 <td>
                   <div class="blm-close-date" *ngIf="lead.expectedCloseDate">
                     <svg lucideCalendar size="12"></svg>
-                    <span>{{ lead.expectedCloseDate | date:'mediumDate' }}</span>
+                    <span>{{ lead.expectedCloseDate | date:'dd-MM-yyyy' }}</span>
                   </div>
                   <span class="no-data-dash" *ngIf="!lead.expectedCloseDate">—</span>
                 </td>
@@ -3041,7 +3041,7 @@
                 <span class="meta-dot">•</span>
                 <span class="meta-item">
                   <svg lucideCalendar size="12"></svg>
-                  <span>{{ r.createdAt | date:'dd MMM yyyy' }}</span>
+                  <span>{{ r.createdAt | date:'dd-MM-yyyy' }}</span>
                 </span>
               </div>
             </div>

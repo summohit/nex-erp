@@ -69,11 +69,11 @@
           </div>
           <div class="hero-meta-item" *ngIf="j.createdAt">
             <svg lucideCalendar size="14"></svg>
-            <span>Posted {{ j.createdAt | date:'mediumDate' }}</span>
+            <span>Posted {{ j.createdAt | date:'dd-MM-yyyy' }}</span>
           </div>
           <div class="hero-meta-item text-amber" *ngIf="j.endDate">
             <svg lucideCalendarClock size="14"></svg>
-            <span>Deadline: {{ j.endDate | date:'mediumDate' }}</span>
+            <span>Deadline: {{ j.endDate | date:'dd-MM-yyyy' }}</span>
           </div>
         </div>
       </div>
@@ -290,7 +290,7 @@
             <td class="cell-applied">
               <div class="applied-date-wrap">
                 <svg lucideCalendar size="13" class="text-slate"></svg>
-                <span>{{ app.createdAt | date:'mediumDate' }}</span>
+                <span>{{ app.createdAt | date:'dd-MM-yyyy' }}</span>
               </div>
             </td>
 
@@ -334,7 +334,7 @@
           </div>
           <div class="card-item-title">
             <h4 class="card-candidate-name">{{ app.fullName }}</h4>
-            <span class="card-applied-time">Applied {{ app.createdAt | date:'mediumDate' }}</span>
+            <span class="card-applied-time">Applied {{ app.createdAt | date:'dd-MM-yyyy' }}</span>
           </div>
           <span class="stage-interactive-badge card-badge" [ngClass]="statusBadgeClass(app.status)">
             <span class="badge-dot"></span>
@@ -471,7 +471,7 @@
         </div>
         <div class="drawer-info-row" *ngIf="candidate.createdAt">
           <span class="info-label"><svg lucideCalendar size="14"></svg> Applied On</span>
-          <span class="info-val">{{ candidate.createdAt | date:'medium' }}</span>
+          <span class="info-val">{{ candidate.createdAt | date:'dd-MM-yyyy, h:mm a' }}</span>
         </div>
       </div>
     </div>
@@ -569,7 +569,7 @@
         </div>
         <div class="spec-item" *ngIf="job()?.endDate">
           <span class="label">Application Deadline</span>
-          <span class="val">{{ job()?.endDate | date:'mediumDate' }}</span>
+          <span class="val">{{ job()?.endDate | date:'dd-MM-yyyy' }}</span>
         </div>
       </div>
 

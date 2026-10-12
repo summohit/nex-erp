@@ -498,7 +498,7 @@
             </span>
             <span class="thr-date-tag">
               <svg lucideCalendar size="13"></svg>
-              {{ r.createdAt | date: 'MMM d, y • h:mm a' }}
+              {{ r.createdAt | date: 'dd-MM-yyyy, h:mm a' }}
             </span>
           </div>
 
@@ -634,7 +634,7 @@
                 <span class="thr-person-name">{{ fullName(r.reviewedBy) }}</span>
                 <span class="thr-person-role">
                   {{ r.status === 'APPROVED' ? 'Approved' : 'Declined' }}
-                  {{ r.reviewedAt | date: 'MMM d, y' }}
+                  {{ r.reviewedAt | date: 'dd-MM-yyyy' }}
                 </span>
               </div>
             </div>
@@ -821,7 +821,7 @@
                   <div class="thr-timeline-top">
                     <span class="thr-event-title">{{ actionLabel(e.action) }}</span>
                     <span class="thr-event-time">{{
-                      e.createdAt | date: 'MMM d, y • h:mm a'
+                      e.createdAt | date: 'dd-MM-yyyy, h:mm a'
                     }}</span>
                   </div>
 
@@ -912,8 +912,8 @@
             <td class="ta-person ta-assigned-avatar"><div class="ta-person-avatar"><img *ngIf="t.assignee?.avatarUrl" [src]="t.assignee.avatarUrl" alt=""><span *ngIf="!t.assignee?.avatarUrl">{{ t.assignee ? (t.assignee.firstName || '?').slice(0,1) + (t.assignee.lastName || '').slice(0,1) : '?' }}</span><span class="ta-person-tooltip">{{ taskPeople(t) }}</span></div></td>
             <td class="ta-raised-by"><div class="ta-person-avatar"><img *ngIf="t.approvalRequestedBy?.avatarUrl" [src]="t.approvalRequestedBy.avatarUrl" alt=""><span *ngIf="!t.approvalRequestedBy?.avatarUrl">{{ t.approvalRequestedBy ? (t.approvalRequestedBy.firstName || '?').slice(0,1) + (t.approvalRequestedBy.lastName || '').slice(0,1) : '?' }}</span><span class="ta-person-tooltip">{{ t.approvalRequestedBy ? t.approvalRequestedBy.firstName + ' ' + t.approvalRequestedBy.lastName : 'Unknown requester' }}</span></div></td>
             <td class="ta-muted">{{ t.approvalRequestedBy ? t.approvalRequestedBy.firstName + ' ' + t.approvalRequestedBy.lastName : '—' }}</td>
-            <td class="ta-muted ta-nowrap">{{ (t.startDate || t.dueDate) ? ((t.startDate || t.dueDate) | date: 'd MMM y') : '—' }}</td>
-            <td class="ta-muted ta-nowrap">{{ t.createdAt | date: 'd MMM y' }}</td>
+            <td class="ta-muted ta-nowrap">{{ (t.startDate || t.dueDate) ? ((t.startDate || t.dueDate) | date: 'dd-MM-yyyy') : '—' }}</td>
+            <td class="ta-muted ta-nowrap">{{ t.createdAt | date: 'dd-MM-yyyy' }}</td>
             <td><span class="ta-stage">{{ approvalStageLabel(t) }}</span></td>
             <td class="ta-actions-col">
               <div class="ta-action-menu"><button type="button" class="ta-icon-btn" title="Actions" (click)="toggleHoursActionMenu(t.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === t.id"><button (click)="openTaskDetails(t); toggleHoursActionMenu(t.id)">View</button><button *ngIf="isAdmin()" (click)="openEditApprove('TASKS', t); toggleHoursActionMenu(t.id)">Edit</button><button class="approve" (click)="decideTaskApproval(t, 'APPROVE'); toggleHoursActionMenu(t.id)">Approve</button><button class="reject" (click)="decideTaskApproval(t, 'REJECT'); toggleHoursActionMenu(t.id)">Reject</button></div></div>
@@ -946,7 +946,7 @@
         <span *ngIf="t.approvalRequestedBy">
           Raised by {{ t.approvalRequestedBy.firstName }} {{ t.approvalRequestedBy.lastName }}
         </span>
-        <span>{{ t.createdAt | date: 'd MMM y, HH:mm' }}</span>
+        <span>{{ t.createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
         <span class="ta-assigned">Assigned to {{ taskPeople(t) }}</span>
       </div>
 
@@ -1014,7 +1014,7 @@
         <span *ngIf="b.requestedBy">
           Raised by {{ b.requestedBy.firstName }} {{ b.requestedBy.lastName }}
         </span>
-        <span>{{ b.createdAt | date: 'd MMM y, HH:mm' }}</span>
+        <span>{{ b.createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
       </div>
 
       <p class="prq-note" *ngIf="b.reason">{{ b.reason }}</p>
@@ -1052,7 +1052,7 @@
       <p>No trip is waiting on your approval.</p>
     </div>
 
-    <div class="ta-table-wrap" *ngIf="filteredFieldVisitRequests().length"><table class="ta-table field-visit-table"><thead><tr><th>Visit Code</th><th>Project</th><th>Site</th><th>Dates</th><th>Team</th><th>Tasks</th><th>Stage</th><th class="ta-actions-col">Actions</th></tr></thead><tbody><tr *ngFor="let r of filteredFieldVisitRequests()"><td><a class="prq-key clickable" [routerLink]="['/field-visits/requests', r.id]">{{ r.requestNumber }}</a></td><td><a class="clickable" [routerLink]="['/projects', r.project?.id]">{{ r.project?.name }}</a></td><td class="ta-wide-cell">{{ r.location }}</td><td class="ta-nowrap">{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'d MMM y' }}</td><td><div class="fv-team-avatars"><div class="fv-team-avatar" *ngFor="let member of r.members.slice(0, 4)" [title]="member.employee.firstName + ' ' + member.employee.lastName"><img *ngIf="member.employee.avatarUrl" [src]="member.employee.avatarUrl" alt=""><span *ngIf="!member.employee.avatarUrl">{{ member.employee.firstName.slice(0,1) }}{{ member.employee.lastName.slice(0,1) }}</span><span class="fv-team-tooltip">{{ member.employee.firstName }} {{ member.employee.lastName }}</span></div><span class="fv-team-more" *ngIf="r.members.length > 4">+{{ r.members.length - 4 }}</span></div></td><td>{{ r.tasks.length }}</td><td><span class="ta-stage">Awaiting administrator</span></td><td class="ta-actions-col"><div class="ta-action-menu"><button class="ta-icon-btn" type="button" (click)="toggleHoursActionMenu(r.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === r.id"><button (click)="openVisitDetails(r); toggleHoursActionMenu(r.id)">View</button><a *ngIf="canEditApprovalRequest(r.status)" [routerLink]="['/field-visits/requests', r.id]" [queryParams]="{ edit: 1 }">Edit</a><button class="approve" (click)="decideFieldVisit(r, 'APPROVED'); toggleHoursActionMenu(r.id)">Approve</button><button class="reject" (click)="decideFieldVisit(r, 'REJECTED'); toggleHoursActionMenu(r.id)">Reject</button></div></div></td></tr></tbody></table></div>
+    <div class="ta-table-wrap" *ngIf="filteredFieldVisitRequests().length"><table class="ta-table field-visit-table"><thead><tr><th>Visit Code</th><th>Project</th><th>Site</th><th>Dates</th><th>Team</th><th>Tasks</th><th>Stage</th><th class="ta-actions-col">Actions</th></tr></thead><tbody><tr *ngFor="let r of filteredFieldVisitRequests()"><td><a class="prq-key clickable" [routerLink]="['/field-visits/requests', r.id]">{{ r.requestNumber }}</a></td><td><a class="clickable" [routerLink]="['/projects', r.project?.id]">{{ r.project?.name }}</a></td><td class="ta-wide-cell">{{ r.location }}</td><td class="ta-nowrap">{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'dd-MM-yyyy' }}</td><td><div class="fv-team-avatars"><div class="fv-team-avatar" *ngFor="let member of r.members.slice(0, 4)" [title]="member.employee.firstName + ' ' + member.employee.lastName"><img *ngIf="member.employee.avatarUrl" [src]="member.employee.avatarUrl" alt=""><span *ngIf="!member.employee.avatarUrl">{{ member.employee.firstName.slice(0,1) }}{{ member.employee.lastName.slice(0,1) }}</span><span class="fv-team-tooltip">{{ member.employee.firstName }} {{ member.employee.lastName }}</span></div><span class="fv-team-more" *ngIf="r.members.length > 4">+{{ r.members.length - 4 }}</span></div></td><td>{{ r.tasks.length }}</td><td><span class="ta-stage">Awaiting administrator</span></td><td class="ta-actions-col"><div class="ta-action-menu"><button class="ta-icon-btn" type="button" (click)="toggleHoursActionMenu(r.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === r.id"><button (click)="openVisitDetails(r); toggleHoursActionMenu(r.id)">View</button><a *ngIf="canEditApprovalRequest(r.status)" [routerLink]="['/field-visits/requests', r.id]" [queryParams]="{ edit: 1 }">Edit</a><button class="approve" (click)="decideFieldVisit(r, 'APPROVED'); toggleHoursActionMenu(r.id)">Approve</button><button class="reject" (click)="decideFieldVisit(r, 'REJECTED'); toggleHoursActionMenu(r.id)">Reject</button></div></div></td></tr></tbody></table></div>
 
     <article class="prq-card" [hidden]="true" *ngFor="let r of filteredFieldVisitRequests()">
       <div class="prq-card-head">
@@ -1072,7 +1072,7 @@
         </div>
         <div class="prq-figure">
           <span class="prq-figure-label">Dates</span>
-          <span class="prq-figure-value">{{ r.startDate | date: 'd MMM' }} – {{ r.endDate | date: 'd MMM y' }} ({{ r.visitDays }}d)</span>
+          <span class="prq-figure-value">{{ r.startDate | date: 'd MMM' }} – {{ r.endDate | date: 'dd-MM-yyyy' }} ({{ r.visitDays }}d)</span>
         </div>
         <div class="prq-figure">
           <span class="prq-figure-label">Team · Tasks</span>
@@ -1084,7 +1084,7 @@
         <span *ngIf="$any(r).raisedBy">
           Raised by {{ $any(r).raisedBy.firstName }} {{ $any(r).raisedBy.lastName }}
         </span>
-        <span *ngIf="$any(r).submittedAt">{{ $any(r).submittedAt | date: 'd MMM y, HH:mm' }}</span>
+        <span *ngIf="$any(r).submittedAt">{{ $any(r).submittedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
       </div>
 
       <div class="prq-actions">
@@ -1135,7 +1135,7 @@
         <span *ngIf="r.raisedBy"
           >Raised by {{ r.raisedBy.firstName }} {{ r.raisedBy.lastName }}</span
         >
-        <span>{{ r.createdAt | date: 'd MMM y, HH:mm' }}</span>
+        <span>{{ r.createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
       </div>
 
       <!-- Angular sanitises this. Never bypassSecurityTrustHtml. -->
@@ -1210,7 +1210,7 @@
 
       <div class="prq-meta">
         <span>Raised by {{ fullName(request.requestedBy) }}</span>
-        <span>{{ request.createdAt | date: 'd MMM y, HH:mm' }}</span>
+        <span>{{ request.createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
       </div>
 
       <div class="prq-location-details">
@@ -1239,7 +1239,7 @@
           {{ request.status === 'APPROVED' ? 'Approved' : 'Rejected' }} by
           {{ fullName(request.reviewedBy) }}
         </span>
-        <span *ngIf="request.reviewedAt">{{ request.reviewedAt | date: 'd MMM y, HH:mm' }}</span>
+        <span *ngIf="request.reviewedAt">{{ request.reviewedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
       </div>
 
       <div
@@ -1342,7 +1342,7 @@
             </div>
             <div class="prq-meta-pill date-pill">
               <svg lucideCalendar size="13"></svg>
-              <span>{{ viewingTask().createdAt | date: 'd MMM y, HH:mm' }}</span>
+              <span>{{ viewingTask().createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
             </div>
           </div>
         </div>
@@ -1388,7 +1388,7 @@
               <span class="attr-label">Start Date</span>
             </div>
             <span class="attr-val">
-              {{ (viewingTask().startDate | date: 'd MMM y') || 'None' }}
+              {{ (viewingTask().startDate | date: 'dd-MM-yyyy') || 'None' }}
             </span>
           </div>
 
@@ -1398,7 +1398,7 @@
               <span class="attr-label">Due Date</span>
             </div>
             <span class="attr-val">
-              {{ (viewingTask().dueDate | date: 'd MMM y') || 'None' }}
+              {{ (viewingTask().dueDate | date: 'dd-MM-yyyy') || 'None' }}
             </span>
           </div>
 
@@ -1609,7 +1609,7 @@
           <div class="prq-project-date-cluster">
             <div class="prq-meta-pill date-pill" *ngIf="v.submittedAt">
               <svg lucideCalendar size="13"></svg>
-              <span>Submitted {{ v.submittedAt | date: 'd MMM y, HH:mm' }}</span>
+              <span>Submitted {{ v.submittedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
             </div>
           </div>
         </div>
@@ -1622,7 +1622,7 @@
           </div>
           <div class="fv-detail-card">
             <span class="fv-detail-label"><svg lucideCalendar size="12"></svg> Dates</span>
-            <span class="fv-detail-value">{{ v.startDate | date: 'd MMM' }} – {{ v.endDate | date: 'd MMM y' }}</span>
+            <span class="fv-detail-value">{{ v.startDate | date: 'd MMM' }} – {{ v.endDate | date: 'dd-MM-yyyy' }}</span>
             <span class="fv-detail-sub">{{ v.visitDays }} {{ v.visitDays === 1 ? 'day' : 'days' }}</span>
           </div>
           <div class="fv-detail-card">
