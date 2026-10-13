@@ -276,7 +276,17 @@ export class AllAttendanceComponent implements OnInit {
     this.years = [current - 2, current - 1, current, current + 1];
   }
 
+  /** Today's position (IST), shown above the period KPIs. */
+  today = signal<any | null>(null);
+  loadToday() {
+    this.attendanceService.getTodaySummary().subscribe({
+      next: (t) => this.today.set(t),
+      error: () => this.today.set(null),
+    });
+  }
+
   ngOnInit() {
+    this.loadToday();
     this.employeeService.getEmployeesBasicList().subscribe({ next: (res) => this.employees.set(res || []) });
     this.masterDataService.getDepartments(true).subscribe({ next: (res) => this.departments.set(res || []) });
     this.masterDataService.getHolidays().subscribe({ next: (res: any) => this.holidays.set(res || []) });

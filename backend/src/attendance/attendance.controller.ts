@@ -170,6 +170,13 @@ export class AttendanceController {
     );
   }
 
+  /** Today at a glance (IST) for the All People Attendance page. */
+  @Get('today-summary')
+  @Permissions('attendance/all')
+  getTodaySummary(@Request() req) {
+    return this.attendanceService.getTodaySummary(req.user.companyId);
+  }
+
   @Get('all')
   @Permissions('attendance/all')
   getAllEmployeesAttendance(

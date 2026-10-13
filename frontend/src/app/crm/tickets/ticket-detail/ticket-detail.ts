@@ -84,7 +84,12 @@ export class TicketDetailComponent implements OnInit {
    * keep their line breaks; the same rule notices use.
    */
   commentHtml(body?: string | null): string {
-    return noticeBodyHtml(body ?? '');
+    // Text pasted into the editor often joins words with non-breaking spaces,
+    // which makes a whole sentence one unbreakable line that pushes the card
+    // wider than the panel. A lone &nbsp; between words becomes a plain space;
+    // runs of them (deliberate indentation) are left alone.
+    return noticeBodyHtml(body ?? '')
+      .replace(/(?<!&nbsp;|\u00a0)(?:&nbsp;|\u00a0)(?!&nbsp;|\u00a0)/g, ' ');
   }
 
   hasText(html?: string | null): boolean {

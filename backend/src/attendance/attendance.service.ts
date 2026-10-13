@@ -866,6 +866,63 @@ export class AttendanceService {
    * the person is waiting on their own attendance record, and the one that has
    * waited longest is the one to answer.
    */
+  /**
+   * Today at a glance for the All People Attendance page: who is in, late,
+   * half day, on leave, off, and who has not clocked in yet — for the IST
+   * calendar day, whatever the server's own timezone.
+   *
+   * "Not clocked in yet" rather than "Absent": during the day it is not yet a
+   * fact. Counts only active people (suspended accounts are excluded), and a
+   * rostered day off is not counted as missing.
+   */
+  async getTodaySummary(companyId: number) {
+    const now = new Date();
+    const today = istDateKey(now);
+    const tomorrow = new Date(today.getTime() + 86400000);
+
+    const people = await this.prisma.employee.findMany({
+      where: { companyId, user: { status: { not: 'SUSPENDED' } } },
+      select: { id: true },
+    });
+    const ids = people.map((p) => p.id);
+
+    const [records, leaves, daysOff] = await Promise.all([
+      this.prisma.attendance.findMany({
+        where: { employeeId: { in: ids }, date: { gte: today, lt: tomorrow } },
+        select: { employeeId: true, clockIn: true, clockOut: true, status: true, isLate: true, isOnsite: true, clockInOutside: true },
+      }),
+      this.prisma.leaveRequest.findMany({
+        where: { employeeId: { in: ids }, status: 'APPROVED', deletedAt: null, startDate: { lt: tomorrow }, endDate: { gte: today } },
+        select: { employeeId: true },
+      }),
+      this.prisma.shiftRosterEntry.findMany({
+        where: { employeeId: { in: ids }, date: today, isDayOff: true },
+        select: { employeeId: true },
+      }),
+    ]);
+
+    const clocked = records.filter((r) => r.clockIn);
+    const clockedIds = new Set(clocked.map((r) => r.employeeId));
+    const leaveIds = new Set(leaves.map((l) => l.employeeId).filter((id) => !clockedIds.has(id)));
+    const offIds = new Set(daysOff.map((d) => d.employeeId).filter((id) => !clockedIds.has(id) && !leaveIds.has(id)));
+
+    return {
+      date: today.toISOString().slice(0, 10),
+      totalEmployees: ids.length,
+      clockedIn: clocked.length,
+      present: clocked.filter((r) => r.status !== 'HALF_DAY' && !r.isLate).length,
+      late: clocked.filter((r) => r.isLate).length,
+      halfDay: clocked.filter((r) => r.status === 'HALF_DAY').length,
+      stillWorking: clocked.filter((r) => !r.clockOut).length,
+      onLeave: leaveIds.size,
+      dayOff: offIds.size,
+      notClockedIn: Math.max(ids.length - clockedIds.size - leaveIds.size - offIds.size, 0),
+      office: clocked.filter((r) => !r.isOnsite && !r.clockInOutside).length,
+      onsite: clocked.filter((r) => r.isOnsite).length,
+      remote: clocked.filter((r) => !r.isOnsite && r.clockInOutside).length,
+    };
+  }
+
   async getPendingClockOuts(
     companyId: number, role?: string | null, employeeId?: number | null,
   ) {

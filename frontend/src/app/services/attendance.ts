@@ -109,6 +109,14 @@ export class AttendanceService {
   private geo = inject(GeolocationService);
   private apiUrl = `${environment.apiUrl}/attendance`;
 
+  /** Today at a glance (IST) for All People Attendance. */
+  getTodaySummary() {
+    return this.http.get<{
+      date: string; totalEmployees: number; clockedIn: number; present: number; late: number; halfDay: number;
+      stillWorking: number; onLeave: number; dayOff: number; notClockedIn: number; office: number; onsite: number; remote: number;
+    }>(`${this.apiUrl}/today-summary`);
+  }
+
   /** People late on `minLate`+ days in the last `days` days, worst first. */
   getLateOffenders(days = 30, minLate = 5) {
     return this.http.get<{ days: number; minLate: number; offenders: { employee: any; lateDays: number; lastLate: string }[] }>(

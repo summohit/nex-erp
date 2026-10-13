@@ -59,6 +59,26 @@
     (applied)="applyAttendanceFilters($event)">
   </app-attendance-filter-drawer>
 
+  <!-- Today at a glance (IST) -->
+  <div class="today-strip" *ngIf="today() as t">
+    <div class="today-head">
+      <span class="today-label">Today</span>
+      <span class="today-date">{{ t.date + 'T00:00:00' | date:'EEEE, dd-MM-yyyy' }}</span>
+      <span class="today-sub">{{ t.totalEmployees }} active employees</span>
+      <button type="button" class="today-refresh" (click)="loadToday()" title="Refresh today's numbers">↻</button>
+    </div>
+    <div class="today-grid">
+      <div class="today-kpi k-in"><b>{{ t.clockedIn }}</b><span>Clocked in</span><small>{{ t.stillWorking }} still working</small></div>
+      <div class="today-kpi k-ok"><b>{{ t.present }}</b><span>On time</span></div>
+      <div class="today-kpi k-late"><b>{{ t.late }}</b><span>Late</span></div>
+      <div class="today-kpi k-half"><b>{{ t.halfDay }}</b><span>Half day</span></div>
+      <div class="today-kpi k-leave"><b>{{ t.onLeave }}</b><span>On leave</span></div>
+      <div class="today-kpi k-off"><b>{{ t.dayOff }}</b><span>Day off</span></div>
+      <div class="today-kpi k-miss"><b>{{ t.notClockedIn }}</b><span>Not clocked in yet</span></div>
+    </div>
+    <div class="today-where">Where: Office {{ t.office }} · On site {{ t.onsite }} · WFH / outside {{ t.remote }}</div>
+  </div>
+
   <!-- KPI / Stats Row -->
   <div class="stats-row">
     <!-- Total Shifts Tracked -->
