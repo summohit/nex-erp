@@ -50,7 +50,8 @@ import {
   LucideDownload,
   LucideCalendarPlus,
   LucideUsers,
-  LucideSparkles
+  LucideSparkles,
+  LucideRefreshCw
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -118,7 +119,8 @@ import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDateP
     LucideDownload,
     LucideCalendarPlus,
     LucideUsers,
-    LucideSparkles
+    LucideSparkles,
+    LucideRefreshCw
   ],
   providers: [DatePipe],
   templateUrl: './attendance-leave.html',
@@ -903,14 +905,109 @@ export class AttendanceLeaveComponent implements OnInit {
   ];
 
   regularizationColDefs: ColDef[] = [
-    { field: 'date', headerName: 'Date', flex: 1, valueFormatter: (params: ValueFormatterParams) => this.datePipe.transform(params.value, 'mediumDate') || '' },
-    { field: 'proposedClockIn', headerName: 'Proposed In', flex: 1, valueFormatter: (params: ValueFormatterParams) => params.value ? (this.datePipe.transform(params.value, 'shortTime') || '') : '-' },
-    { field: 'proposedClockOut', headerName: 'Proposed Out', flex: 1, valueFormatter: (params: ValueFormatterParams) => params.value ? (this.datePipe.transform(params.value, 'shortTime') || '') : '-' },
-    { field: 'reason', headerName: 'Reason', flex: 1.5 },
-    { field: 'status', headerName: 'Status', flex: 1, cellRenderer: (params: any) => {
-        const val = params.value;
-        const color = val === 'APPROVED' ? '#10B981' : (val === 'REJECTED' ? '#1373e5' : '#6b3fd6');
-        return `<span style="color: ${color}; font-weight: 500;">${val}</span>`;
+    { 
+      field: 'date', 
+      headerName: 'Date', 
+      minWidth: 145, 
+      flex: 1, 
+      cellRenderer: (params: any) => {
+        if (!params.value) return '—';
+        const formattedDate = this.datePipe.transform(params.value, 'dd MMM yyyy') || params.value;
+        const dayOfWeek = this.datePipe.transform(params.value, 'EEEE') || '';
+        return `
+          <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; line-height: 1.3;">
+            <span style="font-size: 13px; font-weight: 600; color: #0f172a; letter-spacing: -0.2px;">${formattedDate}</span>
+            <span style="font-size: 11.5px; color: #64748b; margin-top: 1px;">${dayOfWeek}</span>
+          </div>
+        `;
+      }
+    },
+    { 
+      field: 'proposedClockIn', 
+      headerName: 'Proposed In', 
+      minWidth: 130, 
+      flex: 0.9, 
+      cellRenderer: (params: any) => {
+        if (!params.value) return '<span style="color:#94a3b8;">—</span>';
+        const t = this.datePipe.transform(params.value, 'shortTime') || params.value;
+        return `
+          <div style="display: flex; align-items: center; height: 100%;">
+            <span style="display: inline-flex; align-items: center; gap: 5px; height: 24px; line-height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; white-space: nowrap;">
+              <span style="font-size: 11px;">☀️</span>
+              <span>${t}</span>
+            </span>
+          </div>
+        `;
+      }
+    },
+    { 
+      field: 'proposedClockOut', 
+      headerName: 'Proposed Out', 
+      minWidth: 130, 
+      flex: 0.9, 
+      cellRenderer: (params: any) => {
+        if (!params.value) return '<span style="color:#94a3b8;">—</span>';
+        const t = this.datePipe.transform(params.value, 'shortTime') || params.value;
+        return `
+          <div style="display: flex; align-items: center; height: 100%;">
+            <span style="display: inline-flex; align-items: center; gap: 5px; height: 24px; line-height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; white-space: nowrap;">
+              <span style="font-size: 11px;">🌙</span>
+              <span>${t}</span>
+            </span>
+          </div>
+        `;
+      }
+    },
+    { 
+      field: 'reason', 
+      headerName: 'Reason', 
+      minWidth: 180, 
+      flex: 1.4,
+      cellRenderer: (params: any) => {
+        const reason = params.value || 'No reason provided';
+        const safeReason = (reason || '').replace(/"/g, '&quot;');
+        return `
+          <div style="display: flex; align-items: center; height: 100%; min-width: 0;" title="${safeReason}">
+            <span style="font-size: 12.5px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; max-width: 100%; line-height: 1.4;">
+              ${safeReason}
+            </span>
+          </div>
+        `;
+      }
+    },
+    { 
+      field: 'status', 
+      headerName: 'Status', 
+      minWidth: 120, 
+      flex: 0.8,
+      cellRenderer: (params: any) => {
+        const s = (params.value || 'PENDING').toUpperCase();
+        let bg = '#fffbeb';
+        let border = '#fde68a';
+        let color = '#92400e';
+        let dot = '#f59e0b';
+        let label = 'Pending';
+        if (s === 'APPROVED') {
+          bg = '#ecfdf5';
+          border = '#a7f3d0';
+          color = '#065f46';
+          dot = '#10b981';
+          label = 'Approved';
+        } else if (s === 'REJECTED') {
+          bg = '#fef2f2';
+          border = '#fecaca';
+          color = '#991b1b';
+          dot = '#ef4444';
+          label = 'Rejected';
+        }
+        return `
+          <div style="display: flex; align-items: center; height: 100%;">
+            <span style="display: inline-flex; align-items: center; height: 22px; line-height: 20px; padding: 0 8px; border-radius: 11px; font-size: 11px; font-weight: 600; background:${bg}; border: 1px solid ${border}; color:${color}; white-space: nowrap; flex-shrink: 0; box-sizing: border-box;">
+              <span style="width: 6px; height: 6px; min-width: 6px; min-height: 6px; border-radius: 50%; background:${dot}; margin-right: 5px; flex-shrink: 0; display: inline-block;"></span>
+              <span>${label}</span>
+            </span>
+          </div>
+        `;
       }
     }
   ];
@@ -919,41 +1016,193 @@ export class AttendanceLeaveComponent implements OnInit {
     { 
       field: 'employee',
       headerName: 'Employee',
-      // Do not rely on an object-valued field being formatted by the grid.
-      // The renderer gets the nested employee when available, with a clear
-      // employee-id fallback rather than an empty first column.
       valueGetter: (p: any) => {
         const emp = p.data?.employee;
         return emp ? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() : `Employee #${p.data?.employeeId ?? '—'}`;
       },
       valueFormatter: (p) => p.value || 'Employee',
-      minWidth: 200,
+      minWidth: 240,
       flex: 1.5,
+      pinned: 'left',
       cellRenderer: (params: any) => {
         const emp = params.data?.employee;
-        if (!emp) return 'N/A';
-        const name = emp.lastName ? `${emp.firstName} ${emp.lastName}` : emp.firstName;
-        return `<span style="font-weight:600;">${name}</span>`;
+        if (!emp) return `<span class="text-secondary" style="font-size: 13px;">Employee #${params.data?.employeeId ?? '—'}</span>`;
+        const name = `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() || `Employee #${params.data?.employeeId ?? '—'}`;
+        const dept = emp.department?.name || '';
+        const des = emp.designation?.name || '';
+        const sub = [des, dept].filter(Boolean).join(' · ') || 'Employee';
+        const codeBadge = emp.employeeCode 
+          ? `<span class="table-emp-code" style="font-size: 10px !important; font-weight: 600 !important; color: #0369a1 !important; background: #e0f2fe !important; border: 1px solid #bae6fd !important; border-radius: 4px !important; padding: 1px 5px !important; flex-shrink: 0 !important; line-height: 1.2 !important;">#${emp.employeeCode}</span>` 
+          : '';
+        const safeName = (name || '').replace(/"/g, '&quot;');
+        const uiAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B82F6&color=fff&size=128&bold=true`;
+        const avatarSrc = emp.avatarUrl || uiAvatarUrl;
+        return `
+          <div class="cell-user-avatar-row cursor-pointer" style="display: flex !important; align-items: center !important; gap: 10px !important; height: 100% !important; min-width: 0 !important; width: 100% !important; cursor: pointer !important;" title="Click to view details">
+            <img src="${avatarSrc}" 
+                 class="table-emp-avatar" 
+                 alt="${safeName}" 
+                 style="width: 36px !important; height: 36px !important; min-width: 36px !important; min-height: 36px !important; max-width: 36px !important; max-height: 36px !important; border-radius: 50% !important; object-fit: cover !important; flex-shrink: 0 !important; border: 1.5px solid #e2e8f0 !important; display: block !important;" 
+                 onerror="this.onerror=null; this.src='${uiAvatarUrl}';" />
+            <div class="cell-stacked" style="min-width: 0 !important; flex: 1 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; justify-content: center !important; line-height: 1.25 !important;">
+              <div class="cell-title-bold" style="display: flex !important; align-items: center !important; gap: 6px !important; min-width: 0 !important;">
+                <span class="emp-name-text" style="font-size: 13px !important; font-weight: 600 !important; color: #0f172a !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;">${name}</span>
+                ${codeBadge}
+              </div>
+              <div class="user-text-stack text-secondary" style="font-size: 11.5px !important; color: #64748B !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 2px !important;">${sub}</div>
+            </div>
+          </div>
+        `;
       }
     },
-    { field: 'date', headerName: 'Date', flex: 1, valueFormatter: (params: ValueFormatterParams) => this.datePipe.transform(params.value, 'mediumDate') || '' },
-    { field: 'proposedClockIn', headerName: 'Proposed In', flex: 1, valueFormatter: (params: ValueFormatterParams) => params.value ? (this.datePipe.transform(params.value, 'shortTime') || '') : '-' },
-    { field: 'proposedClockOut', headerName: 'Proposed Out', flex: 1, valueFormatter: (params: ValueFormatterParams) => params.value ? (this.datePipe.transform(params.value, 'shortTime') || '') : '-' },
-    { field: 'reason', headerName: 'Reason', flex: 1.5 },
-    { field: 'status', headerName: 'Status', flex: 1 },
-    {
-      headerName: 'Actions',
-      flex: 1,
+    { 
+      field: 'date', 
+      headerName: 'Date', 
+      minWidth: 145, 
+      flex: 1, 
       cellRenderer: (params: any) => {
-        if (params.data.status === 'PENDING') {
+        if (!params.value) return '—';
+        const formattedDate = this.datePipe.transform(params.value, 'dd MMM yyyy') || params.value;
+        const dayOfWeek = this.datePipe.transform(params.value, 'EEEE') || '';
+        return `
+          <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; line-height: 1.3;">
+            <span style="font-size: 13px; font-weight: 600; color: #0f172a; letter-spacing: -0.2px;">${formattedDate}</span>
+            <span style="font-size: 11.5px; color: #64748b; margin-top: 1px;">${dayOfWeek}</span>
+          </div>
+        `;
+      }
+    },
+    { 
+      field: 'proposedClockIn', 
+      headerName: 'Proposed In', 
+      minWidth: 130, 
+      flex: 0.9, 
+      cellRenderer: (params: any) => {
+        if (!params.value) return '<span style="color:#94a3b8;">—</span>';
+        const t = this.datePipe.transform(params.value, 'shortTime') || params.value;
+        return `
+          <div style="display: flex; align-items: center; height: 100%;">
+            <span style="display: inline-flex; align-items: center; gap: 5px; height: 24px; line-height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; white-space: nowrap;">
+              <span style="font-size: 11px;">☀️</span>
+              <span>${t}</span>
+            </span>
+          </div>
+        `;
+      }
+    },
+    { 
+      field: 'proposedClockOut', 
+      headerName: 'Proposed Out', 
+      minWidth: 130, 
+      flex: 0.9, 
+      cellRenderer: (params: any) => {
+        if (!params.value) return '<span style="color:#94a3b8;">—</span>';
+        const t = this.datePipe.transform(params.value, 'shortTime') || params.value;
+        return `
+          <div style="display: flex; align-items: center; height: 100%;">
+            <span style="display: inline-flex; align-items: center; gap: 5px; height: 24px; line-height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; white-space: nowrap;">
+              <span style="font-size: 11px;">🌙</span>
+              <span>${t}</span>
+            </span>
+          </div>
+        `;
+      }
+    },
+    {
+      headerName: 'Duration',
+      minWidth: 115,
+      flex: 0.8,
+      cellRenderer: (params: any) => {
+        const cin = params.data?.proposedClockIn;
+        const cout = params.data?.proposedClockOut;
+        if (!cin || !cout) return '<span style="color:#94a3b8;">—</span>';
+        try {
+          const dIn = new Date(cin);
+          const dOut = new Date(cout);
+          const diffMs = dOut.getTime() - dIn.getTime();
+          if (isNaN(diffMs) || diffMs <= 0) return '<span style="color:#94a3b8;">—</span>';
+          const hrs = Math.floor(diffMs / (1000 * 60 * 60));
+          const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          const text = hrs > 0 ? (mins > 0 ? `${hrs}h ${mins}m` : `${hrs} hrs`) : `${mins} mins`;
           return `
-            <div style="display: flex; gap: 8px; align-items: center; height: 100%;">
-              <button class="btn btn-primary" style="padding: 2px 8px; font-size: 11px;" onclick="window.dispatchEvent(new CustomEvent('resolve-reg', {detail: {id: ${params.data.id}, status: 'APPROVED'}}))">Approve</button>
-              <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; color: #1373e5; border-color: #1373e5;" onclick="window.dispatchEvent(new CustomEvent('resolve-reg', {detail: {id: ${params.data.id}, status: 'REJECTED'}}))">Reject</button>
+            <div style="display: flex; align-items: center; height: 100%;">
+              <span style="display: inline-flex; align-items: center; gap: 4px; height: 22px; line-height: 20px; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; white-space: nowrap;">
+                <span style="font-size: 10px;">⏱️</span>
+                <span>${text}</span>
+              </span>
             </div>
           `;
+        } catch {
+          return '<span style="color:#94a3b8;">—</span>';
         }
-        return '';
+      }
+    },
+    { 
+      field: 'reason', 
+      headerName: 'Reason', 
+      minWidth: 180, 
+      flex: 1.4,
+      cellRenderer: (params: any) => {
+        const reason = params.value || 'No reason provided';
+        const safeReason = (reason || '').replace(/"/g, '&quot;');
+        return `
+          <div style="display: flex; align-items: center; height: 100%; min-width: 0;" title="${safeReason}">
+            <span style="font-size: 12.5px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; max-width: 100%; line-height: 1.4;">
+              ${safeReason}
+            </span>
+          </div>
+        `;
+      }
+    },
+    { 
+      field: 'status', 
+      headerName: 'Status', 
+      minWidth: 120, 
+      flex: 0.8,
+      cellRenderer: (params: any) => {
+        const s = (params.value || 'PENDING').toUpperCase();
+        let bg = '#fffbeb';
+        let border = '#fde68a';
+        let color = '#92400e';
+        let dot = '#f59e0b';
+        let label = 'Pending';
+        if (s === 'APPROVED') {
+          bg = '#ecfdf5';
+          border = '#a7f3d0';
+          color = '#065f46';
+          dot = '#10b981';
+          label = 'Approved';
+        } else if (s === 'REJECTED') {
+          bg = '#fef2f2';
+          border = '#fecaca';
+          color = '#991b1b';
+          dot = '#ef4444';
+          label = 'Rejected';
+        }
+        return `
+          <div style="display: flex; align-items: center; height: 100%;">
+            <span style="display: inline-flex; align-items: center; height: 22px; line-height: 20px; padding: 0 8px; border-radius: 11px; font-size: 11px; font-weight: 600; background:${bg}; border: 1px solid ${border}; color:${color}; white-space: nowrap; flex-shrink: 0; box-sizing: border-box;">
+              <span style="width: 6px; height: 6px; min-width: 6px; min-height: 6px; border-radius: 50%; background:${dot}; margin-right: 5px; flex-shrink: 0; display: inline-block;"></span>
+              <span>${label}</span>
+            </span>
+          </div>
+        `;
+      }
+    },
+    {
+      headerName: 'Actions',
+      width: 100,
+      minWidth: 90,
+      pinned: 'right',
+      sortable: false,
+      filter: false,
+      cellRenderer: LeaveActionCellRendererComponent,
+      cellRendererParams: {
+        onView: (data: any) => this.openRegularizationDetail(data),
+        onApprove: (data: any) => this.resolveRegularization(data.id, 'APPROVED'),
+        onReject: (data: any) => this.openRejectRegularizationModal(data),
+        canApprove: () => true,
+        canReject: () => true
       }
     }
   ];
@@ -1581,6 +1830,43 @@ export class AttendanceLeaveComponent implements OnInit {
   // Regularization State
   myRegularizations = signal<any[]>([]);
   pendingRegularizations = signal<any[]>([]);
+  regularizationSearch = signal<string>('');
+  isLoadingRegularizations = signal<boolean>(false);
+
+  filteredPendingRegularizations = computed(() => {
+    const list = this.pendingRegularizations();
+    const q = this.regularizationSearch().trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((r) => {
+      const emp = r.employee;
+      const name = `${emp?.firstName ?? ''} ${emp?.lastName ?? ''}`.toLowerCase();
+      const code = (emp?.employeeCode ?? '').toLowerCase();
+      const dept = (emp?.department?.name ?? '').toLowerCase();
+      const des = (emp?.designation?.name ?? '').toLowerCase();
+      const reason = (r.reason ?? '').toLowerCase();
+      const date = (r.date ?? '').toLowerCase();
+      return name.includes(q) || code.includes(q) || dept.includes(q) || des.includes(q) || reason.includes(q) || date.includes(q);
+    });
+  });
+
+  uniquePendingRegularizationEmployeesCount = computed(() => {
+    const list = this.pendingRegularizations();
+    const ids = new Set<number>();
+    for (const item of list) {
+      if (item.employeeId) ids.add(item.employeeId);
+      else if (item.employee?.id) ids.add(item.employee.id);
+    }
+    return ids.size;
+  });
+
+  // Regularization Detail & Reject Modals
+  isRegularizationDetailOpen = signal<boolean>(false);
+  selectedRegularization = signal<any>(null);
+  isRejectRegularizationModalOpen = signal<boolean>(false);
+  rejectingRegularizationId = signal<number | null>(null);
+  rejectingRegularizationData = signal<any>(null);
+  rejectingRegularizationReason = signal<string>('');
+
   isRegularizationModalOpen = signal<boolean>(false);
   /** One or more days, each with its own times, and one reason for all. */
   regularizationForm: {
@@ -2060,25 +2346,165 @@ export class AttendanceLeaveComponent implements OnInit {
     });
   }
 
-  resolveRegularization(id: number, status: string) {
+  resolveRegularization(id: number, status: string, reason?: string) {
     if (status === 'REJECTED') {
-      const reason = prompt('Please enter a rejection reason:');
-      if (!reason) return;
-      this.attendanceService.resolveRegularization(id, status, reason).subscribe({
-        next: () => {
-          this.toast.success('Request rejected');
-          this.loadPendingRegularizations();
-        },
-        error: () => this.toast.error('Failed to reject request')
-      });
+      if (reason) {
+        this.attendanceService.resolveRegularization(id, status, reason).subscribe({
+          next: () => {
+            this.toast.success('Regularization rejected');
+            this.loadPendingRegularizations();
+          },
+          error: () => this.toast.error('Failed to reject regularization')
+        });
+      } else {
+        const reg = this.pendingRegularizations().find(r => r.id === id);
+        this.openRejectRegularizationModal(reg || id);
+      }
+      return;
+    }
+    this.attendanceService.resolveRegularization(id, status).subscribe({
+      next: () => {
+        this.toast.success('Regularization approved successfully');
+        this.loadPendingRegularizations();
+      },
+      error: () => this.toast.error('Failed to approve regularization')
+    });
+  }
+
+  openRejectRegularizationModal(dataOrId: any) {
+    if (typeof dataOrId === 'object' && dataOrId !== null) {
+      this.rejectingRegularizationId.set(dataOrId.id);
+      this.rejectingRegularizationData.set(dataOrId);
     } else {
-      this.attendanceService.resolveRegularization(id, status).subscribe({
-        next: () => {
-          this.toast.success('Request approved');
-          this.loadPendingRegularizations();
-        },
-        error: () => this.toast.error('Failed to approve request')
-      });
+      this.rejectingRegularizationId.set(dataOrId);
+      const reg = this.pendingRegularizations().find(r => r.id === dataOrId);
+      this.rejectingRegularizationData.set(reg || null);
+    }
+    this.rejectingRegularizationReason.set('');
+    this.isRejectRegularizationModalOpen.set(true);
+  }
+
+  closeRejectRegularizationModal() {
+    this.isRejectRegularizationModalOpen.set(false);
+    this.rejectingRegularizationId.set(null);
+    this.rejectingRegularizationData.set(null);
+    this.rejectingRegularizationReason.set('');
+  }
+
+  submitRejectRegularization() {
+    const id = this.rejectingRegularizationId();
+    const reason = this.rejectingRegularizationReason().trim();
+    if (!id) return;
+    if (!reason) {
+      this.toast.error('Rejection reason is required');
+      return;
+    }
+    this.attendanceService.resolveRegularization(id, 'REJECTED', reason).subscribe({
+      next: () => {
+        this.toast.success('Regularization request rejected');
+        this.closeRejectRegularizationModal();
+        if (this.isRegularizationDetailOpen() && this.selectedRegularization()?.id === id) {
+          this.closeRegularizationDetail();
+        }
+        this.loadPendingRegularizations();
+      },
+      error: (err: any) => this.toast.error(err?.error?.message || 'Failed to reject regularization')
+    });
+  }
+
+  openRegularizationDetail(data: any) {
+    this.selectedRegularization.set(data);
+    this.isRegularizationDetailOpen.set(true);
+  }
+
+  closeRegularizationDetail() {
+    this.isRegularizationDetailOpen.set(false);
+    this.selectedRegularization.set(null);
+  }
+
+  approveSelectedRegularization() {
+    const reg = this.selectedRegularization();
+    if (!reg) return;
+    this.resolveRegularization(reg.id, 'APPROVED');
+    this.closeRegularizationDetail();
+  }
+
+  rejectSelectedRegularization() {
+    const reg = this.selectedRegularization();
+    if (!reg) return;
+    this.openRejectRegularizationModal(reg);
+  }
+
+  onRegularizationCellClicked(params: CellClickedEvent) {
+    if (params.colDef.field === 'employee' && params.data) {
+      this.openRegularizationDetail(params.data);
+    }
+  }
+
+  refreshPendingRegularizations() {
+    this.isLoadingRegularizations.set(true);
+    this.attendanceService.getPendingRegularizations().subscribe({
+      next: (res: any) => {
+        this.pendingRegularizations.set(res || []);
+        this.isLoadingRegularizations.set(false);
+        this.toast.success('Regularizations refreshed');
+      },
+      error: () => {
+        this.pendingRegularizations.set([]);
+        this.isLoadingRegularizations.set(false);
+        this.toast.error('Failed to refresh regularizations');
+      }
+    });
+  }
+
+  exportPendingRegularizationsCsv(): void {
+    const rows = [['id', 'employee_code', 'employee_name', 'department', 'designation', 'date', 'proposed_clock_in', 'proposed_clock_out', 'reason', 'status']];
+    const list = this.filteredPendingRegularizations();
+    for (const r of list) {
+      const emp = r.employee;
+      const empName = emp ? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() : `Employee #${r.employeeId ?? ''}`;
+      rows.push([
+        String(r.id),
+        emp?.employeeCode || '',
+        empName,
+        emp?.department?.name || '',
+        emp?.designation?.name || '',
+        String(r.date || '').slice(0, 10),
+        r.proposedClockIn ? (this.datePipe.transform(r.proposedClockIn, 'shortTime') || '') : '',
+        r.proposedClockOut ? (this.datePipe.transform(r.proposedClockOut, 'shortTime') || '') : '',
+        r.reason || '',
+        r.status || 'PENDING'
+      ]);
+    }
+    this.downloadCsv(rows, 'pending-regularizations.csv');
+    this.toast.success(`Exported ${list.length} regularization request${list.length === 1 ? '' : 's'}`);
+  }
+
+  getRegularizationEmployeeAvatar(reg: any): string {
+    const emp = reg?.employee;
+    if (emp?.avatarUrl) return emp.avatarUrl;
+    const name = this.getRegularizationEmployeeName(reg);
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B82F6&color=fff&size=128&bold=true`;
+  }
+
+  getRegularizationEmployeeName(reg: any): string {
+    const emp = reg?.employee;
+    if (!emp) return `Employee #${reg?.employeeId ?? '—'}`;
+    return `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() || `Employee #${reg?.employeeId ?? '—'}`;
+  }
+
+  getRegularizationDuration(reg: any): string {
+    if (!reg?.proposedClockIn || !reg?.proposedClockOut) return 'N/A';
+    try {
+      const dIn = new Date(reg.proposedClockIn);
+      const dOut = new Date(reg.proposedClockOut);
+      const diffMs = dOut.getTime() - dIn.getTime();
+      if (isNaN(diffMs) || diffMs <= 0) return 'N/A';
+      const hrs = Math.floor(diffMs / (1000 * 60 * 60));
+      const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      return hrs > 0 ? (mins > 0 ? `${hrs} hrs ${mins} mins` : `${hrs} hrs`) : `${mins} mins`;
+    } catch {
+      return 'N/A';
     }
   }
 
@@ -3084,9 +3510,16 @@ export class AttendanceLeaveComponent implements OnInit {
 
   /** HR / admin queue of attendance corrections awaiting a decision. */
   loadPendingRegularizations() {
+    this.isLoadingRegularizations.set(true);
     this.attendanceService.getPendingRegularizations().subscribe({
-      next: (res: any) => this.pendingRegularizations.set(res || []),
-      error: () => this.pendingRegularizations.set([]),
+      next: (res: any) => {
+        this.pendingRegularizations.set(res || []);
+        this.isLoadingRegularizations.set(false);
+      },
+      error: () => {
+        this.pendingRegularizations.set([]);
+        this.isLoadingRegularizations.set(false);
+      },
     });
   }
 

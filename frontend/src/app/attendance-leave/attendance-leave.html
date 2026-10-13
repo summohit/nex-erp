@@ -246,26 +246,107 @@
 
   <!-- Attendance corrections waiting on HR / admin -->
   <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() === 'regularizations' && isAdmin()">
-    <div class="widget-card">
-      <div class="widget-header" style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-        <div>
-          <h3 style="margin:0;">Pending Regularizations</h3>
-          <p style="margin:4px 0 0; color:#64748b; font-size:13px;">Attendance corrections raised by employees. Approving one corrects that day automatically (and adds comp-off if it was a day off).</p>
+    <!-- KPI Metric Cards for Regularizations -->
+    <div class="leave-kpi-grid mb-4">
+      <div class="leave-kpi-card pending active">
+        <div class="leave-kpi-header">
+          <span class="leave-kpi-label">Pending Review</span>
+          <div class="leave-kpi-icon-wrap pending">
+            <svg lucideClock [size]="17"></svg>
+          </div>
         </div>
-        <button type="button" class="btn btn-outline" (click)="loadPendingRegularizations()">Refresh</button>
+        <div class="leave-kpi-value-row">
+          <span class="leave-kpi-number text-amber">{{ pendingRegularizations().length }}</span>
+          <span class="leave-kpi-badge pending" *ngIf="pendingRegularizations().length > 0">Needs Attention</span>
+          <span class="leave-kpi-subtext" *ngIf="pendingRegularizations().length === 0">All caught up</span>
+        </div>
       </div>
-      <div class="table-container mt-4">
+
+      <div class="leave-kpi-card">
+        <div class="leave-kpi-header">
+          <span class="leave-kpi-label">Affected Employees</span>
+          <div class="leave-kpi-icon-wrap total">
+            <svg lucideUsers [size]="17"></svg>
+          </div>
+        </div>
+        <div class="leave-kpi-value-row">
+          <span class="leave-kpi-number">{{ uniquePendingRegularizationEmployeesCount() }}</span>
+          <span class="leave-kpi-subtext">Staff awaiting decisions</span>
+        </div>
+      </div>
+
+      <div class="leave-kpi-card approved">
+        <div class="leave-kpi-header">
+          <span class="leave-kpi-label">Smart Resolution</span>
+          <div class="leave-kpi-icon-wrap approved">
+            <svg lucideSparkles [size]="17"></svg>
+          </div>
+        </div>
+        <div class="leave-kpi-value-row">
+          <span class="leave-kpi-number text-emerald" style="font-size: 15px; font-weight: 700; line-height: 1.3;">Auto Logs & Comp-off</span>
+          <span class="leave-kpi-subtext">Applied automatically upon approval</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Regularizations Table Card -->
+    <div class="widget-card reg-table-card">
+      <div class="widget-header reg-table-header">
+        <div class="reg-title-wrap">
+          <div class="reg-title-row">
+            <h3 class="reg-title">Pending Regularizations</h3>
+            <span class="reg-count-pill" *ngIf="pendingRegularizations().length > 0">
+              {{ pendingRegularizations().length }} pending
+            </span>
+          </div>
+          <p class="reg-subtitle">
+            Attendance corrections raised by employees. Approving one corrects the shift log automatically and credits comp-off if applicable.
+          </p>
+        </div>
+
+        <div class="reg-header-actions">
+          <!-- Search input -->
+          <div class="reg-search-box">
+            <svg lucideSearch [size]="15" class="reg-search-icon"></svg>
+            <input
+              type="search"
+              class="reg-search-input"
+              placeholder="Search employee, date, reason..."
+              [ngModel]="regularizationSearch()"
+              (ngModelChange)="regularizationSearch.set($event)" />
+            <button type="button" class="reg-search-clear" *ngIf="regularizationSearch()" (click)="regularizationSearch.set('')" title="Clear search">×</button>
+          </div>
+
+          <!-- Export CSV -->
+          <button type="button" class="btn btn-outline reg-btn" (click)="exportPendingRegularizationsCsv()" [disabled]="pendingRegularizations().length === 0" title="Export list to CSV">
+            <svg lucideDownload [size]="15"></svg>
+            <span>Export</span>
+          </button>
+
+          <!-- Refresh -->
+          <button type="button" class="btn btn-outline reg-btn" (click)="refreshPendingRegularizations()" [disabled]="isLoadingRegularizations()" title="Refresh requests">
+            <svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoadingRegularizations()"></svg>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container mt-3">
         <ag-grid-angular
           class="ag-theme-quartz"
           [theme]="'legacy'"
           style="width: 100%; height: 560px;"
-          [rowData]="pendingRegularizations()"
+          [rowData]="filteredPendingRegularizations()"
           [columnDefs]="hrRegularizationColDefs"
           [defaultColDef]="defaultColDef"
           [rowHeight]="64"
           [headerHeight]="48"
+          [pagination]="true"
+          [paginationPageSize]="10"
+          [paginationPageSizeSelector]="leavePageSizes"
           [gridOptions]="gridOptions"
-          [overlayNoRowsTemplate]="'<span style=&quot;color:#64748b&quot;>No regularizations waiting — all caught up.</span>'">
+          (cellClicked)="onRegularizationCellClicked($event)"
+          [overlayNoRowsTemplate]="'<span style=&quot;color:#64748b; font-size:13.5px; font-weight:500;&quot;>No regularizations waiting — all caught up.</span>'">
         </ag-grid-angular>
       </div>
     </div>
@@ -2184,6 +2265,156 @@
           Apply Change
         </button>
         <button class="btn btn-outline" (click)="closeRescheduleModal()" style="width: 100%; margin-top: 8px;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- REGULARIZATION DETAIL MODAL -->
+  <div class="drawer-overlay" *ngIf="isRegularizationDetailOpen()" (click)="closeRegularizationDetail()" style="display: flex; align-items: center; justify-content: center;">
+    <div class="widget-card reg-detail-modal" (click)="$event.stopPropagation()" *ngIf="selectedRegularization() as reg">
+      <div class="widget-header reg-detail-header">
+        <div>
+          <h3 style="margin: 0; font-size: 17.5px; font-weight: 700; color: #0f172a;">Regularization Details</h3>
+          <p style="margin: 3px 0 0; font-size: 12.5px; color: #64748b;">Review employee attendance correction request</p>
+        </div>
+        <button class="btn-icon" (click)="closeRegularizationDetail()" title="Close">
+          <svg lucideX [size]="18"></svg>
+        </button>
+      </div>
+
+      <div class="reg-detail-body">
+        <!-- Employee Profile Card -->
+        <div class="reg-detail-emp-card">
+          <img [src]="getRegularizationEmployeeAvatar(reg)"
+               class="reg-detail-avatar"
+               alt="Avatar" />
+          <div class="reg-detail-emp-info">
+            <div class="reg-detail-name-row">
+              <span class="reg-detail-name">{{ getRegularizationEmployeeName(reg) }}</span>
+              <span *ngIf="reg.employee?.employeeCode" class="table-emp-code">#{{ reg.employee.employeeCode }}</span>
+              <span class="reg-detail-status-chip pending">
+                <span class="reg-dot-amber"></span>
+                Pending Review
+              </span>
+            </div>
+            <div class="reg-detail-meta-row">
+              <span>{{ reg.employee?.designation?.name || 'General' }}</span>
+              <span class="reg-meta-sep" *ngIf="reg.employee?.department?.name">·</span>
+              <span *ngIf="reg.employee?.department?.name">{{ reg.employee.department.name }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Details Grid -->
+        <div class="reg-detail-grid">
+          <!-- Attendance Date -->
+          <div class="reg-detail-item">
+            <span class="reg-detail-label">Attendance Date</span>
+            <div class="reg-detail-val-box">
+              <span class="reg-val-primary">{{ (reg.date | date:'dd MMM yyyy') || reg.date }}</span>
+              <span class="reg-val-secondary">{{ (reg.date | date:'EEEE') || '' }}</span>
+            </div>
+          </div>
+
+          <!-- Total Duration -->
+          <div class="reg-detail-item">
+            <span class="reg-detail-label">Total Duration</span>
+            <div class="reg-detail-val-box">
+              <span class="reg-val-primary">{{ getRegularizationDuration(reg) }}</span>
+              <span class="reg-val-secondary">Calculated working time</span>
+            </div>
+          </div>
+
+          <!-- Proposed Clock In -->
+          <div class="reg-detail-item">
+            <span class="reg-detail-label">Proposed Clock In</span>
+            <div class="reg-detail-time-chip in">
+              <span>☀️</span>
+              <span>{{ (reg.proposedClockIn | date:'shortTime') || '—' }}</span>
+            </div>
+          </div>
+
+          <!-- Proposed Clock Out -->
+          <div class="reg-detail-item">
+            <span class="reg-detail-label">Proposed Clock Out</span>
+            <div class="reg-detail-time-chip out">
+              <span>🌙</span>
+              <span>{{ (reg.proposedClockOut | date:'shortTime') || '—' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reason Box -->
+        <div class="reg-detail-reason-box">
+          <span class="reg-detail-label">Reason for Regularization</span>
+          <div class="reg-reason-content">
+            <p>{{ reg.reason || 'No detailed reason provided.' }}</p>
+          </div>
+        </div>
+
+        <!-- Info Note -->
+        <div class="reg-detail-notice">
+          <svg lucideSparkles [size]="16" class="reg-notice-icon"></svg>
+          <span>Approving this request will automatically update the attendance record and grant compensatory off if this was an official holiday or weekend.</span>
+        </div>
+      </div>
+
+      <div class="reg-detail-footer">
+        <button type="button" class="btn btn-outline" (click)="closeRegularizationDetail()">Cancel</button>
+        <div class="reg-footer-right-actions">
+          <button type="button" class="btn btn-outline reg-btn-reject" (click)="rejectSelectedRegularization()">
+            <svg lucideX [size]="16"></svg>
+            <span>Reject</span>
+          </button>
+          <button type="button" class="btn btn-primary reg-btn-approve" (click)="approveSelectedRegularization()">
+            <svg lucideCheck [size]="16"></svg>
+            <span>Approve Request</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REJECT REGULARIZATION MODAL -->
+  <div class="drawer-overlay" *ngIf="isRejectRegularizationModalOpen()" (click)="closeRejectRegularizationModal()" style="display: flex; align-items: center; justify-content: center;">
+    <div class="widget-card reg-reject-modal" (click)="$event.stopPropagation()">
+      <div class="widget-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="reg-reject-icon-wrap">
+            <svg lucideAlertCircle [size]="18"></svg>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a;">Reject Regularization</h3>
+            <p style="margin: 2px 0 0; font-size: 12px; color: #64748b;" *ngIf="rejectingRegularizationData() as r">
+              {{ getRegularizationEmployeeName(r) }} &bull; {{ (r.date | date:'mediumDate') || r.date }}
+            </p>
+          </div>
+        </div>
+        <button class="btn-icon" (click)="closeRejectRegularizationModal()" title="Close">
+          <svg lucideX [size]="18"></svg>
+        </button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px 0;">
+        <div class="form-group">
+          <label style="font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 6px; display: block;">
+            Reason for Rejection <span style="color: #dc2626;">*</span>
+          </label>
+          <textarea
+            class="form-control"
+            [ngModel]="rejectingRegularizationReason()"
+            (ngModelChange)="rejectingRegularizationReason.set($event)"
+            rows="3"
+            placeholder="Explain why this regularization request cannot be approved..."
+            style="resize: vertical; font-size: 13px; border-radius: 8px;"></textarea>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; padding-top: 8px; border-top: 1px solid #f1f5f9;">
+        <button class="btn btn-outline" (click)="closeRejectRegularizationModal()" style="font-size: 13px;">Cancel</button>
+        <button class="btn btn-primary" (click)="submitRejectRegularization()" style="background-color: #dc2626; border-color: #dc2626; font-size: 13px;">
+          Reject Request
+        </button>
       </div>
     </div>
   </div>
