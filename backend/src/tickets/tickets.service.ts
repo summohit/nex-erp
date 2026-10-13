@@ -912,6 +912,10 @@ export class TicketsService {
         type: 'INFO',
       },
     );
+    // And an email to whoever raised the ticket, so a reply from the team
+    // reaches them even if they never open MIRA. Not when they wrote it.
+    await this.emailCommentToReporter({ ...ticket, id: ticketId }, authorId, author, plain).catch((err) =>
+      console.warn(`Ticket comment email failed: ${err?.message ?? err}`));
 
     return comment;
   }
@@ -1014,6 +1018,28 @@ export class TicketsService {
         recipientName: p.firstName,
       });
     }
+  }
+
+  private async emailCommentToReporter(ticket: any, authorId: number, authorName: string, text: string) {
+    if (!ticket.reporterId || ticket.reporterId === authorId) return;
+    const [reporter, full] = await Promise.all([
+      this.prisma.employee.findFirst({
+        where: { id: ticket.reporterId },
+        select: { firstName: true, user: { select: { email: true } } },
+      }),
+      this.prisma.ticket.findFirst({ where: { id: ticket.id }, select: { title: true, priority: true } }),
+    ]);
+    if (!reporter?.user?.email) return;
+    await this.mailService.sendTicketEmail(reporter.user.email, {
+      kind: 'COMMENT',
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      ticketTitle: full?.title ?? ticket.title ?? '',
+      priority: full?.priority ?? null,
+      actorName: authorName,
+      note: text.length > 2000 ? `${text.slice(0, 2000)}…` : text,
+      recipientName: reporter.firstName,
+    });
   }
 
   private static ticketActorName(actor?: { firstName?: string | null; lastName?: string | null } | null): string {

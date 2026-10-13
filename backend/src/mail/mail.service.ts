@@ -621,7 +621,7 @@ export class MailService {
   async sendTicketEmail(
     email: string,
     t: {
-      kind: 'ASSIGNED' | 'RESOLVED' | 'REJECTED' | 'CLOSED' | 'REOPENED';
+      kind: 'ASSIGNED' | 'RESOLVED' | 'REJECTED' | 'CLOSED' | 'REOPENED' | 'COMMENT';
       ticketId?: number;
       ticketNumber: string;
       ticketTitle: string;
@@ -676,6 +676,14 @@ export class MailService {
         button: 'View Ticket',
         subject: `[${t.ticketNumber}] Closed: ${t.ticketTitle}`,
       },
+      COMMENT: {
+        accent: '#2563eb', badge: 'New reply',
+        heading: 'New reply on your ticket',
+        intro: `There is a new reply on ticket <strong>${e(t.ticketNumber)}</strong>${by}. You can answer it in the ticket discussion.`,
+        steps: [],
+        button: 'Open Ticket',
+        subject: `[${t.ticketNumber}] New reply: ${t.ticketTitle}`,
+      },
       REOPENED: {
         accent: '#d97706', badge: 'Reopened',
         heading: 'Ticket reopened',
@@ -711,7 +719,7 @@ export class MailService {
           ${t.note ? `
           <div style="padding: 12px 28px 0;">
             <div style="border-left: 3px solid ${copy.accent}; background: #f8fafc; padding: 12px 14px; border-radius: 6px;">
-              <div style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px;">${t.kind === 'REJECTED' ? 'Reason' : 'Resolution notes'}</div>
+              <div style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px;">${t.kind === 'REJECTED' ? 'Reason' : t.kind === 'COMMENT' ? 'Message' : 'Resolution notes'}</div>
               <div style="color: #1e293b; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${e(t.note)}</div>
             </div>
           </div>` : ''}
