@@ -220,8 +220,9 @@ export class AttendanceService {
     return this.http.get<any[]>(`${this.apiUrl}/regularization/me`);
   }
 
-  getPendingRegularizations(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/regularization/pending`);
+  getPendingRegularizations(status?: string): Observable<any[]> {
+    const params = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.http.get<any[]>(`${this.apiUrl}/regularization/pending${params}`);
   }
 
   requestRegularization(data: { reason: string; date?: string; proposedClockIn?: string; proposedClockOut?: string; entries?: { date: string; proposedClockIn?: string; proposedClockOut?: string }[] }) {

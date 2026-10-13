@@ -1018,9 +1018,12 @@ export class AttendanceLeaveComponent implements OnInit {
       headerName: 'Employee',
       valueGetter: (p: any) => {
         const emp = p.data?.employee;
-        return emp ? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() : `Employee #${p.data?.employeeId ?? '—'}`;
+        if (!emp) return `Employee #${p.data?.employeeId ?? '—'}`;
+        return `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() || `Employee #${p.data?.employeeId ?? '—'}`;
       },
       valueFormatter: (p) => p.value || 'Employee',
+      filter: 'agTextColumnFilter',
+      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
       minWidth: 240,
       flex: 1.5,
       pinned: 'left',
@@ -1058,12 +1061,19 @@ export class AttendanceLeaveComponent implements OnInit {
     { 
       field: 'date', 
       headerName: 'Date', 
+      valueGetter: (p: any) => {
+        if (!p.data?.date) return '';
+        return this.datePipe.transform(p.data.date, 'dd MMM yyyy') || p.data.date;
+      },
+      filter: 'agTextColumnFilter',
+      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
       minWidth: 145, 
       flex: 1, 
       cellRenderer: (params: any) => {
-        if (!params.value) return '—';
-        const formattedDate = this.datePipe.transform(params.value, 'dd MMM yyyy') || params.value;
-        const dayOfWeek = this.datePipe.transform(params.value, 'EEEE') || '';
+        if (!params.value && !params.data?.date) return '—';
+        const raw = params.data?.date || params.value;
+        const formattedDate = this.datePipe.transform(raw, 'dd MMM yyyy') || raw;
+        const dayOfWeek = this.datePipe.transform(raw, 'EEEE') || '';
         return `
           <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; line-height: 1.3;">
             <span style="font-size: 13px; font-weight: 600; color: #0f172a; letter-spacing: -0.2px;">${formattedDate}</span>
@@ -1075,11 +1085,18 @@ export class AttendanceLeaveComponent implements OnInit {
     { 
       field: 'proposedClockIn', 
       headerName: 'Proposed In', 
+      valueGetter: (p: any) => {
+        if (!p.data?.proposedClockIn) return '-';
+        return this.datePipe.transform(p.data.proposedClockIn, 'shortTime') || p.data.proposedClockIn;
+      },
+      filter: 'agTextColumnFilter',
+      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
       minWidth: 130, 
       flex: 0.9, 
       cellRenderer: (params: any) => {
-        if (!params.value) return '<span style="color:#94a3b8;">—</span>';
-        const t = this.datePipe.transform(params.value, 'shortTime') || params.value;
+        const raw = params.data?.proposedClockIn;
+        if (!raw) return '<span style="color:#94a3b8;">—</span>';
+        const t = this.datePipe.transform(raw, 'shortTime') || raw;
         return `
           <div style="display: flex; align-items: center; height: 100%;">
             <span style="display: inline-flex; align-items: center; gap: 5px; height: 24px; line-height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; white-space: nowrap;">
@@ -1093,11 +1110,18 @@ export class AttendanceLeaveComponent implements OnInit {
     { 
       field: 'proposedClockOut', 
       headerName: 'Proposed Out', 
+      valueGetter: (p: any) => {
+        if (!p.data?.proposedClockOut) return '-';
+        return this.datePipe.transform(p.data.proposedClockOut, 'shortTime') || p.data.proposedClockOut;
+      },
+      filter: 'agTextColumnFilter',
+      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
       minWidth: 130, 
       flex: 0.9, 
       cellRenderer: (params: any) => {
-        if (!params.value) return '<span style="color:#94a3b8;">—</span>';
-        const t = this.datePipe.transform(params.value, 'shortTime') || params.value;
+        const raw = params.data?.proposedClockOut;
+        if (!raw) return '<span style="color:#94a3b8;">—</span>';
+        const t = this.datePipe.transform(raw, 'shortTime') || raw;
         return `
           <div style="display: flex; align-items: center; height: 100%;">
             <span style="display: inline-flex; align-items: center; gap: 5px; height: 24px; line-height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; white-space: nowrap;">
@@ -1110,36 +1134,29 @@ export class AttendanceLeaveComponent implements OnInit {
     },
     {
       headerName: 'Duration',
+      valueGetter: (p: any) => this.getRegularizationDuration(p.data),
+      filter: 'agTextColumnFilter',
+      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
       minWidth: 115,
       flex: 0.8,
       cellRenderer: (params: any) => {
-        const cin = params.data?.proposedClockIn;
-        const cout = params.data?.proposedClockOut;
-        if (!cin || !cout) return '<span style="color:#94a3b8;">—</span>';
-        try {
-          const dIn = new Date(cin);
-          const dOut = new Date(cout);
-          const diffMs = dOut.getTime() - dIn.getTime();
-          if (isNaN(diffMs) || diffMs <= 0) return '<span style="color:#94a3b8;">—</span>';
-          const hrs = Math.floor(diffMs / (1000 * 60 * 60));
-          const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-          const text = hrs > 0 ? (mins > 0 ? `${hrs}h ${mins}m` : `${hrs} hrs`) : `${mins} mins`;
-          return `
-            <div style="display: flex; align-items: center; height: 100%;">
-              <span style="display: inline-flex; align-items: center; gap: 4px; height: 22px; line-height: 20px; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; white-space: nowrap;">
-                <span style="font-size: 10px;">⏱️</span>
-                <span>${text}</span>
-              </span>
-            </div>
-          `;
-        } catch {
-          return '<span style="color:#94a3b8;">—</span>';
-        }
+        const text = this.getRegularizationDuration(params.data);
+        if (text === 'N/A' || !text) return '<span style="color:#94a3b8;">—</span>';
+        return `
+          <div style="display: flex; align-items: center; height: 100%;">
+            <span style="display: inline-flex; align-items: center; gap: 4px; height: 22px; line-height: 20px; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; white-space: nowrap;">
+              <span style="font-size: 10px;">⏱️</span>
+              <span>${text}</span>
+            </span>
+          </div>
+        `;
       }
     },
     { 
       field: 'reason', 
       headerName: 'Reason', 
+      filter: 'agTextColumnFilter',
+      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
       minWidth: 180, 
       flex: 1.4,
       cellRenderer: (params: any) => {
@@ -1157,10 +1174,16 @@ export class AttendanceLeaveComponent implements OnInit {
     { 
       field: 'status', 
       headerName: 'Status', 
-      minWidth: 120, 
+      valueGetter: (p: any) => {
+        const s = (p.data?.status || 'PENDING').toUpperCase();
+        return s === 'APPROVED' ? 'Approved' : (s === 'REJECTED' ? 'Rejected' : 'Pending');
+      },
+      filter: 'agTextColumnFilter',
+      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
+      minWidth: 125, 
       flex: 0.8,
       cellRenderer: (params: any) => {
-        const s = (params.value || 'PENDING').toUpperCase();
+        const s = (params.data?.status || params.value || 'PENDING').toUpperCase();
         let bg = '#fffbeb';
         let border = '#fde68a';
         let color = '#92400e';
@@ -1201,8 +1224,9 @@ export class AttendanceLeaveComponent implements OnInit {
         onView: (data: any) => this.openRegularizationDetail(data),
         onApprove: (data: any) => this.resolveRegularization(data.id, 'APPROVED'),
         onReject: (data: any) => this.openRejectRegularizationModal(data),
-        canApprove: () => true,
-        canReject: () => true
+        canApprove: (data: any) => (data?.status || 'PENDING').toUpperCase() === 'PENDING',
+        canReject: (data: any) => (data?.status || 'PENDING').toUpperCase() === 'PENDING',
+        onViewReason: (data: any) => this.openRejectionReasonModal(data.rejectionReason)
       }
     }
   ];
@@ -1829,12 +1853,29 @@ export class AttendanceLeaveComponent implements OnInit {
 
   // Regularization State
   myRegularizations = signal<any[]>([]);
-  pendingRegularizations = signal<any[]>([]);
+  allRegularizations = signal<any[]>([]);
+  regularizationStatusFilter = signal<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
   regularizationSearch = signal<string>('');
   isLoadingRegularizations = signal<boolean>(false);
 
+  pendingRegularizations = computed(() => {
+    return this.allRegularizations().filter(r => (r.status || 'PENDING').toUpperCase() === 'PENDING');
+  });
+
+  approvedRegularizations = computed(() => {
+    return this.allRegularizations().filter(r => (r.status || '').toUpperCase() === 'APPROVED');
+  });
+
+  rejectedRegularizations = computed(() => {
+    return this.allRegularizations().filter(r => (r.status || '').toUpperCase() === 'REJECTED');
+  });
+
   filteredPendingRegularizations = computed(() => {
-    const list = this.pendingRegularizations();
+    let list = this.allRegularizations();
+    const sf = this.regularizationStatusFilter();
+    if (sf !== 'ALL') {
+      list = list.filter((r) => (r.status || 'PENDING').toUpperCase() === sf);
+    }
     const q = this.regularizationSearch().trim().toLowerCase();
     if (!q) return list;
     return list.filter((r) => {
@@ -1844,8 +1885,17 @@ export class AttendanceLeaveComponent implements OnInit {
       const dept = (emp?.department?.name ?? '').toLowerCase();
       const des = (emp?.designation?.name ?? '').toLowerCase();
       const reason = (r.reason ?? '').toLowerCase();
-      const date = (r.date ?? '').toLowerCase();
-      return name.includes(q) || code.includes(q) || dept.includes(q) || des.includes(q) || reason.includes(q) || date.includes(q);
+      const status = (r.status ?? 'pending').toLowerCase();
+      const rawDate = (r.date ?? '').toLowerCase();
+      const formattedDate = (this.datePipe.transform(r.date, 'dd MMM yyyy') || '').toLowerCase();
+      const dayOfWeek = (this.datePipe.transform(r.date, 'EEEE') || '').toLowerCase();
+      const clockIn = (this.datePipe.transform(r.proposedClockIn, 'shortTime') || '').toLowerCase();
+      const clockOut = (this.datePipe.transform(r.proposedClockOut, 'shortTime') || '').toLowerCase();
+      const duration = this.getRegularizationDuration(r).toLowerCase();
+
+      return name.includes(q) || code.includes(q) || dept.includes(q) || des.includes(q) ||
+             reason.includes(q) || status.includes(q) || rawDate.includes(q) || formattedDate.includes(q) ||
+             dayOfWeek.includes(q) || clockIn.includes(q) || clockOut.includes(q) || duration.includes(q);
     });
   });
 
@@ -1858,6 +1908,10 @@ export class AttendanceLeaveComponent implements OnInit {
     }
     return ids.size;
   });
+
+  setRegularizationStatusFilter(filter: 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED') {
+    this.regularizationStatusFilter.set(filter);
+  }
 
   // Regularization Detail & Reject Modals
   isRegularizationDetailOpen = signal<boolean>(false);
@@ -2357,7 +2411,7 @@ export class AttendanceLeaveComponent implements OnInit {
           error: () => this.toast.error('Failed to reject regularization')
         });
       } else {
-        const reg = this.pendingRegularizations().find(r => r.id === id);
+        const reg = this.allRegularizations().find(r => r.id === id);
         this.openRejectRegularizationModal(reg || id);
       }
       return;
@@ -2377,7 +2431,7 @@ export class AttendanceLeaveComponent implements OnInit {
       this.rejectingRegularizationData.set(dataOrId);
     } else {
       this.rejectingRegularizationId.set(dataOrId);
-      const reg = this.pendingRegularizations().find(r => r.id === dataOrId);
+      const reg = this.allRegularizations().find(r => r.id === dataOrId);
       this.rejectingRegularizationData.set(reg || null);
     }
     this.rejectingRegularizationReason.set('');
@@ -2443,14 +2497,14 @@ export class AttendanceLeaveComponent implements OnInit {
 
   refreshPendingRegularizations() {
     this.isLoadingRegularizations.set(true);
-    this.attendanceService.getPendingRegularizations().subscribe({
+    this.attendanceService.getPendingRegularizations('ALL').subscribe({
       next: (res: any) => {
-        this.pendingRegularizations.set(res || []);
+        this.allRegularizations.set(res || []);
         this.isLoadingRegularizations.set(false);
         this.toast.success('Regularizations refreshed');
       },
       error: () => {
-        this.pendingRegularizations.set([]);
+        this.allRegularizations.set([]);
         this.isLoadingRegularizations.set(false);
         this.toast.error('Failed to refresh regularizations');
       }
@@ -3511,13 +3565,13 @@ export class AttendanceLeaveComponent implements OnInit {
   /** HR / admin queue of attendance corrections awaiting a decision. */
   loadPendingRegularizations() {
     this.isLoadingRegularizations.set(true);
-    this.attendanceService.getPendingRegularizations().subscribe({
+    this.attendanceService.getPendingRegularizations('ALL').subscribe({
       next: (res: any) => {
-        this.pendingRegularizations.set(res || []);
+        this.allRegularizations.set(res || []);
         this.isLoadingRegularizations.set(false);
       },
       error: () => {
-        this.pendingRegularizations.set([]);
+        this.allRegularizations.set([]);
         this.isLoadingRegularizations.set(false);
       },
     });

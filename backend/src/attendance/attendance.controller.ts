@@ -130,8 +130,8 @@ export class AttendanceController {
   }
 
   @Get('regularization/pending')
-  getPendingRegularizations(@Request() req) {
-    return this.attendanceService.getPendingRegularizations(req.user.companyId, req.user.role, req.user.employeeId ?? null);
+  getPendingRegularizations(@Request() req, @Query('status') status?: string) {
+    return this.attendanceService.getPendingRegularizations(req.user.companyId, req.user.role, req.user.employeeId ?? null, status);
   }
 
   @Post('regularization')

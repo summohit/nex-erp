@@ -1286,15 +1286,20 @@ export class AttendanceService {
    * sees the people below them in the reporting line, anyone else sees
    * nothing — and only the fields the queue shows are sent.
    */
-  async getPendingRegularizations(companyId: number, role?: string | null, employeeId?: number | null) {
+  async getPendingRegularizations(companyId: number, role?: string | null, employeeId?: number | null, status?: string) {
     let scope: any = { companyId };
     if (!isHrAdmin(role)) {
       const team = employeeId ? await this.teamBelow(companyId, employeeId) : [];
       if (!team.length) return [];
       scope = { companyId, id: { in: team } };
     }
+    // No status means the approval queue (PENDING) — the mobile app's
+    // Approvals screen relies on that. ALL, APPROVED, REJECTED are opt-in.
+    const wanted = (status || 'PENDING').toUpperCase();
+    const where: any = { employee: scope };
+    if (wanted !== 'ALL') where.status = wanted;
     return this.prisma.attendanceRegularization.findMany({
-      where: { employee: scope, status: 'PENDING' },
+      where,
       include: {
         employee: {
           select: {

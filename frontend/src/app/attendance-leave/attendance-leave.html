@@ -246,57 +246,19 @@
 
   <!-- Attendance corrections waiting on HR / admin -->
   <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() === 'regularizations' && isAdmin()">
-    <!-- KPI Metric Cards for Regularizations -->
-    <div class="leave-kpi-grid mb-4">
-      <div class="leave-kpi-card pending active">
-        <div class="leave-kpi-header">
-          <span class="leave-kpi-label">Pending Review</span>
-          <div class="leave-kpi-icon-wrap pending">
-            <svg lucideClock [size]="17"></svg>
-          </div>
-        </div>
-        <div class="leave-kpi-value-row">
-          <span class="leave-kpi-number text-amber">{{ pendingRegularizations().length }}</span>
-          <span class="leave-kpi-badge pending" *ngIf="pendingRegularizations().length > 0">Needs Attention</span>
-          <span class="leave-kpi-subtext" *ngIf="pendingRegularizations().length === 0">All caught up</span>
-        </div>
-      </div>
-
-      <div class="leave-kpi-card">
-        <div class="leave-kpi-header">
-          <span class="leave-kpi-label">Affected Employees</span>
-          <div class="leave-kpi-icon-wrap total">
-            <svg lucideUsers [size]="17"></svg>
-          </div>
-        </div>
-        <div class="leave-kpi-value-row">
-          <span class="leave-kpi-number">{{ uniquePendingRegularizationEmployeesCount() }}</span>
-          <span class="leave-kpi-subtext">Staff awaiting decisions</span>
-        </div>
-      </div>
-
-      <div class="leave-kpi-card approved">
-        <div class="leave-kpi-header">
-          <span class="leave-kpi-label">Smart Resolution</span>
-          <div class="leave-kpi-icon-wrap approved">
-            <svg lucideSparkles [size]="17"></svg>
-          </div>
-        </div>
-        <div class="leave-kpi-value-row">
-          <span class="leave-kpi-number text-emerald" style="font-size: 15px; font-weight: 700; line-height: 1.3;">Auto Logs & Comp-off</span>
-          <span class="leave-kpi-subtext">Applied automatically upon approval</span>
-        </div>
-      </div>
-    </div>
-
     <!-- Main Regularizations Table Card -->
     <div class="widget-card reg-table-card">
       <div class="widget-header reg-table-header">
         <div class="reg-title-wrap">
           <div class="reg-title-row">
-            <h3 class="reg-title">Pending Regularizations</h3>
-            <span class="reg-count-pill" *ngIf="pendingRegularizations().length > 0">
+            <h3 class="reg-title">
+              {{ regularizationStatusFilter() === 'ALL' ? 'Regularization History' : (regularizationStatusFilter() === 'PENDING' ? 'Pending Regularizations' : (regularizationStatusFilter() === 'APPROVED' ? 'Approved Regularizations' : 'Rejected Regularizations')) }}
+            </h3>
+            <span class="reg-count-pill" *ngIf="regularizationStatusFilter() === 'PENDING' && pendingRegularizations().length > 0">
               {{ pendingRegularizations().length }} pending
+            </span>
+            <span class="reg-count-pill neutral" *ngIf="regularizationStatusFilter() !== 'PENDING'">
+              {{ filteredPendingRegularizations().length }} records
             </span>
           </div>
           <p class="reg-subtitle">
@@ -305,6 +267,22 @@
         </div>
 
         <div class="reg-header-actions">
+          <!-- Quick Status Filter Pills -->
+          <div class="reg-filter-pills">
+            <button type="button" class="reg-filter-pill" [class.active]="regularizationStatusFilter() === 'ALL'" (click)="setRegularizationStatusFilter('ALL')">
+              All ({{ allRegularizations().length }})
+            </button>
+            <button type="button" class="reg-filter-pill pending" [class.active]="regularizationStatusFilter() === 'PENDING'" (click)="setRegularizationStatusFilter('PENDING')">
+              Pending ({{ pendingRegularizations().length }})
+            </button>
+            <button type="button" class="reg-filter-pill approved" [class.active]="regularizationStatusFilter() === 'APPROVED'" (click)="setRegularizationStatusFilter('APPROVED')">
+              Approved ({{ approvedRegularizations().length }})
+            </button>
+            <button type="button" class="reg-filter-pill rejected" [class.active]="regularizationStatusFilter() === 'REJECTED'" (click)="setRegularizationStatusFilter('REJECTED')">
+              Rejected ({{ rejectedRegularizations().length }})
+            </button>
+          </div>
+
           <!-- Search input -->
           <div class="reg-search-box">
             <svg lucideSearch [size]="15" class="reg-search-icon"></svg>
@@ -318,7 +296,7 @@
           </div>
 
           <!-- Export CSV -->
-          <button type="button" class="btn btn-outline reg-btn" (click)="exportPendingRegularizationsCsv()" [disabled]="pendingRegularizations().length === 0" title="Export list to CSV">
+          <button type="button" class="btn btn-outline reg-btn" (click)="exportPendingRegularizationsCsv()" [disabled]="allRegularizations().length === 0" title="Export list to CSV">
             <svg lucideDownload [size]="15"></svg>
             <span>Export</span>
           </button>
@@ -2292,7 +2270,15 @@
             <div class="reg-detail-name-row">
               <span class="reg-detail-name">{{ getRegularizationEmployeeName(reg) }}</span>
               <span *ngIf="reg.employee?.employeeCode" class="table-emp-code">#{{ reg.employee.employeeCode }}</span>
-              <span class="reg-detail-status-chip pending">
+              <span class="reg-detail-status-chip approved" *ngIf="reg.status === 'APPROVED'">
+                <span class="reg-dot-emerald"></span>
+                Approved
+              </span>
+              <span class="reg-detail-status-chip rejected" *ngIf="reg.status === 'REJECTED'">
+                <span class="reg-dot-rose"></span>
+                Rejected
+              </span>
+              <span class="reg-detail-status-chip pending" *ngIf="reg.status === 'PENDING' || !reg.status">
                 <span class="reg-dot-amber"></span>
                 Pending Review
               </span>
@@ -2352,16 +2338,32 @@
           </div>
         </div>
 
+        <!-- Rejection Reason if Rejected -->
+        <div class="reg-detail-reason-box reg-rejection-box" *ngIf="reg.status === 'REJECTED' && reg.rejectionReason">
+          <span class="reg-detail-label" style="color: #dc2626;">HR Decision Note / Rejection Reason</span>
+          <div class="reg-reason-content" style="background: #ffffff; border-color: #fecaca; color: #991b1b;">
+            <p>{{ reg.rejectionReason }}</p>
+          </div>
+        </div>
+
         <!-- Info Note -->
-        <div class="reg-detail-notice">
+        <div class="reg-detail-notice" *ngIf="reg.status === 'PENDING' || !reg.status">
           <svg lucideSparkles [size]="16" class="reg-notice-icon"></svg>
           <span>Approving this request will automatically update the attendance record and grant compensatory off if this was an official holiday or weekend.</span>
+        </div>
+        <div class="reg-detail-notice approved" *ngIf="reg.status === 'APPROVED'">
+          <svg lucideCheck [size]="16" class="reg-notice-icon" style="color: #16a34a;"></svg>
+          <span>This regularization has been approved. The employee's attendance log and shift records have been updated.</span>
+        </div>
+        <div class="reg-detail-notice rejected" *ngIf="reg.status === 'REJECTED'">
+          <svg lucideAlertCircle [size]="16" class="reg-notice-icon" style="color: #dc2626;"></svg>
+          <span>This regularization request was rejected and not applied to attendance records.</span>
         </div>
       </div>
 
       <div class="reg-detail-footer">
-        <button type="button" class="btn btn-outline" (click)="closeRegularizationDetail()">Cancel</button>
-        <div class="reg-footer-right-actions">
+        <button type="button" class="btn btn-outline" (click)="closeRegularizationDetail()">{{ (reg.status === 'PENDING' || !reg.status) ? 'Cancel' : 'Close' }}</button>
+        <div class="reg-footer-right-actions" *ngIf="reg.status === 'PENDING' || !reg.status">
           <button type="button" class="btn btn-outline reg-btn-reject" (click)="rejectSelectedRegularization()">
             <svg lucideX [size]="16"></svg>
             <span>Reject</span>

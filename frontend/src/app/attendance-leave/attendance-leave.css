@@ -4511,6 +4511,12 @@
   padding: 2px 10px;
 }
 
+.reg-count-pill.neutral {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
 .reg-subtitle {
   margin: 0;
   font-size: 13px;
@@ -4523,6 +4529,59 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.reg-filter-pills {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.reg-filter-pill {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+.reg-filter-pill:hover {
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.reg-filter-pill.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.reg-filter-pill.pending.active {
+  color: #b45309;
+  background: #ffffff;
+}
+
+.reg-filter-pill.approved.active {
+  color: #047857;
+  background: #ffffff;
+}
+
+.reg-filter-pill.rejected.active {
+  color: #b91c1c;
+  background: #ffffff;
 }
 
 .reg-search-box {
@@ -4684,11 +4743,37 @@
   border: 1px solid #fde68a;
 }
 
+.reg-detail-status-chip.approved {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+.reg-detail-status-chip.rejected {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
 .reg-dot-amber {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: #f59e0b;
+}
+
+.reg-dot-emerald {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.reg-dot-rose {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
 }
 
 .reg-detail-meta-row {
@@ -4796,10 +4881,27 @@
   line-height: 1.45;
 }
 
+.reg-detail-notice.approved {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.reg-detail-notice.rejected {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
 .reg-notice-icon {
   color: #2563eb;
   flex-shrink: 0;
   margin-top: 1px;
+}
+
+.reg-rejection-box {
+  background: #fef2f2 !important;
+  border-color: #fecaca !important;
 }
 
 .reg-detail-footer {
