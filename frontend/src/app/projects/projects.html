@@ -47,6 +47,125 @@
   </div>
 </ng-template>
 
+<!-- Rich Hover Preview Panel for Board Cards -->
+<ng-template #boardHoverPanel let-p="p">
+  <div class="board-card-hover-panel">
+    <!-- 1. Dates: Start & End Date / Deadline -->
+    <div class="hover-section hover-dates-section">
+      <div class="hover-date-item">
+        <span class="hover-label">
+          <svg lucideCalendar size="12"></svg>
+          <span>Start</span>
+        </span>
+        <span class="hover-date-val">{{ (p.startDate | date:'dd MMM yyyy') || 'Not set' }}</span>
+      </div>
+      <div class="hover-date-arrow">→</div>
+      <div class="hover-date-item">
+        <span class="hover-label">
+          <svg lucideClock size="12"></svg>
+          <span>Deadline</span>
+        </span>
+        <span class="hover-date-val" [class.hover-overdue]="isProjectOverdue(p)">
+          {{ (p.endDate | date:'dd MMM yyyy') || 'No deadline' }}
+          <span class="overdue-chip" *ngIf="isProjectOverdue(p)">Overdue</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- 2. Progress & Task Breakdown -->
+    <div class="hover-section hover-progress-section">
+      <div class="hover-section-header">
+        <span class="hover-label">
+          <svg lucideActivity size="12"></svg>
+          <span>Progress</span>
+        </span>
+        <span class="hover-progress-pct">{{ p.progress || 0 }}%</span>
+      </div>
+      <div class="hover-progress-track">
+        <div class="hover-progress-fill" [style.width.%]="p.progress || 0"></div>
+      </div>
+      <div class="hover-progress-sub">
+        <span><b>{{ p.doneIssues || 0 }}</b> of <b>{{ p._count?.issues || p.totalIssues || 0 }}</b> tasks completed</span>
+        <span *ngIf="p.remainingIssues != null" class="hover-remaining-tag">{{ p.remainingIssues }} pending</span>
+      </div>
+    </div>
+
+    <!-- 3. Budget Details (Detailed Financials) -->
+    <div class="hover-section hover-budget-section" *ngIf="p.canViewFinancials && p.budgetAmount != null && p.budgetAmount > 0">
+      <div class="hover-section-header">
+        <span class="hover-label">
+          <svg lucideBriefcase size="12"></svg>
+          <span>Budget Breakdown</span>
+        </span>
+        <span class="hover-budget-status" [class.over-budget]="p.budgetRemaining < 0">
+          {{ p.budgetRemaining < 0 ? 'Over budget' : ((p.budgetUtilization || 0) + '% used') }}
+        </span>
+      </div>
+      <div class="hover-budget-grid">
+        <div class="hover-budget-stat">
+          <span class="stat-caption">Allocated</span>
+          <span class="stat-amount">{{ p.budgetAmount | currency:(p.currency || 'INR'):'symbol':'1.0-0' }}</span>
+        </div>
+        <div class="hover-budget-stat">
+          <span class="stat-caption">Used</span>
+          <span class="stat-amount">{{ (p.budgetUsed || 0) | currency:(p.currency || 'INR'):'symbol':'1.0-0' }}</span>
+        </div>
+        <div class="hover-budget-stat">
+          <span class="stat-caption">Remaining</span>
+          <span class="stat-amount" [class.text-rose]="p.budgetRemaining < 0">
+            {{ (p.budgetRemaining || 0) | currency:(p.currency || 'INR'):'symbol':'1.0-0' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Team Members: avatars & full names -->
+    <div class="hover-section hover-members-section">
+      <div class="hover-section-header">
+        <span class="hover-label">
+          <svg lucideUsers size="12"></svg>
+          <span>Team Members ({{ p.members?.length || 0 }})</span>
+        </span>
+        <span class="hover-lead-pill" *ngIf="p.lead">
+          ⭐ {{ p.lead.firstName }} {{ p.lead.lastName }}
+        </span>
+      </div>
+      <div class="hover-members-roster" *ngIf="p.members?.length > 0">
+        <div class="hover-member-row" *ngFor="let m of p.members.slice(0, 4)">
+          <div class="hover-member-avatar-wrap">
+            <img *ngIf="m.employee?.avatarUrl" [src]="m.employee.avatarUrl" class="hover-member-img" [alt]="memberDisplayName(m)" />
+            <div *ngIf="!m.employee?.avatarUrl" class="hover-member-placeholder" [style.background]="getPmColor(m.employeeId || m.employee?.id || 0)">
+              {{ (m.employee?.firstName || '?')[0] | uppercase }}
+            </div>
+          </div>
+          <span class="hover-member-fullname">{{ memberDisplayName(m) }}</span>
+          <span class="hover-member-role-tag" *ngIf="m.employeeId === p.leadId || m.role === 'PROJECT_MANAGER' || m.role === 'LEAD'">
+            Lead
+          </span>
+        </div>
+        <div class="hover-members-overflow" *ngIf="p.members.length > 4">
+          +{{ p.members.length - 4 }} more member{{ p.members.length - 4 === 1 ? '' : 's' }}
+        </div>
+      </div>
+      <div class="hover-empty-team" *ngIf="!p.members || p.members.length === 0">
+        <span>No members assigned yet</span>
+      </div>
+    </div>
+
+    <!-- 5. Client & Department Footer Tags -->
+    <div class="hover-client-dept-row" *ngIf="p.client?.name || p.department?.name">
+      <span class="hover-tag" *ngIf="p.client?.name" [title]="'Client: ' + p.client.name">
+        <svg lucideBuilding size="11"></svg>
+        <span>{{ p.client.name }}</span>
+      </span>
+      <span class="hover-tag" *ngIf="p.department?.name" [title]="'Department: ' + p.department.name">
+        <svg lucideFolder size="11"></svg>
+        <span>{{ p.department.name }}</span>
+      </span>
+    </div>
+  </div>
+</ng-template>
+
 <ng-container *ngIf="!editOnlyProjectId">
 <div class="boards-page">
   <!-- Search & Filter Control Bar -->
@@ -276,6 +395,7 @@
           </div>
           <ng-container *ngTemplateOutlet="projectBudget; context: {p: p}"></ng-container>
         </div>
+        <ng-container *ngTemplateOutlet="boardHoverPanel; context: {p: p}"></ng-container>
       </div>
     </div>
   </div>
@@ -343,6 +463,7 @@
           </div>
           <ng-container *ngTemplateOutlet="projectBudget; context: {p: p}"></ng-container>
         </div>
+        <ng-container *ngTemplateOutlet="boardHoverPanel; context: {p: p}"></ng-container>
       </div>
     </div>
   </div>
@@ -517,7 +638,7 @@
       <!-- Skeleton Loaders -->
       <ng-container *ngIf="isLoading(); else boardsContent">
         <div class="boards-grid">
-          <div class="board-card skeleton-card" *ngFor="let s of [1, 2, 3, 4]">
+          <div class="board-card skeleton-card" *ngFor="let s of [1, 2, 3, 4, 5, 6]">
             <div class="board-card-banner skeleton-banner shimmer"></div>
             <div class="board-card-footer skeleton-footer">
               <div class="skeleton-line shimmer" style="width: 55%; height: 14px; border-radius: 4px;"></div>
@@ -603,6 +724,7 @@
               </div>
               <ng-container *ngTemplateOutlet="projectBudget; context: {p: p}"></ng-container>
             </div>
+            <ng-container *ngTemplateOutlet="boardHoverPanel; context: {p: p}"></ng-container>
           </div>
         </div>
 

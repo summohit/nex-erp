@@ -349,9 +349,17 @@ export class ProjectsComponent implements OnInit {
   // --- Avatar stack (team members) ---
   readonly maxStackAvatars = 4;
 
-  private memberDisplayName(m: any): string {
+  memberDisplayName(m: any): string {
     const emp = m?.employee || m;
     return `${emp?.firstName || ''} ${emp?.lastName || ''}`.trim() || 'Unknown';
+  }
+
+  isProjectOverdue(p: any): boolean {
+    if (!p?.endDate || this.isProjectClosed(p)) return false;
+    const end = new Date(p.endDate);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return end.getTime() < now.getTime();
   }
 
   private memberInitial(m: any): string {
@@ -526,7 +534,7 @@ export class ProjectsComponent implements OnInit {
     this.quickFilter.set(this.quickFilter() === filter ? 'none' : filter);
   }
 
-  private isProjectClosed(p: any): boolean {
+  isProjectClosed(p: any): boolean {
     return p.workStatus === 'FINISHED' || p.status === 'ARCHIVED';
   }
 
