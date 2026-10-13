@@ -203,14 +203,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
   dashboard = signal<DashboardPayload | null>(null);
   pendingApprovals = signal<any[]>([]);
   isLoadingMetrics = signal<boolean>(true);
+  // Paid leave only: unpaid (LOP) rows are not part of the balance.
+  myPaidLeaveBalance = computed(() =>
+    ((this.dashboard()?.common?.myLeaveBalance || []) as any[]).filter((x: any) => x.leaveType?.isPaid !== false),
+  );
+
   myLeaveBalanceDays = computed(() => {
-    const b = (this.dashboard()?.common?.myLeaveBalance || []) as any[];
+    const b = this.myPaidLeaveBalance();
     const total = b.reduce((s: number, x: any) => s + ((x.allocated || 0) - (x.used || 0)), 0);
     return total % 1 !== 0 ? total.toFixed(1) : String(Math.round(total));
   });
 
   myLeaveUsedTotal = computed(() => {
-    const b = (this.dashboard()?.common?.myLeaveBalance || []) as any[];
+    const b = this.myPaidLeaveBalance();
     const fmt = (n: number) => (n % 1 !== 0 ? n.toFixed(1) : String(Math.round(n)));
     const used = b.reduce((s: number, x: any) => s + (x.used || 0), 0);
     const allocated = b.reduce((s: number, x: any) => s + (x.allocated || 0), 0);
@@ -218,7 +223,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   });
 
   myLeaveUsageDetail = computed(() => {
-    const b = (this.dashboard()?.common?.myLeaveBalance || []) as any[];
+    const b = this.myPaidLeaveBalance();
     const fmt = (n: number) => (n % 1 !== 0 ? n.toFixed(1) : String(Math.round(n)));
     const used = b.reduce((s: number, x: any) => s + (x.used || 0), 0);
     const allocated = b.reduce((s: number, x: any) => s + (x.allocated || 0), 0);

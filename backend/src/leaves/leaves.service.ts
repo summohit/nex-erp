@@ -220,6 +220,9 @@ export class LeavesService {
         const u = b?.used ?? 0;
         const e = encashedDays.get(`${emp.id}:${type.id}`) ?? 0;
         byType[type.id] = { allocated: a, used: u, remaining: a - u, encashed: e };
+        // Unpaid leave (LOP) is shown per type but never counts toward the
+        // paid balance: a day taken without pay must not reduce paid days.
+        if (!type.isPaid) continue;
         allocated += a; used += u; encashed += e;
       }
 

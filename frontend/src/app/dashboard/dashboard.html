@@ -850,8 +850,8 @@
           <span class="count-badge-pink">{{ myLeaveBalanceDays() }} days</span>
         </div>
         <div class="card-body">
-          <div class="leave-balance-summary" *ngIf="(dashboard()?.common?.myLeaveBalance?.length || 0) > 0">
-            <div class="balance-row" *ngFor="let b of (dashboard()?.common?.myLeaveBalance || []).slice(0, 5)">
+          <div class="leave-balance-summary" *ngIf="myPaidLeaveBalance().length > 0">
+            <div class="balance-row" *ngFor="let b of myPaidLeaveBalance().slice(0, 5)">
               <div class="balance-info">
                 <span class="balance-name">{{ b.leaveType?.name || 'Leave' }}</span>
                 <span class="balance-used">{{ b.used || 0 }} used</span>
