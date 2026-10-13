@@ -23,7 +23,7 @@ const PERMS = [
     title: 'Location Access',
     subtitle: 'Know exactly where your work happens',
     description:
-      'CES Work uses your GPS to accurately log field visits, calculate travel distance, and verify your clock-in location for attendance records.',
+      'MIRA uses your GPS to accurately log field visits, calculate travel distance, and verify your clock-in location for attendance records.',
     bullets: [
       'Record GPS route for field visits',
       'Geo-stamp your clock-in & clock-out',
@@ -32,7 +32,7 @@ const PERMS = [
     androidPermission: PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
     androidRationale: {
       title: 'Location Permission',
-      message: 'CES Work needs your location for field visit tracking and attendance.',
+      message: 'MIRA needs your location for field visit tracking and attendance.',
       buttonPositive: 'Allow',
     },
   },
@@ -54,7 +54,7 @@ const PERMS = [
     androidPermission: PermissionsAndroid.PERMISSIONS.CAMERA,
     androidRationale: {
       title: 'Camera Permission',
-      message: 'CES Work needs camera access to take photos during field visits.',
+      message: 'MIRA needs camera access to take photos during field visits.',
       buttonPositive: 'Allow',
     },
   },
@@ -80,7 +80,7 @@ const PERMS = [
         : null,
     androidRationale: {
       title: 'Notification Permission',
-      message: 'Allow CES Work to send you alerts for tasks, approvals and updates.',
+      message: 'Allow MIRA to send you alerts for tasks, approvals and updates.',
       buttonPositive: 'Allow',
     },
   },

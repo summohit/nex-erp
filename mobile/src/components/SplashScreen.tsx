@@ -162,7 +162,7 @@ export default function SplashScreen() {
             { opacity: content, transform: [{ translateY: contentTranslate }] },
           ]}
         >
-          <Text style={styles.wordmark}>CES WORK</Text>
+          <Text style={styles.wordmark}>MIRA</Text>
           <View style={styles.rule} />
           <Text style={styles.tagline}>Enterprise Workspace</Text>
         </Animated.View>
