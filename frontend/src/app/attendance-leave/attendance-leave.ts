@@ -3223,8 +3223,11 @@ export class AttendanceLeaveComponent implements OnInit {
     const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const hols = this.holidays();
     const logs = this.myHistory();
+    // A pending request is still a declared absence. Showing it in the
+    // employee's own calendar prevents a submitted leave day from looking
+    // indistinguishable from an unexplained absence while it awaits review.
     const reqs = this.isViewingOwnAttendance
-      ? this.myRequests().filter(r => r.status === 'APPROVED')
+      ? this.myRequests().filter(r => ['APPROVED', 'PENDING'].includes(r.status))
       : [];
 
     for (let day = 1; day <= daysInMonth; day++) {
@@ -3278,7 +3281,14 @@ export class AttendanceLeaveComponent implements OnInit {
         // Find attendance
         const log = logs.find(l => this.getBackendDateString(l.date) === dateString);
 
-        if (log && log.clockIn) {
+        // An explicit leave row has no clock-in by design. Handle it before
+        // the worked-day branch so it cannot fall through to "Absent".
+        if (log?.status === 'ON_LEAVE') {
+          status = 'On Leave';
+          tooltip = 'On Leave';
+          if (!isWeekend) workingDaysCount++;
+        }
+        else if (log && log.clockIn) {
           const clockInDate = new Date(log.clockIn);
 
           // The server's verdict, as the admin view shows it. It measured the
