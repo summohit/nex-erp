@@ -516,8 +516,8 @@ export class AttendanceService {
    * allowed but must carry a reason, and is then reviewed by an administrator.
    *
    * The pin is the employee's branch, or the company's first branch with
-   * coordinates for someone with no branch set. No coordinates anywhere means
-   * no check, exactly as before.
+   * coordinates for someone with no branch set. A branch without a pin, or no
+   * coordinates anywhere, means no check.
    */
   private async officeCheck(
     employee: { companyId: number; branch?: any },
@@ -528,6 +528,11 @@ export class AttendanceService {
     if (exempt || !effective.shift?.officeGeofence) return null;
 
     const hasPin = (b: any) => b && b.latitude != null && b.longitude != null && b.geofenceRadius;
+    // A branch with no office pin (Bengaluru, Kolkata… before an office
+    // exists) means no office check for its people — not a check against some
+    // other branch's office. The company fallback is only for someone with no
+    // branch set at all.
+    if (employee.branch && !hasPin(employee.branch)) return null;
     const branch = hasPin(employee.branch)
       ? employee.branch
       : await this.prisma.branch.findFirst({
