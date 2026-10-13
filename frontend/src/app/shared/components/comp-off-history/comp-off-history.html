@@ -1,0 +1,417 @@
+<div class="coh-backdrop" *ngIf="open" (click)="close()">
+  <div class="coh-panel" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Comp-off history">
+    <!-- Drawer Header -->
+    <div class="coh-head">
+      <div class="coh-head-title-wrap">
+        <div class="coh-head-icon" aria-hidden="true">
+          <svg lucideCalendarClock size="22"></svg>
+        </div>
+        <div>
+          <div class="coh-head-title-row">
+            <h3>{{ allEmployees ? 'Comp-off History' : 'My Comp-off History' }}</h3>
+            <span class="coh-head-badge" *ngIf="allEmployees">All Employees</span>
+          </div>
+          <p>Which day each compensatory off was earned for, why, and where it was used.</p>
+        </div>
+      </div>
+
+      <div class="coh-head-actions">
+        <div class="coh-select-wrap">
+          <svg lucideCalendar size="14" class="coh-select-icon"></svg>
+          <select class="coh-select" [ngModel]="year()" (ngModelChange)="setYear($event)" aria-label="Year">
+            <option *ngFor="let y of years" [ngValue]="y">{{ y }}</option>
+          </select>
+          <svg lucideChevronDown size="14" class="coh-select-chevron"></svg>
+        </div>
+        <button type="button" class="coh-close-btn" (click)="close()" aria-label="Close" title="Close (Esc)">
+          <svg lucideX size="18"></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search, Filter Tabs & Metrics Toolbar (For All Employees) -->
+    <div class="coh-toolbar" *ngIf="allEmployees">
+      <!-- Search Input -->
+      <div class="coh-search-box">
+        <svg lucideSearch size="16" class="coh-search-icon"></svg>
+        <input
+          class="coh-search-input"
+          type="text"
+          placeholder="Search by employee name, #ID, or department..."
+          [ngModel]="query()"
+          (ngModelChange)="query.set($event)"
+          aria-label="Search employees"
+        />
+        <button
+          *ngIf="query()"
+          type="button"
+          class="coh-search-clear"
+          (click)="clearQuery()"
+          aria-label="Clear search"
+          title="Clear search"
+        >
+          <svg lucideX size="14"></svg>
+        </button>
+      </div>
+
+      <!-- Quick Filter Tabs & Expand/Collapse Toggle -->
+      <div class="coh-filters-row">
+        <div class="coh-tabs">
+          <button
+            type="button"
+            class="coh-tab-btn"
+            [class.active]="filterStatus() === 'all'"
+            (click)="setFilter('all')"
+          >
+            All
+            <span class="coh-tab-count">{{ people().length }}</span>
+          </button>
+          <button
+            type="button"
+            class="coh-tab-btn"
+            [class.active]="filterStatus() === 'balance'"
+            (click)="setFilter('balance')"
+          >
+            With Balance
+            <span class="coh-tab-count coh-tab-count-active">{{ countWithBalance() }}</span>
+          </button>
+          <button
+            type="button"
+            class="coh-tab-btn"
+            [class.active]="filterStatus() === 'zero'"
+            (click)="setFilter('zero')"
+          >
+            Zero Balance
+            <span class="coh-tab-count">{{ countZeroBalance() }}</span>
+          </button>
+        </div>
+
+        <div class="coh-toolbar-actions" *ngIf="filtered().length">
+          <button type="button" class="coh-toggle-all-btn" (click)="toggleAll()">
+            {{ allAreExpanded() ? 'Collapse All' : 'Expand All' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Summary Metric Strip -->
+      <div class="coh-summary-strip" *ngIf="!loading() && !error() && people().length">
+        <span class="coh-strip-item">
+          <svg lucideUsers size="13"></svg>
+          <b>{{ filtered().length }}</b> {{ filtered().length === 1 ? 'employee' : 'employees' }}
+        </span>
+        <span class="coh-strip-dot">·</span>
+        <span class="coh-strip-item coh-strip-highlight">
+          <svg lucideSparkles size="13"></svg>
+          <b>{{ totalBalanceDays() }}</b> days available
+        </span>
+        <span class="coh-strip-dot">·</span>
+        <span class="coh-strip-item">
+          <svg lucideCalendarCheck size="13"></svg>
+          <b>{{ totalUsedDays() }}</b> days used
+        </span>
+      </div>
+    </div>
+
+    <!-- Scrollable Body Content -->
+    <div class="coh-body">
+      <!-- Loading Skeleton -->
+      <div class="coh-skeleton-wrap" *ngIf="loading()">
+        <div class="coh-skeleton-card" *ngFor="let s of [1, 2, 3, 4]">
+          <div class="coh-skeleton-avatar"></div>
+          <div class="coh-skeleton-info">
+            <div class="coh-skeleton-line w-40"></div>
+            <div class="coh-skeleton-line w-24"></div>
+          </div>
+          <div class="coh-skeleton-pill"></div>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div class="coh-error-card" *ngIf="error()">
+        <div class="coh-error-icon"><svg lucideInfo size="20"></svg></div>
+        <div class="coh-error-text">
+          <b>Unable to load history</b>
+          <p>{{ error() }}</p>
+        </div>
+        <button type="button" class="coh-retry-btn" (click)="load()">Try Again</button>
+      </div>
+
+      <!-- Empty State -->
+      <div class="coh-empty-card" *ngIf="!loading() && !error() && !filtered().length">
+        <div class="coh-empty-icon">
+          <svg lucideCalendar size="32"></svg>
+        </div>
+        <h4>No compensatory off records found</h4>
+        <p *ngIf="query() || filterStatus() !== 'all'">
+          No employees match your search or filter criteria in {{ year() }}.
+        </p>
+        <p *ngIf="!query() && filterStatus() === 'all'">
+          No compensatory off {{ allEmployees ? 'recorded for anyone' : 'recorded for you' }} in {{ year() }}.
+        </p>
+        <button
+          *ngIf="query() || filterStatus() !== 'all'"
+          type="button"
+          class="coh-reset-btn"
+          (click)="clearQuery(); setFilter('all')"
+        >
+          Reset Filters
+        </button>
+      </div>
+
+      <!-- Employee List -->
+      <div
+        class="coh-person"
+        *ngFor="let p of filtered()"
+        [class.is-expanded]="isExpanded(p.employee.id) || !allEmployees"
+      >
+        <!-- Person Header Button (All Employees Accordion) -->
+        <button
+          type="button"
+          class="coh-person-head"
+          (click)="toggle(p.employee.id)"
+          *ngIf="allEmployees"
+          [attr.aria-expanded]="isExpanded(p.employee.id)"
+        >
+          <!-- Avatar -->
+          <div class="coh-avatar-wrap">
+            <img
+              *ngIf="p.employee.avatarUrl"
+              class="coh-avatar-img"
+              [src]="p.employee.avatarUrl"
+              alt=""
+              (error)="p.employee.avatarUrl = null"
+            />
+            <div
+              *ngIf="!p.employee.avatarUrl"
+              class="coh-avatar-initials"
+              [style.background]="avatarBg(p)"
+            >
+              {{ initials(p) }}
+            </div>
+          </div>
+
+          <!-- Info -->
+          <div class="coh-person-info">
+            <div class="coh-name-row">
+              <span class="coh-name">{{ name(p) }}</span>
+              <span class="coh-code" *ngIf="p.employee.employeeCode">#{{ p.employee.employeeCode }}</span>
+            </div>
+            <div class="coh-dept-row">
+              <span class="coh-dept" *ngIf="p.employee.department?.name">{{ p.employee.department?.name }}</span>
+              <span class="coh-dept-dot" *ngIf="p.employee.department?.name && p.employee.designation?.name">·</span>
+              <span class="coh-desig" *ngIf="p.employee.designation?.name">{{ p.employee.designation?.name }}</span>
+            </div>
+          </div>
+
+          <!-- Remaining Badge Pill -->
+          <div class="coh-pill-wrap">
+            <span class="coh-pill" [class.coh-pill-active]="p.remaining > 0" [class.coh-pill-zero]="p.remaining <= 0">
+              <span class="coh-pulse-dot" *ngIf="p.remaining > 0"></span>
+              {{ p.remaining }} left
+            </span>
+          </div>
+
+          <!-- Chevron -->
+          <div class="coh-caret-btn" [class.rotated]="isExpanded(p.employee.id)">
+            <svg lucideChevronDown size="16"></svg>
+          </div>
+        </button>
+
+        <!-- Person Header (Own History Single View) -->
+        <div class="coh-single-head" *ngIf="!allEmployees">
+          <div class="coh-avatar-wrap">
+            <img
+              *ngIf="p.employee.avatarUrl"
+              class="coh-avatar-img"
+              [src]="p.employee.avatarUrl"
+              alt=""
+              (error)="p.employee.avatarUrl = null"
+            />
+            <div
+              *ngIf="!p.employee.avatarUrl"
+              class="coh-avatar-initials"
+              [style.background]="avatarBg(p)"
+            >
+              {{ initials(p) }}
+            </div>
+          </div>
+          <div class="coh-person-info">
+            <div class="coh-name-row">
+              <span class="coh-name">{{ name(p) }}</span>
+              <span class="coh-code" *ngIf="p.employee.employeeCode">#{{ p.employee.employeeCode }}</span>
+            </div>
+            <div class="coh-dept-row">
+              <span class="coh-dept" *ngIf="p.employee.department?.name">{{ p.employee.department?.name }}</span>
+              <span class="coh-dept-dot" *ngIf="p.employee.department?.name && p.employee.designation?.name">·</span>
+              <span class="coh-desig" *ngIf="p.employee.designation?.name">{{ p.employee.designation?.name }}</span>
+            </div>
+          </div>
+          <span class="coh-pill" [class.coh-pill-active]="p.remaining > 0" [class.coh-pill-zero]="p.remaining <= 0">
+            <span class="coh-pulse-dot" *ngIf="p.remaining > 0"></span>
+            {{ p.remaining }} left
+          </span>
+        </div>
+
+        <!-- Expanded Details Content -->
+        <div class="coh-details" *ngIf="!allEmployees || isExpanded(p.employee.id)">
+          <!-- Metrics KPI Cards -->
+          <div class="coh-metrics-grid">
+            <!-- Total Earned -->
+            <div class="coh-metric-card">
+              <div class="coh-metric-top">
+                <span class="coh-metric-label">Total Earned</span>
+                <span class="coh-metric-icon coh-icon-blue"><svg lucideAward size="15"></svg></span>
+              </div>
+              <div class="coh-metric-val">{{ p.allocated }}</div>
+              <span class="coh-metric-unit">{{ p.allocated === 1 ? 'day credit' : 'days credit' }}</span>
+            </div>
+
+            <!-- Used / Consumed -->
+            <div class="coh-metric-card">
+              <div class="coh-metric-top">
+                <span class="coh-metric-label">Used / Taken</span>
+                <span class="coh-metric-icon coh-icon-purple"><svg lucideCalendarCheck size="15"></svg></span>
+              </div>
+              <div class="coh-metric-val">{{ p.used }}</div>
+              <span class="coh-metric-unit">{{ p.used === 1 ? 'day consumed' : 'days consumed' }}</span>
+            </div>
+
+            <!-- Remaining (Hero Highlight) -->
+            <div class="coh-metric-card coh-metric-highlight">
+              <div class="coh-metric-top">
+                <span class="coh-metric-label">Available Balance</span>
+                <span class="coh-metric-icon coh-icon-green"><svg lucideSparkles size="15"></svg></span>
+              </div>
+              <div class="coh-metric-val coh-val-green">{{ p.remaining }}</div>
+              <span class="coh-metric-unit">{{ p.remaining === 1 ? 'day left' : 'days left' }}</span>
+            </div>
+
+            <!-- From Days Worked -->
+            <div class="coh-metric-card">
+              <div class="coh-metric-top">
+                <span class="coh-metric-label">From Work</span>
+                <span class="coh-metric-icon coh-icon-sky"><svg lucideClock size="15"></svg></span>
+              </div>
+              <div class="coh-metric-val">{{ p.earnedFromWork }}</div>
+              <span class="coh-metric-unit">days worked</span>
+            </div>
+
+            <!-- Added by HR (if > 0) -->
+            <div class="coh-metric-card" *ngIf="p.addedManually > 0">
+              <div class="coh-metric-top">
+                <span class="coh-metric-label">Added by HR</span>
+                <span class="coh-metric-icon coh-icon-amber"><svg lucideUserCheck size="15"></svg></span>
+              </div>
+              <div class="coh-metric-val">{{ p.addedManually }}</div>
+              <span class="coh-metric-unit">manual credit</span>
+            </div>
+          </div>
+
+          <!-- Section: Earned For -->
+          <div class="coh-section">
+            <div class="coh-section-head">
+              <div class="coh-section-title">
+                <span class="coh-section-icon coh-icon-plus"><svg lucidePlus size="13"></svg></span>
+                <span>EARNED FOR</span>
+                <span class="coh-section-badge">{{ p.credits.length }}</span>
+              </div>
+            </div>
+
+            <!-- Empty notice -->
+            <div class="coh-empty-notice" *ngIf="!p.credits.length">
+              <svg lucideInfo size="14"></svg>
+              <span>No day-by-day record yet{{ p.addedManually > 0 ? ' — the balance was credited directly by HR.' : '.' }}</span>
+            </div>
+
+            <!-- Credits List -->
+            <div class="coh-credits-list" *ngIf="p.credits.length">
+              <div class="coh-credit-item" *ngFor="let c of p.credits">
+                <div class="coh-credit-header">
+                  <div class="coh-credit-date-wrap">
+                    <svg lucideCalendar size="14" class="coh-date-icon"></svg>
+                    <b>{{ c.date ? (c.date + 'T00:00:00' | date:'EEE, dd MMM yyyy') : '—' }}</b>
+                  </div>
+                  <span class="coh-credit-tag">+{{ c.days }} {{ c.days === 1 ? 'day' : 'days' }}</span>
+                </div>
+
+                <div class="coh-credit-reason" *ngIf="c.reason">
+                  {{ c.reason }}
+                </div>
+
+                <!-- Detail Context Tags -->
+                <div class="coh-chips-wrap">
+                  <span class="coh-chip" *ngIf="c.clockIn">
+                    <svg lucideClock size="12"></svg>
+                    Worked {{ c.clockIn | date:'h:mm a' }}<ng-container *ngIf="c.clockOut"> to {{ c.clockOut | date:'h:mm a' }}</ng-container>
+                  </span>
+                  <span class="coh-chip" *ngIf="c.shift">
+                    <svg lucideCalendarDays size="12"></svg>
+                    Shift: {{ c.shift }}
+                  </span>
+                  <span class="coh-chip coh-chip-visit" *ngIf="c.fieldVisit">
+                    <svg lucideMapPin size="12"></svg>
+                    Field visit #{{ c.fieldVisit.number }} · {{ c.fieldVisit.location }}<ng-container *ngIf="c.fieldVisit.project"> · {{ c.fieldVisit.project }}</ng-container>
+                  </span>
+                  <span class="coh-chip" *ngIf="!c.fieldVisit && c.project">
+                    <svg lucideBriefcase size="12"></svg>
+                    Project: {{ c.project }}
+                  </span>
+                  <span class="coh-chip" *ngIf="!c.fieldVisit && c.onsite">
+                    <svg lucideBuilding size="12"></svg>
+                    On site
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Used On -->
+          <div class="coh-section">
+            <div class="coh-section-head">
+              <div class="coh-section-title">
+                <span class="coh-section-icon coh-icon-minus"><svg lucideMinus size="13"></svg></span>
+                <span>USED ON</span>
+                <span class="coh-section-badge">{{ p.used_leaves.length }}</span>
+              </div>
+            </div>
+
+            <!-- Empty notice -->
+            <div class="coh-empty-notice" *ngIf="!p.used_leaves.length">
+              <svg lucideInfo size="14"></svg>
+              <span>Not used yet in {{ year() }}.</span>
+            </div>
+
+            <!-- Used List -->
+            <div class="coh-used-list" *ngIf="p.used_leaves.length">
+              <div class="coh-used-item" *ngFor="let l of p.used_leaves">
+                <div class="coh-used-top">
+                  <div class="coh-used-date-wrap">
+                    <svg lucideCalendar size="13" class="coh-date-icon"></svg>
+                    <span class="coh-used-date">{{ l.from + 'T00:00:00' | date:'dd MMM yyyy' }}</span>
+                    <ng-container *ngIf="l.to !== l.from">
+                      <span class="coh-date-arrow">→</span>
+                      <span class="coh-used-date">{{ l.to + 'T00:00:00' | date:'dd MMM yyyy' }}</span>
+                    </ng-container>
+                  </div>
+                  <div class="coh-used-badges">
+                    <span class="coh-half-badge" *ngIf="l.halfDay">
+                      <svg lucideClock size="11"></svg> Half Day
+                    </span>
+                    <span class="coh-full-badge" *ngIf="!l.halfDay">
+                      <svg lucideCheck size="11"></svg> Full Day
+                    </span>
+                  </div>
+                </div>
+
+                <div class="coh-used-reason-box" *ngIf="l.reason">
+                  <svg lucideFileText size="13" class="coh-reason-quote-icon"></svg>
+                  <span>{{ l.reason }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

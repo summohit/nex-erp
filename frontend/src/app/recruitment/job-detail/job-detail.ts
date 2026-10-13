@@ -1,4 +1,5 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { jobPublicUrl, shareJobOnWhatsApp, copyText } from '../job-share';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -276,6 +277,15 @@ export class JobDetailComponent implements OnInit {
    * exist, which is why the page loaded with zero open positions. The job id
    * rides along as `?job=` so the visitor lands on this posting.
    */
+  shareMenuOpen = signal(false);
+
+  shareOnWhatsApp() {
+    const job = this.job();
+    this.shareMenuOpen.set(false);
+    if (!job?.companyId) { this.toast.error('Could not build the careers link — this job has no company on it'); return; }
+    shareJobOnWhatsApp(job.title, (job as any).location, jobPublicUrl(job.companyId, this.jobId));
+  }
+
   copyJobLink() {
     const companyId = this.job()?.companyId;
     if (!companyId) {
@@ -283,8 +293,8 @@ export class JobDetailComponent implements OnInit {
       return;
     }
 
-    const url = `${window.location.origin}/careers/${btoa(String(companyId))}?job=${this.jobId}`;
-    navigator.clipboard.writeText(url).then(() => {
+    const url = jobPublicUrl(companyId, this.jobId);
+    copyText(url).then(() => {
       this.isCopiedJobLink.set(true);
       this.toast.success('Public link to this posting copied to clipboard!');
       setTimeout(() => this.isCopiedJobLink.set(false), 2500);

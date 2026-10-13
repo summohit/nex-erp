@@ -12,6 +12,8 @@ export interface ActionCellParams extends ICellRendererParams {
   deleteLabel?: string | ((data: any) => string);
   onViewProfile?: (data: any) => void;
   onView?: (data: any) => void;
+  /** Extra menu items (e.g. Share on WhatsApp), shown after View. */
+  extraActions?: { label: string; onClick: (data: any) => void; show?: (data: any) => boolean }[];
   viewLabel?: string;
   onViewLabel?: string;
   onMarkPaid?: (data: any) => void;
@@ -33,6 +35,11 @@ export interface ActionCellParams extends ICellRendererParams {
         <button mat-menu-item class="menu-item" (click)="view()" *ngIf="params.onView">
           <span class="menu-text">{{ params.viewLabel || 'View / Print Payslip' }}</span>
         </button>
+        <ng-container *ngFor="let a of (params.extraActions || [])">
+          <button mat-menu-item class="menu-item" *ngIf="!a.show || a.show(params.data)" (click)="a.onClick(params.data)">
+            <span class="menu-text">{{ a.label }}</span>
+          </button>
+        </ng-container>
         <button mat-menu-item class="menu-item" (click)="viewProfile()" *ngIf="params.onViewProfile">
           <span class="menu-text">View Profile</span>
         </button>

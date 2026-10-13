@@ -189,9 +189,13 @@
   </div>
 
   <div class="tabs-nav leave-section-nav" *ngIf="activeTab() === 'leave'">
-    <button class="nav-tab" [class.active]="leaveSection() !== 'balances'" (click)="setLeaveSection('application')">
+    <button class="nav-tab" [class.active]="leaveSection() !== 'balances' && leaveSection() !== 'regularizations'" (click)="setLeaveSection('application')">
       Leave Applications
       <span class="tab-badge" *ngIf="isAdmin() && pendingCount() > 0">{{ pendingCount() }}</span>
+    </button>
+    <button class="nav-tab" *ngIf="isAdmin()" [class.active]="leaveSection() === 'regularizations'" (click)="setLeaveSection('regularizations')">
+      Pending Regularizations
+      <span class="tab-badge" *ngIf="pendingRegularizations().length > 0">{{ pendingRegularizations().length }}</span>
     </button>
     <button class="nav-tab" *ngIf="isAdmin()" [class.active]="leaveSection() === 'balances'" (click)="setLeaveSection('balances')">
       Leave Balances
@@ -222,15 +226,52 @@
     (applied)="applyAttendanceFilters($event)">
   </app-attendance-filter-drawer>
 
-  <div class="leave-transfer-actions" *ngIf="activeTab() === 'leave' && leaveSection() === 'balances'" style="display:flex; justify-content:flex-end; gap:8px; margin:0 0 14px; flex-wrap:wrap;">
+  <div class="leave-balances-header-actions" *ngIf="activeTab() === 'leave' && leaveSection() === 'balances'">
+    <button type="button" class="lb-header-btn lb-btn-compoff" *ngIf="isAdmin()" (click)="openCompOffHistory(true)">
+      <svg lucideHistory size="15"></svg>
+      <span>Comp-off history (all employees)</span>
+    </button>
     <ng-container *ngIf="leaveSection() === 'balances' && isAdmin()">
       <input id="leave-balance-import" type="file" accept=".csv,text/csv" hidden (change)="importLeaveBalancesCsv($event)">
-      <label for="leave-balance-import" class="btn btn-outline" role="button" tabindex="0">Import Balances</label>
-      <button type="button" class="btn btn-outline" (click)="exportLeaveBalancesCsv()">Export Balances</button>
+      <label for="leave-balance-import" class="lb-header-btn lb-btn-import" role="button" tabindex="0">
+        <svg lucideUpload size="15"></svg>
+        <span>Import Balances</span>
+      </label>
+      <button type="button" class="lb-header-btn lb-btn-export" (click)="exportLeaveBalancesCsv()">
+        <svg lucideDownload size="15"></svg>
+        <span>Export Balances</span>
+      </button>
     </ng-container>
   </div>
 
-  <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() !== 'balances'">
+  <!-- Attendance corrections waiting on HR / admin -->
+  <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() === 'regularizations' && isAdmin()">
+    <div class="widget-card">
+      <div class="widget-header" style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div>
+          <h3 style="margin:0;">Pending Regularizations</h3>
+          <p style="margin:4px 0 0; color:#64748b; font-size:13px;">Attendance corrections raised by employees. Approving one corrects that day automatically (and adds comp-off if it was a day off).</p>
+        </div>
+        <button type="button" class="btn btn-outline" (click)="loadPendingRegularizations()">Refresh</button>
+      </div>
+      <div class="table-container mt-4">
+        <ag-grid-angular
+          class="ag-theme-quartz"
+          [theme]="'legacy'"
+          style="width: 100%; height: 560px;"
+          [rowData]="pendingRegularizations()"
+          [columnDefs]="hrRegularizationColDefs"
+          [defaultColDef]="defaultColDef"
+          [rowHeight]="64"
+          [headerHeight]="48"
+          [gridOptions]="gridOptions"
+          [overlayNoRowsTemplate]="'<span style=&quot;color:#64748b&quot;>No regularizations waiting — all caught up.</span>'">
+        </ag-grid-angular>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() !== 'balances' && leaveSection() !== 'regularizations'">
     <!-- Executive KPI Metric Cards -->
     <div class="leave-kpi-grid" *ngIf="isAdmin() || isManager() || managerRequests().length > 0">
       <div class="leave-kpi-card" [class.active]="approvalStatusFilter() === 'ALL'" (click)="setApprovalFilter('ALL')">
@@ -493,6 +534,8 @@
                     <td>
                       <span class="quota-type-dot" [class.unpaid]="!row.leaveType.isPaid"></span>
                       {{ row.leaveType.name }}
+                      <button type="button" class="link-btn-sm" *ngIf="$any(row.leaveType).isCompOff || (row.leaveType.name || '').toLowerCase().includes('comp')"
+                              (click)="openCompOffHistory(false)">View history</button>
                     </td>
                     <td>{{ row.allocated }}</td>
                     <td>—</td>
@@ -512,24 +555,6 @@
             </div>
           </article>
         </section>
-      </div>
-      <div class="widget-card mt-4" *ngIf="isAdmin()">
-        <div class="widget-header">
-          <h3>Pending Regularizations</h3>
-        </div>
-        <div class="table-container mt-4">
-          <ag-grid-angular
-            class="ag-theme-quartz"
-            [theme]="'legacy'"
-            style="width: 100%; height: 350px;"
-            [rowData]="pendingRegularizations()"
-            [columnDefs]="hrRegularizationColDefs"
-            [defaultColDef]="defaultColDef"
-            [rowHeight]="64"
-            [headerHeight]="48"
-            [gridOptions]="gridOptions">
-          </ag-grid-angular>
-        </div>
       </div>
   </div> <!-- Close Container -->
 
@@ -1155,70 +1180,148 @@
   <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() === 'balances' && isAdmin()">
       
       <!-- Assign Balances Form -->
-      <div class="widget-card">
-        <div class="widget-header">
-          <div>
-            <h3 style="margin: 0; margin-bottom: 4px;">Assign Leave Balance</h3>
-            <p style="margin: 0; font-size: 13px; color: #64748b;">Allocate annual leave quotas to individual employees or bulk assign across the team</p>
-          </div>
-        </div>
-        
-        <div class="assign-form-container">
-          <div class="filter-group" style="min-width: 140px;">
-            <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">Scope</label>
-            <div style="display: flex; align-items: center; height: 42px;">
-              <input type="checkbox" [ngModel]="assignToAll()" (ngModelChange)="assignToAll.set($event)" id="assignAll" class="custom-checkbox" style="margin-right: 10px; width: 17px; height: 17px; cursor: pointer; accent-color: #3b82f6;">
-              <label for="assignAll" style="margin: 0; font-weight: 600; font-size: 13.5px; cursor: pointer; color: #1e293b;">All Employees</label>
+      <div class="widget-card alb-card">
+        <div class="alb-header">
+          <div class="alb-header-left">
+            <div class="alb-icon-badge" aria-hidden="true">
+              <svg lucideCalendarPlus size="22"></svg>
+            </div>
+            <div>
+              <div class="alb-title-row">
+                <h3 class="alb-title">Assign Leave Balance</h3>
+                <span class="alb-tag">Quota Allocation</span>
+              </div>
+              <p class="alb-subtitle">Allocate annual leave quotas to individual employees or bulk assign across the team</p>
             </div>
           </div>
-          
-          <!-- Searchable Employee Select -->
-          <div class="filter-group" *ngIf="!assignToAll()" style="flex: 1.5; min-width: 260px;">
-            <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">
-              Employee <span style="color: #ef4444;">*</span>
-            </label>
-            <app-searchable-select
-              [options]="employeeAssignOptions()"
-              placeholder="Search employee by name, ID..."
-              [value]="selectedEmployeeId()"
-              (valueChange)="selectedEmployeeId.set($event ? $event.toString() : '')"
-              [loading]="isLoadingEmployees()"
-              loadingText="Loading employees..."
-              [fullWidth]="true">
-            </app-searchable-select>
-          </div>
 
-          <!-- Searchable Leave Type Select -->
-          <div class="filter-group" style="flex: 1.2; min-width: 220px;">
-            <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">
-              Leave Type <span style="color: #ef4444;">*</span>
-            </label>
-            <app-searchable-select
-              [options]="leaveTypeAssignOptions()"
-              placeholder="Select Leave Type..."
-              [value]="selectedLeaveTypeId()"
-              (valueChange)="onLeaveTypeAssignChange($event)"
-              [loading]="isLoadingBalances()"
-              loadingText="Loading leave types..."
-              [fullWidth]="true">
-            </app-searchable-select>
-          </div>
-
-          <div class="filter-group" style="width: 130px;">
-            <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">Allocated Days <span style="color: #ef4444;">*</span></label>
-            <input type="number" class="form-control" [ngModel]="allocatedDays()" (ngModelChange)="allocatedDays.set($event)" min="0" step="0.5" style="height: 42px;">
-          </div>
-
-          <div class="filter-group" style="width: 110px;">
-            <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">Year <span style="color: #ef4444;">*</span></label>
-            <input type="number" class="form-control" [ngModel]="assignYear()" (ngModelChange)="assignYear.set($event)" style="height: 42px;">
-          </div>
-
-          <div style="flex-shrink: 0;">
-            <button class="btn btn-primary" (click)="submitAssignBalance()" [disabled]="isAssigning()" style="height: 42px; padding: 0 22px; font-weight: 600; display: flex; align-items: center; gap: 8px; border-radius: 8px;">
-              <svg lucideCheck [size]="18" *ngIf="!isAssigning()"></svg>
-              {{ isAssigning() ? 'Assigning...' : (assignToAll() ? 'Assign to All' : 'Assign Balance') }}
+          <!-- Scope Segmented Switch -->
+          <div class="alb-scope-switch" role="radiogroup" aria-label="Assignment scope">
+            <button
+              type="button"
+              class="alb-scope-btn"
+              [class.active]="!assignToAll()"
+              (click)="assignToAll.set(false)"
+              aria-label="Individual Employee scope"
+            >
+              <svg lucideUser size="14"></svg>
+              <span>Individual</span>
             </button>
+            <button
+              type="button"
+              class="alb-scope-btn"
+              [class.active]="assignToAll()"
+              (click)="assignToAll.set(true)"
+              aria-label="All Employees scope"
+            >
+              <svg lucideUsers size="14"></svg>
+              <span>All Employees</span>
+              <span class="alb-scope-count" *ngIf="employees().length">({{ employees().length }})</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Form Fields Container -->
+        <div class="alb-form-wrap">
+          <!-- Bulk Allocation Info Banner -->
+          <div class="alb-bulk-banner" *ngIf="assignToAll()">
+            <div class="alb-bulk-icon">
+              <svg lucideUsers size="16"></svg>
+            </div>
+            <div class="alb-bulk-text">
+              <b>Bulk Allocation Active:</b>
+              <span> This quota will be assigned to all <b>{{ employees().length }}</b> active employees for the year <b>{{ assignYear() }}</b>.</span>
+            </div>
+          </div>
+
+          <div class="alb-fields-row">
+            <!-- Searchable Employee Select (only when not bulk) -->
+            <div class="alb-field-group alb-field-employee" *ngIf="!assignToAll()">
+              <label class="alb-label">
+                <svg lucideUser size="13"></svg>
+                <span>Employee</span>
+                <span class="alb-req">*</span>
+              </label>
+              <app-searchable-select
+                [options]="employeeAssignOptions()"
+                placeholder="Search employee by name, ID..."
+                [value]="selectedEmployeeId()"
+                (valueChange)="selectedEmployeeId.set($event ? $event.toString() : '')"
+                [loading]="isLoadingEmployees()"
+                loadingText="Loading employees..."
+                [fullWidth]="true">
+              </app-searchable-select>
+            </div>
+
+            <!-- Searchable Leave Type Select -->
+            <div class="alb-field-group alb-field-leavetype">
+              <label class="alb-label">
+                <svg lucideSparkles size="13"></svg>
+                <span>Leave Type</span>
+                <span class="alb-req">*</span>
+              </label>
+              <app-searchable-select
+                [options]="leaveTypeAssignOptions()"
+                placeholder="Select Leave Type..."
+                [value]="selectedLeaveTypeId()"
+                (valueChange)="onLeaveTypeAssignChange($event)"
+                [loading]="isLoadingBalances()"
+                loadingText="Loading leave types..."
+                [fullWidth]="true">
+              </app-searchable-select>
+            </div>
+
+            <!-- Allocated Days Input -->
+            <div class="alb-field-group alb-field-days">
+              <label class="alb-label">
+                <svg lucideClock size="13"></svg>
+                <span>Allocated Days</span>
+                <span class="alb-req">*</span>
+              </label>
+              <div class="alb-input-wrap">
+                <input
+                  type="number"
+                  class="alb-input"
+                  [ngModel]="allocatedDays()"
+                  (ngModelChange)="allocatedDays.set($event)"
+                  min="0"
+                  step="0.5"
+                  placeholder="0"
+                />
+                <span class="alb-input-suffix">days</span>
+              </div>
+            </div>
+
+            <!-- Year Input -->
+            <div class="alb-field-group alb-field-year">
+              <label class="alb-label">
+                <svg lucideCalendar size="13"></svg>
+                <span>Year</span>
+                <span class="alb-req">*</span>
+              </label>
+              <div class="alb-input-wrap">
+                <input
+                  type="number"
+                  class="alb-input"
+                  [ngModel]="assignYear()"
+                  (ngModelChange)="assignYear.set($event)"
+                  placeholder="2026"
+                />
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="alb-action-group">
+              <button
+                type="button"
+                class="alb-submit-btn"
+                (click)="submitAssignBalance()"
+                [disabled]="isAssigning()"
+              >
+                <svg lucideCheck size="16" *ngIf="!isAssigning()"></svg>
+                <span>{{ isAssigning() ? 'Assigning...' : (assignToAll() ? 'Assign to All' : 'Assign Balance') }}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2084,3 +2187,5 @@
       </div>
     </div>
   </div>
+
+<app-comp-off-history [open]="compOffHistoryOpen()" [allEmployees]="compOffHistoryAll()" (closed)="compOffHistoryOpen.set(false)"></app-comp-off-history>

@@ -76,6 +76,15 @@
           </p>
 
           <div class="card-footer">
+            <div class="share-wrap">
+              <button type="button" class="btn-share" (click)="toggleShare(job, $event)">
+                {{ copiedFor() === $any(job).id ? 'Link copied ✓' : 'Share' }}
+              </button>
+              <div class="share-menu" *ngIf="shareMenuFor() === $any(job).id" (click)="$event.stopPropagation()">
+                <button type="button" (click)="shareOnWhatsApp(job, $event)">Share on WhatsApp</button>
+                <button type="button" (click)="copyJobLink(job, $event)">Copy link</button>
+              </div>
+            </div>
             <button class="btn-apply-now" (click)="openJobApplication(job)">
               View Details & Apply <svg lucideArrowRight size="16"></svg>
             </button>
@@ -106,7 +115,18 @@
             <ng-container *ngIf="job.minSalary">• ₹{{ job.minSalary | number }} - ₹{{ job.maxSalary | number }}</ng-container>
           </p>
         </div>
-        <button class="btn-close" (click)="closeApplyDrawer()"><svg lucideX size="20"></svg></button>
+<div class="drawer-head-actions">
+          <div class="share-wrap">
+              <button type="button" class="btn-share" (click)="toggleShare(job, $event)">
+                {{ copiedFor() === $any(job).id ? 'Link copied ✓' : 'Share' }}
+              </button>
+              <div class="share-menu" *ngIf="shareMenuFor() === $any(job).id" (click)="$event.stopPropagation()">
+                <button type="button" (click)="shareOnWhatsApp(job, $event)">Share on WhatsApp</button>
+                <button type="button" (click)="copyJobLink(job, $event)">Copy link</button>
+              </div>
+            </div>
+          <button class="btn-close" (click)="closeApplyDrawer()"><svg lucideX size="20"></svg></button>
+        </div>
       </div>
 
       <div class="drawer-body">

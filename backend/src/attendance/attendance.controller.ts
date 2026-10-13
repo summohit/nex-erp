@@ -170,6 +170,21 @@ export class AttendanceController {
     );
   }
 
+  /** Comp-off history: own for everyone; any employee or all for HR/admin. */
+  @Get('comp-off/history')
+  getCompOffHistory(
+    @Request() req,
+    @Query('employeeId') employeeId?: string,
+    @Query('year') year?: string,
+    @Query('mine') mine?: string,
+  ) {
+    const target = mine === '1' ? (req.user.employeeId ?? -1) : employeeId ? Number(employeeId) : null;
+    return this.attendanceService.getCompOffHistory(
+      req.user.companyId, { role: req.user.role, employeeId: req.user.employeeId ?? null },
+      target, year ? Number(year) : undefined,
+    );
+  }
+
   /** Today at a glance (IST) for the All People Attendance page. */
   @Get('today-summary')
   @Permissions('attendance/all')

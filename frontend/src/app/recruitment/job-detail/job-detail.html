@@ -21,11 +21,17 @@
         <svg lucideInfo size="15"></svg>
         <span>Job Overview</span>
       </button>
-      <button class="btn-nav-action" (click)="copyJobLink()" title="Copy Public Careers Page Link">
-        <svg *ngIf="!isCopiedJobLink()" lucideCopy size="15"></svg>
-        <svg *ngIf="isCopiedJobLink()" lucideCheck size="15"></svg>
-        <span>{{ isCopiedJobLink() ? 'Link Copied!' : 'Share Posting' }}</span>
-      </button>
+      <div class="share-posting-wrap">
+        <button class="btn-nav-action" (click)="shareMenuOpen.set(!shareMenuOpen())" title="Share this posting">
+          <svg *ngIf="!isCopiedJobLink()" lucideCopy size="15"></svg>
+          <svg *ngIf="isCopiedJobLink()" lucideCheck size="15"></svg>
+          <span>{{ isCopiedJobLink() ? 'Link Copied!' : 'Share Posting' }}</span>
+        </button>
+        <div class="share-posting-menu" *ngIf="shareMenuOpen()">
+          <button type="button" (click)="shareOnWhatsApp()">Share on WhatsApp</button>
+          <button type="button" (click)="copyJobLink(); shareMenuOpen.set(false)">Copy link</button>
+        </div>
+      </div>
       <button class="btn-nav-action btn-nav-primary" (click)="openFullATS()" title="Open in ATS Kanban Board">
         <svg lucideLayoutGrid size="15"></svg>
         <span>ATS Kanban Board</span>

@@ -858,3 +858,16 @@
     flex-wrap: wrap;
   }
 }
+
+/* Share a posting */
+.card-footer { display: flex; gap: 10px; align-items: stretch; }
+.card-footer .btn-apply-now { flex: 1; }
+.share-wrap { position: relative; display: inline-flex; }
+.btn-share { border: 1px solid #cbd5e1; background: #fff; color: #334155; font-weight: 600; font-size: 14px; padding: 0 16px; min-height: 44px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
+.btn-share:hover { border-color: #2563eb; color: #2563eb; }
+.share-menu { position: absolute; z-index: 30; bottom: calc(100% + 6px); left: 0; min-width: 190px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 12px 28px rgba(15,23,42,.16); padding: 6px; display: flex; flex-direction: column; }
+.share-menu button { text-align: left; border: 0; background: transparent; padding: 10px 12px; border-radius: 8px; font-size: 14px; color: #0f172a; cursor: pointer; }
+.share-menu button:hover { background: #eff6ff; color: #1d4ed8; }
+.drawer-head-actions { display: flex; align-items: center; gap: 8px; }
+.drawer-head-actions .share-menu { top: calc(100% + 6px); bottom: auto; right: 0; left: auto; }
+.drawer-head-actions .btn-share { min-height: 38px; }

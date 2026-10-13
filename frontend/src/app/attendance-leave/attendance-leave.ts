@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener } from '@angular/core';
+import { CompOffHistoryComponent } from '../shared/components/comp-off-history/comp-off-history';
 import { CommonModule, DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -43,7 +44,13 @@ import {
   LucideUser,
   LucideBuilding,
   LucideBriefcase,
-  LucideMail
+  LucideMail,
+  LucideHistory,
+  LucideUpload,
+  LucideDownload,
+  LucideCalendarPlus,
+  LucideUsers,
+  LucideSparkles
 } from '@lucide/angular';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -74,6 +81,7 @@ import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDateP
   selector: 'app-attendance-leave',
   standalone: true,
   imports: [
+    CompOffHistoryComponent,
     CommonModule, RouterLink,
     FormsModule, 
     LucideCheck,
@@ -104,7 +112,13 @@ import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDateP
     LucideUser,
     LucideBuilding,
     LucideBriefcase,
-    LucideMail
+    LucideMail,
+    LucideHistory,
+    LucideUpload,
+    LucideDownload,
+    LucideCalendarPlus,
+    LucideUsers,
+    LucideSparkles
   ],
   providers: [DatePipe],
   templateUrl: './attendance-leave.html',
@@ -132,7 +146,7 @@ export class AttendanceLeaveComponent implements OnInit {
   isLoadingMyShift = signal<boolean>(false);
 
   activeTab = signal<string>('attendance');
-  leaveSection = signal<'application' | 'approvals' | 'team-approvals' | 'balances'>('application');
+  leaveSection = signal<'application' | 'approvals' | 'team-approvals' | 'balances' | 'regularizations'>('application');
   leaveViewMode = signal<'list' | 'calendar' | 'employee'>('list');
   leaveCalendarMonth = signal(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   filterDrawerOpen = signal(false);
@@ -521,6 +535,14 @@ export class AttendanceLeaveComponent implements OnInit {
     const role = this.authService.currentUser()?.role;
     return role === 'SUPERADMIN' || role === 'SUPER_ADMIN';
   });
+
+  /** Comp-off history panel: own, or everyone's for HR/admin. */
+  compOffHistoryOpen = signal(false);
+  compOffHistoryAll = signal(false);
+  openCompOffHistory(all: boolean) {
+    this.compOffHistoryAll.set(all);
+    this.compOffHistoryOpen.set(true);
+  }
 
   isAdmin = computed(() => {
     const role = this.authService.currentUser()?.role;
@@ -2045,7 +2067,7 @@ export class AttendanceLeaveComponent implements OnInit {
       this.attendanceService.resolveRegularization(id, status, reason).subscribe({
         next: () => {
           this.toast.success('Request rejected');
-          this.loadAdminData();
+          this.loadPendingRegularizations();
         },
         error: () => this.toast.error('Failed to reject request')
       });
@@ -2053,7 +2075,7 @@ export class AttendanceLeaveComponent implements OnInit {
       this.attendanceService.resolveRegularization(id, status).subscribe({
         next: () => {
           this.toast.success('Request approved');
-          this.loadAdminData();
+          this.loadPendingRegularizations();
         },
         error: () => this.toast.error('Failed to approve request')
       });
@@ -2925,6 +2947,10 @@ export class AttendanceLeaveComponent implements OnInit {
       } else if (tab === 'leave' || tab === 'me' || tab === 'leaves' || tab === 'my-leaves' || tab === 'request') {
         this.activeTab.set('leave');
         this.leaveSection.set('application');
+      } else if (tab === 'regularizations') {
+        this.activeTab.set('leave');
+        this.leaveSection.set('regularizations');
+        this.loadPendingRegularizations();
       } else if (tab === 'balances' || tab === 'approvals' || tab === 'team-approvals') {
         this.activeTab.set('leave');
         this.leaveSection.set(tab === 'balances' ? 'balances' : 'application');
@@ -3056,9 +3082,20 @@ export class AttendanceLeaveComponent implements OnInit {
     });
   }
 
+  /** HR / admin queue of attendance corrections awaiting a decision. */
+  loadPendingRegularizations() {
+    this.attendanceService.getPendingRegularizations().subscribe({
+      next: (res: any) => this.pendingRegularizations.set(res || []),
+      error: () => this.pendingRegularizations.set([]),
+    });
+  }
+
   loadAdminData() {
     const isBalancesPage = this.leaveSection() === 'balances';
     const kind = isBalancesPage ? 'balances' : 'requests';
+    // Restored: this queue stopped loading in an earlier refactor, so the
+    // "Pending Regularizations" table was always empty.
+    if (this.isAdmin() && !isBalancesPage) this.loadPendingRegularizations();
     if (!this.isAdmin() || this.adminDataLoading === kind) return;
     this.adminDataLoading = kind;
     const year = new Date().getFullYear();
@@ -3519,7 +3556,14 @@ export class AttendanceLeaveComponent implements OnInit {
     this.router.navigate(['/attendance', tab]);
   }
 
-  setLeaveSection(section: 'application' | 'approvals' | 'team-approvals' | 'balances') {
+  setLeaveSection(section: 'application' | 'approvals' | 'team-approvals' | 'balances' | 'regularizations') {
+    if (section === 'regularizations') {
+      this.activeTab.set('leave');
+      this.leaveSection.set('regularizations');
+      this.loadPendingRegularizations();
+      this.router.navigate(['/attendance', 'regularizations']);
+      return;
+    }
     const targetSection = section === 'balances' ? 'balances' : 'application';
     this.activeTab.set('leave');
     this.leaveSection.set(targetSection);

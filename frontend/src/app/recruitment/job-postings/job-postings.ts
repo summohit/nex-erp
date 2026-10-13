@@ -1,4 +1,5 @@
 import { Component, signal, inject, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { jobPublicUrl, shareJobOnWhatsApp, copyText } from '../job-share';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -268,6 +269,11 @@ export class JobPostingsComponent implements OnInit {
       cellRendererParams: {
         onView: (data: any) => this.viewJobDetails(data),
         viewLabel: 'View Details',
+        // Sharing a posting only makes sense while it is open to applicants.
+        extraActions: [
+          { label: 'Share on WhatsApp', show: (d: any) => d?.status === 'OPEN', onClick: (d: any) => this.shareJob(d, 'whatsapp') },
+          { label: 'Copy link', show: (d: any) => d?.status === 'OPEN', onClick: (d: any) => this.shareJob(d, 'copy') },
+        ],
         onEdit: (data: any) => this.editJob(data),
         onDelete: (data: any) => this.deleteJob(data)
       }
@@ -278,6 +284,17 @@ export class JobPostingsComponent implements OnInit {
    * Opening details from anywhere on the row. Clicks inside the pinned Actions
    * column are ignored so the row handler does not fire alongside a menu choice.
    */
+  async shareJob(job: any, how: 'whatsapp' | 'copy') {
+    if (!job?.companyId) { this.toast.error('Could not build the careers link for this job'); return; }
+    const url = jobPublicUrl(job.companyId, job.id);
+    if (how === 'whatsapp') {
+      shareJobOnWhatsApp(job.title, job.location, url);
+    } else {
+      await copyText(url);
+      this.toast.success('Job link copied — paste it anywhere to share');
+    }
+  }
+
   onRowClicked(event: any) {
     if (event?.column?.getColDef()?.headerName === 'Actions') return;
     if (event?.data) this.viewJobDetails(event.data);

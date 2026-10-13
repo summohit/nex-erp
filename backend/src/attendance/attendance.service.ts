@@ -923,6 +923,127 @@ export class AttendanceService {
     };
   }
 
+  /**
+   * Comp-off history: for each credit, the day worked and why it counted
+   * (holiday, weekly off, rostered day off), the clock times, and the field
+   * visit or project behind it — plus the comp-off leaves already taken.
+   *
+   * An employee sees their own; HR and admins anyone's, or a company-wide
+   * summary when no employee is given. Balance beyond the recorded credits
+   * (opening balances, manual additions) is shown as "added manually".
+   */
+  async getCompOffHistory(
+    companyId: number,
+    viewer: { role?: string | null; employeeId?: number | null },
+    employeeId?: number | null,
+    year?: number,
+  ) {
+    const y = year || new Date().getUTCFullYear();
+    const hr = isHrAdmin(viewer.role);
+    const target = employeeId ?? (hr ? null : viewer.employeeId ?? null);
+    if (target != null && target !== viewer.employeeId && !hr) {
+      throw new ForbiddenException('You can only see your own comp-off history');
+    }
+    if (target == null && !hr) throw new ForbiddenException('No employee profile');
+
+    const leaveType = await this.prisma.leaveType.findFirst({ where: { companyId, isCompOff: true }, select: { id: true, name: true } });
+    if (!leaveType) return { year: y, employees: [] };
+
+    const employeeWhere: any = { companyId, ...(target != null ? { id: target } : {}) };
+    const [balances, credits] = await Promise.all([
+      this.prisma.leaveBalance.findMany({
+        where: { leaveTypeId: leaveType.id, year: y, employee: employeeWhere },
+        select: { employeeId: true, allocated: true, used: true },
+      }),
+      this.prisma.compOffCredit.findMany({
+        where: { companyId, leaveTypeId: leaveType.id, year: y, ...(target != null ? { employeeId: target } : {}) },
+        include: {
+          attendance: {
+            select: { clockIn: true, clockOut: true, isOnsite: true, status: true,
+              project: { select: { name: true, key: true } }, shift: { select: { name: true } } },
+          },
+        },
+        orderBy: { date: 'desc' },
+      }),
+    ]);
+
+    const ids = [...new Set([...balances.map((b) => b.employeeId), ...credits.map((c) => c.employeeId)])];
+    if (!ids.length) return { year: y, employees: [] };
+
+    const dates = credits.map((c) => c.date).filter((d): d is Date => !!d);
+    const [people, holidays, visits, usedLeaves] = await Promise.all([
+      this.prisma.employee.findMany({
+        where: { id: { in: ids }, companyId },
+        select: { id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true,
+          department: { select: { name: true } }, designation: { select: { name: true } } },
+      }),
+      dates.length
+        ? this.prisma.holiday.findMany({ where: { companyId, date: { in: dates } }, select: { name: true, date: true } })
+        : Promise.resolve([] as { name: string; date: Date }[]),
+      dates.length
+        ? this.prisma.fieldVisitAttendance.findMany({
+            where: { companyId, employeeId: { in: ids }, visitDate: { in: dates } },
+            select: { employeeId: true, visitDate: true,
+              request: { select: { id: true, requestNumber: true, location: true, project: { select: { name: true, key: true } } } } },
+          })
+        : Promise.resolve([] as any[]),
+      this.prisma.leaveRequest.findMany({
+        where: { employeeId: { in: ids }, leaveTypeId: leaveType.id, status: 'APPROVED', deletedAt: null,
+          startDate: { gte: new Date(Date.UTC(y, 0, 1)), lt: new Date(Date.UTC(y + 1, 0, 1)) } },
+        select: { id: true, employeeId: true, startDate: true, endDate: true, isHalfDay: true, reason: true },
+        orderBy: { startDate: 'desc' },
+      }),
+    ]);
+
+    const day = (d: Date) => d.toISOString().slice(0, 10);
+    const holidayOn = new Map(holidays.map((h) => [day(h.date), h.name]));
+    const visitOn = new Map(visits.map((v: any) => [`${v.employeeId}|${day(v.visitDate)}`, v.request]));
+    const reasonLabel = (c: any) => {
+      const d = c.date ? day(c.date) : '';
+      if (holidayOn.has(d)) return `Worked on a holiday (${holidayOn.get(d)})`;
+      if (c.reason === 'WEEK_OFF') return 'Worked on weekly off';
+      if (c.reason === 'HOLIDAY') return 'Worked on a holiday';
+      if (c.date && new Date(c.date).getUTCDay() === 0) return 'Worked on Sunday';
+      return 'Worked on a scheduled day off';
+    };
+
+    const employees = people.map((p) => {
+      const b = balances.find((x) => x.employeeId === p.id);
+      const mine = credits.filter((c) => c.employeeId === p.id).map((c) => {
+        const visit = c.date ? visitOn.get(`${p.id}|${day(c.date)}`) : null;
+        return {
+          id: c.id,
+          date: c.date ? day(c.date) : null,
+          days: c.days,
+          reason: reasonLabel(c),
+          creditedOn: c.createdAt,
+          clockIn: c.attendance?.clockIn ?? null,
+          clockOut: c.attendance?.clockOut ?? null,
+          shift: c.attendance?.shift?.name ?? null,
+          onsite: !!c.attendance?.isOnsite,
+          project: c.attendance?.project ? `${c.attendance.project.name} (${c.attendance.project.key})` : null,
+          fieldVisit: visit ? { id: visit.id, number: visit.requestNumber, location: visit.location,
+            project: visit.project ? `${visit.project.name} (${visit.project.key})` : null } : null,
+        };
+      });
+      const earned = mine.reduce((s2, c) => s2 + (c.days || 0), 0);
+      const allocated = b?.allocated ?? earned;
+      const used = b?.used ?? 0;
+      return {
+        employee: p,
+        allocated, used, remaining: Math.round((allocated - used) * 100) / 100,
+        earnedFromWork: earned,
+        addedManually: Math.max(0, Math.round((allocated - earned) * 100) / 100),
+        credits: mine,
+        used_leaves: usedLeaves.filter((l) => l.employeeId === p.id).map((l) => ({
+          id: l.id, from: day(l.startDate), to: day(l.endDate), halfDay: l.isHalfDay, reason: l.reason,
+        })),
+      };
+    }).sort((a, b) => b.remaining - a.remaining || a.employee.firstName.localeCompare(b.employee.firstName));
+
+    return { year: y, leaveType: leaveType.name, employees };
+  }
+
   async getPendingClockOuts(
     companyId: number, role?: string | null, employeeId?: number | null,
   ) {

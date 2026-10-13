@@ -274,6 +274,46 @@ export class CareersComponent implements OnInit, OnDestroy {
     if (job) this.openJobApplication(job);
   }
 
+  // ── Share a posting (WhatsApp / copy link) ──
+  shareMenuFor = signal<string | number | null>(null);
+
+  /** The link that opens this posting directly: this careers page + ?job=<id>. */
+  jobShareUrl(job: PublicJob): string {
+    const base = `${window.location.origin}${window.location.pathname}`;
+    return `${base}?job=${encodeURIComponent(String((job as any).id))}`;
+  }
+
+  toggleShare(job: PublicJob, event: Event) {
+    event.stopPropagation();
+    const id = (job as any).id;
+    this.shareMenuFor.set(this.shareMenuFor() === id ? null : id);
+  }
+
+  shareOnWhatsApp(job: PublicJob, event: Event) {
+    event.stopPropagation();
+    const text = `We are hiring: ${job.title}${job.location ? ' (' + job.location + ')' : ''} at CES Tech. View details and apply: ${this.jobShareUrl(job)}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+    this.shareMenuFor.set(null);
+  }
+
+  async copyJobLink(job: PublicJob, event: Event) {
+    event.stopPropagation();
+    const url = this.jobShareUrl(job);
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Older browsers / non-secure pages: fall back to a hidden textarea.
+      const ta = document.createElement('textarea');
+      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
+    }
+    this.copiedFor.set((job as any).id);
+    setTimeout(() => this.copiedFor.set(null), 2000);
+    this.shareMenuFor.set(null);
+  }
+  copiedFor = signal<string | number | null>(null);
+
   openJobApplication(job: PublicJob) {
     this.selectedJob.set(job);
     this.candidateForm = {
