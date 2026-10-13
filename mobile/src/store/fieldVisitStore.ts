@@ -104,10 +104,8 @@ export const useFieldVisitStore = create<FieldVisitState>((set, get) => ({
         // this visit — covers the OS having killed the tracking service (or
         // the whole process) and not restarting it, and a fresh app install
         // resuming a visit that was started from a different install.
-        const alreadyTracking = await fieldVisitLocation.isTracking(visit.id);
-        if (!alreadyTracking) {
-          fieldVisitLocation.startTracking(visit.id).catch(() => {});
-        }
+        // Background route tracking is retired (no background-location
+        // permission any more), so a leftover legacy visit is only shown.
         await get().syncFromNative();
       }
     } catch {
@@ -162,7 +160,6 @@ export const useFieldVisitStore = create<FieldVisitState>((set, get) => ({
         elapsedSeconds: 0,
         isStarting: false,
       });
-      fieldVisitLocation.startTracking(visit.id).catch(() => {});
       return visit;
     } catch (e) {
       set({ isStarting: false });

@@ -4,14 +4,9 @@
   <!-- Location — field visits, attendance geo-stamp -->
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-  <!-- Background location — keeps recording a field visit's route while the
-       app is backgrounded or the screen is locked. Requested at runtime only
-       when a visit actually starts, never at first launch (Play Store policy). -->
-  <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-  <!-- Foreground service — required to run the field visit tracking service
-       (and, on Android 14+, to declare its "location" type). -->
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+  <!-- No background location: the old route-tracking field visit (and its
+       foreground service) is retired. Field visits now clock in and out at the
+       site, which needs location only while the app is open. -->
   <!-- Camera — field visit photos, profile picture -->
   <uses-permission android:name="android.permission.CAMERA" />
   <!-- Storage / Media — gallery attachments (SDK < 33 uses READ_EXTERNAL_STORAGE) -->
@@ -56,9 +51,5 @@
       </intent-filter>
     </activity>
 
-    <service
-      android:name=".fieldvisit.FieldVisitLocationService"
-      android:exported="false"
-      android:foregroundServiceType="location" />
   </application>
 </manifest>
