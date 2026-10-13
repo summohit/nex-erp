@@ -47,6 +47,12 @@ export class TicketsController {
     });
   }
 
+  /** Teams a ticket can be moved to, with member counts. Declared before :id. */
+  @Get('teams/list')
+  teams(@Request() req) {
+    return this.ticketsService.teams(req.user.companyId);
+  }
+
   @Get(':id/assignable-members')
   assignableMembers(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.ticketsService.assignableMembers(req.user.companyId, id);

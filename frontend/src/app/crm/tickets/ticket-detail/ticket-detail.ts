@@ -67,6 +67,41 @@ export class TicketDetailComponent implements OnInit {
   private toast = inject(HotToastService);
   private dialog = inject(DialogService);
 
+  // ── Move to another team (IT → HR …) ──
+  teams: { id: number; name: string; members: number }[] = [];
+  showTeamPicker = false;
+  movingTeam = false;
+
+  openTeamPicker() {
+    this.showTeamPicker = !this.showTeamPicker;
+    if (this.showTeamPicker && !this.teams.length) {
+      this.ticketService.getTeams().subscribe({
+        next: (d) => this.teams = d || [],
+        error: () => this.toast.error('Could not load teams'),
+      });
+    }
+  }
+
+  async moveToTeam(team: { id: number; name: string; members: number }) {
+    if (team.id === (this.ticket as any).departmentId) { this.showTeamPicker = false; return; }
+    if (!team.members) { this.toast.error(`${team.name} has no members — choose another team`); return; }
+    const ok = await this.dialog.confirm(
+      `Move ${this.ticket.ticketNumber} to ${team.name}? It will arrive unassigned for ${team.name} to pick up, and they will be able to work on it.`,
+      'Move to team', 'Move', 'Cancel');
+    if (!ok) return;
+    this.movingTeam = true;
+    this.ticketService.updateTicket(this.ticket.id, { departmentId: team.id } as any).subscribe({
+      next: () => {
+        this.toast.success(`Moved to ${team.name}`);
+        this.showTeamPicker = false;
+        this.movingTeam = false;
+        this.refreshTicket();
+        this.ticketUpdated.emit(this.ticket);
+      },
+      error: (err) => { this.movingTeam = false; this.toast.error(err?.error?.message || 'Could not move the ticket'); },
+    });
+  }
+
   commentBody = '';
 
   /** The same toolbar as the ticket description, kept short for a reply. */
@@ -479,7 +514,8 @@ export class TicketDetailComponent implements OnInit {
    * knows the user's department — the JWT does not carry it.
    */
   canManage(): boolean {
-    return this.permissions?.canManage === true;
+    // The owning team may work its tickets too (the server says so per ticket).
+    return this.permissions?.canManage === true || (this.ticket as any)?.viewerCanManage === true;
   }
 
   /** Free-form status override stays with management/admins. */

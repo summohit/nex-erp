@@ -137,6 +137,25 @@ export class TicketsComponent implements OnInit {
     return this.newTicket.type === 'ATTENDANCE_ISSUE';
   }
 
+  /**
+   * An attendance problem filed as a bug goes to IT, who cannot fix a clock
+   * record. Spot the common words so the form can offer to send it to HR.
+   */
+  get looksLikeAttendance(): boolean {
+    if (this.isAttendanceIssue) return false;
+    const text = `${this.newTicket.title || ''} ${(this.newTicket as any).description || ''}`.toLowerCase();
+    return /attendance|half[\s-]?day|absent|clock[\s-]?(in|out)|punch|regulari[sz]|late mark|comp[\s-]?off|night shift|shift (is )?wrong|leave (is )?not|missed clock/.test(text);
+  }
+
+  switchToAttendanceIssue() {
+    this.newTicket = { ...this.newTicket, type: 'ATTENDANCE_ISSUE' } as any;
+  }
+
+  goToRegularization() {
+    this.showCreateModal = false;
+    this.router.navigate(['/attendance/timesheets'], { queryParams: { regularize: 1 } });
+  }
+
   /** Today, as the date input wants it — an issue cannot be in the future. */
   get todayIso(): string {
     return new Date().toISOString().split('T')[0];

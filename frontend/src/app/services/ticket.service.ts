@@ -150,6 +150,11 @@ export class TicketService {
     return this.http.post<{ url: string }>(`${environment.apiUrl}/upload/ticket-attachment`, form);
   }
 
+  /** Teams a ticket can be moved to, with active member counts. */
+  getTeams(): Observable<{ id: number; name: string; members: number }[]> {
+    return this.http.get<{ id: number; name: string; members: number }[]>(`${this.apiUrl}/teams/list`);
+  }
+
   updateTicket(id: number, data: Partial<Ticket>): Observable<Ticket> {
     return this.http.patch<Ticket>(`${this.apiUrl}/${id}`, data);
   }

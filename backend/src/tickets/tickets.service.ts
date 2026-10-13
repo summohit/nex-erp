@@ -289,6 +289,16 @@ export class TicketsService {
   // ─── ASSIGNABLE MEMBERS ────────────────────────────────────────────────────
 
   /** Employees in the ticket's own department — the only valid reassignment targets. */
+  /** Teams a ticket can be moved to, with how many active people are in each. */
+  async teams(companyId: number) {
+    const depts = await this.prisma.department.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, name: true, _count: { select: { employees: { where: { offboardingStatus: { not: 'SEPARATED' } } } } } },
+      orderBy: { name: 'asc' },
+    });
+    return depts.map((d) => ({ id: d.id, name: d.name, members: d._count.employees }));
+  }
+
   async assignableMembers(companyId: number, ticketId: number) {
     const ticket = await this.prisma.ticket.findFirst({
       where: { id: ticketId, companyId },
@@ -346,6 +356,30 @@ export class TicketsService {
    * department, so this is resolved server-side and handed to the UI, which
    * uses it to decide whether to render triage controls at all.
    */
+  /** The department an employee belongs to, or null. */
+  private async departmentOf(employeeId: number | null | undefined): Promise<number | null> {
+    if (!employeeId) return null;
+    const e = await this.prisma.employee.findUnique({ where: { id: employeeId }, select: { departmentId: true } });
+    return e?.departmentId ?? null;
+  }
+
+  /**
+   * Who may work a particular ticket: the ticket team and management as
+   * before, plus the members of the team that now owns it — a ticket moved to
+   * HR has to be workable by HR — and HR roles for attendance issues.
+   */
+  async canManageTicket(
+    companyId: number,
+    ticket: { departmentId: number | null; type?: string | null },
+    user: { role?: string; employeeId?: number | null },
+  ): Promise<boolean> {
+    const { canManage } = await this.myPermissions(companyId, user);
+    if (canManage) return true;
+    if (ticket.type === TicketsService.ATTENDANCE_TYPE && this.canHandleAttendanceIssues(user.role)) return true;
+    const mine = await this.departmentOf(user.employeeId);
+    return mine != null && mine === ticket.departmentId;
+  }
+
   async myPermissions(companyId: number, user: { role?: string; employeeId?: number | null }) {
     const isManagement = this.canSeeAllTickets(user.role);
     const isDevTeam = await this.isEngineeringDept(user.employeeId);
@@ -373,8 +407,14 @@ export class TicketsService {
 
     const privileged = this.canSeeAllTickets(user.role) || (await this.isEngineeringDept(user.employeeId));
     // Everyone else sees what they raised and what is assigned to them.
+    const myDept = await this.departmentOf(user.employeeId);
     const ownOnly = !privileged && user.employeeId
-      ? { OR: [{ reporterId: user.employeeId }, { assigneeId: user.employeeId }] }
+      ? { OR: [
+          { reporterId: user.employeeId },
+          { assigneeId: user.employeeId },
+          // The team a ticket has been moved to works it, so it sees it.
+          ...(myDept != null ? [{ departmentId: myDept }] : []),
+        ] }
       : null;
 
     // Attendance issues are personnel matters. The blanket visibility that the
@@ -387,6 +427,7 @@ export class TicketsService {
       if (user.employeeId) {
         mine.push({ reporterId: user.employeeId }, { assigneeId: user.employeeId });
       }
+      if (myDept != null) mine.push({ departmentId: myDept });
       where.OR = [
         { type: { not: TicketsService.ATTENDANCE_TYPE as any } },
         ...(mine.length ? [{ AND: [{ type: TicketsService.ATTENDANCE_TYPE as any }, { OR: mine }] }] : []),
@@ -575,9 +616,11 @@ export class TicketsService {
     // Not found rather than forbidden, throughout: whether a given ticket
     // exists is itself something the caller should not learn.
     if (user) {
+      const myDept = await this.departmentOf(user.employeeId);
       const involved =
         !!user.employeeId &&
-        (ticket.reporterId === user.employeeId || ticket.assigneeId === user.employeeId);
+        (ticket.reporterId === user.employeeId || ticket.assigneeId === user.employeeId ||
+          (myDept != null && myDept === ticket.departmentId));
 
       if (ticket.type === TicketsService.ATTENDANCE_TYPE) {
         // Personnel matter: the engineering bypass does not apply.
@@ -635,6 +678,10 @@ export class TicketsService {
       }
     }
 
+    // Per-ticket rights for the screen: the owning team may work its tickets.
+    if (user) {
+      (ticket as any).viewerCanManage = await this.canManageTicket(companyId, ticket, user);
+    }
     return ticket;
   }
 
@@ -653,7 +700,7 @@ export class TicketsService {
     // Triage (status, priority, assignment) belongs to the dev team and management.
     // The one exception: once the team marks a ticket RESOLVED, the person who
     // raised it may close it off themselves — and nothing else.
-    const { canManage } = await this.myPermissions(companyId, user);
+    const canManage = await this.canManageTicket(companyId, ticket, user);
     if (!canManage) {
       const isReporter = !!user.employeeId && ticket.reporterId === user.employeeId;
       const closingOnly =
@@ -736,7 +783,34 @@ export class TicketsService {
     if (data.title !== undefined) updateData.title = data.title;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
-    if (data.departmentId !== undefined) updateData.departmentId = Number(data.departmentId);
+    // Moving the ticket to another team (IT → HR and so on). The old assignee
+    // belongs to the old team, so the ticket arrives unassigned for the new
+    // team to pick up — unless the assignee chosen in the same edit is theirs.
+    if (data.departmentId !== undefined && Number(data.departmentId) !== ticket.departmentId) {
+      const target = await this.prisma.department.findFirst({
+        where: { id: Number(data.departmentId), companyId },
+        select: { id: true, name: true },
+      });
+      if (!target) throw new NotFoundException('Team not found');
+      const staff = await this.prisma.employee.count({
+        where: { companyId, departmentId: target.id, offboardingStatus: { not: 'SEPARATED' } },
+      });
+      if (!staff) throw new BadRequestException(`${target.name} has no members, so nobody could pick this ticket up. Choose another team.`);
+      const from = ticket.departmentId
+        ? await this.prisma.department.findUnique({ where: { id: ticket.departmentId }, select: { name: true } })
+        : null;
+      updateData.departmentId = target.id;
+      const keepAssignee = updateData.assigneeId
+        ? (await this.prisma.employee.findFirst({ where: { id: updateData.assigneeId }, select: { departmentId: true } }))?.departmentId === target.id
+        : false;
+      if (!keepAssignee) {
+        if (ticket.assigneeId) {
+          activities.push({ ticketId: id, actorId, action: 'ASSIGNEEID_CHANGED', field: 'assigneeId', oldValue: String(ticket.assigneeId), newValue: '' });
+        }
+        updateData.assigneeId = null;
+      }
+      activities.push({ ticketId: id, actorId, action: 'MOVED_TO_TEAM', field: 'departmentId', oldValue: from?.name ?? '', newValue: target.name });
+    }
 
     if (data.status === 'RESOLVED' && ticket.status !== 'RESOLVED') updateData.resolvedAt = new Date();
     if (data.status && data.status !== 'RESOLVED' && ticket.status === 'RESOLVED') updateData.resolvedAt = null;

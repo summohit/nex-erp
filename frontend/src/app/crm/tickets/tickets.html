@@ -749,6 +749,24 @@
         />
       </div>
 
+      <!-- Attendance problems belong with HR, and most are fixed by a regularization. -->
+      <div class="attendance-guide" *ngIf="!isAttendanceIssue">
+        <b>Attendance problem?</b> (half day, absent, late mark, missed clock-out, wrong shift, comp-off)
+        <span>Most are fixed without a ticket: raise a <strong>Regularization</strong>, HR approves it and the day is corrected automatically.
+        If you still need help, choose type <strong>Attendance issue</strong> — it goes straight to HR, not IT.</span>
+        <div class="attendance-guide-actions">
+          <button type="button" class="guide-btn primary" (click)="goToRegularization()">Raise a regularization</button>
+          <button type="button" class="guide-btn" (click)="switchToAttendanceIssue()">Make this an Attendance issue (HR)</button>
+        </div>
+      </div>
+      <div class="attendance-guide warn" *ngIf="looksLikeAttendance">
+        <b>This looks like an attendance issue.</b>
+        <span>As "{{ formatLabel(newTicket.type || 'BUG') }}" it will go to the IT team, who cannot change attendance. Send it to HR instead.</span>
+        <div class="attendance-guide-actions">
+          <button type="button" class="guide-btn primary" (click)="switchToAttendanceIssue()">Switch to Attendance issue (HR)</button>
+        </div>
+      </div>
+
       <!-- Raised By — which department the issue is being reported for.
            Defaults to the reporter's own; changeable when logging on another
            team's behalf. Options come from the departments API. -->

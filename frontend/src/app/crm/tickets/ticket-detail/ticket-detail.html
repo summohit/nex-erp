@@ -123,6 +123,29 @@
           </div>
         </div>
 
+        <!-- Owning team, and moving the ticket to another one -->
+        <div class="meta-item">
+          <span class="meta-label">
+            Team
+            <button type="button" class="btn-reassign" *ngIf="canManage()" (click)="openTeamPicker()" [disabled]="movingTeam">Move</button>
+          </span>
+          <div class="meta-value-box">
+            <span class="dept-pill">{{ $any(ticket).department?.name || '—' }}</span>
+          </div>
+          <div class="team-picker" *ngIf="showTeamPicker">
+            <div class="team-picker-hint">Send this ticket to another team:</div>
+            <button type="button" class="team-option" *ngFor="let t of teams"
+                    [class.current]="t.id === $any(ticket).departmentId" [class.empty]="!t.members"
+                    [disabled]="!t.members" (click)="moveToTeam(t)"
+                    [title]="t.members ? '' : 'Nobody is in this team yet'">
+              {{ t.name }}
+              <small>{{ t.members ? t.members + (t.members === 1 ? ' person' : ' people') : 'no members' }}</small>
+              <span *ngIf="t.id === $any(ticket).departmentId"> · current</span>
+            </button>
+            <div class="team-picker-hint" *ngIf="!teams.length">Loading teams…</div>
+          </div>
+        </div>
+
         <!-- Assignee (reassignable within the same department) -->
         <div class="meta-item">
           <span class="meta-label">

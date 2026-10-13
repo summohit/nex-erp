@@ -1415,3 +1415,13 @@
 .comment-body-text, .description-content { overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
 .comment-body-text.rich-text ::ng-deep img { max-width: 100%; height: auto; }
 .comments-stream { min-width: 0; }
+
+.team-picker { margin-top: 8px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; padding: 6px; max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; box-shadow: 0 8px 20px rgba(15,23,42,.08); }
+.team-picker-hint { font-size: 12px; color: #64748b; padding: 4px 8px; }
+.team-option { text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 7px; font: 600 13px inherit; color: #0f172a; cursor: pointer; }
+.team-option:hover { background: #eff6ff; color: #1d4ed8; }
+.team-option.current { color: #94a3b8; }
+
+.team-option small { margin-left: 6px; font-weight: 500; color: #94a3b8; }
+.team-option.empty { color: #cbd5e1; cursor: not-allowed; }
+.team-option.empty:hover { background: transparent; color: #cbd5e1; }

@@ -2899,6 +2899,10 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   ngOnInit() {
+    // Deep link from the ticket form: ?regularize=1 opens the request form.
+    if (this.route.snapshot.queryParamMap.get('regularize')) {
+      setTimeout(() => this.openRegularizationModal(), 300);
+    }
     this.employeeService.getMyProfile().subscribe({
       next: (p: any) => {
         this.myWeeklyOffs.set(p?.branch ? (p.branch.weeklyOffs ?? '') : null);

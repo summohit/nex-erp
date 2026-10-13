@@ -2475,3 +2475,13 @@ label {
     padding: 0 !important;
   }
 }
+
+/* Attendance problems → regularization or HR, not IT */
+.attendance-guide { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; margin-bottom: 14px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 13px; line-height: 1.5; }
+.attendance-guide b { font-size: 13.5px; }
+.attendance-guide span { color: #334155; }
+.attendance-guide.warn { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+.attendance-guide-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.guide-btn { border: 1px solid #bfdbfe; background: #fff; color: #1d4ed8; font: 600 12.5px inherit; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.guide-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+.attendance-guide.warn .guide-btn.primary { background: #d97706; border-color: #d97706; }
