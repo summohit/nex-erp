@@ -1006,14 +1006,27 @@ export class OfferLettersService {
     }
 
     const settings = await this.prisma.systemSetting.findUnique({ where: { companyId: letter.companyId } });
-    const { html, header, footer } = await this.generateHtmlFromSettings(
+    const rendered = await this.generateHtmlFromSettings(
       settings, letter.application, letter.issuedAt || new Date(),
     );
 
+    // The signing page must show the exact same revision as regeneration.  A
+    // custom candidate body used to be considered only while creating the PDF,
+    // while this live HTML view always went back to the company template. That
+    // let a candidate sign terms different from the saved and regenerated
+    // document. Keep the letterhead/footer from company settings, but render
+    // the saved body and its current salary table when it exists.
+    const html = letter.application.offerLetterBody?.trim()
+      ? this.applySalaryTable(
+          this.printableBody(letter.application.offerLetterBody),
+          rendered.salaryTableHtml,
+        )
+      : rendered.html;
+
     return {
       html,
-      header,
-      footer,
+      header: rendered.header,
+      footer: rendered.footer,
       status: letter.status,
       candidateName: letter.application.fullName,
       jobTitle: letter.application.job?.title,
