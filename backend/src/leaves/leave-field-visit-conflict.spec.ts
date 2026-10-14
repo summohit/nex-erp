@@ -78,6 +78,18 @@ const APPLY = {
 };
 
 describe('applying for leave over a field visit', () => {
+  // The leave is for 1–2 Oct 2026, so "today" has to be before it — otherwise
+  // the no-leave-in-the-past rule rejects it, which is what broke these tests
+  // once October arrived. Only Date is frozen; timers and promises run as usual.
+  beforeEach(() => {
+    jest.useFakeTimers({
+      now: new Date('2026-09-15T06:30:00.000Z'),
+      doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate', 'clearImmediate',
+        'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'hrtime', 'performance'],
+    });
+  });
+  afterEach(() => jest.useRealTimers());
+
   it('is allowed, and comes back saying what it clashes with', async () => {
     const { service } = makeService();
     const request: any = await service.requestLeave(500, APPLY);
