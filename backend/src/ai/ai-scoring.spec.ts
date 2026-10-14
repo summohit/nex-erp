@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { PdfService, ResumeUnreadableError } from './pdf.service';
 import { AiScoringCron } from './ai-scoring.cron';
+import { AiRateLimitedError } from './ai.service';
 
 const get = axios.get as jest.Mock;
 const pdftotext = execFileSync as unknown as jest.Mock;
@@ -104,6 +105,17 @@ describe('the scoring run', () => {
     const [data] = saved(prisma);
     expect(data).toMatchObject({ isAiScored: true, aiScore: null });
     expect(JSON.parse(data.aiSummary).strengths).toMatch(/failed 3 times/);
+  });
+
+  // Re-scoring 931 resumes on 14 Oct hit Groq's per-minute limit after three.
+  it('stops the batch on a Groq rate limit without holding it against anyone', async () => {
+    const { cron, prisma, ai } = make([app, { ...app, id: 1065 }]);
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    ai.scoreResume.mockRejectedValue(new AiRateLimitedError('Groq API rate limit (429)'));
+
+    for (let i = 0; i < 5; i++) await cron.processUnscoredApplications();
+    expect(ai.scoreResume).toHaveBeenCalledTimes(5); // one per run: the batch stops at the first 429
+    expect(prisma.jobApplication.update).not.toHaveBeenCalled(); // never set aside
   });
 
   it('gives no score when the job has no description', async () => {

@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AiService } from './ai.service';
+import { AiService, AiRateLimitedError } from './ai.service';
 import { PdfService, ResumeUnreadableError } from './pdf.service';
 
 /** Tries before an application that keeps failing is set aside, so it cannot block the queue. */
@@ -90,6 +90,12 @@ export class AiScoringCron implements OnModuleInit, OnModuleDestroy {
           this.attempts.delete(app.id);
           console.log(`[AI Scoring Cron] Successfully scored application #${app.id}: Score ${result.score}`);
         } catch (err) {
+          if (err instanceof AiRateLimitedError) {
+            // Groq's per-minute limit, not this candidate: don't count it as a
+            // failed try, and stop the batch — the rest would only hit it too.
+            console.warn(`[AI Scoring Cron] Groq rate limit at application #${app.id}; resuming next run.`);
+            break;
+          }
           if (err instanceof ResumeUnreadableError) {
             // Retrying cannot help. Record why, with no score — a number here
             // would be shown as "% Match" and read as a judgement on the person.

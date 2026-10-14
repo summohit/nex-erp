@@ -2,6 +2,9 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
+/** Groq said "too many requests" (429). Not the candidate's fault — wait and try again. */
+export class AiRateLimitedError extends Error {}
+
 @Injectable()
 export class AiService {
   private get apiKey(): string {
@@ -110,6 +113,9 @@ Do not include any markdown blocks, backticks, or other text outside the JSON.`;
         }),
       });
 
+      if (response.status === 429) {
+        throw new AiRateLimitedError('Groq API rate limit (429)');
+      }
       if (!response.ok) {
         throw new Error(`Groq API returned status ${response.status}`);
       }
@@ -135,6 +141,7 @@ Do not include any markdown blocks, backticks, or other text outside the JSON.`;
       // Throw rather than return a score of 0: the caller saved that 0 as the
       // candidate's real "0% Match", so a rate limit or a malformed reply became
       // a permanent verdict. Thrown, the application stays unscored and is retried.
+      if (err instanceof AiRateLimitedError) throw err;
       console.error('AI ATS Scoring Error:', err.message || err);
       throw new Error(`AI scoring failed: ${err.message || err}`);
     }
