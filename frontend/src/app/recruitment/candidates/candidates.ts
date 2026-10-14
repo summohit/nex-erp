@@ -129,13 +129,14 @@ export class CandidatesComponent implements OnInit {
   }
 
   /**
-   * Stages a candidate may skip: Negotiation is optional, and On Hold /
-   * Rejected are detours that must never block the path to onboarding.
+   * Stages a candidate may skip: Phone Screening, Interview and Negotiation are
+   * optional, and On Hold / Rejected are detours that must never block the path
+   * to onboarding.
    */
-  readonly SKIPPABLE_STAGES = ['NEGOTIATION', 'ON_HOLD', 'REJECTED'];
+  readonly SKIPPABLE_STAGES = ['PHONE_SCREENING', 'INTERVIEW', 'NEGOTIATION', 'ON_HOLD', 'REJECTED'];
 
   /** Every stage a candidate must have passed through before being Offered. */
-  readonly MANDATORY_BEFORE_OFFER = ['APPLIED', 'PHONE_SCREENING', 'INTERVIEW'];
+  readonly MANDATORY_BEFORE_OFFER = ['APPLIED'];
 
   /** Stages the candidate has been through, including the one they sit in now. */
   private visitedStages(app: JobApplication): Set<string> {

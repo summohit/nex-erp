@@ -26,9 +26,10 @@ describe('ApplicationsService — job offer rules', () => {
   });
 
   describe('mandatory stages', () => {
-    it('blocks OFFERED until phone screening and interview have happened', () => {
-      expect(() => assertStage(candidate(), 'OFFERED')).toThrow(BadRequestException);
-      expect(() => assertStage(candidate(), 'OFFERED')).toThrow(/Phone Screening, Interview/);
+    it('allows OFFERED without phone screening or interview', () => {
+      expect(() => assertStage(candidate(), 'OFFERED')).not.toThrow();
+      expect(() => assertStage(candidate({ status: 'NEGOTIATION', completedStages: ['APPLIED', 'NEGOTIATION'] }), 'OFFERED'))
+        .not.toThrow();
     });
 
     it('allows OFFERED once every mandatory stage has been visited', () => {

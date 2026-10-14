@@ -53,8 +53,13 @@ export class ApplicationsService {
    */
   private static readonly GATED_STAGES = ['OFFERED', 'HIRED', 'ONBOARDED'];
 
-  /** Every stage a candidate must have passed through before being OFFERED. */
-  private static readonly MANDATORY_BEFORE_OFFER = ['APPLIED', 'PHONE_SCREENING', 'INTERVIEW'];
+  /**
+   * Every stage a candidate must have passed through before being OFFERED.
+   * Phone Screening and Interview used to be required too; they are skippable
+   * now (a referral or a known candidate can go straight to an offer), so only
+   * Applied — which every candidate has — remains.
+   */
+  private static readonly MANDATORY_BEFORE_OFFER = ['APPLIED'];
 
   private static readonly STAGE_LABELS: Record<string, string> = {
     APPLIED: 'Applied',
@@ -116,8 +121,9 @@ export class ApplicationsService {
   }
 
   /**
-   * Refuse a move that skips a mandatory stage. NEGOTIATION, ON_HOLD and
-   * REJECTED are never required, so they are absent from every check below.
+   * Refuse a move that skips a mandatory stage. PHONE_SCREENING, INTERVIEW,
+   * NEGOTIATION, ON_HOLD and REJECTED are never required, so they are absent
+   * from every check below.
    */
   private assertStageAllowed(application: any, target: string) {
     if (!ApplicationsService.GATED_STAGES.includes(target)) return;
@@ -128,8 +134,7 @@ export class ApplicationsService {
     if (missing.length > 0) {
       throw new BadRequestException(
         `Cannot move to ${this.stageLabel(target)} — this candidate has not been through ` +
-        `${missing.map((s) => this.stageLabel(s)).join(', ')}. Every stage except ` +
-        `Negotiation, On Hold and Rejected is mandatory.`,
+        `${missing.map((s) => this.stageLabel(s)).join(', ')}.`,
       );
     }
 
