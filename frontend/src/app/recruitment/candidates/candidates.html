@@ -539,14 +539,15 @@
             </div>
             <h4>AI Match Analysis</h4>
           </div>
-          <div class="ai-score-large" [ngClass]="getScoreClass(aiData.score)">
+          <!-- No score when the resume could not be read: show the reason, not a 0. -->
+          <div class="ai-score-large" *ngIf="aiData.score != null" [ngClass]="getScoreClass(aiData.score)">
             <span class="score-value">{{aiData.score}}</span>
             <span class="score-label">Fit</span>
           </div>
         </div>
-        
+
         <!-- Progress Bar -->
-        <div class="ai-progress-bar">
+        <div class="ai-progress-bar" *ngIf="aiData.score != null">
           <div class="ai-progress-fill" [ngClass]="getScoreClass(aiData.score)" [style.width]="aiData.score + '%'"></div>
         </div>
 

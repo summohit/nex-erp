@@ -3,51 +3,71 @@ import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as crypto from 'crypto';
+
+/**
+ * The resume itself is the problem — gone from storage, or a PDF with no text
+ * layer — so trying again will not help. The scorer records it as unreadable
+ * rather than scoring it.
+ */
+export class ResumeUnreadableError extends Error {}
+
+/** Less text than this is not a resume; a scanned PDF yields a few stray characters. */
+const MIN_RESUME_CHARS = 50;
 
 @Injectable()
 export class PdfService {
-  async extractTextFromUrl(url: string, fallbackDetails: any = {}): Promise<string> {
+  /**
+   * The text of the PDF at `url`.
+   *
+   * There used to be a fallback here that returned a made-up resume ("JavaScript,
+   * Node.js… B.S. in Computer Science") whenever extraction failed. pdftotext was
+   * never installed on the production server, so from 6 Aug to 14 Oct 2026 every
+   * candidate was scored against that invented text and every "% Match" was
+   * fiction. Never invent input: a resume that cannot be read is reported as
+   * such (ResumeUnreadableError), and anything that might pass on a retry — a
+   * network blip, pdftotext missing — throws a plain Error so it is retried.
+   */
+  async extractTextFromUrl(url: string): Promise<string> {
+    let pdf: Buffer;
     try {
-      // Fetch PDF as array buffer
-      const response = await axios.get(url, { responseType: 'arraybuffer' });
-      
-      // Save to temp file
-      const tempId = crypto.randomBytes(8).toString('hex');
-      const tempPdfPath = path.join(os.tmpdir(), `resume_${tempId}.pdf`);
-      const tempTxtPath = path.join(os.tmpdir(), `resume_${tempId}.txt`);
-      
-      fs.writeFileSync(tempPdfPath, response.data);
-      
-      try {
-        // Run pdftotext (from poppler-utils) which is available on the system
-        execSync(`pdftotext "${tempPdfPath}" "${tempTxtPath}"`, { stdio: 'ignore' });
-        const text = fs.readFileSync(tempTxtPath, 'utf8');
-        return text;
-      } catch (err) {
-        console.warn('pdftotext failed, using mock data as fallback', err.message);
-      } finally {
-        // Cleanup
-        if (fs.existsSync(tempPdfPath)) fs.unlinkSync(tempPdfPath);
-        if (fs.existsSync(tempTxtPath)) fs.unlinkSync(tempTxtPath);
+      const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 30_000 });
+      pdf = Buffer.from(response.data);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 404 || status === 403 || status === 410) {
+        throw new ResumeUnreadableError(`the resume file is no longer available (HTTP ${status})`);
       }
-    } catch (error) {
-      console.error('Error fetching PDF:', error.message);
+      throw new Error(`could not download the resume: ${err?.message ?? err}`);
     }
-    
-    // Fallback Simulated extraction if actual parsing fails
-    const exp = fallbackDetails.experienceYears || '3-5 Years';
-    const role = fallbackDetails.jobTitle || 'Software Engineer';
-    const name = fallbackDetails.name || 'Candidate';
-    
-    return `
-      ${name}
-      Professional Resume
-      Summary: Highly motivated and experienced ${role} with ${exp} of hands-on experience in building scalable applications.
-      Experience: Senior ${role} (Last 3 years). Developed enterprise-grade systems. Junior Developer (Previous 2 years).
-      Skills: JavaScript, TypeScript, Node.js, Angular, React, MongoDB, SQL, Git, Docker, REST APIs, Microservices.
-      Education: B.S. in Computer Science, University of Technology
-    `;
+
+    const tempId = crypto.randomBytes(8).toString('hex');
+    const tempPdfPath = path.join(os.tmpdir(), `resume_${tempId}.pdf`);
+    const tempTxtPath = path.join(os.tmpdir(), `resume_${tempId}.txt`);
+    let text: string;
+    try {
+      fs.writeFileSync(tempPdfPath, pdf);
+      try {
+        // pdftotext comes from poppler-utils. execFile, not a shell: no quoting
+        // of paths, and a missing binary shows up as ENOENT.
+        execFileSync('pdftotext', [tempPdfPath, tempTxtPath], { stdio: 'ignore' });
+      } catch (err: any) {
+        if (err?.code === 'ENOENT') {
+          // The server, not the resume: retry once poppler-utils is installed.
+          throw new Error('pdftotext is not installed on this server (apt-get install poppler-utils)');
+        }
+        throw new ResumeUnreadableError('the file is not a readable PDF');
+      }
+      text = fs.readFileSync(tempTxtPath, 'utf8');
+    } finally {
+      if (fs.existsSync(tempPdfPath)) fs.unlinkSync(tempPdfPath);
+      if (fs.existsSync(tempTxtPath)) fs.unlinkSync(tempTxtPath);
+    }
+
+    if (text.trim().length < MIN_RESUME_CHARS) {
+      throw new ResumeUnreadableError('the PDF has no readable text (probably a scanned image)');
+    }
+    return text;
   }
 }

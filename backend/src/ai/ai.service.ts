@@ -132,8 +132,11 @@ Do not include any markdown blocks, backticks, or other text outside the JSON.`;
         summary: JSON.stringify(parsed)
       };
     } catch (err: any) {
+      // Throw rather than return a score of 0: the caller saved that 0 as the
+      // candidate's real "0% Match", so a rate limit or a malformed reply became
+      // a permanent verdict. Thrown, the application stays unscored and is retried.
       console.error('AI ATS Scoring Error:', err.message || err);
-      return { score: 0, summary: JSON.stringify({ score: 0, recommendation: "NOT_RECOMMENDED", strengths: "AI Scoring failed due to an error.", matchingSkills: [], missingSkills: [] }) };
+      throw new Error(`AI scoring failed: ${err.message || err}`);
     }
   }
 }

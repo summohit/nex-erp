@@ -1873,7 +1873,7 @@ export class CandidatesComponent implements OnInit {
     } catch (e) {
       // Fallback for legacy plain text summaries
       return {
-        score: app.aiScore || 0,
+        score: app.aiScore ?? null,
         strengths: app.aiSummary,
         matchingSkills: [],
         missingSkills: [],

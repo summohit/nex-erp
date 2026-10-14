@@ -1,12 +1,17 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from './ai.service';
-import { PdfService } from './pdf.service';
+import { PdfService, ResumeUnreadableError } from './pdf.service';
+
+/** Tries before an application that keeps failing is set aside, so it cannot block the queue. */
+const MAX_ATTEMPTS = 3;
 
 @Injectable()
 export class AiScoringCron implements OnModuleInit, OnModuleDestroy {
   private timer: NodeJS.Timeout;
   private isProcessing = false;
+  /** Failed tries per application since the process started. */
+  private attempts = new Map<number, number>();
 
   constructor(
     private prisma: PrismaService,
@@ -47,6 +52,9 @@ export class AiScoringCron implements OnModuleInit, OnModuleDestroy {
         include: {
           job: true
         },
+        // Newest first: after a bulk re-score, the candidates people are looking
+        // at now come back first.
+        orderBy: { id: 'desc' },
         take: 5
       });
 
@@ -55,7 +63,7 @@ export class AiScoringCron implements OnModuleInit, OnModuleDestroy {
           // If there is no job description, mark as scored with 0 to prevent infinite retries
           await this.prisma.jobApplication.update({
             where: { id: app.id },
-            data: { isAiScored: true, aiScore: 0, aiSummary: 'Job description missing. Cannot score.' }
+            data: { isAiScored: true, aiScore: null, aiSummary: this.notScored('Job description missing. Cannot score.') }
           });
           continue;
         }
@@ -64,11 +72,7 @@ export class AiScoringCron implements OnModuleInit, OnModuleDestroy {
           console.log(`[AI Scoring Cron] Scoring application #${app.id} for job: ${app.job.title}`);
           
           // 1. Extract text from PDF
-          const resumeText = await this.pdfService.extractTextFromUrl(app.resumeUrl!, {
-            experienceYears: app.experienceYears,
-            jobTitle: app.job.title,
-            name: app.fullName
-          });
+          const resumeText = await this.pdfService.extractTextFromUrl(app.resumeUrl!);
 
           // 2. Score with AI
           const result = await this.aiService.scoreResume(resumeText, app.job.descriptionHtml);
@@ -83,10 +87,23 @@ export class AiScoringCron implements OnModuleInit, OnModuleDestroy {
             }
           });
           
+          this.attempts.delete(app.id);
           console.log(`[AI Scoring Cron] Successfully scored application #${app.id}: Score ${result.score}`);
         } catch (err) {
-          console.error(`[AI Scoring Cron] Failed to score application #${app.id}:`, err.message);
-          // Don't set isAiScored to true, so it will retry next time.
+          if (err instanceof ResumeUnreadableError) {
+            // Retrying cannot help. Record why, with no score — a number here
+            // would be shown as "% Match" and read as a judgement on the person.
+            await this.setAside(app.id, `Resume could not be read: ${err.message}.`);
+            console.warn(`[AI Scoring Cron] Application #${app.id}: resume unreadable — ${err.message}`);
+            continue;
+          }
+          const tries = (this.attempts.get(app.id) ?? 0) + 1;
+          this.attempts.set(app.id, tries);
+          console.error(`[AI Scoring Cron] Failed to score application #${app.id} (try ${tries}/${MAX_ATTEMPTS}):`, err.message);
+          if (tries >= MAX_ATTEMPTS) {
+            await this.setAside(app.id, `AI scoring failed ${tries} times (${err.message}). Re-score it later.`);
+          }
+          // Otherwise left unscored, so the next run tries again.
         }
       }
     } catch (err) {
@@ -94,5 +111,19 @@ export class AiScoringCron implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.isProcessing = false;
     }
+  }
+
+  /** Mark scored with no score, so it leaves the queue and shows the reason instead of a "% Match". */
+  private async setAside(id: number, reason: string) {
+    this.attempts.delete(id);
+    await this.prisma.jobApplication.update({
+      where: { id },
+      data: { isAiScored: true, aiScore: null, aiSummary: this.notScored(reason) },
+    });
+  }
+
+  /** Same JSON shape the candidate screen reads for a real score, with `score: null`. */
+  private notScored(reason: string): string {
+    return JSON.stringify({ score: null, recommendation: null, strengths: reason, matchingSkills: [], missingSkills: [] });
   }
 }
