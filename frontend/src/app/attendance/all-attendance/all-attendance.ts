@@ -206,7 +206,6 @@ export class AllAttendanceComponent implements OnInit {
     { value: 'On Leave', label: 'On Leave', icon: 'plane', bgClass: 'bg-leave', iconClass: 'status-leave' },
     { value: 'Holiday', label: 'Holiday', icon: 'star', bgClass: 'bg-holiday', iconClass: 'status-holiday' },
     { value: 'Day Off', label: 'Day Off', icon: 'calendar', bgClass: 'bg-day-off', iconClass: 'status-day-off' },
-    { value: 'Overtime', label: 'Overtime', icon: 'zap', bgClass: 'bg-overtime', iconClass: 'status-overtime' },
     { value: 'Missed Clock Out', label: 'Missed Clock Out', icon: 'timer-off', bgClass: 'bg-clockoff', iconClass: 'status-clockoff' }
   ];
 
@@ -701,9 +700,6 @@ export class AllAttendanceComponent implements OnInit {
           const outTime = record.clockOut ? this.formatTime(record.clockOut) : '...';
           tooltip = `In: ${inTime} · Out: ${outTime}`;
           if (holiday) tooltip = `Worked on holiday (${holiday.name || 'Holiday'}) · ${tooltip}`;
-          if (record.overtimeHours && record.overtimeHours > 0) {
-            tooltip += ` · Overtime ${record.overtimeHours}h`;
-          }
           if (record.clockOutReason) {
             tooltip += ' · Missed clock out';
           }
@@ -1430,7 +1426,7 @@ export class AllAttendanceComponent implements OnInit {
       return holiday?.name ? `Company holiday — ${holiday.name}` : 'Company holiday';
     }
     if (holiday && r?.clockIn) {
-      return `Worked on a company holiday — ${holiday.name || 'Holiday'}. Recorded only; no late mark or overtime.`;
+      return `Worked on a company holiday — ${holiday.name || 'Holiday'}. Recorded only; no late mark.`;
     }
     if (status === 'Day Off') return 'Non-working day on this roster';
     if (status === 'On Leave') return 'Approved leave for this day';
@@ -1453,9 +1449,6 @@ export class AllAttendanceComponent implements OnInit {
     }
     if (r.isLate) parts.push('Clocked in after shift start');
     if (r.isEarlyLeave) parts.push('Clocked out before shift end');
-    if (r.overtimeHours && r.overtimeHours > 0) {
-      parts.push(`Overtime — ${this.formatHours(r.overtimeHours)} past the shift`);
-    }
     if (r.clockOutReason) parts.push(`Missed clock-out — "${r.clockOutReason}"`);
     else if (r.autoClockedOut) parts.push('Never clocked out — closed by the 23:00 sweep');
     else if (r.missedClockOut) parts.push('Still open — clock-out overdue');
@@ -1494,7 +1487,6 @@ export class AllAttendanceComponent implements OnInit {
   recordMatchesStatus(r: AttendanceRecord): boolean {
     const f = this.filterStatus;
     if (!f) return true;
-    if (f === 'Overtime') return !!(r.overtimeHours && r.overtimeHours > 0);
     if (f === 'Missed Clock Out') return this.isMissedClockOut(r);
     return this.recordDayStatus(r) === f;
   }
@@ -1503,7 +1495,6 @@ export class AllAttendanceComponent implements OnInit {
     const f = this.filterStatus;
     if (!f) return true;
     if (day.status === 'Empty') return false;
-    if (f === 'Overtime') return !!(day.record?.overtimeHours && day.record.overtimeHours > 0);
     if (f === 'Missed Clock Out') return !!day.record && this.isMissedClockOut(day.record);
     return day.status === f;
   }
@@ -1519,7 +1510,6 @@ export class AllAttendanceComponent implements OnInit {
     if (status === 'On Leave') return 'status-leave-badge';
     if (status === 'Holiday') return 'status-holiday-badge';
     if (status === 'Day Off') return 'status-dayoff-badge';
-    if (status === 'Overtime') return 'status-overtime-badge';
     if (status === 'Missed Clock Out') return 'status-clockoff-badge';
     return 'status-pending';
   }

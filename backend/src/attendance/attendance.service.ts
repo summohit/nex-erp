@@ -213,7 +213,6 @@ export class AttendanceService {
     status: true,
     isLate: true,
     isEarlyLeave: true,
-    overtimeHours: true,
     autoClockedOut: true,
     logs: {
       select: {
@@ -738,13 +737,9 @@ export class AttendanceService {
 
     let isEarlyLeave = false;
     let status = 'PRESENT';
-    let overtimeHours = 0;
 
-    // Scored only for a session closed on its own day. For a previous day the
-    // gap between the shift ending and someone remembering is not work, and
-    // paying overtime on it would reward forgetting; leaving the day at PRESENT
-    // with a reason attached is the honest record, and regularization is how
-    // the real hours get corrected.
+    // A session closed on a previous day keeps its existing status. For a
+    // same-day close, leaving before the scheduled end remains a half day.
     const onHoliday = await this.isHoliday(employee.companyId, existing.date) || effective.isDayOff;
     if (!isPreviousDay && effective.endTime && !onHoliday) {
       // Same IST-fixed resolution as clockIn — see the comment there.
@@ -753,11 +748,6 @@ export class AttendanceService {
       if (now < expectedEnd) {
         isEarlyLeave = true;
         status = 'HALF_DAY';
-      } else {
-        const diffMs = now.getTime() - expectedEnd.getTime();
-        if (diffMs > 30 * 60000) {
-          overtimeHours = parseFloat((diffMs / 3600000).toFixed(2));
-        }
       }
     } else if (isPreviousDay) {
       status = existing.status ?? 'PRESENT';
@@ -800,7 +790,9 @@ export class AttendanceService {
         clockOutLng: data.lng,
         isEarlyLeave,
         status,
-        overtimeHours,
+        // Retain the database field for historical records, but attendance no
+        // longer awards overtime for newly closed sessions.
+        overtimeHours: 0,
         autoClockedOut: false,
         ...outsideOut,
         // The reason is the permanent record that this day's clock-out time is
@@ -1817,7 +1809,7 @@ export class AttendanceService {
       },
       select: {
         shiftId: true, status: true, isLate: true, isEarlyLeave: true,
-        clockIn: true, clockOut: true, overtimeHours: true, employeeId: true,
+        clockIn: true, clockOut: true, employeeId: true,
         shift: { select: { id: true, name: true, shortCode: true, colorCode: true } },
       },
     });
@@ -1825,7 +1817,7 @@ export class AttendanceService {
     type Bucket = {
       shiftId: number | null; name: string; shortCode: string | null; colorCode: string | null;
       present: number; halfDay: number; absent: number; onLeave: number; weeklyOff: number; holiday: number;
-      late: number; earlyLeave: number; hours: number; overtimeHours: number;
+      late: number; earlyLeave: number; hours: number;
       employeeIds: Set<number>;
     };
 
@@ -1840,7 +1832,7 @@ export class AttendanceService {
           shortCode: r.shift?.shortCode ?? null,
           colorCode: r.shift?.colorCode ?? null,
           present: 0, halfDay: 0, absent: 0, onLeave: 0, weeklyOff: 0, holiday: 0,
-          late: 0, earlyLeave: 0, hours: 0, overtimeHours: 0,
+          late: 0, earlyLeave: 0, hours: 0,
           employeeIds: new Set<number>(),
         };
         buckets.set(key, b);
@@ -1863,7 +1855,6 @@ export class AttendanceService {
 
       if (r.isLate) b.late++;
       if (r.isEarlyLeave) b.earlyLeave++;
-      b.overtimeHours += r.overtimeHours || 0;
 
       // Only a closed session has a duration. An open one is still running,
       // and guessing its end would put hours nobody has worked into a total
@@ -1879,7 +1870,6 @@ export class AttendanceService {
       .map(({ employeeIds, ...b }) => ({
         ...b,
         hours: round(b.hours),
-        overtimeHours: round(b.overtimeHours),
         people: employeeIds.size,
         /** Days anybody was expected: the denominator for "how did this shift do". */
         workingDays: b.present + b.halfDay + b.absent,

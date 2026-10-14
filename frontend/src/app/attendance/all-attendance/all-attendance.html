@@ -639,7 +639,6 @@
                   <svg *ngIf="day.status === 'Missed Clock Out'" lucideTimerOff class="status-clockoff-full status-icon" title="Clock-out approval pending"></svg>
                   <span *ngIf="day.record?.fieldVisit || day.record?.isOnsite" class="day-fv-pin" title="Field Visit on site">🚗</span>
                   <span *ngIf="day.record?.clockInLat && !day.record?.fieldVisit && !day.record?.isOnsite" class="day-location-pin" title="GPS location logged">📍</span>
-                  <svg *ngIf="day.record?.overtimeHours" lucideZap class="day-corner-symbol day-ot-symbol status-overtime" title="Overtime"></svg>
                   <svg *ngIf="showResolvedClockOutMarker(day.record)" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" title="Approved clock-out"></svg>
                 </ng-container>
                 <span *ngIf="day.isFuture && day.status === 'Empty'" class="future-dot">·</span>
@@ -698,9 +697,6 @@
       </div>
       <div class="cell-tooltip-detail" *ngIf="tip.day.record?.totalHours">
         <strong>Duration:</strong> {{ formatHours(tip.day.record?.totalHours || 0) }}
-      </div>
-      <div class="cell-tooltip-detail cell-tooltip-overtime" *ngIf="(tip.day.record?.overtimeHours || 0) > 0">
-        ⚡ Overtime: {{ formatHours(tip.day.record?.overtimeHours || 0) }}
       </div>
       <div class="cell-tooltip-detail cell-tooltip-missed" *ngIf="tip.day.record?.clockOutReason">
         ⏱ Missed clock-out: "{{ tip.day.record?.clockOutReason }}"
@@ -906,8 +902,7 @@
         <span>
           <strong>Auto-closed at 11:00 PM.</strong>
           Nobody clocked out, so the system closed the day at its 11:00 PM cutoff and reused the
-          clock-in location. The clock-out time and coordinates below are not a recorded departure,
-          and any overtime on this day follows from the cutoff rather than from hours actually worked.
+          clock-in location. The clock-out time and coordinates below are not a recorded departure.
         </span>
       </div>
 

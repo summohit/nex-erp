@@ -37,6 +37,12 @@ export interface NewTicketAttachment {
   fileSize?: number | null;
 }
 
+export interface TicketMoveUpdate {
+  departmentId: number;
+  moveReason: string;
+  attachments?: NewTicketAttachment[];
+}
+
 export interface TicketActivity {
   id: number;
   action: string;
@@ -155,7 +161,7 @@ export class TicketService {
     return this.http.get<{ id: number; name: string; members: number }[]>(`${this.apiUrl}/teams/list`);
   }
 
-  updateTicket(id: number, data: Partial<Ticket>): Observable<Ticket> {
+  updateTicket(id: number, data: Partial<Ticket> | TicketMoveUpdate): Observable<Ticket> {
     return this.http.patch<Ticket>(`${this.apiUrl}/${id}`, data);
   }
 
