@@ -14,11 +14,17 @@ describe('approving a regularization', () => {
   };
   const HR = { companyId: 1, role: 'HR', employeeId: 3 };
 
-  function make(existing: any) {
+  // A plain working day on a 09:30–18:30 shift, 15 minutes' buffer, half-day after 13:30.
+  const SHIFT = {
+    source: 'STANDING', isDayOff: false, onsite: null, startTime: '09:30', endTime: '18:30',
+    shift: { id: 6, name: 'Onsite Project', bufferTimeMinutes: 15, halfDayTime: '13:30', officeGeofence: false },
+  };
+
+  function make(existing: any, request: any = reg) {
     const prisma: any = {
       attendanceRegularization: {
-        findUnique: jest.fn().mockResolvedValue(reg),
-        update: jest.fn().mockResolvedValue({ ...reg, status: 'APPROVED' }),
+        findUnique: jest.fn().mockResolvedValue(request),
+        update: jest.fn().mockResolvedValue({ ...request, status: 'APPROVED' }),
       },
       employee: { findMany: jest.fn().mockResolvedValue([]) },
       attendance: {
@@ -27,10 +33,15 @@ describe('approving a regularization', () => {
         update: jest.fn().mockResolvedValue({ id: existing?.id }),
       },
     };
-    const notifications: any = { create: jest.fn(), notifyEmployees: jest.fn(), notifyUser: jest.fn() };
-    const service = new AttendanceService(prisma, notifications, {} as any, {} as any);
+    const notifications: any = {
+      create: jest.fn(), notifyEmployees: jest.fn(), notifyUser: jest.fn(),
+      createNotification: jest.fn().mockResolvedValue(undefined),
+    };
+    const roster: any = { getEffectiveShift: jest.fn().mockResolvedValue(SHIFT) };
+    const service = new AttendanceService(prisma, notifications, roster, {} as any);
+    jest.spyOn(service, 'isHoliday').mockResolvedValue(false);
     const grant = jest.spyOn(service as any, 'grantCompOffIfEligible').mockResolvedValue(undefined);
-    return { service, prisma, grant };
+    return { service, prisma, grant, roster };
   }
 
   it('checks the new day for comp-off', async () => {
@@ -71,6 +82,49 @@ describe('approving a regularization', () => {
     prisma.employee.findMany.mockResolvedValueOnce([{ id: 10 }]).mockResolvedValue([]);
     await service.resolveRegularization(1, 99, 'APPROVED', undefined, { companyId: 1, role: 'EMPLOYEE', employeeId: 7 }).catch(() => {});
     expect(grant).toHaveBeenCalledWith(77);
+  });
+
+  // Amit Kumar's onsite days were HALF_DAY; approving corrected times left them
+  // HALF_DAY because approval never re-scored the day.
+  describe('re-scores the corrected day', () => {
+    const onsiteDay = {
+      ...reg, date: new Date('2026-10-06T00:00:00Z'),
+      proposedClockIn: new Date('2026-10-06T09:25:00+05:30'), proposedClockOut: new Date('2026-10-06T18:40:00+05:30'),
+    };
+    const halfDay = { id: 51312, status: 'HALF_DAY', isLate: true, isEarlyLeave: true, clockIn: null, clockOut: null };
+
+    it('turns a half day worked in full into PRESENT, on the shift in force that day', async () => {
+      const { service, prisma } = make(halfDay, onsiteDay);
+      await service.resolveRegularization(1, 99, 'APPROVED', undefined, HR);
+      expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({
+        status: 'PRESENT', isLate: false, isEarlyLeave: false, shiftId: 6,
+      });
+    });
+
+    it('keeps HALF_DAY when the corrected times still leave early', async () => {
+      const { service, prisma } = make(halfDay, { ...onsiteDay, proposedClockOut: new Date('2026-10-06T15:00:00+05:30') });
+      await service.resolveRegularization(1, 99, 'APPROVED', undefined, HR);
+      expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({ status: 'HALF_DAY', isEarlyLeave: true });
+    });
+
+    it('marks late without halving the day before the half-day boundary', async () => {
+      const { service, prisma } = make(halfDay, { ...onsiteDay, proposedClockIn: new Date('2026-10-06T10:00:00+05:30') });
+      await service.resolveRegularization(1, 99, 'APPROVED', undefined, HR);
+      expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({ status: 'PRESENT', isLate: true });
+    });
+
+    it('compares a clock-out after midnight with that day\'s shift end', async () => {
+      const { service, prisma } = make(halfDay, { ...onsiteDay, proposedClockOut: new Date('2026-10-07T00:30:00+05:30') });
+      await service.resolveRegularization(1, 99, 'APPROVED', undefined, HR);
+      expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({ status: 'PRESENT', isEarlyLeave: false });
+    });
+
+    it('leaves a leave day\'s status alone', async () => {
+      const { service, prisma, roster } = make({ ...halfDay, status: 'ON_LEAVE' }, onsiteDay);
+      await service.resolveRegularization(1, 99, 'APPROVED', undefined, HR);
+      expect(roster.getEffectiveShift).not.toHaveBeenCalled();
+      expect(prisma.attendance.update.mock.calls[0][0].data.status).toBeUndefined();
+    });
   });
 
   it('credits nothing when the request is rejected', async () => {

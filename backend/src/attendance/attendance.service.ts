@@ -1417,6 +1417,46 @@ export class AttendanceService {
     return created;
   }
 
+  /**
+   * The status a regularized day earns from its corrected times, judged the way
+   * a live clock-in and clock-out would have judged them: late past the shift
+   * start plus buffer, HALF_DAY past the half-day boundary or for leaving before
+   * the shift ends. The shift is the one in force that day — a roster entry
+   * (an approved onsite stint) first, the standing shift otherwise.
+   */
+  private async scoreRegularizedDay(
+    employeeId: number, companyId: number, date: Date, clockIn: Date | null, clockOut: Date | null,
+  ): Promise<{ status: string; isLate: boolean; isEarlyLeave: boolean; shiftId: number | null }> {
+    const effective = await this.roster.getEffectiveShift(employeeId, date);
+    const onHoliday = effective.isDayOff || await this.isHoliday(companyId, date);
+    const shiftId = effective.shift?.id ?? null;
+    if (onHoliday) return { status: 'PRESENT', isLate: false, isEarlyLeave: false, shiftId };
+
+    let isLate = false;
+    let lateStartHalfDay = false;
+    if (clockIn && effective.startTime) {
+      const buffer = effective.shift?.bufferTimeMinutes ?? 0;
+      isLate = clockIn.getTime() > istTimeInstant(clockIn, effective.startTime).getTime() + buffer * 60000;
+      lateStartHalfDay = isHalfDayStart(clockIn, effective.startTime, effective.shift?.halfDayTime, istTimeInstant);
+    }
+
+    let isEarlyLeave = false;
+    if (clockIn && clockOut && effective.endTime) {
+      // Resolved on the clock-in's day so a session closed after midnight is
+      // compared with the right shift end; an overnight shift ends the next day.
+      let expectedEnd = istTimeInstant(clockIn, effective.endTime);
+      if (effective.startTime && expectedEnd <= istTimeInstant(clockIn, effective.startTime)) {
+        expectedEnd = new Date(expectedEnd.getTime() + 86_400_000);
+      }
+      isEarlyLeave = clockOut < expectedEnd;
+    }
+
+    return {
+      status: lateStartHalfDay || isEarlyLeave ? 'HALF_DAY' : 'PRESENT',
+      isLate, isEarlyLeave, shiftId,
+    };
+  }
+
   async resolveRegularization(
     id: number, approverUserId: number, status: string, rejectionReason?: string,
     actor?: { companyId: number; role?: string | null; employeeId?: number | null },
@@ -1438,21 +1478,30 @@ export class AttendanceService {
       const attendance = await this.prisma.attendance.findUnique({
         where: { employeeId_date: { employeeId: regularization.employeeId, date: regularization.date } }
       });
+      const clockIn = regularization.proposedClockIn || attendance?.clockIn || null;
+      const clockOut = regularization.proposedClockOut || attendance?.clockOut || null;
+      // Approval used to rewrite the times and leave the status alone, so a day
+      // scored HALF_DAY stayed HALF_DAY however it was corrected — Amit Kumar's
+      // onsite days (3–9 Oct) were approved and still docked half a day each.
+      // Score the corrected times against the day's real shift instead. A leave,
+      // holiday or weekly-off row is not a worked-day score, so it is left as it was.
+      const rescore = !attendance || ['PRESENT', 'HALF_DAY'].includes(String(attendance.status));
+      const score = rescore
+        ? await this.scoreRegularizedDay(regularization.employeeId, regularization.employee.companyId, regularization.date, clockIn, clockOut)
+        : {};
       const saved = attendance
         ? await this.prisma.attendance.update({
           where: { id: attendance.id },
-          data: {
-            clockIn: regularization.proposedClockIn || attendance.clockIn,
-            clockOut: regularization.proposedClockOut || attendance.clockOut
-          }
+          data: { clockIn, clockOut, ...score }
         })
         : await this.prisma.attendance.create({
           data: {
             employeeId: regularization.employeeId,
             date: regularization.date,
-            clockIn: regularization.proposedClockIn,
-            clockOut: regularization.proposedClockOut,
-            status: 'PRESENT'
+            clockIn,
+            clockOut,
+            status: 'PRESENT',
+            ...score,
           }
         });
       // A day worked on a Sunday, holiday or day off earns comp-off however it
