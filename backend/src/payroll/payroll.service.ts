@@ -413,9 +413,24 @@ export class PayrollService {
 
   // ==================== 3. PAYSLIPS ====================
 
+  /**
+   * Payroll is calculated by calendar day, not by an instant in a timezone.
+   * Attendance `date` is a PostgreSQL DATE returned by Prisma at UTC midnight.
+   * Constructing these boundaries in the server's local timezone shifted Indian
+   * dates back one day (and could move a Saturday onto a Sunday), making a
+   * weekly off look like an absence. Keep every payroll date in UTC instead.
+   */
+  private payrollDate(year: number, month: number, day: number): Date {
+    return new Date(Date.UTC(year, month - 1, day));
+  }
+
+  private payrollDateKey(date: Date): string {
+    return date.toISOString().slice(0, 10);
+  }
+
   private isWeeklyOff(date: Date, rules: string[]): boolean {
-    const day = date.getDay(); // 0=Sun, 6=Sat
-    const dateNum = date.getDate();
+    const day = date.getUTCDay(); // 0=Sun, 6=Sat
+    const dateNum = date.getUTCDate();
     const occurrence = Math.ceil(dateNum / 7); // 1st, 2nd, 3rd, 4th, 5th occurrence in the month
     
     for (const rule of rules) {
@@ -430,6 +445,35 @@ export class PayrollService {
       }
     }
     return false;
+  }
+
+  /** Paid leave offsets loss of pay; two complementary half-day leaves make a full day. */
+  private paidLeaveCredit(dateKey: string, leaves: Array<{ startDate: Date; endDate: Date; isHalfDay?: boolean }>): number {
+    let credit = 0;
+    for (const leave of leaves) {
+      const start = this.payrollDateKey(leave.startDate);
+      const end = this.payrollDateKey(leave.endDate);
+      if (dateKey >= start && dateKey <= end) credit += leave.isHalfDay ? 0.5 : 1;
+    }
+    return Math.min(1, credit);
+  }
+
+  private attendanceCredit(status?: string): number {
+    if (status === 'PRESENT') return 1;
+    if (status === 'HALF_DAY') return 0.5;
+    return 0;
+  }
+
+  /** Company holidays are neither payable absences nor working days. */
+  private async payrollHolidayKeys(companyId: number, start: Date, end: Date): Promise<Set<string>> {
+    // The optional guard keeps focused unit tests lightweight; Prisma always
+    // supplies this delegate in the application.
+    if (!this.prisma.holiday?.findMany) return new Set<string>();
+    const holidays = await this.prisma.holiday.findMany({
+      where: { companyId, date: { gte: start, lte: end } },
+      select: { date: true },
+    });
+    return new Set(holidays.map((holiday) => this.payrollDateKey(holiday.date)));
   }
 
   /**
@@ -452,36 +496,54 @@ export class PayrollService {
       include: { salaryStructures: { include: { component: true } }, branch: true },
     });
 
-    const totalDaysInMonth = new Date(year, month, 0).getDate();
+    const totalDaysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const startDate = this.payrollDate(year, month, 1);
+    const endDate = this.payrollDate(year, month, totalDaysInMonth);
+    const holidayKeys = await this.payrollHolidayKeys(companyId, startDate, endDate);
     const rows: any[] = [];
 
     for (const emp of employees) {
       let gross = 0;
       let deductions = 0;
+      let basicSalary = 0;
+      const componentNames: string[] = [];
       for (const st of emp.salaryStructures || []) {
         const amt = st.amount || 0;
-        if (st.component?.type === 'EARNING') gross += amt;
-        else if (st.component?.type === 'DEDUCTION') deductions += amt;
+        if (st.component?.name) componentNames.push(st.component.name);
+        if (st.component?.type === 'EARNING') {
+          gross += amt;
+          if (st.component.name.toLowerCase().includes('basic')) basicSalary = amt;
+        } else if (st.component?.type === 'DEDUCTION') deductions += amt;
       }
       if (gross <= 0) continue;
+
+      // Keep the preview's net pay equal to the DRAFT generator: statutory
+      // deductions are part of payroll even when no salary-structure line was
+      // configured for them.
+      const hasComponent = (phrase: string) => componentNames
+        .some((name) => name.toLowerCase().includes(phrase.toLowerCase()));
+      const statutoryBasic = basicSalary || gross * 0.5;
+      if (statutoryBasic > 0 && !hasComponent('Provident Fund')) deductions += Math.round(statutoryBasic * 0.12);
+      if (gross > 0 && gross <= 21000 && !hasComponent('State Insurance')) deductions += Math.round(gross * 0.0075);
+      if (gross > 15000 && !hasComponent('Professional Tax')) deductions += 200;
+      if (gross > 50000 && !hasComponent('TDS')) deductions += Math.round((gross - 50000) * 0.10);
 
       const offs = (emp.branch?.weeklyOffs || '0').split(',').map((n) => n.trim());
       let workingDays = 0;
       for (let d = 1; d <= totalDaysInMonth; d++) {
-        if (!offs.includes(String(new Date(year, month - 1, d).getDay()))) workingDays++;
+        const date = this.payrollDate(year, month, d);
+        if (!this.isWeeklyOff(date, offs) && !holidayKeys.has(this.payrollDateKey(date))) workingDays++;
       }
       if (workingDays === 0) workingDays = totalDaysInMonth;
 
       const attendances = await this.prisma.attendance.findMany({
         where: {
           employeeId: emp.id,
-          date: { gte: new Date(year, month - 1, 1), lte: new Date(year, month, 0) },
+          date: { gte: startDate, lte: endDate },
         },
         select: { date: true, status: true, clockOutApproval: true },
       });
       const byDay = new Map<string, string>();
-      let present = 0;
-      let half = 0;
       for (const a of attendances) {
         // §Att5: a late clock-out awaiting approval, or refused, is a claim
         // about a day rather than a record of one. It must not reach payroll
@@ -489,34 +551,38 @@ export class PayrollService {
         // exactly as it would if it had never been opened, until somebody
         // rules on it.
         if (!countsAsAttended(a)) continue;
-        byDay.set(a.date.toISOString().split('T')[0], a.status);
-        if (a.status === 'PRESENT') present++;
-        else if (a.status === 'HALF_DAY') half++;
+        byDay.set(this.payrollDateKey(a.date), a.status);
       }
 
       // §Att10: deleted leave stops covering an absence. Left in, a removed
       // request would keep excusing days it no longer exists to excuse — and
       // the only visible symptom would be pay that nobody can account for.
       const leaves = await this.prisma.leaveRequest.findMany({
-        where: { employeeId: emp.id, status: 'APPROVED', deletedAt: null },
-        select: { startDate: true, endDate: true },
+        where: {
+          employeeId: emp.id,
+          status: 'APPROVED',
+          deletedAt: null,
+          leaveType: { isPaid: true },
+          startDate: { lte: endDate },
+          endDate: { gte: startDate },
+        },
+        select: { startDate: true, endDate: true, isHalfDay: true },
       });
 
       let absences = 0;
+      let present = 0;
+      let half = 0;
       for (let d = 1; d <= totalDaysInMonth; d++) {
-        const date = new Date(year, month - 1, d);
-        if (offs.includes(String(date.getDay()))) continue;
-        const key = date.toISOString().split('T')[0];
+        const date = this.payrollDate(year, month, d);
+        if (this.isWeeklyOff(date, offs) || holidayKeys.has(this.payrollDateKey(date))) continue;
+        const key = this.payrollDateKey(date);
         const st = byDay.get(key);
-        if (st === 'PRESENT' || st === 'HALF_DAY') continue;
-        const covered = leaves.some(
-          (l) =>
-            key >= l.startDate.toISOString().split('T')[0] &&
-            key <= l.endDate.toISOString().split('T')[0],
-        );
-        if (!covered) absences++;
+        const attendanceCredit = this.attendanceCredit(st);
+        if (attendanceCredit === 1) present++;
+        else if (attendanceCredit === 0.5) half++;
+        const payableCredit = Math.min(1, attendanceCredit + this.paidLeaveCredit(key, leaves));
+        absences += 1 - payableCredit;
       }
-      absences += half * 0.5;
 
       const lossOfPay = Math.round((gross / workingDays) * absences * 100) / 100;
       rows.push({
@@ -602,9 +668,10 @@ export class PayrollService {
       }
     });
 
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0); // Last day of month
-    const totalDaysInMonth = endDate.getDate();
+    const totalDaysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const startDate = this.payrollDate(year, month, 1);
+    const endDate = this.payrollDate(year, month, totalDaysInMonth); // Last day of month
+    const holidayKeys = await this.payrollHolidayKeys(companyId, startDate, endDate);
 
     for (const emp of employees) {
       // Branch Weekly Offs logic
@@ -613,8 +680,8 @@ export class PayrollService {
       
       let workingDaysInMonth = 0;
       for (let d = 1; d <= totalDaysInMonth; d++) {
-        const date = new Date(year, month - 1, d);
-        if (!this.isWeeklyOff(date, weeklyOffRules)) {
+        const date = this.payrollDate(year, month, d);
+        if (!this.isWeeklyOff(date, weeklyOffRules) && !holidayKeys.has(this.payrollDateKey(date))) {
           workingDaysInMonth++;
         }
       }
@@ -645,49 +712,32 @@ export class PayrollService {
         include: { leaveType: true }
       });
 
-      let presentCount = 0;
-      let halfDayCount = 0;
-      
       const attendanceMap = new Map();
       for (const att of attendances) {
         // §Att5, same rule as the preview above: unapproved is not attended.
         if (!countsAsAttended(att)) continue;
         // Simple YYYY-MM-DD string for safe comparison ignoring timezones
-        const dateStr = att.date.toISOString().split('T')[0];
+        const dateStr = this.payrollDateKey(att.date);
         attendanceMap.set(dateStr, att.status);
-        if (att.status === 'PRESENT') presentCount++;
-        else if (att.status === 'HALF_DAY') halfDayCount++;
       }
 
       let unexcusedAbsences = 0;
+      let presentCount = 0;
+      let halfDayCount = 0;
 
       for (let d = 1; d <= totalDaysInMonth; d++) {
-        const date = new Date(year, month - 1, d);
+        const date = this.payrollDate(year, month, d);
         // Only check working days for LOP
-        if (!this.isWeeklyOff(date, weeklyOffRules)) {
-          const dateStr = date.toISOString().split('T')[0];
+        if (!this.isWeeklyOff(date, weeklyOffRules) && !holidayKeys.has(this.payrollDateKey(date))) {
+          const dateStr = this.payrollDateKey(date);
           const status = attendanceMap.get(dateStr);
-          
-          if (status !== 'PRESENT' && status !== 'HALF_DAY') {
-            // Check if covered by approved paid leave
-            let isCovered = false;
-            for (const leave of approvedLeaves) {
-              const leaveStartStr = leave.startDate.toISOString().split('T')[0];
-              const leaveEndStr = leave.endDate.toISOString().split('T')[0];
-              if (dateStr >= leaveStartStr && dateStr <= leaveEndStr) {
-                isCovered = true;
-                break;
-              }
-            }
-
-            if (!isCovered) {
-              unexcusedAbsences++;
-            }
-          }
+          const attendanceCredit = this.attendanceCredit(status);
+          if (attendanceCredit === 1) presentCount++;
+          else if (attendanceCredit === 0.5) halfDayCount++;
+          const payableCredit = Math.min(1, attendanceCredit + this.paidLeaveCredit(dateStr, approvedLeaves));
+          unexcusedAbsences += 1 - payableCredit;
         }
       }
-
-      unexcusedAbsences += (halfDayCount * 0.5);
       
       const presentDays = presentCount + (halfDayCount * 0.5);
 
@@ -1423,7 +1473,12 @@ export class PayrollService {
       where: {
         id,
         companyId,
-        ...(onlyEmployeeId == null ? {} : { employeeId: onlyEmployeeId }),
+        // Draft payroll is internal working data. Employees may only open a
+        // slip after payroll has finalised it (or marked it paid), including
+        // when they try a detail/PDF URL directly.
+        ...(onlyEmployeeId == null
+          ? {}
+          : { employeeId: onlyEmployeeId, status: { in: ['FINALIZED', 'PAID'] } }),
       },
       include: {
         employee: {

@@ -26,14 +26,16 @@ describe('PayrollService — the preview agrees with the run', () => {
   let service: PayrollService;
   let attendance: any[];
   let leaves: any[];
+  let holidays: any[];
 
   /** A PRESENT row for each given day of September 2026. */
   const presentOn = (days: number[]) =>
-    days.map((d) => ({ date: new Date(2026, 8, d), status: 'PRESENT' }));
+    days.map((d) => ({ date: new Date(Date.UTC(2026, 8, d)), status: 'PRESENT' }));
 
   beforeEach(() => {
     attendance = [];
     leaves = [];
+    holidays = [];
 
     prisma = {
       payslip: {
@@ -65,6 +67,7 @@ describe('PayrollService — the preview agrees with the run', () => {
       },
       attendance: { findMany: jest.fn(async () => attendance) },
       leaveRequest: { findMany: jest.fn(async () => leaves) },
+      holiday: { findMany: jest.fn(async () => holidays) },
       expenseClaim: {
         findMany: jest.fn(async () => []),
         updateMany: jest.fn(async () => ({ count: 0 })),
@@ -111,12 +114,73 @@ describe('PayrollService — the preview agrees with the run', () => {
 
   it('does not charge for a day approved leave covers', async () => {
     attendance = presentOn([1, 2, 3]);
-    leaves = [{ startDate: new Date(2026, 8, 4), endDate: new Date(2026, 8, 30) }];
+    leaves = [{ startDate: new Date(Date.UTC(2026, 8, 4)), endDate: new Date(Date.UTC(2026, 8, 30)) }];
 
     const slip = await generated();
     const { row } = await previewed();
     expect(row.lossOfPay).toBeCloseTo(slip.lossOfPay, 2);
     expect(row.lossOfPay).toBe(0);
+  });
+
+  it('credits an approved paid half-day leave as half a payable day', async () => {
+    // 4 September is a working day. With no attendance, a half-day paid leave
+    // must leave exactly half a day of LOP, in both preview and generation.
+    attendance = presentOn([1, 2, 3]);
+    leaves = [{ startDate: new Date(Date.UTC(2026, 8, 4)), endDate: new Date(Date.UTC(2026, 8, 4)), isHalfDay: true }];
+
+    const slip = await generated();
+    const { row } = await previewed();
+    expect(row.lossOfPay).toBeCloseTo(slip.lossOfPay, 2);
+    expect(row.absences).toBeCloseTo(slip.absentDays, 2);
+  });
+
+  it('excludes a company holiday from both working days and loss of pay', async () => {
+    // September 7, 2026 is a working Monday. No attendance is required for it
+    // once the company declares it a holiday.
+    holidays = [{ date: new Date(Date.UTC(2026, 8, 7)) }];
+    attendance = presentOn(Array.from({ length: 30 }, (_, i) => i + 1));
+
+    const slip = await generated();
+    const { row } = await previewed();
+    expect(row.workingDays).toBe(slip.workingDays);
+    expect(row.lossOfPay).toBe(0);
+  });
+
+  it('does not shift Saturday attendance into Sunday when server timezone differs from UTC', async () => {
+    // September 2026 has 24 working days when Sundays plus the 2nd and 4th
+    // Saturday are off. Twenty-two full days and two half days must therefore
+    // be displayed as 23 present and 1 absent — never 23.5 present plus
+    // absences from Saturdays that were already recorded.
+    prisma.employee.findMany = jest.fn(async () => [{
+      id: EMPLOYEE,
+      firstName: 'Saanvi',
+      lastName: 'Sharma',
+      branch: { weeklyOffs: '0:all,6:even' },
+      salaryStructures: [
+        { amount: GROSS, component: { name: 'Basic Salary', type: 'EARNING' } },
+        { amount: DEDUCTION, component: { name: 'Provident Fund (PF)', type: 'DEDUCTION' } },
+      ],
+    }]);
+    const weeklyOffs = new Set([6, 12, 13, 20, 26, 27]);
+    const halfDays = new Set([4, 18]);
+    attendance = Array.from({ length: 30 }, (_, index) => index + 1)
+      .filter((day) => !weeklyOffs.has(day))
+      // Database DATE values are UTC midnight. This is the representation
+      // production payroll receives from Prisma regardless of server timezone.
+      .map((day) => ({
+        date: new Date(Date.UTC(2026, 8, day)),
+        status: halfDays.has(day) ? 'HALF_DAY' : 'PRESENT',
+      }));
+
+    const slip = await generated();
+    const { row } = await previewed();
+
+    expect(slip.workingDays).toBe(24);
+    expect(slip.presentDays).toBe(23);
+    expect(slip.absentDays).toBe(1);
+    expect(row.workingDays).toBe(24);
+    expect(row.presentDays).toBe(23);
+    expect(row.absences).toBe(1);
   });
 
   /**
