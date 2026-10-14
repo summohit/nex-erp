@@ -122,6 +122,9 @@ type QueueKpi = { label: string; value: string | number; detail: string; tone: '
   styleUrls: ['./task-hours-requests-tab.css'],
 })
 export class TaskHoursRequestsTabComponent {
+  /** Templates cannot reach globals; the pickers compare ids as strings. */
+  protected readonly String = String;
+
   private api = inject(TaskHoursRequestsService);
   private toast = inject(HotToastService);
 
