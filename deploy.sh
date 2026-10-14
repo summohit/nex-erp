@@ -10,11 +10,13 @@ set -o pipefail
 # Server config
 SERVER_IP="94.136.188.176"
 SERVER_USER="root"
-# Never hardcode this. The previous value sat in this file, in a public repo, for
-# every commit since it was added -- rotate the server password, not this line,
-# if it ever leaks again. Export it for the shell that runs the deploy:
-#   export NEX_DEPLOY_PASS='...'      (better: set up an SSH key and drop sshpass)
-SERVER_PASS="${NEX_DEPLOY_PASS:?NEX_DEPLOY_PASS is not set - export the deploy password before running}"
+# SSH key auth -- no password to export, type or leak. The key's public half is
+# in the server's authorized_keys. Point NEX_DEPLOY_KEY elsewhere to use another.
+SSH_KEY="${NEX_DEPLOY_KEY:-$HOME/.ssh/id_ed25519_nexvps}"
+if [ ! -f "$SSH_KEY" ]; then
+  echo "SSH key not found: $SSH_KEY (set NEX_DEPLOY_KEY to its path)" >&2
+  exit 1
+fi
 REMOTE_DIR="/var/www/nex-erp"
 
 # Local paths
@@ -28,7 +30,12 @@ BACKEND_DIR="$SCRIPT_DIR/backend"
 CTRL_DIR="/tmp/nex-erp-deploy-ctrl"
 mkdir -p "$CTRL_DIR"
 CTRL_PATH="$CTRL_DIR/%r@%h:%p"
-SSH_OPTS=(-o StrictHostKeyChecking=no -o ControlMaster=auto -o ControlPath="$CTRL_PATH" -o ControlPersist=600)
+# BatchMode: fail at once instead of falling back to a password prompt.
+# ServerAlive*: keep the long server-side build from being dropped as idle.
+SSH_OPTS=(-i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes
+  -o StrictHostKeyChecking=accept-new
+  -o ServerAliveInterval=30 -o ServerAliveCountMax=10
+  -o ControlMaster=auto -o ControlPath="$CTRL_PATH" -o ControlPersist=600)
 
 # Colors
 GREEN='\033[0;32m'
@@ -46,7 +53,7 @@ info()  { echo -e "${CYAN}[→]${NC} $1"; }
 open_master() {
   if ! ssh -O check -o ControlPath="$CTRL_PATH" "$SERVER_USER@$SERVER_IP" 2>/dev/null; then
     info "Opening SSH connection to server..."
-    sshpass -p "$SERVER_PASS" ssh "${SSH_OPTS[@]}" -MNf "$SERVER_USER@$SERVER_IP"
+    ssh "${SSH_OPTS[@]}" -MNf "$SERVER_USER@$SERVER_IP"
   fi
 }
 
@@ -136,16 +143,6 @@ echo "╠═══════════════════════�
 echo "║  Server: $SERVER_IP              ║"
 echo "║  Domain: mira.ces-pl.com                 ║"
 echo "╚══════════════════════════════════════════╝"
-
-# Check for sshpass
-if ! command -v sshpass &> /dev/null; then
-  warn "sshpass not found. Installing..."
-  brew install hudochenkov/sshpass/sshpass 2>/dev/null || {
-    err "Could not install sshpass. Please install it manually:"
-    err "  brew install hudochenkov/sshpass/sshpass"
-    exit 1
-  }
-fi
 
 TARGET="${1:-all}"
 
