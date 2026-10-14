@@ -330,7 +330,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         'Geofenced Mobile & Web Clock-In',
         'Tablet Kiosk Mode with Selfie Punch',
         'Dynamic Shift Rotations & Rosters',
-        'Real-time Absenteeism & Overtime Sync'
+        'Real-time Absenteeism Sync'
       ]
     },
     {
@@ -463,7 +463,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     },
     {
       question: 'How does the Biometric & Mobile Attendance integrate with Payroll?',
-      answer: 'Attendance data (punches, shift calculations, approved leaves, and unauthorized absences) automatically computes Loss of Pay (LOP) and overtime multipliers directly into the salary calculation engine with zero manual export required.',
+      answer: 'Attendance data (punches, shift calculations, approved leaves, and unauthorized absences) automatically computes Loss of Pay (LOP) directly into the salary calculation engine with zero manual export required.',
       category: 'Payroll & HR'
     },
     {

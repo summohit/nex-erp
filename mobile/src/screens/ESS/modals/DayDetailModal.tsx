@@ -185,7 +185,6 @@ export default function DayDetailModal({
   const sessions = log?.logs?.length > 0 ? log.logs : (log ? [log] : []);
   const hasPunches = !!(log && (log.clockIn || log.clockOut || sessions.length > 0));
   const totalDuration = getTotalDurationFormatted();
-  const isOvertime = totalDuration.hours >= 8.5;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -350,14 +349,6 @@ export default function DayDetailModal({
                       <Text style={styles.durationHubValue}>{totalDuration.text}</Text>
                     </View>
                   </View>
-
-                  {totalDuration.hours > 0 && (
-                    <View style={[styles.targetBadge, isOvertime ? styles.targetBadgeGreen : styles.targetBadgeSlate]}>
-                      <Text style={[styles.targetBadgeText, isOvertime ? styles.targetTextGreen : styles.targetTextSlate]}>
-                        {isOvertime ? 'Target Met' : 'Standard'}
-                      </Text>
-                    </View>
-                  )}
                 </View>
               </View>
             ) : (
@@ -786,28 +777,6 @@ const styles = StyleSheet.create({
     color: '#252525',
     fontVariant: ['tabular-nums'],
   },
-  targetBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  targetBadgeGreen: {
-    backgroundColor: '#ECFDF5',
-  },
-  targetBadgeSlate: {
-    backgroundColor: '#F1F5F9',
-  },
-  targetBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  targetTextGreen: {
-    color: '#059669',
-  },
-  targetTextSlate: {
-    color: '#64748B',
-  },
-
   /* --- Themed Non-Punch State Cards --- */
   stateCardContainer: {
     paddingHorizontal: 16,

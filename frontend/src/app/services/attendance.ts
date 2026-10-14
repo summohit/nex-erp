@@ -31,7 +31,6 @@ export interface AttendanceRecord {
    */
   autoClockedOut?: boolean;
   totalHours?: number;
-  overtimeHours?: number;
   /**
    * The day was left open past IST midnight and closed late — the server asked
    * for (and stored) a reason for the missed clock-out.
@@ -82,7 +81,6 @@ export interface ShiftPeriodRow {
   late: number;
   earlyLeave: number;
   hours: number;
-  overtimeHours: number;
   people: number;
   /** Days anybody was expected — the denominator for "how did this shift do". */
   workingDays: number;

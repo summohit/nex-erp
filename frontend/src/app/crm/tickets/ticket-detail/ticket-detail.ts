@@ -10,7 +10,7 @@ import {
   LucideSparkles, LucideCopy, LucideCalendar, LucideSearch,
   LucideChevronDown, LucideImage, LucideImagePlus
 } from '@lucide/angular';
-import { TicketService, Ticket, TicketComment, TicketEmployee, TicketPermissions } from '../../../services/ticket.service';
+import { TicketService, Ticket, TicketComment, TicketEmployee, TicketPermissions, TicketMoveUpdate } from '../../../services/ticket.service';
 import { AuthService } from '../../../services/auth.service';
 import { DialogService } from '../../../shared/services/dialog.service';
 import { firstValueFrom } from 'rxjs';
@@ -85,12 +85,38 @@ export class TicketDetailComponent implements OnInit {
   async moveToTeam(team: { id: number; name: string; members: number }) {
     if (team.id === (this.ticket as any).departmentId) { this.showTeamPicker = false; return; }
     if (!team.members) { this.toast.error(`${team.name} has no members — choose another team`); return; }
-    const ok = await this.dialog.confirm(
-      `Move ${this.ticket.ticketNumber} to ${team.name}? It will arrive unassigned for ${team.name} to pick up, and they will be able to work on it.`,
-      'Move to team', 'Move', 'Cancel');
-    if (!ok) return;
+    const answer = await this.dialog.promptWithAttachment(
+      `Why is this moving to ${team.name}? The description and any evidence are saved in the ticket discussion for the new team and reporter.`,
+      `Move ${this.ticket.ticketNumber} to ${team.name}`,
+      {
+        placeholder: 'Why is this moving?',
+        confirmLabel: 'Move ticket',
+        required: true,
+        attachmentLabel: 'Attach evidence (optional)',
+        attachmentHint: 'Screenshots, files, or other context for the receiving team.',
+        tone: 'warning',
+      },
+    );
+    if (!answer?.text?.trim()) return;
+
+    const payload: TicketMoveUpdate = { departmentId: team.id, moveReason: answer.text.trim() };
+    if (answer.file) {
+      try {
+        const upload = await firstValueFrom(this.ticketService.uploadImage(answer.file));
+        payload.attachments = [{ fileName: answer.file.name, fileUrl: upload.url, fileSize: answer.file.size }];
+      } catch (err: any) {
+        const moveWithoutEvidence = await this.dialog.confirm(
+          err?.error?.message || 'The evidence file could not be uploaded.',
+          'Evidence upload failed',
+          'Move without evidence',
+          'Cancel',
+          'warning',
+        );
+        if (!moveWithoutEvidence) return;
+      }
+    }
     this.movingTeam = true;
-    this.ticketService.updateTicket(this.ticket.id, { departmentId: team.id } as any).subscribe({
+    this.ticketService.updateTicket(this.ticket.id, payload).subscribe({
       next: () => {
         this.toast.success(`Moved to ${team.name}`);
         this.showTeamPicker = false;

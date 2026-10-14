@@ -92,6 +92,12 @@ export class TaskHoursRequestsService {
     return this.http.get<TaskHoursRequest[]>(`${this.api}/task-hours-requests`, { params });
   }
 
+  filterOptions() {
+    return this.http.get<{ projects: { id: number; name: string; key?: string | null }[]; requesters: { id: number; name: string }[] }>(
+      `${this.api}/task-hours-requests/filter-options`,
+    );
+  }
+
   /** §4: one request's full history, oldest first. */
   timeline(id: number) {
     return this.http.get<TaskHoursActivity[]>(`${this.api}/task-hours-requests/${id}/timeline`);

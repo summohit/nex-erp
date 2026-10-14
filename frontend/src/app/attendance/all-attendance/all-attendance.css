@@ -1568,13 +1568,6 @@
   box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.15);
 }
 
-.legend-item.active[data-status="Overtime"] {
-  border-color: #9333ea;
-  color: #7e22ce;
-  background: #faf5ff;
-  box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.15);
-}
-
 .legend-item.active[data-status="Missed Clock Out"] {
   border-color: #8b5cf6;
   color: #6d28d9;
@@ -1668,9 +1661,6 @@
 
 .status-day-off { color: #94a3b8; }
 .bg-day-off { background-color: rgba(148, 163, 184, 0.15); }
-
-.status-overtime { color: #6b3fd6; }
-.bg-overtime { background-color: rgba(217, 119, 6, 0.15); }
 
 .status-clockoff { color: #8b5cf6; }
 .bg-clockoff { background-color: rgba(139, 92, 246, 0.15); }
@@ -1957,18 +1947,13 @@
   opacity: 0.75;
 }
 
-/* Overtime / missed-clock-out mini symbols pinned to the day-cell corners */
+/* Missed-clock-out mini symbol pinned to a day-cell corner */
 .day-corner-symbol {
   position: absolute;
   width: 10px;
   height: 10px;
   stroke-width: 3px;
   z-index: 2;
-}
-
-.day-ot-symbol {
-  bottom: 2px;
-  right: 2px;
 }
 
 .day-missed-symbol {
@@ -2601,10 +2586,6 @@
 .cell-tooltip-detail strong {
   color: #94a3b8;
   font-weight: 600;
-}
-
-.cell-tooltip-overtime {
-  color: #fbbf24;
 }
 
 .cell-tooltip-missed {

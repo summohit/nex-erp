@@ -37,6 +37,11 @@ export class FieldVisitRequestsController {
     );
   }
 
+  @Get('availability')
+  availability(@Req() req, @Query('employeeIds') employeeIds?: string, @Query('startDate') startDate?: string, @Query('endDate') endDate?: string) {
+    return this.requests.availability(req.user.companyId, String(employeeIds ?? '').split(',').filter(Boolean).map(Number), startDate, endDate);
+  }
+
   @Get(':id')
   getOne(@Req() req, @Param('id', ParseIntPipe) id: number) {
     return this.requests.getOne(

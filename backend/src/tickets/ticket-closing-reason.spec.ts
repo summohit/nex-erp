@@ -25,6 +25,15 @@ describe('TicketsService.update — resolving and rejecting', () => {
       ticketActivity: { create: record('activity') },
       ticketComment: { create: record('comment') },
       ticketAttachment: { create: record('attachment') },
+      department: {
+        findFirst: jest.fn(async () => ({ id: 3, name: 'HR' })),
+        findUnique: jest.fn(async () => ({ name: 'IT' })),
+      },
+      employee: {
+        count: jest.fn(async () => 2),
+        findFirst: jest.fn(async () => ({ firstName: 'Mira', lastName: 'Patel' })),
+        findMany: jest.fn(async () => [{ id: 44 }, { id: 45 }]),
+      },
       $transaction: jest.fn(async (ops: any[]) => ops.map((o) => ({ ...o, ticketNumber: 'TKT-027', title: 'SD WAN' }))),
     };
     service = new TicketsService(prisma, { sendTicketAssignedEmail: jest.fn() } as any, { notifyEmployees: jest.fn(), createNotification: jest.fn() } as any);
@@ -78,5 +87,29 @@ describe('TicketsService.update — resolving and rejecting', () => {
     await move('IN_PROGRESS');
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(written.find((w) => w.kind === 'comment')).toBeUndefined();
+  });
+
+  it('refuses moving to another team without a reason', async () => {
+    const err = await service.update(COMPANY, 27, DEV, { departmentId: 3 }, { role: 'EMPLOYEE', employeeId: DEV }).catch((e) => e);
+    expect(err).toBeInstanceOf(BadRequestException);
+    expect(err.message).toMatch(/why this ticket is moving/i);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('records a team move, reason, and evidence in one transaction', async () => {
+    await service.update(COMPANY, 27, DEV, {
+      departmentId: 3,
+      moveReason: 'This is an employee leave-policy question.',
+      attachments: [{ fileName: 'leave-policy.png', fileUrl: 'https://cdn/leave-policy.png', fileSize: 1200 }],
+    }, { role: 'EMPLOYEE', employeeId: DEV });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(written.find((w) => w.kind === 'ticket').data).toMatchObject({ departmentId: 3, assigneeId: null });
+    expect(written.find((w) => w.kind === 'comment').data.body)
+      .toContain('Moved from IT to HR by Mira Patel: This is an employee leave-policy question.');
+    expect(written.find((w) => w.kind === 'comment').data.body)
+      .toContain('Evidence: leave-policy.png');
+    expect(written.find((w) => w.kind === 'attachment').data)
+      .toMatchObject({ ticketId: 27, fileName: 'leave-policy.png', uploadedById: DEV });
   });
 });

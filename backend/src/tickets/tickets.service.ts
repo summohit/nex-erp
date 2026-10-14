@@ -739,6 +739,21 @@ export class TicketsService {
     delete data.statusReason;
     delete data.statusAttachment;
 
+    const movingTeam = data.departmentId !== undefined && Number(data.departmentId) !== ticket.departmentId;
+    const moveReason = String(data.moveReason ?? '').trim();
+    const moveAttachments = Array.isArray(data.attachments)
+      ? data.attachments.filter((a: any) => a?.fileUrl).map((a: any) => ({
+          fileName: String(a.fileName || 'evidence'),
+          fileUrl: String(a.fileUrl),
+          fileSize: Number.isFinite(Number(a.fileSize)) ? Number(a.fileSize) : null,
+        }))
+      : [];
+    if (movingTeam && !moveReason) {
+      throw new BadRequestException('Describe why this ticket is moving before selecting a new team.');
+    }
+    delete data.moveReason;
+    delete data.attachments;
+
     const updateData: any = {};
 
     // Reassignment stays within the ticket's own department — except when that
@@ -765,6 +780,8 @@ export class TicketsService {
     }
 
     const activities: any[] = [];
+    let movedFromTeam = '';
+    let movedToTeam = '';
 
     const trackChange = (field: string, raw: any, cast?: (v: any) => any) => {
       if (raw === undefined) return;
@@ -799,6 +816,8 @@ export class TicketsService {
       const from = ticket.departmentId
         ? await this.prisma.department.findUnique({ where: { id: ticket.departmentId }, select: { name: true } })
         : null;
+      movedFromTeam = from?.name ?? 'Unassigned';
+      movedToTeam = target.name;
       updateData.departmentId = target.id;
       const keepAssignee = updateData.assigneeId
         ? (await this.prisma.employee.findFirst({ where: { id: updateData.assigneeId }, select: { departmentId: true } }))?.departmentId === target.id
@@ -809,13 +828,21 @@ export class TicketsService {
         }
         updateData.assigneeId = null;
       }
-      activities.push({ ticketId: id, actorId, action: 'MOVED_TO_TEAM', field: 'departmentId', oldValue: from?.name ?? '', newValue: target.name });
+      activities.push({ ticketId: id, actorId, action: 'MOVED_TO_TEAM', field: 'departmentId', oldValue: movedFromTeam, newValue: target.name });
     }
 
     if (data.status === 'RESOLVED' && ticket.status !== 'RESOLVED') updateData.resolvedAt = new Date();
     if (data.status && data.status !== 'RESOLVED' && ticket.status === 'RESOLVED') updateData.resolvedAt = null;
     if ((data.status === 'CLOSED' || data.status === 'REJECTED') && !['CLOSED', 'REJECTED'].includes(ticket.status)) updateData.closedAt = new Date();
     if (data.status && !['CLOSED', 'REJECTED'].includes(data.status) && ['CLOSED', 'REJECTED'].includes(ticket.status)) updateData.closedAt = null;
+
+    const moveActor = movingTeam
+      ? await this.prisma.employee.findFirst({ where: { id: actorId, companyId }, select: { firstName: true, lastName: true } })
+      : null;
+    const moveActorName = TicketsService.ticketActorName(moveActor);
+    const moveEvidenceLines = moveAttachments
+      .map((a) => `\nEvidence: ${a.fileName} — ${a.fileUrl}`)
+      .join('');
 
     const [updated] = await this.prisma.$transaction([
       this.prisma.ticket.update({
@@ -852,6 +879,23 @@ export class TicketsService {
             this.prisma.ticketActivity.create({
               data: { ticketId: id, actorId, action: 'ATTACHMENT_ADDED', newValue: statusAttachment.fileName || 'attachment' },
             }),
+          ]
+        : []),
+      ...(movingTeam
+        ? [
+            this.prisma.ticketComment.create({
+              data: {
+                ticketId: id,
+                authorId: actorId,
+                body: `Moved from ${movedFromTeam} to ${movedToTeam} by ${moveActorName}: ${moveReason}${moveEvidenceLines}`,
+              },
+            }),
+            ...moveAttachments.map((attachment) => this.prisma.ticketAttachment.create({
+              data: { ticketId: id, uploadedById: actorId, ...attachment },
+            })),
+            ...moveAttachments.map((attachment) => this.prisma.ticketActivity.create({
+              data: { ticketId: id, actorId, action: 'ATTACHMENT_ADDED', newValue: attachment.fileName },
+            })),
           ]
         : []),
     ]);
@@ -924,6 +968,29 @@ export class TicketsService {
           type: 'INFO',
         });
       }
+    }
+
+    if (movingTeam) {
+      const newTeam = await this.prisma.employee.findMany({
+        where: { companyId, departmentId: updateData.departmentId, offboardingStatus: { not: 'SEPARATED' } },
+        select: { id: true },
+      });
+      await this.notifyTicketParticipants(
+        [ticket.reporterId, ...newTeam.map((person) => person.id)],
+        actorId,
+        companyId,
+        {
+          title: `Ticket moved to ${movedToTeam}`,
+          message: `${updated.ticketNumber}: ${updated.title} — ${moveReason}`,
+          type: 'INFO',
+        },
+      );
+      this.emailCommentToReporter(
+        { ...updated, reporterId: ticket.reporterId },
+        actorId,
+        moveActorName,
+        `Moved from ${movedFromTeam} to ${movedToTeam}: ${moveReason}`,
+      ).catch((err) => console.warn(`Ticket move email failed: ${err?.message ?? err}`));
     }
 
     return timer ? { ...updated, timer } : updated;
