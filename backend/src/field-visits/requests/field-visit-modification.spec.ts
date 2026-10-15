@@ -184,10 +184,10 @@ describe('proposing a change', () => {
 });
 
 describe('asking with a reason (15 Oct 2026)', () => {
-  it('refuses a change without a reason', async () => {
-    const { service } = makeService();
-    await expect(service.requestModification(1, PM, 'EMPLOYEE', 9, change({ changeReason: ' ' }) as any))
-      .rejects.toThrow(/reason for the change/);
+  it('accepts a change from the older app with no reason, and marks it', async () => {
+    const { service, prisma } = makeService();
+    await service.requestModification(1, PM, 'EMPLOYEE', 9, change({ changeReason: undefined }) as any);
+    expect(prisma.fieldVisitRequest.update.mock.calls[0][0].data.pendingChange.reason).toBe('No reason given (older app)');
   });
 
   it('parks a postpone with the new dates and keeps everything else', async () => {

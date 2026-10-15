@@ -1520,8 +1520,10 @@ export class FieldVisitRequestsService {
       throw new BadRequestException('There is already a change waiting for a decision on this trip');
     }
 
-    const reason = String(data?.changeReason ?? '').trim();
-    if (!reason) throw new BadRequestException('Give a reason for the change');
+    // The web and app 2.5.3+ require a reason. App 2.5.2 has no reason box,
+    // so a change from it is accepted and marked; drop this once 2.5.2 is
+    // retired (added 15 Oct 2026).
+    const reason = String(data?.changeReason ?? '').trim() || 'No reason given (older app)';
 
     // Validated now rather than at approval, so an impossible change is
     // refused while the person proposing it is still looking at it.
