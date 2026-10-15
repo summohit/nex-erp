@@ -13,6 +13,7 @@ import { ApprovalsService } from '../approvals/approvals.service';
 import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
 import { isCompanyAdmin, isHrAdmin } from '../common/company-roles';
 import { isBranchWeeklyOff } from '../common/weekly-offs';
+import { isRestDay } from '../common/rest-day';
 
 /**
  * What the field visit clock tells attendance about the day it is clocking.
@@ -73,20 +74,15 @@ export class AttendanceService {
     if (attendance.clockOutApproval === CLOCK_OUT_APPROVAL.PENDING || attendance.clockOutApproval === CLOCK_OUT_APPROVAL.REJECTED) return;
 
     const date = attendance.date;
-    const isSunday = date.getUTCDay() === 0;
-    const weeklyOff = isBranchWeeklyOff(date, attendance.employee.branch?.weeklyOffs);
     const holiday = await this.isHoliday(attendance.employee.companyId, date);
-    const effective = await this.roster.getEffectiveShift(
-      attendance.employeeId,
-      date,
-      attendance.employee.shift,
-      attendance.employee.branch?.weeklyOffs ?? '',
-    );
-    // A roster entry, or a shift with fixed working days, knows this person's
-    // real day off (someone who works Sat–Sun with Monday off). Only without
-    // either do Sunday and the branch weekly off apply. Before 15 Oct 2026
+    const entry = await this.prisma.shiftRosterEntry.findUnique({
+      where: { employeeId_date: { employeeId: attendance.employeeId, date } },
+      select: { isDayOff: true, onsiteApprovalStatus: true },
+    });
+    // The same rest-day rule payroll uses: the roster row, else a shift that
+    // actually has days off, else the branch weekly off. Before 15 Oct 2026
     // every Sunday counted, so rostered Sunday shifts earned comp-off.
-    const dayOff = effective.source === 'NONE' ? (isSunday || weeklyOff) : effective.isDayOff;
+    const dayOff = isRestDay(date, entry, attendance.employee.shift?.workingDays, attendance.employee.branch?.weeklyOffs);
     if (!dayOff && !holiday) return;
 
     // Comp-off is earned only for an approved field visit that day (decided

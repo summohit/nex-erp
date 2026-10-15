@@ -10,6 +10,7 @@ import {
 import { ApprovalsService } from '../approvals/approvals.service';
 import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
 import { NotificationsService } from '../notifications/notifications.service';
+import { isRestDay } from '../common/rest-day';
 
 /** Roles that rule on expense claims without being put on the list. */
 const EXPENSE_APPROVER_ROLES = ['SUPERADMIN', 'ADMIN', 'HR', 'FINANCE'];
@@ -428,6 +429,28 @@ export class PayrollService {
     return date.toISOString().slice(0, 10);
   }
 
+  /**
+   * One person's rest days for a pay period, from their roster rows, shift
+   * and branch (common/rest-day.ts). Until 15 Oct 2026 payroll read only the
+   * branch, so someone rostered Sat–Sun with Monday off lost pay every Monday.
+   */
+  private async restDayCheck(
+    emp: { id: number; shift?: { workingDays?: string | null } | null; branch?: { weeklyOffs?: string | null } | null },
+    start: Date, end: Date,
+  ): Promise<(date: Date) => boolean> {
+    // Tests that stub prisma without a roster still get the branch rule.
+    const rows = this.prisma.shiftRosterEntry?.findMany
+      ? await this.prisma.shiftRosterEntry.findMany({
+        where: { employeeId: emp.id, date: { gte: start, lte: end } },
+        select: { date: true, isDayOff: true, onsiteApprovalStatus: true },
+      })
+      : [];
+    const byDay = new Map(rows.map((r) => [this.payrollDateKey(r.date), r]));
+    return (date: Date) => isRestDay(
+      date, byDay.get(this.payrollDateKey(date)), emp.shift?.workingDays, emp.branch?.weeklyOffs || '0',
+    );
+  }
+
   private isWeeklyOff(date: Date, rules: string[]): boolean {
     const day = date.getUTCDay(); // 0=Sun, 6=Sat
     const dateNum = date.getUTCDate();
@@ -493,7 +516,7 @@ export class PayrollService {
   async previewPayroll(companyId: number, month: number, year: number) {
     const employees = await this.prisma.employee.findMany({
       where: { companyId, user: { status: { not: 'SUSPENDED' } }, allowPayrollGenerate: true },
-      include: { salaryStructures: { include: { component: true } }, branch: true },
+      include: { salaryStructures: { include: { component: true } }, branch: true, shift: { select: { workingDays: true } } },
     });
 
     const totalDaysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -528,11 +551,11 @@ export class PayrollService {
       if (gross > 15000 && !hasComponent('Professional Tax')) deductions += 200;
       if (gross > 50000 && !hasComponent('TDS')) deductions += Math.round((gross - 50000) * 0.10);
 
-      const offs = (emp.branch?.weeklyOffs || '0').split(',').map((n) => n.trim());
+      const restDay = await this.restDayCheck(emp, startDate, endDate);
       let workingDays = 0;
       for (let d = 1; d <= totalDaysInMonth; d++) {
         const date = this.payrollDate(year, month, d);
-        if (!this.isWeeklyOff(date, offs) && !holidayKeys.has(this.payrollDateKey(date))) workingDays++;
+        if (!restDay(date) && !holidayKeys.has(this.payrollDateKey(date))) workingDays++;
       }
       if (workingDays === 0) workingDays = totalDaysInMonth;
 
@@ -574,7 +597,7 @@ export class PayrollService {
       let half = 0;
       for (let d = 1; d <= totalDaysInMonth; d++) {
         const date = this.payrollDate(year, month, d);
-        if (this.isWeeklyOff(date, offs) || holidayKeys.has(this.payrollDateKey(date))) continue;
+        if (restDay(date) || holidayKeys.has(this.payrollDateKey(date))) continue;
         const key = this.payrollDateKey(date);
         const st = byDay.get(key);
         const attendanceCredit = this.attendanceCredit(st);
@@ -664,7 +687,8 @@ export class PayrollService {
         salaryStructures: {
           include: { component: true }
         },
-        branch: true
+        branch: true,
+        shift: { select: { workingDays: true } },
       }
     });
 
@@ -674,14 +698,13 @@ export class PayrollService {
     const holidayKeys = await this.payrollHolidayKeys(companyId, startDate, endDate);
 
     for (const emp of employees) {
-      // Branch Weekly Offs logic
-      const weeklyOffsConfig = emp.branch?.weeklyOffs || "0";
-      const weeklyOffRules = weeklyOffsConfig.split(',').map(n => n.trim());
-      
+      // Rest days: the roster, else the shift, else the branch weekly offs.
+      const restDay = await this.restDayCheck(emp, startDate, endDate);
+
       let workingDaysInMonth = 0;
       for (let d = 1; d <= totalDaysInMonth; d++) {
         const date = this.payrollDate(year, month, d);
-        if (!this.isWeeklyOff(date, weeklyOffRules) && !holidayKeys.has(this.payrollDateKey(date))) {
+        if (!restDay(date) && !holidayKeys.has(this.payrollDateKey(date))) {
           workingDaysInMonth++;
         }
       }
@@ -728,7 +751,7 @@ export class PayrollService {
       for (let d = 1; d <= totalDaysInMonth; d++) {
         const date = this.payrollDate(year, month, d);
         // Only check working days for LOP
-        if (!this.isWeeklyOff(date, weeklyOffRules) && !holidayKeys.has(this.payrollDateKey(date))) {
+        if (!restDay(date) && !holidayKeys.has(this.payrollDateKey(date))) {
           const dateStr = this.payrollDateKey(date);
           const status = attendanceMap.get(dateStr);
           const attendanceCredit = this.attendanceCredit(status);
