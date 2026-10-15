@@ -23,7 +23,9 @@ const prisma = new PrismaClient({
 
 const APPLY = process.argv.includes('--apply');
 const ALLOW_NEGATIVE = process.argv.includes('--allow-negative');
-const IDS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+// #2 Nabin, #9 Ayushman, #10 Gaurav, #14 Ansh kept: the user confirmed they were on
+// field visits that day, though the system has no approved visit for them.
+const IDS = [3, 4, 5, 6, 7, 8, 11, 12, 13];
 
 const name = (e) => `${e.firstName} ${e.lastName || ''}`.trim();
 const ymd = (d) => d.toISOString().slice(0, 10);
