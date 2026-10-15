@@ -299,17 +299,8 @@ const GROUP_ORDER = ['WORKSPACE', 'MY TEAM', 'FINANCE', 'OPERATIONS', 'SYSTEM'];
 
 // Items that are fully implemented and always shown
 const ALWAYS_ON_ITEMS: { group: string; id: string; title: string; icon: string; route: string }[] = [
-  { group: 'WORKSPACE', id: 'notifications', title: 'Notifications', icon: 'bell', route: '/notifications' },
-  // Mobile-only screens with no web menu row: without these they were only in
-  // the offline fallback list, so nobody could reach Team Leave or Approvals.
-  { group: 'WORKSPACE', id: 'm-my-shift', title: 'My Shift', icon: 'clock', route: '/m/my-shift' },
   { group: 'MY TEAM', id: 'm-approvals', title: 'Approvals', icon: 'user-check', route: '/m/approvals' },
   { group: 'MY TEAM', id: 'm-team-attendance', title: 'Team Attendance', icon: 'calendar-days', route: '/m/team-attendance' },
-  { group: 'FINANCE', id: 'payslips', title: 'Payslips', icon: 'file-text', route: '/payroll/payslips' },
-  { group: 'FINANCE', id: 'hardware-requests', title: 'Hardware Requests', icon: 'package', route: '/assets/requests' },
-  // Self-service two-factor setup. Listed here as well as coming from the
-  // server menu, so it is reachable even before that Menu row propagates.
-  { group: 'SYSTEM', id: 'settings/security', title: 'Security', icon: 'shield-check', route: '/settings/security' },
 ];
 
 function resolveNav(item: MenuItem): { screen: string; params?: any } | null {
@@ -326,52 +317,27 @@ function resolveNav(item: MenuItem): { screen: string; params?: any } | null {
   return null;
 }
 
+/**
+ * The web sidebar as the server sends it for this login. Pages with a mobile
+ * screen open in the app; the rest open the same page on the web. Only rows
+ * with nowhere to go (no route, no children) are dropped.
+ */
 function filterFunctionalItems(items: MenuItem[]): MenuItem[] {
   const result: MenuItem[] = [];
   for (const item of items) {
-    if (item.subItems && item.subItems.length > 0) {
-      const validSubItems = item.subItems.filter(
-        sub => sub.external || sub.route === '/careers' || (sub.route && ROUTE_TO_NAV[sub.route])
-      );
-      if (validSubItems.length > 0) {
-        result.push({
-          ...item,
-          subItems: validSubItems,
-        });
-        continue;
-      }
-    }
-    if (item.external || item.route === '/careers' || (item.route && ROUTE_TO_NAV[item.route])) {
-      result.push(item);
-    }
+    const subItems = (item.subItems ?? []).filter(sub => !!sub.route);
+    if (subItems.length) result.push({ ...item, subItems });
+    else if (item.route) result.push({ ...item, subItems: undefined });
   }
   return result;
 }
 
-/**
- * Already one tap away in the bottom tab bar (Home, Attendance, Projects,
- * Leaves, Profile) or the header bell, so the drawer does not repeat them.
- */
-const IN_TAB_BAR = new Set([
-  '/dashboard', '/notifications', '/employees/me/profile',
-  '/attendance/timesheets', '/attendance/leaves', '/projects',
-]);
-
-function withoutTabBarItems(items: MenuItem[]): MenuItem[] {
-  return items
-    .filter(item => !item.route || !IN_TAB_BAR.has(item.route) || !!item.subItems?.length)
-    .map(item => (item.subItems?.length
-      ? { ...item, subItems: item.subItems.filter(sub => !sub.route || !IN_TAB_BAR.has(sub.route)) }
-      : item))
-    .filter(item => !item.subItems || item.subItems.length > 0);
-}
-
 function groupItems(rawItems: MenuItem[], showTeam: boolean): { group: string; items: MenuItem[] }[] {
-  const items = withoutTabBarItems(rawItems);
+  const items = rawItems;
   // A group left with one entry (Employees → My Profile, Settings → Security)
   // is shown as that entry, so it is one tap instead of two.
   const functionalItems = filterFunctionalItems(items).map(item =>
-    item.subItems?.length === 1 && !item.subItems[0].external
+    item.subItems?.length === 1
       ? { ...item.subItems[0], icon: item.icon }
       : item,
   );
@@ -446,13 +412,18 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
       });
       return;
     }
-    const nav = resolveNav(item);
-    if (nav) {
-      onClose();
-      navigateTo(navigation, nav.screen, nav.params);
-    } else {
-      setComingSoon(true);
-    }
+    // A one-entry group shown as its entry can be the careers link.
+    if (item.external || item.route === '/careers') { handleSubItemPress(item); return; }
+    openRoute(item);
+  }
+
+  /** In the app when it has the screen, otherwise the same page on the web. */
+  function openRoute(item: MenuItem) {
+    const nav = item.route ? ROUTE_TO_NAV[item.route] : null;
+    onClose();
+    if (nav) { navigateTo(navigation, nav.screen, nav.params); return; }
+    if (item.route) { Linking.openURL(`${WEB_URL}${item.route}`).catch(() => setComingSoon(true)); return; }
+    setComingSoon(true);
   }
 
   function handleSubItemPress(sub: MenuItem) {
@@ -466,13 +437,7 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
       return;
     }
 
-    const nav = resolveNav(sub);
-    if (nav) {
-      onClose();
-      navigateTo(navigation, nav.screen, nav.params);
-    } else {
-      setComingSoon(true);
-    }
+    openRoute(sub);
   }
 
   function handleLogout() {
