@@ -290,6 +290,9 @@ const ITEM_TO_GROUP: Record<string, string> = {
   sales: 'OPERATIONS',
   offboarding: 'OPERATIONS',
   settings: 'SYSTEM',
+  // Children that can stand in for their one-entry group (see groupItems).
+  'settings/security': 'SYSTEM',
+  'assets/requests': 'FINANCE',
 };
 
 const GROUP_ORDER = ['WORKSPACE', 'MY TEAM', 'FINANCE', 'OPERATIONS', 'SYSTEM'];
@@ -346,9 +349,20 @@ function filterFunctionalItems(items: MenuItem[]): MenuItem[] {
 }
 
 function groupItems(items: MenuItem[]): { group: string; items: MenuItem[] }[] {
-  const functionalItems = filterFunctionalItems(items);
+  // A group left with one entry (Employees → My Profile, Settings → Security)
+  // is shown as that entry, so it is one tap instead of two.
+  const functionalItems = filterFunctionalItems(items).map(item =>
+    item.subItems?.length === 1 && !item.subItems[0].external
+      ? { ...item.subItems[0], icon: item.icon }
+      : item,
+  );
   const groups: Record<string, MenuItem[]> = {};
   const existingIds = new Set(functionalItems.map(i => i.id));
+  // Routes the server menu already offers, children included, so an always-on
+  // entry is not listed twice (Payroll & Expenses → Payslips, and Payslips).
+  const existingRoutes = new Set(
+    functionalItems.flatMap(i => [i.route, ...(i.subItems ?? []).map(sub => sub.route)]).filter(Boolean),
+  );
 
   for (const item of functionalItems) {
     const group = ITEM_TO_GROUP[item.id] || ITEM_TO_GROUP[item.route?.replace('/', '') || ''] || 'WORKSPACE';
@@ -357,7 +371,7 @@ function groupItems(items: MenuItem[]): { group: string; items: MenuItem[] }[] {
   }
 
   for (const item of ALWAYS_ON_ITEMS) {
-    if (!existingIds.has(item.id)) {
+    if (!existingIds.has(item.id) && !existingRoutes.has(item.route)) {
       if (!groups[item.group]) groups[item.group] = [];
       groups[item.group].push({ id: item.id, title: item.title, icon: item.icon, route: item.route });
     }
