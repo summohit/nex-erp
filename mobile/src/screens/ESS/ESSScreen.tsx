@@ -18,10 +18,13 @@ const PulseSkeleton = ({ style }: { style: any }) => {
 };
 
 import AppScreen from '../../components/AppScreen';
+import { TeamLeavePanel } from '../Team/TeamLeaveScreen';
+import { teamService, TeamLeaveRequest } from '../../api/teamService';
 import { 
   Calendar, Clock, CheckCircle, XCircle, 
   FileText, Send, HeartPulse, Briefcase, Umbrella, Sparkles, Info, Trash2, AlertCircle,
-  UploadCloud, Paperclip, X
+  UploadCloud, Paperclip, X,
+  Users,
 } from 'lucide-react-native';
 import { useLeaveStore } from '../../store/leaveStore';
 import { leaveService } from '../../api/leaveService';
@@ -35,7 +38,15 @@ import ExpensesTab from './tabs/ExpensesTab';
 export default function ESSScreen({ route }: any) {
   const { balances, requests, isLoading, isSubmitting, fetchLeaveData, submitLeaveRequest, cancelLeaveRequest } = useLeaveStore();
   const [mainTab, setMainTab] = useState<'timesheets' | 'leaves' | 'holidays' | 'expenses'>((route?.params?.initialTab as any) || 'timesheets');
-  const [activeTab, setActiveTab] = useState<'requests' | 'apply'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'apply' | 'team'>('requests');
+  // Team leave sits here beside your own, for anyone with people under them.
+  const [teamRows, setTeamRows] = useState<TeamLeaveRequest[] | null>(null);
+  const [teamRefresh, setTeamRefresh] = useState(0);
+  useEffect(() => {
+    teamService.getTeamLeaveRequests().then(setTeamRows).catch(() => setTeamRows([]));
+  }, [teamRefresh]);
+  const hasTeam = (teamRows?.length ?? 0) > 0;
+  const teamPending = teamRows?.filter((r) => r.status === 'PENDING').length ?? 0;
 
   useEffect(() => {
     if (route?.params?.initialTab) {
@@ -329,7 +340,7 @@ export default function ESSScreen({ route }: any) {
             style={styles.tabScrollView}
             contentContainerStyle={styles.scrollContentContainer}
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchLeaveData} colors={['#1373e5']} />}
+            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={() => { fetchLeaveData(); setTeamRefresh((k) => k + 1); }} colors={['#1373e5']} />}
           >
             <View>
               {/* --- Leave Balances Section --- */}
@@ -411,13 +422,28 @@ export default function ESSScreen({ route }: any) {
               activeOpacity={0.85}
             >
               <Calendar size={16} color={activeTab === 'apply' ? '#1373e5' : '#64748B'} />
-              <Text style={[styles.segmentText, activeTab === 'apply' && styles.segmentTextActive]}>Apply for Leave</Text>
+              <Text style={[styles.segmentText, activeTab === 'apply' && styles.segmentTextActive]}>{hasTeam ? 'Apply' : 'Apply for Leave'}</Text>
             </TouchableOpacity>
+
+            {hasTeam && (
+              <TouchableOpacity
+                style={[styles.segmentButton, activeTab === 'team' && styles.segmentActive]}
+                onPress={() => setActiveTab('team')}
+                activeOpacity={0.85}
+              >
+                <Users size={16} color={activeTab === 'team' ? '#1373e5' : '#64748B'} />
+                <Text style={[styles.segmentText, activeTab === 'team' && styles.segmentTextActive]}>
+                  Team{teamPending ? ` (${teamPending})` : ''}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
         {/* --- Tab Content --- */}
-        {activeTab === 'requests' ? (
+        {activeTab === 'team' ? (
+          <TeamLeavePanel refreshKey={teamRefresh} onLoaded={setTeamRows} />
+        ) : activeTab === 'requests' ? (
           <View style={styles.requestsContainer}>
             {isLoading && requests.length === 0 ? (
               <>

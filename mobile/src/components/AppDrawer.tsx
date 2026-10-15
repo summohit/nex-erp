@@ -296,7 +296,6 @@ const ALWAYS_ON_ITEMS: { group: string; id: string; title: string; icon: string;
   { group: 'WORKSPACE', id: 'm-my-shift', title: 'My Shift', icon: 'clock', route: '/m/my-shift' },
   { group: 'WORKSPACE', id: 'm-notices', title: 'Notice Board', icon: 'megaphone', route: '/m/notices' },
   { group: 'MY TEAM', id: 'm-approvals', title: 'Approvals', icon: 'user-check', route: '/m/approvals' },
-  { group: 'MY TEAM', id: 'm-team-leave', title: 'Team Leave', icon: 'users', route: '/m/team-leave' },
   { group: 'MY TEAM', id: 'm-team-attendance', title: 'Team Attendance', icon: 'calendar-days', route: '/m/team-attendance' },
   { group: 'FINANCE', id: 'payslips', title: 'Payslips', icon: 'file-text', route: '/payroll/payslips' },
   { group: 'FINANCE', id: 'hardware-requests', title: 'Hardware Requests', icon: 'package', route: '/assets/requests' },

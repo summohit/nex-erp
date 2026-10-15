@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Image,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image,
   ActivityIndicator, Alert, Modal, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import AppScreen from '../../components/AppScreen';
@@ -33,9 +33,27 @@ const STATUS_STYLE: Record<string, { bg: string; fg: string; label: string }> = 
  * the line again on every decision, so this screen cannot overreach.
  */
 export default function TeamLeaveScreen() {
+  const [refreshKey, setRefreshKey] = useState(0);
+  return (
+    <AppScreen title="Team Leave" subtitle="Approve your team's leave">
+      <ScrollView
+        contentContainerStyle={styles.screenBody}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={() => setRefreshKey((k) => k + 1)} />}
+      >
+        <TeamLeavePanel refreshKey={refreshKey} />
+      </ScrollView>
+    </AppScreen>
+  );
+}
+
+/**
+ * The team's leave with Approve / Reject, without a screen around it, so the
+ * Leaves tab can show it beside My Requests. Rendered as plain views (not a
+ * FlatList) because it sits inside the tab's own ScrollView.
+ */
+export function TeamLeavePanel({ refreshKey = 0, onLoaded }: { refreshKey?: number; onLoaded?: (rows: TeamLeaveRequest[]) => void }) {
   const [rows, setRows] = useState<TeamLeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<Tab>('PENDING');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [rejecting, setRejecting] = useState<TeamLeaveRequest | null>(null);
@@ -43,16 +61,18 @@ export default function TeamLeaveScreen() {
 
   const load = useCallback(async () => {
     try {
-      setRows(await teamService.getTeamLeaveRequests());
+      const data = await teamService.getTeamLeaveRequests();
+      setRows(data);
+      onLoaded?.(data);
     } catch (e: any) {
       Alert.alert('Could not load team leave', e?.response?.data?.message || 'Please try again.');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, refreshKey]);
 
   const pending = useMemo(() => rows.filter((r) => r.status === 'PENDING'), [rows]);
   const shown = tab === 'PENDING' ? pending : rows;
@@ -61,7 +81,11 @@ export default function TeamLeaveScreen() {
     setBusyId(r.id);
     try {
       await teamService.decideLeave(r.id, status, why);
-      setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, status, rejectionReason: why ?? null } : x)));
+      setRows((prev) => {
+        const next = prev.map((x) => (x.id === r.id ? { ...x, status, rejectionReason: why ?? null } : x));
+        onLoaded?.(next);
+        return next;
+      });
     } catch (e: any) {
       Alert.alert('Could not save', e?.response?.data?.message || 'Please try again.');
     } finally {
@@ -126,7 +150,7 @@ export default function TeamLeaveScreen() {
   };
 
   return (
-    <AppScreen title="Team Leave" subtitle="Approve your team's leave">
+    <View>
       <View style={styles.tabs}>
         {(['PENDING', 'ALL'] as Tab[]).map((t) => (
           <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
@@ -138,18 +162,13 @@ export default function TeamLeaveScreen() {
       </View>
 
       {loading ? <ActivityIndicator style={styles.loader} color={theme.colors.primary} /> : (
-        <FlatList
-          data={shown}
-          keyExtractor={(r) => String(r.id)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-          ListEmptyComponent={
+        <View style={styles.list}>
+          {shown.length ? shown.map((item) => <React.Fragment key={item.id}>{renderItem({ item })}</React.Fragment>) : (
             <Text style={styles.empty}>
               {rows.length ? 'No pending leave. You are all caught up.' : 'No leave from your team yet. Only people who report to you appear here.'}
             </Text>
-          }
-        />
+          )}
+        </View>
       )}
 
       <Modal visible={!!rejecting} transparent animationType="fade" onRequestClose={() => setRejecting(null)}>
@@ -173,19 +192,20 @@ export default function TeamLeaveScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </AppScreen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  screenBody: { paddingBottom: 120 },
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 8 },
   tab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, backgroundColor: '#F1F5F9' },
   tabActive: { backgroundColor: theme.colors.primary },
   tabText: { fontSize: 13, fontWeight: '600', color: '#475569' },
   tabTextActive: { color: '#fff' },
   loader: { marginTop: 40 },
-  list: { padding: 16, paddingBottom: 120, gap: 12 },
+  list: { padding: 16, gap: 12 },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: theme.colors.border },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: { width: 40, height: 40, borderRadius: 20 },
