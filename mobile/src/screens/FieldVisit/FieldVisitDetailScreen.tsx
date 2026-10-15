@@ -75,6 +75,13 @@ export default function FieldVisitDetailScreen() {
       { text: 'Withdraw', style: 'destructive', onPress: () => act('withdraw', () => fv.withdraw(id)) },
     ]);
 
+  const sendForApproval = () =>
+    act('send it', async () => {
+      const saved = await fv.submit(id);
+      Alert.alert(saved?.status === 'APPROVED' ? 'Approved' : 'Sent for approval',
+        saved?.status === 'APPROVED' ? `${visit!.requestNumber} is approved.` : `${visit!.requestNumber} is waiting for approval.`);
+    });
+
   const submitCancel = () =>
     act('cancel', async () => {
       await fv.cancel(id, cancelReason.trim());
@@ -126,6 +133,11 @@ export default function FieldVisitDetailScreen() {
 
         {!!visit.remarks && (<><Text style={styles.section}>Remarks</Text><Text style={styles.item}>{visit.remarks}</Text></>)}
 
+        {(visit.attachments?.length ?? 0) > 0 && <Text style={styles.section}>Attachments ({visit.attachments!.length})</Text>}
+        {visit.attachments?.map((a, i) => (
+          <Text key={a.id ?? i} style={[styles.item, styles.linkItem]} numberOfLines={1} onPress={() => Linking.openURL(a.fileUrl)}>📎 {a.fileName}</Text>
+        ))}
+
         {days.length > 0 && <Text style={styles.section}>Days on site</Text>}
         {days.map(([day, rows]) => (
           <View key={day} style={styles.dayCard}>
@@ -156,6 +168,23 @@ export default function FieldVisitDetailScreen() {
           </View>
         ))}
 
+        {visit.canSubmit && (
+          <TouchableOpacity style={[styles.action, styles.actionPrimary]} disabled={busy} onPress={sendForApproval}>
+            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.solidText}>Send for approval</Text>}
+          </TouchableOpacity>
+        )}
+        {visit.canEdit && (
+          <TouchableOpacity style={[styles.action, styles.actionGhost]} disabled={busy}
+            onPress={() => navigation.navigate('FieldVisitRequestForm', { mode: 'edit', id })}>
+            <Text style={styles.actionGhostText}>{visit.status === 'DRAFT' ? 'Edit draft' : 'Edit request'}</Text>
+          </TouchableOpacity>
+        )}
+        {visit.canRequestChange && (
+          <TouchableOpacity style={[styles.action, styles.actionGhost]} disabled={busy}
+            onPress={() => navigation.navigate('FieldVisitRequestForm', { mode: 'change', id })}>
+            <Text style={styles.actionGhostText}>Request a change</Text>
+          </TouchableOpacity>
+        )}
         {visit.canWithdraw && (
           <TouchableOpacity style={[styles.action, styles.actionGhost]} disabled={busy} onPress={withdraw}>
             <Text style={styles.actionGhostText}>Withdraw to draft</Text>
@@ -216,6 +245,8 @@ const styles = StyleSheet.create({
   label: { fontSize: 12.5, fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 6 },
   action: { marginTop: 20, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   actionGhost: { backgroundColor: '#F1F5F9' },
+  actionPrimary: { backgroundColor: theme.colors.primary },
+  linkItem: { color: theme.colors.primary },
   actionGhostText: { fontWeight: '700', color: '#334155' },
   actionDanger: { borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
   actionDangerText: { fontWeight: '700', color: '#DC2626' },

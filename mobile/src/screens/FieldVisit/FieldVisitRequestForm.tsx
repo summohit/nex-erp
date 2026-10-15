@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal, FlatList,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal, FlatList, Linking,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import AppScreen from '../../components/AppScreen';
 import {
-  fieldVisitRequestService as fv, ProjectLite, VisitLocation, TaskOption,
+  fieldVisitRequestService as fv, ProjectLite, VisitLocation, TaskOption, FvAttachment, FvLeaveClash,
+  VisitLocationCapabilities, NewFieldVisit,
 } from '../../api/fieldVisitRequestService';
+import MediaPickerModal from '../Profile/components/MediaPickerModal';
 import { workService, PersonLite } from '../../api/workService';
 import { getCurrentLocation, requestLocationPermission } from '../../store/dashboardStore';
 import { theme } from '../../theme/theme';
@@ -25,15 +27,19 @@ const niceTime = (t: string) => {
 const personName = (p: PersonLite) => `${p.firstName} ${p.lastName || ''}`.trim();
 
 /**
- * Raise a field visit request — the same request the web form sends.
+ * Raise, edit or change a field visit request — the same request the web form sends.
  *
- * A project visit's tasks are picked from the project (adopted on approval)
- * or typed as new work; a general visit's tasks are picked from the chosen
- * people's own open general tasks. Submitted straight for approval; an
- * administrator's own request is approved on the spot by the server.
+ * mode 'new' raises one (saved as a draft or sent for approval), 'edit' edits a
+ * draft, 'change' proposes a change to an approved trip for an administrator to
+ * rule on (the project cannot change). A project visit's tasks are picked from
+ * the project (adopted on approval) or typed as new work; a general visit's are
+ * the chosen people's own open general tasks. An administrator's own request is
+ * approved on the spot by the server.
  */
 export default function FieldVisitRequestForm() {
   const navigation = useNavigation<any>();
+  const params = (useRoute<any>().params ?? {}) as { mode?: 'new' | 'edit' | 'change'; id?: number };
+  const mode = params.id ? params.mode ?? 'edit' : 'new';
   const today = ymd(new Date());
 
   const [visitType, setVisitType] = useState<'PROJECT' | 'GENERAL'>('PROJECT');
@@ -47,8 +53,21 @@ export default function FieldVisitRequestForm() {
   const [tasks, setTasks] = useState<TaskLine[]>([]);
   const [newTask, setNewTask] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState<'draft' | 'send' | null>(null);
   const [locating, setLocating] = useState(false);
+  const [attachments, setAttachments] = useState<FvAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [mediaOpen, setMediaOpen] = useState(false);
+  const [clashes, setClashes] = useState<FvLeaveClash[]>([]);
+  const [loadingVisit, setLoadingVisit] = useState(mode !== 'new');
+  // Loading a saved request sets the type and project, which would otherwise
+  // clear the tasks that were loaded with it.
+  const hydrating = useRef(false);
+
+  // New saved site
+  const [locCaps, setLocCaps] = useState<VisitLocationCapabilities | null>(null);
+  const [siteForm, setSiteForm] = useState<{ name: string; address: string; lat?: number; lng?: number } | null>(null);
+  const [savingSite, setSavingSite] = useState(false);
 
   // Picker data
   const [picker, setPicker] = useState<PickerKind>(null);
@@ -80,11 +99,104 @@ export default function FieldVisitRequestForm() {
       })
       .catch(() => fv.projects().then(setProjects).catch(() => {}));
     fv.visitLocations().then(setSites).catch(() => {});
+    fv.locationCapabilities().then(setLocCaps).catch(() => {});
     workService.getEmployees().then(setEmployees).catch(() => {});
   }, []);
 
+  // Editing a draft or changing an approved trip starts from what was saved.
+  useEffect(() => {
+    if (!params.id) return;
+    fv.get(params.id)
+      .then((v) => {
+        hydrating.current = true;
+        setVisitType(v.project?.isSystem ? 'GENERAL' : 'PROJECT');
+        if (v.project && !v.project.isSystem) setProject({ id: v.project.id, name: v.project.name, key: v.project.key });
+        setSite({ name: v.location, lat: v.latitude, lng: v.longitude, visitLocationId: v.visitLocation?.id });
+        setStartDate(v.startDate.slice(0, 10));
+        setEndDate(v.endDate.slice(0, 10));
+        setStartTime(v.startTime);
+        setEndTime(v.endTime);
+        setPeople(v.members.map((m) => m.employee as PersonLite));
+        setTasks(v.tasks.map((t) => ({ issueId: t.issueId ?? undefined, name: t.issue?.title ?? t.name, key: t.issue?.key })));
+        setRemarks(v.remarks ?? '');
+        setAttachments((v.attachments ?? []).map((a) => ({ fileName: a.fileName, fileUrl: a.fileUrl, fileSize: a.fileSize ?? undefined })));
+      })
+      .catch((e: any) => Alert.alert('Could not load', e?.response?.data?.message || 'Please try again.', [{ text: 'OK', onPress: () => navigation.goBack() }]))
+      .finally(() => setLoadingVisit(false));
+  }, [params.id, navigation]);
+
   // Changing the kind of visit or the project invalidates the picked tasks.
-  useEffect(() => { setTasks([]); }, [visitType, project?.id]);
+  useEffect(() => {
+    if (hydrating.current) { hydrating.current = false; return; }
+    setTasks([]);
+  }, [visitType, project?.id]);
+
+  // Warn — as the web does — when someone going is on approved leave during the trip.
+  useEffect(() => {
+    const ids = people.map((p) => p.id);
+    if (!ids.length || endDate < startDate) { setClashes([]); return; }
+    fv.availability(ids, startDate, endDate).then(setClashes).catch(() => setClashes([]));
+  }, [people, startDate, endDate]);
+
+  const clashText = useMemo(() => clashes.map((c) => {
+    const p = people.find((x) => x.id === c.employeeId);
+    const from = c.startDate.slice(0, 10); const to = c.endDate.slice(0, 10);
+    return `${p ? personName(p) : 'Someone'} is on leave ${from === to ? nice(from) : `${nice(from)} – ${nice(to)}`}`;
+  }), [clashes, people]);
+
+  const addAttachment = async (asset: { uri: string; fileName: string; type: string; fileSize?: number }) => {
+    setMediaOpen(false);
+    setUploading(true);
+    try {
+      const fileUrl = await fv.upload(asset);
+      if (!fileUrl) throw new Error('The server did not return the file.');
+      setAttachments((prev) => [...prev, { fileName: asset.fileName, fileUrl, fileSize: asset.fileSize }]);
+    } catch (e: any) {
+      Alert.alert('Could not attach', e?.response?.data?.message || e?.message || 'Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const openSiteForm = () => { setPicker(null); setSiteForm({ name: '', address: '' }); };
+
+  const pinSiteHere = async () => {
+    try {
+      if (!(await requestLocationPermission())) throw new Error('Allow location for MIRA first.');
+      const fix = await getCurrentLocation();
+      setSiteForm((f) => (f ? { ...f, lat: fix.lat, lng: fix.lng } : f));
+    } catch (e: any) {
+      Alert.alert('No location', e?.message || 'Turn on Location and try again.');
+    }
+  };
+
+  /** An administrator adds the site at once; a project manager asks for it. */
+  const saveSite = async () => {
+    if (!siteForm?.name.trim()) return;
+    const body = {
+      name: siteForm.name.trim(), address: siteForm.address.trim() || undefined,
+      latitude: siteForm.lat, longitude: siteForm.lng,
+    };
+    setSavingSite(true);
+    try {
+      if (locCaps?.isAdmin) {
+        const added = await fv.addLocation(body);
+        setSites((prev) => [...prev, added]);
+        if (added.latitude != null && added.longitude != null) {
+          setSite({ name: added.name, lat: added.latitude, lng: added.longitude, visitLocationId: added.id });
+        }
+        Alert.alert('Site added', `${added.name} is now a saved site.`);
+      } else {
+        await fv.requestLocation(body);
+        Alert.alert('Sent for approval', `${body.name} will appear as a saved site once an administrator approves it. You can still pin the site for this visit now.`);
+      }
+      setSiteForm(null);
+    } catch (e: any) {
+      Alert.alert('Could not save the site', e?.response?.data?.message || 'Please try again.');
+    } finally {
+      setSavingSite(false);
+    }
+  };
 
   const openTaskPicker = async () => {
     setQuery('');
@@ -129,34 +241,52 @@ export default function FieldVisitRequestForm() {
     return p;
   }, [visitType, project, site, startDate, endDate, startTime, endTime, people, tasks]);
 
-  const submit = async () => {
+  /**
+   * send=false saves a draft; send=true sends it for approval. In change mode
+   * the whole form goes to an administrator as a proposed change.
+   */
+  const save = async (send: boolean) => {
     if (problems.length) { Alert.alert('Almost there', problems.join('\n')); return; }
-    setSubmitting(true);
+    setSubmitting(send ? 'send' : 'draft');
+    const body: NewFieldVisit = {
+      visitType,
+      projectId: visitType === 'PROJECT' ? project!.id : undefined,
+      location: site.name.trim(),
+      visitLocationId: site.visitLocationId,
+      latitude: site.lat!, longitude: site.lng!,
+      startDate, endDate, startTime, endTime,
+      remarks: remarks.trim() || undefined,
+      employeeIds: people.map((p) => p.id),
+      tasks: tasks.map((t) => ({ issueId: t.issueId, name: t.name })),
+      attachments,
+      submit: send,
+    };
     try {
-      const saved = await fv.create({
-        visitType,
-        projectId: visitType === 'PROJECT' ? project!.id : undefined,
-        location: site.name.trim(),
-        visitLocationId: site.visitLocationId,
-        latitude: site.lat!, longitude: site.lng!,
-        startDate, endDate, startTime, endTime,
-        remarks: remarks.trim() || undefined,
-        employeeIds: people.map((p) => p.id),
-        tasks: tasks.map((t) => ({ issueId: t.issueId, name: t.name })),
-        submit: true,
-      });
-      Alert.alert(
-        saved?.status === 'APPROVED' ? 'Approved' : 'Request sent',
-        saved?.status === 'APPROVED'
+      let saved;
+      if (mode === 'change') {
+        saved = await fv.requestChange(params.id!, body);
+        Alert.alert('Change sent', `The change to ${saved?.requestNumber ?? 'this visit'} is waiting for approval. The visit stays as it is until then.`,
+          [{ text: 'OK', onPress: () => navigation.goBack() }]);
+        return;
+      }
+      if (mode === 'edit') {
+        saved = await fv.update(params.id!, { ...body, submit: false });
+        if (send) saved = await fv.submit(params.id!);
+      } else {
+        saved = await fv.create(body);
+      }
+      const title = !send ? 'Draft saved' : saved?.status === 'APPROVED' ? 'Approved' : 'Request sent';
+      const message = !send
+        ? `${saved?.requestNumber ?? 'Your draft'} is saved. Send it for approval when it is ready.`
+        : saved?.status === 'APPROVED'
           ? `${saved.requestNumber} is approved — clock in from Today when you reach the site.`
-          : `${saved?.requestNumber ?? 'Your request'} is waiting for approval.`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }],
-      );
+          : `${saved?.requestNumber ?? 'Your request'} is waiting for approval.`;
+      Alert.alert(title, message, [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;
-      Alert.alert('Could not send', Array.isArray(msg) ? msg.join('\n') : msg || 'Please try again.');
+      Alert.alert(send ? 'Could not send' : 'Could not save', Array.isArray(msg) ? msg.join('\n') : msg || 'Please try again.');
     } finally {
-      setSubmitting(false);
+      setSubmitting(null);
     }
   };
 
@@ -187,10 +317,19 @@ export default function FieldVisitRequestForm() {
   const multi = picker === 'PEOPLE' || picker === 'TASKS';
 
   return (
-    <AppScreen title="New Field Visit" subtitle="Request a site visit">
+    <AppScreen
+      title={mode === 'change' ? 'Request a Change' : mode === 'edit' ? 'Edit Draft' : 'New Field Visit'}
+      subtitle={mode === 'change' ? 'Approved visit — needs approval again' : 'Request a site visit'}
+    >
+      {loadingVisit ? <ActivityIndicator style={{ marginTop: 40 }} color={theme.colors.primary} /> : (
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        {mode === 'change' && (
+          <Text style={styles.notice}>Change what is needed and send it. The visit stays as approved until an administrator accepts the change. The project cannot be changed.</Text>
+        )}
         <Text style={styles.label}>Type of visit</Text>
-        {canRaiseProject ? (
+        {mode === 'change' ? (
+          <Text style={styles.hint}>{visitType === 'GENERAL' ? 'General visit' : 'Project visit'}</Text>
+        ) : canRaiseProject ? (
           <View style={styles.segment}>
             {(['PROJECT', 'GENERAL'] as const).map((t) => (
               <TouchableOpacity key={t} style={[styles.segBtn, visitType === t && styles.segOn]} onPress={() => setVisitType(t)}>
@@ -205,7 +344,7 @@ export default function FieldVisitRequestForm() {
         {visitType === 'PROJECT' && (
           <>
             <Text style={styles.label}>Project *</Text>
-            <TouchableOpacity style={styles.field} onPress={() => { setQuery(''); setPicker('PROJECT'); }}>
+            <TouchableOpacity style={styles.field} disabled={mode === 'change'} onPress={() => { setQuery(''); setPicker('PROJECT'); }}>
               <Text style={project ? styles.value : styles.placeholder}>{project ? `${project.name} (${project.key})` : 'Pick a project'}</Text>
             </TouchableOpacity>
           </>
@@ -255,6 +394,13 @@ export default function FieldVisitRequestForm() {
             {people.length ? people.map(personName).join(', ') : 'Add people'}
           </Text>
         </TouchableOpacity>
+        {clashText.length > 0 && (
+          <View style={styles.clash}>
+            <Text style={styles.clashTitle}>On leave during this visit</Text>
+            {clashText.map((t) => <Text key={t} style={styles.clashLine}>• {t}</Text>)}
+            <Text style={styles.clashHint}>You can still send it — the approver sees this too.</Text>
+          </View>
+        )}
 
         <Text style={styles.label}>Tasks *</Text>
         {tasks.map((t, i) => (
@@ -283,10 +429,67 @@ export default function FieldVisitRequestForm() {
         <Text style={styles.label}>Remarks</Text>
         <TextInput style={[styles.input, styles.area]} placeholder="Anything the approver should know" value={remarks} onChangeText={setRemarks} multiline />
 
-        <TouchableOpacity style={[styles.submit, submitting && { opacity: 0.7 }]} disabled={submitting} onPress={submit}>
-          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Send for approval</Text>}
+        <Text style={styles.label}>Attachments</Text>
+        {attachments.map((a, i) => (
+          <View key={`${a.fileUrl}-${i}`} style={styles.taskLine}>
+            <Text style={[styles.taskText, styles.linkText]} numberOfLines={1} onPress={() => Linking.openURL(a.fileUrl)}>📎 {a.fileName}</Text>
+            <TouchableOpacity onPress={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}><Text style={styles.remove}>✕</Text></TouchableOpacity>
+          </View>
+        ))}
+        <TouchableOpacity style={styles.secondary} disabled={uploading} onPress={() => setMediaOpen(true)}>
+          {uploading ? <ActivityIndicator color={theme.colors.primary} /> : <Text style={styles.secondaryText}>＋ Attach a photo or PDF</Text>}
         </TouchableOpacity>
+
+        {mode === 'change' ? (
+          <TouchableOpacity style={[styles.submit, !!submitting && { opacity: 0.7 }]} disabled={!!submitting} onPress={() => save(true)}>
+            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Send change for approval</Text>}
+          </TouchableOpacity>
+        ) : (
+          <>
+            <TouchableOpacity style={[styles.submit, !!submitting && { opacity: 0.7 }]} disabled={!!submitting} onPress={() => save(true)}>
+              {submitting === 'send' ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Send for approval</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.draftBtn, !!submitting && { opacity: 0.7 }]} disabled={!!submitting} onPress={() => save(false)}>
+              {submitting === 'draft' ? <ActivityIndicator color={theme.colors.primary} /> : <Text style={styles.draftText}>{mode === 'edit' ? 'Save draft' : 'Save as draft'}</Text>}
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
+      )}
+
+      <MediaPickerModal
+        visible={mediaOpen}
+        onClose={() => setMediaOpen(false)}
+        onMediaSelected={addAttachment}
+        title="Attach to the request"
+        allowFiles
+        maxSizeMB={10}
+      />
+
+      <Modal visible={!!siteForm} animationType="slide" onRequestClose={() => setSiteForm(null)}>
+        <View style={styles.picker}>
+          <View style={styles.pickerHead}>
+            <Text style={styles.pickerTitle}>{locCaps?.isAdmin ? 'Add a saved site' : 'Request a saved site'}</Text>
+            <TouchableOpacity onPress={() => setSiteForm(null)}><Text style={styles.doneText}>Close</Text></TouchableOpacity>
+          </View>
+          {!locCaps?.isAdmin && <Text style={styles.hint}>An administrator approves it before it appears in the list.</Text>}
+          <Text style={styles.label}>Site name *</Text>
+          <TextInput style={styles.input} placeholder="e.g. PNB Head Office, Delhi" value={siteForm?.name ?? ''}
+            onChangeText={(v) => setSiteForm((f) => (f ? { ...f, name: v } : f))} />
+          <Text style={styles.label}>Address</Text>
+          <TextInput style={[styles.input, styles.area]} placeholder="Street, area, city" value={siteForm?.address ?? ''} multiline
+            onChangeText={(v) => setSiteForm((f) => (f ? { ...f, address: v } : f))} />
+          <TouchableOpacity style={styles.secondary} onPress={pinSiteHere}>
+            <Text style={styles.secondaryText}>
+              {siteForm?.lat != null ? `📍 Pinned (${siteForm.lat.toFixed(4)}, ${siteForm.lng!.toFixed(4)}) — tap to refresh` : '📍 Pin it at my current location'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.submit, (!siteForm?.name.trim() || savingSite) && { opacity: 0.5 }]}
+            disabled={!siteForm?.name.trim() || savingSite} onPress={saveSite}>
+            {savingSite ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{locCaps?.isAdmin ? 'Add site' : 'Send request'}</Text>}
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       <DateTimePickerModal
         isVisible={!!dateTarget}
@@ -317,6 +520,11 @@ export default function FieldVisitRequestForm() {
             <TouchableOpacity onPress={() => setPicker(null)}><Text style={styles.doneText}>{multi ? 'Done' : 'Close'}</Text></TouchableOpacity>
           </View>
           <TextInput style={styles.input} placeholder="Search" value={query} onChangeText={setQuery} />
+          {picker === 'SITE' && locCaps?.canAdd && (
+            <TouchableOpacity style={styles.secondary} onPress={openSiteForm}>
+              <Text style={styles.secondaryText}>{locCaps.isAdmin ? '＋ Add a new saved site' : '＋ Request a new saved site'}</Text>
+            </TouchableOpacity>
+          )}
           {loadingOptions ? <ActivityIndicator style={{ marginTop: 30 }} color={theme.colors.primary} /> : (
             <FlatList
               data={pickerRows}
@@ -368,6 +576,14 @@ const styles = StyleSheet.create({
   addText: { color: '#fff', fontWeight: '700' },
   submit: { marginTop: 24, height: 50, borderRadius: 12, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' },
   submitText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  draftBtn: { marginTop: 10, height: 48, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
+  draftText: { color: theme.colors.primaryText, fontWeight: '700', fontSize: 15 },
+  notice: { fontSize: 13, color: '#92400E', backgroundColor: '#FEF3C7', padding: 10, borderRadius: 10, marginBottom: 4 },
+  clash: { marginTop: 8, padding: 10, borderRadius: 10, backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA' },
+  clashTitle: { fontWeight: '700', color: '#9A3412', marginBottom: 2 },
+  clashLine: { fontSize: 13, color: '#9A3412', marginTop: 2 },
+  clashHint: { fontSize: 12, color: '#C2410C', marginTop: 4 },
+  linkText: { color: theme.colors.primary },
   picker: { flex: 1, backgroundColor: '#fff', paddingTop: 54, paddingHorizontal: 16, gap: 10 },
   pickerHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   pickerTitle: { fontSize: 20, fontWeight: '800', color: theme.colors.textPrimary },

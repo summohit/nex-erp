@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, UPLOAD_TIMEOUT_MS } from './apiClient';
 
 /**
  * Field visits as the web runs them: a request (site, dates, people, tasks),
@@ -67,9 +67,13 @@ export interface FvAttendance {
   employee: FvPerson;
 }
 
+export interface FvAttachment { id?: number; fileName: string; fileUrl: string; fileSize?: number | null }
+
 /** A request as GET /:id returns it: the request, every day on it, and what this person may do. */
 export interface FieldVisitDetail extends FieldVisitRequest {
   attendances: FvAttendance[];
+  attachments?: FvAttachment[];
+  visitLocation?: { id: number; name: string; address?: string | null; latitude?: number | null; longitude?: number | null } | null;
   pendingChange?: any | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
@@ -119,8 +123,15 @@ export interface NewFieldVisit {
   remarks?: string;
   employeeIds: number[];
   tasks: { issueId?: number; name: string }[];
+  attachments?: FvAttachment[];
+  /** false saves a draft; true sends it for approval (an administrator's is approved at once). */
   submit: boolean;
 }
+
+/** An approved leave that overlaps the trip, clipped to its dates (GET /availability). */
+export interface FvLeaveClash { employeeId: number; startDate: string; endDate: string }
+
+export interface VisitLocationCapabilities { isAdmin: boolean; isProjectManager: boolean; canAdd: boolean; canReview: boolean }
 
 export const fieldVisitRequestService = {
   // ── requests ──
@@ -147,6 +158,37 @@ export const fieldVisitRequestService = {
     const { data } = await apiClient.post('/field-visit-requests', body);
     return data;
   },
+  /** Edit a draft (or, for a Super Admin, a pending request). Same body as create. */
+  async update(id: number, body: NewFieldVisit): Promise<FieldVisitRequest> {
+    const { data } = await apiClient.patch(`/field-visit-requests/${id}`, body);
+    return data;
+  },
+  async submit(id: number): Promise<FieldVisitRequest> {
+    const { data } = await apiClient.post(`/field-visit-requests/${id}/submit`);
+    return data;
+  },
+  /** Propose a change to an approved trip: the whole form, which an administrator then rules on. */
+  async requestChange(id: number, body: NewFieldVisit): Promise<FieldVisitRequest> {
+    const { data } = await apiClient.post(`/field-visit-requests/${id}/request-modification`, body);
+    return data;
+  },
+  async availability(employeeIds: number[], startDate: string, endDate: string): Promise<FvLeaveClash[]> {
+    if (!employeeIds.length) return [];
+    const { data } = await apiClient.get('/field-visit-requests/availability', {
+      params: { employeeIds: employeeIds.join(','), startDate, endDate },
+    });
+    return data || [];
+  },
+  /** Upload one file for a request's attachments; returns its URL. */
+  async upload(file: { uri: string; fileName: string; type: string }): Promise<string> {
+    const form = new FormData();
+    form.append('file', { uri: file.uri, name: file.fileName, type: file.type } as any);
+    const { data } = await apiClient.post('/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT_MS,
+    });
+    return data?.url || data?.fileUrl || data?.path;
+  },
   async withdraw(id: number) {
     await apiClient.post(`/field-visit-requests/${id}/withdraw`);
   },
@@ -159,6 +201,20 @@ export const fieldVisitRequestService = {
     const { data } = await apiClient.get('/projects');
     const rows = Array.isArray(data) ? data : data?.items || data?.data || [];
     return rows.map((p: any) => ({ id: p.id, name: p.name, key: p.key }));
+  },
+  async locationCapabilities(): Promise<VisitLocationCapabilities> {
+    const { data } = await apiClient.get('/visit-location-requests/capabilities');
+    return data;
+  },
+  /** A project manager (not an administrator) asks for a new saved site; an administrator approves it. */
+  async requestLocation(body: { name: string; address?: string; latitude?: number; longitude?: number }) {
+    const { data } = await apiClient.post('/visit-location-requests', body);
+    return data;
+  },
+  /** An administrator adds a saved site directly. Returns the new site. */
+  async addLocation(body: { name: string; address?: string; latitude?: number; longitude?: number }): Promise<VisitLocation> {
+    const { data } = await apiClient.post('/master-data/visit-locations', body);
+    return data;
   },
   async visitLocations(): Promise<VisitLocation[]> {
     const { data } = await apiClient.get('/master-data/visit-locations');
