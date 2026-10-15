@@ -2789,6 +2789,27 @@
           </div>
         </div>
 
+        <!-- Travel allowance: how the amount was calculated from the field visit. -->
+        <div class="travel-breakdown" *ngIf="ex.travelDetail?.days?.length">
+          <div class="travel-breakdown-head">Travel allowance · {{ ex.travelDetail.site }}</div>
+          <table>
+            <thead>
+              <tr><th>Date</th><th>From</th><th>Return</th><th>Km</th><th>Vehicle</th><th>Amount</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let d of ex.travelDetail.days">
+                <td>{{ d.date }}</td>
+                <td>{{ d.from }}</td>
+                <td>{{ d.returnTo }}</td>
+                <td>{{ d.goingKm }} + {{ d.returnKm }} = {{ d.km }}</td>
+                <td>{{ d.vehicle }} · ₹{{ d.ratePerKm }}/km</td>
+                <td>₹{{ d.amount | number:'1.2-2' }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="travel-breakdown-note">Calculated from the field visit. Check the km before approving.</p>
+        </div>
+
         <!-- 2. Claimant Profile Card -->
         <div class="expense-claimant-card">
           <div class="claimant-avatar-box">

@@ -79,6 +79,49 @@
       </div>
     </div>
 
+    <!-- Card: field visit travel allowance (saved on its own) -->
+    <div class="setting-card">
+      <div class="card-top">
+        <div class="card-icon-wrap shift-icon">
+          <svg lucideCalendarClock size="20"></svg>
+        </div>
+        <div class="card-title-group">
+          <h3>Field Visit Travel Allowance</h3>
+          <p>Delhi NCR visits are paid per km: from where the person taps Start journey (or their office) to the site and back. Outstation visits get no km allowance. Claims go to finance as expense claims, separate from the payslip.</p>
+        </div>
+      </div>
+
+      <div class="travel-grid">
+        <label class="travel-field">
+          <span>Delhi NCR radius from the office (km)</span>
+          <input type="number" min="1" max="500" [(ngModel)]="travelRadius" />
+        </label>
+
+        <div class="travel-rates">
+          <span class="travel-label">Rate per km, by vehicle</span>
+          <div class="travel-rate-row" *ngFor="let r of travelRates; let i = index">
+            <input type="text" placeholder="Vehicle (e.g. Bike)" [(ngModel)]="r.vehicle" aria-label="Vehicle" />
+            <div class="travel-rate-amount">
+              <span>₹</span>
+              <input type="number" min="0" step="0.5" [(ngModel)]="r.ratePerKm" aria-label="Rate per km" />
+              <span>/km</span>
+            </div>
+            <button type="button" class="link-reset" (click)="removeTravelRate(i)">Remove</button>
+          </div>
+          <button type="button" class="link-reset" (click)="addTravelRate()">+ Add vehicle</button>
+        </div>
+      </div>
+
+      <div class="card-footer-note">
+        <svg lucideInfo size="14"></svg>
+        <span *ngIf="!travelRates.length">No rates yet: completed Delhi NCR visits wait until at least one vehicle has a rate.</span>
+        <span *ngIf="travelRates.length">People pick their vehicle when they tap Start journey.</span>
+        <button class="btn-save travel-save" type="button" (click)="saveTravel()" [disabled]="isSavingTravel()">
+          {{ isSavingTravel() ? 'Saving…' : 'Save travel allowance' }}
+        </button>
+      </div>
+    </div>
+
     <!-- Card: default quotation terms -->
     <div class="setting-card">
       <div class="card-top">

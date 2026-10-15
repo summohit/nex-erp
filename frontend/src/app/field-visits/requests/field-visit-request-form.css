@@ -2281,3 +2281,12 @@ textarea.has-field-error,
 .scope-chip-owner { margin-left: 4px; font-size: 11.5px; font-weight: 600; color: #475569; white-space: nowrap; }
 .scope-chip-owner.not-going { color: #b91c1c; }
 .not-going-alert { background: #fef2f2; border-color: #fecaca; border-left-color: #ef4444; color: #7f1d1d; }
+
+/* Travel type (Delhi NCR / Outstation). */
+.travel-zone-field { margin-top: 14px; }
+.travel-zone-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.travel-zone-option { text-align: left; display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; cursor: pointer; font: inherit; }
+.travel-zone-option strong { font-size: 14px; color: #0f172a; }
+.travel-zone-option span { font-size: 12.5px; color: #64748b; }
+.travel-zone-option.active { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+.travel-zone-hint { margin: 8px 0 0; font-size: 12.5px; color: #64748b; }

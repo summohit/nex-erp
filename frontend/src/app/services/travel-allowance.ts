@@ -1,0 +1,37 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
+
+export type TravelZone = 'DELHI_NCR' | 'OUTSTATION';
+export interface TravelRate { vehicle: string; ratePerKm: number }
+export interface TravelConfig { ncrRadiusKm: number; rates: TravelRate[] }
+
+/** Field visit travel allowance: rates, the NCR suggestion and journey taps. */
+@Injectable({ providedIn: 'root' })
+export class TravelAllowanceService {
+  private http = inject(HttpClient);
+  private apiUrl = `${environment.apiUrl}/travel-allowance`;
+
+  getSettings() {
+    return this.http.get<TravelConfig>(`${this.apiUrl}/settings`);
+  }
+
+  /** Super admin only. */
+  saveSettings(config: TravelConfig) {
+    return this.http.put<TravelConfig>(`${this.apiUrl}/settings`, config);
+  }
+
+  suggestZone(lat: number, lng: number) {
+    return this.http.get<{ zone: TravelZone | null; distanceKm: number | null; ncrRadiusKm: number }>(
+      `${this.apiUrl}/zone?lat=${lat}&lng=${lng}`,
+    );
+  }
+
+  startJourney(body: { requestId: number; lat: number; lng: number; vehicle?: string }) {
+    return this.http.post(`${this.apiUrl}/journey/start`, body);
+  }
+
+  endJourney(body: { requestId: number; lat: number; lng: number }) {
+    return this.http.post(`${this.apiUrl}/journey/end`, body);
+  }
+}

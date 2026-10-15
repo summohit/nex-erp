@@ -339,6 +339,7 @@
               type="number"
               step="0.000001"
               [(ngModel)]="form.latitude"
+              (change)="suggestTravelZone()"
               [class.has-field-error]="showValidationErrors() && isFieldInvalid('coordinates')"
               placeholder="e.g. 28.613939" />
           </div>
@@ -351,6 +352,7 @@
               type="number"
               step="0.000001"
               [(ngModel)]="form.longitude"
+              (change)="suggestTravelZone()"
               [class.has-field-error]="showValidationErrors() && isFieldInvalid('coordinates')"
               placeholder="e.g. 77.209021" />
           </div>
@@ -377,6 +379,33 @@
             </div>
           </div>
         }
+
+        <!-- Travel type: decides the km allowance (Delhi NCR) or normal expenses (Outstation). -->
+        <div class="field travel-zone-field">
+          <label><span>Travel type</span></label>
+          <div class="travel-zone-options" role="radiogroup" aria-label="Travel type">
+            <button type="button" class="travel-zone-option" [class.active]="form.travelZone === 'DELHI_NCR'"
+                    role="radio" [attr.aria-checked]="form.travelZone === 'DELHI_NCR'" (click)="chooseTravelZone('DELHI_NCR')">
+              <strong>Delhi NCR</strong>
+              <span>Paid per km — people tap Start journey on the day</span>
+            </button>
+            <button type="button" class="travel-zone-option" [class.active]="form.travelZone === 'OUTSTATION'"
+                    role="radio" [attr.aria-checked]="form.travelZone === 'OUTSTATION'" (click)="chooseTravelZone('OUTSTATION')">
+              <strong>Outstation</strong>
+              <span>No km allowance — costs go through expense claims</span>
+            </button>
+          </div>
+          @if (travelSuggestion()?.distanceKm != null) {
+            <p class="travel-zone-hint">
+              This site is about {{ travelSuggestion()!.distanceKm }} km from the office
+              (Delhi NCR is within {{ travelSuggestion()!.ncrRadiusKm }} km), so
+              {{ travelSuggestion()!.zone === 'DELHI_NCR' ? 'Delhi NCR' : 'Outstation' }} is suggested.
+              @if (form.travelZone && travelSuggestion()!.zone && form.travelZone !== travelSuggestion()!.zone) {
+                <b>You picked differently — the approver will see this.</b>
+              }
+            </p>
+          }
+        </div>
       </div>
 
       <!-- SECTION 2: SCHEDULE & HOURS -->

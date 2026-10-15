@@ -1,3 +1,4 @@
+import { TravelAllowanceService, TravelRate } from '../../services/travel-allowance';
 import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -76,6 +77,46 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
   private companyService = inject(CompanyService);
 
   private sanitizer = inject(DomSanitizer);
+  private travelApi = inject(TravelAllowanceService);
+
+  /** Field visit travel allowance: NCR radius and rates per vehicle. */
+  travelRadius = 60;
+  travelRates: TravelRate[] = [];
+  isSavingTravel = signal(false);
+
+  private loadTravel() {
+    this.travelApi.getSettings().subscribe({
+      next: (c) => { this.travelRadius = c.ncrRadiusKm; this.travelRates = (c.rates || []).map((r) => ({ ...r })); },
+      error: () => this.toast.error('Could not load travel allowance settings'),
+    });
+  }
+
+  addTravelRate() {
+    this.travelRates = [...this.travelRates, { vehicle: '', ratePerKm: 0 }];
+  }
+
+  removeTravelRate(i: number) {
+    this.travelRates = this.travelRates.filter((_, idx) => idx !== i);
+  }
+
+  saveTravel() {
+    const rates = this.travelRates
+      .map((r) => ({ vehicle: String(r.vehicle ?? '').trim(), ratePerKm: Number(r.ratePerKm) }))
+      .filter((r) => r.vehicle);
+    this.isSavingTravel.set(true);
+    this.travelApi.saveSettings({ ncrRadiusKm: Number(this.travelRadius), rates }).subscribe({
+      next: (c) => {
+        this.travelRadius = c.ncrRadiusKm;
+        this.travelRates = c.rates.map((r) => ({ ...r }));
+        this.isSavingTravel.set(false);
+        this.toast.success('Travel allowance saved');
+      },
+      error: (e) => {
+        this.isSavingTravel.set(false);
+        this.toast.error(e?.error?.message || 'Could not save travel allowance');
+      },
+    });
+  }
 
   settings = signal<SystemSetting | null>(null);
   isLoading = signal(true);
@@ -122,6 +163,7 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
       return;
     }
     this.load();
+    this.loadTravel();
     this.employeeService.getEmployeesBasicList().subscribe({
       next: (list) => this.employees.set(list),
       error: () => this.toast.error('Failed to load employees for ticket assignee'),

@@ -274,6 +274,49 @@
         </div>
       </div>
 
+      <!-- Travel allowance (Delhi NCR): one location read per tap, no tracking. -->
+      @if (isNcrDay()) {
+        <div class="journey-panel">
+          <div class="journey-head">
+            <svg lucideRoute [size]="16"></svg>
+            <strong>Travel allowance</strong>
+            <span class="journey-zone">Delhi NCR</span>
+          </div>
+          @if (!day()!.journeyStartAt) {
+            @if (!day()!.clockInTime) {
+              <p class="journey-note">Tap when you set off — from the office, home or anywhere. Only this one location is recorded.</p>
+              <div class="journey-row">
+                @if (travelRates().length) {
+                  <select class="journey-select" [(ngModel)]="vehicle" aria-label="How are you travelling?">
+                    @for (r of travelRates(); track r.vehicle) {
+                      <option [value]="r.vehicle">{{ r.vehicle }} · ₹{{ r.ratePerKm }}/km</option>
+                    }
+                  </select>
+                }
+                <button class="primary-btn journey-btn" type="button" [disabled]="journeyWorking()" (click)="startJourney()">
+                  <svg lucideNavigation [size]="16"></svg>
+                  <span>{{ journeyWorking() ? 'Reading location…' : 'Start journey' }}</span>
+                </button>
+              </div>
+            } @else {
+              <p class="journey-note">No journey was started today, so your trip is counted from your office.</p>
+            }
+          } @else {
+            <p class="journey-note">
+              Started {{ day()!.journeyStartAt | date:'h:mm a' }}@if (day()!.journeyVehicle) { · {{ day()!.journeyVehicle }}}.
+              @if (day()!.journeyEndAt) { Ended {{ day()!.journeyEndAt | date:'h:mm a' }}. }
+              @else { The return is counted as the same distance unless you tap End journey where you finish. }
+            </p>
+            @if (!day()!.journeyEndAt) {
+              <button class="ghost-btn journey-btn" type="button" [disabled]="journeyWorking()" (click)="endJourney()">
+                <svg lucideMapPin [size]="16"></svg>
+                <span>{{ journeyWorking() ? 'Reading location…' : 'End journey' }}</span>
+              </button>
+            }
+          }
+        </div>
+      }
+
       @if (day()!.status === 'COMPLETED' || day()!.clockOutTime) {
         <div class="done-banner">
           <svg lucideCheckCircle2 [size]="18"></svg>

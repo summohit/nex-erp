@@ -2,6 +2,7 @@ import { Component, HostBinding, Input, OnInit, OnDestroy, inject, signal, compu
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { TravelAllowanceService, TravelRate } from '../../services/travel-allowance';
 import {
   LucideMapPin, LucideNavigation, LucideClock, LucideCheckCircle,
   LucideAlertTriangle, LucideRefreshCw, LucideCalendarDays,
@@ -43,6 +44,12 @@ interface Fix {
 })
 export class MyFieldVisitComponent implements OnInit, OnDestroy {
   private api = inject(FieldVisitAttendanceService);
+  private travel = inject(TravelAllowanceService);
+
+  /** Travel allowance (Delhi NCR visits): vehicles the super admin priced. */
+  travelRates = signal<TravelRate[]>([]);
+  vehicle = '';
+  journeyWorking = signal(false);
 
   today = new Date();
   days = signal<FieldVisitDay[]>([]);
@@ -90,6 +97,13 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
 
   load(): void {
     this.isLoading.set(true);
+    this.travel.getSettings().subscribe({
+      next: (c) => {
+        this.travelRates.set(c.rates || []);
+        if (!this.vehicle && c.rates?.length) this.vehicle = c.rates[0].vehicle;
+      },
+      error: () => this.travelRates.set([]),
+    });
     this.api.getToday().subscribe({
       next: (days) => {
         this.days.set(days);
@@ -212,6 +226,64 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
       next: () => { this.isWorking.set(false); this.load(); },
       error: (err) => { this.error.set(this.messageOf(err)); this.isWorking.set(false); },
     });
+  }
+
+  // ─── Travel allowance: Start / End journey ─────────────────────────────────
+
+  /** A Delhi NCR day: the journey buttons apply. */
+  isNcrDay = computed(() => this.day()?.request.travelZone === 'DELHI_NCR');
+
+  /**
+   * One location read, now. Not the clock-in watcher: the journey starts
+   * wherever they are, usually far from the site, and nothing is tracked
+   * between the two taps. On an iPhone Safari asks for permission once.
+   */
+  private locateOnce(): Promise<{ lat: number; lng: number }> {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) { reject(new Error('This browser cannot read your location.')); return; }
+      navigator.geolocation.getCurrentPosition(
+        (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        (e) => reject(new Error(e.code === 1
+          ? 'Location is blocked. Allow location for this site in your browser settings and try again.'
+          : 'Your location could not be read. Try again.')),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+      );
+    });
+  }
+
+  async startJourney(): Promise<void> {
+    const day = this.day();
+    if (!day) return;
+    if (this.travelRates().length && !this.vehicle) { this.error.set('Pick how you are travelling.'); return; }
+    this.journeyWorking.set(true);
+    this.error.set(null);
+    try {
+      const here = await this.locateOnce();
+      this.travel.startJourney({ requestId: day.request.id, ...here, vehicle: this.vehicle || undefined }).subscribe({
+        next: () => { this.journeyWorking.set(false); this.load(); },
+        error: (err) => { this.error.set(this.messageOf(err)); this.journeyWorking.set(false); },
+      });
+    } catch (e: any) {
+      this.error.set(e.message);
+      this.journeyWorking.set(false);
+    }
+  }
+
+  async endJourney(): Promise<void> {
+    const day = this.day();
+    if (!day) return;
+    this.journeyWorking.set(true);
+    this.error.set(null);
+    try {
+      const here = await this.locateOnce();
+      this.travel.endJourney({ requestId: day.request.id, ...here }).subscribe({
+        next: () => { this.journeyWorking.set(false); this.load(); },
+        error: (err) => { this.error.set(this.messageOf(err)); this.journeyWorking.set(false); },
+      });
+    } catch (e: any) {
+      this.error.set(e.message);
+      this.journeyWorking.set(false);
+    }
   }
 
   selectTask(id: number): void {

@@ -135,6 +135,7 @@ export interface FieldVisitLeaveConflict {
 }
 
 export interface FieldVisitRequestInput {
+  travelZone?: 'DELHI_NCR' | 'OUTSTATION';
   /** Why an approved trip is changed; required in modify mode. */
   changeReason?: string;
   /** GENERAL visits belong to no project; their scope is the people's general tasks. */

@@ -1,3 +1,4 @@
+import { TravelAllowanceService } from '../../services/travel-allowance';
 import { Component, EventEmitter, Input, OnInit, Output, inject, signal, computed, effect, untracked, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -94,6 +95,8 @@ export class FieldVisitRequestFormComponent implements OnInit {
 
   @Output() saved = new EventEmitter<void>();
   @Output() closed = new EventEmitter<void>();
+
+  private travelApi = inject(TravelAllowanceService);
 
   private api = inject(FieldVisitRequestsService);
   private projectsService = inject(ProjectsService);
@@ -454,6 +457,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
     endTime: '18:00',
     remarks: '',
     changeReason: '',
+    travelZone: '' as '' | 'DELHI_NCR' | 'OUTSTATION',
     employeeIds: [] as number[],
     tasks: [] as {
       issueId: number | null;
@@ -491,6 +495,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
         endTime: this.request.endTime,
         remarks: this.request.remarks ?? '',
         changeReason: '',
+        travelZone: ((this.request as any).travelZone ?? '') as '' | 'DELHI_NCR' | 'OUTSTATION',
         employeeIds: this.request.members.map((m) => m.employee.id),
         // A line saved before this picker existed, or one describing work that
         // is not on the board, comes back as free text. Keeping it renders
@@ -703,6 +708,33 @@ export class FieldVisitRequestFormComponent implements OnInit {
     this.form.location = [site.name, site.address].filter(Boolean).join(' – ');
     if (site.latitude != null) this.form.latitude = site.latitude;
     if (site.longitude != null) this.form.longitude = site.longitude;
+    this.suggestTravelZone();
+  }
+
+  /** What the system suggests for this site, and how far it is from the office. */
+  travelSuggestion = signal<{ zone: 'DELHI_NCR' | 'OUTSTATION' | null; distanceKm: number | null; ncrRadiusKm: number } | null>(null);
+  /** Once the PM picks a travel type, a new pin no longer overrides it. */
+  private travelZoneChosen = false;
+
+  /**
+   * Delhi NCR or Outstation for the pin (decided 15 Oct 2026): pre-selected
+   * from the distance to the head office, the PM's own pick kept.
+   */
+  suggestTravelZone(): void {
+    const lat = Number(this.form.latitude), lng = Number(this.form.longitude);
+    if (this.form.latitude == null || this.form.longitude == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    this.travelApi.suggestZone(lat, lng).subscribe({
+      next: (s) => {
+        this.travelSuggestion.set(s);
+        if (s.zone && (!this.form.travelZone || !this.travelZoneChosen)) this.form.travelZone = s.zone;
+      },
+      error: () => this.travelSuggestion.set(null),
+    });
+  }
+
+  chooseTravelZone(zone: 'DELHI_NCR' | 'OUTSTATION'): void {
+    this.form.travelZone = zone;
+    this.travelZoneChosen = true;
   }
 
   mapUrl(): SafeResourceUrl {
@@ -725,6 +757,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
       async (pos) => {
         this.form.latitude = Number(pos.coords.latitude.toFixed(6));
         this.form.longitude = Number(pos.coords.longitude.toFixed(6));
+        this.suggestTravelZone();
         if (!this.form.location) {
           this.form.location = await this.reverseGeocode(this.form.latitude, this.form.longitude);
         }
@@ -1257,6 +1290,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
       startTime: this.form.startTime,
       endTime: this.form.endTime,
       remarks: this.form.remarks.trim() || undefined,
+      travelZone: this.form.travelZone || undefined,
       ...(this.mode === 'modify' ? { changeReason: this.form.changeReason.trim() } : {}),
       employeeIds: this.selectedEmployeeIds(),
       // `issueId` is what makes a line an adopted task rather than a phrase;

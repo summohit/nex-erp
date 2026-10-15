@@ -1161,3 +1161,14 @@
 }
 
 .card-footer-note.warning-note svg { color: #6b3fd6; }
+
+/* Field visit travel allowance */
+.travel-grid { display: flex; flex-direction: column; gap: 14px; margin: 6px 0 12px; }
+.travel-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #334155; max-width: 260px; }
+.travel-field input, .travel-rate-row input { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; }
+.travel-rates { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.travel-label { font-size: 13px; color: #334155; }
+.travel-rate-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.travel-rate-amount { display: flex; align-items: center; gap: 4px; color: #64748b; }
+.travel-rate-amount input { width: 90px; }
+.travel-save { margin-left: auto; }

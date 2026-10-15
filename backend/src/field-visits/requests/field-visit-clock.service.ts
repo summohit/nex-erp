@@ -63,10 +63,12 @@ export class FieldVisitClockService {
     id: true, visitDate: true, isHoliday: true, status: true,
     clockInTime: true, clockInDistanceKm: true,
     clockOutTime: true, clockOutDistanceKm: true,
+    // Travel allowance (Delhi NCR visits): what the journey buttons show.
+    journeyVehicle: true, journeyStartAt: true, journeyEndAt: true,
     issue: { select: { id: true, key: true, title: true } },
     request: {
       select: {
-        id: true, requestNumber: true, status: true,
+        id: true, requestNumber: true, status: true, travelZone: true,
         location: true, latitude: true, longitude: true, geofenceRadiusM: true,
         startTime: true, endTime: true,
         project: { select: { id: true, name: true, key: true } },

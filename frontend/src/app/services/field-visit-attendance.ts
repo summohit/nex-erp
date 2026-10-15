@@ -20,6 +20,8 @@ export interface FieldVisitSite {
   geofenceRadiusM: number;
   startTime: string;
   endTime: string;
+  /** DELHI_NCR (km allowance, journey buttons) or OUTSTATION. */
+  travelZone?: 'DELHI_NCR' | 'OUTSTATION' | null;
   project?: { id: number; name: string; key?: string | null } | null;
 }
 
@@ -33,6 +35,9 @@ export interface FieldVisitDay {
   clockInDistanceKm?: number | null;
   clockOutTime?: string | null;
   clockOutDistanceKm?: number | null;
+  journeyVehicle?: string | null;
+  journeyStartAt?: string | null;
+  journeyEndAt?: string | null;
   issue?: { id: number; key: string; title: string } | null;
   request: FieldVisitSite;
   tasks: FieldVisitTask[];

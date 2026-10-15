@@ -911,3 +911,12 @@
   .embedded-empty { flex-wrap: wrap; }
   .ee-date { order: -1; margin-left: auto; }
 }
+
+/* Travel allowance: Start / End journey. */
+.journey-panel { border: 1px solid #dbeafe; background: #f8fbff; border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+.journey-head { display: flex; align-items: center; gap: 8px; color: #1e3a8a; }
+.journey-zone { margin-left: auto; font-size: 12px; font-weight: 600; color: #1d4ed8; background: #dbeafe; padding: 2px 8px; border-radius: 999px; }
+.journey-note { margin: 8px 0 10px; font-size: 13px; color: #475569; }
+.journey-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.journey-select { flex: 1; min-width: 160px; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; background: #fff; }
+.journey-btn { width: auto; }
