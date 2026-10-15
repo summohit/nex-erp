@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { approvedOrRaisedBy } from '../projects/project-roles';
 import { LeavesService } from '../leaves/leaves.service';
 import { EmployeesService } from '../employees/employees.service';
 import { OnboardingService } from '../onboarding/onboarding.service';
@@ -366,7 +367,8 @@ export class DashboardService {
     const base = {
       project: { companyId },
       isArchived: false,
-      OR: [{ assigneeId: employeeId }, { reporterId: employeeId }]
+      OR: [{ assigneeId: employeeId }, { reporterId: employeeId }],
+      AND: [approvedOrRaisedBy(employeeId)],
     };
     const [pending, overdue] = await Promise.all([
       this.prisma.issue.count({ where: { ...base, status: { notIn: ['DONE', 'CANCELLED'] } } }),
@@ -605,7 +607,8 @@ export class DashboardService {
         project: { companyId },
         isArchived: false,
         status: { notIn: ['DONE', 'CANCELLED'] },
-        OR: [{ assigneeId: employeeId }, { reporterId: employeeId }]
+        OR: [{ assigneeId: employeeId }, { reporterId: employeeId }],
+        AND: [approvedOrRaisedBy(employeeId)],
       },
       include: { project: { select: { id: true, key: true, name: true } } },
       orderBy: { dueDate: 'asc' },

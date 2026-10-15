@@ -153,6 +153,25 @@ export function taskVisibilityFilter(viewer: ProjectViewer): any | null {
       { reporterId: me },
       { members: { some: { employeeId: me } } },
     ],
+    AND: [approvedOrRaisedBy(me)],
+  };
+}
+
+/**
+ * A task an employee may see on their own lists: approved (or never needed
+ * approval), or one they raised, which they see with its pending note.
+ * Pending and rejected tasks stay hidden from everyone else on the task, so
+ * work nobody has confirmed doesn't read as work (decided 15 Oct 2026). The
+ * PM, architect, admins and super admin skip this through seesEveryTask.
+ */
+export function approvedOrRaisedBy(employeeId: number): any {
+  return {
+    OR: [
+      { approvalState: null },
+      { approvalState: 'APPROVED' },
+      { reporterId: employeeId },
+      { approvalRequestedById: employeeId },
+    ],
   };
 }
 

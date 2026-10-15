@@ -1,5 +1,6 @@
 import {
-  PROJECT_ROLE, seesEveryTask, mayChangeAnyTask, taskVisibilityFilter, resolveProjectViewer,
+  PROJECT_ROLE, seesEveryTask, mayChangeAnyTask, taskVisibilityFilter,
+  approvedOrRaisedBy, resolveProjectViewer,
   seesProjectFinancials,
 } from './project-roles';
 
@@ -46,7 +47,24 @@ describe('what a limited viewer sees', () => {
         { reporterId: 60 },
         { members: { some: { employeeId: 60 } } },
       ],
+      AND: [approvedOrRaisedBy(60)],
     });
+  });
+
+  it('hides pending and rejected tasks unless they raised them', () => {
+    expect(approvedOrRaisedBy(60)).toEqual({
+      OR: [
+        { approvalState: null },
+        { approvalState: 'APPROVED' },
+        { reporterId: 60 },
+        { approvalRequestedById: 60 },
+      ],
+    });
+  });
+
+  it('is every task, pending ones included, for whoever sees the whole board', () => {
+    expect(taskVisibilityFilter(viewer({ projectRole: PROJECT_ROLE.MANAGER }))).toBeNull();
+    expect(taskVisibilityFilter(viewer({ projectRole: PROJECT_ROLE.ARCHITECT }))).toBeNull();
   });
 
   it('is nothing at all when the login has no employee record', () => {

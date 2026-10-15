@@ -470,8 +470,11 @@ export class FieldVisitRequestsService {
   }
 
   /**
-   * What a non-administrator is entitled to see: their own trips, the ones
-   * they are going on, and the ones on projects they run.
+   * What a non-administrator is entitled to see: their own trips, the ones on
+   * projects they run or are technical architect on, and the ones they are
+   * going on once approved. Someone only going on a trip doesn't see it while
+   * it is a draft, pending or rejected, since nobody has confirmed it yet; a
+   * cancelled one stays so they know it is off (decided 15 Oct 2026).
    */
   private visibilityWhere(companyId: number, role: string, employeeId: number | null) {
     if (this.isApprover(role)) return { companyId };
@@ -480,9 +483,12 @@ export class FieldVisitRequestsService {
       companyId,
       OR: [
         { raisedById: me },
-        { members: { some: { employeeId: me } } },
+        {
+          members: { some: { employeeId: me } },
+          status: { in: [FIELD_VISIT_STATUS.APPROVED, FIELD_VISIT_STATUS.COMPLETED, FIELD_VISIT_STATUS.CANCELLED] },
+        },
         { project: { leadId: me } },
-        { project: { members: { some: { employeeId: me, role: 'PROJECT_MANAGER' } } } },
+        { project: { members: { some: { employeeId: me, role: { in: ['PROJECT_MANAGER', 'TECHNICAL_ARCHITECT'] } } } } },
       ],
     };
   }

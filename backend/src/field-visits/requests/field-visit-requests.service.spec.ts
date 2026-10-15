@@ -415,15 +415,15 @@ describe('editing and calling off', () => {
 });
 
 describe('who can see what', () => {
-  it('scopes a plain employee to their own trips and the ones they are on', async () => {
+  it('scopes a plain employee to their own trips and the approved ones they are on', async () => {
     const { service, prisma } = makeService();
     await service.list(1, 'EMPLOYEE', 60, {});
     const where = prisma.fieldVisitRequest.findMany.mock.calls[0][0].where;
     expect(where.OR).toEqual([
       { raisedById: 60 },
-      { members: { some: { employeeId: 60 } } },
+      { members: { some: { employeeId: 60 } }, status: { in: ['APPROVED', 'COMPLETED', 'CANCELLED'] } },
       { project: { leadId: 60 } },
-      { project: { members: { some: { employeeId: 60, role: 'PROJECT_MANAGER' } } } },
+      { project: { members: { some: { employeeId: 60, role: { in: ['PROJECT_MANAGER', 'TECHNICAL_ARCHITECT'] } } } } },
     ]);
   });
 

@@ -2,6 +2,7 @@ import {
   Injectable, BadRequestException, ForbiddenException, NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { approvedOrRaisedBy } from '../projects/project-roles';
 import { TasksGateway } from '../events/tasks/tasks.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CrmService } from '../crm/crm.service';
@@ -725,7 +726,7 @@ export class TasksService {
         ...(opts.includeDone ? {} : { status: { notIn: CLOSED_STATUSES } }),
         ...(everyone
           ? (onePerson ? { OR: [{ assigneeId: onePerson }, { members: { some: { employeeId: onePerson } } }] } : {})
-          : created ? { reporterId: employeeId } : { OR: mine }),
+          : created ? { reporterId: employeeId } : { OR: mine, AND: [approvedOrRaisedBy(employeeId)] }),
       },
       select: {
         id: true, key: true, title: true, status: true, priority: true,
