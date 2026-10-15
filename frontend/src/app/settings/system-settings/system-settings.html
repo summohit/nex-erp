@@ -20,10 +20,18 @@
     </div>
   </div>
 
+  <!-- Tabs: one group of settings at a time, instead of one long page. -->
+  <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+    <button type="button" role="tab" class="settings-tab" *ngFor="let t of TABS"
+            [class.active]="tab() === t.key" [attr.aria-selected]="tab() === t.key" (click)="setTab(t.key)">
+      {{ t.label }}
+    </button>
+  </div>
+
   <div class="settings-grid" *ngIf="settings() as s">
     
     <!-- Card 1: Attendance & Shift Visibility -->
-    <div class="setting-card">
+    <div class="setting-card" *ngIf="tab() === 'general'">
       <div class="card-top">
         <div class="card-icon-wrap shift-icon">
           <svg lucideCalendarClock size="20"></svg>
@@ -46,7 +54,7 @@
     </div>
 
     <!-- Card: timesheet approval (§22) -->
-    <div class="setting-card">
+    <div class="setting-card" *ngIf="tab() === 'general'">
       <div class="card-top">
         <div class="card-icon-wrap shift-icon">
           <svg lucideCalendarClock size="20"></svg>
@@ -80,7 +88,7 @@
     </div>
 
     <!-- Card: field visit travel allowance (saved on its own) -->
-    <div class="setting-card">
+    <div class="setting-card" *ngIf="tab() === 'field'">
       <div class="card-top">
         <div class="card-icon-wrap shift-icon">
           <svg lucideCalendarClock size="20"></svg>
@@ -123,7 +131,7 @@
     </div>
 
     <!-- Card: default quotation terms -->
-    <div class="setting-card">
+    <div class="setting-card" *ngIf="tab() === 'sales'">
       <div class="card-top">
         <div class="card-icon-wrap">
           <svg lucideFileText size="20"></svg>
@@ -150,7 +158,7 @@
     </div>
 
     <!-- Card: Attendance issue handler -->
-    <div class="setting-card">
+    <div class="setting-card" *ngIf="tab() === 'tickets'">
       <div class="card-top">
         <div class="card-icon-wrap ticket-icon">
           <svg lucideCalendarClock size="20"></svg>
@@ -202,7 +210,7 @@
     </div>
 
     <!-- Card: quotation signatory -->
-    <div class="setting-card">
+    <div class="setting-card" *ngIf="tab() === 'sales'">
       <div class="card-top">
         <div class="card-icon-wrap">
           <svg lucidePenLine size="20"></svg>
@@ -254,7 +262,7 @@
     </div>
 
     <!-- Card: Company-wide two-factor authentication -->
-    <div class="setting-card">
+    <div class="setting-card" *ngIf="tab() === 'general'">
       <div class="card-top">
         <div class="card-icon-wrap shift-icon">
           <svg lucideShieldCheck size="20"></svg>
@@ -281,7 +289,7 @@
     </div>
 
     <!-- Card: Default Ticket Assignee -->
-    <div class="setting-card">
+    <div class="setting-card" *ngIf="tab() === 'tickets'">
       <div class="card-top">
         <div class="card-icon-wrap ticket-icon">
           <svg lucideTicket size="20"></svg>
@@ -333,7 +341,7 @@
     </div>
 
     <!-- Card 2: Offer Letter Template (.docx) -->
-    <div class="setting-card">
+    <div class="setting-card" *ngIf="tab() === 'letters'">
       <div class="card-top">
         <div class="card-icon-wrap docx-icon">
           <svg lucideFileText size="20"></svg>
@@ -464,7 +472,7 @@
     </div>
 
     <!-- Card 3: Built-in HTML Letter Template -->
-    <div class="setting-card">
+    <div class="setting-card" *ngIf="tab() === 'letters'">
       <div class="card-top">
         <div class="card-icon-wrap html-icon">
           <svg lucideFileText size="20"></svg>

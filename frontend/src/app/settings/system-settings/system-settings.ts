@@ -119,6 +119,28 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
   }
 
   settings = signal<SystemSetting | null>(null);
+  /** Which group of settings is showing. Remembered per browser. */
+  readonly TABS = [
+    { key: 'general', label: 'General & Security' },
+    { key: 'tickets', label: 'Tickets' },
+    { key: 'field', label: 'Field Visits' },
+    { key: 'sales', label: 'Sales' },
+    { key: 'letters', label: 'Offer Letters' },
+  ] as const;
+  tab = signal<string>(this.savedTab());
+
+  private savedTab(): string {
+    try {
+      const v = localStorage.getItem('systemSettingsTab');
+      return v && ['general', 'tickets', 'field', 'sales', 'letters'].includes(v) ? v : 'general';
+    } catch { return 'general'; }
+  }
+
+  setTab(key: string) {
+    this.tab.set(key);
+    try { localStorage.setItem('systemSettingsTab', key); } catch { /* private window */ }
+  }
+
   isLoading = signal(true);
   isSaving = signal(false);
   isUploading = signal(false);
