@@ -185,6 +185,12 @@
             </button>
           </div>
 
+          <!-- The built-in list, shown until the super admin saves their own. -->
+          <div class="fv-radius-hint fv-default-note" *ngIf="travelIsDefault">
+            <svg lucideInfo size="14"></svg>
+            <span>These are <b>suggested defaults</b> for a growing company. Adjust them and press <b>Save Travel Allowance</b> to make them your policy.</span>
+          </div>
+
           <!-- Empty State when no vehicles configured -->
           <div class="fv-empty-state" *ngIf="!travelRates.length">
             <div class="fv-empty-icon-wrap">
@@ -216,6 +222,7 @@
           <div class="fv-rates-table" *ngIf="travelRates.length">
             <div class="fv-table-head">
               <div class="fv-col-vehicle">Vehicle Category / Model</div>
+              <div class="fv-col-kind">How it's paid</div>
               <div class="fv-col-rate">Rate Per Km (₹)</div>
               <div class="fv-col-est">Sample Round-Trip (50 km)</div>
               <div class="fv-col-action">Remove</div>
@@ -237,8 +244,22 @@
                 </div>
               </div>
 
+              <!-- Per km (own vehicle) or actual fare (metro, bus, auto/cab) -->
+              <div class="fv-col-kind">
+                <select class="fv-kind-select" [(ngModel)]="r.kind" aria-label="How it's paid">
+                  <option value="PER_KM">Per km</option>
+                  <option value="ACTUAL_FARE">Actual fare</option>
+                </select>
+              </div>
+
               <!-- Rate Per Km Column -->
-              <div class="fv-col-rate">
+              <div class="fv-col-rate" *ngIf="r.kind === 'ACTUAL_FARE'">
+                <label class="fv-receipt-toggle">
+                  <input type="checkbox" [(ngModel)]="r.receiptRequired" />
+                  <span>Receipt required</span>
+                </label>
+              </div>
+              <div class="fv-col-rate" *ngIf="r.kind !== 'ACTUAL_FARE'">
                 <div class="fv-rate-input-group">
                   <span class="fv-rate-prefix">₹</span>
                   <input 
@@ -256,9 +277,13 @@
 
               <!-- Sample Cost Estimate -->
               <div class="fv-col-est">
-                <div class="fv-cost-pill" title="Estimated reimbursement for a 50 km return visit">
+                <div class="fv-cost-pill" *ngIf="r.kind !== 'ACTUAL_FARE'" title="Estimated reimbursement for a 50 km return visit">
                   <span class="fv-cost-val">₹{{ ((r.ratePerKm || 0) * 50).toFixed(0) }}</span>
                   <span class="fv-cost-label">est. total</span>
+                </div>
+                <div class="fv-cost-pill" *ngIf="r.kind === 'ACTUAL_FARE'" title="Paid what the person enters at End journey">
+                  <span class="fv-cost-val">Fare paid</span>
+                  <span class="fv-cost-label">up to ₹{{ travelMaxFare }}/day</span>
                 </div>
               </div>
 
@@ -283,7 +308,7 @@
                 <span>Add another vehicle</span>
               </button>
 
-              <div class="fv-missing-presets" *ngIf="!hasVehicle('Bike') || !hasVehicle('Car')">
+              <div class="fv-missing-presets" *ngIf="!hasVehicle('Bike') || !hasVehicle('Car') || !hasVehicle('Metro') || !hasVehicle('Bus') || !hasVehicle('Cab')">
                 <span class="fv-missing-label">Quick suggestions:</span>
                 <button 
                   type="button" 
@@ -301,8 +326,27 @@
                 >
                   + Car (₹9/km)
                 </button>
+                <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Metro')" (click)="addPresetVehicle('Metro', 0, 'ACTUAL_FARE', false)">+ Metro (fare)</button>
+                <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Bus')" (click)="addPresetVehicle('Bus', 0, 'ACTUAL_FARE', false)">+ Bus (fare)</button>
+                <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Cab')" (click)="addPresetVehicle('Auto / Cab', 0, 'ACTUAL_FARE', true)">+ Auto / Cab (fare + receipt)</button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Daily limit for actual-fare days -->
+        <div class="fv-section">
+          <div class="fv-section-head">
+            <div class="fv-section-title">
+              <svg lucideRoute size="16"></svg>
+              <h4>Daily Fare Limit (Metro, Bus, Auto / Cab)</h4>
+            </div>
+            <span class="fv-section-desc">The most someone can enter for one day on an actual-fare vehicle. Catches typos; set 0 for no limit.</span>
+          </div>
+          <div class="fv-input-group fv-fare-limit">
+            <span class="fv-input-affix fv-input-prefix">₹</span>
+            <input type="number" min="0" step="50" [(ngModel)]="travelMaxFare" class="fv-radius-input" aria-label="Daily fare limit" />
+            <span class="fv-input-affix fv-input-suffix">per day</span>
           </div>
         </div>
 

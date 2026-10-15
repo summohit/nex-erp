@@ -4483,6 +4483,10 @@ model FieldVisitAttendance {
   journeyEndAt      DateTime?
   journeyEndLat     Float?
   journeyEndLng     Float?
+  /// Actual-fare vehicles (metro, bus, auto/cab): what they paid, entered at
+  /// End journey, and the ticket or receipt photo when there is one.
+  journeyFare       Float?
+  journeyFareReceiptUrl String?
 
   /// The tracked visit this day produced, once one is started.
   fieldVisitId Int?

@@ -2,12 +2,19 @@ import { TravelAllowanceService, TRAVEL_ZONE, straightKm } from './travel-allowa
 
 const OFFICE = { latitude: 28.4964, longitude: 77.4022 }; // Noida HO
 const CP = { lat: 28.623, lng: 77.212 }; // Connaught Place
-const CONFIG = { ncrRadiusKm: 60, rates: [{ vehicle: 'Bike', ratePerKm: 4 }, { vehicle: 'Car', ratePerKm: 9 }] };
+const CONFIG = {
+  ncrRadiusKm: 60, maxFarePerDay: 500,
+  rates: [
+    { vehicle: 'Bike', kind: 'PER_KM' as const, ratePerKm: 4 },
+    { vehicle: 'Car', kind: 'PER_KM' as const, ratePerKm: 9 },
+    { vehicle: 'Metro', kind: 'ACTUAL_FARE' as const, ratePerKm: 0, receiptRequired: false },
+  ],
+};
 
 function make(over: any = {}) {
   const created: any[] = [];
   const prisma: any = {
-    systemSetting: { findUnique: jest.fn(async () => ({ travelAllowanceConfig: CONFIG })) },
+    systemSetting: { findUnique: jest.fn(async () => ({ travelAllowanceConfig: 'config' in over ? over.config : CONFIG })) },
     employee: { findUnique: jest.fn(async () => ({ branch: OFFICE })) },
     branch: { findFirst: jest.fn(async () => OFFICE) },
     expenseClaim: {
@@ -26,7 +33,8 @@ const visit = (attendances: any[]) => ({
 });
 const day = (over: any = {}) => ({
   employeeId: 60, visitDate: new Date('2026-10-14T00:00:00Z'), journeyVehicle: 'Car',
-  journeyStartLat: null, journeyStartLng: null, journeyEndLat: null, journeyEndLng: null, ...over,
+  journeyStartLat: null, journeyStartLng: null, journeyEndLat: null, journeyEndLng: null,
+  journeyFare: null, journeyFareReceiptUrl: null, ...over,
 });
 
 describe('travel allowance', () => {
@@ -66,5 +74,28 @@ describe('travel allowance', () => {
   it('only lets the super admin change rates', async () => {
     const { service } = make();
     await expect(service.setConfig(1, 'ADMIN', CONFIG)).rejects.toThrow(/super admin/);
+  });
+
+  it('pays a metro day the fare entered, not by km', async () => {
+    const { service, created } = make({ requests: [visit([day({ journeyVehicle: 'Metro', journeyFare: 64, journeyStartLat: 28.57, journeyStartLng: 77.32 })])] });
+    await service.sweep();
+    const d = created[0].travelDetail.days[0];
+    expect(d).toMatchObject({ kind: 'ACTUAL_FARE', fare: 64, ratePerKm: null, amount: 64 });
+    expect(created[0].amount).toBe(64);
+  });
+
+  it('flags a metro day with no fare entered', async () => {
+    const { service, created } = make({ requests: [visit([day({ journeyVehicle: 'Metro' })])] });
+    await service.sweep();
+    expect(created[0].travelDetail.days[0]).toMatchObject({ amount: 0, note: expect.stringMatching(/No fare/) });
+  });
+
+  it('starts a company with no saved settings on the default vehicles', async () => {
+    const { service } = make({ config: null });
+    const c = await service.getConfig(1);
+    expect(c.isDefault).toBe(true);
+    expect(c.maxFarePerDay).toBe(500);
+    expect(c.rates.map((r) => r.vehicle)).toEqual(['Bike / Scooter', 'Car', 'Metro', 'Bus', 'Auto / Cab']);
+    expect(c.rates.find((r) => r.vehicle === 'Auto / Cab')).toMatchObject({ kind: 'ACTUAL_FARE', receiptRequired: true });
   });
 });

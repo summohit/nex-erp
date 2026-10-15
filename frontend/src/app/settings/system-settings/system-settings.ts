@@ -96,17 +96,26 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
   /** Field visit travel allowance: NCR radius and rates per vehicle. */
   travelRadius = 60;
   travelRates: TravelRate[] = [];
+  /** Cap on an actual-fare day (metro, bus, auto/cab), to catch typos. */
+  travelMaxFare = 500;
+  /** True while the list shown is the built-in default, not yet saved. */
+  travelIsDefault = false;
   isSavingTravel = signal(false);
 
   private loadTravel() {
     this.travelApi.getSettings().subscribe({
-      next: (c) => { this.travelRadius = c.ncrRadiusKm; this.travelRates = (c.rates || []).map((r) => ({ ...r })); },
+      next: (c) => {
+        this.travelRadius = c.ncrRadiusKm;
+        this.travelMaxFare = c.maxFarePerDay ?? 500;
+        this.travelIsDefault = !!c.isDefault;
+        this.travelRates = (c.rates || []).map((r) => ({ kind: 'PER_KM' as const, ...r }));
+      },
       error: () => this.toast.error('Could not load travel allowance settings'),
     });
   }
 
   addTravelRate() {
-    this.travelRates = [...this.travelRates, { vehicle: '', ratePerKm: 0 }];
+    this.travelRates = [...this.travelRates, { vehicle: '', kind: 'PER_KM', ratePerKm: 0 }];
   }
 
   removeTravelRate(i: number) {
@@ -117,12 +126,14 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
     this.travelRadius = km;
   }
 
-  addPresetVehicle(vehicle: string, rate: number) {
+  addPresetVehicle(vehicle: string, rate: number, kind: 'PER_KM' | 'ACTUAL_FARE' = 'PER_KM', receiptRequired = false) {
     const exists = this.travelRates.some(
       (r) => (r.vehicle || '').toLowerCase().trim() === vehicle.toLowerCase().trim()
     );
     if (!exists) {
-      this.travelRates = [...this.travelRates, { vehicle, ratePerKm: rate }];
+      this.travelRates = [...this.travelRates, kind === 'ACTUAL_FARE'
+        ? { vehicle, kind, ratePerKm: 0, receiptRequired }
+        : { vehicle, kind, ratePerKm: rate }];
     } else {
       this.toast.error(`"${vehicle}" is already in your rate list`);
     }
@@ -148,13 +159,20 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
 
   saveTravel() {
     const rates = this.travelRates
-      .map((r) => ({ vehicle: String(r.vehicle ?? '').trim(), ratePerKm: Number(r.ratePerKm) }))
+      .map((r) => ({
+        vehicle: String(r.vehicle ?? '').trim(),
+        kind: r.kind === 'ACTUAL_FARE' ? 'ACTUAL_FARE' as const : 'PER_KM' as const,
+        ratePerKm: r.kind === 'ACTUAL_FARE' ? 0 : Number(r.ratePerKm),
+        receiptRequired: r.kind === 'ACTUAL_FARE' ? !!r.receiptRequired : undefined,
+      }))
       .filter((r) => r.vehicle);
     this.isSavingTravel.set(true);
-    this.travelApi.saveSettings({ ncrRadiusKm: Number(this.travelRadius), rates }).subscribe({
+    this.travelApi.saveSettings({ ncrRadiusKm: Number(this.travelRadius), maxFarePerDay: Number(this.travelMaxFare), rates }).subscribe({
       next: (c) => {
         this.travelRadius = c.ncrRadiusKm;
-        this.travelRates = c.rates.map((r) => ({ ...r }));
+        this.travelMaxFare = c.maxFarePerDay ?? 500;
+        this.travelIsDefault = false;
+        this.travelRates = c.rates.map((r) => ({ kind: 'PER_KM' as const, ...r }));
         this.isSavingTravel.set(false);
         this.toast.success('Travel allowance saved');
       },

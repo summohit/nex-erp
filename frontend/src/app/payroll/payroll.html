@@ -2802,8 +2802,18 @@
                 <td>{{ d.from }}</td>
                 <td>{{ d.returnTo }}</td>
                 <td>{{ d.goingKm }} + {{ d.returnKm }} = {{ d.km }}</td>
-                <td>{{ d.vehicle }} · ₹{{ d.ratePerKm }}/km</td>
-                <td>₹{{ d.amount | number:'1.2-2' }}</td>
+                <td>
+                  {{ d.vehicle }} ·
+                  <ng-container *ngIf="d.kind === 'ACTUAL_FARE'; else perKm">
+                    fare paid
+                    <a *ngIf="d.receiptUrl" [href]="d.receiptUrl" target="_blank" rel="noopener">receipt</a>
+                  </ng-container>
+                  <ng-template #perKm>₹{{ d.ratePerKm }}/km</ng-template>
+                </td>
+                <td>
+                  ₹{{ d.amount | number:'1.2-2' }}
+                  <div class="travel-breakdown-flag" *ngIf="d.note">{{ d.note }}</div>
+                </td>
               </tr>
             </tbody>
           </table>

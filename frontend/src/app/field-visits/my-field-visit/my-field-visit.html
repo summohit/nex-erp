@@ -289,7 +289,7 @@
                 @if (travelRates().length) {
                   <select class="journey-select" [(ngModel)]="vehicle" aria-label="How are you travelling?">
                     @for (r of travelRates(); track r.vehicle) {
-                      <option [value]="r.vehicle">{{ r.vehicle }} · ₹{{ r.ratePerKm }}/km</option>
+                      <option [value]="r.vehicle">{{ r.vehicle }} · {{ r.kind === 'ACTUAL_FARE' ? 'fare paid' : '₹' + r.ratePerKm + '/km' }}</option>
                     }
                   </select>
                 }
@@ -307,8 +307,22 @@
               @if (day()!.journeyEndAt) { Ended {{ day()!.journeyEndAt | date:'h:mm a' }}. }
               @else { The return is counted as the same distance unless you tap End journey where you finish. }
             </p>
+            @if (!day()!.journeyEndAt && isActualFare()) {
+              <div class="journey-fare">
+                <label class="journey-fare-field">
+                  <span>{{ journeyRate()!.vehicle }} fare for today (₹)</span>
+                  <input type="number" min="1" [max]="maxFarePerDay() || null" step="1" [(ngModel)]="fare" placeholder="e.g. 60" />
+                </label>
+                <label class="journey-receipt">
+                  <span>{{ journeyRate()!.receiptRequired ? 'Receipt or app screenshot (required)' : 'Ticket photo (optional)' }}</span>
+                  <input type="file" accept="image/*,application/pdf" (change)="onReceiptPicked($event)" />
+                  @if (uploadingReceipt()) { <small>Uploading…</small> }
+                  @else if (fareReceiptName) { <small>Attached: {{ fareReceiptName }}</small> }
+                </label>
+              </div>
+            }
             @if (!day()!.journeyEndAt) {
-              <button class="ghost-btn journey-btn" type="button" [disabled]="journeyWorking()" (click)="endJourney()">
+              <button class="ghost-btn journey-btn" type="button" [disabled]="journeyWorking() || uploadingReceipt()" (click)="endJourney()">
                 <svg lucideMapPin [size]="16"></svg>
                 <span>{{ journeyWorking() ? 'Reading location…' : 'End journey' }}</span>
               </button>

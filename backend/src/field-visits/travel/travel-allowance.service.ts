@@ -10,10 +10,24 @@ import { FIELD_VISIT_STATUS } from '../field-visit-status';
 export const TRAVEL_ZONE = { NCR: 'DELHI_NCR', OUTSTATION: 'OUTSTATION' } as const;
 export type TravelZone = typeof TRAVEL_ZONE[keyof typeof TRAVEL_ZONE];
 
-export interface TravelRate { vehicle: string; ratePerKm: number }
-export interface TravelConfig { ncrRadiusKm: number; rates: TravelRate[] }
+export type TravelKind = 'PER_KM' | 'ACTUAL_FARE';
+/**
+ * PER_KM: own bike or car, distance × rate. ACTUAL_FARE: metro, bus, auto or
+ * cab, where the person enters what they paid; `receiptRequired` says whether
+ * a ticket or receipt photo must go with it.
+ */
+export interface TravelRate { vehicle: string; kind: TravelKind; ratePerKm: number; receiptRequired?: boolean }
+export interface TravelConfig { ncrRadiusKm: number; maxFarePerDay: number; rates: TravelRate[]; isDefault?: boolean }
 
-const DEFAULT_CONFIG: TravelConfig = { ncrRadiusKm: 60, rates: [] };
+/** Starting list for a company that has not set its own (decided 15 Oct 2026). */
+export const DEFAULT_RATES: TravelRate[] = [
+  { vehicle: 'Bike / Scooter', kind: 'PER_KM', ratePerKm: 4 },
+  { vehicle: 'Car', kind: 'PER_KM', ratePerKm: 9 },
+  { vehicle: 'Metro', kind: 'ACTUAL_FARE', ratePerKm: 0, receiptRequired: false },
+  { vehicle: 'Bus', kind: 'ACTUAL_FARE', ratePerKm: 0, receiptRequired: false },
+  { vehicle: 'Auto / Cab', kind: 'ACTUAL_FARE', ratePerKm: 0, receiptRequired: true },
+];
+const DEFAULT_CONFIG: TravelConfig = { ncrRadiusKm: 60, maxFarePerDay: 500, rates: DEFAULT_RATES };
 
 /** Straight-line km between two points. */
 export function straightKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
@@ -65,13 +79,23 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     const row = await this.prisma.systemSetting.findUnique({
       where: { companyId }, select: { travelAllowanceConfig: true },
     });
-    const raw: any = row?.travelAllowanceConfig ?? {};
+    const raw: any = row?.travelAllowanceConfig;
+    if (!raw) return { ...DEFAULT_CONFIG, rates: DEFAULT_RATES.map((r) => ({ ...r })), isDefault: true };
     return {
       ncrRadiusKm: Number(raw.ncrRadiusKm) > 0 ? Number(raw.ncrRadiusKm) : DEFAULT_CONFIG.ncrRadiusKm,
+      maxFarePerDay: Number(raw.maxFarePerDay) >= 0 && raw.maxFarePerDay != null ? Number(raw.maxFarePerDay) : DEFAULT_CONFIG.maxFarePerDay,
       rates: Array.isArray(raw.rates)
-        ? raw.rates.filter((r: any) => r?.vehicle && Number(r.ratePerKm) >= 0)
-          .map((r: any) => ({ vehicle: String(r.vehicle).trim(), ratePerKm: Number(r.ratePerKm) }))
+        ? raw.rates.filter((r: any) => r?.vehicle).map((r: any) => this.cleanRate(r))
         : [],
+    };
+  }
+
+  private cleanRate(r: any): TravelRate {
+    const kind: TravelKind = r?.kind === 'ACTUAL_FARE' ? 'ACTUAL_FARE' : 'PER_KM';
+    return {
+      vehicle: String(r?.vehicle ?? '').trim(), kind,
+      ratePerKm: kind === 'PER_KM' ? Number(r?.ratePerKm) : 0,
+      ...(kind === 'ACTUAL_FARE' ? { receiptRequired: !!r?.receiptRequired } : {}),
     };
   }
 
@@ -79,16 +103,16 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     if (!isSuperAdmin(role)) throw new ForbiddenException('Only the super admin sets travel allowance rates');
     const radius = Number(body?.ncrRadiusKm);
     if (!(radius > 0 && radius <= 500)) throw new BadRequestException('The Delhi NCR radius must be between 1 and 500 km');
-    const rates = (Array.isArray(body?.rates) ? body.rates : []).map((r: any) => ({
-      vehicle: String(r?.vehicle ?? '').trim(), ratePerKm: Number(r?.ratePerKm),
-    }));
-    if (rates.some((r) => !r.vehicle || !(r.ratePerKm >= 0) || r.ratePerKm > 1000)) {
-      throw new BadRequestException('Each rate needs a vehicle name and a rate per km between 0 and 1000');
+    const maxFare = Number(body?.maxFarePerDay ?? DEFAULT_CONFIG.maxFarePerDay);
+    if (!(maxFare >= 0 && maxFare <= 100000)) throw new BadRequestException('The daily fare limit must be between 0 and 100000');
+    const rates = (Array.isArray(body?.rates) ? body.rates : []).map((r: any) => this.cleanRate(r));
+    if (rates.some((r) => !r.vehicle || (r.kind === 'PER_KM' && !(r.ratePerKm >= 0 && r.ratePerKm <= 1000)))) {
+      throw new BadRequestException('Each vehicle needs a name, and a per-km vehicle a rate between 0 and 1000');
     }
     if (new Set(rates.map((r) => r.vehicle.toLowerCase())).size !== rates.length) {
       throw new BadRequestException('Each vehicle can be listed once');
     }
-    const config: TravelConfig = { ncrRadiusKm: radius, rates };
+    const config: TravelConfig = { ncrRadiusKm: radius, maxFarePerDay: maxFare, rates };
     await this.prisma.systemSetting.upsert({
       where: { companyId },
       create: { companyId, travelAllowanceConfig: config as any },
@@ -140,7 +164,7 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
         request: { status: FIELD_VISIT_STATUS.APPROVED, ...(requestId ? { id: Number(requestId) } : {}) },
       },
       select: {
-        id: true, companyId: true, journeyStartAt: true, journeyEndAt: true, clockInTime: true,
+        id: true, companyId: true, journeyStartAt: true, journeyEndAt: true, clockInTime: true, journeyVehicle: true,
         request: { select: { id: true, requestNumber: true, travelZone: true } },
       },
     });
@@ -180,15 +204,36 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async endJourney(userId: number, body: { requestId?: number; lat: number; lng: number }) {
+  async endJourney(
+    userId: number,
+    body: { requestId?: number; lat: number; lng: number; fare?: number; receiptUrl?: string },
+  ) {
     const day = await this.todaysNcrDay(userId, body?.requestId);
     if (!day.journeyStartAt) throw new BadRequestException('Start your journey first.');
     if (day.journeyEndAt) throw new BadRequestException('You already ended your journey today.');
     const { la, lo } = this.coords(body?.lat, body?.lng);
+
+    // An actual-fare vehicle (metro, bus, auto/cab) is paid what they enter here.
+    const config = await this.getConfig(day.companyId);
+    const rate = config.rates.find((r) => r.vehicle.toLowerCase() === String(day.journeyVehicle ?? '').toLowerCase());
+    let fare: number | null = null;
+    let receiptUrl: string | null = null;
+    if (rate?.kind === 'ACTUAL_FARE') {
+      fare = Number(body?.fare);
+      if (!(fare > 0)) throw new BadRequestException(`Enter the ${rate.vehicle} fare you paid for the day.`);
+      if (config.maxFarePerDay > 0 && fare > config.maxFarePerDay) {
+        throw new BadRequestException(`That is more than the ₹${config.maxFarePerDay} daily limit — check the amount, or ask finance.`);
+      }
+      receiptUrl = String(body?.receiptUrl ?? '').trim() || null;
+      if (rate.receiptRequired && !receiptUrl) {
+        throw new BadRequestException(`Attach the ${rate.vehicle} receipt or app screenshot.`);
+      }
+      fare = Math.round(fare * 100) / 100;
+    }
     return this.prisma.fieldVisitAttendance.update({
       where: { id: day.id },
-      data: { journeyEndAt: new Date(), journeyEndLat: la, journeyEndLng: lo },
-      select: { id: true, journeyEndAt: true },
+      data: { journeyEndAt: new Date(), journeyEndLat: la, journeyEndLng: lo, journeyFare: fare, journeyFareReceiptUrl: receiptUrl },
+      select: { id: true, journeyEndAt: true, journeyFare: true },
     });
   }
 
@@ -230,6 +275,7 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
           select: {
             employeeId: true, visitDate: true, journeyVehicle: true,
             journeyStartLat: true, journeyStartLng: true, journeyEndLat: true, journeyEndLng: true,
+            journeyFare: true, journeyFareReceiptUrl: true,
           },
           orderBy: { visitDate: 'asc' },
         },
@@ -267,14 +313,21 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
       const returnKm = a.journeyEndLat != null
         ? await this.roadKm(r.latitude, r.longitude, a.journeyEndLat, a.journeyEndLng)
         : goingKm;
+      // The vehicle they picked; without one (no Start journey), the first
+      // per-km rate, as the office fallback assumes their own transport.
       const rate = config.rates.find((x) => x.vehicle.toLowerCase() === String(a.journeyVehicle ?? '').toLowerCase())
-        ?? config.rates[0];
+        ?? config.rates.find((x) => x.kind === 'PER_KM') ?? config.rates[0];
       const km = Math.round((goingKm + returnKm) * 10) / 10;
+      const actual = rate.kind === 'ACTUAL_FARE';
       days.push({
         date: a.visitDate.toISOString().slice(0, 10), from: from.label,
         returnTo: a.journeyEndLat != null ? 'End journey' : 'Same as going',
-        goingKm, returnKm, km, vehicle: rate.vehicle, ratePerKm: rate.ratePerKm,
-        amount: Math.round(km * rate.ratePerKm * 100) / 100,
+        goingKm, returnKm, km, vehicle: rate.vehicle, kind: rate.kind,
+        ratePerKm: actual ? null : rate.ratePerKm,
+        fare: actual ? (a.journeyFare ?? 0) : null,
+        receiptUrl: actual ? a.journeyFareReceiptUrl ?? null : null,
+        ...(actual && a.journeyFare == null ? { note: 'No fare entered — check with the employee' } : {}),
+        amount: actual ? Math.round((a.journeyFare ?? 0) * 100) / 100 : Math.round(km * rate.ratePerKm * 100) / 100,
       });
     }
     if (!days.length) return false;

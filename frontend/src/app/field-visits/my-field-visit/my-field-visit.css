@@ -920,3 +920,8 @@
 .journey-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .journey-select { flex: 1; min-width: 160px; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; background: #fff; }
 .journey-btn { width: auto; }
+
+.journey-fare { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.journey-fare-field, .journey-receipt { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: #334155; }
+.journey-fare-field input { max-width: 200px; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; }
+.journey-receipt small { color: #64748b; }

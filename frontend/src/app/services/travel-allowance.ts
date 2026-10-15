@@ -3,8 +3,10 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 
 export type TravelZone = 'DELHI_NCR' | 'OUTSTATION';
-export interface TravelRate { vehicle: string; ratePerKm: number }
-export interface TravelConfig { ncrRadiusKm: number; rates: TravelRate[] }
+export type TravelKind = 'PER_KM' | 'ACTUAL_FARE';
+/** PER_KM: own bike or car. ACTUAL_FARE: metro, bus, auto/cab — they enter what they paid. */
+export interface TravelRate { vehicle: string; kind?: TravelKind; ratePerKm: number; receiptRequired?: boolean }
+export interface TravelConfig { ncrRadiusKm: number; maxFarePerDay?: number; rates: TravelRate[]; isDefault?: boolean }
 
 /** Field visit travel allowance: rates, the NCR suggestion and journey taps. */
 @Injectable({ providedIn: 'root' })
@@ -31,7 +33,7 @@ export class TravelAllowanceService {
     return this.http.post(`${this.apiUrl}/journey/start`, body);
   }
 
-  endJourney(body: { requestId: number; lat: number; lng: number }) {
+  endJourney(body: { requestId: number; lat: number; lng: number; fare?: number; receiptUrl?: string }) {
     return this.http.post(`${this.apiUrl}/journey/end`, body);
   }
 }

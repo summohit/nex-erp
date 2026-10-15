@@ -1927,3 +1927,11 @@
 .settings-tab:hover { color: #0f172a; }
 .settings-tab.active { color: #1d4ed8; border-bottom-color: #1d4ed8; font-weight: 600; }
 @media (max-width: 640px) { .settings-tabs { flex-wrap: nowrap; overflow-x: auto; } }
+
+/* Vehicle kind (per km / actual fare) and the fare limit */
+.fv-col-kind { flex: 0 0 150px; padding-right: 14px; }
+@media (max-width: 760px) { .fv-col-kind { flex: none; padding-right: 0; } }
+.fv-kind-select { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; font-size: 13px; background: #fff; }
+.fv-receipt-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #334155; cursor: pointer; }
+.fv-fare-limit { max-width: 260px; }
+.fv-default-note { margin-bottom: 12px; }
