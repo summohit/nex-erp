@@ -197,22 +197,22 @@
               <svg lucideCar size="24"></svg>
             </div>
             <h5>No vehicle rates configured</h5>
-            <p>Add vehicle categories and their per-km rates to enable automatic mileage claims for field visits.</p>
+            <p>Add the vehicles people can pick when they start a journey. Own vehicles are paid by salary grade; metro, bus and cab at the fare.</p>
             
             <div class="fv-quick-add-group">
               <span class="fv-quick-add-title">Quick add standard vehicle types:</span>
               <div class="fv-quick-add-pills">
                 <button type="button" class="fv-quick-add-chip" (click)="addPresetVehicle('Two Wheeler / Bike', 4.5)">
                   <svg lucideBike size="14"></svg>
-                  <span>+ Two Wheeler / Bike (₹4.50/km)</span>
+                  <span>+ Two Wheeler / Bike</span>
                 </button>
                 <button type="button" class="fv-quick-add-chip" (click)="addPresetVehicle('Four Wheeler / Car', 9.0)">
                   <svg lucideCar size="14"></svg>
-                  <span>+ Four Wheeler / Car (₹9.00/km)</span>
+                  <span>+ Four Wheeler / Car</span>
                 </button>
                 <button type="button" class="fv-quick-add-chip" (click)="addPresetVehicle('Scooter / EV', 3.5)">
                   <svg lucideBike size="14"></svg>
-                  <span>+ Scooter / EV (₹3.50/km)</span>
+                  <span>+ Scooter / EV</span>
                 </button>
               </div>
             </div>
@@ -223,8 +223,7 @@
             <div class="fv-table-head">
               <div class="fv-col-vehicle">Vehicle Category / Model</div>
               <div class="fv-col-kind">How it's paid</div>
-              <div class="fv-col-rate">Rate Per Km (₹)</div>
-              <div class="fv-col-est">Sample Round-Trip (50 km)</div>
+              <div class="fv-col-rate">Rate</div>
               <div class="fv-col-action">Remove</div>
             </div>
 
@@ -260,31 +259,7 @@
                 </label>
               </div>
               <div class="fv-col-rate" *ngIf="r.kind !== 'ACTUAL_FARE'">
-                <div class="fv-rate-input-group">
-                  <span class="fv-rate-prefix">₹</span>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    step="0.5" 
-                    [(ngModel)]="r.ratePerKm" 
-                    placeholder="0.00"
-                    class="fv-rate-input"
-                    aria-label="Rate per km" 
-                  />
-                  <span class="fv-rate-suffix">/ km</span>
-                </div>
-              </div>
-
-              <!-- Sample Cost Estimate -->
-              <div class="fv-col-est">
-                <div class="fv-cost-pill" *ngIf="r.kind !== 'ACTUAL_FARE'" title="Estimated reimbursement for a 50 km return visit">
-                  <span class="fv-cost-val">₹{{ ((r.ratePerKm || 0) * 50).toFixed(0) }}</span>
-                  <span class="fv-cost-label">est. total</span>
-                </div>
-                <div class="fv-cost-pill" *ngIf="r.kind === 'ACTUAL_FARE'" title="Paid what the person enters at End journey">
-                  <span class="fv-cost-val">Fare paid</span>
-                  <span class="fv-cost-label">up to ₹{{ travelMaxFare }}/day</span>
-                </div>
+                <span class="fv-grade-rate-note">By salary grade</span>
               </div>
 
               <!-- Remove Action Column -->
@@ -316,7 +291,7 @@
                   *ngIf="!hasVehicle('Bike')" 
                   (click)="addPresetVehicle('Two Wheeler / Bike', 4.5)"
                 >
-                  + Bike (₹4.5/km)
+                  + Bike
                 </button>
                 <button 
                   type="button" 
@@ -324,13 +299,32 @@
                   *ngIf="!hasVehicle('Car')" 
                   (click)="addPresetVehicle('Four Wheeler / Car', 9.0)"
                 >
-                  + Car (₹9/km)
+                  + Car
                 </button>
                 <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Metro')" (click)="addPresetVehicle('Metro', 0, 'ACTUAL_FARE', false)">+ Metro (fare)</button>
                 <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Bus')" (click)="addPresetVehicle('Bus', 0, 'ACTUAL_FARE', false)">+ Bus (fare)</button>
                 <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Cab')" (click)="addPresetVehicle('Auto / Cab', 0, 'ACTUAL_FARE', true)">+ Auto / Cab (fare + receipt)</button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Per-km rates come from salary grades; this is the fallback. -->
+        <div class="fv-section">
+          <div class="fv-section-head">
+            <div class="fv-section-title">
+              <svg lucideRoute size="16"></svg>
+              <h4>Per-km Rate</h4>
+            </div>
+            <span class="fv-section-desc">
+              Own-vehicle trips (bike, car) are paid by the person's <b>salary grade</b> — set the rate for each grade, and for interns, in
+              <b>Payroll → Salary Structure → Grades &amp; Template</b>. This default is used only when their grade has no rate.
+            </span>
+          </div>
+          <div class="fv-input-group fv-fare-limit">
+            <span class="fv-input-affix fv-input-prefix">₹</span>
+            <input type="number" min="0" step="0.5" [(ngModel)]="travelDefaultRate" class="fv-radius-input" aria-label="Default rate per km" />
+            <span class="fv-input-affix fv-input-suffix">per km (default)</span>
           </div>
         </div>
 
@@ -364,7 +358,7 @@
             <h5 *ngIf="travelRates.length">How Distance &amp; Claims are Processed</h5>
             <p *ngIf="travelRates.length">
               Technicians record GPS coordinates when tapping <b>Start Journey</b> and <b>End Journey</b> in the mobile app. 
-              The hourly system sweep calculates round-trip kilometers, multiplies by the assigned vehicle rate, and submits a formal expense claim to Finance for reimbursement.
+              The hourly system sweep calculates round-trip kilometers, multiplies by the person's grade rate (or takes the fare for metro, bus and cab), and submits an expense claim to Finance.
             </p>
           </div>
         </div>

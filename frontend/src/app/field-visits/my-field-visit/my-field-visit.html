@@ -289,7 +289,7 @@
                 @if (travelRates().length) {
                   <select class="journey-select" [(ngModel)]="vehicle" aria-label="How are you travelling?">
                     @for (r of travelRates(); track r.vehicle) {
-                      <option [value]="r.vehicle">{{ r.vehicle }} · {{ r.kind === 'ACTUAL_FARE' ? 'fare paid' : '₹' + r.ratePerKm + '/km' }}</option>
+                      <option [value]="r.vehicle">{{ r.vehicle }} · {{ r.kind === 'ACTUAL_FARE' ? 'fare paid' : 'own vehicle' }}</option>
                     }
                   </select>
                 }

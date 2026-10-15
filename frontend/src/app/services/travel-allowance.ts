@@ -6,7 +6,12 @@ export type TravelZone = 'DELHI_NCR' | 'OUTSTATION';
 export type TravelKind = 'PER_KM' | 'ACTUAL_FARE';
 /** PER_KM: own bike or car. ACTUAL_FARE: metro, bus, auto/cab — they enter what they paid. */
 export interface TravelRate { vehicle: string; kind?: TravelKind; ratePerKm: number; receiptRequired?: boolean }
-export interface TravelConfig { ncrRadiusKm: number; maxFarePerDay?: number; rates: TravelRate[]; isDefault?: boolean }
+export interface TravelConfig {
+  ncrRadiusKm: number; maxFarePerDay?: number;
+  /** Used only when a person's grade (or interns) has no per-km rate. */
+  defaultRatePerKm?: number;
+  rates: TravelRate[]; isDefault?: boolean;
+}
 
 /** Field visit travel allowance: rates, the NCR suggestion and journey taps. */
 @Injectable({ providedIn: 'root' })

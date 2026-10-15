@@ -17,17 +17,24 @@ export type TravelKind = 'PER_KM' | 'ACTUAL_FARE';
  * a ticket or receipt photo must go with it.
  */
 export interface TravelRate { vehicle: string; kind: TravelKind; ratePerKm: number; receiptRequired?: boolean }
-export interface TravelConfig { ncrRadiusKm: number; maxFarePerDay: number; rates: TravelRate[]; isDefault?: boolean }
+/**
+ * Per-km pay comes from the person's salary grade (Payroll → Grades);
+ * `defaultRatePerKm` is used only when their grade, or interns, have no rate.
+ * The vehicle list says what can be picked and how each is paid.
+ */
+export interface TravelConfig {
+  ncrRadiusKm: number; maxFarePerDay: number; defaultRatePerKm: number; rates: TravelRate[]; isDefault?: boolean;
+}
 
 /** Starting list for a company that has not set its own (decided 15 Oct 2026). */
 export const DEFAULT_RATES: TravelRate[] = [
-  { vehicle: 'Bike / Scooter', kind: 'PER_KM', ratePerKm: 4 },
-  { vehicle: 'Car', kind: 'PER_KM', ratePerKm: 9 },
+  { vehicle: 'Bike / Scooter', kind: 'PER_KM', ratePerKm: 0 },
+  { vehicle: 'Car', kind: 'PER_KM', ratePerKm: 0 },
   { vehicle: 'Metro', kind: 'ACTUAL_FARE', ratePerKm: 0, receiptRequired: false },
   { vehicle: 'Bus', kind: 'ACTUAL_FARE', ratePerKm: 0, receiptRequired: false },
   { vehicle: 'Auto / Cab', kind: 'ACTUAL_FARE', ratePerKm: 0, receiptRequired: true },
 ];
-const DEFAULT_CONFIG: TravelConfig = { ncrRadiusKm: 60, maxFarePerDay: 500, rates: DEFAULT_RATES };
+const DEFAULT_CONFIG: TravelConfig = { ncrRadiusKm: 60, maxFarePerDay: 500, defaultRatePerKm: 4, rates: DEFAULT_RATES };
 
 /** Straight-line km between two points. */
 export function straightKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
@@ -84,6 +91,10 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     return {
       ncrRadiusKm: Number(raw.ncrRadiusKm) > 0 ? Number(raw.ncrRadiusKm) : DEFAULT_CONFIG.ncrRadiusKm,
       maxFarePerDay: Number(raw.maxFarePerDay) >= 0 && raw.maxFarePerDay != null ? Number(raw.maxFarePerDay) : DEFAULT_CONFIG.maxFarePerDay,
+      // Saved before grades set the rate: the first per-km vehicle's rate.
+      defaultRatePerKm: raw.defaultRatePerKm != null && Number(raw.defaultRatePerKm) >= 0
+        ? Number(raw.defaultRatePerKm)
+        : Number((Array.isArray(raw.rates) ? raw.rates : []).find((r: any) => r?.kind !== 'ACTUAL_FARE' && Number(r?.ratePerKm) > 0)?.ratePerKm) || DEFAULT_CONFIG.defaultRatePerKm,
       rates: Array.isArray(raw.rates)
         ? raw.rates.filter((r: any) => r?.vehicle).map((r: any) => this.cleanRate(r))
         : [],
@@ -94,7 +105,7 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     const kind: TravelKind = r?.kind === 'ACTUAL_FARE' ? 'ACTUAL_FARE' : 'PER_KM';
     return {
       vehicle: String(r?.vehicle ?? '').trim(), kind,
-      ratePerKm: kind === 'PER_KM' ? Number(r?.ratePerKm) : 0,
+      ratePerKm: 0,
       ...(kind === 'ACTUAL_FARE' ? { receiptRequired: !!r?.receiptRequired } : {}),
     };
   }
@@ -105,14 +116,14 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     if (!(radius > 0 && radius <= 500)) throw new BadRequestException('The Delhi NCR radius must be between 1 and 500 km');
     const maxFare = Number(body?.maxFarePerDay ?? DEFAULT_CONFIG.maxFarePerDay);
     if (!(maxFare >= 0 && maxFare <= 100000)) throw new BadRequestException('The daily fare limit must be between 0 and 100000');
+    const defaultRate = Number(body?.defaultRatePerKm ?? DEFAULT_CONFIG.defaultRatePerKm);
+    if (!(defaultRate >= 0 && defaultRate <= 1000)) throw new BadRequestException('The default rate per km must be between 0 and 1000');
     const rates = (Array.isArray(body?.rates) ? body.rates : []).map((r: any) => this.cleanRate(r));
-    if (rates.some((r) => !r.vehicle || (r.kind === 'PER_KM' && !(r.ratePerKm >= 0 && r.ratePerKm <= 1000)))) {
-      throw new BadRequestException('Each vehicle needs a name, and a per-km vehicle a rate between 0 and 1000');
-    }
+    if (rates.some((r) => !r.vehicle)) throw new BadRequestException('Each vehicle needs a name');
     if (new Set(rates.map((r) => r.vehicle.toLowerCase())).size !== rates.length) {
       throw new BadRequestException('Each vehicle can be listed once');
     }
-    const config: TravelConfig = { ncrRadiusKm: radius, maxFarePerDay: maxFare, rates };
+    const config: TravelConfig = { ncrRadiusKm: radius, maxFarePerDay: maxFare, defaultRatePerKm: defaultRate, rates };
     await this.prisma.systemSetting.upsert({
       where: { companyId },
       create: { companyId, travelAllowanceConfig: config as any },
@@ -397,7 +408,7 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
    * 2026): one rate per grade whatever the vehicle. Consultants are graded by
    * salary like everyone else; interns (employment type Internship or
    * designation Intern) sit outside grades and get the ungraded rate. With no
-   * rate set, the vehicle's default applies.
+   * rate set, the default rate per km from System Settings applies.
    */
   private async gradeRate(companyId: number, employeeId: number): Promise<{ rate: number | null; label: string }> {
     const emp = await this.prisma.employee.findUnique({
@@ -445,14 +456,14 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
         ?? config.rates.find((x) => x.kind === 'PER_KM') ?? config.rates[0];
       const km = Math.round((goingKm + returnKm) * 10) / 10;
       const actual = rate.kind === 'ACTUAL_FARE';
-      // Own vehicle: the grade's rate where one is set, else the vehicle's.
-      const perKm = !actual && graded.rate != null ? graded.rate : rate.ratePerKm;
+      // Own vehicle: the grade's rate, or the default when the grade has none.
+      const perKm = graded.rate != null ? graded.rate : config.defaultRatePerKm;
       days.push({
         date: a.visitDate.toISOString().slice(0, 10), from: from.label,
         returnTo: a.journeyEndLat != null ? 'End journey' : 'Same as going',
         goingKm, returnKm, km, vehicle: rate.vehicle, kind: rate.kind,
         ratePerKm: actual ? null : perKm,
-        grade: actual ? null : graded.label,
+        grade: actual ? null : graded.rate != null ? graded.label : `${graded.label} · default rate`,
         fare: actual ? (a.journeyFare ?? 0) : null,
         receiptUrl: actual ? a.journeyFareReceiptUrl ?? null : null,
         trackedKm: a.journeyTrackedKm ?? null,

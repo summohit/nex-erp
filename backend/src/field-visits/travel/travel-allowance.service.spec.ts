@@ -3,10 +3,10 @@ import { TravelAllowanceService, TRAVEL_ZONE, straightKm } from './travel-allowa
 const OFFICE = { latitude: 28.4964, longitude: 77.4022 }; // Noida HO
 const CP = { lat: 28.623, lng: 77.212 }; // Connaught Place
 const CONFIG = {
-  ncrRadiusKm: 60, maxFarePerDay: 500,
+  ncrRadiusKm: 60, maxFarePerDay: 500, defaultRatePerKm: 5,
   rates: [
-    { vehicle: 'Bike', kind: 'PER_KM' as const, ratePerKm: 4 },
-    { vehicle: 'Car', kind: 'PER_KM' as const, ratePerKm: 9 },
+    { vehicle: 'Bike', kind: 'PER_KM' as const, ratePerKm: 0 },
+    { vehicle: 'Car', kind: 'PER_KM' as const, ratePerKm: 0 },
     { vehicle: 'Metro', kind: 'ACTUAL_FARE' as const, ratePerKm: 0, receiptRequired: false },
   ],
 };
@@ -54,7 +54,7 @@ describe('travel allowance', () => {
     await service.sweep();
     const d = created[0].travelDetail.days[0];
     const oneWay = Math.round(straightKm(OFFICE.latitude, OFFICE.longitude, CP.lat, CP.lng) * 1.3 * 10) / 10;
-    expect(d).toMatchObject({ from: 'Office (no Start journey)', returnTo: 'Same as going', goingKm: oneWay, returnKm: oneWay, ratePerKm: 9 });
+    expect(d).toMatchObject({ from: 'Office (no Start journey)', returnTo: 'Same as going', goingKm: oneWay, returnKm: oneWay, ratePerKm: 5 });
     expect(created[0]).toMatchObject({ category: 'TRAVEL', status: 'PENDING', fieldVisitRequestId: 9, employeeId: 60 });
   });
 
@@ -66,8 +66,8 @@ describe('travel allowance', () => {
     expect(d.from).toBe('Start journey');
     expect(d.returnTo).toBe('End journey');
     expect(d.goingKm).not.toBe(d.returnKm);
-    expect(d.ratePerKm).toBe(4);
-    expect(created[0].amount).toBeCloseTo(d.km * 4, 1);
+    expect(d.ratePerKm).toBe(5);
+    expect(created[0].amount).toBeCloseTo(d.km * 5, 1);
   });
 
   it('does not create a second claim for someone who already has one', async () => {
@@ -128,13 +128,13 @@ describe('travel allowance', () => {
     expect(created[0].travelDetail.days[0]).toMatchObject({ grade: 'G3', ratePerKm: 7 });
   });
 
-  it('falls back to the vehicle rate when the grade has none', async () => {
+  it('falls back to the default rate when the grade has none', async () => {
     const { service, created } = make({
       requests: [visit([day({ journeyVehicle: 'Car' })])], gross: 40000,
       grades: [{ name: 'G3', minGross: 30001, maxGross: 60000, kmRate: null }],
     });
     await service.sweep();
-    expect(created[0].travelDetail.days[0]).toMatchObject({ grade: 'G3', ratePerKm: 9 });
+    expect(created[0].travelDetail.days[0]).toMatchObject({ grade: 'G3 · default rate', ratePerKm: 5 });
   });
 
   it('pays an intern the ungraded rate', async () => {

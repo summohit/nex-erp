@@ -132,7 +132,7 @@ export default function JourneyPanel({ day, onChanged }: { day: FvDay; onChanged
               {config.rates.map((r) => (
                 <TouchableOpacity key={r.vehicle} style={[styles.chip, vehicle === r.vehicle && styles.chipOn]} onPress={() => setVehicle(r.vehicle)}>
                   <Text style={[styles.chipText, vehicle === r.vehicle && styles.chipTextOn]}>
-                    {r.vehicle} · {r.kind === 'ACTUAL_FARE' ? 'fare' : `₹${r.ratePerKm}/km`}
+                    {r.vehicle} · {r.kind === 'ACTUAL_FARE' ? 'fare' : 'own vehicle'}
                   </Text>
                 </TouchableOpacity>
               ))}

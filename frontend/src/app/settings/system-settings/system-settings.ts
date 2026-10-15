@@ -98,6 +98,8 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
   travelRates: TravelRate[] = [];
   /** Cap on an actual-fare day (metro, bus, auto/cab), to catch typos. */
   travelMaxFare = 500;
+  /** Used only when a person's grade (or interns) has no per-km rate. */
+  travelDefaultRate = 4;
   /** True while the list shown is the built-in default, not yet saved. */
   travelIsDefault = false;
   isSavingTravel = signal(false);
@@ -107,6 +109,7 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
       next: (c) => {
         this.travelRadius = c.ncrRadiusKm;
         this.travelMaxFare = c.maxFarePerDay ?? 500;
+        this.travelDefaultRate = c.defaultRatePerKm ?? 4;
         this.travelIsDefault = !!c.isDefault;
         this.travelRates = (c.rates || []).map((r) => ({ kind: 'PER_KM' as const, ...r }));
       },
@@ -167,10 +170,14 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
       }))
       .filter((r) => r.vehicle);
     this.isSavingTravel.set(true);
-    this.travelApi.saveSettings({ ncrRadiusKm: Number(this.travelRadius), maxFarePerDay: Number(this.travelMaxFare), rates }).subscribe({
+    this.travelApi.saveSettings({
+      ncrRadiusKm: Number(this.travelRadius), maxFarePerDay: Number(this.travelMaxFare),
+      defaultRatePerKm: Number(this.travelDefaultRate), rates,
+    }).subscribe({
       next: (c) => {
         this.travelRadius = c.ncrRadiusKm;
         this.travelMaxFare = c.maxFarePerDay ?? 500;
+        this.travelDefaultRate = c.defaultRatePerKm ?? 4;
         this.travelIsDefault = false;
         this.travelRates = c.rates.map((r) => ({ kind: 'PER_KM' as const, ...r }));
         this.isSavingTravel.set(false);
