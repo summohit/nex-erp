@@ -62,6 +62,8 @@ export interface FieldVisitRequestInput {
   startTime: string;
   endTime: string;
   remarks?: string;
+  /** Why an approved trip is being changed; required on a change request. */
+  changeReason?: string;
   employeeIds: number[];
   /**
    * What the trip is for. `issueId` names a task that already exists on the
@@ -568,6 +570,15 @@ export class FieldVisitRequestsService {
       canRequestChange: request.status === FIELD_VISIT_STATUS.APPROVED
         && !request.pendingChange
         && mayRaise,
+      canRequestPostpone: request.status === FIELD_VISIT_STATUS.APPROVED
+        && !request.pendingChange
+        && mayRaise,
+      // The project manager or anyone going may ask; an admin approves.
+      canRequestCancel: request.status === FIELD_VISIT_STATUS.APPROVED
+        && !request.pendingChange
+        && (mayRaise || (request.members ?? []).some((m: any) => (m.employee?.id ?? m.employeeId) === employeeId)),
+      /** CHANGE, POSTPONE or CANCEL, when something is waiting. */
+      pendingChangeKind: request.pendingChange ? ((request.pendingChange as any).kind ?? 'CHANGE') : null,
       canReviewChange: !!request.pendingChange && this.isApprover(role),
       // Mirrors cancel() and complete(): administrators only, and only while
       // the trip can still be stopped or closed.
@@ -900,7 +911,7 @@ export class FieldVisitRequestsService {
         companyId: true, projectId: true,
         location: true, latitude: true, longitude: true,
         startDate: true, endDate: true, visitDays: true,
-        startTime: true, endTime: true,
+        startTime: true, endTime: true, remarks: true,
         pendingChange: true,
         project: { select: { id: true, name: true, isSystem: true } },
         members: { select: { employeeId: true } },
@@ -1509,11 +1520,15 @@ export class FieldVisitRequestsService {
       throw new BadRequestException('There is already a change waiting for a decision on this trip');
     }
 
+    const reason = String(data?.changeReason ?? '').trim();
+    if (!reason) throw new BadRequestException('Give a reason for the change');
+
     // Validated now rather than at approval, so an impossible change is
     // refused while the person proposing it is still looking at it.
     const { project, fields, employeeIds, tasks } = await this.normalize(companyId, data);
-    if (!(await this.mayRaise(companyId, project, role, employeeId)) && request.raisedById !== employeeId) {
-      throw new ForbiddenException('You cannot change this field visit request');
+    // The project manager asks (decided 15 Oct 2026); an admin may too.
+    if (!(await this.mayRaise(companyId, project, role, employeeId))) {
+      throw new ForbiddenException('Only the project manager can ask to change this field visit');
     }
     if (project.id !== request.projectId) {
       throw new BadRequestException(
@@ -1526,36 +1541,135 @@ export class FieldVisitRequestsService {
       throw new BadRequestException('Nothing in this request would change');
     }
 
-    const proposal = {
+    return this.proposeChange(companyId, employeeId, request, {
       ...fields,
       startDate: fields.startDate.toISOString(),
       endDate: fields.endDate.toISOString(),
       employeeIds,
       tasks,
-    };
+      kind: 'CHANGE',
+      reason,
+    }, `change ${changed.join(', ')}`);
+  }
 
+  /**
+   * Ask to move an approved trip to new dates. Hours, people and tasks stay
+   * as approved. The project manager asks, with a reason; an admin approves
+   * like any change (decided 15 Oct 2026).
+   */
+  async requestPostpone(
+    companyId: number, employeeId: number | null, role: string,
+    id: number, body: { startDate?: string; endDate?: string; reason?: string },
+  ) {
+    const request = await this.loadForDecision(companyId, id);
+    this.assertOpenForRequest(request);
+    const reason = String(body?.reason ?? '').trim();
+    if (!reason) throw new BadRequestException('Give a reason for postponing');
+
+    const current: FieldVisitRequestInput = {
+      visitType: request.project.isSystem ? 'GENERAL' : 'PROJECT',
+      projectId: request.projectId,
+      location: request.location,
+      latitude: request.latitude as number,
+      longitude: request.longitude as number,
+      startDate: String(body?.startDate ?? ''),
+      endDate: String(body?.endDate ?? ''),
+      startTime: request.startTime,
+      endTime: request.endTime,
+      remarks: request.remarks ?? undefined,
+      employeeIds: request.members.map((m) => m.employeeId),
+      tasks: request.tasks.map((t) => ({ name: t.name, description: t.description ?? undefined, issueId: t.issueId })) as any,
+    };
+    const { project, fields, employeeIds, tasks } = await this.normalize(companyId, current);
+    if (!(await this.mayRaise(companyId, project, role, employeeId))) {
+      throw new ForbiddenException('Only the project manager can ask to postpone this field visit');
+    }
+    if (this.day(fields.startDate) === this.day(request.startDate) && this.day(fields.endDate) === this.day(request.endDate)) {
+      throw new BadRequestException('Pick new dates — these are the dates already approved');
+    }
+    if (fields.startDate < request.startDate) {
+      throw new BadRequestException('Postponing moves a trip later; to bring it forward, request a change');
+    }
+
+    return this.proposeChange(companyId, employeeId, request, {
+      ...fields,
+      startDate: fields.startDate.toISOString(),
+      endDate: fields.endDate.toISOString(),
+      employeeIds,
+      tasks,
+      kind: 'POSTPONE',
+      reason,
+    }, `postpone to ${this.day(fields.startDate)}–${this.day(fields.endDate)}`);
+  }
+
+  /**
+   * Ask for an approved trip to be called off. The project manager or anyone
+   * going may ask, with a reason; an admin's approval cancels it (decided
+   * 15 Oct 2026). Admins can still cancel straight away with cancel().
+   */
+  async requestCancel(
+    companyId: number, employeeId: number | null, role: string, id: number, reasonText?: string,
+  ) {
+    const request = await this.loadForDecision(companyId, id);
+    this.assertOpenForRequest(request);
+    const reason = String(reasonText ?? '').trim();
+    if (!reason) throw new BadRequestException('Give a reason for cancelling');
+
+    const project = await this.loadProject(companyId, request.project.id, request.project.isSystem);
+    const going = employeeId != null && request.members.some((m) => m.employeeId === employeeId);
+    if (!going && !(await this.mayRaise(companyId, project, role, employeeId))) {
+      throw new ForbiddenException('Only the project manager or someone going can ask to cancel this field visit');
+    }
+    return this.proposeChange(companyId, employeeId, request, { kind: 'CANCEL', reason }, 'cancel the trip');
+  }
+
+  private assertOpenForRequest(request: { status: string; pendingChange: unknown }) {
+    if (request.status !== FIELD_VISIT_STATUS.APPROVED) {
+      throw new BadRequestException(
+        `Only an approved field visit can be changed this way — this one is ${this.spoken(request.status)}`,
+      );
+    }
+    if (request.pendingChange) {
+      throw new BadRequestException('There is already a request waiting for a decision on this trip');
+    }
+  }
+
+  /** Park a change, postpone or cancel request for an admin to rule on. */
+  private async proposeChange(
+    companyId: number, employeeId: number | null,
+    request: { id: number; requestNumber: string; location: string },
+    proposal: Record<string, any>, what: string,
+  ) {
     const updated = await this.prisma.$transaction(async (tx) => {
       const saved = await tx.fieldVisitRequest.update({
-        where: { id },
+        where: { id: request.id },
         data: { pendingChange: proposal, pendingChangeAt: new Date() },
         select: this.SELECT,
       });
       await tx.fieldVisitRequestActivity.create({
         data: {
-          requestId: id, action: 'MODIFICATION_REQUESTED',
-          detail: `Proposed changes to ${changed.join(', ')}`,
+          requestId: request.id, action: 'MODIFICATION_REQUESTED',
+          detail: `Asked to ${what}: ${proposal.reason}`,
           actorId: employeeId as number,
         },
       });
       return saved;
     });
 
+    const asker = employeeId != null
+      ? await this.prisma.employee.findUnique({ where: { id: employeeId }, select: { firstName: true, lastName: true } })
+      : null;
+    const titles: Record<string, string> = {
+      CHANGE: 'Field visit change awaiting approval',
+      POSTPONE: 'Field visit postpone awaiting approval',
+      CANCEL: 'Field visit cancellation awaiting approval',
+    };
     await this.notifications.notifyApprovers({
       companyId,
       roles: APPROVER_ROLES,
-      title: 'Field visit change awaiting approval',
-      message: `${this.who(updated.raisedBy)} asked to change ${request.requestNumber}`
-        + ` (${changed.join(', ')}) at ${request.location}.`,
+      title: titles[proposal.kind] ?? titles.CHANGE,
+      message: `${asker ? this.who(asker) : 'Someone'} asked to ${what} for ${request.requestNumber}`
+        + ` at ${request.location}: ${proposal.reason}`,
       type: 'ACTION_REQUIRED',
       linkUrl: this.LINK,
     });
@@ -1575,6 +1689,15 @@ export class FieldVisitRequestsService {
   ) {
     const request = await this.requirePendingChange(companyId, reviewerId, role, id);
     const proposal: any = request.pendingChange;
+
+    // An approved cancel request cancels the trip the usual way, which gives
+    // back the days and archives the tasks.
+    if (proposal?.kind === 'CANCEL') {
+      await this.prisma.fieldVisitRequest.update({
+        where: { id }, data: { pendingChange: Prisma.DbNull, pendingChangeAt: null },
+      });
+      return this.cancel(companyId, reviewerId, role, id, `Cancel request approved: ${proposal.reason}`);
+    }
 
     const { result, applied } = await this.prisma.$transaction(async (tx) => {
       await tx.fieldVisitRequestMember.deleteMany({ where: { requestId: id } });
@@ -1643,10 +1766,11 @@ export class FieldVisitRequestsService {
       {
         companyId,
         excludeEmployeeId: reviewerId,
-        title: 'Field visit changed',
+        title: proposal?.kind === 'POSTPONE' ? 'Field visit postponed' : 'Field visit changed',
         message: `${result.requestNumber} — ${result.visitDays} day(s) at ${result.location}`
           + ` from ${this.day(result.startDate)}.`
-          + `${applied.archivedTasks ? ` ${applied.archivedTasks} task(s) no longer apply.` : ''}`,
+          + `${applied.archivedTasks ? ` ${applied.archivedTasks} task(s) no longer apply.` : ''}`
+          + `${proposal?.reason ? ` Reason: ${proposal.reason}` : ''}`,
         type: 'INFO',
         linkUrl: this.LINK,
       },
@@ -1684,7 +1808,8 @@ export class FieldVisitRequestsService {
     await this.notifications.notifyEmployees([request.raisedById], {
       companyId,
       excludeEmployeeId: reviewerId,
-      title: 'Field visit change declined',
+      title: ({ POSTPONE: 'Field visit postpone declined', CANCEL: 'Field visit cancellation declined' } as Record<string, string>)[
+        (request.pendingChange as any)?.kind] ?? 'Field visit change declined',
       message: `${request.requestNumber} stays as approved: ${text}`,
       type: 'WARNING',
       linkUrl: this.LINK,

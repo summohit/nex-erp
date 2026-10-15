@@ -148,6 +148,30 @@ export class FieldVisitRequestsController {
     );
   }
 
+  /** Ask to move an approved trip to new dates: { startDate, endDate, reason }. */
+  @Post(':id/request-postpone')
+  requestPostpone(
+    @Req() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { startDate?: string; endDate?: string; reason?: string },
+  ) {
+    return this.requests.requestPostpone(
+      req.user.companyId, req.user.employeeId ?? null, req.user.role, id, body,
+    );
+  }
+
+  /** Ask an admin to call off an approved trip: { reason }. */
+  @Post(':id/request-cancel')
+  requestCancel(
+    @Req() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { reason?: string },
+  ) {
+    return this.requests.requestCancel(
+      req.user.companyId, req.user.employeeId ?? null, req.user.role, id, body?.reason,
+    );
+  }
+
   @Post(':id/modification/approve')
   approveModification(@Req() req, @Param('id', ParseIntPipe) id: number) {
     return this.requests.approveModification(

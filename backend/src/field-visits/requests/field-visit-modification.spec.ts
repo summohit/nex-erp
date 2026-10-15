@@ -51,6 +51,7 @@ function change(over: any = {}) {
     endTime: '18:00',
     employeeIds: [60, 62],
     tasks: [{ name: 'Site Inspection' }, { name: 'Network Configuration' }],
+    changeReason: 'Client asked for a second engineer',
     ...over,
   };
 }
@@ -72,6 +73,7 @@ function makeService(requestOver: any = {}) {
         Promise.resolve({ ...PROJECT, id: a.where.id })),
     },
     employee: {
+      findUnique: jest.fn().mockResolvedValue({ firstName: 'Priya', lastName: 'PM' }),
       findMany: jest.fn().mockImplementation((a: any) =>
         Promise.resolve((a.where.id.in as number[]).map((id) => ({ id })))),
     },
@@ -137,7 +139,7 @@ describe('proposing a change', () => {
     await service.requestModification(1, PM, 'EMPLOYEE', 9, change() as any);
 
     expect(prisma.fieldVisitRequestActivity.create.mock.calls[0][0].data)
-      .toMatchObject({ action: 'MODIFICATION_REQUESTED', detail: 'Proposed changes to people' });
+      .toMatchObject({ action: 'MODIFICATION_REQUESTED', detail: 'Asked to change people: Client asked for a second engineer' });
     expect(notifications.notifyApprovers).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'ACTION_REQUIRED' }),
     );
@@ -178,6 +180,56 @@ describe('proposing a change', () => {
     // 22nd to 24th is three days, whatever the form believes.
     await expect(service.requestModification(1, PM, 'EMPLOYEE', 9, change({ visitDays: 2 }) as any))
       .rejects.toThrow(/is 3 day\(s\), not 2/);
+  });
+});
+
+describe('asking with a reason (15 Oct 2026)', () => {
+  it('refuses a change without a reason', async () => {
+    const { service } = makeService();
+    await expect(service.requestModification(1, PM, 'EMPLOYEE', 9, change({ changeReason: ' ' }) as any))
+      .rejects.toThrow(/reason for the change/);
+  });
+
+  it('parks a postpone with the new dates and keeps everything else', async () => {
+    const { service, prisma } = makeService();
+    await service.requestPostpone(1, PM, 'EMPLOYEE', 9, { startDate: '2026-09-29', endDate: '2026-10-01', reason: 'Site not ready' });
+    const proposal = prisma.fieldVisitRequest.update.mock.calls[0][0].data.pendingChange;
+    expect(proposal).toMatchObject({
+      kind: 'POSTPONE', reason: 'Site not ready', startTime: '09:00', endTime: '18:00', employeeIds: [60, 61],
+    });
+    expect(proposal.startDate).toBe('2026-09-29T00:00:00.000Z');
+  });
+
+  it('refuses a postpone without a reason, to the same dates, or earlier', async () => {
+    const { service } = makeService();
+    await expect(service.requestPostpone(1, PM, 'EMPLOYEE', 9, { startDate: '2026-09-29', endDate: '2026-10-01' }))
+      .rejects.toThrow(/reason for postponing/);
+    await expect(service.requestPostpone(1, PM, 'EMPLOYEE', 9, { startDate: '2026-09-22', endDate: '2026-09-24', reason: 'x' }))
+      .rejects.toThrow(/Pick new dates/);
+    await expect(service.requestPostpone(1, PM, 'EMPLOYEE', 9, { startDate: '2026-09-20', endDate: '2026-09-21', reason: 'x' }))
+      .rejects.toThrow(/moves a trip later/);
+  });
+
+  it('refuses a postpone from someone only going on the trip', async () => {
+    const { service } = makeService();
+    await expect(service.requestPostpone(1, 60, 'EMPLOYEE', 9, { startDate: '2026-09-29', endDate: '2026-10-01', reason: 'x' }))
+      .rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('lets someone going ask to cancel, with a reason', async () => {
+    const { service, prisma, notifications } = makeService();
+    await service.requestCancel(1, 60, 'EMPLOYEE', 9, 'Client closed the site');
+    expect(prisma.fieldVisitRequest.update.mock.calls[0][0].data.pendingChange)
+      .toEqual({ kind: 'CANCEL', reason: 'Client closed the site' });
+    expect(notifications.notifyApprovers).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Field visit cancellation awaiting approval' }),
+    );
+  });
+
+  it('refuses a cancel request without a reason, or from someone not involved', async () => {
+    const { service } = makeService();
+    await expect(service.requestCancel(1, 60, 'EMPLOYEE', 9, '')).rejects.toThrow(/reason for cancelling/);
+    await expect(service.requestCancel(1, 99, 'EMPLOYEE', 9, 'x')).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
 
