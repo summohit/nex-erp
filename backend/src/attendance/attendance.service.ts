@@ -82,7 +82,24 @@ export class AttendanceService {
       attendance.employee.shift,
       attendance.employee.branch?.weeklyOffs ?? '',
     );
-    if (!isSunday && !weeklyOff && !effective.isDayOff && !holiday) return;
+    // A roster entry, or a shift with fixed working days, knows this person's
+    // real day off (someone who works Sat–Sun with Monday off). Only without
+    // either do Sunday and the branch weekly off apply. Before 15 Oct 2026
+    // every Sunday counted, so rostered Sunday shifts earned comp-off.
+    const dayOff = effective.source === 'NONE' ? (isSunday || weeklyOff) : effective.isDayOff;
+    if (!dayOff && !holiday) return;
+
+    // Comp-off is earned only for an approved field visit that day (decided
+    // 15 Oct 2026); clocking in on a day off by itself no longer credits it.
+    const onVisit = await this.prisma.fieldVisitAttendance.findFirst({
+      where: {
+        employeeId: attendance.employeeId,
+        visitDate: date,
+        request: { status: { in: ['APPROVED', 'COMPLETED'] } },
+      },
+      select: { id: true },
+    });
+    if (!onVisit) return;
 
     const companyId = attendance.employee.companyId;
     const year = date.getUTCFullYear();
