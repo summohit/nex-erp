@@ -22,7 +22,7 @@ export const TOTP_PERIOD_SECONDS = 30;
  * rather than per-company: renaming an issuer orphans everyone's existing
  * entry, and the individual account is identified by the label (their email).
  */
-export const TOTP_ISSUER = process.env.TOTP_ISSUER || 'NEX ERP';
+export const TOTP_ISSUER = process.env.TOTP_ISSUER || 'MIRA';
 
 export const BACKUP_CODE_COUNT = 10;
 

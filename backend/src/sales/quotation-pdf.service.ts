@@ -156,7 +156,7 @@ export class QuotationPdfService {
       // nodemailer takes a list; one send, every recipient on the same message.
       to: recipients,
       quoteNumber: quote.quoteNumber,
-      companyName: company?.name || 'NEX ERP',
+      companyName: company?.name || 'MIRA',
       buyerName: quote.billingContactName || quote.lead?.contactName || quote.billingCompanyName || undefined,
       totalLabel: `${quote.currency === 'INR' ? '₹' : quote.currency} ${this.money(quote.total)}`,
       validUntil: this.date(quote.validUntil),

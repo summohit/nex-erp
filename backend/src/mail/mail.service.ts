@@ -125,7 +125,7 @@ export class MailService {
 
     const url = 'https://api.brevo.com/v3/smtp/email';
     const payload = {
-      sender: { email: this.fromEmail, name: 'NEX ERP' },
+      sender: { email: this.fromEmail, name: 'MIRA' },
       to: [{ email: mailOptions.to }],
       subject: mailOptions.subject,
       htmlContent: mailOptions.html,
@@ -148,7 +148,7 @@ export class MailService {
     
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-        <h2 style="color: #1e3a8a; text-align: center;">Welcome to NEX ERP! 🚀</h2>
+        <h2 style="color: #1e3a8a; text-align: center;">Welcome to MIRA! 🚀</h2>
         <p style="color: #475569; font-size: 16px;">Hello,</p>
         <p style="color: #475569; font-size: 16px;">Thank you for signing up. Please verify your email address to activate your account and get started.</p>
         <div style="text-align: center; margin: 30px 0;">
@@ -176,7 +176,7 @@ export class MailService {
 
       this.logger.log(`Sending verification email to ${email} via SMTP transport.`);
       const info = await this.sendWithRetry({
-        from: `"NEX ERP" <${this.fromEmail}>`,
+        from: `"MIRA" <${this.fromEmail}>`,
         to: email,
         envelope: { from: this.fromEmail, to: email },
         subject: 'Action Required: Verify Your Email',
@@ -196,9 +196,9 @@ export class MailService {
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-        <h2 style="color: #1e3a8a; text-align: center;">Reset Your NEX ERP Password</h2>
+        <h2 style="color: #1e3a8a; text-align: center;">Reset Your MIRA Password</h2>
         <p style="color: #475569; font-size: 16px;">Hello,</p>
-        <p style="color: #475569; font-size: 16px;">We received a request to reset the password for your NEX ERP account (<strong style="color: #1e3a8a;">${email}</strong>).</p>
+        <p style="color: #475569; font-size: 16px;">We received a request to reset the password for your MIRA account (<strong style="color: #1e3a8a;">${email}</strong>).</p>
         <p style="color: #475569; font-size: 16px;">Use the verification code below to confirm your identity and set a new password:</p>
         <div style="text-align: center; margin: 30px 0;">
           <span style="background-color: #f1f5f9; color: #1e3a8a; padding: 14px 32px; border-radius: 8px; font-weight: bold; font-size: 28px; letter-spacing: 8px;">${otp}</span>
@@ -220,17 +220,17 @@ export class MailService {
         this.logger.log(`Sending password reset OTP email to ${email} via Brevo HTTP API.`);
         return await this.sendBrevoEmail({
           to: email,
-          subject: 'Your NEX ERP Password Reset Code',
+          subject: 'Your MIRA Password Reset Code',
           html: htmlContent,
         });
       }
 
       this.logger.log(`Sending password reset OTP email to ${email} via SMTP transport.`);
       const info = await this.sendWithRetry({
-        from: `"NEX ERP" <${this.fromEmail}>`,
+        from: `"MIRA" <${this.fromEmail}>`,
         to: email,
         envelope: { from: this.fromEmail, to: email },
-        subject: 'Your NEX ERP Password Reset Code',
+        subject: 'Your MIRA Password Reset Code',
         html: htmlContent,
       });
       this.logger.log(`Password reset OTP email sent to ${email}. MessageId: ${info.messageId}`);
@@ -249,7 +249,7 @@ export class MailService {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
         <h2 style="color: #1e3a8a; text-align: center;">You're All Set! 🎉</h2>
         <p style="color: #475569; font-size: 16px;">Your email has been verified successfully.</p>
-        <p style="color: #475569; font-size: 16px;">Welcome to NEX ERP. You can now log in and complete your onboarding process.</p>
+        <p style="color: #475569; font-size: 16px;">Welcome to MIRA. You can now log in and complete your onboarding process.</p>
         <div style="text-align: center; margin: 30px 0;">
           <a href="${loginLink}" style="background-color: #FF5200; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">Go to Login</a>
         </div>
@@ -261,7 +261,7 @@ export class MailService {
         this.logger.log(`Sending welcome email to ${email} via Brevo HTTP API.`);
         await this.sendBrevoEmail({
           to: email,
-          subject: 'Welcome to NEX ERP 🚀',
+          subject: 'Welcome to MIRA 🚀',
           html: htmlContent,
         });
         this.logger.log(`Welcome email sent to ${email}`);
@@ -270,10 +270,10 @@ export class MailService {
 
       this.logger.log(`Sending welcome email to ${email} via SMTP transport.`);
       await this.sendWithRetry({
-        from: `"NEX ERP" <${this.fromEmail}>`,
+        from: `"MIRA" <${this.fromEmail}>`,
         to: email,
         envelope: { from: this.fromEmail, to: email },
-        subject: 'Welcome to NEX ERP 🚀',
+        subject: 'Welcome to MIRA 🚀',
         html: htmlContent,
       });
       this.logger.log(`Welcome email sent to ${email}`);
@@ -288,7 +288,7 @@ export class MailService {
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-        <h2 style="color: #1e3a8a; text-align: center;">Welcome to NEX ERP 🚀</h2>
+        <h2 style="color: #1e3a8a; text-align: center;">Welcome to MIRA 🚀</h2>
         <p style="color: #475569; font-size: 16px;">Your account has been created. Here are your login credentials:</p>
         <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px; margin: 20px 0;">
           <p style="margin: 4px 0; color: #1e293b;"><strong>Email:</strong> ${email}</p>
@@ -306,7 +306,7 @@ export class MailService {
         this.logger.log(`Sending credentials email to ${email} via Brevo HTTP API.`);
         await this.sendBrevoEmail({
           to: email,
-          subject: 'Your NEX ERP Login Credentials',
+          subject: 'Your MIRA Login Credentials',
           html: htmlContent,
         });
         this.logger.log(`Credentials email sent to ${email}`);
@@ -315,10 +315,10 @@ export class MailService {
 
       this.logger.log(`Sending credentials email to ${email} via SMTP transport.`);
       await this.sendWithRetry({
-        from: `"NEX ERP" <${this.fromEmail}>`,
+        from: `"MIRA" <${this.fromEmail}>`,
         to: email,
         envelope: { from: this.fromEmail, to: email },
-        subject: 'Your NEX ERP Login Credentials',
+        subject: 'Your MIRA Login Credentials',
         html: htmlContent,
       });
       this.logger.log(`Credentials email sent to ${email}`);
@@ -508,7 +508,7 @@ export class MailService {
         return;
       }
       await this.sendWithRetry({
-        from: `"NEX ERP Recruitment" <${this.fromEmail}>`,
+        from: `"MIRA Recruitment" <${this.fromEmail}>`,
         to: email,
         envelope: { from: this.fromEmail, to: email },
         subject: `Offer Accepted: ${candidateName} (${jobTitle})`,
@@ -544,7 +544,7 @@ export class MailService {
         return;
       }
       await this.sendWithRetry({
-        from: `"NEX ERP Recruitment" <${this.fromEmail}>`,
+        from: `"MIRA Recruitment" <${this.fromEmail}>`,
         to: email,
         envelope: { from: this.fromEmail, to: email },
         subject: `Offer Declined: ${candidateName} (${jobTitle})`,
@@ -586,7 +586,7 @@ export class MailService {
         return;
       }
       await this.sendWithRetry({
-        from: `"NEX ERP" <${this.fromEmail}>`,
+        from: `"MIRA" <${this.fromEmail}>`,
         envelope: { from: this.fromEmail, to: email },
         to: email,
         subject: `Notice: ${title}`,
@@ -882,7 +882,7 @@ export class MailService {
         });
       }
       return await this.sendWithRetry({
-        from: `"NEX ERP" <${this.fromEmail}>`,
+        from: `"MIRA" <${this.fromEmail}>`,
         to: email,
         envelope: { from: this.fromEmail, to: email },
         subject: 'Your Onboarding Process is Initiated',
@@ -897,7 +897,7 @@ export class MailService {
     const crmUrl = process.env.APP_URL || 'http://localhost:4200';
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-        <h2 style="color: #1e3a8a; text-align: center;">Onboarding Complete! Welcome to NEX ERP</h2>
+        <h2 style="color: #1e3a8a; text-align: center;">Onboarding Complete! Welcome to MIRA</h2>
         <p style="color: #475569; font-size: 16px;">Hi ${this.escapeHtml(employeeName)},</p>
         <p style="color: #475569; font-size: 16px;">
           Your onboarding setup is now complete! You can log into the system using the credentials below.
@@ -922,7 +922,7 @@ export class MailService {
         });
       }
       return await this.sendWithRetry({
-        from: `"NEX ERP" <${this.fromEmail}>`,
+        from: `"MIRA" <${this.fromEmail}>`,
         to: email,
         envelope: { from: this.fromEmail, to: email },
         subject: 'Onboarding Complete - Your Login Credentials',
@@ -959,7 +959,7 @@ export class MailService {
         });
       }
       return await this.sendWithRetry({
-        from: `"NEX ERP" <${this.fromEmail}>`,
+        from: `"MIRA" <${this.fromEmail}>`,
         to: email,
         envelope: { from: this.fromEmail, to: email },
         subject: `Interview Scheduled: ${interviewTitle}`,

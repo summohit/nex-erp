@@ -27,7 +27,7 @@ export class EmailService {
   ): Promise<boolean> {
     try {
       const mailOptions = {
-        from: `"CES Tech ERP Payroll" <${process.env.SMTP_FROM || 'payroll@ces-pl.com'}>`,
+        from: `"MIRA Payroll" <${process.env.SMTP_FROM || 'payroll@ces-pl.com'}>`,
         to: toEmail,
         subject: `Your Salary Payslip for ${monthName} ${year} - CES Tech ERP`,
         html: `
