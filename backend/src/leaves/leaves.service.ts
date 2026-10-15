@@ -893,6 +893,14 @@ export class LeavesService {
     if (!request) throw new BadRequestException('Request not found');
     if (status === 'REJECTED' && !rejectionReason) throw new BadRequestException('Rejection reason is required');
 
+    // A Super Admin may decide any leave, their own included. Everyone else
+    // decides only other people's: the hierarchy walk starts at the requester,
+    // so without the own-leave check a manager would pass it for themselves.
+    const isSuperAdmin = actor.role === 'SUPERADMIN';
+    const isOwn = !!actor.employee?.id && actor.employee.id === request.employeeId;
+    if (isOwn && !isSuperAdmin) {
+      throw new BadRequestException('You cannot approve or reject your own leave — it goes to your manager or HR');
+    }
     const isAdminOrHr = ['SUPERADMIN', 'ADMIN', 'HR'].includes(actor.role);
     const isInHierarchy = actor.employee?.id
       ? await this.isEmployeeInHierarchy(actor.employee.id, request.employeeId)
