@@ -93,6 +93,12 @@ export class EmployeesController {
     return this.employeesService.delete(+id, req.user.companyId);
   }
 
+  /** Whether the signed-in person has anyone reporting to them (mobile shows My Team only then). */
+  @Get('me/team-summary')
+  getMyTeamSummary(@Request() req) {
+    return this.employeesService.getMyTeamSummary(req.user.companyId, req.user.employeeId ?? null);
+  }
+
   @Get('me/profile')
   getMyProfile(@Request() req) {
     return this.employeesService.getMyProfile(req.user.companyId, req.user.sub);

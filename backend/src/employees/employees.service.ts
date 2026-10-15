@@ -411,6 +411,21 @@ export class EmployeesService {
 
   // --- Profile Features ---
 
+  /** Direct reports, and whether this person leads any project (for the mobile menu). */
+  async getMyTeamSummary(companyId: number, employeeId: number | null) {
+    if (employeeId == null) return { directReports: 0, leadsProjects: false, hasTeam: false };
+    const [directReports, projects] = await Promise.all([
+      this.prisma.employee.count({ where: { companyId, managerId: employeeId } }),
+      this.prisma.project.count({
+        where: {
+          companyId, isSystem: false,
+          OR: [{ leadId: employeeId }, { members: { some: { employeeId, role: 'PROJECT_MANAGER' } } }],
+        },
+      }),
+    ]);
+    return { directReports, leadsProjects: projects > 0, hasTeam: directReports > 0 };
+  }
+
   async getMyProfile(companyId: number, currentUserId: number) {
     const employee = await this.prisma.employee.findFirst({
       where: { userId: currentUserId, companyId },

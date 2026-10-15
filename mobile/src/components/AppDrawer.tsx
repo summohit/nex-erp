@@ -52,7 +52,7 @@ import {
   UserPlus,
   LifeBuoy,
 } from 'lucide-react-native';
-import { API_URL } from '../api/apiClient';
+import { API_URL, apiClient } from '../api/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { useMenuStore, MenuItem } from '../store/menuStore';
 import { useDashboardStore } from '../store/dashboardStore';
@@ -348,7 +348,26 @@ function filterFunctionalItems(items: MenuItem[]): MenuItem[] {
   return result;
 }
 
-function groupItems(items: MenuItem[]): { group: string; items: MenuItem[] }[] {
+/**
+ * Already one tap away in the bottom tab bar (Home, Attendance, Projects,
+ * Leaves, Profile) or the header bell, so the drawer does not repeat them.
+ */
+const IN_TAB_BAR = new Set([
+  '/dashboard', '/notifications', '/employees/me/profile',
+  '/attendance/timesheets', '/attendance/leaves', '/projects',
+]);
+
+function withoutTabBarItems(items: MenuItem[]): MenuItem[] {
+  return items
+    .filter(item => !item.route || !IN_TAB_BAR.has(item.route) || !!item.subItems?.length)
+    .map(item => (item.subItems?.length
+      ? { ...item, subItems: item.subItems.filter(sub => !sub.route || !IN_TAB_BAR.has(sub.route)) }
+      : item))
+    .filter(item => !item.subItems || item.subItems.length > 0);
+}
+
+function groupItems(rawItems: MenuItem[], showTeam: boolean): { group: string; items: MenuItem[] }[] {
+  const items = withoutTabBarItems(rawItems);
   // A group left with one entry (Employees → My Profile, Settings → Security)
   // is shown as that entry, so it is one tap instead of two.
   const functionalItems = filterFunctionalItems(items).map(item =>
@@ -371,6 +390,7 @@ function groupItems(items: MenuItem[]): { group: string; items: MenuItem[] }[] {
   }
 
   for (const item of ALWAYS_ON_ITEMS) {
+    if (item.group === 'MY TEAM' && !showTeam) continue;
     if (!existingIds.has(item.id) && !existingRoutes.has(item.route)) {
       if (!groups[item.group]) groups[item.group] = [];
       groups[item.group].push({ id: item.id, title: item.title, icon: item.icon, route: item.route });
@@ -470,8 +490,25 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
     return email ? email.substring(0, 2).toUpperCase() : 'MS';
   };
 
+  // MY TEAM is for people with someone reporting to them, and for HR and
+  // administrators, who act on everyone's requests.
+  const [team, setTeam] = useState<{ hasTeam: boolean; leadsProjects: boolean } | null>(null);
+  useEffect(() => {
+    if (!visible) return;
+    apiClient.get('/employees/me/team-summary')
+      .then(({ data }) => setTeam({ hasTeam: !!data?.hasTeam, leadsProjects: !!data?.leadsProjects }))
+      .catch(() => {});
+  }, [visible]);
+  const role = String(user?.role || '').toUpperCase();
+  const isAdminRole = ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN', 'HR'].includes(role);
+  const showTeam = isAdminRole || !!team?.hasTeam;
+  const workspaceLabel = role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN' ? 'Admin Workspace'
+    : role === 'HR' ? 'HR Workspace'
+      : team?.hasTeam || team?.leadsProjects ? 'Manager Workspace'
+        : 'Employee Workspace';
+
   const allItems: MenuItem[] = sections.flatMap(s => s.items);
-  const grouped = groupItems(allItems);
+  const grouped = groupItems(allItems, showTeam);
 
   return (
     <>
@@ -500,7 +537,7 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
                     </Text>
                     <View style={styles.brandSubtitleRow}>
                       <View style={styles.workspaceDot} />
-                      <Text style={styles.brandSubtitle}>Employee Workspace</Text>
+                      <Text style={styles.brandSubtitle}>{workspaceLabel}</Text>
                     </View>
                   </View>
                 </View>
