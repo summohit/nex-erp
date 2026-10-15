@@ -249,6 +249,13 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   '/settings/security': { screen: 'Security' },
   '/attendance/holidays': { screen: 'Attendance', params: { initialTab: 'holidays' } },
   '/payroll/expenses': { screen: 'Attendance', params: { initialTab: 'expenses' } },
+  '/m/my-tasks': { screen: 'MyTasks' },
+  '/m/weekly-timesheet': { screen: 'WeeklyTimesheet' },
+  '/m/my-shift': { screen: 'MyShift' },
+  '/m/notices': { screen: 'Notices' },
+  '/m/approvals': { screen: 'Approvals' },
+  '/m/team-leave': { screen: 'TeamLeave' },
+  '/m/team-attendance': { screen: 'TeamAttendance' },
 };
 
 // Client-side group bucketing for visual grouping
@@ -277,11 +284,20 @@ const ITEM_TO_GROUP: Record<string, string> = {
   settings: 'SYSTEM',
 };
 
-const GROUP_ORDER = ['WORKSPACE', 'FINANCE', 'OPERATIONS', 'SYSTEM'];
+const GROUP_ORDER = ['WORKSPACE', 'MY TEAM', 'FINANCE', 'OPERATIONS', 'SYSTEM'];
 
 // Items that are fully implemented and always shown
 const ALWAYS_ON_ITEMS: { group: string; id: string; title: string; icon: string; route: string }[] = [
   { group: 'WORKSPACE', id: 'notifications', title: 'Notifications', icon: 'bell', route: '/notifications' },
+  // Mobile-only screens with no web menu row: without these they were only in
+  // the offline fallback list, so nobody could reach Team Leave or Approvals.
+  { group: 'WORKSPACE', id: 'm-my-tasks', title: 'My Tasks', icon: 'check-square', route: '/m/my-tasks' },
+  { group: 'WORKSPACE', id: 'm-timesheet', title: 'Timesheet', icon: 'timer', route: '/m/weekly-timesheet' },
+  { group: 'WORKSPACE', id: 'm-my-shift', title: 'My Shift', icon: 'clock', route: '/m/my-shift' },
+  { group: 'WORKSPACE', id: 'm-notices', title: 'Notice Board', icon: 'megaphone', route: '/m/notices' },
+  { group: 'MY TEAM', id: 'm-approvals', title: 'Approvals', icon: 'user-check', route: '/m/approvals' },
+  { group: 'MY TEAM', id: 'm-team-leave', title: 'Team Leave', icon: 'users', route: '/m/team-leave' },
+  { group: 'MY TEAM', id: 'm-team-attendance', title: 'Team Attendance', icon: 'calendar-days', route: '/m/team-attendance' },
   { group: 'FINANCE', id: 'payslips', title: 'Payslips', icon: 'file-text', route: '/payroll/payslips' },
   { group: 'FINANCE', id: 'hardware-requests', title: 'Hardware Requests', icon: 'package', route: '/assets/requests' },
   // Self-service two-factor setup. Listed here as well as coming from the
