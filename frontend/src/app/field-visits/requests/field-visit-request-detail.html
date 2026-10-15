@@ -92,7 +92,7 @@
         <div class="change-head">
           <h3>
             <svg lucidePencil [size]="16"></svg>
-            Change requested
+            {{ pendingTitle() }}
           </h3>
           <span class="change-when">{{ request()!.pendingChangeAt | date:'d MMM, h:mm a' }}</span>
         </div>
@@ -101,6 +101,11 @@
           the site and dates below.
         </p>
 
+        @if (request()!.pendingChange!.reason) {
+          <p class="change-note"><b>Reason:</b> {{ request()!.pendingChange!.reason }}</p>
+        }
+
+        @if (request()!.pendingChangeKind !== 'CANCEL') {
         <table class="diff">
           <thead>
             <tr><th>What</th><th>Now</th><th>Proposed</th></tr>
@@ -115,12 +120,15 @@
             }
           </tbody>
         </table>
+        } @else {
+          <p class="change-note">Approving cancels the visit: unclocked days are released and its tasks archived.</p>
+        }
 
         @if (request()!.canReviewChange) {
           <div class="change-actions">
             <button class="primary-btn" type="button" [disabled]="isWorking()" (click)="approveChange()">
               <svg lucideCheckCircle [size]="16"></svg>
-              Approve change
+              {{ request()!.pendingChangeKind === 'CANCEL' ? 'Approve cancellation' : request()!.pendingChangeKind === 'POSTPONE' ? 'Approve postpone' : 'Approve change' }}
             </button>
             <button class="ghost-btn danger" type="button" [disabled]="isWorking()" (click)="isRejectingChange.set(true)">
               <svg lucideX [size]="16"></svg>
@@ -482,13 +490,63 @@
             Request a change
           </button>
         }
+        @if (request()!.canRequestPostpone) {
+          <button class="ghost-btn change-btn" type="button" [disabled]="isWorking()" (click)="openPostpone()">
+            <svg lucideCalendarDays [size]="15"></svg>
+            Postpone
+          </button>
+        }
         @if (isCompanyWide() && (request()!.status === 'DRAFT' || request()!.status === 'PENDING_APPROVAL' || request()!.status === 'APPROVED')) {
-          <button class="ghost-btn danger-outline" type="button" [disabled]="isWorking()" (click)="cancel()">
+          <button class="ghost-btn danger-outline" type="button" [disabled]="isWorking()" (click)="cancelReason = ''; isCancelling.set(true)">
             <svg lucideBan [size]="15"></svg>
             Cancel visit
           </button>
+        } @else if (request()!.canRequestCancel) {
+          <button class="ghost-btn danger-outline" type="button" [disabled]="isWorking()" (click)="cancelReason = ''; isRequestingCancel.set(true)">
+            <svg lucideBan [size]="15"></svg>
+            Request cancellation
+          </button>
         }
       </div>
+
+      @if (isPostponing()) {
+        <div class="card reject-card">
+          <label>New dates</label>
+          <div class="postpone-dates">
+            <input type="date" [(ngModel)]="postponeStart" [min]="request()!.startDate.slice(0, 10)" aria-label="New start date" />
+            <span>to</span>
+            <input type="date" [(ngModel)]="postponeEnd" [min]="postponeStart" aria-label="New end date" />
+          </div>
+          <label>Why is it being postponed?</label>
+          <textarea rows="3" [(ngModel)]="postponeReason" placeholder="An administrator approves this. Hours, people and tasks stay as they are."></textarea>
+          <div class="reject-actions">
+            <button class="ghost-btn" type="button" (click)="isPostponing.set(false)">Never mind</button>
+            <button class="primary-btn" type="button" [disabled]="isWorking()" (click)="submitPostpone()">Send for approval</button>
+          </div>
+        </div>
+      }
+
+      @if (isRequestingCancel()) {
+        <div class="card reject-card">
+          <label>Why should this visit be cancelled?</label>
+          <textarea rows="3" [(ngModel)]="cancelReason" placeholder="An administrator approves this. The trip runs as planned until then."></textarea>
+          <div class="reject-actions">
+            <button class="ghost-btn" type="button" (click)="isRequestingCancel.set(false)">Never mind</button>
+            <button class="primary-btn danger" type="button" [disabled]="isWorking()" (click)="submitCancelRequest()">Send for approval</button>
+          </div>
+        </div>
+      }
+
+      @if (isCancelling()) {
+        <div class="card reject-card">
+          <label>Why is this visit being cancelled?</label>
+          <textarea rows="3" [(ngModel)]="cancelReason" placeholder="Everyone on the trip is told, with this reason."></textarea>
+          <div class="reject-actions">
+            <button class="ghost-btn" type="button" (click)="isCancelling.set(false)">Never mind</button>
+            <button class="primary-btn danger" type="button" [disabled]="isWorking()" (click)="cancel()">Cancel visit</button>
+          </div>
+        </div>
+      }
 
       @if (!request()!.canSubmit && !request()!.canReview && request()!.status === 'PENDING_APPROVAL') {
         <p class="await-note">

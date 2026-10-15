@@ -453,6 +453,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
     startTime: '09:00',
     endTime: '18:00',
     remarks: '',
+    changeReason: '',
     employeeIds: [] as number[],
     tasks: [] as {
       issueId: number | null;
@@ -489,6 +490,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
         startTime: this.request.startTime,
         endTime: this.request.endTime,
         remarks: this.request.remarks ?? '',
+        changeReason: '',
         employeeIds: this.request.members.map((m) => m.employee.id),
         // A line saved before this picker existed, or one describing work that
         // is not on the board, comes back as free text. Keeping it renders
@@ -1255,6 +1257,7 @@ export class FieldVisitRequestFormComponent implements OnInit {
       startTime: this.form.startTime,
       endTime: this.form.endTime,
       remarks: this.form.remarks.trim() || undefined,
+      ...(this.mode === 'modify' ? { changeReason: this.form.changeReason.trim() } : {}),
       employeeIds: this.selectedEmployeeIds(),
       // `issueId` is what makes a line an adopted task rather than a phrase;
       // `name` alone would have approval mint a second card for work the
@@ -1276,6 +1279,10 @@ export class FieldVisitRequestFormComponent implements OnInit {
     const id = this.request?.id;
     if (!id) return;
     if (!this.validateForm()) {
+      return;
+    }
+    if (!this.form.changeReason.trim()) {
+      this.error.set('Give a reason for the change — the approver reads it.');
       return;
     }
     this.error.set(null);

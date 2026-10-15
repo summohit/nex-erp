@@ -976,6 +976,21 @@
         </div>
       </div>
 
+      @if (mode === 'modify') {
+        <div class="form-section">
+          <div class="section-header">
+            <span class="section-tag">Required</span>
+            <span class="section-title">Reason for the change</span>
+          </div>
+          <div class="field">
+            <textarea
+              rows="3"
+              [(ngModel)]="form.changeReason"
+              placeholder="Why does this trip need to change? The approver sees this."></textarea>
+          </div>
+        </div>
+      }
+
       @if (error()) {
         <div class="error-banner">
           <svg lucideX [size]="16"></svg>

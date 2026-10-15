@@ -81,6 +81,16 @@ export class FieldVisitRequestDetailComponent implements OnInit {
   isRejectingChange = signal(false);
   changeRejectionReason = '';
 
+  /** Postpone and cancel requests (decided 15 Oct 2026). */
+  isPostponing = signal(false);
+  postponeStart = '';
+  postponeEnd = '';
+  postponeReason = '';
+  isRequestingCancel = signal(false);
+  cancelReason = '';
+  /** Admin cancelling straight away, which also asks why. */
+  isCancelling = signal(false);
+
   ngOnInit(): void {
     this.load();
   }
@@ -246,7 +256,51 @@ export class FieldVisitRequestDetailComponent implements OnInit {
   }
 
   cancel(): void {
-    this.run(this.api.cancel(this.id), 'Field visit cancelled');
+    this.run(this.api.cancel(this.id, this.cancelReason.trim() || undefined), 'Field visit cancelled', () => {
+      this.isCancelling.set(false);
+      this.cancelReason = '';
+    });
+  }
+
+  openPostpone(): void {
+    const r = this.request();
+    this.postponeStart = r?.startDate?.slice(0, 10) ?? '';
+    this.postponeEnd = r?.endDate?.slice(0, 10) ?? '';
+    this.postponeReason = '';
+    this.isPostponing.set(true);
+  }
+
+  submitPostpone(): void {
+    if (!this.postponeStart || !this.postponeEnd) {
+      this.toast.error('Pick the new start and end dates.');
+      return;
+    }
+    if (!this.postponeReason.trim()) {
+      this.toast.error('Give a reason for postponing.');
+      return;
+    }
+    this.run(
+      this.api.requestPostpone(this.id, { startDate: this.postponeStart, endDate: this.postponeEnd, reason: this.postponeReason.trim() }),
+      'Postpone sent for approval',
+      () => this.isPostponing.set(false),
+    );
+  }
+
+  submitCancelRequest(): void {
+    if (!this.cancelReason.trim()) {
+      this.toast.error('Give a reason for cancelling.');
+      return;
+    }
+    this.run(this.api.requestCancel(this.id, this.cancelReason.trim()), 'Cancellation sent for approval', () => {
+      this.isRequestingCancel.set(false);
+      this.cancelReason = '';
+    });
+  }
+
+  /** Heading for the waiting-request card. */
+  pendingTitle(): string {
+    const kind = this.request()?.pendingChangeKind;
+    return kind === 'POSTPONE' ? 'Postpone requested' : kind === 'CANCEL' ? 'Cancellation requested' : 'Change requested';
   }
 
   withdraw(): void {
@@ -266,7 +320,11 @@ export class FieldVisitRequestDetailComponent implements OnInit {
   }
 
   approveChange(): void {
-    this.run(this.api.approveModification(this.id), 'Change approved — the work now matches it');
+    const kind = this.request()?.pendingChangeKind;
+    this.run(
+      this.api.approveModification(this.id),
+      kind === 'CANCEL' ? 'Cancellation approved — the trip is off' : kind === 'POSTPONE' ? 'Postpone approved' : 'Change approved — the work now matches it',
+    );
   }
 
   rejectChange(): void {

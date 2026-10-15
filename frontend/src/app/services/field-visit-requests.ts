@@ -95,10 +95,16 @@ export interface FieldVisitRequest {
   canReview?: boolean;
   canWithdraw?: boolean;
   canRequestChange?: boolean;
+  canRequestPostpone?: boolean;
+  canRequestCancel?: boolean;
+  /** CHANGE, POSTPONE or CANCEL, when a request is waiting. */
+  pendingChangeKind?: 'CHANGE' | 'POSTPONE' | 'CANCEL' | null;
   canReviewChange?: boolean;
 }
 
 export interface PendingFieldVisitChange {
+  kind?: 'CHANGE' | 'POSTPONE' | 'CANCEL';
+  reason?: string;
   location: string;
   latitude: number;
   longitude: number;
@@ -129,6 +135,8 @@ export interface FieldVisitLeaveConflict {
 }
 
 export interface FieldVisitRequestInput {
+  /** Why an approved trip is changed; required in modify mode. */
+  changeReason?: string;
   /** GENERAL visits belong to no project; their scope is the people's general tasks. */
   visitType?: 'PROJECT' | 'GENERAL';
   projectId?: number;
@@ -219,6 +227,14 @@ export class FieldVisitRequestsService {
 
   requestModification(id: number, body: FieldVisitRequestInput) {
     return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/request-modification`, body);
+  }
+
+  requestPostpone(id: number, body: { startDate: string; endDate: string; reason: string }) {
+    return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/request-postpone`, body);
+  }
+
+  requestCancel(id: number, reason: string) {
+    return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/request-cancel`, { reason });
   }
 
   approveModification(id: number) {

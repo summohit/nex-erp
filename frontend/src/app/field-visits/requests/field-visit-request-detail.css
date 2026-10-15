@@ -1305,3 +1305,8 @@
 /* The distance is a link to the point it was measured from. */
 a.distance-pill { text-decoration: none; }
 a.distance-pill:hover { filter: brightness(0.96); }
+
+/* Postpone: the new date pair. */
+.postpone-dates { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.postpone-dates input { padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font: inherit; }
+.postpone-dates span { color: #64748b; font-size: 13px; }
