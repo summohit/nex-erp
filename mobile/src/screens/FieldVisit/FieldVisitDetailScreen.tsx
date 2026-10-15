@@ -29,6 +29,8 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
+  CalendarClock,
+  Ban,
 } from 'lucide-react-native';
 import AppScreen from '../../components/AppScreen';
 import {
@@ -56,7 +58,10 @@ export default function FieldVisitDetailScreen() {
   const [busy, setBusy] = useState(false);
   const [isApprover, setIsApprover] = useState(false);
   // Which reason sheet is open, and for what.
-  const [sheet, setSheet] = useState<null | 'reject' | 'cancel' | 'rejectChange' | { status: string }>(null);
+  const [sheet, setSheet] = useState<null | 'reject' | 'cancel' | 'rejectChange' | 'requestCancel' | { status: string }>(null);
+  /** Postpone request being filled in: new dates and why. */
+  const [postpone, setPostpone] = useState<{ startDate: string; endDate: string; reason: string } | null>(null);
+  const [postponePicker, setPostponePicker] = useState<null | 'startDate' | 'endDate'>(null);
   const [statusMenu, setStatusMenu] = useState(false);
   // Super Admin: correct a pending request while approving it.
   const [edit, setEdit] = useState<{ location: string; startDate: string; endDate: string; startTime: string; endTime: string; reason: string } | null>(null);
@@ -173,6 +178,11 @@ export default function FieldVisitDetailScreen() {
     if (sheet === 'reject') act('reject', async () => { await fv.reject(id, reason); setSheet(null); });
     else if (sheet === 'cancel') act('cancel', async () => { await fv.cancel(id, reason); setSheet(null); });
     else if (sheet === 'rejectChange') act('reject the change', async () => { await fv.rejectChange(id, reason); setSheet(null); });
+    else if (sheet === 'requestCancel') act('send the cancellation', async () => {
+      await fv.requestCancel(id, reason);
+      setSheet(null);
+      Alert.alert('Sent for approval', 'An administrator decides. The visit runs as planned until then.');
+    });
     else if (sheet && typeof sheet === 'object') moveTo(sheet.status, reason || undefined);
   };
 
@@ -182,11 +192,30 @@ export default function FieldVisitDetailScreen() {
       { text: 'Mark complete', onPress: () => act('mark it complete', () => fv.complete(id)) },
     ]);
 
+  const pendingKind = visit?.pendingChangeKind ?? (visit?.pendingChange?.kind || 'CHANGE');
+
   const approveChange = () =>
-    Alert.alert('Approve the change?', 'The visit, its people, tasks and days are updated to the proposal.', [
-      { text: 'Back', style: 'cancel' },
-      { text: 'Approve change', onPress: () => act('approve the change', () => fv.approveChange(id)) },
-    ]);
+    Alert.alert(
+      pendingKind === 'CANCEL' ? 'Approve the cancellation?' : pendingKind === 'POSTPONE' ? 'Approve the postpone?' : 'Approve the change?',
+      pendingKind === 'CANCEL'
+        ? 'The visit is cancelled: unclocked days are released and its tasks archived.'
+        : 'The visit, its people, tasks and days are updated to the proposal.',
+      [
+        { text: 'Back', style: 'cancel' },
+        { text: 'Approve', onPress: () => act('approve the request', () => fv.approveChange(id)) },
+      ],
+    );
+
+  const sendPostpone = () => {
+    if (!postpone) return;
+    if (postpone.endDate < postpone.startDate) { Alert.alert('Check the dates', 'The end date is before the start date.'); return; }
+    if (!postpone.reason.trim()) { Alert.alert('Give a reason', 'Say why the visit is being postponed.'); return; }
+    act('send the postpone', async () => {
+      await fv.requestPostpone(id, postpone.startDate, postpone.endDate, postpone.reason.trim());
+      setPostpone(null);
+      Alert.alert('Sent for approval', 'An administrator decides. The visit stays on its current dates until then.');
+    });
+  };
 
   const startEdit = () => setEdit({
     location: visit!.location, startDate: visit!.startDate.slice(0, 10), endDate: visit!.endDate.slice(0, 10),
@@ -590,8 +619,16 @@ export default function FieldVisitDetailScreen() {
           <View style={styles.changeBoxCard}>
             <View style={styles.changeBoxHeader}>
               <AlertTriangle size={17} color="#D97706" strokeWidth={2.2} />
-              <Text style={styles.changeTitle}>Proposed Modification</Text>
+              <Text style={styles.changeTitle}>
+                {pendingKind === 'CANCEL' ? 'Cancellation Requested' : pendingKind === 'POSTPONE' ? 'Postpone Requested' : 'Proposed Modification'}
+              </Text>
             </View>
+            {!!visit.pendingChange?.reason && (
+              <Text style={styles.inputLabel}>Reason: {visit.pendingChange.reason}</Text>
+            )}
+            {pendingKind === 'CANCEL' ? (
+              <Text style={styles.inputLabel}>Approving cancels the visit: unclocked days are released and its tasks archived.</Text>
+            ) : (
             <View style={styles.changeRowsWrap}>
               {changeRows(visit).map(([label, from, to]) => (
                 <View key={label} style={styles.changeComparisonRow}>
@@ -604,6 +641,7 @@ export default function FieldVisitDetailScreen() {
                 </View>
               ))}
             </View>
+            )}
             {visit.canReviewChange && (
               <View style={styles.rowBtns}>
                 <TouchableOpacity
@@ -612,7 +650,7 @@ export default function FieldVisitDetailScreen() {
                   disabled={busy}
                   onPress={approveChange}
                 >
-                  <Text style={styles.solidBtnText}>Approve Change</Text>
+                  <Text style={styles.solidBtnText}>Approve</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.halfBtn, styles.rejectBtn]}
@@ -620,7 +658,7 @@ export default function FieldVisitDetailScreen() {
                   disabled={busy}
                   onPress={() => setSheet('rejectChange')}
                 >
-                  <Text style={styles.rejectBtnText}>Reject Change</Text>
+                  <Text style={styles.rejectBtnText}>Decline</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -779,6 +817,49 @@ export default function FieldVisitDetailScreen() {
             </TouchableOpacity>
           )}
 
+          {visit.canRequestPostpone && !postpone && (
+            <TouchableOpacity
+              style={styles.outlineActionBtn}
+              activeOpacity={0.8}
+              disabled={busy}
+              onPress={() => setPostpone({ startDate: visit.startDate.slice(0, 10), endDate: visit.endDate.slice(0, 10), reason: '' })}
+            >
+              <CalendarClock size={16} color="#334155" strokeWidth={2} />
+              <Text style={styles.outlineActionBtnText}>Postpone</Text>
+            </TouchableOpacity>
+          )}
+
+          {postpone && (
+            <View style={styles.editBoxCard}>
+              <Text style={styles.changeTitle}>Postpone to new dates</Text>
+              <View style={styles.rowBtns}>
+                <TouchableOpacity style={[styles.textInput, styles.flexInput]} onPress={() => setPostponePicker('startDate')}>
+                  <Text style={styles.pickerText}>From {dateLabel(postpone.startDate)}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.textInput, styles.flexInput]} onPress={() => setPostponePicker('endDate')}>
+                  <Text style={styles.pickerText}>To {dateLabel(postpone.endDate)}</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.inputLabel}>Reason *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={postpone.reason}
+                onChangeText={(v) => setPostpone({ ...postpone, reason: v })}
+                placeholder="Why is the visit being postponed?"
+                placeholderTextColor="#94A3B8"
+                multiline
+              />
+              <View style={styles.rowBtns}>
+                <TouchableOpacity style={[styles.halfBtn, styles.rejectBtn]} activeOpacity={0.8} onPress={() => setPostpone(null)}>
+                  <Text style={styles.rejectBtnText}>Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.halfBtn, styles.approveBtn]} activeOpacity={0.8} disabled={busy} onPress={sendPostpone}>
+                  <Text style={styles.solidBtnText}>Send for approval</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           {visit.canWithdraw && (
             <TouchableOpacity
               style={styles.outlineActionBtn}
@@ -800,6 +881,18 @@ export default function FieldVisitDetailScreen() {
             >
               <Trash2 size={16} color="#DC2626" strokeWidth={2} />
               <Text style={styles.dangerOutlineBtnText}>Cancel this visit</Text>
+            </TouchableOpacity>
+          )}
+
+          {!visit.canCancel && visit.canRequestCancel && (
+            <TouchableOpacity
+              style={[styles.outlineActionBtn, styles.dangerOutlineBtn]}
+              activeOpacity={0.8}
+              disabled={busy}
+              onPress={() => setSheet('requestCancel')}
+            >
+              <Ban size={16} color="#DC2626" strokeWidth={2} />
+              <Text style={styles.dangerOutlineBtnText}>Request cancellation</Text>
             </TouchableOpacity>
           )}
 
@@ -842,17 +935,33 @@ export default function FieldVisitDetailScreen() {
 
       <ReasonSheet
         visible={!!sheet}
-        title={sheet === 'reject' ? 'Reject this request' : sheet === 'cancel' ? 'Cancel this visit'
+        title={sheet === 'requestCancel' ? 'Request cancellation' : sheet === 'reject' ? 'Reject this request' : sheet === 'cancel' ? 'Cancel this visit'
           : sheet === 'rejectChange' ? 'Reject the change' : `Move to ${STATUS_TARGETS.find((t) => typeof sheet === 'object' && sheet && t.value === sheet.status)?.label ?? ''}`}
-        message={sheet === 'cancel' ? 'Everyone on it is told.' : sheet === 'reject' || sheet === 'rejectChange' ? 'The person who raised it sees this reason.' : undefined}
-        confirmLabel={sheet === 'reject' ? 'Reject' : sheet === 'cancel' ? 'Cancel visit' : sheet === 'rejectChange' ? 'Reject change' : 'Change status'}
+        message={sheet === 'requestCancel' ? 'An administrator approves this. The visit runs as planned until then.' : sheet === 'cancel' ? 'Everyone on it is told.' : sheet === 'reject' || sheet === 'rejectChange' ? 'The person who raised it sees this reason.' : undefined}
+        confirmLabel={sheet === 'requestCancel' ? 'Send for approval' : sheet === 'reject' ? 'Reject' : sheet === 'cancel' ? 'Cancel visit' : sheet === 'rejectChange' ? 'Reject change' : 'Change status'}
         danger
-        required={sheet === 'reject' || sheet === 'rejectChange'}
+        required={sheet === 'reject' || sheet === 'rejectChange' || sheet === 'requestCancel'}
         busy={busy}
         onSubmit={onReason}
         onClose={() => setSheet(null)}
       />
 
+      <DateTimePickerModal
+        isVisible={!!postponePicker}
+        mode="date"
+        date={postpone && postponePicker ? new Date(`${postpone[postponePicker]}T00:00:00`) : new Date()}
+        minimumDate={new Date(`${visit.startDate.slice(0, 10)}T00:00:00`)}
+        onConfirm={(d) => {
+          const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          if (postpone && postponePicker) {
+            const next = { ...postpone, [postponePicker]: day };
+            if (postponePicker === 'startDate' && next.endDate < day) next.endDate = day;
+            setPostpone(next);
+          }
+          setPostponePicker(null);
+        }}
+        onCancel={() => setPostponePicker(null)}
+      />
       <DateTimePickerModal
         isVisible={!!editPicker}
         mode={editPicker === 'startDate' || editPicker === 'endDate' ? 'date' : 'time'}

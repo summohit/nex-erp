@@ -74,6 +74,8 @@ export default function FieldVisitRequestForm() {
   const [tasks, setTasks] = useState<TaskLine[]>([]);
   const [newTask, setNewTask] = useState('');
   const [remarks, setRemarks] = useState('');
+  /** Required when asking to change an approved visit. */
+  const [changeReason, setChangeReason] = useState('');
   const [submitting, setSubmitting] = useState<'draft' | 'send' | null>(null);
   const [locating, setLocating] = useState(false);
   const [attachments, setAttachments] = useState<FvAttachment[]>([]);
@@ -246,6 +248,7 @@ export default function FieldVisitRequestForm() {
   const problems = useMemo(() => {
     const p: string[] = [];
     if (visitType === 'PROJECT' && !project) p.push('Pick the project');
+    if (mode === 'change' && !changeReason.trim()) p.push('Give a reason for the change');
     if (!site.name.trim()) p.push('Name the site');
     if (site.lat == null || site.lng == null) p.push('Pick a saved site or use your current location for the site pin');
     if (endDate < startDate) p.push('The end date is before the start date');
@@ -253,7 +256,7 @@ export default function FieldVisitRequestForm() {
     if (!people.length) p.push('Add who is going');
     if (!tasks.length) p.push('Add at least one task');
     return p;
-  }, [visitType, project, site, startDate, endDate, startTime, endTime, people, tasks]);
+  }, [visitType, project, site, startDate, endDate, startTime, endTime, people, tasks, mode, changeReason]);
 
   const save = async (send: boolean) => {
     if (problems.length) { Alert.alert('Almost there', problems.join('\n')); return; }
@@ -266,6 +269,7 @@ export default function FieldVisitRequestForm() {
       latitude: site.lat!, longitude: site.lng!,
       startDate, endDate, startTime, endTime,
       remarks: remarks.trim() || undefined,
+      ...(mode === 'change' ? { changeReason: changeReason.trim() } : {}),
       employeeIds: people.map((p) => p.id),
       tasks: tasks.map((t) => ({ issueId: t.issueId, name: t.name })),
       attachments,
@@ -710,6 +714,20 @@ export default function FieldVisitRequestForm() {
               </View>
               <Text style={styles.cardHeaderTitle}>REMARKS & ATTACHMENTS</Text>
             </View>
+
+            {mode === 'change' && (
+              <View style={styles.fieldBlock}>
+                <Text style={styles.fieldLabel}>Reason for the change *</Text>
+                <TextInput
+                  style={[styles.textInputBox, styles.textAreaBox]}
+                  placeholder="Why does this visit need to change? The approver sees this."
+                  placeholderTextColor="#94A3B8"
+                  value={changeReason}
+                  onChangeText={setChangeReason}
+                  multiline
+                />
+              </View>
+            )}
 
             <View style={styles.fieldBlock}>
               <Text style={styles.fieldLabel}>Remarks (Optional)</Text>

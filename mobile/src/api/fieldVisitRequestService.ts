@@ -85,6 +85,12 @@ export interface FieldVisitDetail extends FieldVisitRequest {
   canReview: boolean;
   canWithdraw: boolean;
   canRequestChange: boolean;
+  /** PM: ask to move the visit to new dates. */
+  canRequestPostpone?: boolean;
+  /** PM or anyone going: ask an admin to call it off. */
+  canRequestCancel?: boolean;
+  /** CHANGE, POSTPONE or CANCEL, when a request is waiting. */
+  pendingChangeKind?: 'CHANGE' | 'POSTPONE' | 'CANCEL' | null;
   canReviewChange: boolean;
   canCancel: boolean;
   canComplete: boolean;
@@ -114,6 +120,8 @@ export interface ProjectLite { id: number; name: string; key: string }
 export interface TaskOption { id: number; key: string; title: string; status?: string }
 
 export interface NewFieldVisit {
+  /** Why an approved visit is changed; required when requesting a change. */
+  changeReason?: string;
   visitType: 'PROJECT' | 'GENERAL';
   projectId?: number;
   location: string;
@@ -229,6 +237,14 @@ export const fieldVisitRequestService = {
   async changeStatus(id: number, status: string, reason?: string, overrideDayOff?: boolean) {
     const { data } = await apiClient.post(`/field-visit-requests/${id}/status`, { status, reason, overrideDayOff });
     return data;
+  },
+  /** Ask to move an approved visit to new dates; an admin approves. */
+  async requestPostpone(id: number, startDate: string, endDate: string, reason: string) {
+    await apiClient.post(`/field-visit-requests/${id}/request-postpone`, { startDate, endDate, reason });
+  },
+  /** Ask an admin to cancel an approved visit. */
+  async requestCancel(id: number, reason: string) {
+    await apiClient.post(`/field-visit-requests/${id}/request-cancel`, { reason });
   },
   async approveChange(id: number) {
     await apiClient.post(`/field-visit-requests/${id}/modification/approve`);
