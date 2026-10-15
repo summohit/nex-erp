@@ -235,6 +235,13 @@ export class AttendanceService {
     return this.http.get<any[]>(`${this.apiUrl}/team/timeline?start=${start}&end=${end}`);
   }
 
+  /** Roster rows (working and day off) for the grid's rest-day rule. */
+  getRosterDays(from: string, to: string): Observable<{ employeeId: number; date: string; isDayOff: boolean }[]> {
+    return this.http.get<{ employeeId: number; date: string; isDayOff: boolean }[]>(
+      `${this.apiUrl}/roster-days?from=${from}&to=${to}`,
+    );
+  }
+
   getAllEmployeesAttendance(filters: {
     month?: number; year?: number; employeeId?: number; departmentId?: number;
     status?: string; from?: string; to?: string; all?: boolean;

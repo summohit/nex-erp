@@ -194,6 +194,17 @@ export class AttendanceController {
     return this.attendanceService.getTodaySummary(req.user.companyId);
   }
 
+  /**
+   * Roster rows for everyone in a date range, so the attendance grid decides
+   * rest days the way payroll does (common/rest-day.ts): working as well as
+   * day-off rows, since a rostered Sunday shift is a working day.
+   */
+  @Get('roster-days')
+  @Permissions('attendance/all')
+  getRosterDays(@Request() req, @Query('from') from: string, @Query('to') to: string) {
+    return this.attendanceService.getRosterDays(req.user.companyId, from, to);
+  }
+
   @Get('all')
   @Permissions('attendance/all')
   getAllEmployeesAttendance(

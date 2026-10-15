@@ -17,7 +17,7 @@ import {
 } from '@lucide/angular';
 import { forkJoin, firstValueFrom } from 'rxjs';
 import { AttendanceService, AttendanceRecord } from '../../services/attendance';
-import { isWeeklyOff } from '../../shared/utils/weekly-offs';
+import { isRestDay } from '../../shared/utils/weekly-offs';
 import { MasterDataService, Department } from '../../services/master-data.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
 import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDatePreset } from '../../shared/components/attendance-filter-drawer/attendance-filter-drawer';
@@ -304,6 +304,7 @@ export class AllAttendanceComponent implements OnInit {
     this.periodVersion.update(v => v + 1);
     if (this.performersPeriod() === 'year') this.loadYear();
     this.isLoading.set(true);
+    this.loadRosterDays();
     this.attendanceService.getAllEmployeesAttendance({
       month: this.filterMonth,
       year: this.filterYear,
@@ -617,6 +618,23 @@ export class AllAttendanceComponent implements OnInit {
   }
 
   /** One employee's status for each of `days`, and whether each day counts. */
+  /** `employeeId_YYYY-MM-DD` → rostered day off (true) or working (false). */
+  rosterDays = signal<Map<string, boolean>>(new Map());
+
+  private loadRosterDays() {
+    const y = this.filterYear, m = this.filterMonth;
+    if (!y || !m) return;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const last = new Date(y, m, 0).getDate();
+    const from = this.filterStartDate() || `${y}-${pad(m)}-01`;
+    const to = this.filterEndDate() || `${y}-${pad(m)}-${pad(last)}`;
+    this.attendanceService.getRosterDays(from.slice(0, 10), to.slice(0, 10)).subscribe({
+      next: (rows) => this.rosterDays.set(new Map(rows.map((r) => [`${r.employeeId}_${r.date}`, r.isDayOff]))),
+      // Without it the grid falls back to shift and branch, as before.
+      error: () => this.rosterDays.set(new Map()),
+    });
+  }
+
   private buildDayCells(
     emp: any,
     days: { dayNumber: number; weekdayStr: string; date: Date; dateStr: string; isFuture: boolean }[],
@@ -628,6 +646,7 @@ export class AllAttendanceComponent implements OnInit {
       // day off: absences on Saturdays were invisible, and Saturdays worked
       // inflated the present tally without ever entering the denominator.
       const weeklyOffs = emp.branch?.weeklyOffs;
+      const roster = this.rosterDays();
 
       return days.map(day => {
         let countsPresent = false;
@@ -635,13 +654,10 @@ export class AllAttendanceComponent implements OnInit {
         const key = `${emp.id}_${day.dateStr}`;
         const record = recordMap.get(key);
         const holiday = holidays.find(h => this.getBackendDateString(h.date) === day.dateStr);
-        // An explicit standing-shift schedule is personal and therefore wins
-        // over the branch default. This keeps permanent Saturday/Sunday teams
-        // visible as working days without requiring weekly roster overrides.
-        const workingDays = String(emp.shift?.workingDays ?? '').trim();
-        const isDayOff = workingDays
-          ? !workingDays.split(',').map((value: string) => value.trim()).includes(this.dayName(day.date))
-          : isWeeklyOff(day.date, weeklyOffs);
+        // The payroll rule (15 Oct 2026): the roster row, else a shift that
+        // really leaves days out, else the branch. An all-week shift used to
+        // win here, so Sundays nobody worked showed as absences.
+        const isDayOff = isRestDay(day.date, roster.get(key), emp.shift?.workingDays, weeklyOffs);
         // Historic WEEKLY_OFF rows were generated using the branch default.
         // They must not keep Saturday/Sunday off after a person is moved to a
         // permanent weekend shift. An explicit roster entry still wins.

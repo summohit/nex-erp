@@ -60,6 +60,23 @@ export class AttendanceService {
     return { imported, skipped: rows.length - imported };
   }
 
+  /** Roster rows in a range, for the attendance grid's rest-day rule. */
+  async getRosterDays(companyId: number, from: string, to: string) {
+    const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    if (!isDay(from) || !isDay(to)) throw new BadRequestException('from and to must be dates (YYYY-MM-DD)');
+    const start = new Date(`${from}T00:00:00.000Z`);
+    const end = new Date(`${to}T00:00:00.000Z`);
+    if (end.getTime() - start.getTime() > 400 * 86400000) throw new BadRequestException('Ask for at most about a year at a time');
+    const rows = await this.prisma.shiftRosterEntry.findMany({
+      where: { companyId, date: { gte: start, lte: end } },
+      select: { employeeId: true, date: true, isDayOff: true, onsiteApprovalStatus: true },
+    });
+    // An unapproved on-site request decides nothing, as in isRestDay.
+    return rows
+      .filter((r) => r.isDayOff || r.onsiteApprovalStatus !== 'PENDING')
+      .map((r) => ({ employeeId: r.employeeId, date: r.date.toISOString().slice(0, 10), isDayOff: r.isDayOff }));
+  }
+
   /**
    * Credit a completed attendance day that falls on Sunday or the employee's
    * roster/branch day off. The unique attendanceId ledger row is the guard

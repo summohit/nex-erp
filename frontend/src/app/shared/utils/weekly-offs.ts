@@ -40,3 +40,23 @@ export function isWeeklyOff(date: Date, weeklyOffs?: string | null): boolean {
   }
   return false;
 }
+
+const REST_DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/**
+ * One person's rest day, the same rule as the server's common/rest-day.ts
+ * (payroll and comp-off): a roster row decides; without one, a shift that
+ * actually leaves days out; otherwise the branch weekly offs. Most shifts
+ * list all seven days, which says nothing about rest days.
+ */
+export function isRestDay(
+  date: Date,
+  rosterIsDayOff: boolean | undefined,
+  shiftWorkingDays: string | null | undefined,
+  branchWeeklyOffs: string | null | undefined,
+): boolean {
+  if (rosterIsDayOff !== undefined) return rosterIsDayOff;
+  const days = String(shiftWorkingDays ?? '').split(',').map((d) => d.trim()).filter(Boolean);
+  if (days.length && days.length < 7) return !days.includes(REST_DAY_NAMES[date.getDay()]);
+  return isWeeklyOff(date, branchWeeklyOffs);
+}
