@@ -11,6 +11,29 @@ export interface LeaveBalance {
   };
 }
 
+export interface CompOffCredit {
+  id: number;
+  date: string | null;
+  days: number;
+  reason: string;
+  creditedOn: string;
+  clockIn: string | null;
+  clockOut: string | null;
+  onsite: boolean;
+  project: string | null;
+  fieldVisit: { id: number; number: string; location: string; project: string | null } | null;
+}
+
+export interface CompOffPerson {
+  allocated: number;
+  used: number;
+  remaining: number;
+  earnedFromWork: number;
+  addedManually: number;
+  credits: CompOffCredit[];
+  used_leaves: { id: number; from: string; to: string; halfDay: boolean; reason?: string | null }[];
+}
+
 export interface LeaveRequest {
   id: number;
   leaveTypeId: number;
@@ -39,6 +62,18 @@ export const leaveService = {
     const params = year ? { year } : {};
     const response = await apiClient.get('/leaves/balances/me', { params });
     return response.data;
+  },
+
+  /** Every leave type, so the quota lists types with no balance as 0 (as the web does). */
+  getLeaveTypes: async (): Promise<{ id: number; name: string; isPaid?: boolean }[]> => {
+    const response = await apiClient.get('/master-data/leave-types');
+    return response.data || [];
+  },
+
+  /** Own comp-off history for a year: what each day was earned for and where it was used. */
+  getMyCompOffHistory: async (year: number): Promise<CompOffPerson | null> => {
+    const response = await apiClient.get('/attendance/comp-off/history', { params: { year, mine: 1 } });
+    return response.data?.employees?.[0] ?? null;
   },
 
   getMyRequests: async (): Promise<LeaveRequest[]> => {

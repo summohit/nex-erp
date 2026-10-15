@@ -35,7 +35,7 @@ import TimesheetTab from './tabs/TimesheetTab';
 import HolidaysTab from './tabs/HolidaysTab';
 import ExpensesTab from './tabs/ExpensesTab';
 
-export default function ESSScreen({ route }: any) {
+export default function ESSScreen({ route, navigation }: any) {
   const { balances, requests, isLoading, isSubmitting, fetchLeaveData, submitLeaveRequest, cancelLeaveRequest } = useLeaveStore();
   const [mainTab, setMainTab] = useState<'timesheets' | 'leaves' | 'holidays' | 'expenses'>((route?.params?.initialTab as any) || 'timesheets');
   const [activeTab, setActiveTab] = useState<'requests' | 'apply' | 'team'>('requests');
@@ -346,7 +346,9 @@ export default function ESSScreen({ route }: any) {
               {/* --- Leave Balances Section --- */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Leave Balances</Text>
-          <Text style={styles.sectionBadge}>{balances.length} Available</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('LeaveQuota')} activeOpacity={0.7}>
+            <Text style={styles.quotaLink}>Quota & comp-off ›</Text>
+          </TouchableOpacity>
         </View>
 
         <ScrollView 
@@ -780,6 +782,7 @@ export default function ESSScreen({ route }: any) {
 }
 
 const styles = StyleSheet.create({
+  quotaLink: { fontSize: 13, fontWeight: '700', color: '#1373e5' },
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
