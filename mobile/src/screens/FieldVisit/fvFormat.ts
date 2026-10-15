@@ -1,14 +1,21 @@
 /** Labels and formatting shared by the field visit screens, matching the web. */
 
-export const FV_STATUS: Record<string, { label: string; bg: string; fg: string }> = {
-  DRAFT: { label: 'Draft', bg: '#F1F5F9', fg: '#475569' },
-  PENDING_APPROVAL: { label: 'Waiting approval', bg: '#FEF3C7', fg: '#92400E' },
-  APPROVED: { label: 'Approved', bg: '#DCFCE7', fg: '#15803D' },
-  REJECTED: { label: 'Rejected', bg: '#FEE2E2', fg: '#B91C1C' },
-  CANCELLED: { label: 'Cancelled', bg: '#F1F5F9', fg: '#64748B' },
-  COMPLETED: { label: 'Completed', bg: '#E0E7FF', fg: '#3730A3' },
+export const FV_STATUS: Record<string, { label: string; bg: string; fg: string; border: string; dot: string }> = {
+  DRAFT: { label: 'Draft', bg: '#F8FAFC', fg: '#475569', border: '#E2E8F0', dot: '#94A3B8' },
+  PENDING_APPROVAL: { label: 'Waiting approval', bg: '#FFFBEB', fg: '#B45309', border: '#FDE68A', dot: '#F59E0B' },
+  APPROVED: { label: 'Approved', bg: '#F0FDF4', fg: '#15803D', border: '#BBF7D0', dot: '#22C55E' },
+  REJECTED: { label: 'Rejected', bg: '#FEF2F2', fg: '#B91C1C', border: '#FECACA', dot: '#EF4444' },
+  CANCELLED: { label: 'Cancelled', bg: '#F8FAFC', fg: '#64748B', border: '#E2E8F0', dot: '#94A3B8' },
+  COMPLETED: { label: 'Completed', bg: '#EEF2FF', fg: '#4338CA', border: '#C7D2FE', dot: '#6366F1' },
 };
 export const fvStatus = (s: string) => FV_STATUS[s] || FV_STATUS.DRAFT;
+
+export const initials = (p?: { firstName?: string | null; lastName?: string | null } | null) => {
+  if (!p) return 'FV';
+  const f = p.firstName ? p.firstName[0] : '';
+  const l = p.lastName ? p.lastName[0] : '';
+  return (f + l).toUpperCase() || (p.firstName ? p.firstName.slice(0, 2).toUpperCase() : 'FV');
+};
 
 /** Timeline actions, for an entry the server did not describe in words. */
 export const FV_ACTIVITY: Record<string, string> = {

@@ -4,6 +4,32 @@ import {
 } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import {
+  ArrowLeft,
+  MapPin,
+  Calendar,
+  Clock,
+  Users,
+  CheckSquare,
+  MessageSquare,
+  Paperclip,
+  ExternalLink,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  FolderKanban,
+  Navigation,
+  FileText,
+  SlidersHorizontal,
+  History,
+  Pencil,
+  RotateCcw,
+  Check,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+} from 'lucide-react-native';
 import AppScreen from '../../components/AppScreen';
 import {
   fieldVisitRequestService as fv, FieldVisitDetail, FvActivity, FvAttendance, FvApprovalEdits, ROSTER_DAY_OFF_CLASH,
@@ -11,17 +37,13 @@ import {
 import ReasonSheet from './ReasonSheet';
 import { theme } from '../../theme/theme';
 import {
-  fvStatus, FV_ACTIVITY, dateLabel, timeLabel, clockAt, whenLabel, range, who, metres, mapsUrl,
+  fvStatus, FV_ACTIVITY, dateLabel, timeLabel, clockAt, whenLabel, range, who, metres, mapsUrl, initials,
 } from './fvFormat';
 
 /**
  * One field visit, end to end — the mobile counterpart of the web's request
  * detail: who asked, who is going, the tasks, the site, each person's days with
  * how far from the site they clocked, and the history.
- *
- * Every action is shown only when the server says this person may take it (the
- * can* flags on GET /field-visit-requests/:id). The list screen used to offer
- * Withdraw and Cancel to everyone and let the server refuse.
  */
 export default function FieldVisitDetailScreen() {
   const navigation = useNavigation<any>();
@@ -187,193 +209,635 @@ export default function FieldVisitDetailScreen() {
   };
 
   const back = (
-    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow} accessibilityRole="button">
-      <Text style={styles.back}>‹ Field Visits</Text>
+    <TouchableOpacity
+      onPress={() => navigation.goBack()}
+      style={styles.backButton}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+    >
+      <ArrowLeft size={16} color="#0F172A" strokeWidth={2.4} />
+      <Text style={styles.backButtonText}>Field Visits</Text>
     </TouchableOpacity>
   );
 
   if (loading) {
-    return <AppScreen title="Field Visit">{back}<ActivityIndicator style={styles.loader} color={theme.colors.primary} /></AppScreen>;
+    return (
+      <AppScreen title="Field Visit">
+        {back}
+        <View style={styles.centerLoader}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.centerLoaderText}>Loading visit details…</Text>
+        </View>
+      </AppScreen>
+    );
   }
   if (!visit) {
-    return <AppScreen title="Field Visit">{back}<Text style={styles.empty}>{error}</Text></AppScreen>;
+    return (
+      <AppScreen title="Field Visit">
+        {back}
+        <View style={styles.errorBox}>
+          <AlertTriangle size={32} color="#DC2626" />
+          <Text style={styles.emptyTitle}>Could Not Load Visit</Text>
+          <Text style={styles.emptyText}>{error}</Text>
+        </View>
+      </AppScreen>
+    );
   }
 
   const s = fvStatus(visit.status);
-  // Administrators may move a request to another status (server changeStatus),
-  // including a finished one back to pending.
   const canMoveStatus = isApprover;
+  const radiusStr = metres(visit.geofenceRadiusM / 1000);
+
   return (
     <AppScreen title={visit.requestNumber} subtitle={visit.project?.isSystem ? 'General visit' : visit.project?.name}>
       <ScrollView
-        contentContainerStyle={styles.body}
+        contentContainerStyle={styles.scrollBody}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
+        {/* Back Link */}
         {back}
-        <View style={[styles.badge, { backgroundColor: s.bg }]}><Text style={[styles.badgeText, { color: s.fg }]}>{s.label}</Text></View>
 
-        <Text style={styles.site}>{visit.location}</Text>
-        <Text style={styles.link} onPress={() => Linking.openURL(mapsUrl(visit.latitude, visit.longitude))}>Open site in Maps</Text>
-        <Text style={styles.meta}>{range(visit)} · {visit.visitDays} day{visit.visitDays === 1 ? '' : 's'}</Text>
-        <Text style={styles.meta}>
-          {timeLabel(visit.startTime)} – {timeLabel(visit.endTime)} · clock in within {metres(visit.geofenceRadiusM / 1000)} of the site
-        </Text>
-        {!!visit.raisedBy && <Text style={styles.meta}>Raised by {who(visit.raisedBy)}</Text>}
-        {!!visit.reviewedBy && visit.reviewedAt && (
-          <Text style={styles.meta}>Reviewed by {who(visit.reviewedBy)} · {whenLabel(visit.reviewedAt)}</Text>
-        )}
-        {visit.status === 'REJECTED' && !!visit.rejectionReason && <Text style={styles.rejected}>Rejected: {visit.rejectionReason}</Text>}
-        {!!visit.pendingChange && <Text style={styles.notice}>A change to this visit is waiting for approval.</Text>}
-
-        <Text style={styles.section}>People ({visit.members.length})</Text>
-        {visit.members.map((m) => <Text key={m.id} style={styles.item}>• {who(m.employee)}</Text>)}
-
-        <Text style={styles.section}>Tasks ({visit.tasks.length})</Text>
-        {visit.tasks.map((t) => <Text key={t.id} style={styles.item}>• {t.issue ? `${t.issue.key} · ${t.issue.title}` : t.name}</Text>)}
-
-        {!!visit.remarks && (<><Text style={styles.section}>Remarks</Text><Text style={styles.item}>{visit.remarks}</Text></>)}
-
-        {(visit.attachments?.length ?? 0) > 0 && <Text style={styles.section}>Attachments ({visit.attachments!.length})</Text>}
-        {visit.attachments?.map((a, i) => (
-          <Text key={a.id ?? i} style={[styles.item, styles.linkItem]} numberOfLines={1} onPress={() => Linking.openURL(a.fileUrl)}>📎 {a.fileName}</Text>
-        ))}
-
-        {days.length > 0 && <Text style={styles.section}>Days on site</Text>}
-        {days.map(([day, rows]) => (
-          <View key={day} style={styles.dayCard}>
-            <Text style={styles.dayTitle}>{dateLabel(day)}{rows[0]?.isHoliday ? ' · holiday' : ''}</Text>
-            {rows.map((a) => (
-              <View key={a.id} style={styles.dayRow}>
-                <Text style={styles.dayWho}>{who(a.employee)}</Text>
-                <Text style={styles.dayWhat}>
-                  {a.clockInTime
-                    ? `In ${clockAt(a.clockInTime)}${a.clockInDistanceKm != null ? ` (${metres(a.clockInDistanceKm)})` : ''}`
-                      + (a.clockOutTime ? ` · Out ${clockAt(a.clockOutTime)}${a.clockOutDistanceKm != null ? ` (${metres(a.clockOutDistanceKm)})` : ''}` : ' · on site')
-                    : a.status.replace(/_/g, ' ').toLowerCase()}
+        {/* Hero Card: Request Number, Project, Status */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroHeaderRow}>
+            <View style={styles.badgeRow}>
+              <View style={styles.codeBadge}>
+                <Text style={styles.codeBadgeText}>{visit.requestNumber}</Text>
+              </View>
+              <View style={styles.projectTag}>
+                <FolderKanban size={12} color="#64748B" strokeWidth={2} />
+                <Text style={styles.projectTagText} numberOfLines={1}>
+                  {visit.project?.isSystem ? 'General visit' : visit.project?.name || 'General'}
                 </Text>
-                {!!a.issue && <Text style={styles.dayTask}>{a.issue.key} · {a.issue.title}</Text>}
+              </View>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border }]}>
+              <View style={[styles.statusDot, { backgroundColor: s.dot }]} />
+              <Text style={[styles.statusBadgeText, { color: s.fg }]}>{s.label}</Text>
+            </View>
+          </View>
+
+          {/* Pending change alert */}
+          {!!visit.pendingChange && (
+            <View style={styles.noticeBox}>
+              <Clock size={16} color="#D97706" strokeWidth={2.2} />
+              <Text style={styles.noticeText}>A change to this visit is waiting for approval.</Text>
+            </View>
+          )}
+
+          {/* Rejection Alert */}
+          {visit.status === 'REJECTED' && !!visit.rejectionReason && (
+            <View style={styles.rejectionNotice}>
+              <AlertTriangle size={16} color="#DC2626" strokeWidth={2.2} />
+              <Text style={styles.rejectionNoticeText}>Rejected: {visit.rejectionReason}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Location Card */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionCardHeader}>
+            <View style={styles.sectionIconWrap}>
+              <MapPin size={16} color="#0284C7" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.sectionLabel}>VISIT LOCATION</Text>
+          </View>
+          <Text style={styles.siteMainTitle}>{visit.location}</Text>
+          <View style={styles.geofenceChip}>
+            <Navigation size={13} color="#15803D" strokeWidth={2.2} />
+            <Text style={styles.geofenceChipText}>Target Geofence: within {radiusStr} of site</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.mapsOutlineBtn}
+            activeOpacity={0.7}
+            onPress={() => Linking.openURL(mapsUrl(visit.latitude, visit.longitude))}
+          >
+            <ExternalLink size={14} color="#1373e5" strokeWidth={2.2} />
+            <Text style={styles.mapsOutlineBtnText}>Open site in Google Maps</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Schedule & Timing Card */}
+        <View style={styles.sectionCard}>
+          <View style={styles.scheduleGrid}>
+            {/* Dates Col */}
+            <View style={styles.scheduleCol}>
+              <View style={styles.scheduleHeaderRow}>
+                <Calendar size={14} color="#64748B" strokeWidth={2} />
+                <Text style={styles.scheduleColLabel}>DATES & DURATION</Text>
+              </View>
+              <Text style={styles.scheduleColValue}>{range(visit)}</Text>
+              <Text style={styles.scheduleColSub}>
+                {visit.visitDays} day{visit.visitDays === 1 ? '' : 's'} on-site
+              </Text>
+            </View>
+
+            {/* Hours Col */}
+            <View style={styles.scheduleColDivider} />
+            <View style={styles.scheduleCol}>
+              <View style={styles.scheduleHeaderRow}>
+                <Clock size={14} color="#64748B" strokeWidth={2} />
+                <Text style={styles.scheduleColLabel}>SITE HOURS</Text>
+              </View>
+              <Text style={styles.scheduleColValue}>
+                {timeLabel(visit.startTime)} – {timeLabel(visit.endTime)}
+              </Text>
+              <Text style={styles.scheduleColSub}>Daily work window</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Audit & Ownership Card */}
+        <View style={styles.sectionCard}>
+          <View style={styles.auditRow}>
+            <View style={styles.auditAvatar}>
+              <Text style={styles.auditAvatarText}>{initials(visit.raisedBy)}</Text>
+            </View>
+            <View style={styles.auditInfoCol}>
+              <Text style={styles.auditRoleLabel}>RAISED BY</Text>
+              <Text style={styles.auditPersonName}>{who(visit.raisedBy) || 'Requester'}</Text>
+            </View>
+          </View>
+
+          {!!visit.reviewedBy && visit.reviewedAt && (
+            <View style={[styles.auditRow, styles.auditRowSecondary]}>
+              <View style={[styles.auditAvatar, { backgroundColor: '#ECFDF5' }]}>
+                <Text style={[styles.auditAvatarText, { color: '#15803D' }]}>{initials(visit.reviewedBy)}</Text>
+              </View>
+              <View style={styles.auditInfoCol}>
+                <View style={styles.verifiedRow}>
+                  <Text style={styles.auditRoleLabel}>REVIEWED BY</Text>
+                  <CheckCircle2 size={12} color="#16A34A" strokeWidth={2.4} />
+                </View>
+                <Text style={styles.auditPersonName}>
+                  {who(visit.reviewedBy)} <Text style={styles.auditTimestamp}>· {whenLabel(visit.reviewedAt)}</Text>
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Team Members Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderBar}>
+            <View style={styles.sectionHeaderLeft}>
+              <Users size={16} color="#1373e5" strokeWidth={2.2} />
+              <Text style={styles.sectionTitle}>People</Text>
+            </View>
+            <View style={styles.countBadgePill}>
+              <Text style={styles.countBadgePillText}>{visit.members.length}</Text>
+            </View>
+          </View>
+          <View style={styles.memberListWrap}>
+            {visit.members.map((m) => (
+              <View key={m.id} style={styles.memberItemCard}>
+                <View style={styles.memberAvatar}>
+                  <Text style={styles.memberAvatarText}>{initials(m.employee)}</Text>
+                </View>
+                <View style={styles.memberInfo}>
+                  <Text style={styles.memberName}>{who(m.employee)}</Text>
+                  <Text style={styles.memberRole}>Assigned Team Member</Text>
+                </View>
+                <View style={styles.assignedBadge}>
+                  <Text style={styles.assignedBadgeText}>Assigned</Text>
+                </View>
               </View>
             ))}
           </View>
-        ))}
+        </View>
 
-        {timeline.length > 0 && <Text style={styles.section}>History</Text>}
-        {timeline.map((t) => (
-          <View key={t.id} style={styles.tlRow}>
-            <View style={styles.tlDot} />
-            <View style={styles.tlText}>
-              <Text style={styles.tlWhat}>{t.detail || FV_ACTIVITY[t.action] || t.action}</Text>
-              <Text style={styles.tlMeta}>{t.actor ? `${who(t.actor)} · ` : ''}{whenLabel(t.createdAt)}</Text>
+        {/* Tasks Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderBar}>
+            <View style={styles.sectionHeaderLeft}>
+              <CheckSquare size={16} color="#7C3AED" strokeWidth={2.2} />
+              <Text style={styles.sectionTitle}>Tasks</Text>
+            </View>
+            <View style={[styles.countBadgePill, { backgroundColor: '#FAF5FF' }]}>
+              <Text style={[styles.countBadgePillText, { color: '#7E22CE' }]}>{visit.tasks.length}</Text>
             </View>
           </View>
-        ))}
-
-        {!!visit.pendingChange && (
-          <View style={styles.changeBox}>
-            <Text style={styles.changeTitle}>Proposed change</Text>
-            {changeRows(visit).map(([label, from, to]) => (
-              <Text key={label} style={styles.changeLine}>{label}: <Text style={styles.changeFrom}>{from}</Text> → <Text style={styles.changeTo}>{to}</Text></Text>
+          <View style={styles.taskListWrap}>
+            {visit.tasks.map((t) => (
+              <View key={t.id} style={styles.taskItemCard}>
+                <View style={styles.taskKeyRow}>
+                  <View style={styles.taskKeyPill}>
+                    <Text style={styles.taskKeyPillText}>#{t.issue ? t.issue.key : 'TASK'}</Text>
+                  </View>
+                  {t.issue?.status && (
+                    <View style={styles.taskStatusPill}>
+                      <Text style={styles.taskStatusPillText}>{t.issue.status}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.taskTitle}>{t.issue ? t.issue.title : t.name}</Text>
+              </View>
             ))}
+          </View>
+        </View>
+
+        {/* Remarks Section */}
+        {!!visit.remarks && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderBar}>
+              <View style={styles.sectionHeaderLeft}>
+                <MessageSquare size={16} color="#D97706" strokeWidth={2.2} />
+                <Text style={styles.sectionTitle}>Remarks</Text>
+              </View>
+            </View>
+            <View style={styles.remarksCard}>
+              <View style={styles.remarksBar} />
+              <Text style={styles.remarksText}>{visit.remarks}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Attachments Section */}
+        {(visit.attachments?.length ?? 0) > 0 && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderBar}>
+              <View style={styles.sectionHeaderLeft}>
+                <Paperclip size={16} color="#475569" strokeWidth={2.2} />
+                <Text style={styles.sectionTitle}>Attachments</Text>
+              </View>
+              <View style={styles.countBadgePill}>
+                <Text style={styles.countBadgePillText}>{visit.attachments!.length}</Text>
+              </View>
+            </View>
+            {visit.attachments?.map((a, i) => (
+              <TouchableOpacity
+                key={a.id ?? i}
+                style={styles.attachmentCard}
+                activeOpacity={0.7}
+                onPress={() => Linking.openURL(a.fileUrl)}
+              >
+                <View style={styles.attachmentIconWrap}>
+                  <FileText size={16} color="#1373e5" strokeWidth={2} />
+                </View>
+                <Text style={styles.attachmentName} numberOfLines={1}>
+                  {a.fileName}
+                </Text>
+                <ExternalLink size={14} color="#94A3B8" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Days on Site Attendance */}
+        {days.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderBar}>
+              <View style={styles.sectionHeaderLeft}>
+                <Calendar size={16} color="#0284C7" strokeWidth={2.2} />
+                <Text style={styles.sectionTitle}>Days on site</Text>
+              </View>
+              <View style={[styles.countBadgePill, { backgroundColor: '#F0F9FF' }]}>
+                <Text style={[styles.countBadgePillText, { color: '#0284C7' }]}>{days.length}</Text>
+              </View>
+            </View>
+            {days.map(([day, rows]) => (
+              <View key={day} style={styles.dayGroupCard}>
+                <View style={styles.dayGroupHeader}>
+                  <Text style={styles.dayGroupDateText}>{dateLabel(day)}</Text>
+                  {rows[0]?.isHoliday && (
+                    <View style={styles.holidayBadge}>
+                      <Text style={styles.holidayBadgeText}>🎉 Holiday</Text>
+                    </View>
+                  )}
+                </View>
+
+                {rows.map((a) => {
+                  const hasIn = !!a.clockInTime;
+                  const hasOut = !!a.clockOutTime;
+                  return (
+                    <View key={a.id} style={styles.attendanceMemberRow}>
+                      <View style={styles.attendanceAvatar}>
+                        <Text style={styles.attendanceAvatarText}>{initials(a.employee)}</Text>
+                      </View>
+                      <View style={styles.attendanceDetailsCol}>
+                        <View style={styles.attendanceTopLine}>
+                          <Text style={styles.attendanceMemberName}>{who(a.employee)}</Text>
+                          <View style={[styles.attendanceStatusTag, {
+                            backgroundColor: hasIn ? (hasOut ? '#F1F5F9' : '#DCFCE7') : '#F8FAFC',
+                            borderColor: hasIn ? (hasOut ? '#E2E8F0' : '#86EFAC') : '#E2E8F0',
+                          }]}>
+                            <Text style={[styles.attendanceStatusTagText, {
+                              color: hasIn ? (hasOut ? '#475569' : '#15803D') : '#64748B',
+                            }]}>
+                              {hasIn ? (hasOut ? 'Completed' : 'On Site') : a.status.replace(/_/g, ' ').toLowerCase()}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {hasIn && (
+                          <Text style={styles.attendanceClockLine}>
+                            In <Text style={styles.boldText}>{clockAt(a.clockInTime)}</Text>
+                            {a.clockInDistanceKm != null ? ` (${metres(a.clockInDistanceKm)})` : ''}
+                            {hasOut && (
+                              <Text> · Out <Text style={styles.boldText}>{clockAt(a.clockOutTime)}</Text>
+                                {a.clockOutDistanceKm != null ? ` (${metres(a.clockOutDistanceKm)})` : ''}
+                              </Text>
+                            )}
+                          </Text>
+                        )}
+
+                        {!!a.issue && (
+                          <View style={styles.attendanceTaskLine}>
+                            <Text style={styles.attendanceTaskText}>
+                              #{a.issue.key} · {a.issue.title}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* History / Timeline */}
+        {timeline.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderBar}>
+              <View style={styles.sectionHeaderLeft}>
+                <History size={16} color="#475569" strokeWidth={2.2} />
+                <Text style={styles.sectionTitle}>Activity History</Text>
+              </View>
+            </View>
+            <View style={styles.timelineCard}>
+              {timeline.map((t, idx) => (
+                <View key={t.id} style={styles.timelineRow}>
+                  <View style={styles.timelineVisualCol}>
+                    <View style={styles.timelineDot} />
+                    {idx < timeline.length - 1 && <View style={styles.timelineLine} />}
+                  </View>
+                  <View style={styles.timelineTextCol}>
+                    <Text style={styles.timelineWhatText}>{t.detail || FV_ACTIVITY[t.action] || t.action}</Text>
+                    <Text style={styles.timelineMetaText}>
+                      {t.actor ? `${who(t.actor)} · ` : ''}{whenLabel(t.createdAt)}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Proposed Change Section */}
+        {!!visit.pendingChange && (
+          <View style={styles.changeBoxCard}>
+            <View style={styles.changeBoxHeader}>
+              <AlertTriangle size={17} color="#D97706" strokeWidth={2.2} />
+              <Text style={styles.changeTitle}>Proposed Modification</Text>
+            </View>
+            <View style={styles.changeRowsWrap}>
+              {changeRows(visit).map(([label, from, to]) => (
+                <View key={label} style={styles.changeComparisonRow}>
+                  <Text style={styles.changeFieldLabel}>{label}</Text>
+                  <View style={styles.changeValuesRow}>
+                    <Text style={styles.changeFromValue}>{from}</Text>
+                    <Text style={styles.changeArrow}>→</Text>
+                    <Text style={styles.changeToValue}>{to}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
             {visit.canReviewChange && (
               <View style={styles.rowBtns}>
-                <TouchableOpacity style={[styles.halfBtn, styles.actionPrimary]} disabled={busy} onPress={approveChange}>
-                  <Text style={styles.solidText}>Approve change</Text>
+                <TouchableOpacity
+                  style={[styles.halfBtn, styles.approveBtn]}
+                  activeOpacity={0.8}
+                  disabled={busy}
+                  onPress={approveChange}
+                >
+                  <Text style={styles.solidBtnText}>Approve Change</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.halfBtn, styles.actionDanger]} disabled={busy} onPress={() => setSheet('rejectChange')}>
-                  <Text style={styles.actionDangerText}>Reject change</Text>
+                <TouchableOpacity
+                  style={[styles.halfBtn, styles.rejectBtn]}
+                  activeOpacity={0.8}
+                  disabled={busy}
+                  onPress={() => setSheet('rejectChange')}
+                >
+                  <Text style={styles.rejectBtnText}>Reject Change</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
         )}
 
-        {visit.canReview && !edit && (
-          <View style={styles.rowBtns}>
-            <TouchableOpacity style={[styles.halfBtn, styles.approveBtn]} disabled={busy} onPress={() => approve()}>
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.solidText}>Approve</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.halfBtn, styles.actionDanger]} disabled={busy} onPress={() => setSheet('reject')}>
-              <Text style={styles.actionDangerText}>Reject</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {visit.canReview && visit.canEdit && visit.status === 'PENDING_APPROVAL' && !edit && (
-          <TouchableOpacity style={[styles.action, styles.actionGhost]} disabled={busy} onPress={startEdit}>
-            <Text style={styles.actionGhostText}>Edit and approve (Super Admin)</Text>
-          </TouchableOpacity>
-        )}
+        {/* Super Admin Inline Edit Box */}
         {edit && (
-          <View style={styles.editBox}>
+          <View style={styles.editBoxCard}>
             <Text style={styles.changeTitle}>Correct, then approve</Text>
-            <Text style={styles.label}>Site name</Text>
-            <TextInput style={styles.field} value={edit.location} onChangeText={(v) => setEdit({ ...edit, location: v })} />
+            <Text style={styles.inputLabel}>Site name</Text>
+            <TextInput
+              style={styles.textInput}
+              value={edit.location}
+              onChangeText={(v) => setEdit({ ...edit, location: v })}
+            />
             <View style={styles.rowBtns}>
-              <TouchableOpacity style={[styles.field, styles.flex]} onPress={() => setEditPicker('startDate')}><Text style={styles.fieldText}>From {dateLabel(edit.startDate)}</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.field, styles.flex]} onPress={() => setEditPicker('endDate')}><Text style={styles.fieldText}>To {dateLabel(edit.endDate)}</Text></TouchableOpacity>
-            </View>
-            <View style={styles.rowBtns}>
-              <TouchableOpacity style={[styles.field, styles.flex]} onPress={() => setEditPicker('startTime')}><Text style={styles.fieldText}>In {timeLabel(edit.startTime)}</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.field, styles.flex]} onPress={() => setEditPicker('endTime')}><Text style={styles.fieldText}>Out {timeLabel(edit.endTime)}</Text></TouchableOpacity>
-            </View>
-            <Text style={styles.label}>Why it was changed *</Text>
-            <TextInput style={[styles.field, styles.area]} value={edit.reason} multiline placeholder="The person who raised it is told"
-              onChangeText={(v) => setEdit({ ...edit, reason: v })} />
-            <TouchableOpacity style={[styles.action, styles.approveBtn]} disabled={busy} onPress={approveEdited}>
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.solidText}>Approve with changes</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setEdit(null)}><Text style={styles.keep}>Discard changes</Text></TouchableOpacity>
-          </View>
-        )}
-
-        {visit.canComplete && (
-          <TouchableOpacity style={[styles.action, styles.actionGhost]} disabled={busy} onPress={markComplete}>
-            <Text style={styles.actionGhostText}>Mark complete</Text>
-          </TouchableOpacity>
-        )}
-
-        {visit.canSubmit && (
-          <TouchableOpacity style={[styles.action, styles.actionPrimary]} disabled={busy} onPress={sendForApproval}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.solidText}>Send for approval</Text>}
-          </TouchableOpacity>
-        )}
-        {visit.canEdit && visit.status === 'DRAFT' && (
-          <TouchableOpacity style={[styles.action, styles.actionGhost]} disabled={busy}
-            onPress={() => navigation.navigate('FieldVisitRequestForm', { mode: 'edit', id })}>
-            <Text style={styles.actionGhostText}>Edit draft</Text>
-          </TouchableOpacity>
-        )}
-        {visit.canRequestChange && (
-          <TouchableOpacity style={[styles.action, styles.actionGhost]} disabled={busy}
-            onPress={() => navigation.navigate('FieldVisitRequestForm', { mode: 'change', id })}>
-            <Text style={styles.actionGhostText}>Request a change</Text>
-          </TouchableOpacity>
-        )}
-        {visit.canWithdraw && (
-          <TouchableOpacity style={[styles.action, styles.actionGhost]} disabled={busy} onPress={withdraw}>
-            <Text style={styles.actionGhostText}>Withdraw to draft</Text>
-          </TouchableOpacity>
-        )}
-        {visit.canCancel && (
-          <TouchableOpacity style={[styles.action, styles.actionDanger]} disabled={busy} onPress={() => setSheet('cancel')}>
-            <Text style={styles.actionDangerText}>Cancel this visit</Text>
-          </TouchableOpacity>
-        )}
-
-        {canMoveStatus && (
-          <TouchableOpacity onPress={() => setStatusMenu((v) => !v)} disabled={busy}>
-            <Text style={styles.statusLink}>{statusMenu ? 'Hide status options' : 'Change status…'}</Text>
-          </TouchableOpacity>
-        )}
-        {statusMenu && (
-          <View style={styles.statusMenu}>
-            {STATUS_TARGETS.filter((t) => t.value !== visit.status).map((t) => (
-              <TouchableOpacity key={t.value} style={styles.statusOpt} disabled={busy}
-                onPress={() => (t.reason ? setSheet({ status: t.value }) : moveTo(t.value))}>
-                <Text style={styles.statusOptText}>Move to {t.label}</Text>
+              <TouchableOpacity
+                style={[styles.textInput, styles.flexInput]}
+                onPress={() => setEditPicker('startDate')}
+              >
+                <Text style={styles.pickerText}>From {dateLabel(edit.startDate)}</Text>
               </TouchableOpacity>
-            ))}
+              <TouchableOpacity
+                style={[styles.textInput, styles.flexInput]}
+                onPress={() => setEditPicker('endDate')}
+              >
+                <Text style={styles.pickerText}>To {dateLabel(edit.endDate)}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.rowBtns}>
+              <TouchableOpacity
+                style={[styles.textInput, styles.flexInput]}
+                onPress={() => setEditPicker('startTime')}
+              >
+                <Text style={styles.pickerText}>In {timeLabel(edit.startTime)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.textInput, styles.flexInput]}
+                onPress={() => setEditPicker('endTime')}
+              >
+                <Text style={styles.pickerText}>Out {timeLabel(edit.endTime)}</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.inputLabel}>Why it was changed *</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              value={edit.reason}
+              multiline
+              placeholder="The person who raised it is told"
+              onChangeText={(v) => setEdit({ ...edit, reason: v })}
+            />
+            <TouchableOpacity
+              style={[styles.primaryActionBtn, styles.approveBtn]}
+              activeOpacity={0.85}
+              disabled={busy}
+              onPress={approveEdited}
+            >
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.solidBtnText}>Approve with changes</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setEdit(null)} style={styles.discardBtn}>
+              <Text style={styles.discardBtnText}>Discard changes</Text>
+            </TouchableOpacity>
           </View>
         )}
+
+        {/* Action Controls Section */}
+        <View style={styles.actionsContainer}>
+          {visit.canReview && !edit && (
+            <View style={styles.rowBtns}>
+              <TouchableOpacity
+                style={[styles.halfBtn, styles.approveBtn]}
+                activeOpacity={0.85}
+                disabled={busy}
+                onPress={() => approve()}
+              >
+                {busy ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <View style={styles.btnContentRow}>
+                    <Check size={18} color="#FFFFFF" strokeWidth={2.6} />
+                    <Text style={styles.solidBtnText}>Approve</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.halfBtn, styles.rejectBtn]}
+                activeOpacity={0.85}
+                disabled={busy}
+                onPress={() => setSheet('reject')}
+              >
+                <View style={styles.btnContentRow}>
+                  <X size={18} color="#DC2626" strokeWidth={2.4} />
+                  <Text style={styles.rejectBtnText}>Reject</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {visit.canReview && visit.canEdit && visit.status === 'PENDING_APPROVAL' && !edit && (
+            <TouchableOpacity
+              style={styles.outlineActionBtn}
+              activeOpacity={0.8}
+              disabled={busy}
+              onPress={startEdit}
+            >
+              <Pencil size={16} color="#334155" strokeWidth={2} />
+              <Text style={styles.outlineActionBtnText}>Edit and approve (Super Admin)</Text>
+            </TouchableOpacity>
+          )}
+
+          {visit.canComplete && (
+            <TouchableOpacity
+              style={[styles.primaryActionBtn, styles.approveBtn]}
+              activeOpacity={0.85}
+              disabled={busy}
+              onPress={markComplete}
+            >
+              <CheckCircle2 size={18} color="#FFFFFF" strokeWidth={2.4} />
+              <Text style={styles.solidBtnText}>Mark visit complete</Text>
+            </TouchableOpacity>
+          )}
+
+          {visit.canSubmit && (
+            <TouchableOpacity
+              style={styles.primaryActionBtn}
+              activeOpacity={0.85}
+              disabled={busy}
+              onPress={sendForApproval}
+            >
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.solidBtnText}>Send for approval</Text>}
+            </TouchableOpacity>
+          )}
+
+          {visit.canEdit && visit.status === 'DRAFT' && (
+            <TouchableOpacity
+              style={styles.outlineActionBtn}
+              activeOpacity={0.8}
+              disabled={busy}
+              onPress={() => navigation.navigate('FieldVisitRequestForm', { mode: 'edit', id })}
+            >
+              <Pencil size={16} color="#334155" strokeWidth={2} />
+              <Text style={styles.outlineActionBtnText}>Edit draft</Text>
+            </TouchableOpacity>
+          )}
+
+          {visit.canRequestChange && (
+            <TouchableOpacity
+              style={styles.outlineActionBtn}
+              activeOpacity={0.8}
+              disabled={busy}
+              onPress={() => navigation.navigate('FieldVisitRequestForm', { mode: 'change', id })}
+            >
+              <Pencil size={16} color="#334155" strokeWidth={2} />
+              <Text style={styles.outlineActionBtnText}>Request a change</Text>
+            </TouchableOpacity>
+          )}
+
+          {visit.canWithdraw && (
+            <TouchableOpacity
+              style={styles.outlineActionBtn}
+              activeOpacity={0.8}
+              disabled={busy}
+              onPress={withdraw}
+            >
+              <RotateCcw size={16} color="#334155" strokeWidth={2} />
+              <Text style={styles.outlineActionBtnText}>Withdraw to draft</Text>
+            </TouchableOpacity>
+          )}
+
+          {visit.canCancel && (
+            <TouchableOpacity
+              style={[styles.outlineActionBtn, styles.dangerOutlineBtn]}
+              activeOpacity={0.8}
+              disabled={busy}
+              onPress={() => setSheet('cancel')}
+            >
+              <Trash2 size={16} color="#DC2626" strokeWidth={2} />
+              <Text style={styles.dangerOutlineBtnText}>Cancel this visit</Text>
+            </TouchableOpacity>
+          )}
+
+          {canMoveStatus && (
+            <TouchableOpacity
+              style={styles.statusToggleBtn}
+              activeOpacity={0.7}
+              onPress={() => setStatusMenu((v) => !v)}
+              disabled={busy}
+            >
+              <SlidersHorizontal size={15} color="#1373e5" strokeWidth={2} />
+              <Text style={styles.statusToggleText}>
+                {statusMenu ? 'Hide status controls' : 'Change status (Admin)'}
+              </Text>
+              {statusMenu ? (
+                <ChevronUp size={15} color="#1373e5" />
+              ) : (
+                <ChevronDown size={15} color="#1373e5" />
+              )}
+            </TouchableOpacity>
+          )}
+
+          {statusMenu && (
+            <View style={styles.statusMenuCard}>
+              {STATUS_TARGETS.filter((t) => t.value !== visit.status).map((t) => (
+                <TouchableOpacity
+                  key={t.value}
+                  style={styles.statusMenuItem}
+                  activeOpacity={0.75}
+                  disabled={busy}
+                  onPress={() => (t.reason ? setSheet({ status: t.value }) : moveTo(t.value))}
+                >
+                  <Text style={styles.statusMenuItemText}>Move status to {t.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
       </ScrollView>
 
       <ReasonSheet
@@ -425,76 +889,851 @@ const STATUS_TARGETS: { value: string; label: string; reason: boolean }[] = [
 function changeRows(v: FieldVisitDetail): [string, string, string][] {
   const c = v.pendingChange || {};
   const rows: [string, string, string][] = [];
-  if (c.location && c.location !== v.location) rows.push(['Site', v.location, c.location]);
+  if (c.location && c.location !== v.location) rows.push(['Site Location', v.location, c.location]);
   const from = range(v);
   const to = c.startDate && c.endDate ? range({ startDate: c.startDate, endDate: c.endDate }) : from;
-  if (to !== from) rows.push(['Dates', from, to]);
+  if (to !== from) rows.push(['Visit Dates', from, to]);
   const hours = `${timeLabel(v.startTime)} – ${timeLabel(v.endTime)}`;
   const newHours = `${timeLabel(c.startTime ?? v.startTime)} – ${timeLabel(c.endTime ?? v.endTime)}`;
-  if (newHours !== hours) rows.push(['Hours', hours, newHours]);
+  if (newHours !== hours) rows.push(['Site Hours', hours, newHours]);
   if (Array.isArray(c.employeeIds)) {
     const now = v.members.map((m) => m.employee.id).sort().join(',');
-    if ([...c.employeeIds].sort().join(',') !== now) rows.push(['People', String(v.members.length), String(c.employeeIds.length)]);
+    if ([...c.employeeIds].sort().join(',') !== now) rows.push(['People Count', `${v.members.length} members`, `${c.employeeIds.length} members`]);
   }
-  if (Array.isArray(c.tasks) && c.tasks.length !== v.tasks.length) rows.push(['Tasks', String(v.tasks.length), String(c.tasks.length)]);
+  if (Array.isArray(c.tasks) && c.tasks.length !== v.tasks.length) rows.push(['Tasks Count', `${v.tasks.length} tasks`, `${c.tasks.length} tasks`]);
   if (!rows.length) rows.push(['Details', 'as approved', 'see the request']);
   return rows;
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 16, paddingBottom: 120 },
-  loader: { marginTop: 40 },
-  empty: { textAlign: 'center', color: theme.colors.textSecondary, marginTop: 40, paddingHorizontal: 24 },
-  backRow: { paddingVertical: 6, marginBottom: 6 },
-  back: { color: theme.colors.primary, fontWeight: '700', fontSize: 14 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, alignSelf: 'flex-start' },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  site: { fontSize: 18, fontWeight: '800', color: theme.colors.textPrimary, marginTop: 8 },
-  link: { color: theme.colors.primary, fontWeight: '600', marginTop: 6 },
-  meta: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 4 },
-  rejected: { marginTop: 8, fontSize: 13, color: '#B91C1C' },
-  notice: { marginTop: 8, fontSize: 13, color: '#92400E', backgroundColor: '#FEF3C7', padding: 8, borderRadius: 8 },
-  section: { marginTop: 20, fontSize: 12.5, fontWeight: '700', color: theme.colors.textSecondary, textTransform: 'uppercase' },
-  item: { fontSize: 14, color: theme.colors.textPrimary, marginTop: 5 },
-  dayCard: { marginTop: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: '#fff' },
-  dayTitle: { fontWeight: '700', color: theme.colors.textPrimary, marginBottom: 4 },
-  dayRow: { marginTop: 6 },
-  dayWho: { fontSize: 13.5, fontWeight: '600', color: theme.colors.textPrimary },
-  dayWhat: { fontSize: 12.5, color: theme.colors.textSecondary, marginTop: 1 },
-  dayTask: { fontSize: 12, color: theme.colors.textMuted, marginTop: 1 },
-  tlRow: { flexDirection: 'row', marginTop: 10, gap: 10 },
-  tlDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.primary, marginTop: 6 },
-  tlText: { flex: 1 },
-  tlWhat: { fontSize: 13.5, color: theme.colors.textPrimary },
-  tlMeta: { fontSize: 12, color: theme.colors.textMuted, marginTop: 2 },
-  label: { fontSize: 12.5, fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 6 },
-  action: { marginTop: 20, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  actionGhost: { backgroundColor: '#F1F5F9' },
-  actionPrimary: { backgroundColor: theme.colors.primary },
-  approveBtn: { backgroundColor: '#16A34A' },
-  rowBtns: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  halfBtn: { flex: 1, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  flex: { flex: 1 },
-  changeBox: { marginTop: 18, padding: 12, borderRadius: 12, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A' },
-  changeTitle: { fontWeight: '800', color: theme.colors.textPrimary, marginBottom: 6 },
-  changeLine: { fontSize: 13, color: theme.colors.textPrimary, marginTop: 3 },
-  changeFrom: { color: theme.colors.textMuted, textDecorationLine: 'line-through' },
-  changeTo: { fontWeight: '700' },
-  editBox: { marginTop: 18, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: '#F8FAFC' },
-  field: { minHeight: 44, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 12, justifyContent: 'center', backgroundColor: '#fff', color: theme.colors.textPrimary },
-  fieldText: { color: theme.colors.textPrimary },
-  area: { minHeight: 70, paddingTop: 10, textAlignVertical: 'top' },
-  statusLink: { textAlign: 'center', color: theme.colors.primary, fontWeight: '700', marginTop: 18 },
-  statusMenu: { marginTop: 8, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
-  statusOpt: { paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', backgroundColor: '#fff' },
-  statusOptText: { color: theme.colors.textPrimary, fontWeight: '600' },
-  linkItem: { color: theme.colors.primary },
-  actionGhostText: { fontWeight: '700', color: '#334155' },
-  actionDanger: { borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
-  actionDangerText: { fontWeight: '700', color: '#DC2626' },
-  actionDangerSolid: { backgroundColor: '#DC2626' },
-  solidText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  disabled: { opacity: 0.5 },
-  keep: { textAlign: 'center', color: theme.colors.textSecondary, marginTop: 12, fontWeight: '600' },
-  input: { minHeight: 70, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 10, textAlignVertical: 'top', color: theme.colors.textPrimary },
+  scrollBody: {
+    padding: 16,
+    paddingBottom: 140,
+    gap: 14,
+  },
+  centerLoader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 60,
+    gap: 12,
+  },
+  centerLoaderText: {
+    color: '#64748B',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  errorBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  emptyText: {
+    fontSize: 13.5,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  backButtonText: {
+    color: '#0F172A',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  heroCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    gap: 10,
+  },
+  heroHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  codeBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  codeBadgeText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#4338CA',
+    letterSpacing: 0.2,
+  },
+  projectTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4.5,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 7.5,
+    paddingVertical: 3.5,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    maxWidth: '55%',
+  },
+  projectTagText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5.5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  statusDot: {
+    width: 6.5,
+    height: 6.5,
+    borderRadius: 3.25,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  noticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    padding: 10,
+    borderRadius: 10,
+  },
+  noticeText: {
+    fontSize: 12.5,
+    color: '#92400E',
+    fontWeight: '600',
+    flex: 1,
+  },
+  rejectionNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    padding: 10,
+  },
+  rejectionNoticeText: {
+    fontSize: 13,
+    color: '#991B1B',
+    fontWeight: '600',
+    flex: 1,
+  },
+  sectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    gap: 8,
+  },
+  sectionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  sectionIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    backgroundColor: '#F0F9FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionLabel: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  siteMainTitle: {
+    fontSize: 16.5,
+    fontWeight: '700',
+    color: '#0F172A',
+    lineHeight: 23,
+    marginTop: 2,
+  },
+  geofenceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    paddingHorizontal: 8,
+    paddingVertical: 4.5,
+    borderRadius: 7,
+    marginTop: 2,
+  },
+  geofenceChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#15803D',
+  },
+  mapsOutlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  mapsOutlineBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1373e5',
+  },
+  scheduleGrid: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  scheduleCol: {
+    flex: 1,
+    gap: 4,
+  },
+  scheduleColDivider: {
+    width: 1,
+    backgroundColor: '#F1F5F9',
+    alignSelf: 'stretch',
+    marginHorizontal: 14,
+  },
+  scheduleHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 2,
+  },
+  scheduleColLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.4,
+  },
+  scheduleColValue: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  scheduleColSub: {
+    fontSize: 11.5,
+    color: '#64748B',
+  },
+  auditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+  },
+  auditRowSecondary: {
+    paddingTop: 10,
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  auditAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  auditAvatarText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#4338CA',
+  },
+  auditInfoCol: {
+    flex: 1,
+  },
+  auditRoleLabel: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 0.4,
+  },
+  auditPersonName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 1,
+  },
+  verifiedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  auditTimestamp: {
+    fontWeight: '400',
+    color: '#64748B',
+    fontSize: 12.5,
+  },
+  sectionContainer: {
+    gap: 8,
+  },
+  sectionHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1E293B',
+    letterSpacing: -0.1,
+  },
+  countBadgePill: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  countBadgePillText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#1373e5',
+  },
+  memberListWrap: {
+    gap: 8,
+  },
+  memberItemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  memberAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatarText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1373e5',
+  },
+  memberInfo: {
+    flex: 1,
+  },
+  memberName: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  memberRole: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  assignedBadge: {
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  assignedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  taskListWrap: {
+    gap: 8,
+  },
+  taskItemCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 5,
+  },
+  taskKeyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  taskKeyPill: {
+    backgroundColor: '#FAF5FF',
+    paddingHorizontal: 7.5,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  taskKeyPillText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#7E22CE',
+  },
+  taskStatusPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6.5,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  taskStatusPillText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  taskTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+    lineHeight: 19,
+  },
+  remarksCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  remarksBar: {
+    width: 4,
+    backgroundColor: '#F59E0B',
+  },
+  remarksText: {
+    flex: 1,
+    fontSize: 13.5,
+    color: '#78350F',
+    lineHeight: 20,
+    padding: 12,
+  },
+  attachmentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  attachmentIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentName: {
+    flex: 1,
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#1373e5',
+  },
+  dayGroupCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 8,
+    gap: 10,
+  },
+  dayGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  dayGroupDateText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  holidayBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  holidayBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  attendanceMemberRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  attendanceAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  attendanceAvatarText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  attendanceDetailsCol: {
+    flex: 1,
+  },
+  attendanceTopLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  attendanceMemberName: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  attendanceStatusTag: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  attendanceStatusTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  attendanceClockLine: {
+    fontSize: 12.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  boldText: {
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  attendanceTaskLine: {
+    marginTop: 3,
+  },
+  attendanceTaskText: {
+    fontSize: 11.5,
+    color: '#7C3AED',
+    fontWeight: '600',
+  },
+  timelineCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  timelineVisualCol: {
+    alignItems: 'center',
+    width: 16,
+  },
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#1373e5',
+    marginTop: 5,
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 4,
+  },
+  timelineTextCol: {
+    flex: 1,
+    paddingBottom: 14,
+  },
+  timelineWhatText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  timelineMetaText: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  changeBoxCard: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+  },
+  changeBoxHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  changeTitle: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  changeRowsWrap: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+  },
+  changeComparisonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  changeFieldLabel: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  changeValuesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  changeFromValue: {
+    fontSize: 12.5,
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+  },
+  changeArrow: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  changeToValue: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  editBoxCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginTop: 4,
+  },
+  textInput: {
+    minHeight: 44,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    fontSize: 13.5,
+    color: '#0F172A',
+  },
+  pickerText: {
+    fontSize: 13,
+    color: '#0F172A',
+    fontWeight: '500',
+  },
+  flexInput: {
+    flex: 1,
+  },
+  textArea: {
+    minHeight: 70,
+    paddingTop: 10,
+    textAlignVertical: 'top',
+  },
+  discardBtn: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  discardBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  actionsContainer: {
+    gap: 10,
+    marginTop: 6,
+  },
+  rowBtns: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  halfBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  approveBtn: {
+    backgroundColor: '#16A34A',
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  rejectBtn: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  solidBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14.5,
+  },
+  rejectBtnText: {
+    color: '#DC2626',
+    fontWeight: '700',
+    fontSize: 14.5,
+  },
+  primaryActionBtn: {
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#1373e5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 7,
+    shadowColor: '#1373e5',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  outlineActionBtn: {
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  outlineActionBtnText: {
+    color: '#334155',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  dangerOutlineBtn: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  dangerOutlineBtnText: {
+    color: '#DC2626',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  statusToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  statusToggleText: {
+    color: '#1373e5',
+    fontWeight: '700',
+    fontSize: 13.5,
+  },
+  statusMenuCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  statusMenuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  statusMenuItemText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
 });
