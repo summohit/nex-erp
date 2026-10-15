@@ -196,7 +196,7 @@
             <div class="fv-empty-icon-wrap">
               <svg lucideCar size="24"></svg>
             </div>
-            <h5>No vehicle rates configured</h5>
+            <h5>No vehicles added</h5>
             <p>Add the vehicles people can pick when they start a journey. Own vehicles are paid by salary grade; metro, bus and cab at the fare.</p>
             
             <div class="fv-quick-add-group">
@@ -269,7 +269,7 @@
                   class="fv-remove-btn" 
                   (click)="removeTravelRate(i)" 
                   title="Remove {{ r.vehicle || 'vehicle' }} rate"
-                  aria-label="Remove vehicle rate"
+                  aria-label="Remove vehicle"
                 >
                   <svg lucideTrash2 size="16"></svg>
                 </button>
@@ -353,7 +353,7 @@
           <div class="fv-banner-content">
             <h5 *ngIf="!travelRates.length">Rates Required for Automated Claim Generation</h5>
             <p *ngIf="!travelRates.length">
-              Completed Delhi NCR field visits will pause automated allowance calculation until at least one vehicle rate is configured and saved above.
+              Completed Delhi NCR field visits wait until at least one vehicle is added and saved above.
             </p>
             <h5 *ngIf="travelRates.length">How Distance &amp; Claims are Processed</h5>
             <p *ngIf="travelRates.length">
