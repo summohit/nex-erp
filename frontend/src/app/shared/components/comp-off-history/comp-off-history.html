@@ -6,12 +6,8 @@
         <div class="coh-head-icon" aria-hidden="true">
           <svg lucideCalendarClock size="22"></svg>
         </div>
-        <div>
-          <div class="coh-head-title-row">
-            <h3>{{ allEmployees ? 'Comp-off History' : 'My Comp-off History' }}</h3>
-            <span class="coh-head-badge" *ngIf="allEmployees">All Employees</span>
-          </div>
-          <p>Which day each compensatory off was earned for, why, and where it was used.</p>
+        <div class="coh-head-title-row">
+          <h3>{{ allEmployees ? 'Comp-off History' : 'My Comp-off History' }}</h3>
         </div>
       </div>
 
@@ -148,6 +144,7 @@
           class="coh-reset-btn"
           (click)="resetFilters()"
         >
+          <svg lucideRotateCcw size="13.5"></svg>
           Reset Filters
         </button>
       </div>
