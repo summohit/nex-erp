@@ -249,6 +249,14 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   '/settings/security': { screen: 'Security' },
   '/attendance/holidays': { screen: 'Attendance', params: { initialTab: 'holidays' } },
   '/payroll/expenses': { screen: 'Attendance', params: { initialTab: 'expenses' } },
+  // Web routes whose mobile screen already exists. Without these the server's
+  // menu rows were dropped as "web only", hiding Field Visits from everyone.
+  '/field-visits/requests': { screen: 'FieldVisit' },
+  '/tasks': { screen: 'MyTasks' },
+  '/timesheets': { screen: 'WeeklyTimesheet' },
+  '/notices': { screen: 'Notices' },
+  '/task-requests': { screen: 'Approvals' },
+  '/attendance/approvals': { screen: 'Approvals' },
   '/m/my-tasks': { screen: 'MyTasks' },
   '/m/weekly-timesheet': { screen: 'WeeklyTimesheet' },
   '/m/my-shift': { screen: 'MyShift' },
@@ -291,10 +299,7 @@ const ALWAYS_ON_ITEMS: { group: string; id: string; title: string; icon: string;
   { group: 'WORKSPACE', id: 'notifications', title: 'Notifications', icon: 'bell', route: '/notifications' },
   // Mobile-only screens with no web menu row: without these they were only in
   // the offline fallback list, so nobody could reach Team Leave or Approvals.
-  { group: 'WORKSPACE', id: 'm-my-tasks', title: 'My Tasks', icon: 'check-square', route: '/m/my-tasks' },
-  { group: 'WORKSPACE', id: 'm-timesheet', title: 'Timesheet', icon: 'timer', route: '/m/weekly-timesheet' },
   { group: 'WORKSPACE', id: 'm-my-shift', title: 'My Shift', icon: 'clock', route: '/m/my-shift' },
-  { group: 'WORKSPACE', id: 'm-notices', title: 'Notice Board', icon: 'megaphone', route: '/m/notices' },
   { group: 'MY TEAM', id: 'm-approvals', title: 'Approvals', icon: 'user-check', route: '/m/approvals' },
   { group: 'MY TEAM', id: 'm-team-attendance', title: 'Team Attendance', icon: 'calendar-days', route: '/m/team-attendance' },
   { group: 'FINANCE', id: 'payslips', title: 'Payslips', icon: 'file-text', route: '/payroll/payslips' },
