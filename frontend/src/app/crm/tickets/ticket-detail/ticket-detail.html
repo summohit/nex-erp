@@ -347,6 +347,20 @@
             <ng-container *ngIf="item.isComment">
               <div *ngIf="editingCommentId !== item.id" class="comment-body-text rich-text"
                    [innerHTML]="commentHtml(item.body)"></div>
+              <div class="comment-attachments" *ngIf="commentAttachments(item.body).length">
+                <a *ngFor="let attachment of commentAttachments(item.body)"
+                   class="comment-attachment-icon"
+                   [href]="attachment.url"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   [title]="attachment.name + ' (open attachment)'"
+                   [attr.aria-label]="'Open attachment: ' + attachment.name">
+                  <svg lucidePaperclip [size]="16" aria-hidden="true"></svg>
+                </a>
+                <span class="comment-attachment-count" [attr.aria-label]="commentAttachments(item.body).length + ' attachments'">
+                  {{ commentAttachments(item.body).length }}
+                </span>
+              </div>
               <div *ngIf="editingCommentId === item.id" class="inline-edit-box">
                 <quill-editor class="comment-quill" [(ngModel)]="editCommentBody"
                               [modules]="commentQuillModules" [styles]="{ 'min-height': '70px' }"></quill-editor>

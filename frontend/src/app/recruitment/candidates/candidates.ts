@@ -1421,42 +1421,16 @@ export class CandidatesComponent implements OnInit {
 
     this.isSavingLetterDraft.set(true);
     this.candidatesService.saveOfferLetterDraft(appId, this.letterDraftBody).subscribe({
-      next: () => {
+      next: (result) => {
         this.letterDraftCustomised.set(true);
         this.showLetterEditor.set(false);
-        this.regenerateAfterLetterEdit(appId);
-      },
-      error: (err) => {
-        this.isSavingLetterDraft.set(false);
-        this.toast.error(err.error?.message || 'Could not save the offer letter');
-      },
-    });
-  }
-
-  /**
-   * Rebuild the PDF from the text just saved.
-   *
-   * Separate from generateOfferLetter() because that one re-asks the
-   * already-sent question this flow has asked already, and because a failure
-   * here must not read as a failed save: the text is safely stored either way,
-   * and the recruiter only needs to know the document did not rebuild.
-   */
-  private regenerateAfterLetterEdit(appId: number) {
-    this.isGeneratingOfferLetter.set(true);
-    this.candidatesService.generateOfferLetter(appId).subscribe({
-      next: (letter) => {
-        this.offerLetter.set(letter);
-        this.isGeneratingOfferLetter.set(false);
+        this.offerLetter.set(result.letter);
         this.isSavingLetterDraft.set(false);
         this.toast.success('Letter saved and regenerated');
       },
       error: (err) => {
-        this.isGeneratingOfferLetter.set(false);
         this.isSavingLetterDraft.set(false);
-        this.toast.error(
-          err?.error?.message
-            || 'Letter text saved, but the document could not be rebuilt — use Regenerate Letter.',
-        );
+        this.toast.error(err.error?.message || 'Could not save the offer letter');
       },
     });
   }

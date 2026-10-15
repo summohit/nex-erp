@@ -683,7 +683,11 @@ export class OfferLettersService {
     };
   }
 
-  /** Store the letter text for this candidate alone. */
+  /**
+   * Store the letter text for this candidate and rebuild its envelope in the
+   * same server request. A signing link must not point at the prior document
+   * revision after the recruiter has been told the edit was saved.
+   */
   async saveDraft(applicationId: number, companyId: number, body: string) {
     const application = await this.prisma.jobApplication.findFirst({
       where: { id: applicationId, companyId },
@@ -704,7 +708,11 @@ export class OfferLettersService {
       where: { id: applicationId },
       data: { offerLetterBody: body },
     });
-    return { isCustomised: true };
+
+    // generate keeps the existing access token, so all previously shared
+    // signing links immediately resolve to the edited letter.
+    const letter = await this.generate(applicationId, companyId);
+    return { isCustomised: true, letter };
   }
 
   /** Put the candidate back on the shared template. */

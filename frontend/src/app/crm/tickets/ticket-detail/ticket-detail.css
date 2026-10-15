@@ -710,6 +710,39 @@
   white-space: pre-wrap;
 }
 
+.comment-attachments {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.comment-attachment-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  color: #2563eb;
+  background: #eff6ff;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.comment-attachment-icon:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.comment-attachment-count {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .inline-edit-box {
   display: flex;
   flex-direction: column;

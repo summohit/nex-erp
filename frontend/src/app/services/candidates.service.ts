@@ -150,7 +150,7 @@ export class CandidatesService {
     return this.http.get<any>(`${this.apiUrl}/${applicationId}/offer-letter/draft`);
   }
 
-  saveOfferLetterDraft(applicationId: number, body: string): Observable<{ isCustomised: boolean }> {
+  saveOfferLetterDraft(applicationId: number, body: string): Observable<{ isCustomised: boolean; letter: any }> {
     return this.http.put<any>(`${this.apiUrl}/${applicationId}/offer-letter/draft`, { body });
   }
 

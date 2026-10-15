@@ -8,7 +8,7 @@ import {
   LucideAlertCircle, LucideCheckCircle2, LucideFlame,
   LucideMessageSquare, LucideArrowRight, LucideHistory,
   LucideSparkles, LucideCopy, LucideCalendar, LucideSearch,
-  LucideChevronDown, LucideImage, LucideImagePlus
+  LucideChevronDown, LucideImage, LucideImagePlus, LucidePaperclip
 } from '@lucide/angular';
 import { TicketService, Ticket, TicketComment, TicketEmployee, TicketPermissions, TicketMoveUpdate } from '../../../services/ticket.service';
 import { AuthService } from '../../../services/auth.service';
@@ -50,7 +50,7 @@ import { noticeBodyHtml, noticeBodyText } from '../../../services/notices';
     LucideAlertCircle, LucideCheckCircle2, LucideFlame,
     LucideMessageSquare, LucideArrowRight, LucideHistory,
     LucideSparkles, LucideCopy, LucideCalendar, LucideSearch,
-    LucideChevronDown, LucideImage, LucideImagePlus, QuillModule,
+    LucideChevronDown, LucideImage, LucideImagePlus, LucidePaperclip, QuillModule,
   ],
   templateUrl: './ticket-detail.html',
   styleUrls: ['./ticket-detail.css'],
@@ -145,12 +145,42 @@ export class TicketDetailComponent implements OnInit {
    * keep their line breaks; the same rule notices use.
    */
   commentHtml(body?: string | null): string {
+    const textOnly = this.commentBodyWithoutAttachments(body ?? '');
     // Text pasted into the editor often joins words with non-breaking spaces,
     // which makes a whole sentence one unbreakable line that pushes the card
     // wider than the panel. A lone &nbsp; between words becomes a plain space;
     // runs of them (deliberate indentation) are left alone.
-    return noticeBodyHtml(body ?? '')
+    return noticeBodyHtml(textOnly)
       .replace(/(?<!&nbsp;|\u00a0)(?:&nbsp;|\u00a0)(?!&nbsp;|\u00a0)/g, ' ');
+  }
+
+  /**
+   * Status changes store their evidence in the audit comment as a normal HTML
+   * link.  Comments that start as plain text are escaped by noticeBodyHtml,
+   * which previously made that markup appear verbatim in the timeline.
+   */
+  commentAttachments(body?: string | null): { name: string; url: string }[] {
+    const html = body ?? '';
+    const anchor = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    const attachments: { name: string; url: string }[] = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = anchor.exec(html))) {
+      const url = match[1];
+      // Only turn the evidence links produced by the ticket API into files;
+      // links deliberately included in a user's rich-text comment stay inline.
+      if (/\/uploads\/ticket_attachments\//i.test(url)) {
+        const name = match[2].replace(/<[^>]+>/g, '').trim() || 'Attachment';
+        attachments.push({ name, url });
+      }
+    }
+    return attachments;
+  }
+
+  private commentBodyWithoutAttachments(body: string): string {
+    return body
+      .replace(/\s*Evidence attached:\s*<a\s+[^>]*href=["'][^"']*\/uploads\/ticket_attachments\/[^"']*["'][^>]*>[\s\S]*?<\/a>/gi, '')
+      .trim();
   }
 
   hasText(html?: string | null): boolean {
@@ -398,25 +428,34 @@ export class TicketDetailComponent implements OnInit {
     // how or why first — the server refuses either without a reason. The answer
     // lands in History & Discussion; an attachment, if given, in Attachments.
     let extra: { statusReason?: string; statusAttachment?: { fileName: string; fileUrl: string; fileSize: number } } = {};
-    if ((status === 'RESOLVED' || status === 'REJECTED') && status !== this.ticket.status) {
+    if ((status === 'RESOLVED' || status === 'REJECTED' || status === 'CLOSED') && status !== this.ticket.status) {
       const resolving = status === 'RESOLVED';
+      const closing = status === 'CLOSED';
       const answer = await this.dialog.promptWithAttachment(
-        resolving
+        closing
+          ? 'Add a closure remark and attach evidence. Both are saved in the ticket discussion.'
+          : resolving
           ? 'Describe how this ticket was resolved. It is added to the ticket\'s discussion, so whoever raised it can see what was done.'
           : 'Say why this ticket is being rejected. It is added to the ticket\'s discussion, so whoever raised it knows why.',
-        resolving ? `Resolve ${this.ticket.ticketNumber}` : `Reject ${this.ticket.ticketNumber}`,
+        closing ? `Close ${this.ticket.ticketNumber}` : resolving ? `Resolve ${this.ticket.ticketNumber}` : `Reject ${this.ticket.ticketNumber}`,
         {
-          placeholder: resolving
+          placeholder: closing
+            ? 'e.g. Confirmed the fix in production.'
+            : resolving
             ? 'e.g. Delivered and configured the SD-WAN router on site; link is up.'
             : 'e.g. Duplicate of TKT-019, which is already being handled.',
-          confirmLabel: resolving ? 'Mark resolved' : 'Reject ticket',
+          confirmLabel: closing ? 'Close ticket' : resolving ? 'Mark resolved' : 'Reject ticket',
           required: true,
-          attachmentLabel: 'Attach a file (optional)',
-          attachmentHint: resolving ? 'A screenshot, report or delivery proof.' : 'Anything that supports the decision.',
-          tone: resolving ? 'success' : 'danger',
+          attachmentLabel: closing ? 'Attach evidence (required)' : 'Attach a file (optional)',
+          attachmentHint: closing ? 'A screenshot, report, or other proof is required to close.' : resolving ? 'A screenshot, report or delivery proof.' : 'Anything that supports the decision.',
+          tone: resolving || closing ? 'success' : 'danger',
         },
       );
       if (!answer?.text?.trim()) return;
+      if (closing && !answer.file) {
+        this.toast.error('Attach evidence before closing the ticket');
+        return;
+      }
       extra.statusReason = answer.text.trim();
 
       if (answer.file) {
@@ -424,6 +463,10 @@ export class TicketDetailComponent implements OnInit {
           const up = await firstValueFrom(this.ticketService.uploadImage(answer.file));
           extra.statusAttachment = { fileName: answer.file.name, fileUrl: up.url, fileSize: answer.file.size };
         } catch (err: any) {
+          if (closing) {
+            this.toast.error(err?.error?.message || 'Evidence could not be uploaded. The ticket was not closed.');
+            return;
+          }
           const goOn = await this.dialog.confirm(
             err?.error?.message || 'The attachment could not be uploaded.',
             'Attachment failed',
@@ -567,19 +610,7 @@ export class TicketDetailComponent implements OnInit {
 
   closeAsReporter() {
     if (this.closingAsReporter) return;
-    this.closingAsReporter = true;
-    this.ticketService.updateTicket(this.ticket.id, { status: 'CLOSED' as any }).subscribe({
-      next: (t) => {
-        this.closingAsReporter = false;
-        this.ticket = { ...this.ticket, ...t };
-        this.ticketUpdated.emit(this.ticket);
-        this.toast.success('Ticket verified and closed. Thank you for confirming.');
-      },
-      error: (err) => {
-        this.closingAsReporter = false;
-        this.toast.error(err?.error?.message || 'Failed to close ticket');
-      },
-    });
+    this.changeStatus('CLOSED');
   }
 
   // ─── Reassignment ──────────────────────────────────────────────────────────
