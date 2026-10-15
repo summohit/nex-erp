@@ -394,9 +394,10 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * The per-km rate for own-vehicle trips, by salary grade (decided 15 Oct
-   * 2026): one rate per grade whatever the vehicle. Interns (employment type
-   * Internship or designation Intern) and consultants sit outside grades and
-   * get the ungraded rate. With no rate set, the vehicle's default applies.
+   * 2026): one rate per grade whatever the vehicle. Consultants are graded by
+   * salary like everyone else; interns (employment type Internship or
+   * designation Intern) sit outside grades and get the ungraded rate. With no
+   * rate set, the vehicle's default applies.
    */
   private async gradeRate(companyId: number, employeeId: number): Promise<{ rate: number | null; label: string }> {
     const emp = await this.prisma.employee.findUnique({
@@ -408,9 +409,9 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     });
     if (!emp) return { rate: null, label: '' };
     const intern = /intern/i.test(emp.employmentType ?? '') || /intern/i.test(emp.designation?.name ?? '');
-    if (intern || emp.payType === 'CONSULTANT') {
+    if (intern) {
       const t = await this.prisma.salaryTemplate.findUnique({ where: { companyId }, select: { ungradedKmRate: true } });
-      return { rate: t?.ungradedKmRate ?? null, label: intern ? 'Intern' : 'Consultant' };
+      return { rate: t?.ungradedKmRate ?? null, label: 'Intern' };
     }
     const gross = emp.salaryStructures
       .filter((s) => s.component?.type === 'EARNING')

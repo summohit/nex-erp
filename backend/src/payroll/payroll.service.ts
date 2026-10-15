@@ -158,8 +158,12 @@ export class PayrollService {
         salaryGroup = emp.department.name;
       }
       // Read from the gross rather than stored, so it cannot fall out of step
-      // with what the person is paid. Consultants are not graded.
-      const grade = isConsultant ? null : gradeFor(grossEarnings, grades);
+      // with what the person is paid. Consultants are graded like everyone
+      // else (decided 15 Oct 2026); their pay type still decides deductions.
+      // Interns are outside grades (employment type Internship or designation
+      // Intern), the same rule the travel allowance uses.
+      const intern = /intern/i.test((emp as any).employmentType ?? '') || /intern/i.test(emp.designation?.name ?? '');
+      const grade = intern ? null : gradeFor(grossEarnings, grades);
 
       return {
         id: emp.id,
@@ -292,7 +296,7 @@ export class PayrollService {
     return this.getSalaryGrades(companyId);
   }
 
-  /** Per-km travel rate for interns and consultants, who sit outside grades. */
+  /** Per-km travel rate for interns, who sit outside grades. */
   async getUngradedKmRate(companyId: number): Promise<{ ungradedKmRate: number | null }> {
     const row = await this.prisma.salaryTemplate.findUnique({ where: { companyId }, select: { ungradedKmRate: true } });
     return { ungradedKmRate: row?.ungradedKmRate ?? null };

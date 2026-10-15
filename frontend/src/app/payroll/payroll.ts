@@ -101,7 +101,7 @@ export class PayrollComponent implements OnInit {
   salaryTemplate = signal<SalaryTemplateRules | null>(null);
   isGradesModalOpen = signal(false);
   gradesDraft: SalaryGrade[] = [];
-  /** Travel ₹/km for interns and consultants, edited with the grades. */
+  /** Travel ₹/km for interns, who are outside grades; edited with the grades. */
   ungradedKmRateDraft: number | null = null;
   templateDraft: SalaryTemplateRules | null = null;
   isSavingGrades = signal(false);
@@ -611,10 +611,8 @@ export class PayrollComponent implements OnInit {
     }
 
     const grade = this.salaryTableGradeFilter();
-    if (grade === 'CONSULTANT') {
-      rows = rows.filter(e => e.payType === 'CONSULTANT');
-    } else if (grade === 'UNGRADED') {
-      rows = rows.filter(e => e.payType !== 'CONSULTANT' && !e.grade);
+    if (grade === 'UNGRADED') {
+      rows = rows.filter(e => !e.grade);
     } else if (grade !== 'ALL') {
       rows = rows.filter(e => e.grade?.name === grade);
     }
@@ -669,9 +667,9 @@ export class PayrollComponent implements OnInit {
         valA = (a.salaryGroup || '').toLowerCase();
         valB = (b.salaryGroup || '').toLowerCase();
       } else if (sortCol === 'grade') {
-        // Grade order is pay order, so sort by gross; consultants last.
-        valA = a.payType === 'CONSULTANT' ? Infinity : (a.grossEarnings || 0);
-        valB = b.payType === 'CONSULTANT' ? Infinity : (b.grossEarnings || 0);
+        // Grade order is pay order, so sort by gross.
+        valA = a.grossEarnings || 0;
+        valB = b.grossEarnings || 0;
         if (valA === valB) return 0;
         return (valA < valB ? -1 : 1) * dir;
       } else if (sortCol === 'allowPayroll') {
@@ -734,8 +732,7 @@ export class PayrollComponent implements OnInit {
   gradeFilterOptions = computed<SearchableSelectOption[]>(() => [
     { id: 'ALL', name: 'All Grades' },
     ...this.salaryGrades().map(g => ({ id: g.name, name: g.label ? `${g.name} · ${g.label}` : g.name })),
-    { id: 'UNGRADED', name: 'No salary yet' },
-    { id: 'CONSULTANT', name: 'Consultants' },
+    { id: 'UNGRADED', name: 'No grade (interns, no salary yet)' },
   ]);
 
   /**
@@ -754,11 +751,7 @@ export class PayrollComponent implements OnInit {
         gross: people.reduce((t, e) => t + (e.grossEarnings || 0), 0),
       };
     });
-    const consultants = active.filter(e => e.payType === 'CONSULTANT');
-    return {
-      bands,
-      consultants: { count: consultants.length, gross: consultants.reduce((t, e) => t + (e.grossEarnings || 0), 0) },
-    };
+    return { bands };
   });
 
   gradeRange(g: SalaryGrade): string {
@@ -805,7 +798,7 @@ export class PayrollComponent implements OnInit {
       next: (saved) => {
         this.salaryGrades.set(saved);
         this.payrollService.setUngradedKmRate(ungraded).subscribe({
-          error: (err) => this.toast.error(err.error?.message || 'Could not save the intern/consultant travel rate'),
+          error: (err) => this.toast.error(err.error?.message || 'Could not save the intern travel rate'),
         });
         if (!this.templateDraft) return this.finishGradesSave();
         this.payrollService.updateSalaryTemplate(this.templateDraft).subscribe({
