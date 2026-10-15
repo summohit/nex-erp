@@ -455,10 +455,13 @@ export class AttendanceLeaveComponent implements OnInit {
 
   // A manager decides their team's leave, never their own: the request has to
   // be one of the reportees' (managerRequests), not one of myRequests.
-  canApproveLeaveApplication = (request: LeaveRequest): boolean =>
-    this.isAdmin()
-    || (this.managerRequests().some((teamRequest) => teamRequest.id === request.id)
-      && !this.myRequests().some((ownRequest) => ownRequest.id === request.id));
+  /** Nobody but a Super Admin decides their own leave; the server repeats this. */
+  canApproveLeaveApplication = (request: LeaveRequest): boolean => {
+    const role = this.authService.currentUser()?.role;
+    if (role === 'SUPERADMIN' || role === 'SUPER_ADMIN') return true;
+    if (this.myRequests().some((ownRequest) => ownRequest.id === request.id)) return false;
+    return this.isAdmin() || this.managerRequests().some((teamRequest) => teamRequest.id === request.id);
+  };
 
   canEditLeaveApplication = (request: LeaveRequest): boolean =>
     (this.authService.currentUser()?.role === 'SUPERADMIN'
@@ -2712,7 +2715,7 @@ export class AttendanceLeaveComponent implements OnInit {
 
   onApprovalSelectionChanged(event: any): void {
     const pendingIds = event.api.getSelectedRows()
-      .filter((request: LeaveRequest) => request.status === 'PENDING')
+      .filter((request: LeaveRequest) => request.status === 'PENDING' && this.canApproveLeaveApplication(request))
       .map((request: LeaveRequest) => request.id);
     this.selectedApprovalIds.set(pendingIds);
   }

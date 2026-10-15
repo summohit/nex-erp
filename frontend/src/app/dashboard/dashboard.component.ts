@@ -446,6 +446,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Nobody but a Super Admin decides their own leave; the server repeats this. */
+  canDecideLeave(req: any): boolean {
+    const me = this.authService.currentUser();
+    if (me?.role === 'SUPERADMIN' || me?.role === 'SUPER_ADMIN') return true;
+    const myEmail = String(me?.email || '').toLowerCase();
+    return !myEmail || String(req?.employee?.user?.email || '').toLowerCase() !== myEmail;
+  }
+
   approveLeave(reqId: number) {
     this.leavesService.updateRequestStatus(reqId, 'APPROVED').subscribe({
       next: () => {

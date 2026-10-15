@@ -649,7 +649,7 @@
                   <td>{{ req.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(req.startDate | date:'dd-MM-yyyy') !== (req.endDate | date:'dd-MM-yyyy')"><span class="date-to">to</span>{{ req.endDate | date:'dd-MM-yyyy' }}</ng-container></td>
                   <td><span class="status-pill" [ngClass]="req.status.toLowerCase()">{{ req.status }}</span></td>
                   <td style="text-align: right;">
-                    <div class="action-btn-group">
+                    <div class="action-btn-group" *ngIf="canDecideLeave(req); else ownLeave">
                       <button class="btn-approve-sm" (click)="approveLeave(req.id)" title="Approve Request">
                         <svg lucideCheck size="13"></svg>
                         <span>Approve</span>
@@ -659,6 +659,7 @@
                         <span>Reject</span>
                       </button>
                     </div>
+                    <ng-template #ownLeave><span class="badge-subtle">Your request</span></ng-template>
                   </td>
                 </tr>
               </tbody>
