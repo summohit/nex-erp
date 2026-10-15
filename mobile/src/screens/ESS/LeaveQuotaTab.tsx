@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { ChevronLeft, History, X, Plus, Minus } from 'lucide-react-native';
-import AppScreen from '../../components/AppScreen';
+import { History, X, Plus, Minus } from 'lucide-react-native';
 import { leaveService, LeaveBalance, CompOffPerson } from '../../api/leaveService';
 import { theme } from '../../theme/theme';
 
@@ -16,15 +14,14 @@ const n = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 const isCompOff = (name: string) => /comp/i.test(name);
 
 /**
- * My leave quota — the web's "Leaves Quota" table as cards for a phone, one per
+ * Leave Quota tab of the Attendance screen — the web's "Leaves Quota" table as cards for a phone, one per
  * leave type: allotted, taken, remaining, and over-used. Comp-off types open
  * the comp-off history (what each day was earned for, and where it was used).
  *
  * Built the way the web builds it: every leave type, with this year's balance
  * rows summed per type, so a type with no balance still shows as 0.
  */
-export default function LeaveQuotaScreen() {
-  const navigation = useNavigation<any>();
+export default function LeaveQuotaTab() {
   const year = new Date().getFullYear();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,20 +93,15 @@ export default function LeaveQuotaScreen() {
   };
 
   return (
-    <AppScreen title="Leave Quota" subtitle={`My leave balance · ${year}`}>
+    <View style={styles.flex}>
       <ScrollView
         contentContainerStyle={styles.body}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
-        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
-          <ChevronLeft size={18} color={theme.colors.primary} />
-          <Text style={styles.backText}>Leaves</Text>
-        </TouchableOpacity>
-
         <View style={styles.summary}>
           <Text style={styles.summaryLabel}>Remaining leaves</Text>
           <Text style={styles.summaryValue}>{n(remaining)}</Text>
-          <Text style={styles.summarySub}>days across all paid and unpaid types</Text>
+          <Text style={styles.summarySub}>{year} · all leave types</Text>
         </View>
 
         {loading ? <ActivityIndicator style={styles.loader} color={theme.colors.primary} /> : (
@@ -122,7 +114,7 @@ export default function LeaveQuotaScreen() {
       </ScrollView>
 
       <CompOffHistorySheet visible={historyOpen} onClose={() => setHistoryOpen(false)} />
-    </AppScreen>
+    </View>
   );
 }
 
@@ -234,8 +226,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   body: { padding: 16, paddingBottom: 120, gap: 10 },
   loader: { marginTop: 30 },
-  back: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
-  backText: { color: theme.colors.primary, fontWeight: '700' },
   summary: { backgroundColor: '#EFF6FF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#DBEAFE' },
   summaryLabel: { fontSize: 13, color: '#1E40AF', fontWeight: '600' },
   summaryValue: { fontSize: 32, fontWeight: '800', color: '#1373e5', marginTop: 2 },
