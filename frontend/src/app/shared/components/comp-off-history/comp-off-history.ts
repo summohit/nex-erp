@@ -35,6 +35,7 @@ import {
   LucideX,
 } from '@lucide/angular';
 import { environment } from '../../../../environments/environment';
+import { DateRange, DateRangePickerComponent } from '../date-range-picker/date-range-picker';
 
 export interface CompOffCredit {
   id: number;
@@ -84,6 +85,7 @@ export interface CompOffPerson {
     CommonModule,
     DatePipe,
     FormsModule,
+    DateRangePickerComponent,
     LucideAward,
     LucideBriefcase,
     LucideBuilding,
@@ -116,14 +118,14 @@ export class CompOffHistoryComponent implements OnChanges {
   @Output() closed = new EventEmitter<void>();
 
   year = signal(new Date().getFullYear());
+  /** From the Duration filter; null until it reports its starting range. */
+  range = signal<DateRange | null>(null);
   loading = signal(false);
   error = signal<string | null>(null);
   people = signal<CompOffPerson[]>([]);
   query = signal('');
   filterStatus = signal<'all' | 'balance' | 'zero'>('all');
   expandedIds = signal<Set<number>>(new Set());
-
-  readonly years = [0, 1, 2].map((i) => new Date().getFullYear() - i);
 
   countWithBalance = computed(() => this.people().filter((p) => p.remaining > 0).length);
   countZeroBalance = computed(() => this.people().filter((p) => p.remaining === 0).length);
@@ -155,12 +157,22 @@ export class CompOffHistoryComponent implements OnChanges {
   }
 
   ngOnChanges() {
-    if (this.open) this.load();
+    // The Duration filter loads on open: it reports its starting range as it
+    // appears, which calls setRange. Closing drops the old range.
+    if (!this.open) this.range.set(null);
   }
 
-  setYear(y: number) {
-    this.year.set(Number(y));
+  setRange(r: DateRange) {
+    this.range.set(r);
     this.load();
+  }
+
+  /** "in the last 1 year", "between 01 Oct and 15 Oct" — for empty notices. */
+  rangeText(): string {
+    const r = this.range();
+    if (!r) return `in ${this.year()}`;
+    if (r.label !== 'Custom Range') return `for ${r.label.toLowerCase()}`;
+    return r.from === r.to ? `on ${r.from}` : `between ${r.from} and ${r.to}`;
   }
 
   setFilter(status: 'all' | 'balance' | 'zero') {
@@ -174,7 +186,9 @@ export class CompOffHistoryComponent implements OnChanges {
   load() {
     this.loading.set(true);
     this.error.set(null);
-    const params: Record<string, string> = { year: String(this.year()) };
+    const params: Record<string, string> = {};
+    const r = this.range();
+    if (r) { params['from'] = r.from; params['to'] = r.to; } else params['year'] = String(this.year());
     if (!this.allEmployees) params['mine'] = '1';
     this.http.get<{ employees: CompOffPerson[] }>(`${environment.apiUrl}/attendance/comp-off/history`, { params }).subscribe({
       next: (res) => {

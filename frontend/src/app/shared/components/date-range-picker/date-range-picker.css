@@ -1,0 +1,113 @@
+/* Same look as the Timesheets Duration filter. */
+:host { display: inline-block; }
+
+.drp-anchor { position: relative; }
+
+.drp-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: all 0.15s ease;
+}
+.drp-trigger:hover { background: #f8fafc; border-color: #cbd5e1; }
+.drp-trigger.is-open { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12); }
+.drp-title { font-size: 14px; font-weight: 600; color: #334155; }
+.drp-subtitle { font-size: 13px; color: #94a3b8; white-space: nowrap; }
+.drp-chevron { color: #64748b; transition: transform 0.2s ease; }
+.drp-chevron.flipped { transform: rotate(180deg); }
+
+.drp-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1000;
+  width: 680px;
+  max-width: calc(100vw - 32px);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.16), 0 8px 16px -4px rgba(15, 23, 42, 0.08);
+}
+.drp-popover.align-left { right: auto; left: 0; }
+
+.drp-body { display: flex; }
+
+.drp-presets {
+  width: 160px;
+  flex-shrink: 0;
+  border-right: 1px solid #e2e8f0;
+  padding: 10px 0;
+  display: flex;
+  flex-direction: column;
+}
+.drp-preset {
+  text-align: left;
+  padding: 10px 20px;
+  font: inherit;
+  font-size: 14px;
+  color: #334155;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.drp-preset:hover { background: #f1f5f9; color: #0f172a; }
+.drp-preset.active { background: #546377; color: #ffffff; font-weight: 500; }
+
+.drp-right { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.drp-cals { display: flex; gap: 24px; padding: 18px 22px 14px; }
+.drp-cal { flex: 1; min-width: 0; }
+.drp-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.drp-cal-title { font-size: 14.5px; font-weight: 600; color: #1e293b; }
+.drp-nav {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; border-radius: 6px;
+  background: transparent; color: #0f172a; cursor: pointer;
+}
+.drp-nav:hover { background: #f1f5f9; }
+
+.drp-grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; }
+.drp-dow { display: flex; align-items: center; justify-content: center; height: 30px; font-size: 13px; font-weight: 700; color: #1e293b; }
+.drp-cell { display: flex; align-items: center; justify-content: center; height: 34px; cursor: pointer; user-select: none; }
+.drp-num {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 4px; font-size: 13px; color: #1e293b;
+}
+.drp-cell.other .drp-num { color: #cbd5e1; }
+.drp-cell.in-range { background: #f1f5f9; }
+.drp-cell.start { background: #f1f5f9; border-radius: 4px 0 0 4px; }
+.drp-cell.end { background: #f1f5f9; border-radius: 0 4px 4px 0; }
+.drp-cell.start.end { background: transparent; }
+.drp-cell.start .drp-num, .drp-cell.end .drp-num { background: #546377; color: #ffffff; font-weight: 600; }
+.drp-cell:not(.start):not(.end):not(.other):hover .drp-num { background: #e2e8f0; }
+
+.drp-footer {
+  display: flex; align-items: center; justify-content: flex-end; gap: 16px;
+  padding: 12px 20px; border-top: 1px solid #e2e8f0;
+}
+.drp-range-text { font-size: 13px; color: #475569; margin-right: auto; }
+.drp-actions { display: flex; gap: 8px; }
+.drp-btn {
+  padding: 7px 16px; font: inherit; font-size: 13.5px; font-weight: 500;
+  border: 1px solid #e2e8f0; border-radius: 6px; background: #ffffff; color: #334155; cursor: pointer;
+}
+.drp-btn:hover { background: #f8fafc; }
+.drp-btn-apply { background: #546377; border-color: #546377; color: #ffffff; }
+.drp-btn-apply:hover { background: #475569; }
+.drp-btn-apply:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 720px) {
+  .drp-popover { position: fixed; left: 16px; right: 16px; top: 80px; width: auto; max-width: none; max-height: calc(100vh - 100px); overflow-y: auto; }
+  .drp-body { flex-direction: column; }
+  .drp-presets { width: auto; flex-direction: row; flex-wrap: wrap; gap: 6px; padding: 12px; border-right: none; border-bottom: 1px solid #e2e8f0; }
+  .drp-preset { padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 999px; font-size: 13px; }
+  .drp-cals { flex-direction: column; padding: 14px; }
+  .drp-cal:nth-child(2) { display: none; }
+  .drp-subtitle { display: none; }
+}

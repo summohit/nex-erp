@@ -70,9 +70,13 @@ export const leaveService = {
     return response.data || [];
   },
 
-  /** Own comp-off history for a year: what each day was earned for and where it was used. */
-  getMyCompOffHistory: async (year: number): Promise<CompOffPerson | null> => {
-    const response = await apiClient.get('/attendance/comp-off/history', { params: { year, mine: 1 } });
+  /**
+   * Own comp-off history: what each day was earned for and where it was used,
+   * for a year or a from/to range (YYYY-MM-DD) from the Duration filter.
+   */
+  getMyCompOffHistory: async (period: number | { from: string; to: string }): Promise<CompOffPerson | null> => {
+    const params = typeof period === 'number' ? { year: period, mine: 1 } : { ...period, mine: 1 };
+    const response = await apiClient.get('/attendance/comp-off/history', { params });
     return response.data?.employees?.[0] ?? null;
   },
 

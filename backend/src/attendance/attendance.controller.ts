@@ -177,11 +177,13 @@ export class AttendanceController {
     @Query('employeeId') employeeId?: string,
     @Query('year') year?: string,
     @Query('mine') mine?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     const target = mine === '1' ? (req.user.employeeId ?? -1) : employeeId ? Number(employeeId) : null;
     return this.attendanceService.getCompOffHistory(
       req.user.companyId, { role: req.user.role, employeeId: req.user.employeeId ?? null },
-      target, year ? Number(year) : undefined,
+      target, year ? Number(year) : undefined, { from, to },
     );
   }
 

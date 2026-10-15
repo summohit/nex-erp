@@ -16,13 +16,7 @@
       </div>
 
       <div class="coh-head-actions">
-        <div class="coh-select-wrap">
-          <svg lucideCalendar size="14" class="coh-select-icon"></svg>
-          <select class="coh-select" [ngModel]="year()" (ngModelChange)="setYear($event)" aria-label="Year">
-            <option *ngFor="let y of years" [ngValue]="y">{{ y }}</option>
-          </select>
-          <svg lucideChevronDown size="14" class="coh-select-chevron"></svg>
-        </div>
+        <app-date-range-picker initial="Last 1 Year" (rangeChange)="setRange($event)"></app-date-range-picker>
         <button type="button" class="coh-close-btn" (click)="close()" aria-label="Close" title="Close (Esc)">
           <svg lucideX size="18"></svg>
         </button>
@@ -143,10 +137,10 @@
         </div>
         <h4>No compensatory off records found</h4>
         <p *ngIf="query() || filterStatus() !== 'all'">
-          No employees match your search or filter criteria in {{ year() }}.
+          No employees match your search or filter criteria {{ rangeText() }}.
         </p>
         <p *ngIf="!query() && filterStatus() === 'all'">
-          No compensatory off {{ allEmployees ? 'recorded for anyone' : 'recorded for you' }} in {{ year() }}.
+          No compensatory off {{ allEmployees ? 'recorded for anyone' : 'recorded for you' }} {{ rangeText() }}.
         </p>
         <button
           *ngIf="query() || filterStatus() !== 'all'"
@@ -378,7 +372,7 @@
             <!-- Empty notice -->
             <div class="coh-empty-notice" *ngIf="!p.used_leaves.length">
               <svg lucideInfo size="14"></svg>
-              <span>Not used yet in {{ year() }}.</span>
+              <span>Not used yet {{ rangeText() }}.</span>
             </div>
 
             <!-- Used List -->

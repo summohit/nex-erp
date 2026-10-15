@@ -1,0 +1,54 @@
+<div class="drp-anchor">
+  <button type="button" class="drp-trigger" [class.is-open]="open()" (click)="toggle()" [attr.aria-expanded]="open()">
+    <span class="drp-title">Duration</span>
+    <span class="drp-subtitle">{{ buttonText() }}</span>
+    <svg lucideChevronDown size="14" class="drp-chevron" [class.flipped]="open()"></svg>
+  </button>
+
+  <div class="drp-popover" [class.align-left]="align === 'left'" *ngIf="open()" (click)="$event.stopPropagation()">
+    <div class="drp-body">
+      <div class="drp-presets">
+        <button type="button" *ngFor="let p of PRESETS" class="drp-preset" [class.active]="pickLabel() === p" (click)="choosePreset(p)">
+          {{ p }}
+        </button>
+      </div>
+
+      <div class="drp-right">
+        <div class="drp-cals">
+          <div class="drp-cal" *ngFor="let m of [1, 2]">
+            <div class="drp-cal-head">
+              <button type="button" class="drp-nav" (click)="shiftMonth(-1)" aria-label="Previous month">
+                <svg lucideChevronLeft size="16"></svg>
+              </button>
+              <span class="drp-cal-title">{{ monthName(m === 1 ? month1() : month2()) }}</span>
+              <button type="button" class="drp-nav" (click)="shiftMonth(1)" aria-label="Next month">
+                <svg lucideChevronRight size="16"></svg>
+              </button>
+            </div>
+            <div class="drp-grid">
+              <div class="drp-dow" *ngFor="let d of DOW">{{ d }}</div>
+              <div
+                *ngFor="let day of (m === 1 ? days1() : days2())"
+                class="drp-cell"
+                [class.other]="!day.isCurrentMonth"
+                [class.start]="isStart(day.date)"
+                [class.end]="isEnd(day.date)"
+                [class.in-range]="inRange(day.date)"
+                (click)="clickDay(day)">
+                <span class="drp-num">{{ day.dayNumber }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="drp-footer">
+          <span class="drp-range-text">{{ pickText() }}</span>
+          <div class="drp-actions">
+            <button type="button" class="drp-btn" (click)="cancel()">Cancel</button>
+            <button type="button" class="drp-btn drp-btn-apply" [disabled]="!pickStart()" (click)="apply()">Apply</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

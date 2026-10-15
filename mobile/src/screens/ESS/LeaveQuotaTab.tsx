@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal,
 } from 'react-native';
-import { History, X, Plus, Minus } from 'lucide-react-native';
+import { History, X, Plus, Minus, Calendar } from 'lucide-react-native';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { leaveService, LeaveBalance, CompOffPerson } from '../../api/leaveService';
 import { theme } from '../../theme/theme';
 
@@ -127,18 +128,68 @@ function Stat({ label, value, strong, danger }: { label: string; value: string; 
   );
 }
 
+const PRESETS = ['Today', 'Last 30 Days', 'This Month', 'Last Month', 'Last 90 Days', 'Last 6 Months', 'Last 1 Year', 'Custom'] as const;
+type Preset = typeof PRESETS[number];
+
+const dayKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const shortDate = (d: Date) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+/** The same presets as the web's Duration filter. */
+function presetRange(p: Preset): [Date, Date] | null {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const back = (days: number) => { const d = new Date(now); d.setDate(d.getDate() - days); return d; };
+  switch (p) {
+    case 'Today': return [new Date(now), new Date(now)];
+    case 'Last 30 Days': return [back(29), new Date(now)];
+    case 'This Month': return [new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 0)];
+    case 'Last Month': return [new Date(now.getFullYear(), now.getMonth() - 1, 1), new Date(now.getFullYear(), now.getMonth(), 0)];
+    case 'Last 90 Days': return [back(89), new Date(now)];
+    case 'Last 6 Months': { const d = new Date(now); d.setMonth(d.getMonth() - 6); return [d, new Date(now)]; }
+    case 'Last 1 Year': { const d = new Date(now); d.setFullYear(d.getFullYear() - 1); return [d, new Date(now)]; }
+    default: return null;
+  }
+}
+
 /** The web's "My Comp-off History" drawer, as a full-height sheet. */
 function CompOffHistorySheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const thisYear = new Date().getFullYear();
-  const [year, setYear] = useState(thisYear);
+  const [preset, setPreset] = useState<Preset>('Last 1 Year');
+  const [range, setRange] = useState<[Date, Date]>(() => presetRange('Last 1 Year')!);
+  /** Which end of a custom range the date picker is setting, if open. */
+  const [picking, setPicking] = useState<'from' | 'to' | null>(null);
   const [data, setData] = useState<CompOffPerson | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const from = dayKey(range[0]);
+  const to = dayKey(range[1]);
   useEffect(() => {
     if (!visible) return;
     setLoading(true);
-    leaveService.getMyCompOffHistory(year).then(setData).catch(() => setData(null)).finally(() => setLoading(false));
-  }, [visible, year]);
+    leaveService.getMyCompOffHistory({ from, to }).then(setData).catch(() => setData(null)).finally(() => setLoading(false));
+  }, [visible, from, to]);
+
+  const choose = (p: Preset) => {
+    setPreset(p);
+    const r = presetRange(p);
+    if (r) setRange(r);
+    else setPicking('from');
+  };
+
+  const onPicked = (d: Date) => {
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const side = picking;
+    setPicking(null);
+    if (side === 'from') {
+      setRange(([, end]) => (day > end ? [day, day] : [day, end]));
+      // Straight on to the end date, as the web's calendar does.
+      setTimeout(() => setPicking('to'), 400);
+    } else if (side === 'to') {
+      setRange(([start]) => (day < start ? [day, start] : [start, day]));
+    }
+  };
+
+  const periodText = preset === 'Custom' ? `${shortDate(range[0])} – ${shortDate(range[1])}` : preset.toLowerCase();
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -151,13 +202,31 @@ function CompOffHistorySheet({ visible, onClose }: { visible: boolean; onClose: 
           <TouchableOpacity onPress={onClose} style={styles.close}><X size={20} color="#334155" /></TouchableOpacity>
         </View>
 
-        <View style={styles.years}>
-          {[thisYear - 1, thisYear].map((y) => (
-            <TouchableOpacity key={y} style={[styles.yearChip, y === year && styles.yearOn]} onPress={() => setYear(y)}>
-              <Text style={[styles.yearText, y === year && styles.yearTextOn]}>{y}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.years} style={styles.yearsWrap}>
+          {PRESETS.map((p) => (
+            <TouchableOpacity key={p} style={[styles.yearChip, p === preset && styles.yearOn]} onPress={() => choose(p)}>
+              <Text style={[styles.yearText, p === preset && styles.yearTextOn]}>{p}</Text>
             </TouchableOpacity>
           ))}
+        </ScrollView>
+        <View style={styles.rangeRow}>
+          <Calendar size={14} color="#64748B" />
+          <TouchableOpacity onPress={() => { setPreset('Custom'); setPicking('from'); }}>
+            <Text style={styles.rangeText}>{shortDate(range[0])}</Text>
+          </TouchableOpacity>
+          <Text style={styles.rangeDash}>to</Text>
+          <TouchableOpacity onPress={() => { setPreset('Custom'); setPicking('to'); }}>
+            <Text style={styles.rangeText}>{shortDate(range[1])}</Text>
+          </TouchableOpacity>
         </View>
+        <DateTimePickerModal
+          isVisible={picking != null}
+          mode="date"
+          date={picking === 'to' ? range[1] : range[0]}
+          maximumDate={new Date(new Date().getFullYear(), 11, 31)}
+          onConfirm={onPicked}
+          onCancel={() => setPicking(null)}
+        />
 
         {loading ? <ActivityIndicator style={styles.loader} color={theme.colors.primary} /> : (
           <ScrollView contentContainerStyle={styles.sheetBody}>
@@ -204,7 +273,7 @@ function CompOffHistorySheet({ visible, onClose }: { visible: boolean; onClose: 
                 </Text>
                 {!!u.reason && <Text style={styles.entryReason}>{u.reason}</Text>}
               </View>
-            )) : <Text style={styles.none}>Not used yet in {year}.</Text>}
+            )) : <Text style={styles.none}>Not used {periodText}.</Text>}
           </ScrollView>
         )}
       </View>
@@ -252,7 +321,11 @@ const styles = StyleSheet.create({
   sheetTitle: { fontSize: 20, fontWeight: '800', color: theme.colors.textPrimary },
   sheetSub: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 2 },
   close: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' },
-  years: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginTop: 12 },
+  yearsWrap: { flexGrow: 0, marginTop: 12 },
+  years: { flexDirection: 'row', gap: 8, paddingHorizontal: 16 },
+  rangeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, marginTop: 10 },
+  rangeText: { fontSize: 13, fontWeight: '700', color: theme.colors.primary, textDecorationLine: 'underline' },
+  rangeDash: { fontSize: 13, color: '#64748B' },
   yearChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: '#fff', borderWidth: 1, borderColor: theme.colors.border },
   yearOn: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   yearText: { fontWeight: '700', color: '#475569' },

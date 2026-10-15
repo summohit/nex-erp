@@ -951,8 +951,21 @@ export class AttendanceService {
     viewer: { role?: string | null; employeeId?: number | null },
     employeeId?: number | null,
     year?: number,
+    /**
+     * Optional date range (YYYY-MM-DD) from the Duration filter. Credits and
+     * the days used are limited to it; the balance stays the one for the year
+     * the range ends in, since balances are kept per year.
+     */
+    range: { from?: string; to?: string } = {},
   ) {
-    const y = year || new Date().getUTCFullYear();
+    const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    if ((range.from || range.to) && !(isDay(range.from) && isDay(range.to))) {
+      throw new BadRequestException('from and to must both be dates (YYYY-MM-DD)');
+    }
+    let from = isDay(range.from) ? new Date(`${range.from}T00:00:00.000Z`) : null;
+    let to = isDay(range.to) ? new Date(`${range.to}T00:00:00.000Z`) : null;
+    if (from && to && from > to) [from, to] = [to, from];
+    const y = to ? to.getUTCFullYear() : year || new Date().getUTCFullYear();
     const hr = isHrAdmin(viewer.role);
     const target = employeeId ?? (hr ? null : viewer.employeeId ?? null);
     if (target != null && target !== viewer.employeeId && !hr) {
@@ -970,7 +983,12 @@ export class AttendanceService {
         select: { employeeId: true, allocated: true, used: true },
       }),
       this.prisma.compOffCredit.findMany({
-        where: { companyId, leaveTypeId: leaveType.id, year: y, ...(target != null ? { employeeId: target } : {}) },
+        // The balance year's credits (to work out what HR added by hand) plus
+        // any in the range, which may reach into last year.
+        where: {
+          companyId, leaveTypeId: leaveType.id, ...(target != null ? { employeeId: target } : {}),
+          ...(from && to ? { OR: [{ year: y }, { date: { gte: from, lte: to } }] } : { year: y }),
+        },
         include: {
           attendance: {
             select: { clockIn: true, clockOut: true, isOnsite: true, status: true,
@@ -1003,7 +1021,9 @@ export class AttendanceService {
         : Promise.resolve([] as any[]),
       this.prisma.leaveRequest.findMany({
         where: { employeeId: { in: ids }, leaveTypeId: leaveType.id, status: 'APPROVED', deletedAt: null,
-          startDate: { gte: new Date(Date.UTC(y, 0, 1)), lt: new Date(Date.UTC(y + 1, 0, 1)) } },
+          ...(from && to
+            ? { startDate: { lte: to }, endDate: { gte: from } }
+            : { startDate: { gte: new Date(Date.UTC(y, 0, 1)), lt: new Date(Date.UTC(y + 1, 0, 1)) } }) },
         select: { id: true, employeeId: true, startDate: true, endDate: true, isHalfDay: true, reason: true },
         orderBy: { startDate: 'desc' },
       }),
@@ -1023,7 +1043,11 @@ export class AttendanceService {
 
     const employees = people.map((p) => {
       const b = balances.find((x) => x.employeeId === p.id);
-      const mine = credits.filter((c) => c.employeeId === p.id).map((c) => {
+      const all = credits.filter((c) => c.employeeId === p.id);
+      // Earned this balance year, for the manual-credit sum; shown, for the range.
+      const earned = all.filter((c) => c.year === y).reduce((s2, c) => s2 + (c.days || 0), 0);
+      const shown = from && to ? all.filter((c) => c.date && c.date >= from! && c.date <= to!) : all;
+      const mine = shown.map((c) => {
         const visit = c.date ? visitOn.get(`${p.id}|${day(c.date)}`) : null;
         return {
           id: c.id,
@@ -1040,13 +1064,12 @@ export class AttendanceService {
             project: visit.project ? `${visit.project.name} (${visit.project.key})` : null } : null,
         };
       });
-      const earned = mine.reduce((s2, c) => s2 + (c.days || 0), 0);
       const allocated = b?.allocated ?? earned;
       const used = b?.used ?? 0;
       return {
         employee: p,
         allocated, used, remaining: Math.round((allocated - used) * 100) / 100,
-        earnedFromWork: earned,
+        earnedFromWork: mine.reduce((s2, c) => s2 + (c.days || 0), 0),
         addedManually: Math.max(0, Math.round((allocated - earned) * 100) / 100),
         credits: mine,
         used_leaves: usedLeaves.filter((l) => l.employeeId === p.id).map((l) => ({
@@ -1055,7 +1078,7 @@ export class AttendanceService {
       };
     }).sort((a, b) => b.remaining - a.remaining || a.employee.firstName.localeCompare(b.employee.firstName));
 
-    return { year: y, leaveType: leaveType.name, employees };
+    return { year: y, from: from ? day(from) : null, to: to ? day(to) : null, leaveType: leaveType.name, employees };
   }
 
   async getPendingClockOuts(
