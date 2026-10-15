@@ -237,6 +237,97 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  // ─── Route points (Android app) ──────────────────────────────────────────
+
+  /**
+   * Points the app recorded between Start and End journey, sent in batches.
+   * Accepted for today's NCR day once the journey has started; duplicates (by
+   * time) are dropped and the tracked km recomputed each time.
+   */
+  async addRoutePoints(userId: number, body: { requestId?: number; points?: unknown }) {
+    const raw = Array.isArray(body?.points) ? body.points : [];
+    const incoming = raw
+      .map((p: any) => [Number(p?.[0]), Number(p?.[1]), Number(p?.[2])])
+      .filter(([la, lo, t]) => Number.isFinite(la) && Number.isFinite(lo) && Number.isFinite(t)
+        && Math.abs(la) <= 90 && Math.abs(lo) <= 180 && !(la === 0 && lo === 0));
+    const day = await this.todaysNcrDay(userId, body?.requestId);
+    if (!day.journeyStartAt) throw new BadRequestException('Start your journey first.');
+    if (!incoming.length) return { accepted: 0, trackedKm: null };
+
+    const row = await this.prisma.fieldVisitAttendance.findUnique({
+      where: { id: day.id }, select: { journeyRoute: true },
+    });
+    const existing: number[][] = Array.isArray(row?.journeyRoute) ? (row!.journeyRoute as any) : [];
+    const seen = new Set(existing.map((p) => p[2]));
+    const startMs = new Date(day.journeyStartAt).getTime() - 60_000;
+    const merged = [...existing, ...incoming.filter((p) => !seen.has(p[2]) && p[2] >= startMs)]
+      .sort((a, b) => a[2] - b[2])
+      .slice(0, 5000);
+    const trackedKm = TravelAllowanceService.trackedKm(merged);
+    await this.prisma.fieldVisitAttendance.update({
+      where: { id: day.id },
+      data: { journeyRoute: merged as any, journeyTrackedKm: trackedKm },
+    });
+    return { accepted: merged.length - existing.length, trackedKm };
+  }
+
+  /**
+   * Length of a recorded path, ignoring GPS jumps: a step implying more than
+   * 150 km/h is dropped as noise rather than counted.
+   */
+  static trackedKm(points: number[][]): number {
+    let km = 0;
+    let prev: number[] | null = null;
+    for (const p of points) {
+      if (prev) {
+        const d = straightKm(prev[0], prev[1], p[0], p[1]);
+        const hours = Math.max((p[2] - prev[2]) / 3_600_000, 1 / 3600);
+        if (d / hours > 150) continue;
+        km += d;
+      }
+      prev = p;
+    }
+    return Math.round(km * 10) / 10;
+  }
+
+  /** The route behind a travel claim, for the map: claimant or an expense approver. */
+  async claimRoute(companyId: number, claimId: number, viewer: { employeeId: number | null; mayApprove: boolean }) {
+    const claim = await this.prisma.expenseClaim.findFirst({
+      where: { id: claimId, companyId },
+      select: { employeeId: true, fieldVisitRequestId: true },
+    });
+    if (!claim?.fieldVisitRequestId) throw new BadRequestException('This is not a travel allowance claim');
+    if (!viewer.mayApprove && claim.employeeId !== viewer.employeeId) {
+      throw new ForbiddenException('You cannot see this route');
+    }
+    const req = await this.prisma.fieldVisitRequest.findUnique({
+      where: { id: claim.fieldVisitRequestId },
+      select: {
+        location: true, latitude: true, longitude: true,
+        attendances: {
+          where: { employeeId: claim.employeeId ?? -1 },
+          select: {
+            visitDate: true, journeyVehicle: true, journeyTrackedKm: true, journeyRoute: true,
+            journeyStartLat: true, journeyStartLng: true, journeyEndLat: true, journeyEndLng: true,
+            clockInLat: true, clockInLng: true,
+          },
+          orderBy: { visitDate: 'asc' },
+        },
+      },
+    });
+    return {
+      site: { name: req?.location, lat: req?.latitude, lng: req?.longitude },
+      days: (req?.attendances ?? []).map((a) => ({
+        date: a.visitDate.toISOString().slice(0, 10),
+        vehicle: a.journeyVehicle,
+        trackedKm: a.journeyTrackedKm,
+        start: a.journeyStartLat != null ? { lat: a.journeyStartLat, lng: a.journeyStartLng } : null,
+        end: a.journeyEndLat != null ? { lat: a.journeyEndLat, lng: a.journeyEndLng } : null,
+        route: Array.isArray(a.journeyRoute) ? (a.journeyRoute as number[][]).map((p) => [p[0], p[1]]) : [],
+      })),
+    };
+  }
+
   // ─── Distance ────────────────────────────────────────────────────────────
 
   /**
@@ -275,7 +366,7 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
           select: {
             employeeId: true, visitDate: true, journeyVehicle: true,
             journeyStartLat: true, journeyStartLng: true, journeyEndLat: true, journeyEndLng: true,
-            journeyFare: true, journeyFareReceiptUrl: true,
+            journeyFare: true, journeyFareReceiptUrl: true, journeyTrackedKm: true,
           },
           orderBy: { visitDate: 'asc' },
         },
@@ -326,7 +417,12 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
         ratePerKm: actual ? null : rate.ratePerKm,
         fare: actual ? (a.journeyFare ?? 0) : null,
         receiptUrl: actual ? a.journeyFareReceiptUrl ?? null : null,
+        trackedKm: a.journeyTrackedKm ?? null,
         ...(actual && a.journeyFare == null ? { note: 'No fare entered — check with the employee' } : {}),
+        // A recorded route much longer or shorter than the road estimate is
+        // worth a look; it does not change the amount.
+        ...(!actual && a.journeyTrackedKm != null && km > 0 && Math.abs(a.journeyTrackedKm - km) / km > 0.3
+          ? { note: `Tracked route ${a.journeyTrackedKm} km vs ${km} km estimated — check the route` } : {}),
         amount: actual ? Math.round((a.journeyFare ?? 0) * 100) / 100 : Math.round(km * rate.ratePerKm * 100) / 100,
       });
     }

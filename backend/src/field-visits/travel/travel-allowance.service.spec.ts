@@ -34,7 +34,7 @@ const visit = (attendances: any[]) => ({
 const day = (over: any = {}) => ({
   employeeId: 60, visitDate: new Date('2026-10-14T00:00:00Z'), journeyVehicle: 'Car',
   journeyStartLat: null, journeyStartLng: null, journeyEndLat: null, journeyEndLng: null,
-  journeyFare: null, journeyFareReceiptUrl: null, ...over,
+  journeyFare: null, journeyFareReceiptUrl: null, journeyTrackedKm: null, ...over,
 });
 
 describe('travel allowance', () => {
@@ -97,5 +97,18 @@ describe('travel allowance', () => {
     expect(c.maxFarePerDay).toBe(500);
     expect(c.rates.map((r) => r.vehicle)).toEqual(['Bike / Scooter', 'Car', 'Metro', 'Bus', 'Auto / Cab']);
     expect(c.rates.find((r) => r.vehicle === 'Auto / Cab')).toMatchObject({ kind: 'ACTUAL_FARE', receiptRequired: true });
+  });
+
+  it('measures a recorded route and ignores GPS jumps', () => {
+    const t0 = 1_700_000_000_000;
+    // ~1.1 km north each minute (66 km/h), then a 50 km jump in 30 s.
+    const pts = [[28.50, 77.40, t0], [28.51, 77.40, t0 + 60_000], [28.52, 77.40, t0 + 120_000], [28.97, 77.40, t0 + 150_000]];
+    expect(TravelAllowanceService.trackedKm(pts)).toBeCloseTo(2.2, 1);
+  });
+
+  it('flags a day whose tracked route is far longer than the estimate', async () => {
+    const { service, created } = make({ requests: [visit([day({ journeyTrackedKm: 120 })])] });
+    await service.sweep();
+    expect(created[0].travelDetail.days[0].note).toMatch(/Tracked route 120 km/);
   });
 });

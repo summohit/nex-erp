@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { isPayrollRole } from '../../common/company-roles';
 import { AuthGuard } from '../../auth/auth.guard';
 import { TravelAllowanceService, TravelConfig } from './travel-allowance.service';
 
@@ -30,6 +31,21 @@ export class TravelAllowanceController {
   @Post('journey/start')
   start(@Req() req, @Body() body: any) {
     return this.travel.startJourney(req.user.sub, body);
+  }
+
+  /** Android app: { requestId?, points: [[lat, lng, epochMs], ...] } recorded during the journey. */
+  @Post('journey/points')
+  points(@Req() req, @Body() body: any) {
+    return this.travel.addRoutePoints(req.user.sub, body);
+  }
+
+  /** The route behind a travel claim, for the map. Claimant or finance. */
+  @Get('claims/:id/route')
+  route(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.travel.claimRoute(req.user.companyId, id, {
+      employeeId: req.user.employeeId ?? null,
+      mayApprove: isPayrollRole(req.user.role),
+    });
   }
 
   /** { requestId?, lat, lng } — optional, where they finished. */
