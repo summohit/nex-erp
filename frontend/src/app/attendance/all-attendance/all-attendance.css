@@ -1797,6 +1797,51 @@
   box-shadow: -4px 2px 8px -2px rgba(0, 0, 0, 0.06);
 }
 
+/* A month matrix cannot meaningfully compress 28–31 date columns into a
+   phone-width card. Keep each date legible and let the card scroll sideways;
+   the employee and total columns stay pinned while the dates move beneath. */
+@media (max-width: 640px) {
+  .matrix-scroll-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .matrix-table {
+    width: max-content;
+    min-width: 760px;
+    table-layout: fixed;
+  }
+
+  .matrix-table th.col-employee-header,
+  .matrix-table td.col-employee-cell {
+    width: 178px;
+  }
+
+  .matrix-table th.col-day-header,
+  .matrix-table td.col-day-cell {
+    width: 38px;
+    min-width: 38px;
+  }
+
+  .matrix-table th.col-total-header,
+  .matrix-table td.col-total-cell {
+    width: 58px;
+  }
+
+  .col-employee-cell {
+    padding-left: 10px !important;
+  }
+
+  .emp-profile-lockup {
+    gap: 7px;
+  }
+
+  .emp-text-meta {
+    max-width: 120px;
+  }
+}
+
 .matrix-row:hover td.sticky-left,
 .matrix-row:hover td.sticky-right {
   background-color: #f8fafc;
