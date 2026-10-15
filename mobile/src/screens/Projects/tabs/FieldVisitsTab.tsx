@@ -2,8 +2,11 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Modal, Platform,
 } from 'react-native';
-import { MapPin, Clock, Ruler, Camera, User, CheckCircle2, XCircle, AlertTriangle, X } from 'lucide-react-native';
+import { MapPin, Clock, Ruler, Camera, User, X } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useFieldVisitStore } from '../../../store/fieldVisitStore';
+import { fieldVisitRequestService, FieldVisitRequest } from '../../../api/fieldVisitRequestService';
+import { fvStatus, range, timeLabel, who } from '../../FieldVisit/fvFormat';
 import { formatDuration } from '../../../utils/haversine';
 
 interface Props {
@@ -21,14 +24,25 @@ const statusColor = (status: string) => {
 };
 
 export default function FieldVisitsTab({ projectId }: Props) {
+  const navigation = useNavigation<any>();
   const { projectVisits, isLoading, fetchProjectVisits } = useFieldVisitStore();
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  // Field visits as they are raised now (requests). The store's projectVisits
+  // are the old phone-started visits, kept below as history; on their own this
+  // tab missed every visit raised since the request flow replaced them.
+  const [requests, setRequests] = useState<FieldVisitRequest[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
 
   useEffect(() => {
     fetchProjectVisits(projectId);
-  }, [projectId]);
+    setLoadingRequests(true);
+    fieldVisitRequestService.list({ projectId })
+      .then((rows) => setRequests([...rows].sort((a, b) => b.startDate.localeCompare(a.startDate))))
+      .catch(() => setRequests([]))
+      .finally(() => setLoadingRequests(false));
+  }, [projectId, fetchProjectVisits]);
 
-  if (isLoading) {
+  if (isLoading || loadingRequests) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#1373e5" />
@@ -36,7 +50,7 @@ export default function FieldVisitsTab({ projectId }: Props) {
     );
   }
 
-  if (projectVisits.length === 0) {
+  if (projectVisits.length === 0 && requests.length === 0) {
     return (
       <View style={styles.emptyBox}>
         <View style={styles.emptyIconCircle}>
@@ -50,6 +64,21 @@ export default function FieldVisitsTab({ projectId }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {requests.map((r) => {
+        const st = fvStatus(r.status);
+        return (
+          <TouchableOpacity key={`r${r.id}`} style={styles.card} onPress={() => navigation.navigate('FieldVisitDetail', { id: r.id })}>
+            <View style={styles.reqHead}>
+              <Text style={styles.reqNo}>{r.requestNumber}</Text>
+              <View style={[styles.reqBadge, { backgroundColor: st.bg }]}><Text style={[styles.reqBadgeText, { color: st.fg }]}>{st.label}</Text></View>
+            </View>
+            <Text style={styles.reqSite} numberOfLines={2}>{r.location}</Text>
+            <Text style={styles.reqMeta}>{range(r)} · {timeLabel(r.startTime)} – {timeLabel(r.endTime)}</Text>
+            <Text style={styles.reqMeta} numberOfLines={1}>{r.members.map((m) => who(m.employee)).join(', ')}</Text>
+          </TouchableOpacity>
+        );
+      })}
+      {projectVisits.length > 0 && requests.length > 0 && <Text style={styles.historyTitle}>Earlier visits</Text>}
       {projectVisits.map((v) => {
         const sc = statusColor(v.status);
         const employeeName = v.employee
@@ -176,6 +205,13 @@ export default function FieldVisitsTab({ projectId }: Props) {
 }
 
 const styles = StyleSheet.create({
+  reqHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  reqNo: { fontSize: 12, fontWeight: '700', color: '#64748B' },
+  reqBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  reqBadgeText: { fontSize: 11, fontWeight: '700' },
+  reqSite: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginTop: 6 },
+  reqMeta: { fontSize: 12.5, color: '#475569', marginTop: 3 },
+  historyTitle: { fontSize: 12.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', marginTop: 8, marginBottom: 4 },
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   content: { padding: 16, gap: 14, paddingBottom: 40 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },

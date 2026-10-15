@@ -1,37 +1,15 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert,
-  Modal, ScrollView, TextInput, Linking,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Linking,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AppScreen from '../../components/AppScreen';
 import { fieldVisitRequestService as fv, FieldVisitRequest, FvDay } from '../../api/fieldVisitRequestService';
 import { getCurrentLocation, requestLocationPermission } from '../../store/dashboardStore';
 import { theme } from '../../theme/theme';
+import { fvStatus, timeLabel, clockAt, range, mapsUrl } from './fvFormat';
 
 type Tab = 'TODAY' | 'MINE';
-
-const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
-  DRAFT: { label: 'Draft', bg: '#F1F5F9', fg: '#475569' },
-  PENDING_APPROVAL: { label: 'Waiting approval', bg: '#FEF3C7', fg: '#92400E' },
-  APPROVED: { label: 'Approved', bg: '#DCFCE7', fg: '#15803D' },
-  REJECTED: { label: 'Rejected', bg: '#FEE2E2', fg: '#B91C1C' },
-  CANCELLED: { label: 'Cancelled', bg: '#F1F5F9', fg: '#64748B' },
-  COMPLETED: { label: 'Completed', bg: '#E0E7FF', fg: '#3730A3' },
-};
-
-const dateLabel = (d: string) =>
-  new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
-const timeLabel = (t?: string | null) => {
-  if (!t) return '';
-  const [h, m] = t.split(':').map(Number);
-  return `${((h + 11) % 12) + 1}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
-};
-const clockAt = (d?: string | null) =>
-  d ? new Date(d).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' }) : '';
-const range = (r: { startDate: string; endDate: string }) =>
-  r.startDate.slice(0, 10) === r.endDate.slice(0, 10) ? dateLabel(r.startDate) : `${dateLabel(r.startDate)} → ${dateLabel(r.endDate)}`;
-const who = (p?: { firstName: string; lastName?: string | null } | null) => (p ? `${p.firstName} ${p.lastName || ''}`.trim() : '');
 
 export default function FieldVisitsScreen() {
   const navigation = useNavigation<any>();
@@ -42,9 +20,6 @@ export default function FieldVisitsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
   const [taskFor, setTaskFor] = useState<Record<number, number | undefined>>({});
-  const [open, setOpen] = useState<FieldVisitRequest | null>(null);
-  const [cancelling, setCancelling] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
 
   const load = useCallback(async () => {
     const [t, m] = await Promise.allSettled([fv.today(), fv.list()]);
@@ -87,24 +62,6 @@ export default function FieldVisitsScreen() {
     }
   };
 
-  const withdraw = (r: FieldVisitRequest) =>
-    Alert.alert('Withdraw request?', `${r.requestNumber} goes back to a draft.`, [
-      { text: 'Keep it', style: 'cancel' },
-      { text: 'Withdraw', style: 'destructive', onPress: async () => {
-        try { await fv.withdraw(r.id); setOpen(null); load(); } catch (e: any) { Alert.alert('Could not withdraw', e?.response?.data?.message || 'Please try again.'); }
-      } },
-    ]);
-
-  const submitCancel = async () => {
-    if (!open || !cancelReason.trim()) return;
-    try {
-      await fv.cancel(open.id, cancelReason.trim());
-      setCancelling(false); setCancelReason(''); setOpen(null); load();
-    } catch (e: any) {
-      Alert.alert('Could not cancel', e?.response?.data?.message || 'Please try again.');
-    }
-  };
-
   const mineSorted = useMemo(() => [...mine].sort((a, b) => b.startDate.localeCompare(a.startDate)), [mine]);
 
   const renderDay = ({ item: d }: { item: FvDay }) => {
@@ -117,7 +74,7 @@ export default function FieldVisitsScreen() {
         <Text style={styles.meta}>
           {timeLabel(d.request.startTime)} – {timeLabel(d.request.endTime)} · within {d.request.geofenceRadiusM >= 1000 ? `${d.request.geofenceRadiusM / 1000} km` : `${d.request.geofenceRadiusM} m`} of the site
         </Text>
-        <Text style={styles.link} onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${d.request.latitude},${d.request.longitude}`)}>
+        <Text style={styles.link} onPress={() => Linking.openURL(mapsUrl(d.request.latitude, d.request.longitude))}>
           Open site in Maps
         </Text>
 
@@ -153,9 +110,9 @@ export default function FieldVisitsScreen() {
   };
 
   const renderRequest = ({ item: r }: { item: FieldVisitRequest }) => {
-    const s = STATUS[r.status] || STATUS.DRAFT;
+    const s = fvStatus(r.status);
     return (
-      <TouchableOpacity style={styles.card} onPress={() => setOpen(r)}>
+      <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('FieldVisitDetail', { id: r.id })}>
         <View style={styles.headRow}>
           <Text style={styles.reqNo}>{r.requestNumber}</Text>
           <View style={[styles.badge, { backgroundColor: s.bg }]}><Text style={[styles.badgeText, { color: s.fg }]}>{s.label}</Text></View>
@@ -203,54 +160,6 @@ export default function FieldVisitsScreen() {
         />
       )}
 
-      <Modal visible={!!open} animationType="slide" onRequestClose={() => { setOpen(null); setCancelling(false); }}>
-        {open && (
-          <View style={styles.detail}>
-            <View style={styles.headRow}>
-              <Text style={styles.detailTitle}>{open.requestNumber}</Text>
-              <TouchableOpacity onPress={() => { setOpen(null); setCancelling(false); }}><Text style={styles.close}>Close</Text></TouchableOpacity>
-            </View>
-            <ScrollView contentContainerStyle={styles.detailBody}>
-              <View style={[styles.badge, { backgroundColor: (STATUS[open.status] || STATUS.DRAFT).bg, alignSelf: 'flex-start' }]}>
-                <Text style={[styles.badgeText, { color: (STATUS[open.status] || STATUS.DRAFT).fg }]}>{(STATUS[open.status] || STATUS.DRAFT).label}</Text>
-              </View>
-              <Text style={styles.site}>{open.location}</Text>
-              <Text style={styles.meta}>{open.project?.isSystem ? 'General visit' : open.project?.name}</Text>
-              <Text style={styles.meta}>{range(open)} · {timeLabel(open.startTime)} – {timeLabel(open.endTime)}</Text>
-              {!!open.raisedBy && <Text style={styles.meta}>Raised by {who(open.raisedBy)}</Text>}
-              {open.status === 'REJECTED' && !!open.rejectionReason && <Text style={styles.rejected}>Rejected: {open.rejectionReason}</Text>}
-
-              <Text style={styles.section}>People ({open.members.length})</Text>
-              {open.members.map((m) => <Text key={m.id} style={styles.item}>• {who(m.employee)}</Text>)}
-
-              <Text style={styles.section}>Tasks ({open.tasks.length})</Text>
-              {open.tasks.map((t) => <Text key={t.id} style={styles.item}>• {t.issue ? `${t.issue.key} · ${t.issue.title}` : t.name}</Text>)}
-
-              {!!open.remarks && (<><Text style={styles.section}>Remarks</Text><Text style={styles.item}>{open.remarks}</Text></>)}
-
-              {open.status === 'PENDING_APPROVAL' && (
-                <TouchableOpacity style={[styles.action, styles.actionGhost]} onPress={() => withdraw(open)}>
-                  <Text style={styles.actionGhostText}>Withdraw to draft</Text>
-                </TouchableOpacity>
-              )}
-              {open.status === 'APPROVED' && !cancelling && (
-                <TouchableOpacity style={[styles.action, styles.actionDanger]} onPress={() => setCancelling(true)}>
-                  <Text style={styles.actionDangerText}>Cancel this visit</Text>
-                </TouchableOpacity>
-              )}
-              {cancelling && (
-                <View style={styles.cancelBox}>
-                  <Text style={styles.label}>Why is it cancelled? Everyone on it is told.</Text>
-                  <TextInput style={styles.input} value={cancelReason} onChangeText={setCancelReason} placeholder="e.g. Client postponed" multiline />
-                  <TouchableOpacity style={[styles.action, styles.actionDangerSolid, !cancelReason.trim() && { opacity: 0.5 }]} disabled={!cancelReason.trim()} onPress={submitCancel}>
-                    <Text style={styles.clockText}>Cancel visit</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        )}
-      </Modal>
     </AppScreen>
   );
 }
@@ -287,18 +196,4 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '700' },
   rejected: { marginTop: 6, fontSize: 12.5, color: '#B91C1C' },
   empty: { textAlign: 'center', color: theme.colors.textSecondary, marginTop: 40, paddingHorizontal: 24, lineHeight: 20 },
-  detail: { flex: 1, backgroundColor: '#fff', paddingTop: 54, paddingHorizontal: 18 },
-  detailTitle: { fontSize: 20, fontWeight: '800', color: theme.colors.textPrimary },
-  close: { color: theme.colors.primary, fontWeight: '700' },
-  detailBody: { paddingVertical: 14, paddingBottom: 60, gap: 2 },
-  section: { marginTop: 16, fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, textTransform: 'uppercase' },
-  item: { fontSize: 14, color: theme.colors.textPrimary, marginTop: 4 },
-  action: { marginTop: 20, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  actionGhost: { backgroundColor: '#F1F5F9' },
-  actionGhostText: { fontWeight: '700', color: '#334155' },
-  actionDanger: { borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
-  actionDangerText: { fontWeight: '700', color: '#DC2626' },
-  actionDangerSolid: { backgroundColor: '#DC2626' },
-  cancelBox: { marginTop: 16 },
-  input: { minHeight: 70, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 10, textAlignVertical: 'top', color: theme.colors.textPrimary },
 });

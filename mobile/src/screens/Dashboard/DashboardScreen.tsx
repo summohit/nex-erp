@@ -17,7 +17,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { useAuthStore } from '../../store/authStore';
 import { useDashboardStore, getCurrentLocation, requestLocationPermission } from '../../store/dashboardStore';
 import { notificationService, AppNotification } from '../../api/notificationService';
-import { useFieldVisitStore } from '../../store/fieldVisitStore';
+import { fieldVisitRequestService, FvDay } from '../../api/fieldVisitRequestService';
 import { formatElapsed } from '../../utils/haversine';
 import { navigateTo } from '../../navigation/navigationUtils';
 import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
@@ -163,7 +163,11 @@ export default function DashboardScreen() {
     isLoading,
     error,
   } = useDashboardStore();
-  const { activeVisit, fetchActiveVisit } = useFieldVisitStore();
+  // Today's approved field visit days (the request flow). The card used to read
+  // the old phone-started "active visit", which nothing creates any more, so it
+  // never showed anyone on a visit.
+  const [visitDays, setVisitDays] = useState<FvDay[]>([]);
+  const loadVisitDays = () => fieldVisitRequestService.today().then(setVisitDays).catch(() => setVisitDays([]));
 
   // currentTime and visitElapsed used to live here, each on a one-second
   // interval. They are now LiveClock and VisitElapsed, which own their own
@@ -178,13 +182,18 @@ export default function DashboardScreen() {
     message: string;
   }>({ visible: false, type: 'success', title: '', message: '' });
 
-  const isTraveling = !!activeVisit;
+  /** Clocked in at a site and not yet out. */
+  const onSiteDay = visitDays.find((d) => !!d.clockInTime && !d.clockOutTime) ?? null;
+  /** An approved visit today, not yet clocked in. */
+  const upcomingDay = onSiteDay ? null : visitDays.find((d) => !d.clockInTime) ?? null;
+  const isTraveling = !!onSiteDay;
+  const visitDay = onSiteDay ?? upcomingDay;
 
   // Initial load
   useEffect(() => {
     fetchDashboardData();
-    fetchActiveVisit().catch(() => {});
-  }, [fetchDashboardData, fetchActiveVisit]);
+    loadVisitDays();
+  }, [fetchDashboardData]);
 
   // The per-second timers that used to sit here now live inside LiveClock and
   // VisitElapsed. What remains ticks once a minute, which costs one render per
@@ -243,7 +252,7 @@ export default function DashboardScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchDashboardData(), loadHomeSections()]);
+    await Promise.all([fetchDashboardData(), loadHomeSections(), loadVisitDays()]);
     setRefreshing(false);
   };
 
@@ -861,42 +870,46 @@ export default function DashboardScreen() {
                   <View style={[styles.fieldBadge, isTraveling && styles.fieldBadgeActive]}>
                     <Navigation size={15} color={isTraveling ? '#16A34A' : '#64748B'} strokeWidth={2.2} />
                     <Text style={[styles.fieldBadgeText, isTraveling && styles.fieldBadgeTextActive]}>
-                      {isTraveling ? 'TRAVELING' : 'IDLE'}
+                      {isTraveling ? 'ON SITE' : upcomingDay ? 'TODAY' : 'IDLE'}
                     </Text>
                   </View>
                   <Text style={styles.fieldMainTitle}>
-                    {isTraveling ? 'Field Visit in Progress' : 'Field Visit'}
+                    {isTraveling ? 'Field Visit in Progress' : upcomingDay ? 'Field Visit Today' : 'Field Visit'}
                   </Text>
                 </View>
                 <View style={[styles.fieldStatusDotWrap, isTraveling ? styles.fieldDotActive : styles.fieldDotIdle]} />
               </View>
 
-              {isTraveling && activeVisit ? (
+              {visitDay ? (
                 <>
                   <View style={styles.fieldVisitProjectRow}>
-                    <View style={[styles.fieldProjectDot, { backgroundColor: activeVisit.project?.color || '#2563EB' }]} />
+                    <View style={[styles.fieldProjectDot, { backgroundColor: '#2563EB' }]} />
                     <Text style={styles.fieldProjectName} numberOfLines={1}>
-                      {activeVisit.project?.name || 'Active Visit Project'}
+                      {visitDay.request.project?.name || 'General visit'}
                     </Text>
                   </View>
-                  {!!activeVisit.purpose && (
-                    <Text style={styles.fieldPurposeText} numberOfLines={2}>
-                      {activeVisit.purpose}
-                    </Text>
-                  )}
+                  <Text style={styles.fieldPurposeText} numberOfLines={2}>
+                    {visitDay.request.location}
+                  </Text>
                   <View style={styles.fieldLiveMetricsRow}>
                     <View style={styles.fieldLiveMetricItem}>
                       <Clock size={15} color="#1373e5" strokeWidth={2.2} />
-                      <VisitElapsed startTime={activeVisit.startTime} style={styles.fieldLiveValue} />
-                      <Text style={styles.fieldLiveLabel}>Duration</Text>
+                      {onSiteDay?.clockInTime ? (
+                        <VisitElapsed startTime={onSiteDay.clockInTime} style={styles.fieldLiveValue} />
+                      ) : (
+                        <Text style={styles.fieldLiveValue}>{visitDay.request.startTime}–{visitDay.request.endTime}</Text>
+                      )}
+                      <Text style={styles.fieldLiveLabel}>{onSiteDay ? 'On site' : 'Hours'}</Text>
                     </View>
                     <View style={styles.fieldLiveDivider} />
                     <View style={styles.fieldLiveMetricItem}>
                       <MapPin size={15} color="#2563EB" strokeWidth={2.2} />
                       <Text style={styles.fieldLiveValue}>
-                        {new Date(activeVisit.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        {onSiteDay?.clockInTime
+                          ? new Date(onSiteDay.clockInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
+                          : visitDay.request.requestNumber}
                       </Text>
-                      <Text style={styles.fieldLiveLabel}>Started</Text>
+                      <Text style={styles.fieldLiveLabel}>{onSiteDay ? 'Clocked in' : 'Request'}</Text>
                     </View>
                   </View>
                   <TouchableOpacity
@@ -905,13 +918,13 @@ export default function DashboardScreen() {
                     onPress={() => safeNavigate('FieldVisit')}
                   >
                     <MapPin size={16} color="#FFFFFF" strokeWidth={2.2} style={{ marginRight: 6 }} />
-                    <Text style={styles.fieldActiveActionText}>View Live Route</Text>
+                    <Text style={styles.fieldActiveActionText}>{onSiteDay ? 'Clock out at site' : 'Clock in at site'}</Text>
                   </TouchableOpacity>
                 </>
               ) : (
                 <View style={styles.fieldIdleContent}>
                   <Text style={styles.fieldIdleDescription}>
-                    Track your business travel, client meetings, and route logs effortlessly.
+                    Raise a field visit request. Once it is approved, you clock in here at the site.
                   </Text>
                   <View style={styles.fieldIdleActionRow}>
                     <TouchableOpacity
@@ -920,7 +933,7 @@ export default function DashboardScreen() {
                       onPress={() => safeNavigate('FieldVisit')}
                     >
                       <Navigation size={15} color="#FFFFFF" strokeWidth={2.4} style={{ marginRight: 6 }} />
-                      <Text style={styles.fieldStartBtnText}>Start Trip</Text>
+                      <Text style={styles.fieldStartBtnText}>Field Visits</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

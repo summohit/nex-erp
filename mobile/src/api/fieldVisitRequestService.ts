@@ -53,6 +53,54 @@ export interface FvDay {
   tasks: { id: number; key: string; title: string }[];
 }
 
+/** One person's day on the trip, as the detail view lists it. */
+export interface FvAttendance {
+  id: number;
+  visitDate: string;
+  status: string;
+  isHoliday?: boolean;
+  clockInTime?: string | null;
+  clockInDistanceKm?: number | null;
+  clockOutTime?: string | null;
+  clockOutDistanceKm?: number | null;
+  issue?: { id: number; key: string; title: string } | null;
+  employee: FvPerson;
+}
+
+/** A request as GET /:id returns it: the request, every day on it, and what this person may do. */
+export interface FieldVisitDetail extends FieldVisitRequest {
+  attendances: FvAttendance[];
+  pendingChange?: any | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewedBy?: FvPerson | null;
+  canEdit: boolean;
+  canSubmit: boolean;
+  canReview: boolean;
+  canWithdraw: boolean;
+  canRequestChange: boolean;
+  canReviewChange: boolean;
+  canCancel: boolean;
+  canComplete: boolean;
+}
+
+export interface FvActivity {
+  id: number;
+  action: string;
+  detail?: string | null;
+  createdAt: string;
+  actor?: FvPerson | null;
+}
+
+/** What the signed-in person may do with field visits (GET /capabilities). */
+export interface FvCapabilities {
+  isApprover: boolean;
+  isSuperAdmin: boolean;
+  allProjects: boolean;
+  managedProjectIds: number[];
+  isProjectManager: boolean;
+}
+
 export interface VisitLocation { id: number; name: string; address?: string | null; latitude?: number | null; longitude?: number | null }
 export interface ProjectLite { id: number; name: string; key: string }
 export interface TaskOption { id: number; key: string; title: string; status?: string }
@@ -76,9 +124,24 @@ export interface NewFieldVisit {
 
 export const fieldVisitRequestService = {
   // ── requests ──
-  async list(status?: string): Promise<FieldVisitRequest[]> {
-    const { data } = await apiClient.get('/field-visit-requests', { params: status ? { status } : {} });
+  async list(filter: { status?: string; projectId?: number } = {}): Promise<FieldVisitRequest[]> {
+    const params: Record<string, string> = {};
+    if (filter.status) params.status = filter.status;
+    if (filter.projectId) params.projectId = String(filter.projectId);
+    const { data } = await apiClient.get('/field-visit-requests', { params });
     return data || [];
+  },
+  async get(id: number): Promise<FieldVisitDetail> {
+    const { data } = await apiClient.get(`/field-visit-requests/${id}`);
+    return data;
+  },
+  async timeline(id: number): Promise<FvActivity[]> {
+    const { data } = await apiClient.get(`/field-visit-requests/${id}/timeline`);
+    return data || [];
+  },
+  async capabilities(): Promise<FvCapabilities> {
+    const { data } = await apiClient.get('/field-visit-requests/capabilities');
+    return data;
   },
   async create(body: NewFieldVisit): Promise<FieldVisitRequest> {
     const { data } = await apiClient.post('/field-visit-requests', body);

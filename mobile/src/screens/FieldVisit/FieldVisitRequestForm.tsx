@@ -63,8 +63,22 @@ export default function FieldVisitRequestForm() {
   const [dateTarget, setDateTarget] = useState<'start' | 'end' | null>(null);
   const [timeTarget, setTimeTarget] = useState<'start' | 'end' | null>(null);
 
+  // Project visits are raised by the project's manager (or an administrator);
+  // anyone may raise a General visit. Offer only the projects the server would
+  // accept, and no Project option at all to someone who manages none.
+  const [canRaiseProject, setCanRaiseProject] = useState(true);
+
   useEffect(() => {
-    fv.projects().then(setProjects).catch(() => {});
+    Promise.all([fv.projects(), fv.capabilities()])
+      .then(([all, caps]) => {
+        const mine = caps.allProjects ? all : all.filter((p) => caps.managedProjectIds.includes(p.id));
+        setProjects(mine);
+        if (!caps.allProjects && mine.length === 0) {
+          setCanRaiseProject(false);
+          setVisitType('GENERAL');
+        }
+      })
+      .catch(() => fv.projects().then(setProjects).catch(() => {}));
     fv.visitLocations().then(setSites).catch(() => {});
     workService.getEmployees().then(setEmployees).catch(() => {});
   }, []);
@@ -176,13 +190,17 @@ export default function FieldVisitRequestForm() {
     <AppScreen title="New Field Visit" subtitle="Request a site visit">
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>Type of visit</Text>
-        <View style={styles.segment}>
-          {(['PROJECT', 'GENERAL'] as const).map((t) => (
-            <TouchableOpacity key={t} style={[styles.segBtn, visitType === t && styles.segOn]} onPress={() => setVisitType(t)}>
-              <Text style={[styles.segText, visitType === t && styles.segTextOn]}>{t === 'PROJECT' ? 'Project visit' : 'General visit'}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {canRaiseProject ? (
+          <View style={styles.segment}>
+            {(['PROJECT', 'GENERAL'] as const).map((t) => (
+              <TouchableOpacity key={t} style={[styles.segBtn, visitType === t && styles.segOn]} onPress={() => setVisitType(t)}>
+                <Text style={[styles.segText, visitType === t && styles.segTextOn]}>{t === 'PROJECT' ? 'Project visit' : 'General visit'}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.hint}>General visit — built from your own general tasks. A project visit is raised by that project's manager.</Text>
+        )}
 
         {visitType === 'PROJECT' && (
           <>
