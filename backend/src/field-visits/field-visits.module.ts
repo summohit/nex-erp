@@ -12,13 +12,15 @@ import { NotificationsModule } from '../notifications/notifications.module';
 // keeping a second implementation of open sessions, lateness and half days.
 import { AttendanceModule } from '../attendance/attendance.module';
 import { FieldVisitRemindersCron } from './field-visit-reminders.cron';
+import { TravelAllowanceService } from './travel/travel-allowance.service';
+import { TravelAllowanceController } from './travel/travel-allowance.controller';
 
 @Module({
   imports: [NotificationsModule, AttendanceModule],
-  controllers: [FieldVisitsController, FieldVisitRequestsController, FieldVisitClockController],
+  controllers: [FieldVisitsController, FieldVisitRequestsController, FieldVisitClockController, TravelAllowanceController],
   providers: [
     FieldVisitsService, FieldVisitRequestsService, FieldVisitActivationService,
-    FieldVisitClockService, FieldVisitRemindersCron, PrismaService,
+    FieldVisitClockService, FieldVisitRemindersCron, TravelAllowanceService, PrismaService,
   ],
   // Exported for LeavesService: approving leave over a trip has to give those
   // days back, and the logic for what that means lives with the fan-out that

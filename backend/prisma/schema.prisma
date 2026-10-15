@@ -1176,8 +1176,15 @@ model ExpenseClaim {
   projectName     String?
   projectId       Int?
   project         Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  /// The field visit a travel-allowance claim was calculated from. One claim
+  /// per person per visit; the unique keeps the hourly sweep from doubling it.
+  fieldVisitRequestId Int?
+  /// The calculation: per day, start point, km and rate.
+  travelDetail    Json?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  @@unique([fieldVisitRequestId, employeeId])
 }
 
 // Appreciation & Awards
@@ -3041,6 +3048,9 @@ model SystemSetting {
   // used to render offer letters. Kept as JSON so adding a clause doesn't require a
   // migration — see OfferLetterConfig in offer-letters.service.ts for the shape.
   offerLetterConfig             Json?
+  /// Field visit travel allowance (super admin): { ncrRadiusKm, rates:
+  /// [{ vehicle, ratePerKm }] }. See field-visits/travel/travel-allowance.service.ts.
+  travelAllowanceConfig         Json?
   defaultTicketAssigneeId       Int? // Employee auto-assigned as default ticket assignee
   // Standard terms pre-filled into every new quotation. Editable on the quote
   // itself, so this is a starting point rather than a policy — null falls back
@@ -4305,6 +4315,10 @@ model FieldVisitRequest {
   /// typed (§PB10). SetNull, and the location/coordinates above stay put: where
   /// somebody actually went is a fact about the trip, and retiring a site from
   /// the picker must not erase it from trips already made.
+  /// DELHI_NCR (paid per km) or OUTSTATION (normal expense claims). Set on
+  /// the form, suggested from the distance to the office; null on visits
+  /// raised before the travel allowance (15 Oct 2026).
+  travelZone      String?
   visitLocationId Int?
   visitLocation   VisitLocation? @relation(fields: [visitLocationId], references: [id], onDelete: SetNull)
 
@@ -4458,6 +4472,17 @@ model FieldVisitAttendance {
   clockOutLat        Float?
   clockOutLng        Float?
   clockOutDistanceKm Float?
+
+  /// Travel allowance (Delhi NCR visits): one location read when the person
+  /// taps Start journey, wherever they set off from, and an optional one at
+  /// End journey. No tracking in between.
+  journeyVehicle    String?
+  journeyStartAt    DateTime?
+  journeyStartLat   Float?
+  journeyStartLng   Float?
+  journeyEndAt      DateTime?
+  journeyEndLat     Float?
+  journeyEndLng     Float?
 
   /// The tracked visit this day produced, once one is started.
   fieldVisitId Int?

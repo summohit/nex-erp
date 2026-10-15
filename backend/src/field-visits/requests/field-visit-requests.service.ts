@@ -1,10 +1,11 @@
 import { describeChanges, diffFields, recordApprovalEdit, requireEditReason } from '../../common/approval-edits';
-import {
+import { Optional,
   Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { TravelAllowanceService, TRAVEL_ZONE } from '../travel/travel-allowance.service';
 import { FieldVisitActivationService } from './field-visit-activation.service';
 import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY } from '../field-visit-status';
 import { CompanyRole, isCompanyAdmin, isSuperAdmin } from '../../common/company-roles';
@@ -62,6 +63,8 @@ export interface FieldVisitRequestInput {
   startTime: string;
   endTime: string;
   remarks?: string;
+  /** DELHI_NCR or OUTSTATION; suggested from the site's distance when left out. */
+  travelZone?: string | null;
   /** Why an approved trip is being changed; required on a change request. */
   changeReason?: string;
   employeeIds: number[];
@@ -99,6 +102,8 @@ export class FieldVisitRequestsService {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private activation: FieldVisitActivationService,
+    /** Optional so specs that build the service without it still work. */
+    @Optional() private travel?: TravelAllowanceService,
   ) {}
 
 
@@ -122,7 +127,7 @@ export class FieldVisitRequestsService {
     id: true, requestNumber: true, location: true,
     latitude: true, longitude: true, geofenceRadiusM: true,
     startDate: true, endDate: true, visitDays: true,
-    startTime: true, endTime: true, remarks: true,
+    startTime: true, endTime: true, remarks: true, travelZone: true,
     status: true, rejectionReason: true,
     pendingChange: true, pendingChangeAt: true,
     submittedAt: true, reviewedAt: true, createdAt: true, updatedAt: true,
@@ -419,11 +424,24 @@ export class FieldVisitRequestsService {
         startDate, endDate, visitDays,
         startTime, endTime,
         remarks: String(data?.remarks ?? '').trim() || null,
+        travelZone: await this.resolveTravelZone(companyId, data?.travelZone, latitude, longitude),
       },
       employeeIds,
       tasks,
       attachments,
     };
+  }
+
+  /**
+   * Delhi NCR or Outstation (decided 15 Oct 2026). The PM's choice stands;
+   * left out, it is suggested from the site's distance to the head office.
+   */
+  private async resolveTravelZone(companyId: number, raw: unknown, lat: number, lng: number): Promise<string | null> {
+    const zone = String(raw ?? '').trim().toUpperCase();
+    if (zone === TRAVEL_ZONE.NCR || zone === TRAVEL_ZONE.OUTSTATION) return zone;
+    if (zone) throw new BadRequestException('Travel type must be Delhi NCR or Outstation');
+    if (!this.travel) return null;
+    return (await this.travel.suggestZone(companyId, lat, lng)).zone;
   }
 
   // ─── Who may do what ───────────────────────────────────────────────────────
@@ -890,6 +908,7 @@ export class FieldVisitRequestsService {
     if (existing.startTime !== fields.startTime || existing.endTime !== fields.endTime) {
       changed.push('hours');
     }
+    if (fields.travelZone && (existing.travelZone ?? null) !== fields.travelZone) changed.push('travel type');
     const before = (existing.members ?? []).map((m: any) => m.employeeId).sort().join(',');
     if (before !== [...employeeIds].sort().join(',')) changed.push('people');
     // The link, not the wording. Two different tasks can share a title, and
@@ -911,7 +930,7 @@ export class FieldVisitRequestsService {
         companyId: true, projectId: true,
         location: true, latitude: true, longitude: true,
         startDate: true, endDate: true, visitDays: true,
-        startTime: true, endTime: true, remarks: true,
+        startTime: true, endTime: true, remarks: true, travelZone: true,
         pendingChange: true,
         project: { select: { id: true, name: true, isSystem: true } },
         members: { select: { employeeId: true } },
@@ -1579,6 +1598,7 @@ export class FieldVisitRequestsService {
       startTime: request.startTime,
       endTime: request.endTime,
       remarks: request.remarks ?? undefined,
+      travelZone: request.travelZone,
       employeeIds: request.members.map((m) => m.employeeId),
       tasks: request.tasks.map((t) => ({ name: t.name, description: t.description ?? undefined, issueId: t.issueId })) as any,
     };
@@ -1709,6 +1729,7 @@ export class FieldVisitRequestsService {
         where: { id },
         data: {
           location: proposal.location,
+          ...(proposal.travelZone !== undefined ? { travelZone: proposal.travelZone } : {}),
           latitude: proposal.latitude,
           longitude: proposal.longitude,
           startDate: new Date(proposal.startDate),
