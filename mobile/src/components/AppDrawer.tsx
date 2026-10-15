@@ -46,7 +46,6 @@ import {
   Megaphone,
   CheckSquare,
   CalendarDays,
-  ExternalLink,
   FolderKanban,
   UserCheck,
   UserPlus,
@@ -154,22 +153,6 @@ function getIcon(iconName?: string, itemId?: string, route?: string): React.Comp
   return Briefcase;
 }
 
-function getSubItemIcon(sub: MenuItem): React.ComponentType<any> | null {
-  const titleLower = sub.title?.toLowerCase() || '';
-  const idLower = sub.id?.toLowerCase() || '';
-  if (sub.external || titleLower.includes('public') || titleLower.includes('career')) return ExternalLink;
-  if (titleLower.includes('interview') || idLower.includes('interview')) return Calendar;
-  if (titleLower.includes('candidate') || titleLower.includes('job')) return Users;
-  if (titleLower.includes('profile') || idLower.includes('profile')) return UserCircle;
-  if (titleLower.includes('timesheet') || titleLower.includes('time')) return Clock;
-  if (titleLower.includes('leave') || titleLower.includes('holiday')) return CalendarDays;
-  if (titleLower.includes('document')) return FileText;
-  if (sub.icon) {
-    const icon = getIcon(sub.icon, sub.id, sub.route);
-    if (icon !== Briefcase) return icon;
-  }
-  return null;
-}
 
 // Executive Soft-Card category tints (Slack / Notion inspired)
 interface ItemTheme {
@@ -605,8 +588,6 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
                               <View style={styles.subItemsTree}>
                                 {item.subItems!.map(sub => {
                                   const subActive = activeScreen === resolveNav(sub)?.screen;
-                                  const SubIconComponent = getSubItemIcon(sub);
-                                  const isExternal = !!sub.external || sub.route === '/careers';
 
                                   return (
                                     <TouchableOpacity
@@ -616,15 +597,6 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
                                       onPress={() => handleSubItemPress(sub)}
                                     >
                                       <View style={styles.subItemLeft}>
-                                        {SubIconComponent ? (
-                                          <SubIconComponent
-                                            size={14}
-                                            color={subActive ? '#1373e5' : '#64748B'}
-                                            strokeWidth={subActive ? 2.2 : 1.8}
-                                          />
-                                        ) : (
-                                          <View style={[styles.subItemDot, subActive && styles.subItemDotActive]} />
-                                        )}
                                         <Text
                                           style={[styles.subItemText, subActive && styles.subItemTextActive]}
                                           numberOfLines={1}
@@ -632,9 +604,6 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
                                           {sub.title.replace(' ↗', '')}
                                         </Text>
                                       </View>
-                                      {isExternal && (
-                                        <ExternalLink size={12} color="#94A3B8" strokeWidth={2} />
-                                      )}
                                     </TouchableOpacity>
                                   );
                                 })}
