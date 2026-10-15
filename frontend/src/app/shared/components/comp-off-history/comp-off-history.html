@@ -143,10 +143,10 @@
           No compensatory off {{ allEmployees ? 'recorded for anyone' : 'recorded for you' }} {{ rangeText() }}.
         </p>
         <button
-          *ngIf="query() || filterStatus() !== 'all'"
+          *ngIf="hasFilters()"
           type="button"
           class="coh-reset-btn"
-          (click)="clearQuery(); setFilter('all')"
+          (click)="resetFilters()"
         >
           Reset Filters
         </button>

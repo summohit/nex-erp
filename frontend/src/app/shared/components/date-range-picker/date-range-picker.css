@@ -1,7 +1,14 @@
 /* Same look as the Timesheets Duration filter. */
 :host { display: inline-block; }
 
-.drp-anchor { position: relative; }
+.drp-anchor { position: relative; display: flex; align-items: center; gap: 8px; }
+
+.drp-reset {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 10px; font: inherit; font-size: 13px; font-weight: 500;
+  color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer;
+}
+.drp-reset:hover { background: #e2e8f0; color: #0f172a; }
 
 .drp-trigger {
   display: inline-flex;

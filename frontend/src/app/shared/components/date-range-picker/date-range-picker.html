@@ -1,4 +1,8 @@
 <div class="drp-anchor">
+  <button type="button" class="drp-reset" *ngIf="isChanged()" (click)="reset()" title="Reset to {{ initial }}">
+    <svg lucideRotateCcw size="13"></svg>
+    Reset
+  </button>
   <button type="button" class="drp-trigger" [class.is-open]="open()" (click)="toggle()" [attr.aria-expanded]="open()">
     <span class="drp-title">Duration</span>
     <span class="drp-subtitle">{{ buttonText() }}</span>

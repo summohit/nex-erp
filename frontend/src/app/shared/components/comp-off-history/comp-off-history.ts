@@ -5,6 +5,7 @@ import {
   Input,
   OnChanges,
   Output,
+  ViewChild,
   computed,
   inject,
   signal,
@@ -120,6 +121,16 @@ export class CompOffHistoryComponent implements OnChanges {
   year = signal(new Date().getFullYear());
   /** From the Duration filter; null until it reports its starting range. */
   range = signal<DateRange | null>(null);
+  @ViewChild(DateRangePickerComponent) picker?: DateRangePickerComponent;
+
+  /** A search, tab or date range other than the default is applied. */
+  hasFilters = computed(() => !!this.query() || this.filterStatus() !== 'all' || (!!this.range() && this.range()!.label !== 'Last 1 Year'));
+
+  resetFilters() {
+    this.clearQuery();
+    this.setFilter('all');
+    this.picker?.reset();
+  }
   loading = signal(false);
   error = signal<string | null>(null);
   people = signal<CompOffPerson[]>([]);

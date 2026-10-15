@@ -1,6 +1,6 @@
 import { Component, ElementRef, EventEmitter, HostListener, Input, OnInit, Output, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { LucideChevronDown, LucideChevronLeft, LucideChevronRight } from '@lucide/angular';
+import { LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideRotateCcw } from '@lucide/angular';
 
 export interface DateRange {
   /** YYYY-MM-DD, inclusive. */
@@ -20,7 +20,7 @@ interface CalDay { date: Date; dayNumber: number; isCurrentMonth: boolean }
 @Component({
   selector: 'app-date-range-picker',
   standalone: true,
-  imports: [CommonModule, LucideChevronDown, LucideChevronLeft, LucideChevronRight],
+  imports: [CommonModule, LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideRotateCcw],
   templateUrl: './date-range-picker.html',
   styleUrl: './date-range-picker.css',
 })
@@ -49,6 +49,9 @@ export class DateRangePickerComponent implements OnInit {
   month2 = computed(() => new Date(this.month1().getFullYear(), this.month1().getMonth() + 1, 1));
   days1 = computed(() => this.daysOf(this.month1()));
   days2 = computed(() => this.daysOf(this.month2()));
+
+  /** Whether a range other than the starting preset is applied. */
+  isChanged = computed(() => this.label() !== this.initial);
 
   buttonText = computed(() => `${this.fmt(this.start())} To ${this.fmt(this.end())}`);
   pickText = computed(() => {
@@ -113,6 +116,12 @@ export class DateRangePickerComponent implements OnInit {
     const s = this.pickStart();
     if (!s) return;
     this.commit('Custom Range', s, this.pickEnd() ?? s);
+  }
+
+  /** Back to the starting preset. */
+  reset() {
+    const [s, e] = this.rangeFor(this.initial) ?? this.rangeFor('This Month')!;
+    this.commit(this.initial, s, e);
   }
 
   cancel() {
