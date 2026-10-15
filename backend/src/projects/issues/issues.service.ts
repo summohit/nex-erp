@@ -1764,9 +1764,29 @@ export class IssuesService {
     return { success: true, date: data.date, totalMin: target, trackedMin, manualMin: Math.max(manualMin, 0) };
   }
 
-  async getComments(companyId: number, projectId: number, issueId: number) {
-    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
+  /**
+   * The board's visibility rule for one task, so a task the board hides
+   * (pending or rejected, or not theirs) cannot be read through its comments,
+   * activity or checklists from a saved link. NotFound rather than Forbidden,
+   * so the link does not confirm the task exists.
+   */
+  private async assertMaySeeTask(
+    companyId: number, projectId: number, issueId: number, employeeId: number | null, role?: string,
+  ) {
+    const viewer = await resolveProjectViewer(this.prisma as any, companyId, projectId, employeeId, role);
+    const visible = taskVisibilityFilter(viewer);
+    const issue = await this.prisma.issue.findFirst({
+      where: { id: issueId, companyId, projectId, ...(visible ? { AND: [visible] } : {}) },
+      select: { id: true },
+    });
     if (!issue) throw new NotFoundException('Issue not found');
+  }
+
+  async getComments(
+    companyId: number, projectId: number, issueId: number,
+    employeeId: number | null = null, role?: string,
+  ) {
+    await this.assertMaySeeTask(companyId, projectId, issueId, employeeId, role);
 
     return this.prisma.issueComment.findMany({
       where: { issueId },
@@ -1784,9 +1804,11 @@ export class IssuesService {
     });
   }
 
-  async getActivities(companyId: number, projectId: number, issueId: number) {
-    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
-    if (!issue) throw new NotFoundException('Issue not found');
+  async getActivities(
+    companyId: number, projectId: number, issueId: number,
+    employeeId: number | null = null, role?: string,
+  ) {
+    await this.assertMaySeeTask(companyId, projectId, issueId, employeeId, role);
 
     return this.prisma.issueActivity.findMany({
       where: { issueId },
@@ -1880,9 +1902,11 @@ export class IssuesService {
     });
   }
 
-  async getChecklists(companyId: number, projectId: number, issueId: number) {
-    const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
-    if (!issue) throw new NotFoundException('Issue not found');
+  async getChecklists(
+    companyId: number, projectId: number, issueId: number,
+    employeeId: number | null = null, role?: string,
+  ) {
+    await this.assertMaySeeTask(companyId, projectId, issueId, employeeId, role);
 
     return this.prisma.checklist.findMany({
       where: { issueId },

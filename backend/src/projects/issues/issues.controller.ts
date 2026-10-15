@@ -201,7 +201,7 @@ export class IssuesController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('id', ParseIntPipe) id: number
   ) {
-    return this.issuesService.getComments(req.user.companyId, projectId, id);
+    return this.issuesService.getComments(req.user.companyId, projectId, id, req.user.employeeId ?? null, req.user.role);
   }
 
   @Get(':id/activities')
@@ -210,7 +210,7 @@ export class IssuesController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('id', ParseIntPipe) id: number
   ) {
-    return this.issuesService.getActivities(req.user.companyId, projectId, id);
+    return this.issuesService.getActivities(req.user.companyId, projectId, id, req.user.employeeId ?? null, req.user.role);
   }
 
   @Post(':id/comments')
@@ -239,7 +239,7 @@ export class IssuesController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('id', ParseIntPipe) id: number
   ) {
-    return this.issuesService.getChecklists(req.user.companyId, projectId, id);
+    return this.issuesService.getChecklists(req.user.companyId, projectId, id, req.user.employeeId ?? null, req.user.role);
   }
 
   @Post(':id/checklists')
