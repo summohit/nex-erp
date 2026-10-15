@@ -34,10 +34,12 @@
           <span>Add Visit Location</span>
         </button>
       }
-      <button class="primary-btn new-request-btn" type="button" (click)="openForm()">
-        <svg lucidePlus [size]="16"></svg>
-        <span>New request</span>
-      </button>
+      @if (canRaise()) {
+        <button class="primary-btn new-request-btn" type="button" (click)="openForm()">
+          <svg lucidePlus [size]="16"></svg>
+          <span>New request</span>
+        </button>
+      }
     </div>
   </div>
 
@@ -178,11 +180,15 @@
         <svg lucideMapPin [size]="32"></svg>
       </div>
       <h2>No field visit requests yet</h2>
-      <p>Raise a new site visit request for your projects. Once submitted, it goes to management for approval.</p>
-      <button class="primary-btn" type="button" (click)="openForm()">
-        <svg lucidePlus [size]="16"></svg>
-        <span>Create first request</span>
-      </button>
+      @if (canRaise()) {
+        <p>Raise a new site visit request for your projects. Once submitted, it goes to management for approval.</p>
+        <button class="primary-btn" type="button" (click)="openForm()">
+          <svg lucidePlus [size]="16"></svg>
+          <span>Create first request</span>
+        </button>
+      } @else {
+        <p>Field visits you are sent on by your project manager appear here.</p>
+      }
     </div>
   } @else if (filteredRequests().length === 0) {
     <!-- Empty tab or no matching filters -->

@@ -58,6 +58,14 @@ export class FieldVisitRequestsPageComponent implements OnInit {
   readonly isSuperAdmin = inject(RoleService).isSuperAdmin;
 
   locationCapabilities = signal<VisitLocationRequestCapabilities | null>(null);
+  /**
+   * Raising field visits is for project managers and administrators; employees
+   * are sent on them and clock in at the site. The server enforces the same.
+   */
+  readonly canRaise = computed(() => {
+    const caps = this.locationCapabilities();
+    return !!caps && (caps.isAdmin || caps.isProjectManager);
+  });
   isLocationFormOpen = signal(false);
   allRequests = signal<FieldVisitRequest[]>([]);
   isLoading = signal(true);

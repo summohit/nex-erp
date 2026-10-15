@@ -8,7 +8,6 @@ import { NotificationsService } from '../../notifications/notifications.service'
 import { FieldVisitActivationService } from './field-visit-activation.service';
 import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY } from '../field-visit-status';
 import { CompanyRole, isCompanyAdmin, isSuperAdmin } from '../../common/company-roles';
-import { canCreateTask } from '../../tasks/task-permissions';
 
 /**
  * Who is notified about a trip awaiting a decision.
@@ -439,17 +438,35 @@ export class FieldVisitRequestsService {
     );
   }
 
-  /** Whoever runs the project asks; an administrator may raise one anywhere. */
+  /**
+   * Whoever runs the project asks; an administrator may raise one anywhere.
+   * A general visit has no project manager of its own, so it needs someone who
+   * manages at least one project. Employees are sent on visits and clock in at
+   * the site; raising and managing them is for project managers and
+   * administrators (decided 15 Oct 2026, after an employee raised one).
+   */
   private async mayRaise(
     companyId: number, project: any, role: string, employeeId: number | null,
   ): Promise<boolean> {
     if (this.isApprover(role)) return true;
-    // General visits are not attached to a project manager. Apply the same
-    // authority that permits creating General tasks instead.
-    if (project?.isSystem) {
-      return canCreateTask(this.prisma as any, companyId, employeeId, role, project);
-    }
+    if (project?.isSystem) return this.managesAnyProject(companyId, employeeId);
     return this.managesProject(project, employeeId);
+  }
+
+  /** Lead of, or PROJECT_MANAGER on, at least one real project. */
+  private async managesAnyProject(companyId: number, employeeId: number | null): Promise<boolean> {
+    if (employeeId == null) return false;
+    const count = await this.prisma.project.count({
+      where: {
+        companyId,
+        isSystem: false,
+        OR: [
+          { leadId: employeeId },
+          { members: { some: { employeeId, role: 'PROJECT_MANAGER' } } },
+        ],
+      },
+    });
+    return count > 0;
   }
 
   /**
@@ -528,8 +545,7 @@ export class FieldVisitRequestsService {
     const project = await this.loadProject(companyId, request.project.id, request.project.isSystem);
     // A general visit has no project manager, so the person who raised it
     // stands in for one.
-    const mayRaise = await this.mayRaise(companyId, project, role, employeeId)
-      || (project.isGeneral && request.raisedBy?.id === employeeId);
+    const mayRaise = await this.mayRaise(companyId, project, role, employeeId);
     return {
       ...request,
       // The Super Admin can correct a request while reviewing it. Other
@@ -582,6 +598,8 @@ export class FieldVisitRequestsService {
       /** The projects this person manages, when not an administrator. */
       managedProjectIds: managed.map((p) => p.id),
       isProjectManager: approver || managed.length > 0,
+      /** May raise field visits at all (project or general); employees only go on them. */
+      canRaise: approver || managed.length > 0,
     };
   }
 
@@ -692,10 +710,10 @@ export class FieldVisitRequestsService {
     const { project, fields, employeeIds, tasks, attachments } =
       await this.normalize(companyId, data);
 
-    // A general visit has no project manager to ask, so anyone may raise one;
-    // it still goes to an administrator for approval like every other trip.
-    if (!project.isGeneral && !(await this.mayRaise(companyId, project, role, employeeId))) {
-      throw new ForbiddenException('Only the project manager raises a field visit for this project');
+    if (!(await this.mayRaise(companyId, project, role, employeeId))) {
+      throw new ForbiddenException(project.isGeneral
+        ? 'Only a project manager or an administrator raises a field visit'
+        : 'Only the project manager raises a field visit for this project');
     }
     if (employeeId == null) {
       throw new ForbiddenException('Your login is not linked to an employee record');

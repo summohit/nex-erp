@@ -9,6 +9,7 @@ function make(over: any = {}) {
     project: {
       findMany: jest.fn().mockResolvedValue([{ id: 7 }, { id: 9 }]),
       findFirst: jest.fn().mockResolvedValue({ id: 7, leadId: 50, isSystem: false, isGeneral: false, members: [] }),
+      count: jest.fn().mockResolvedValue(0),
     },
     fieldVisitRequest: { findFirst: jest.fn() },
     ...over,
@@ -67,5 +68,39 @@ describe('per-request actions', () => {
   it('lets only the raiser or an administrator withdraw', async () => {
     expect(await flags('EMPLOYEE', 'PENDING_APPROVAL', 60)).toMatchObject({ canWithdraw: false });
     expect(await flags('EMPLOYEE', 'PENDING_APPROVAL', 50)).toMatchObject({ canWithdraw: true });
+  });
+});
+
+/**
+ * 15 Oct 2026: an employee (not a project manager) could raise a General visit,
+ * because general visits skipped the manager check. Employees go on visits and
+ * clock in; raising them is for project managers and administrators.
+ */
+describe('who may raise a field visit', () => {
+  const general = { id: 1, isSystem: true, isGeneral: true, leadId: null, members: [] };
+  const mayRaise = (service: any, role: string, employeeId: number, project: any = general) =>
+    service.mayRaise(1, project, role, employeeId);
+
+  it('refuses a general visit to an employee who manages no project', async () => {
+    const { service } = make();
+    expect(await mayRaise(service, 'EMPLOYEE', 60)).toBe(false);
+  });
+
+  it('lets a project manager raise a general visit', async () => {
+    const { service, prisma } = make();
+    prisma.project.count.mockResolvedValue(1);
+    expect(await mayRaise(service, 'EMPLOYEE', 50)).toBe(true);
+    expect(prisma.project.count.mock.calls[0][0].where).toMatchObject({ companyId: 1, isSystem: false });
+  });
+
+  it('lets an administrator raise anything', async () => {
+    const { service } = make();
+    expect(await mayRaise(service, 'ADMIN', 2)).toBe(true);
+    expect(await mayRaise(service, 'SUPERADMIN', 2)).toBe(true);
+  });
+
+  it('says canRaise is false for someone who manages nothing', async () => {
+    const { service } = make({ project: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn() } });
+    expect(await service.capabilities(1, 'EMPLOYEE', 60)).toMatchObject({ canRaise: false });
   });
 });

@@ -924,7 +924,7 @@ export default function DashboardScreen() {
               ) : (
                 <View style={styles.fieldIdleContent}>
                   <Text style={styles.fieldIdleDescription}>
-                    Raise a field visit request. Once it is approved, you clock in here at the site.
+                    When you are on an approved field visit, you clock in here at the site.
                   </Text>
                   <View style={styles.fieldIdleActionRow}>
                     <TouchableOpacity

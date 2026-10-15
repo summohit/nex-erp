@@ -105,6 +105,8 @@ export interface FvCapabilities {
   allProjects: boolean;
   managedProjectIds: number[];
   isProjectManager: boolean;
+  /** May raise field visits at all; employees are only sent on them. */
+  canRaise?: boolean;
 }
 
 export interface VisitLocation { id: number; name: string; address?: string | null; latitude?: number | null; longitude?: number | null }
