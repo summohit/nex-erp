@@ -15,7 +15,12 @@ function make(over: any = {}) {
   const created: any[] = [];
   const prisma: any = {
     systemSetting: { findUnique: jest.fn(async () => ({ travelAllowanceConfig: 'config' in over ? over.config : CONFIG })) },
-    employee: { findUnique: jest.fn(async () => ({ branch: OFFICE })) },
+    employee: { findUnique: jest.fn(async () => ({
+      branch: OFFICE, payType: 'EMPLOYEE', employmentType: over.employmentType ?? 'Full Time', designation: { name: 'Engineer' },
+      salaryStructures: [{ amount: over.gross ?? 40000, component: { type: 'EARNING' } }],
+    })) },
+    salaryGrade: { findMany: jest.fn(async () => over.grades ?? []) },
+    salaryTemplate: { findUnique: jest.fn(async () => ({ ungradedKmRate: over.ungradedKmRate ?? null })) },
     branch: { findFirst: jest.fn(async () => OFFICE) },
     expenseClaim: {
       findMany: jest.fn(async () => over.existing ?? []),
@@ -110,5 +115,40 @@ describe('travel allowance', () => {
     const { service, created } = make({ requests: [visit([day({ journeyTrackedKm: 120 })])] });
     await service.sweep();
     expect(created[0].travelDetail.days[0].note).toMatch(/Tracked route 120 km/);
+  });
+
+  const GRADES = [
+    { name: 'G2', minGross: 15001, maxGross: 30000, kmRate: 4 },
+    { name: 'G3', minGross: 30001, maxGross: 60000, kmRate: 7 },
+  ];
+
+  it('pays an own-vehicle trip at the grade rate, whatever the vehicle', async () => {
+    const { service, created } = make({ requests: [visit([day({ journeyVehicle: 'Car' })])], grades: GRADES, gross: 40000 });
+    await service.sweep();
+    expect(created[0].travelDetail.days[0]).toMatchObject({ grade: 'G3', ratePerKm: 7 });
+  });
+
+  it('falls back to the vehicle rate when the grade has none', async () => {
+    const { service, created } = make({
+      requests: [visit([day({ journeyVehicle: 'Car' })])], gross: 40000,
+      grades: [{ name: 'G3', minGross: 30001, maxGross: 60000, kmRate: null }],
+    });
+    await service.sweep();
+    expect(created[0].travelDetail.days[0]).toMatchObject({ grade: 'G3', ratePerKm: 9 });
+  });
+
+  it('pays an intern the ungraded rate', async () => {
+    const { service, created } = make({
+      requests: [visit([day({ journeyVehicle: 'Bike' })])], grades: GRADES, gross: 20000,
+      employmentType: 'Internship', ungradedKmRate: 2.5,
+    });
+    await service.sweep();
+    expect(created[0].travelDetail.days[0]).toMatchObject({ grade: 'Intern', ratePerKm: 2.5 });
+  });
+
+  it('keeps metro at the fare, whatever the grade', async () => {
+    const { service, created } = make({ requests: [visit([day({ journeyVehicle: 'Metro', journeyFare: 50 })])], grades: GRADES });
+    await service.sweep();
+    expect(created[0].travelDetail.days[0]).toMatchObject({ amount: 50, grade: null });
   });
 });

@@ -6217,3 +6217,8 @@
 .travel-route-map { height: min(60vh, 520px); width: 100%; }
 .travel-route-loading { padding: 16px; color: #64748b; }
 .travel-route-days { padding: 10px 16px; font-size: 12.5px; color: #475569; border-top: 1px solid #e2e8f0; }
+
+/* Travel rate for interns and consultants, under the grades table */
+.gt-ungraded-row { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: 14px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.gt-ungraded-row p { margin: 4px 0 0; font-size: 12.5px; color: #64748b; max-width: 620px; }
+.gt-ungraded-input { width: 140px; }

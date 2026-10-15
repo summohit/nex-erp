@@ -50,6 +50,8 @@ export interface SalaryGrade {
   label?: string | null;
   minGross: number;
   maxGross: number | null;
+  /** Field visit travel: ₹ per km for own-vehicle trips. Null = vehicle default. */
+  kmRate?: number | null;
 }
 
 /** How a monthly gross splits into components. */
@@ -308,6 +310,15 @@ export class PayrollService {
 
   saveSalaryGrades(grades: SalaryGrade[]): Observable<SalaryGrade[]> {
     return this.http.put<SalaryGrade[]>(`${this.apiUrl}/grades`, grades);
+  }
+
+  /** Per-km travel rate for interns and consultants (outside grades). */
+  getUngradedKmRate(): Observable<{ ungradedKmRate: number | null }> {
+    return this.http.get<{ ungradedKmRate: number | null }>(`${this.apiUrl}/grades/ungraded-km-rate`);
+  }
+
+  setUngradedKmRate(ungradedKmRate: number | null): Observable<{ ungradedKmRate: number | null }> {
+    return this.http.put<{ ungradedKmRate: number | null }>(`${this.apiUrl}/grades/ungraded-km-rate`, { ungradedKmRate });
   }
 
   getSalaryTemplate(): Observable<SalaryTemplateRules> {

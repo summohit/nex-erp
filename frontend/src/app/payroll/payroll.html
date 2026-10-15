@@ -2811,7 +2811,7 @@
                     fare paid
                     <a *ngIf="d.receiptUrl" [href]="d.receiptUrl" target="_blank" rel="noopener">receipt</a>
                   </ng-container>
-                  <ng-template #perKm>₹{{ d.ratePerKm }}/km</ng-template>
+                  <ng-template #perKm><span *ngIf="d.grade">{{ d.grade }} · </span>₹{{ d.ratePerKm }}/km</ng-template>
                 </td>
                 <td>
                   ₹{{ d.amount | number:'1.2-2' }}
@@ -3494,6 +3494,7 @@
                   <th>Level / Description</th>
                   <th style="width: 180px;">From (₹ / mo)</th>
                   <th style="width: 180px;">To (₹ / mo)</th>
+                  <th style="width: 140px;" title="Field visit travel allowance for own-vehicle trips">Travel ₹ / km</th>
                   <th style="width: 44px;"></th>
                 </tr>
               </thead>
@@ -3519,6 +3520,12 @@
                       <input class="form-control form-control-sm" type="number" min="0" [(ngModel)]="g.maxGross" placeholder="No ceiling">
                     </div>
                   </td>
+                  <td>
+                    <div class="currency-input-sm">
+                      <span class="curr-tag">₹</span>
+                      <input class="form-control form-control-sm" type="number" min="0" step="0.5" [(ngModel)]="g.kmRate" placeholder="Default" aria-label="Travel rate per km for this grade">
+                    </div>
+                  </td>
                   <td class="text-center">
                     <button type="button" class="gt-remove-btn" (click)="removeGradeRow(i)" title="Remove grade band">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -3532,6 +3539,18 @@
           <div class="gt-tip-banner">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             <span>Tip: Leave "To" empty on the highest grade only for uncapped upper limits. Pay ranges must be contiguous and non-overlapping.</span>
+          </div>
+
+          <!-- Travel rate for people outside grades -->
+          <div class="gt-ungraded-row">
+            <div>
+              <strong>Interns &amp; consultants · Travel ₹ / km</strong>
+              <p>Interns (employment type Internship or designation Intern) and consultants are not graded. Own-vehicle field visit trips are paid at this rate. Leave empty to use each vehicle's default from System Settings. Metro, bus and cab are always paid at the actual fare.</p>
+            </div>
+            <div class="currency-input-sm gt-ungraded-input">
+              <span class="curr-tag">₹</span>
+              <input class="form-control form-control-sm" type="number" min="0" step="0.5" [(ngModel)]="ungradedKmRateDraft" placeholder="Default" aria-label="Travel rate per km for interns and consultants">
+            </div>
           </div>
         </div>
 

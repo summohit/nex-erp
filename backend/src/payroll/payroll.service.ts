@@ -254,14 +254,18 @@ export class PayrollService {
    * Replace the company's grades. Bands must not overlap -- a gross in two
    * grades would have no answer -- and only the top one may be open-ended.
    */
-  async saveSalaryGrades(companyId: number, input: { name: string; label?: string | null; minGross: number; maxGross: number | null }[]) {
+  async saveSalaryGrades(companyId: number, input: { name: string; label?: string | null; minGross: number; maxGross: number | null; kmRate?: number | null }[]) {
     const grades = (input || []).map((g) => ({
       name: String(g.name || '').trim(),
       label: g.label ? String(g.label).trim() : null,
       minGross: Number(g.minGross) || 0,
       maxGross: g.maxGross == null || (g.maxGross as any) === '' ? null : Number(g.maxGross),
+      kmRate: g.kmRate == null || (g.kmRate as any) === '' ? null : Number(g.kmRate),
       position: 0,
     })).sort((a, b) => a.minGross - b.minGross);
+    if (grades.some((g) => g.kmRate != null && !(g.kmRate >= 0 && g.kmRate <= 1000))) {
+      throw new BadRequestException('A per-km rate must be between 0 and 1000');
+    }
 
     if (grades.some(g => !g.name)) throw new BadRequestException('Every grade needs a name');
     if (new Set(grades.map(g => g.name.toLowerCase())).size !== grades.length) {
@@ -288,10 +292,27 @@ export class PayrollService {
     return this.getSalaryGrades(companyId);
   }
 
+  /** Per-km travel rate for interns and consultants, who sit outside grades. */
+  async getUngradedKmRate(companyId: number): Promise<{ ungradedKmRate: number | null }> {
+    const row = await this.prisma.salaryTemplate.findUnique({ where: { companyId }, select: { ungradedKmRate: true } });
+    return { ungradedKmRate: row?.ungradedKmRate ?? null };
+  }
+
+  async setUngradedKmRate(companyId: number, value: unknown): Promise<{ ungradedKmRate: number | null }> {
+    const rate = value == null || value === '' ? null : Number(value);
+    if (rate != null && !(rate >= 0 && rate <= 1000)) throw new BadRequestException('A per-km rate must be between 0 and 1000');
+    await this.prisma.salaryTemplate.upsert({
+      where: { companyId },
+      create: { companyId, ungradedKmRate: rate },
+      update: { ungradedKmRate: rate },
+    });
+    return { ungradedKmRate: rate };
+  }
+
   async getSalaryTemplate(companyId: number): Promise<SalaryTemplateRules> {
     const row = await this.prisma.salaryTemplate.findUnique({ where: { companyId } });
     if (!row) return { ...DEFAULT_TEMPLATE };
-    const { id, companyId: _c, createdAt, updatedAt, ...rules } = row as any;
+    const { id, companyId: _c, createdAt, updatedAt, ungradedKmRate: _u, ...rules } = row as any;
     return rules as SalaryTemplateRules;
   }
 

@@ -1054,6 +1054,9 @@ model SalaryGrade {
   label     String? // e.g. "Support staff"
   minGross  Float    @default(0) // inclusive
   maxGross  Float? // inclusive; null = no ceiling
+  /// Field visit travel allowance: rupees per km for own-vehicle trips by
+  /// people in this grade (15 Oct 2026). Null = the vehicle's default rate.
+  kmRate    Float?
   position  Int      @default(0)
   companyId Int
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1075,6 +1078,9 @@ model SalaryTemplate {
   esiPct          Float    @default(0.75) // % of gross
   esiGrossLimit   Float    @default(21000) // ESI only at or below this gross
   professionalTax Float    @default(200) // monthly
+  /// Per-km travel rate for people outside grades: interns and consultants.
+  /// Null = the vehicle's default rate.
+  ungradedKmRate  Float?
   companyId       Int      @unique
   company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt       DateTime @default(now())

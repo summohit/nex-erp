@@ -392,8 +392,42 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     return { created };
   }
 
+  /**
+   * The per-km rate for own-vehicle trips, by salary grade (decided 15 Oct
+   * 2026): one rate per grade whatever the vehicle. Interns (employment type
+   * Internship or designation Intern) and consultants sit outside grades and
+   * get the ungraded rate. With no rate set, the vehicle's default applies.
+   */
+  private async gradeRate(companyId: number, employeeId: number): Promise<{ rate: number | null; label: string }> {
+    const emp = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: {
+        payType: true, employmentType: true, designation: { select: { name: true } },
+        salaryStructures: { select: { amount: true, component: { select: { type: true } } } },
+      },
+    });
+    if (!emp) return { rate: null, label: '' };
+    const intern = /intern/i.test(emp.employmentType ?? '') || /intern/i.test(emp.designation?.name ?? '');
+    if (intern || emp.payType === 'CONSULTANT') {
+      const t = await this.prisma.salaryTemplate.findUnique({ where: { companyId }, select: { ungradedKmRate: true } });
+      return { rate: t?.ungradedKmRate ?? null, label: intern ? 'Intern' : 'Consultant' };
+    }
+    const gross = emp.salaryStructures
+      .filter((s) => s.component?.type === 'EARNING')
+      .reduce((sum, s) => sum + (s.amount || 0), 0);
+    const grades = await this.prisma.salaryGrade.findMany({
+      where: { companyId }, orderBy: [{ position: 'asc' }, { minGross: 'asc' }],
+      select: { name: true, minGross: true, maxGross: true, kmRate: true },
+    });
+    const grade = gross > 0
+      ? grades.find((g) => gross >= g.minGross && (g.maxGross == null || gross <= g.maxGross))
+      : undefined;
+    return { rate: grade?.kmRate ?? null, label: grade?.name ?? 'No grade' };
+  }
+
   private async createClaim(r: any, employeeId: number, config: TravelConfig): Promise<boolean> {
     const office = await this.officeOf(r.companyId, employeeId);
+    const graded = await this.gradeRate(r.companyId, employeeId);
     const days: any[] = [];
     for (const a of r.attendances.filter((x: any) => x.employeeId === employeeId)) {
       const from = a.journeyStartLat != null
@@ -410,11 +444,14 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
         ?? config.rates.find((x) => x.kind === 'PER_KM') ?? config.rates[0];
       const km = Math.round((goingKm + returnKm) * 10) / 10;
       const actual = rate.kind === 'ACTUAL_FARE';
+      // Own vehicle: the grade's rate where one is set, else the vehicle's.
+      const perKm = !actual && graded.rate != null ? graded.rate : rate.ratePerKm;
       days.push({
         date: a.visitDate.toISOString().slice(0, 10), from: from.label,
         returnTo: a.journeyEndLat != null ? 'End journey' : 'Same as going',
         goingKm, returnKm, km, vehicle: rate.vehicle, kind: rate.kind,
-        ratePerKm: actual ? null : rate.ratePerKm,
+        ratePerKm: actual ? null : perKm,
+        grade: actual ? null : graded.label,
         fare: actual ? (a.journeyFare ?? 0) : null,
         receiptUrl: actual ? a.journeyFareReceiptUrl ?? null : null,
         trackedKm: a.journeyTrackedKm ?? null,
@@ -423,7 +460,7 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
         // worth a look; it does not change the amount.
         ...(!actual && a.journeyTrackedKm != null && km > 0 && Math.abs(a.journeyTrackedKm - km) / km > 0.3
           ? { note: `Tracked route ${a.journeyTrackedKm} km vs ${km} km estimated — check the route` } : {}),
-        amount: actual ? Math.round((a.journeyFare ?? 0) * 100) / 100 : Math.round(km * rate.ratePerKm * 100) / 100,
+        amount: actual ? Math.round((a.journeyFare ?? 0) * 100) / 100 : Math.round(km * perKm * 100) / 100,
       });
     }
     if (!days.length) return false;

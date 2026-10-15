@@ -101,6 +101,8 @@ export class PayrollComponent implements OnInit {
   salaryTemplate = signal<SalaryTemplateRules | null>(null);
   isGradesModalOpen = signal(false);
   gradesDraft: SalaryGrade[] = [];
+  /** Travel ₹/km for interns and consultants, edited with the grades. */
+  ungradedKmRateDraft: number | null = null;
   templateDraft: SalaryTemplateRules | null = null;
   isSavingGrades = signal(false);
   /** The row "Apply template" was opened for, and what it would set. */
@@ -771,7 +773,11 @@ export class PayrollComponent implements OnInit {
   }
 
   openGradesModal() {
-    this.gradesDraft = this.salaryGrades().map(g => ({ name: g.name, label: g.label ?? '', minGross: g.minGross, maxGross: g.maxGross }));
+    this.gradesDraft = this.salaryGrades().map(g => ({ name: g.name, label: g.label ?? '', minGross: g.minGross, maxGross: g.maxGross, kmRate: g.kmRate ?? null }));
+    this.payrollService.getUngradedKmRate().subscribe({
+      next: (r) => this.ungradedKmRateDraft = r.ungradedKmRate,
+      error: () => this.ungradedKmRateDraft = null,
+    });
     this.templateDraft = this.salaryTemplate() ? { ...this.salaryTemplate()! } : null;
     this.isGradesModalOpen.set(true);
   }
@@ -792,10 +798,15 @@ export class PayrollComponent implements OnInit {
       ...g,
       maxGross: g.maxGross === null || (g.maxGross as any) === '' ? null : Number(g.maxGross),
       minGross: Number(g.minGross) || 0,
+      kmRate: g.kmRate === null || g.kmRate === undefined || (g.kmRate as any) === '' ? null : Number(g.kmRate),
     }));
+    const ungraded = this.ungradedKmRateDraft === null || (this.ungradedKmRateDraft as any) === '' ? null : Number(this.ungradedKmRateDraft);
     this.payrollService.saveSalaryGrades(grades).subscribe({
       next: (saved) => {
         this.salaryGrades.set(saved);
+        this.payrollService.setUngradedKmRate(ungraded).subscribe({
+          error: (err) => this.toast.error(err.error?.message || 'Could not save the intern/consultant travel rate'),
+        });
         if (!this.templateDraft) return this.finishGradesSave();
         this.payrollService.updateSalaryTemplate(this.templateDraft).subscribe({
           next: (t) => { this.salaryTemplate.set(t); this.finishGradesSave(); },

@@ -151,10 +151,23 @@ export class PayrollController {
     return this.payrollService.getSalaryGrades(req.user.companyId);
   }
 
+  /** Per-km travel rate for interns and consultants (outside grades). */
+  @Get('grades/ungraded-km-rate')
+  getUngradedKmRate(@Request() req) {
+    this.assertPayrollOperator(req, 'see salary grades');
+    return this.payrollService.getUngradedKmRate(req.user.companyId);
+  }
+
+  @Put('grades/ungraded-km-rate')
+  setUngradedKmRate(@Request() req, @Body() body: { ungradedKmRate: number | null }) {
+    this.assertPayrollOperator(req, 'change salary grades');
+    return this.payrollService.setUngradedKmRate(req.user.companyId, body?.ungradedKmRate);
+  }
+
   @Put('grades')
   saveSalaryGrades(
     @Request() req,
-    @Body() grades: { name: string; label?: string | null; minGross: number; maxGross: number | null }[],
+    @Body() grades: { name: string; label?: string | null; minGross: number; maxGross: number | null; kmRate?: number | null }[],
   ) {
     this.assertPayrollOperator(req, 'change salary grades');
     return this.payrollService.saveSalaryGrades(req.user.companyId, grades);
