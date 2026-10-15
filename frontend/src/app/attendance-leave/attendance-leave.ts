@@ -76,7 +76,7 @@ export interface DayStatus {
 
 import { OutsideOfficeAnswer, OutsideOfficeService } from '../shared/services/outside-office.service';
 import { GeolocationService } from '../shared/services/geolocation.service';
-import { isWeeklyOff } from '../shared/utils/weekly-offs';
+import { isRestDay } from '../shared/utils/weekly-offs';
 import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDatePreset } from '../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 @Component({
   selector: 'app-attendance-leave',
@@ -3397,10 +3397,30 @@ export class AttendanceLeaveComponent implements OnInit {
    */
   myWeeklyOffs = signal<string | null>(null);
 
+  /** Your shift's working days, and your roster: `YYYY-MM-DD` → day off. */
+  myShiftDays = signal<string | null>(null);
+  myRoster = signal<Map<string, boolean>>(new Map());
+
+  /** The payroll rule (15 Oct 2026): your roster, then your shift, then your branch. */
   private isOffDay(date: Date): boolean {
     const rule = this.myWeeklyOffs();
-    if (rule === null) return date.getDay() === 0 || date.getDay() === 6;
-    return isWeeklyOff(date, rule);
+    if (rule === null && !this.myRoster().size) return date.getDay() === 0 || date.getDay() === 6;
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return isRestDay(date, this.myRoster().get(key), this.myShiftDays(), rule);
+  }
+
+  /** A year back and two months ahead, enough for the calendars on this page. */
+  private loadMyRoster() {
+    const d = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+    const from = new Date(); from.setDate(from.getDate() - 330);
+    const to = new Date(); to.setDate(to.getDate() + 60);
+    this.attendanceService.getMyRosterDays(d(from), d(to)).subscribe({
+      next: (rows) => {
+        this.myRoster.set(new Map(rows.map((r) => [r.date, r.isDayOff])));
+        this.generateGrid();
+      },
+      error: () => {},
+    });
   }
 
   ngOnInit() {
@@ -3411,7 +3431,9 @@ export class AttendanceLeaveComponent implements OnInit {
     this.employeeService.getMyProfile().subscribe({
       next: (p: any) => {
         this.myWeeklyOffs.set(p?.branch ? (p.branch.weeklyOffs ?? '') : null);
+        this.myShiftDays.set(p?.shift?.workingDays ?? null);
         this.generateGrid();
+        this.loadMyRoster();
       },
       error: () => {},
     });

@@ -1,4 +1,4 @@
-import { isBranchWeeklyOff } from '../common/weekly-offs';
+import { isRestDay } from '../common/rest-day';
 import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -260,7 +260,7 @@ export class LeavesService {
   async requestLeave(userId: number, data: { leaveTypeId: number, startDate: string, endDate: string, reason?: string, attachmentUrl?: string, isHalfDay?: boolean, halfDayPeriod?: string }) {
     const employee = await this.prisma.employee.findUnique({ 
       where: { userId },
-      include: { user: true, branch: true, manager: { include: { user: true } } }
+      include: { user: true, branch: true, shift: { select: { workingDays: true } }, manager: { include: { user: true } } }
     });
     if (!employee) throw new BadRequestException('Employee not found');
     return this.createLeaveRequestFor(employee, data);
@@ -356,7 +356,7 @@ export class LeavesService {
       throw new BadRequestException(`Leave already applied for ${from} to ${to}`);
     }
 
-    const workingDays = this.calculateWorkingDays(startDate, endDate, employee.branch?.weeklyOffs || '0', data.isHalfDay || false, await this.getHolidayDates(employee.companyId, startDate, endDate));
+    const workingDays = await this.calculateWorkingDays(startDate, endDate, employee, data.isHalfDay || false, await this.getHolidayDates(employee.companyId, startDate, endDate));
     if (workingDays === 0) {
       throw new BadRequestException('Leave duration evaluates to 0 working days.');
     }
@@ -663,7 +663,7 @@ export class LeavesService {
           ? { employee: { companyId: actor.employee.companyId } }
           : { employeeId: actor.employee.id }),
       },
-      include: { employee: { include: { branch: true } } },
+      include: { employee: { include: { branch: true, shift: { select: { workingDays: true } } } } },
     });
 
     if (!request) throw new BadRequestException('Request not found or not authorized');
@@ -685,7 +685,7 @@ export class LeavesService {
       if (request.status === 'APPROVED') {
         const start = new Date(request.startDate);
         const end = new Date(request.endDate);
-        const diffDays = this.calculateWorkingDays(start, end, request.employee.branch?.weeklyOffs || '0', request.isHalfDay, await this.getHolidayDates(request.employee.companyId, start, end));
+        const diffDays = await this.calculateWorkingDays(start, end, request.employee, request.isHalfDay, await this.getHolidayDates(request.employee.companyId, start, end));
         
         await tx.leaveBalance.updateMany({
           where: {
@@ -769,7 +769,7 @@ export class LeavesService {
 
     const employee = await this.prisma.employee.findFirst({
       where: { id: data.employeeId, companyId },
-      include: { user: true, branch: true, manager: { include: { user: true } } },
+      include: { user: true, branch: true, shift: { select: { workingDays: true } }, manager: { include: { user: true } } },
     });
     if (!employee) throw new BadRequestException('Employee not found');
 
@@ -807,7 +807,7 @@ export class LeavesService {
 
     const request = await this.prisma.leaveRequest.findFirst({
       where: { id: requestId, deletedAt: null, employee: { companyId: actor.employee?.companyId } },
-      include: { employee: { include: { branch: true } } },
+      include: { employee: { include: { branch: true, shift: { select: { workingDays: true } } } } },
     });
     if (!request) throw new BadRequestException('Request not found');
 
@@ -820,8 +820,7 @@ export class LeavesService {
       if (request.status === 'APPROVED') {
         const start = new Date(request.startDate);
         const end = new Date(request.endDate);
-        const days = this.calculateWorkingDays(
-          start, end, request.employee.branch?.weeklyOffs || '0', request.isHalfDay,
+        const days = await this.calculateWorkingDays(start, end, request.employee, request.isHalfDay,
           await this.getHolidayDates(request.employee.companyId, start, end),
         );
         await tx.leaveBalance.updateMany({
@@ -887,7 +886,7 @@ export class LeavesService {
     // approvable, and findUnique cannot filter on anything but the key.
     const request = await this.prisma.leaveRequest.findFirst({
       where: { id: requestId, deletedAt: null },
-      include: { employee: { include: { branch: true } } }
+      include: { employee: { include: { branch: true, shift: { select: { workingDays: true } } } } }
     });
 
     if (!request) throw new BadRequestException('Request not found');
@@ -928,7 +927,7 @@ export class LeavesService {
       if (status === 'APPROVED' && request.status !== 'APPROVED') {
         const start = new Date(request.startDate);
         const end = new Date(request.endDate);
-        const diffDays = this.calculateWorkingDays(start, end, request.employee.branch?.weeklyOffs || '0', request.isHalfDay, await this.getHolidayDates(request.employee.companyId, start, end));
+        const diffDays = await this.calculateWorkingDays(start, end, request.employee, request.isHalfDay, await this.getHolidayDates(request.employee.companyId, start, end));
         
         await tx.leaveBalance.updateMany({
           where: {
@@ -956,7 +955,7 @@ export class LeavesService {
       } else if (status === 'REJECTED' && request.status === 'APPROVED') {
         const start = new Date(request.startDate);
         const end = new Date(request.endDate);
-        const diffDays = this.calculateWorkingDays(start, end, request.employee.branch?.weeklyOffs || '0', request.isHalfDay, await this.getHolidayDates(request.employee.companyId, start, end));
+        const diffDays = await this.calculateWorkingDays(start, end, request.employee, request.isHalfDay, await this.getHolidayDates(request.employee.companyId, start, end));
         
         await tx.leaveBalance.updateMany({
           where: {
@@ -1020,15 +1019,32 @@ export class LeavesService {
    * walked by calendar date in UTC, the way leave dates and holidays are
    * stored, so the server's own timezone cannot shift a day.
    */
-  private calculateWorkingDays(start: Date, end: Date, weeklyOffsStr: string, isHalfDay: boolean, holidayDates?: Set<string>): number {
+  private async calculateWorkingDays(
+    start: Date, end: Date,
+    employee: { id: number; shift?: { workingDays?: string | null } | null; branch?: { weeklyOffs?: string | null } | null },
+    isHalfDay: boolean, holidayDates?: Set<string>,
+  ): Promise<number> {
     const dayOf = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
     const current = dayOf(start);
     const last = dayOf(end);
 
+    // Rest days follow the roster, then the shift, then the branch, as payroll
+    // does (15 Oct 2026): leave on a rostered Monday off costs nothing, and
+    // leave on a rostered working Sunday costs a day.
+    // Tests that stub prisma without a roster still get the shift/branch rule.
+    const rows = this.prisma.shiftRosterEntry?.findMany
+      ? await this.prisma.shiftRosterEntry.findMany({
+        where: { employeeId: employee.id, date: { gte: current, lte: last } },
+        select: { date: true, isDayOff: true, onsiteApprovalStatus: true },
+      })
+      : [];
+    const roster = new Map(rows.map((r) => [r.date.toISOString().slice(0, 10), r]));
+
     let count = 0;
     while (current <= last) {
       const dateStr = current.toISOString().split('T')[0];
-      if (!isBranchWeeklyOff(current, weeklyOffsStr) && !(holidayDates && holidayDates.has(dateStr))) {
+      const rest = isRestDay(current, roster.get(dateStr), employee.shift?.workingDays, employee.branch?.weeklyOffs || '0');
+      if (!rest && !(holidayDates && holidayDates.has(dateStr))) {
         count++;
       }
       current.setUTCDate(current.getUTCDate() + 1);

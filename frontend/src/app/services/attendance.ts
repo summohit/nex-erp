@@ -242,6 +242,13 @@ export class AttendanceService {
     );
   }
 
+  /** Your own roster rows, for My Attendance. */
+  getMyRosterDays(from: string, to: string): Observable<{ employeeId: number; date: string; isDayOff: boolean }[]> {
+    return this.http.get<{ employeeId: number; date: string; isDayOff: boolean }[]>(
+      `${this.apiUrl}/roster-days/me?from=${from}&to=${to}`,
+    );
+  }
+
   getAllEmployeesAttendance(filters: {
     month?: number; year?: number; employeeId?: number; departmentId?: number;
     status?: string; from?: string; to?: string; all?: boolean;

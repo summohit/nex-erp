@@ -199,6 +199,12 @@ export class AttendanceController {
    * rest days the way payroll does (common/rest-day.ts): working as well as
    * day-off rows, since a rostered Sunday shift is a working day.
    */
+  /** Your own roster rows, for My Attendance. Anyone signed in. */
+  @Get('roster-days/me')
+  getMyRosterDays(@Request() req, @Query('from') from: string, @Query('to') to: string) {
+    return this.attendanceService.getRosterDays(req.user.companyId, from, to, req.user.employeeId ?? -1);
+  }
+
   @Get('roster-days')
   @Permissions('attendance/all')
   getRosterDays(@Request() req, @Query('from') from: string, @Query('to') to: string) {
