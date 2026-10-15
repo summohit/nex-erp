@@ -620,6 +620,8 @@ export class AllAttendanceComponent implements OnInit {
   /** One employee's status for each of `days`, and whether each day counts. */
   /** `employeeId_YYYY-MM-DD` → rostered day off (true) or working (false). */
   rosterDays = signal<Map<string, boolean>>(new Map());
+  /** The same for the year view. */
+  yearRoster = signal<Map<string, boolean>>(new Map());
 
   private loadRosterDays() {
     const y = this.filterYear, m = this.filterMonth;
@@ -640,13 +642,14 @@ export class AllAttendanceComponent implements OnInit {
     days: { dayNumber: number; weekdayStr: string; date: Date; dateStr: string; isFuture: boolean }[],
     recordMap: Map<string, AttendanceRecord>,
     holidays: any[],
+    /** Roster rows for these days; the month's by default. */
+    roster: Map<string, boolean> = this.rosterDays(),
   ): DayMatrixStatus[] {
       // This person's own days off, not a hardcoded Saturday and Sunday. Every
       // branch here is "0" — Sunday only — which made every Saturday read as a
       // day off: absences on Saturdays were invisible, and Saturdays worked
       // inflated the present tally without ever entering the denominator.
       const weeklyOffs = emp.branch?.weeklyOffs;
-      const roster = this.rosterDays();
 
       return days.map(day => {
         let countsPresent = false;
@@ -847,6 +850,15 @@ export class AllAttendanceComponent implements OnInit {
 
     this.yearLoading.set(true);
     const months = Array.from({ length: lastMonth }, (_, i) => i + 1);
+    // The year's roster rows, so the year view decides rest days like the month.
+    const lastDay = new Date(year, lastMonth, 0).getDate();
+    this.attendanceService.getRosterDays(`${year}-01-01`, `${year}-${String(lastMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`).subscribe({
+      next: (rows) => {
+        if (key !== this.yearRecordsFor) return;
+        this.yearRoster.set(new Map(rows.map((r) => [`${r.employeeId}_${r.date}`, r.isDayOff])));
+      },
+      error: () => this.yearRoster.set(new Map()),
+    });
     forkJoin(months.map(month => this.attendanceService.getAllEmployeesAttendance({
       month,
       year,
@@ -899,7 +911,7 @@ export class AllAttendanceComponent implements OnInit {
     const days = this.daysOfYear();
     const recordMap = this.buildRecordMap(records);
     return this.filteredEmployees(records).map(emp => {
-      const cells = this.buildDayCells(emp, days, recordMap, holidays);
+      const cells = this.buildDayCells(emp, days, recordMap, holidays, this.yearRoster());
       return {
         employee: emp,
         days: cells,
