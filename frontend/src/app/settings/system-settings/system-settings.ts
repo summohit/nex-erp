@@ -24,7 +24,14 @@ import {
   LucideExternalLink,
   LucideTicket,
   LucideChevronDown,
-  LucidePenLine
+  LucidePenLine,
+  LucideMapPin,
+  LucideNavigation,
+  LucideRoute,
+  LucideCar,
+  LucideBike,
+  LucidePlus,
+  LucideAlertTriangle
 } from '@lucide/angular';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import {
@@ -62,7 +69,14 @@ import { environment } from '../../../environments/environment';
     LucideExternalLink,
     LucideTicket,
     LucideChevronDown,
-    LucidePenLine
+    LucidePenLine,
+    LucideMapPin,
+    LucideNavigation,
+    LucideRoute,
+    LucideCar,
+    LucideBike,
+    LucidePlus,
+    LucideAlertTriangle
   ],
   templateUrl: './system-settings.html',
   styleUrls: ['./system-settings.css']
@@ -97,6 +111,39 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
 
   removeTravelRate(i: number) {
     this.travelRates = this.travelRates.filter((_, idx) => idx !== i);
+  }
+
+  setTravelRadius(km: number) {
+    this.travelRadius = km;
+  }
+
+  addPresetVehicle(vehicle: string, rate: number) {
+    const exists = this.travelRates.some(
+      (r) => (r.vehicle || '').toLowerCase().trim() === vehicle.toLowerCase().trim()
+    );
+    if (!exists) {
+      this.travelRates = [...this.travelRates, { vehicle, ratePerKm: rate }];
+    } else {
+      this.toast.error(`"${vehicle}" is already in your rate list`);
+    }
+  }
+
+  hasVehicle(name: string): boolean {
+    return this.travelRates.some((r) =>
+      (r.vehicle || '').toLowerCase().includes(name.toLowerCase())
+    );
+  }
+
+  isTwoWheeler(name?: string): boolean {
+    const n = (name || '').toLowerCase();
+    return (
+      n.includes('bike') ||
+      n.includes('scooter') ||
+      n.includes('cycle') ||
+      n.includes('two') ||
+      n.includes('moped') ||
+      n.includes('ev 2')
+    );
   }
 
   saveTravel() {

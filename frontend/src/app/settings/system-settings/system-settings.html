@@ -12,7 +12,12 @@
     </div>
 
     <div class="header-actions">
-      <button class="btn-save" (click)="save()" [disabled]="isSaving() || isUploading()">
+      <button *ngIf="tab() === 'field'" class="btn-save" (click)="saveTravel()" [disabled]="isSavingTravel()">
+        <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSavingTravel()"></svg>
+        <svg lucideSave size="16" *ngIf="!isSavingTravel()"></svg>
+        <span>{{ isSavingTravel() ? 'Saving Allowance...' : 'Save Travel Allowance' }}</span>
+      </button>
+      <button *ngIf="tab() !== 'field'" class="btn-save" (click)="save()" [disabled]="isSaving() || isUploading()">
         <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSaving()"></svg>
         <svg lucideSave size="16" *ngIf="!isSaving()"></svg>
         <span>{{ isSaving() ? 'Saving Changes...' : 'Save Changes' }}</span>
@@ -88,46 +93,258 @@
     </div>
 
     <!-- Card: field visit travel allowance (saved on its own) -->
-    <div class="setting-card" *ngIf="tab() === 'field'">
-      <div class="card-top">
-        <div class="card-icon-wrap shift-icon">
-          <svg lucideCalendarClock size="20"></svg>
+    <div class="setting-card fv-setting-card" *ngIf="tab() === 'field'">
+      
+      <!-- Card Header -->
+      <div class="card-top fv-card-top">
+        <div class="card-icon-wrap fv-icon-wrap">
+          <svg lucideNavigation size="22"></svg>
         </div>
         <div class="card-title-group">
-          <h3>Field Visit Travel Allowance</h3>
-          <p>Delhi NCR visits are paid per km: from where the person taps Start journey (or their office) to the site and back. Outstation visits get no km allowance. Claims go to finance as expense claims, separate from the payslip.</p>
-        </div>
-      </div>
-
-      <div class="travel-grid">
-        <label class="travel-field">
-          <span>Delhi NCR radius from the office (km)</span>
-          <input type="number" min="1" max="500" [(ngModel)]="travelRadius" />
-        </label>
-
-        <div class="travel-rates">
-          <span class="travel-label">Rate per km, by vehicle</span>
-          <div class="travel-rate-row" *ngFor="let r of travelRates; let i = index">
-            <input type="text" placeholder="Vehicle (e.g. Bike)" [(ngModel)]="r.vehicle" aria-label="Vehicle" />
-            <div class="travel-rate-amount">
-              <span>₹</span>
-              <input type="number" min="0" step="0.5" [(ngModel)]="r.ratePerKm" aria-label="Rate per km" />
-              <span>/km</span>
-            </div>
-            <button type="button" class="link-reset" (click)="removeTravelRate(i)">Remove</button>
+          <div class="fv-title-row">
+            <h3>Field Visit Travel Allowance</h3>
+            <span class="fv-badge">Policy &amp; Reimbursement</span>
           </div>
-          <button type="button" class="link-reset" (click)="addTravelRate()">+ Add vehicle</button>
+          <p>
+            Configure automated per-kilometer mileage reimbursement for local Delhi NCR client visits. 
+            Visits are paid per kilometer based on the technician's selected vehicle from journey start to destination and back. 
+            Outstation visits get no km allowance and route to Finance as standard expense claims.
+          </p>
         </div>
       </div>
 
-      <div class="card-footer-note">
-        <svg lucideInfo size="14"></svg>
-        <span *ngIf="!travelRates.length">No rates yet: completed Delhi NCR visits wait until at least one vehicle has a rate.</span>
-        <span *ngIf="travelRates.length">People pick their vehicle when they tap Start journey.</span>
-        <button class="btn-save travel-save" type="button" (click)="saveTravel()" [disabled]="isSavingTravel()">
-          {{ isSavingTravel() ? 'Saving…' : 'Save travel allowance' }}
+      <div class="fv-content-container">
+
+        <!-- 1. Coverage Radius Configuration Section -->
+        <div class="fv-section fv-radius-section">
+          <div class="fv-section-head">
+            <div class="fv-section-title">
+              <svg lucideMapPin size="16"></svg>
+              <h4>Coverage Boundary (Delhi NCR Radius)</h4>
+            </div>
+            <span class="fv-section-desc">Client locations within this straight-line radius from the base office qualify for local mileage allowance.</span>
+          </div>
+
+          <div class="fv-radius-control-box">
+            <div class="fv-input-group">
+              <span class="fv-input-affix fv-input-prefix">
+                <svg lucideMapPin size="15"></svg>
+              </span>
+              <input 
+                type="number" 
+                min="1" 
+                max="500" 
+                [(ngModel)]="travelRadius" 
+                class="fv-radius-input"
+                aria-label="Delhi NCR radius from office in kilometers" 
+              />
+              <span class="fv-input-affix fv-input-suffix">km radius</span>
+            </div>
+
+            <!-- Quick Radius Presets -->
+            <div class="fv-preset-pills">
+              <span class="fv-preset-label">Quick select:</span>
+              <button 
+                type="button" 
+                *ngFor="let p of [30, 50, 60, 80, 100]" 
+                class="fv-preset-chip" 
+                [class.active]="travelRadius === p"
+                (click)="setTravelRadius(p)"
+              >
+                {{ p }} km
+                <span class="fv-chip-hint" *ngIf="p === 60">(Standard)</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="fv-radius-hint">
+            <svg lucideInfo size="14"></svg>
+            <span>
+              Visits with destination sites up to <b>{{ travelRadius }} km</b> from the office qualify for automated per-km mileage. Sites beyond {{ travelRadius }} km are marked as <b>Outstation</b>.
+            </span>
+          </div>
+        </div>
+
+        <!-- 2. Vehicle Rates Table Section -->
+        <div class="fv-section fv-rates-section">
+          <div class="fv-rates-header-row">
+            <div>
+              <div class="fv-section-title">
+                <svg lucideRoute size="16"></svg>
+                <h4>Vehicle Reimbursement Rates</h4>
+                <span class="fv-count-pill" *ngIf="travelRates.length">
+                  {{ travelRates.length }} {{ travelRates.length === 1 ? 'vehicle' : 'vehicles' }}
+                </span>
+              </div>
+              <span class="fv-section-desc">Technicians select their vehicle when tapping "Start Journey" in the mobile app.</span>
+            </div>
+
+            <button type="button" class="fv-add-btn" (click)="addTravelRate()">
+              <svg lucidePlus size="15"></svg>
+              <span>Add Vehicle</span>
+            </button>
+          </div>
+
+          <!-- Empty State when no vehicles configured -->
+          <div class="fv-empty-state" *ngIf="!travelRates.length">
+            <div class="fv-empty-icon-wrap">
+              <svg lucideCar size="24"></svg>
+            </div>
+            <h5>No vehicle rates configured</h5>
+            <p>Add vehicle categories and their per-km rates to enable automatic mileage claims for field visits.</p>
+            
+            <div class="fv-quick-add-group">
+              <span class="fv-quick-add-title">Quick add standard vehicle types:</span>
+              <div class="fv-quick-add-pills">
+                <button type="button" class="fv-quick-add-chip" (click)="addPresetVehicle('Two Wheeler / Bike', 4.5)">
+                  <svg lucideBike size="14"></svg>
+                  <span>+ Two Wheeler / Bike (₹4.50/km)</span>
+                </button>
+                <button type="button" class="fv-quick-add-chip" (click)="addPresetVehicle('Four Wheeler / Car', 9.0)">
+                  <svg lucideCar size="14"></svg>
+                  <span>+ Four Wheeler / Car (₹9.00/km)</span>
+                </button>
+                <button type="button" class="fv-quick-add-chip" (click)="addPresetVehicle('Scooter / EV', 3.5)">
+                  <svg lucideBike size="14"></svg>
+                  <span>+ Scooter / EV (₹3.50/km)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vehicle Rates Table -->
+          <div class="fv-rates-table" *ngIf="travelRates.length">
+            <div class="fv-table-head">
+              <div class="fv-col-vehicle">Vehicle Category / Model</div>
+              <div class="fv-col-rate">Rate Per Km (₹)</div>
+              <div class="fv-col-est">Sample Round-Trip (50 km)</div>
+              <div class="fv-col-action">Remove</div>
+            </div>
+
+            <div class="fv-table-row" *ngFor="let r of travelRates; let i = index">
+              <!-- Vehicle Name Column -->
+              <div class="fv-col-vehicle">
+                <div class="fv-vehicle-input-wrap">
+                  <svg lucideBike size="16" *ngIf="isTwoWheeler(r.vehicle)" class="fv-vehicle-icon"></svg>
+                  <svg lucideCar size="16" *ngIf="!isTwoWheeler(r.vehicle)" class="fv-vehicle-icon"></svg>
+                  <input 
+                    type="text" 
+                    placeholder="Vehicle category (e.g. Bike, Car, SUV)" 
+                    [(ngModel)]="r.vehicle" 
+                    class="fv-vehicle-input"
+                    aria-label="Vehicle category" 
+                  />
+                </div>
+              </div>
+
+              <!-- Rate Per Km Column -->
+              <div class="fv-col-rate">
+                <div class="fv-rate-input-group">
+                  <span class="fv-rate-prefix">₹</span>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    step="0.5" 
+                    [(ngModel)]="r.ratePerKm" 
+                    placeholder="0.00"
+                    class="fv-rate-input"
+                    aria-label="Rate per km" 
+                  />
+                  <span class="fv-rate-suffix">/ km</span>
+                </div>
+              </div>
+
+              <!-- Sample Cost Estimate -->
+              <div class="fv-col-est">
+                <div class="fv-cost-pill" title="Estimated reimbursement for a 50 km return visit">
+                  <span class="fv-cost-val">₹{{ ((r.ratePerKm || 0) * 50).toFixed(0) }}</span>
+                  <span class="fv-cost-label">est. total</span>
+                </div>
+              </div>
+
+              <!-- Remove Action Column -->
+              <div class="fv-col-action">
+                <button 
+                  type="button" 
+                  class="fv-remove-btn" 
+                  (click)="removeTravelRate(i)" 
+                  title="Remove {{ r.vehicle || 'vehicle' }} rate"
+                  aria-label="Remove vehicle rate"
+                >
+                  <svg lucideTrash2 size="16"></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Add Bar below table if some standard presets are missing -->
+            <div class="fv-table-footer-bar">
+              <button type="button" class="fv-add-sub-btn" (click)="addTravelRate()">
+                <svg lucidePlus size="14"></svg>
+                <span>Add another vehicle</span>
+              </button>
+
+              <div class="fv-missing-presets" *ngIf="!hasVehicle('Bike') || !hasVehicle('Car')">
+                <span class="fv-missing-label">Quick suggestions:</span>
+                <button 
+                  type="button" 
+                  class="fv-quick-add-link" 
+                  *ngIf="!hasVehicle('Bike')" 
+                  (click)="addPresetVehicle('Two Wheeler / Bike', 4.5)"
+                >
+                  + Bike (₹4.5/km)
+                </button>
+                <button 
+                  type="button" 
+                  class="fv-quick-add-link" 
+                  *ngIf="!hasVehicle('Car')" 
+                  (click)="addPresetVehicle('Four Wheeler / Car', 9.0)"
+                >
+                  + Car (₹9/km)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Policy & Operational Guidance Banner -->
+        <div class="fv-guidance-banner" [class.fv-banner-warn]="!travelRates.length">
+          <div class="fv-banner-icon">
+            <svg lucideAlertTriangle size="18" *ngIf="!travelRates.length"></svg>
+            <svg lucideInfo size="18" *ngIf="travelRates.length > 0"></svg>
+          </div>
+          <div class="fv-banner-content">
+            <h5 *ngIf="!travelRates.length">Rates Required for Automated Claim Generation</h5>
+            <p *ngIf="!travelRates.length">
+              Completed Delhi NCR field visits will pause automated allowance calculation until at least one vehicle rate is configured and saved above.
+            </p>
+            <h5 *ngIf="travelRates.length">How Distance &amp; Claims are Processed</h5>
+            <p *ngIf="travelRates.length">
+              Technicians record GPS coordinates when tapping <b>Start Journey</b> and <b>End Journey</b> in the mobile app. 
+              The hourly system sweep calculates round-trip kilometers, multiplies by the assigned vehicle rate, and submits a formal expense claim to Finance for reimbursement.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Card Action Footer -->
+      <div class="fv-card-footer">
+        <div class="fv-footer-status">
+          <svg lucideCheckCircle2 size="16" class="fv-status-icon"></svg>
+          <span>Changes take effect on all completed field visits in the next hourly sweep.</span>
+        </div>
+        <button 
+          class="btn-save fv-save-btn" 
+          type="button" 
+          (click)="saveTravel()" 
+          [disabled]="isSavingTravel()"
+        >
+          <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSavingTravel()"></svg>
+          <svg lucideSave size="16" *ngIf="!isSavingTravel()"></svg>
+          <span>{{ isSavingTravel() ? 'Saving Allowance...' : 'Save Travel Allowance' }}</span>
         </button>
       </div>
+
     </div>
 
     <!-- Card: default quotation terms -->
@@ -572,10 +789,13 @@
   </div>
 
   <!-- Bottom Save Bar (Sticky on long pages) -->
-  <div class="bottom-action-bar" *ngIf="settings()">
+  <div class="bottom-action-bar" *ngIf="settings() && tab() !== 'field'">
     <div class="save-hint">
       <svg lucideCheckCircle2 size="16"></svg>
-      <span>Changes apply immediately across all future offer letter generations.</span>
+      <span *ngIf="tab() === 'letters'">Changes apply immediately across all future offer letter generations.</span>
+      <span *ngIf="tab() === 'general'">Changes apply immediately across attendance and timesheets.</span>
+      <span *ngIf="tab() === 'tickets'">Changes apply to newly created attendance issue tickets.</span>
+      <span *ngIf="tab() === 'sales'">Changes apply to all future quotation proposals.</span>
     </div>
     <button class="btn-save" (click)="save()" [disabled]="isSaving() || isUploading()">
       <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSaving()"></svg>
