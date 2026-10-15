@@ -2791,7 +2791,10 @@
 
         <!-- Travel allowance: how the amount was calculated from the field visit. -->
         <div class="travel-breakdown" *ngIf="ex.travelDetail?.days?.length">
-          <div class="travel-breakdown-head">Travel allowance · {{ ex.travelDetail.site }}</div>
+          <div class="travel-breakdown-head">
+            Travel allowance · {{ ex.travelDetail.site }}
+            <button type="button" class="travel-route-btn" (click)="openRoute(ex.id)">View route</button>
+          </div>
           <table>
             <thead>
               <tr><th>Date</th><th>From</th><th>Return</th><th>Km</th><th>Vehicle</th><th>Amount</th></tr>
@@ -3675,6 +3678,30 @@
           <span class="btn-spinner" *ngIf="isSavingGrades()"></span>
           {{ isSavingGrades() ? 'Saving Configuration…' : 'Save Configuration' }}
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Travel claim route map: start, site, end and the recorded path (Android app). -->
+<div class="drawer-overlay travel-route-overlay" *ngIf="routeOpen()" (click)="closeRoute()">
+  <div class="travel-route-modal" (click)="$event.stopPropagation()" role="dialog" aria-label="Travel route">
+    <div class="travel-route-head">
+      <strong>Route · {{ routeInfo()?.site?.name }}</strong>
+      <button class="btn-icon" type="button" (click)="closeRoute()" aria-label="Close">✕</button>
+    </div>
+    <div class="travel-route-legend">
+      <span><i style="background:#16a34a"></i>Start journey</span>
+      <span><i style="background:#dc2626"></i>Site</span>
+      <span><i style="background:#0f172a"></i>End journey</span>
+      <span><i style="background:#2563eb"></i>Recorded route</span>
+    </div>
+    <div *ngIf="routeLoading()" class="travel-route-loading">Loading route…</div>
+    <div id="travel-route-map" class="travel-route-map"></div>
+    <div class="travel-route-days" *ngIf="routeInfo() as r">
+      <div *ngFor="let d of r.days">
+        {{ d.date }} · {{ d.vehicle || 'No vehicle' }} ·
+        {{ d.route.length > 1 ? (d.trackedKm + ' km recorded') : 'No recorded route (web or no Start journey) — start and end points only' }}
       </div>
     </div>
   </div>

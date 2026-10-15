@@ -1,3 +1,4 @@
+import { TravelAllowanceService, ClaimRoute } from '../services/travel-allowance';
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -2559,6 +2560,80 @@ export class PayrollComponent implements OnInit {
     if (!claim || claim.isSummaryRow) return;
     this.selectedExpense.set(claim);
     this.isExpenseDetailOpen.set(true);
+  }
+
+  // ─── Travel claim route map ───────────────────────────────────────────────
+  private travelApi = inject(TravelAllowanceService);
+  routeOpen = signal(false);
+  routeLoading = signal(false);
+  routeInfo = signal<ClaimRoute | null>(null);
+
+  /** Leaflet from the CDN, loaded the first time a route is opened. */
+  private loadLeaflet(): Promise<any> {
+    const w = window as any;
+    if (w.L) return Promise.resolve(w.L);
+    return new Promise((resolve, reject) => {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+      document.head.appendChild(css);
+      const js = document.createElement('script');
+      js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      js.onload = () => resolve(w.L);
+      js.onerror = () => reject(new Error('Map could not load'));
+      document.body.appendChild(js);
+    });
+  }
+
+  openRoute(claimId: number) {
+    this.routeOpen.set(true);
+    this.routeLoading.set(true);
+    this.routeInfo.set(null);
+    this.travelApi.claimRoute(claimId).subscribe({
+      next: async (info) => {
+        this.routeInfo.set(info);
+        this.routeLoading.set(false);
+        try {
+          const L = await this.loadLeaflet();
+          setTimeout(() => this.drawRoute(L, info), 0);
+        } catch { this.toast.error('The map could not load'); }
+      },
+      error: (e) => { this.routeLoading.set(false); this.toast.error(e?.error?.message || 'Could not load the route'); },
+    });
+  }
+
+  private routeMap: any = null;
+  private drawRoute(L: any, info: ClaimRoute) {
+    const el = document.getElementById('travel-route-map');
+    if (!el) return;
+    if (this.routeMap) { this.routeMap.remove(); this.routeMap = null; }
+    const map = L.map(el);
+    this.routeMap = map;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+    const bounds: any[] = [];
+    const dot = (lat: number, lng: number, color: string, label: string) => {
+      L.circleMarker([lat, lng], { radius: 8, color, fillColor: color, fillOpacity: 0.9, weight: 2 }).addTo(map).bindTooltip(label);
+      bounds.push([lat, lng]);
+    };
+    if (info.site?.lat != null) dot(info.site.lat, info.site.lng, '#dc2626', `Site: ${info.site.name}`);
+    const colors = ['#2563eb', '#7c3aed', '#0d9488', '#ea580c'];
+    info.days.forEach((d, i) => {
+      const c = colors[i % colors.length];
+      if (d.route?.length > 1) {
+        L.polyline(d.route, { color: c, weight: 4, opacity: 0.85 }).addTo(map).bindTooltip(`${d.date}: ${d.trackedKm ?? '?'} km tracked`);
+        d.route.forEach((p) => bounds.push(p));
+      }
+      if (d.start) dot(d.start.lat, d.start.lng, '#16a34a', `${d.date}: Start journey`);
+      if (d.end) dot(d.end.lat, d.end.lng, '#0f172a', `${d.date}: End journey`);
+    });
+    if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] }); else map.setView([28.6, 77.2], 10);
+  }
+
+  closeRoute() {
+    this.routeOpen.set(false);
+    if (this.routeMap) { this.routeMap.remove(); this.routeMap = null; }
   }
 
   closeExpenseDetail() {

@@ -25,6 +25,7 @@ import {
   fieldVisitRequestService as fv, FieldVisitRequest, FvDay, FvCapabilities, VisitLocationRequest, ROSTER_DAY_OFF_CLASH,
 } from '../../api/fieldVisitRequestService';
 import ReasonSheet from './ReasonSheet';
+import JourneyPanel from './JourneyPanel';
 import { getCurrentLocation, requestLocationPermission } from '../../store/dashboardStore';
 import { theme } from '../../theme/theme';
 import { fvStatus, timeLabel, clockAt, range, mapsUrl, who, initials } from './fvFormat';
@@ -275,6 +276,9 @@ export default function FieldVisitsScreen() {
             )}
           </View>
         )}
+
+        {/* Travel allowance: Start / End journey (Delhi NCR visits) */}
+        {d.request.travelZone === 'DELHI_NCR' && <JourneyPanel day={d} onChanged={load} />}
 
         {/* Clock In/Out Action Button */}
         {!done && (

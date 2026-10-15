@@ -29,6 +29,11 @@ export class TravelAllowanceService {
     );
   }
 
+  /** The recorded route behind a travel claim. */
+  claimRoute(claimId: number) {
+    return this.http.get<ClaimRoute>(`${this.apiUrl}/claims/${claimId}/route`);
+  }
+
   startJourney(body: { requestId: number; lat: number; lng: number; vehicle?: string }) {
     return this.http.post(`${this.apiUrl}/journey/start`, body);
   }
@@ -36,4 +41,13 @@ export class TravelAllowanceService {
   endJourney(body: { requestId: number; lat: number; lng: number; fare?: number; receiptUrl?: string }) {
     return this.http.post(`${this.apiUrl}/journey/end`, body);
   }
+}
+
+export interface ClaimRoute {
+  site: { name: string; lat: number; lng: number };
+  days: {
+    date: string; vehicle: string | null; trackedKm: number | null;
+    start: { lat: number; lng: number } | null; end: { lat: number; lng: number } | null;
+    route: number[][];
+  }[];
 }

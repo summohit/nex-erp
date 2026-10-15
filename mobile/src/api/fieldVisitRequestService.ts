@@ -45,11 +45,16 @@ export interface FvDay {
   clockInDistanceKm?: number | null;
   clockOutTime?: string | null;
   clockOutDistanceKm?: number | null;
+  /** Travel allowance (Delhi NCR visits). */
+  journeyVehicle?: string | null;
+  journeyStartAt?: string | null;
+  journeyEndAt?: string | null;
   issue?: { id: number; key: string; title: string } | null;
   request: {
     id: number; requestNumber: string; status: string; location: string;
     latitude: number; longitude: number; geofenceRadiusM: number;
     startTime: string; endTime: string;
+    travelZone?: 'DELHI_NCR' | 'OUTSTATION' | null;
     project?: { id: number; name: string; key: string } | null;
   };
   tasks: { id: number; key: string; title: string }[];
@@ -323,4 +328,32 @@ export const fieldVisitRequestService = {
     const { data } = await apiClient.post('/field-visit-attendance/clock-out', body);
     return data;
   },
+
+  // ── travel allowance (Delhi NCR visits) ──
+  async travelSettings(): Promise<TravelConfig> {
+    const { data } = await apiClient.get('/travel-allowance/settings');
+    return data;
+  },
+  async startJourney(body: { requestId: number; lat: number; lng: number; vehicle?: string }) {
+    const { data } = await apiClient.post('/travel-allowance/journey/start', body);
+    return data;
+  },
+  async endJourney(body: { requestId: number; lat: number; lng: number; fare?: number; receiptUrl?: string }) {
+    const { data } = await apiClient.post('/travel-allowance/journey/end', body);
+    return data;
+  },
+  /** Points recorded on the phone during the journey: [lat, lng, epochMs]. */
+  async sendRoutePoints(requestId: number, points: number[][]) {
+    const { data } = await apiClient.post('/travel-allowance/journey/points', { requestId, points });
+    return data;
+  },
+  async uploadReceipt(fd: FormData): Promise<{ url: string }> {
+    const { data } = await apiClient.post('/upload/attendance-proof', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }, timeout: UPLOAD_TIMEOUT_MS,
+    });
+    return data;
+  },
 };
+
+export interface TravelRate { vehicle: string; kind?: 'PER_KM' | 'ACTUAL_FARE'; ratePerKm: number; receiptRequired?: boolean }
+export interface TravelConfig { ncrRadiusKm: number; maxFarePerDay?: number; rates: TravelRate[] }

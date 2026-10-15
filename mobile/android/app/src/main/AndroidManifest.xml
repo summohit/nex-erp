@@ -4,9 +4,13 @@
   <!-- Location — field visits, attendance geo-stamp -->
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-  <!-- No background location: the old route-tracking field visit (and its
-       foreground service) is retired. Field visits now clock in and out at the
-       site, which needs location only while the app is open. -->
+  <!-- Travel allowance route recorder (15 Oct 2026): a foreground service of
+       type "location", started only when the person taps Start journey and
+       stopped at End journey, with a visible notification while it runs. No
+       ACCESS_BACKGROUND_LOCATION: it runs as a foreground service, started
+       from the open app with while-in-use location. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
   <!-- Camera — field visit photos, profile picture -->
   <uses-permission android:name="android.permission.CAMERA" />
   <!-- Storage / Media — gallery attachments (SDK < 33 uses READ_EXTERNAL_STORAGE) -->
@@ -51,5 +55,9 @@
       </intent-filter>
     </activity>
 
+      <service
+      android:name=".fieldvisit.FieldVisitLocationService"
+      android:exported="false"
+      android:foregroundServiceType="location" />
   </application>
 </manifest>
