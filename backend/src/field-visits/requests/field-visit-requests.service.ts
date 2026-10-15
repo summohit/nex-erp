@@ -547,6 +547,41 @@ export class FieldVisitRequestsService {
         && !request.pendingChange
         && mayRaise,
       canReviewChange: !!request.pendingChange && this.isApprover(role),
+      // Mirrors cancel() and complete(): administrators only, and only while
+      // the trip can still be stopped or closed.
+      canCancel: this.isApprover(role)
+        && !([FIELD_VISIT_STATUS.CANCELLED, FIELD_VISIT_STATUS.REJECTED, FIELD_VISIT_STATUS.COMPLETED] as string[]).includes(request.status),
+      canComplete: request.status === FIELD_VISIT_STATUS.APPROVED && this.isApprover(role),
+    };
+  }
+
+  /**
+   * What the signed-in person may do with field visits, so a client can show
+   * only what the server would allow. Anyone may raise a General visit from
+   * their own general tasks; a project visit needs the project's manager
+   * (lead or PROJECT_MANAGER member) or an administrator.
+   */
+  async capabilities(companyId: number, role: string, employeeId: number | null) {
+    const approver = this.isApprover(role);
+    const managed = approver || employeeId == null ? [] : await this.prisma.project.findMany({
+      where: {
+        companyId,
+        isSystem: false,
+        OR: [
+          { leadId: employeeId },
+          { members: { some: { employeeId, role: 'PROJECT_MANAGER' } } },
+        ],
+      },
+      select: { id: true },
+    });
+    return {
+      isApprover: approver,
+      isSuperAdmin: isSuperAdmin(role),
+      /** Raises project visits on every project. */
+      allProjects: approver,
+      /** The projects this person manages, when not an administrator. */
+      managedProjectIds: managed.map((p) => p.id),
+      isProjectManager: approver || managed.length > 0,
     };
   }
 

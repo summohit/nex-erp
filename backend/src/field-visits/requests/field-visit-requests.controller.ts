@@ -37,6 +37,12 @@ export class FieldVisitRequestsController {
     );
   }
 
+  /** What the signed-in person may do here. Declared before `:id`. */
+  @Get('capabilities')
+  capabilities(@Req() req) {
+    return this.requests.capabilities(req.user.companyId, req.user.role, req.user.employeeId ?? null);
+  }
+
   @Get('availability')
   availability(@Req() req, @Query('employeeIds') employeeIds?: string, @Query('startDate') startDate?: string, @Query('endDate') endDate?: string) {
     return this.requests.availability(req.user.companyId, String(employeeIds ?? '').split(',').filter(Boolean).map(Number), startDate, endDate);
