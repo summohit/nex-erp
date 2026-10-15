@@ -27,6 +27,8 @@ export interface FieldVisitRequest {
   remarks?: string | null;
   status: FvStatus;
   rejectionReason?: string | null;
+  /** A proposed change to an approved trip, waiting for an administrator. */
+  pendingChange?: any | null;
   createdAt: string;
   project?: { id: number; name: string; key: string; isSystem?: boolean } | null;
   raisedBy?: FvPerson | null;
@@ -131,6 +133,27 @@ export interface NewFieldVisit {
 /** An approved leave that overlaps the trip, clipped to its dates (GET /availability). */
 export interface FvLeaveClash { employeeId: number; startDate: string; endDate: string }
 
+/** What a Super Admin may correct while approving a pending request. */
+export interface FvApprovalEdits { location?: string; startDate?: string; endDate?: string; startTime?: string; endTime?: string }
+
+export interface FvBulkResult { id: number; success: boolean; error?: string; code?: string }
+
+/** A project manager's request for a new saved site. */
+export interface VisitLocationRequest {
+  id: number;
+  name: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejectionReason?: string | null;
+  createdAt: string;
+  requestedBy?: FvPerson | null;
+}
+
+/** The server's code when approving would put someone on site on a rostered day off. */
+export const ROSTER_DAY_OFF_CLASH = 'ROSTER_DAY_OFF_CLASH';
+
 export interface VisitLocationCapabilities { isAdmin: boolean; isProjectManager: boolean; canAdd: boolean; canReview: boolean }
 
 export const fieldVisitRequestService = {
@@ -188,6 +211,41 @@ export const fieldVisitRequestService = {
       timeout: UPLOAD_TIMEOUT_MS,
     });
     return data?.url || data?.fileUrl || data?.path;
+  },
+  // ── administrators ──
+  async approve(id: number, opts: { overrideDayOff?: boolean; edits?: FvApprovalEdits; editReason?: string } = {}) {
+    const { data } = await apiClient.post(`/field-visit-requests/${id}/approve`, opts);
+    return data;
+  },
+  async reject(id: number, reason: string) {
+    await apiClient.post(`/field-visit-requests/${id}/reject`, { reason });
+  },
+  async complete(id: number) {
+    await apiClient.post(`/field-visit-requests/${id}/complete`);
+  },
+  /** Move a request to any status the server allows an administrator (e.g. an approved trip back to pending). */
+  async changeStatus(id: number, status: string, reason?: string, overrideDayOff?: boolean) {
+    const { data } = await apiClient.post(`/field-visit-requests/${id}/status`, { status, reason, overrideDayOff });
+    return data;
+  },
+  async approveChange(id: number) {
+    await apiClient.post(`/field-visit-requests/${id}/modification/approve`);
+  },
+  async rejectChange(id: number, reason: string) {
+    await apiClient.post(`/field-visit-requests/${id}/modification/reject`, { reason });
+  },
+  /** Several at once; each succeeds or fails on its own. */
+  async bulkStatus(ids: number[], status: string, reason?: string, overrideDayOff?: boolean): Promise<FvBulkResult[]> {
+    const { data } = await apiClient.post('/field-visit-requests/bulk/status', { ids, status, reason, overrideDayOff });
+    return data || [];
+  },
+  async locationRequests(): Promise<VisitLocationRequest[]> {
+    const { data } = await apiClient.get('/visit-location-requests');
+    return data || [];
+  },
+  async reviewLocation(id: number, decision: 'APPROVED' | 'REJECTED', reason?: string) {
+    const { data } = await apiClient.post(`/visit-location-requests/${id}/review`, { decision, reason });
+    return data;
   },
   async withdraw(id: number) {
     await apiClient.post(`/field-visit-requests/${id}/withdraw`);

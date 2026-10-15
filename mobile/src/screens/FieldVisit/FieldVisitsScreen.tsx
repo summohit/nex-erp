@@ -4,12 +4,15 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AppScreen from '../../components/AppScreen';
-import { fieldVisitRequestService as fv, FieldVisitRequest, FvDay } from '../../api/fieldVisitRequestService';
+import {
+  fieldVisitRequestService as fv, FieldVisitRequest, FvDay, FvCapabilities, VisitLocationRequest, ROSTER_DAY_OFF_CLASH,
+} from '../../api/fieldVisitRequestService';
+import ReasonSheet from './ReasonSheet';
 import { getCurrentLocation, requestLocationPermission } from '../../store/dashboardStore';
 import { theme } from '../../theme/theme';
-import { fvStatus, timeLabel, clockAt, range, mapsUrl } from './fvFormat';
+import { fvStatus, timeLabel, clockAt, range, mapsUrl, who } from './fvFormat';
 
-type Tab = 'TODAY' | 'MINE';
+type Tab = 'TODAY' | 'MINE' | 'APPROVALS';
 
 export default function FieldVisitsScreen() {
   const navigation = useNavigation<any>();
@@ -20,14 +23,94 @@ export default function FieldVisitsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
   const [taskFor, setTaskFor] = useState<Record<number, number | undefined>>({});
+  // Administrators: what waits on them, and bulk decisions on it.
+  const [caps, setCaps] = useState<FvCapabilities | null>(null);
+  const [siteRequests, setSiteRequests] = useState<VisitLocationRequest[]>([]);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [sheet, setSheet] = useState<null | { kind: 'bulkReject' } | { kind: 'siteReject'; id: number }>(null);
 
   const load = useCallback(async () => {
-    const [t, m] = await Promise.allSettled([fv.today(), fv.list()]);
+    const [t, m, c] = await Promise.allSettled([fv.today(), fv.list(), fv.capabilities()]);
     if (t.status === 'fulfilled') setDays(t.value);
     if (m.status === 'fulfilled') setMine(m.value);
+    if (c.status === 'fulfilled') {
+      setCaps(c.value);
+      if (c.value.isApprover) {
+        fv.locationRequests().then((rows) => setSiteRequests(rows.filter((r) => r.status === 'PENDING'))).catch(() => {});
+      }
+    }
     setLoading(false);
     setRefreshing(false);
   }, []);
+
+  const approver = !!caps?.isApprover;
+  /** Waiting on an administrator: new requests, and changes to approved ones. */
+  const awaiting = useMemo(
+    () => mine.filter((r) => r.status === 'PENDING_APPROVAL' || !!r.pendingChange)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate)),
+    [mine],
+  );
+  const pendingIds = awaiting.filter((r) => r.status === 'PENDING_APPROVAL').map((r) => r.id);
+  const toggle = (id: number) => setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  /** Approve several; any that land on a rostered day off are offered the same override as one at a time. */
+  const bulkApprove = async (ids: number[], override = false) => {
+    setBulkBusy(true);
+    try {
+      const results = await fv.bulkStatus(ids, 'APPROVED', undefined, override);
+      const ok = results.filter((r) => r.success).length;
+      const dayOff = results.filter((r) => !r.success && r.code === ROSTER_DAY_OFF_CLASH);
+      const other = results.filter((r) => !r.success && r.code !== ROSTER_DAY_OFF_CLASH);
+      await load();
+      setSelected([]);
+      if (dayOff.length && !override) {
+        Alert.alert(
+          `${dayOff.length} visit${dayOff.length > 1 ? 's fall' : ' falls'} on rostered days off`,
+          dayOff.map((f) => f.error).join('\n\n'),
+          [{ text: 'Leave them', style: 'cancel' },
+            { text: 'Approve and override days off', onPress: () => bulkApprove(dayOff.map((f) => f.id), true) }],
+        );
+      } else {
+        Alert.alert(`${ok} of ${results.length} approved`, other.map((f) => f.error).filter(Boolean).join('\n\n') || undefined);
+      }
+    } catch (e: any) {
+      Alert.alert('Could not approve', e?.response?.data?.message || 'Please try again.');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const onReason = async (reason: string) => {
+    if (!sheet) return;
+    setBulkBusy(true);
+    try {
+      if (sheet.kind === 'bulkReject') {
+        const results = await fv.bulkStatus(selected, 'REJECTED', reason);
+        const failed = results.filter((r) => !r.success);
+        Alert.alert(`${results.length - failed.length} of ${results.length} rejected`, failed.map((f) => f.error).join('\n\n') || undefined);
+        setSelected([]);
+      } else {
+        await fv.reviewLocation(sheet.id, 'REJECTED', reason);
+      }
+      setSheet(null);
+      await load();
+    } catch (e: any) {
+      Alert.alert('Could not do that', e?.response?.data?.message || 'Please try again.');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const approveSite = (r: VisitLocationRequest) =>
+    Alert.alert('Approve this site?', `${r.name} becomes a saved site everyone can pick.`, [
+      { text: 'Back', style: 'cancel' },
+      { text: 'Approve', onPress: async () => {
+        try { await fv.reviewLocation(r.id, 'APPROVED'); await load(); } catch (e: any) {
+          Alert.alert('Could not approve', e?.response?.data?.message || 'Please try again.');
+        }
+      } },
+    ]);
 
   // Back from the request form: show what was just raised.
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -125,13 +208,64 @@ export default function FieldVisitsScreen() {
     );
   };
 
+  const renderAwaiting = ({ item: r }: { item: FieldVisitRequest }) => {
+    const isPending = r.status === 'PENDING_APPROVAL';
+    const on = selected.includes(r.id);
+    return (
+      <TouchableOpacity style={[styles.card, on && styles.cardOn]} onPress={() => navigation.navigate('FieldVisitDetail', { id: r.id })}
+        onLongPress={() => isPending && toggle(r.id)}>
+        <View style={styles.headRow}>
+          <View style={styles.headLeft}>
+            {isPending && (
+              <TouchableOpacity onPress={() => toggle(r.id)} hitSlop={10}><Text style={styles.check}>{on ? '☑' : '☐'}</Text></TouchableOpacity>
+            )}
+            <Text style={styles.reqNo}>{r.requestNumber}</Text>
+          </View>
+          <View style={[styles.badge, { backgroundColor: isPending ? '#FEF3C7' : '#FFEDD5' }]}>
+            <Text style={[styles.badgeText, { color: isPending ? '#92400E' : '#9A3412' }]}>{isPending ? 'New request' : 'Change requested'}</Text>
+          </View>
+        </View>
+        <Text style={styles.site} numberOfLines={2}>{r.location}</Text>
+        <Text style={styles.meta}>{range(r)} · {r.members.length} {r.members.length === 1 ? 'person' : 'people'} · {r.project?.isSystem ? 'General' : r.project?.name}</Text>
+        {!!r.raisedBy && <Text style={styles.meta}>Raised by {who(r.raisedBy)}</Text>}
+      </TouchableOpacity>
+    );
+  };
+
+  const siteRequestsFooter = siteRequests.length > 0 ? (
+    <View>
+      <Text style={styles.sectionHead}>New site requests ({siteRequests.length})</Text>
+      {siteRequests.map((r) => (
+        <View key={r.id} style={[styles.card, styles.siteCard]}>
+          <Text style={styles.site}>{r.name}</Text>
+          {!!r.address && <Text style={styles.meta}>{r.address}</Text>}
+          {!!r.requestedBy && <Text style={styles.meta}>Requested by {who(r.requestedBy)}</Text>}
+          {r.latitude != null && r.longitude != null && (
+            <Text style={styles.link} onPress={() => Linking.openURL(mapsUrl(r.latitude!, r.longitude!))}>See the pin in Maps</Text>
+          )}
+          <View style={styles.rowBtns}>
+            <TouchableOpacity style={[styles.halfBtn, styles.approveBtn]} onPress={() => approveSite(r)}><Text style={styles.clockText}>Approve</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.halfBtn, styles.rejectBtn]} onPress={() => setSheet({ kind: 'siteReject', id: r.id })}>
+              <Text style={styles.rejectText}>Reject</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+    </View>
+  ) : null;
+
+  const tabs: Tab[] = approver ? ['TODAY', 'MINE', 'APPROVALS'] : ['TODAY', 'MINE'];
+  const tabLabel = (t: Tab) => (t === 'TODAY' ? `Today (${days.length})`
+    : t === 'MINE' ? `${approver ? 'All' : 'My visits'} (${mine.length})`
+      : `Approvals (${awaiting.length + siteRequests.length})`);
+
   return (
     <AppScreen title="Field Visits" subtitle="Requests and on-site attendance">
       <View style={styles.top}>
         <View style={styles.segment}>
-          {(['TODAY', 'MINE'] as Tab[]).map((t) => (
+          {tabs.map((t) => (
             <TouchableOpacity key={t} style={[styles.segBtn, tab === t && styles.segOn]} onPress={() => setTab(t)}>
-              <Text style={[styles.segText, tab === t && styles.segTextOn]}>{t === 'TODAY' ? `Today (${days.length})` : `My visits (${mine.length})`}</Text>
+              <Text style={[styles.segText, tab === t && styles.segTextOn]} numberOfLines={1}>{tabLabel(t)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -140,7 +274,34 @@ export default function FieldVisitsScreen() {
         </TouchableOpacity>
       </View>
 
-      {loading ? <ActivityIndicator style={styles.loader} color={theme.colors.primary} /> : tab === 'TODAY' ? (
+      {tab === 'APPROVALS' && selected.length > 0 && (
+        <View style={styles.bulkBar}>
+          <Text style={styles.bulkText}>{selected.length} selected</Text>
+          <TouchableOpacity style={[styles.bulkBtn, styles.approveBtn]} disabled={bulkBusy} onPress={() => bulkApprove(selected)}>
+            {bulkBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.clockText}>Approve</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.bulkBtn, styles.rejectBtn]} disabled={bulkBusy} onPress={() => setSheet({ kind: 'bulkReject' })}>
+            <Text style={styles.rejectText}>Reject</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {loading ? <ActivityIndicator style={styles.loader} color={theme.colors.primary} /> : tab === 'APPROVALS' ? (
+        <FlatList
+          data={awaiting}
+          keyExtractor={(r) => `a${r.id}`}
+          renderItem={renderAwaiting}
+          contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+          ListHeaderComponent={pendingIds.length > 1 ? (
+            <TouchableOpacity onPress={() => setSelected(selected.length === pendingIds.length ? [] : pendingIds)}>
+              <Text style={styles.selectAll}>{selected.length === pendingIds.length ? 'Clear selection' : `Select all ${pendingIds.length} new requests`}</Text>
+            </TouchableOpacity>
+          ) : undefined}
+          ListFooterComponent={siteRequestsFooter ?? undefined}
+          ListEmptyComponent={siteRequests.length ? undefined : <Text style={styles.empty}>Nothing is waiting for approval.</Text>}
+        />
+      ) : tab === 'TODAY' ? (
         <FlatList
           data={days}
           keyExtractor={(d) => String(d.id)}
@@ -160,6 +321,16 @@ export default function FieldVisitsScreen() {
         />
       )}
 
+      <ReasonSheet
+        visible={!!sheet}
+        title={sheet?.kind === 'bulkReject' ? `Reject ${selected.length} request${selected.length === 1 ? '' : 's'}` : 'Reject this site'}
+        message="The person who raised it sees this reason."
+        confirmLabel="Reject"
+        danger
+        busy={bulkBusy}
+        onSubmit={onReason}
+        onClose={() => setSheet(null)}
+      />
     </AppScreen>
   );
 }
@@ -176,6 +347,20 @@ const styles = StyleSheet.create({
   loader: { marginTop: 40 },
   list: { padding: 16, paddingBottom: 120, gap: 12 },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: theme.colors.border },
+  cardOn: { borderColor: theme.colors.primary, backgroundColor: '#F8FBFF' },
+  headLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  check: { fontSize: 18, color: theme.colors.primary },
+  selectAll: { color: theme.colors.primary, fontWeight: '700', marginBottom: 4 },
+  sectionHead: { fontSize: 12.5, fontWeight: '700', color: theme.colors.textSecondary, textTransform: 'uppercase', marginTop: 12, marginBottom: 8 },
+  siteCard: { marginBottom: 12 },
+  rowBtns: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  halfBtn: { flex: 1, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  approveBtn: { backgroundColor: '#16A34A' },
+  rejectBtn: { borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
+  rejectText: { color: '#DC2626', fontWeight: '700' },
+  bulkBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: '#EFF6FF' },
+  bulkText: { flex: 1, fontWeight: '700', color: theme.colors.textPrimary },
+  bulkBtn: { height: 38, paddingHorizontal: 16, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   reqNo: { fontSize: 12, fontWeight: '700', color: theme.colors.textMuted },
   site: { fontSize: 16, fontWeight: '700', color: theme.colors.textPrimary, marginTop: 4 },
