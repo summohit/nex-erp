@@ -455,3 +455,4 @@
 .doc-retype { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .doc-retype-note { font-size: 12px; color: #b45309; font-weight: 600; }
 .doc-retype-select { padding: 6px 8px; border: 1px solid #fcd34d; border-radius: 8px; font: inherit; font-size: 12.5px; background: #fffbeb; max-width: 220px; }
+.doc-retype-select.doc-retype-quiet { border-color: #e2e8f0; background: #fff; color: #475569; }

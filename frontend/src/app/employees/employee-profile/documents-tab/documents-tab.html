@@ -21,11 +21,13 @@
         <span class="doc-badge">{{ doc.documentType || 'Document' }}</span>
         <h3>{{ doc.fileName }}</h3>
         <p>{{ timeAgo(doc.createdAt) }}</p>
-        <!-- Saved as Other: let them file it under its proper type. -->
-        <div class="doc-retype" *ngIf="doc.documentType === 'Other'">
-          <span class="doc-retype-note">Saved as Other — what is this file?</span>
-          <select class="doc-retype-select" (change)="retype(doc, $any($event.target).value)" aria-label="Set document type">
-            <option value="" selected disabled>Set type…</option>
+        <!-- Any file can be re-filed: an "Other" upload, or one picked wrongly. -->
+        <div class="doc-retype">
+          <span class="doc-retype-note" *ngIf="doc.documentType === 'Other'">Saved as Other — what is this file?</span>
+          <select class="doc-retype-select" [class.doc-retype-quiet]="doc.documentType !== 'Other'"
+                  [value]="doc.documentType === 'Other' ? '' : doc.documentType"
+                  (change)="retype(doc, $any($event.target).value)" aria-label="Change document type">
+            <option value="" disabled>{{ doc.documentType === 'Other' ? 'Set type…' : 'Change type…' }}</option>
             <option *ngFor="let type of documentTypes" [value]="type" [disabled]="type === 'Other'">{{ type }}</option>
           </select>
         </div>

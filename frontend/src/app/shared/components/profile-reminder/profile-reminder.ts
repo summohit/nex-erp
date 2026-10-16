@@ -111,7 +111,11 @@ export class ProfileReminderComponent implements OnInit, OnDestroy {
     if (!s || !documentType) return;
     this.retyping.set(documentId);
     this.employees.updateDocumentType(s.employeeId, documentId, documentType).subscribe({
-      next: () => { this.retyping.set(null); this.toast.success(`Saved as ${documentType}`); this.check(true); },
+      next: () => {
+        this.retyping.set(null);
+        this.toast.success(`Saved as ${documentType}. Picked the wrong one? Change it on your profile's Documents tab.`, { duration: 6000 });
+        this.check(true);
+      },
       error: (e) => { this.retyping.set(null); this.toast.error(e?.error?.message || 'Could not change the type'); },
     });
   }

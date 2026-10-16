@@ -15,6 +15,7 @@
           <div class="pr-note">
             You already uploaded {{ s.otherDocuments.length === 1 ? 'this file' : 'these ' + s.otherDocuments.length + ' files' }},
             but as <b>Other</b>, so they don't count yet. Pick what each one is — no need to upload again.
+            Picked the wrong type? You can change it any time on your profile's <b>Documents</b> tab.
           </div>
           <ul class="pr-list">
             @for (d of s.otherDocuments; track d.id) {
