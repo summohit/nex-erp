@@ -50,7 +50,8 @@ const menuSections: MenuSection[] = [
           { id: 'employees/me/profile', title: 'My Profile', route: '/employees/me/profile' },
           { id: 'employees/org-chart', title: 'Organization Chart', route: '/employees/org-chart' },
           { id: 'employees/onboarding', title: 'Onboarding', route: '/employees/onboarding' },
-          { id: 'employees/documents', title: 'Documents', route: '/employees/documents' }
+          { id: 'employees/documents', title: 'Documents', route: '/employees/documents' },
+          { id: 'employees/profile-completion', title: 'Profile Completion', route: '/employees/profile-completion' }
         ]
       },
       {

@@ -294,6 +294,24 @@ export class MenusService implements OnModuleInit {
 
       }
 
+      // Profile Completion under Employees (HR's document drive, 16 Oct 2026).
+      const employeesMenu = await this.prisma.menu.findFirst({ where: { route: '/employees', parentId: { not: null } } });
+      if (employeesMenu) {
+        const exists = await this.prisma.menu.findFirst({ where: { route: '/employees/profile-completion' } });
+        if (!exists) {
+          await this.prisma.menu.create({
+            data: {
+              title: 'Profile Completion',
+              route: '/employees/profile-completion',
+              displayOrder: 5,
+              parentId: employeesMenu.id,
+              isActive: true,
+            },
+          });
+          this.logger.log('Profile Completion menu auto-seeded successfully.');
+        }
+      }
+
       // Also ensure Lead Forms is under CRM
       const crmSection = await this.prisma.menu.findFirst({ where: { title: 'CRM', parentId: { not: null } } });
       if (crmSection) {
@@ -397,6 +415,10 @@ export class MenusService implements OnModuleInit {
     // the Notices service; this grant makes the board visible in HR's sidebar
     // even when no explicit RolePermission row exists yet.
     if (roleName === 'HR') allowedModules.add('notices');
+
+    // Who has documents or details missing: the report HR and admins follow
+    // up with (the endpoint allows the same roles).
+    if (['ADMIN', 'HR'].includes(roleName)) allowedModules.add('employees/profile-completion');
 
     // The Delivery section's children all ride on the single 'projects'
     // permission. Renaming the sidebar entry must not quietly revoke access:

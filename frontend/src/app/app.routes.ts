@@ -99,7 +99,7 @@ export const routes: Routes = [
       {
         path: 'employees/profile-completion',
         canActivate: [permissionGuard],
-        data: { module: 'employees/documents' },
+        data: { module: 'employees/profile-completion' },
         loadComponent: () => import('./employees/profile-completion/profile-completion').then(m => m.ProfileCompletionComponent)
       },
       {
