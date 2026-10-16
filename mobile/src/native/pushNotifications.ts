@@ -12,7 +12,9 @@ import {
   AuthorizationStatus,
 } from '@react-native-firebase/messaging';
 import type { RemoteMessage } from '@react-native-firebase/messaging';
+import notifee from '@notifee/react-native';
 import { apiClient } from '../api/apiClient';
+import { displayRemote, handleNotificationEvent, initialNotificationData } from './notificationDisplay';
 
 /**
  * Push registration for the mobile app.
@@ -153,9 +155,11 @@ export function initPushListeners(opts: {
     // displaying them is the app's job.
     unsubscribers.push(
       onMessage(app, async (remote: RemoteMessage) => {
+        // Android pushes are data only, so draw them as in the background.
+        if (Platform.OS === 'android') await displayRemote(remote);
         opts.onForegroundMessage?.(
-          remote.notification?.title ?? 'MIRA',
-          remote.notification?.body ?? '',
+          remote.notification?.title ?? remote.data?.title as string ?? 'MIRA',
+          remote.notification?.body ?? remote.data?.body as string ?? '',
           (remote.data ?? {}) as Record<string, string>,
         );
       }),
@@ -167,6 +171,16 @@ export function initPushListeners(opts: {
         opts.onOpenedFromNotification?.((remote.data ?? {}) as Record<string, string>);
       }),
     );
+
+    // Taps and Approve / Reject on notifications the app drew (Android).
+    unsubscribers.push(
+      notifee.onForegroundEvent((event) =>
+        handleNotificationEvent(event, (data) => opts.onOpenedFromNotification?.(data)),
+      ),
+    );
+    initialNotificationData()
+      .then((data) => { if (data) opts.onOpenedFromNotification?.(data); })
+      .catch(() => {});
 
     // Tapped while the app was killed. This resolves once, at startup, with
     // the notification that launched the app — or null if something else did.

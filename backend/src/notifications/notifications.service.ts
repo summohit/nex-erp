@@ -3,6 +3,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from './notifications.gateway';
 import { PushService } from './push/push.service';
 
+/**
+ * Extras a phone notification can carry (16 Oct 2026): Approve / Reject
+ * buttons for something waiting on the recipient, and the photo of the person
+ * it is about. The web and the in-app list ignore them.
+ */
+export interface NotificationExtra {
+  action?: { kind: 'LEAVE' | 'FIELD_VISIT'; id: number };
+  avatarUrl?: string | null;
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -88,7 +98,8 @@ export class NotificationsService {
     message: string,
     type = 'INFO',
     linkUrl?: string,
-    companyId?: number
+    companyId?: number,
+    extra?: NotificationExtra,
   ) {
     if (!userId) {
       this.logger.warn(`createNotification aborted: userId is null or undefined for message "${message}"`);
@@ -138,7 +149,11 @@ export class NotificationsService {
           message,
           type,
           linkUrl,
-          data: { notificationId: String(notification.id) },
+          data: {
+            notificationId: String(notification.id),
+            ...(extra?.action ? { actionKind: extra.action.kind, actionId: String(extra.action.id) } : {}),
+            ...(extra?.avatarUrl && /^https?:\/\//.test(extra.avatarUrl) ? { avatarUrl: extra.avatarUrl } : {}),
+          },
         })
         .catch((err) => this.logger.warn(`Push failed for user ${userId}: ${err.message}`));
 
@@ -228,6 +243,7 @@ export class NotificationsService {
       linkUrl?: string;
       /** The person who caused the change; never notified about their own action. */
       excludeEmployeeId?: number | null;
+      extra?: NotificationExtra;
     },
   ): Promise<number> {
     try {
@@ -255,6 +271,7 @@ export class NotificationsService {
           opts.type ?? 'INFO',
           opts.linkUrl,
           opts.companyId,
+          opts.extra,
         );
         sent++;
       }
@@ -285,6 +302,7 @@ export class NotificationsService {
     excludeUserId?: number | null;
     /** Reporting manager's user id, when the flow has one. */
     managerUserId?: number | null;
+    extra?: NotificationExtra;
   }): Promise<number> {
     const recipients = new Set<number>();
 
@@ -318,6 +336,7 @@ export class NotificationsService {
         opts.type ?? 'ACTION_REQUIRED',
         opts.linkUrl,
         opts.companyId,
+        opts.extra,
       );
     }
 

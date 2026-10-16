@@ -147,7 +147,7 @@ export class FieldVisitRequestsService {
         issue: {
           select: {
             id: true, key: true, title: true, status: true, priority: true, approvalState: true,
-            assignee: { select: { id: true, firstName: true, lastName: true } },
+            assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
           },
         },
       },
@@ -1441,6 +1441,7 @@ export class FieldVisitRequestsService {
         + `${request.visitDays} day(s) at ${request.location} for ${request.project?.name ?? 'a project'}.`,
       type: 'ACTION_REQUIRED',
       linkUrl: this.LINK,
+      extra: { action: { kind: 'FIELD_VISIT', id: request.id }, avatarUrl: request.raisedBy?.avatarUrl },
     });
 
     // A company with no administrator other than the requester leaves the trip

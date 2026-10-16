@@ -426,7 +426,8 @@ export class LeavesService {
         message,
         'LEAVE',
         '/attendance/leave-approvals',
-        employee.companyId
+        employee.companyId,
+        { action: { kind: 'LEAVE', id: request.id }, avatarUrl: employee.avatarUrl },
       );
     }
 
@@ -450,7 +451,8 @@ export class LeavesService {
           message,
           'LEAVE',
           '/attendance/leave-approvals',
-          employee.companyId
+          employee.companyId,
+          { action: { kind: 'LEAVE', id: request.id }, avatarUrl: employee.avatarUrl },
         );
       }
     }

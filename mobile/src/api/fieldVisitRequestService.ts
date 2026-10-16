@@ -122,7 +122,18 @@ export interface FvCapabilities {
 
 export interface VisitLocation { id: number; name: string; address?: string | null; latitude?: number | null; longitude?: number | null }
 export interface ProjectLite { id: number; name: string; key: string }
-export interface TaskOption { id: number; key: string; title: string; status?: string }
+export interface TaskOption {
+  id: number; key: string; title: string; status?: string;
+  dueDate?: string | null; priority?: string | null; approvalState?: string | null;
+  /** Who the task is assigned to, as the web form shows it. */
+  assignee?: { id: number; firstName: string; lastName?: string | null; avatarUrl?: string | null } | null;
+}
+
+const toTaskOption = (i: any): TaskOption => ({
+  id: i.id, key: i.key, title: i.title, status: i.status,
+  dueDate: i.dueDate ?? null, priority: i.priority ?? null, approvalState: i.approvalState ?? null,
+  assignee: i.assignee ?? null,
+});
 
 export interface NewFieldVisit {
   /** Why an approved visit is changed; required when requesting a change. */
@@ -306,13 +317,13 @@ export const fieldVisitRequestService = {
     const rows = Array.isArray(data) ? data : data?.items || [];
     return rows
       .filter((i: any) => !i.isArchived && !['DONE', 'CANCELLED'].includes(i.status))
-      .map((i: any) => ({ id: i.id, key: i.key, title: i.title, status: i.status }));
+      .map(toTaskOption);
   },
   /** A general visit's scope: the chosen people's own open general tasks. */
   async generalTasks(employeeIds: number[]): Promise<TaskOption[]> {
     if (!employeeIds.length) return [];
     const { data } = await apiClient.get('/field-visit-requests/general-tasks', { params: { employeeIds: employeeIds.join(',') } });
-    return (data || []).map((i: any) => ({ id: i.id, key: i.key, title: i.title, status: i.status }));
+    return (data || []).map(toTaskOption);
   },
 
   // ── clocking at the site ──

@@ -219,29 +219,25 @@ export class PushService implements OnModuleInit {
       ),
     };
 
+    // The unread count, for the app icon badge.
+    const unread = await this.prisma.notification
+      .count({ where: { userId, isRead: false } })
+      .catch(() => 0);
+    const channelId = (payload.linkUrl ?? '').startsWith('/attendance/my') ? 'shift-reminders' : 'mira-updates';
+
+    // Android gets data only, and the app draws the notification itself
+    // (16 Oct 2026): that is what allows Approve / Reject buttons, the
+    // person's photo, grouping and the badge. iPhone and the browser still
+    // get a ready-made notification.
     const message = {
-      notification: { title: payload.title, body: payload.message },
-      data,
-      // Per-platform blocks so a shift reminder actually makes a sound on a
-      // locked phone rather than arriving silently in a tray.
-      android: {
-        priority: 'high' as const,
-        notification: {
-          // Shift reminders keep their own channel; everything else goes to
-          // "Tasks & approvals" (16 Oct 2026). Both are created by the app.
-          channelId: (payload.linkUrl ?? '').startsWith('/attendance/my') ? 'shift-reminders' : 'mira-updates',
-          defaultSound: true,
-          // The app's white "M" in MIRA blue; older builds fall back to theirs.
-          icon: 'ic_notification',
-          color: '#1373E5',
-        },
-      },
+      data: { ...data, title: payload.title, body: payload.message, channelId, badge: String(unread) },
+      android: { priority: 'high' as const },
       apns: {
-        payload: { aps: { sound: 'default', contentAvailable: true } },
+        payload: { aps: { alert: { title: payload.title, body: payload.message }, sound: 'default', badge: unread } },
       },
       webpush: {
+        notification: { title: payload.title, body: payload.message, requireInteraction: false },
         fcmOptions: payload.linkUrl ? { link: payload.linkUrl } : undefined,
-        notification: { requireInteraction: false },
       },
     };
 

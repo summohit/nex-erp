@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal, FlatList, Linking,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
@@ -43,7 +43,7 @@ import { theme } from '../../theme/theme';
 import { initials } from './fvFormat';
 
 type PickerKind = 'PROJECT' | 'SITE' | 'PEOPLE' | 'TASKS' | null;
-type TaskLine = { issueId?: number; name: string; key?: string };
+type TaskLine = { issueId?: number; name: string; key?: string; assignee?: TaskOption['assignee']; status?: string; dueDate?: string | null };
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const hm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -52,7 +52,52 @@ const niceTime = (t: string) => {
   const [h, m] = t.split(':').map(Number);
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 };
+const STATUS_LABEL: Record<string, string> = {
+  TODO: 'To do', IN_PROGRESS: 'In progress', IN_REVIEW: 'In review', BLOCKED: 'Blocked', DONE: 'Done', CANCELLED: 'Cancelled',
+};
+const statusLabel = (st?: string) => (st ? STATUS_LABEL[st] ?? st.replace(/_/g, ' ').toLowerCase() : '');
+const dueLabel = (d?: string | null) => (d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '');
+
+/** Profile photo, falling back to initials when there is none or it fails to load. */
+function PersonAvatar({ person, size, style, textStyle }: {
+  person?: { firstName?: string | null; lastName?: string | null; avatarUrl?: string | null } | null;
+  size: number; style?: any; textStyle?: any;
+}) {
+  const [failed, setFailed] = useState(false);
+  const uri = person?.avatarUrl;
+  if (uri && !failed) {
+    return <Image source={{ uri }} onError={() => setFailed(true)} style={[style, { width: size, height: size, borderRadius: size / 2 }]} />;
+  }
+  return (
+    <View style={[style, { width: size, height: size, borderRadius: size / 2 }]}>
+      <Text style={textStyle}>{initials(person)}</Text>
+    </View>
+  );
+}
+
 const personName = (p: PersonLite) => `${p.firstName} ${p.lastName || ''}`.trim();
+
+/** Owner photo and name, status and due date under a task, as on the web form. */
+function TaskMeta({ task, keyLabel }: { task: { assignee?: TaskOption['assignee']; status?: string; dueDate?: string | null; approvalState?: string | null }; keyLabel?: string }) {
+  const a = task.assignee;
+  const pending = task.approvalState === 'PENDING_TECHNICAL' || task.approvalState === 'PENDING_ADMIN';
+  return (
+    <View style={styles.taskMetaRow}>
+      {!!keyLabel && <Text style={styles.itemSubText}>{keyLabel} · </Text>}
+      {a ? (
+        <>
+          <PersonAvatar person={a} size={16} style={styles.taskMetaAvatar} textStyle={styles.taskMetaAvatarText} />
+          <Text style={styles.taskMetaText} numberOfLines={1}>{`${a.firstName} ${a.lastName || ''}`.trim()}</Text>
+        </>
+      ) : (
+        <Text style={[styles.taskMetaText, { color: '#94A3B8' }]}>Unassigned</Text>
+      )}
+      {!!task.status && <Text style={styles.taskMetaText}> · {statusLabel(task.status)}</Text>}
+      {!!task.dueDate && <Text style={styles.taskMetaText}> · due {dueLabel(task.dueDate)}</Text>}
+      {pending && <Text style={styles.taskMetaPending}> Awaiting approval</Text>}
+    </View>
+  );
+}
 
 /**
  * Raise, edit or change a field visit request — executive mobile form matching ERP standards.
@@ -134,7 +179,7 @@ export default function FieldVisitRequestForm() {
         setStartTime(v.startTime);
         setEndTime(v.endTime);
         setPeople(v.members.map((m) => m.employee as PersonLite));
-        setTasks(v.tasks.map((t) => ({ issueId: t.issueId ?? undefined, name: t.issue?.title ?? t.name, key: t.issue?.key })));
+        setTasks(v.tasks.map((t: any) => ({ issueId: t.issueId ?? undefined, name: t.issue?.title ?? t.name, key: t.issue?.key, assignee: t.issue?.assignee ?? null, status: t.issue?.status, dueDate: t.issue?.dueDate ?? null })));
         setRemarks(v.remarks ?? '');
         setAttachments((v.attachments ?? []).map((a) => ({ fileName: a.fileName, fileUrl: a.fileUrl, fileSize: a.fileSize ?? undefined })));
       })
@@ -322,8 +367,10 @@ export default function FieldVisitRequestForm() {
   })
   : picker === 'TASKS' ? taskOptions.filter((t) => !q || `${t.key} ${t.title}`.toLowerCase().includes(q)).map((t) => {
     const on = tasks.some((x) => x.issueId === t.id);
-    return { id: t.id, title: t.title, sub: t.key, on,
-      onPress: () => setTasks((prev) => (on ? prev.filter((x) => x.issueId !== t.id) : [...prev, { issueId: t.id, name: t.title, key: t.key }])) };
+    return { id: t.id, title: t.title, sub: t.key, on, task: t,
+      onPress: () => setTasks((prev) => (on ? prev.filter((x) => x.issueId !== t.id) : [...prev, {
+        issueId: t.id, name: t.title, key: t.key, assignee: t.assignee, status: t.status, dueDate: t.dueDate,
+      }])) };
   })
   : [];
   const multi = picker === 'PEOPLE' || picker === 'TASKS';
@@ -603,9 +650,7 @@ export default function FieldVisitRequestForm() {
               <View style={styles.chipsWrap}>
                 {people.map((p) => (
                   <View key={p.id} style={styles.personPillCard}>
-                    <View style={styles.personPillAvatar}>
-                      <Text style={styles.personPillAvatarText}>{initials(p)}</Text>
-                    </View>
+                    <PersonAvatar person={p} size={24} style={styles.personPillAvatar} textStyle={styles.personPillAvatarText} />
                     <Text style={styles.personPillName} numberOfLines={1}>{personName(p)}</Text>
                     <TouchableOpacity
                       onPress={() => setPeople((prev) => prev.filter((x) => x.id !== p.id))}
@@ -652,6 +697,7 @@ export default function FieldVisitRequestForm() {
                     <Text style={styles.taskCardPillText}>{t.key ? `#${t.key}` : 'NEW WORK'}</Text>
                   </View>
                   <Text style={styles.taskCardTitle} numberOfLines={2}>{t.name}</Text>
+                  {!!t.issueId && <TaskMeta task={t} />}
                 </View>
                 <TouchableOpacity
                   onPress={() => setTasks((prev) => prev.filter((_, j) => j !== i))}
@@ -1016,11 +1062,12 @@ export default function FieldVisitRequestForm() {
                 >
                   {/* Left avatar or category icon */}
                   {picker === 'PEOPLE' ? (
-                    <View style={[styles.itemAvatar, r.on && styles.itemAvatarActive]}>
-                      <Text style={[styles.itemAvatarText, r.on && styles.itemAvatarTextActive]}>
-                        {initials((r as any).person)}
-                      </Text>
-                    </View>
+                    <PersonAvatar
+                      person={(r as any).person}
+                      size={36}
+                      style={[styles.itemAvatar, r.on && styles.itemAvatarActive]}
+                      textStyle={[styles.itemAvatarText, r.on && styles.itemAvatarTextActive]}
+                    />
                   ) : picker === 'PROJECT' ? (
                     <View style={styles.itemCategoryIcon}>
                       <FolderKanban size={16} color="#9333EA" strokeWidth={2} />
@@ -1040,7 +1087,9 @@ export default function FieldVisitRequestForm() {
                     <Text style={[styles.itemTitleText, r.on && styles.itemTitleTextActive]}>
                       {r.title}
                     </Text>
-                    {!!r.sub && (
+                    {picker === 'TASKS' && (r as any).task ? (
+                      <TaskMeta task={(r as any).task} keyLabel={r.sub} />
+                    ) : !!r.sub && (
                       <Text style={styles.itemSubText} numberOfLines={1}>{r.sub}</Text>
                     )}
                   </View>
@@ -1736,6 +1785,11 @@ const styles = StyleSheet.create({
   pickerItemRowActive: {
     backgroundColor: '#F0F9FF',
   },
+  taskMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 4 },
+  taskMetaAvatar: { backgroundColor: '#E0E7FF', alignItems: 'center', justifyContent: 'center', marginRight: 5 },
+  taskMetaAvatarText: { fontSize: 8, fontWeight: '700', color: '#4338CA' },
+  taskMetaText: { fontSize: 12, color: '#64748B', fontWeight: '500' },
+  taskMetaPending: { fontSize: 11, color: '#B45309', fontWeight: '700', marginLeft: 6 },
   itemAvatar: {
     width: 38,
     height: 38,
