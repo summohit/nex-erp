@@ -3012,6 +3012,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   private isAdjacentColumnMove(issue: any, targetColumnId: number): boolean {
     if (!issue || !issue.columnId) return true;
+    // Cancelled can be reached from any column (permission checked separately).
+    if (this.isCancelColumn(targetColumnId)) return true;
     const cols = this.columns();
     if (!cols || cols.length < 2) return true;
     const fromIndex = cols.findIndex((c: any) => c.id === issue.columnId);
@@ -3026,6 +3028,12 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (col.type === 'REVIEW') return true;
     const name = (col.name || '').toLowerCase();
     return name.includes('review');
+  }
+
+  private isCancelColumn(columnId: number | null | undefined): boolean {
+    const col = this.getColumnById(columnId);
+    if (!col) return false;
+    return col.type === 'CANCELLED' || (col.name || '').toLowerCase().includes('cancel');
   }
 
   private isDoneOrArchiveColumn(columnId: number | null | undefined): boolean {
@@ -3044,6 +3052,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     const issue = this.selectedIssue();
     if (!issue) return false;
     if ((this.isReviewColumn(columnId) || this.isDoneOrArchiveColumn(columnId)) && !this.canMoveIntoReviewOrDone(issue, columnId)) return true;
+    // Cancelling: the same people who may close the task.
+    if (this.isCancelColumn(columnId) && issue.columnId !== columnId) {
+      if (this.isAssigneeProjectManager(issue) ? !this.isProjectOwner : !(this.isProjectOwner || this.canCompleteIssue(issue))) return true;
+    }
     if (!this.isAdjacentColumnMove(issue, columnId)) return true;
     return false;
   }

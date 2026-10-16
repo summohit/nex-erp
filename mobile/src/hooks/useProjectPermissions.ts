@@ -72,8 +72,16 @@ export function isDoneOrArchiveColumn(columnId: number | string | null | undefin
   return name.includes('done') || name.includes('complete') || name.includes('archive');
 }
 
+export function isCancelColumn(columnId: number | string | null | undefined, columns: any[]): boolean {
+  const col = getColumnById(columnId, columns);
+  if (!col) return false;
+  return col.type === 'CANCELLED' || (col.name || '').toLowerCase().includes('cancel');
+}
+
 export function isAdjacentColumnMove(issue: any, targetColumnId: number | string, columns: any[]): boolean {
   if (!issue || !issue.columnId) return true;
+  // Cancelled can be reached from any column (permission checked separately).
+  if (isCancelColumn(targetColumnId, columns)) return true;
   if (!columns || columns.length < 2) return true;
   const fromIndex = columns.findIndex((c: any) => c.id === issue.columnId);
   const toIndex = columns.findIndex((c: any) => c.id === targetColumnId);
@@ -91,7 +99,7 @@ export function canMoveIntoReviewOrDone(
   const review = isReviewColumn(columnId, columns);
   const done = isDoneOrArchiveColumn(columnId, columns);
 
-  if (isAssigneePM(issue, project) && (review || done)) {
+  if (isAssigneePM(issue, project) && done) {
     return isProjectOwner(project, user);
   }
   if (done) {
@@ -111,6 +119,13 @@ export function isStatusMoveBlocked(
   const review = isReviewColumn(columnId, columns);
   const done = isDoneOrArchiveColumn(columnId, columns);
   if ((review || done) && !canMoveIntoReviewOrDone(issue, columnId, project, user, columns)) return true;
+  // Cancelling: the same people who may close the task.
+  if (isCancelColumn(columnId, columns) && issue.columnId !== columnId) {
+    const may = isAssigneePM(issue, project)
+      ? isProjectOwner(project, user)
+      : isProjectOwner(project, user) || canCompleteIssue(issue, project, user);
+    if (!may) return true;
+  }
   if (!isAdjacentColumnMove(issue, columnId, columns)) return true;
   return false;
 }

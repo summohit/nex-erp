@@ -176,6 +176,9 @@ export default function BoardTab() {
     if ((perms.isReviewColumn(col.id) || perms.isDoneOrArchiveColumn(col.id)) && !perms.canMoveIntoReviewOrDone(issue, col.id)) {
       return perms.isAssigneePM(issue) ? 'Only the project owner' : 'Only PM / owner / manager';
     }
+    if (/cancel/i.test(col.name || '') || col.type === 'CANCELLED') {
+      return perms.isAssigneePM(issue) ? 'Only the project owner' : 'Only PM / owner / manager';
+    }
     return 'One step at a time';
   };
 

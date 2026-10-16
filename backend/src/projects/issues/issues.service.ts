@@ -1112,6 +1112,10 @@ export class IssuesService {
       updateData.phaseId = await this.resolvePhaseId(companyId, data.phaseId);
     }
     let isRestrictedTarget = data.status === 'DONE';
+    // Cancelling skips the one-column rule (a task in progress must be
+    // cancellable without first being marked done), but only people who
+    // could close the task may do it.
+    let isCancelTarget = data.status === 'CANCELLED';
 
     if (data.columnId !== undefined) {
       updateData.columnId = Number(data.columnId);
@@ -1120,8 +1124,11 @@ export class IssuesService {
         if (this.isRestrictedColumn(targetCol)) {
           isRestrictedTarget = true;
         }
-        // Enforce adjacent-column-only moves on the backend
-        if (oldIssue.columnId && oldIssue.columnId !== updateData.columnId) {
+        if (targetCol.type === 'CANCELLED' || targetCol.name.toLowerCase().includes('cancel')) {
+          isCancelTarget = true;
+        }
+        // Enforce adjacent-column-only moves on the backend (not for Cancelled)
+        if (!isCancelTarget && oldIssue.columnId && oldIssue.columnId !== updateData.columnId) {
           const columns = await this.prisma.boardColumn.findMany({
             where: { board: { projectId }, isArchived: false },
             orderBy: { position: 'asc' }
@@ -1144,6 +1151,10 @@ export class IssuesService {
           else if (colName.includes('to do') || colName.includes('todo')) updateData.status = 'TODO';
         }
       }
+    }
+
+    if (isCancelTarget && !isRestrictedTarget && oldIssue.status !== 'CANCELLED') {
+      await this.assertCanCompleteOrArchive(companyId, employeeId, oldIssue, role);
     }
 
     if (isRestrictedTarget) {
