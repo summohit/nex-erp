@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Alert, 
 import { ChevronLeft, ChevronRight, CheckCircle, Clock, XCircle, AlertCircle, Calendar, Plane, Star } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTimesheetStore } from '../../../store/timesheetStore';
+import { isRestDay } from '../../../utils/weeklyOffs';
 
 import RegularizationFormModal from '../modals/RegularizationFormModal';
 import DayDetailModal from '../modals/DayDetailModal';
@@ -33,7 +34,7 @@ function toISTDateString(dateStr: string): string {
 }
 
 export default function TimesheetTab() {
-  const { attendanceHistory, regularizations, holidays, leaveRequests, currentMonth, isLoading, fetchData, changeMonth } = useTimesheetStore();
+  const { attendanceHistory, regularizations, holidays, leaveRequests, currentMonth, isLoading, fetchData, changeMonth, roster, shiftWorkingDays, branchWeeklyOffs } = useTimesheetStore();
   const [showModal, setShowModal] = useState(false);
   const [selectedDayData, setSelectedDayData] = useState<any>(null);
   const [showDayDetailModal, setShowDayDetailModal] = useState(false);
@@ -69,8 +70,12 @@ export default function TimesheetTab() {
       checkDate.setHours(0, 0, 0, 0);
       
       const isFuture = checkDate.getTime() > today.getTime();
-      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      // Same rule as the web and payroll: roster, then shift, then branch.
+      // Until the profile loads, fall back to Saturday and Sunday as before.
+      const isWeekend = branchWeeklyOffs === null && !Object.keys(roster).length && !shiftWorkingDays
+        ? d.getDay() === 0 || d.getDay() === 6
+        : isRestDay(d, roster[dateStr], shiftWorkingDays, branchWeeklyOffs);
 
       // Check Attendance record — use IST date conversion to handle UTC-shifted dates
       const log = attendanceHistory.find(r => toISTDateString(r.date) === dateStr);

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { attendanceService, AttendanceRecord, RegularizationRequest } from '../api/attendanceService';
 import { leaveService, LeaveRequest } from '../api/leaveService';
+import { apiClient } from '../api/apiClient';
+import { employeeService } from '../api/employeeService';
 
 interface TimesheetState {
   attendanceHistory: AttendanceRecord[];
@@ -8,6 +10,11 @@ interface TimesheetState {
   holidays: any[];
   leaveRequests: LeaveRequest[];
   currentMonth: Date;
+  /** Rest-day inputs, as payroll uses them: roster (`YYYY-MM-DD` → day off), then shift, then branch. */
+  roster: Record<string, boolean>;
+  shiftWorkingDays: string | null;
+  /** Null until the profile loads (or when there is no branch). */
+  branchWeeklyOffs: string | null;
   isLoading: boolean;
   error: string | null;
   fetchData: (month?: Date) => Promise<void>;
@@ -21,6 +28,9 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
   holidays: [],
   leaveRequests: [],
   currentMonth: new Date(),
+  roster: {},
+  shiftWorkingDays: null,
+  branchWeeklyOffs: null,
   isLoading: false,
   error: null,
 
@@ -34,15 +44,28 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
     const from = new Date(target.getFullYear(), target.getMonth(), 1);
     const to = new Date(target.getFullYear(), target.getMonth() + 1, 0);
     const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     set({ isLoading: true, error: null });
     try {
-      const [history, regs, hols, leaves] = await Promise.allSettled([
+      const [history, regs, hols, leaves, rosterRes, profileRes] = await Promise.allSettled([
         attendanceService.getMyHistory(iso(from), iso(to)),
         attendanceService.getMyRegularizations(),
         attendanceService.getHolidays(),
         leaveService.getMyRequests(),
+        apiClient.get('/attendance/roster-days/me', { params: { from: ymd(from), to: ymd(to) } }),
+        employeeService.getMyProfile(),
       ]);
+      const roster: Record<string, boolean> = {};
+      if (rosterRes.status === 'fulfilled') {
+        for (const r of (rosterRes.value.data || []) as { date: string; isDayOff: boolean }[]) roster[String(r.date).slice(0, 10)] = r.isDayOff;
+      }
+      const profile: any = profileRes.status === 'fulfilled' ? profileRes.value : null;
+      set({
+        roster,
+        shiftWorkingDays: profile?.shift?.workingDays ?? null,
+        branchWeeklyOffs: profile?.branch ? (profile.branch.weeklyOffs ?? '') : null,
+      });
 
       const attendanceHistory = history.status === 'fulfilled' ? history.value : [];
       const regularizations = regs.status === 'fulfilled' ? regs.value : [];
