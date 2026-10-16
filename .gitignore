@@ -33,6 +33,8 @@ scraper/__pycache__/
 # device in the project, so the real file never enters the repository —
 # backend/config/firebase.example.json documents its shape.
 backend/config/firebase.json
+mobile/android/app/google-services.json
+mobile/ios/GoogleService-Info.plist
 
 # Scraped Workway exports that carry pay data.
 # out_hr/ is otherwise tracked (attendance, roster), but these two exports hold
