@@ -139,13 +139,16 @@ export class PushService implements OnModuleInit {
     try {
       // Required lazily so a backend without the credentials never loads the
       // SDK at all, and so this file can be unit-tested without it.
-      const admin = require('firebase-admin');
-      const credential = admin.credential.cert(loaded.serviceAccount);
+      // firebase-admin 12+ is modular: the old admin.credential / admin.apps /
+      // admin.messaging() namespace is gone in 14, which is what kept push off.
+      const { initializeApp, getApps, cert } = require('firebase-admin/app');
+      const { getMessaging } = require('firebase-admin/messaging');
+      const credential = cert(loaded.serviceAccount);
 
       // getApps() guards the watch-mode restart: initializeApp throws on a
       // duplicate app name and would otherwise crash every reload.
-      const app = admin.apps?.length ? admin.apps[0] : admin.initializeApp({ credential });
-      this.messaging = admin.messaging(app);
+      const app = getApps().length ? getApps()[0] : initializeApp({ credential });
+      this.messaging = getMessaging(app);
       this.enabled = true;
       this.logger.log('Push enabled (Firebase Cloud Messaging).');
     } catch (err: any) {
