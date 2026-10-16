@@ -389,6 +389,9 @@ model Employee {
   company              Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   branchId             Int?
   branch               Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  /// Ticked by the person in the profile reminder: no previous employer, so
+  /// no UAN, experience letter or salary slip is asked for (16 Oct 2026).
+  firstJob             Boolean      @default(false)
   managerId            Int?
   manager              Employee?    @relation("EmployeeToManager", fields: [managerId], references: [id], onDelete: SetNull)
   subordinates         Employee[]   @relation("EmployeeToManager")

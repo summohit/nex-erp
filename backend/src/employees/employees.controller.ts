@@ -1,5 +1,9 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ProfileCompletenessService } from './profile-completeness/profile-completeness.service';
+import {
+  ALL_DOCUMENT_TYPES, OPTIONAL_DOCUMENTS, PREVIOUS_EMPLOYMENT_DOCUMENTS, REQUIRED_DOCUMENTS,
+} from './profile-completeness/profile-documents';
 import { EmployeesService } from './employees.service';
 import { EmployeesImportService } from './employees-import.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -9,7 +13,8 @@ import { AuthGuard } from '../auth/auth.guard';
 export class EmployeesController {
   constructor(
     private readonly employeesService: EmployeesService,
-    private readonly employeesImportService: EmployeesImportService
+    private readonly employeesImportService: EmployeesImportService,
+    private readonly profileCompleteness: ProfileCompletenessService,
   ) {}
 
   @Post('bulk-upload')
@@ -97,6 +102,33 @@ export class EmployeesController {
   @Get('me/team-summary')
   getMyTeamSummary(@Request() req) {
     return this.employeesService.getMyTeamSummary(req.user.companyId, req.user.employeeId ?? null);
+  }
+
+  /** Profile reminder: what the signed-in person still has to upload or fill in. */
+  @Get('me/profile-completeness')
+  getMyProfileCompleteness(@Request() req) {
+    return this.profileCompleteness.mine(req.user.companyId, req.user.employeeId ?? null);
+  }
+
+  /** "This is my first job": no UAN, experience letter or salary slip asked for. */
+  @Put('me/first-job')
+  setMyFirstJob(@Request() req, @Body() body: { firstJob: boolean }) {
+    return this.profileCompleteness.setFirstJob(req.user.companyId, req.user.employeeId ?? null, !!body?.firstJob);
+  }
+
+  /** HR: everyone's profile completion, with what is missing and their manager. */
+  @Get('profile-completeness')
+  getProfileCompletenessReport(@Request() req) {
+    return this.profileCompleteness.report(req.user.companyId, req.user.role);
+  }
+
+  /** The document types, in order: one list for every upload dropdown. */
+  @Get('document-types')
+  getDocumentTypes() {
+    return {
+      required: REQUIRED_DOCUMENTS, previousEmployment: PREVIOUS_EMPLOYMENT_DOCUMENTS,
+      optional: OPTIONAL_DOCUMENTS, all: ALL_DOCUMENT_TYPES,
+    };
   }
 
   @Get('me/profile')
