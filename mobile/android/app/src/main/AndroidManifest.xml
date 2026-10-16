@@ -37,9 +37,15 @@
       android:name="com.google.firebase.messaging.default_notification_channel_id"
       android:value="shift-reminders"
       tools:replace="android:value" />
+    <!-- A white single-colour icon: the launcher icon showed as a grey square. -->
     <meta-data
       android:name="com.google.firebase.messaging.default_notification_icon"
-      android:resource="@mipmap/ic_launcher" />
+      android:resource="@drawable/ic_notification"
+      tools:replace="android:resource" />
+    <meta-data
+      android:name="com.google.firebase.messaging.default_notification_color"
+      android:resource="@color/notification_color"
+      tools:replace="android:resource" />
 
     <activity
       android:name=".MainActivity"

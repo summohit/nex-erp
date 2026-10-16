@@ -3,6 +3,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { initPushListeners } from './src/native/pushNotifications';
 import { navigateTo, navigationRef } from './src/navigation/navigationUtils';
+import { routeForLink } from './src/native/notificationRoutes';
 
 function App(): React.JSX.Element {
   useEffect(() => {
@@ -20,16 +21,20 @@ function App(): React.JSX.Element {
      */
     const unsubscribe = initPushListeners({
       onOpenedFromNotification: (data) => {
-        // The container may not be mounted yet when a tap launched the app from
-        // killed — navigating into an unready ref is a no-op crash risk, and
-        // the user lands on Home, which is an acceptable fallback.
-        if (!navigationRef.isReady()) return;
-
-        // Shift reminders are about clocking, so they go to Attendance. Anything
-        // else opens the app without a guess at a route that may not exist.
-        const isShiftReminder =
-          data?.type === 'ACTION_REQUIRED' || (data?.linkUrl ?? '').includes('attendance');
-        if (isShiftReminder) navigateTo(navigationRef, 'Attendance');
+        // Open the screen the notification is about (16 Oct 2026). A tap that
+        // launched a killed app arrives before navigation is mounted, so it
+        // waits for it (up to ~10 s) instead of being dropped.
+        const target = routeForLink(data?.linkUrl);
+        let tries = 0;
+        const go = () => {
+          if (navigationRef.isReady()) {
+            // Signed out (Login on screen): there is nowhere to go yet.
+            try { navigateTo(navigationRef, target.screen, target.params); } catch {}
+          } else if (tries++ < 40) {
+            setTimeout(go, 250);
+          }
+        };
+        go();
       },
     });
 

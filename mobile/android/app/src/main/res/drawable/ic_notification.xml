@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Notification bar icon. Android draws small notification icons as a single
+  colour from their alpha, so the full-colour launcher icon came out as a grey
+  square. A white "M" on transparent; the colour comes from
+  default_notification_color.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3,20V4h3.2L12,12.4L17.8,4H21v16h-3.2V9.6l-5,7.1h-1.6l-5,-7.1V20z" />
+</vector>

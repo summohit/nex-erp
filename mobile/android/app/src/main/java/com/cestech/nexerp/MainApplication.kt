@@ -29,6 +29,7 @@ class MainApplication : Application(), ReactApplication {
     super.onCreate()
     loadReactNative(this)
     createShiftReminderChannel()
+    createUpdatesChannel()
   }
 
   /**
@@ -58,8 +59,27 @@ class MainApplication : Application(), ReactApplication {
     manager?.createNotificationChannel(channel)
   }
 
+  /**
+   * Everything that is not a shift reminder: tasks, approvals, leave, field
+   * visits. Its own channel so people can tune it separately from shift
+   * reminders (16 Oct 2026). Must match PushService's channel choice.
+   */
+  private fun createUpdatesChannel() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    val channel = NotificationChannel(
+      UPDATES_CHANNEL_ID,
+      "Tasks & approvals",
+      NotificationManager.IMPORTANCE_HIGH,
+    ).apply {
+      description = "Tasks, approvals, leave, field visits and other updates."
+      enableVibration(true)
+    }
+    getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+  }
+
   companion object {
     /** Must match AndroidManifest's default channel and PushService's channelId. */
     const val SHIFT_REMINDER_CHANNEL_ID = "shift-reminders"
+    const val UPDATES_CHANNEL_ID = "mira-updates"
   }
 }

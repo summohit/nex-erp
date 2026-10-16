@@ -1,3 +1,5 @@
 <resources>
     <color name="bootsplash_background">#ffffff</color>
+    <!-- Tints the notification icon and title (MIRA blue). -->
+    <color name="notification_color">#1373E5</color>
 </resources>

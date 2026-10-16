@@ -226,7 +226,15 @@ export class PushService implements OnModuleInit {
       // locked phone rather than arriving silently in a tray.
       android: {
         priority: 'high' as const,
-        notification: { channelId: 'shift-reminders', defaultSound: true },
+        notification: {
+          // Shift reminders keep their own channel; everything else goes to
+          // "Tasks & approvals" (16 Oct 2026). Both are created by the app.
+          channelId: (payload.linkUrl ?? '').startsWith('/attendance/my') ? 'shift-reminders' : 'mira-updates',
+          defaultSound: true,
+          // The app's white "M" in MIRA blue; older builds fall back to theirs.
+          icon: 'ic_notification',
+          color: '#1373E5',
+        },
       },
       apns: {
         payload: { aps: { sound: 'default', contentAvailable: true } },
