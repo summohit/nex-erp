@@ -7,6 +7,7 @@
     </div>
 
     <div class="flex items-center gap-2">
+      <a class="btn-secondary" routerLink="/employees/profile-completion">Profile completion</a>
       <button class="btn-secondary" (click)="downloadAllAsZip()" [disabled]="isZipping() || filteredDocuments().length === 0">
         <svg lucideArchive size="16" *ngIf="!isZipping()"></svg>
         <span>{{ isZipping() ? 'Zipping...' : 'Download All (ZIP)' }}</span>

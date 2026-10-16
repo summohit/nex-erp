@@ -196,6 +196,36 @@ export class EmployeeService {
 
   // --- Uploads ---
 
+  /** Profile reminder: what the signed-in person still has to upload or fill in. */
+  getMyProfileCompleteness(): Observable<ProfileCompleteness | null> {
+    const token = getAccessToken();
+    return this.http.get<ProfileCompleteness | null>(`${this.apiUrl}/me/profile-completeness`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+
+  /** "This is my first job": no UAN, experience letter or salary slip asked for. */
+  setMyFirstJob(firstJob: boolean): Observable<ProfileCompleteness | null> {
+    const token = getAccessToken();
+    return this.http.put<ProfileCompleteness | null>(`${this.apiUrl}/me/first-job`, { firstJob }, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+
+  /** HR: everyone's profile completion. */
+  getProfileCompletenessReport(): Observable<ProfileCompletenessReport> {
+    const token = getAccessToken();
+    return this.http.get<ProfileCompletenessReport>(`${this.apiUrl}/profile-completeness`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+
+  /** The document types every upload dropdown offers, in order. */
+  getDocumentTypes(): Observable<{ required: string[]; previousEmployment: string[]; optional: string[]; all: string[] }> {
+    const token = getAccessToken();
+    return this.http.get<any>(`${this.apiUrl}/document-types`, { headers: { Authorization: `Bearer ${token}` } });
+  }
+
   uploadDocument(file: File): Observable<{ url: string }> {
     const token = getAccessToken();
     const formData = new FormData();
@@ -213,4 +243,28 @@ export class EmployeeService {
       headers: { Authorization: `Bearer ${token}` }
     });
   }
+}
+
+export interface ProfileMissingItem { key: string; label: string; kind: 'document' | 'details'; hint?: string }
+export interface ProfileCompleteness {
+  employeeId: number;
+  exempt: boolean;
+  complete: boolean;
+  missing: ProfileMissingItem[];
+  canBeFirstJob: boolean;
+  firstJob: boolean;
+  uploadedAsOther: number;
+}
+export interface ProfileCompletenessReport {
+  total: number;
+  complete: number;
+  incomplete: number;
+  rows: {
+    employee: { id: number; firstName: string; lastName?: string | null; employeeCode?: string | null; email?: string; department: string | null; designation: string | null };
+    manager: string | null;
+    complete: boolean;
+    firstJob: boolean;
+    missing: string[];
+    uploadedAsOther: number;
+  }[];
 }

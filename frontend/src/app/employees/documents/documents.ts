@@ -1,3 +1,4 @@
+import { RouterLink } from '@angular/router';
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -14,7 +15,7 @@ import {
 @Component({
   selector: 'app-employee-documents',
   standalone: true,
-  imports: [
+  imports: [RouterLink, 
     CommonModule,
     FormsModule,
     SearchableSelectComponent,

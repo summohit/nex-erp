@@ -1,0 +1,73 @@
+<div class="pc-page">
+  <div class="pc-header">
+    <div>
+      <a routerLink="/employees/documents" class="pc-back">← Documents Center</a>
+      <h1>Profile completion</h1>
+      <p>Who still has documents or details missing. Everyone incomplete sees a reminder in MIRA every 15 minutes until they finish.</p>
+    </div>
+    <div class="pc-actions">
+      <button type="button" class="pc-btn" (click)="load()">Refresh</button>
+      <button type="button" class="pc-btn pc-primary" (click)="download()" [disabled]="!rows().length">Download CSV</button>
+    </div>
+  </div>
+
+  @if (report(); as r) {
+    <div class="pc-stats">
+      <div class="pc-stat"><b>{{ r.total }}</b><span>employees</span></div>
+      <div class="pc-stat pc-ok"><b>{{ r.complete }}</b><span>complete</span></div>
+      <div class="pc-stat pc-warn"><b>{{ r.incomplete }}</b><span>incomplete</span></div>
+    </div>
+  }
+
+  <div class="pc-toolbar">
+    <div class="pc-tabs" role="tablist">
+      <button type="button" [class.active]="filter() === 'INCOMPLETE'" (click)="filter.set('INCOMPLETE')">Incomplete</button>
+      <button type="button" [class.active]="filter() === 'COMPLETE'" (click)="filter.set('COMPLETE')">Complete</button>
+      <button type="button" [class.active]="filter() === 'ALL'" (click)="filter.set('ALL')">All</button>
+    </div>
+    <input class="pc-search" type="search" placeholder="Search name, code, department, manager…"
+           [ngModel]="query()" (ngModelChange)="query.set($event)" aria-label="Search" />
+  </div>
+
+  @if (loading()) {
+    <p class="pc-muted">Loading…</p>
+  } @else if (error()) {
+    <p class="pc-error">{{ error() }}</p>
+  } @else {
+    <div class="pc-table-wrap">
+      <table class="pc-table">
+        <thead>
+          <tr><th>Employee</th><th>Department</th><th>Manager</th><th>Missing</th></tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.employee.id) {
+            <tr>
+              <td>
+                <a [routerLink]="['/employees', row.employee.id, 'profile']" class="pc-name">
+                  {{ row.employee.firstName }} {{ row.employee.lastName }}
+                </a>
+                <div class="pc-sub">{{ row.employee.employeeCode }}{{ row.firstJob ? ' · first job' : '' }}</div>
+              </td>
+              <td>{{ row.employee.department || '—' }}</td>
+              <td>{{ row.manager || '—' }}</td>
+              <td>
+                @if (row.complete) {
+                  <span class="pc-done">Complete</span>
+                } @else {
+                  <div class="pc-chips">
+                    @for (m of row.missing; track m) { <span class="pc-chip">{{ m }}</span> }
+                  </div>
+                  @if (row.uploadedAsOther) {
+                    <div class="pc-sub">{{ row.uploadedAsOther }} file(s) saved as Other</div>
+                  }
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="4" class="pc-muted">Nobody here.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

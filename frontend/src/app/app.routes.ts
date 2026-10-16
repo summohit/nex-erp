@@ -97,6 +97,12 @@ export const routes: Routes = [
         loadComponent: () => import('./employees/org-chart/org-chart').then(m => m.OrgChart)
       },
       {
+        path: 'employees/profile-completion',
+        canActivate: [permissionGuard],
+        data: { module: 'employees/documents' },
+        loadComponent: () => import('./employees/profile-completion/profile-completion').then(m => m.ProfileCompletionComponent)
+      },
+      {
         path: 'employees/documents',
         canActivate: [permissionGuard],
         data: { module: 'employees/documents' },

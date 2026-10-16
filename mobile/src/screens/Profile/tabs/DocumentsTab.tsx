@@ -22,16 +22,25 @@ interface DocumentsTabProps {
   onClearPendingFile: () => void;
 }
 
+// The same list the profile reminder checks (server: profile-documents.ts).
 const DOCUMENT_TYPES = [
-  'PAN Card',
+  'Resume / CV',
   'Aadhaar Card',
-  'Passport',
+  'PAN Card',
+  'Passport Size Photo',
+  '10th Marksheet',
+  '12th Marksheet',
+  'Graduation Degree',
   'Bank Proof / Cancelled Cheque',
-  'Educational Certificate',
+  'Reference Person',
+  'UAN',
   'Relieving / Experience Letter',
   'Payslips',
-  'Form 16 / Tax Proof',
+  'Passport',
+  'Post-Graduation Degree',
   'Driving License / Voter ID',
+  'Educational Certificate',
+  'Form 16 / Tax Proof',
   'Other',
 ];
 

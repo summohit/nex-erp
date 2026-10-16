@@ -1,0 +1,67 @@
+@if (open() && status(); as s) {
+  <div class="pr-backdrop" role="presentation">
+    <div class="pr-modal" role="dialog" aria-modal="true" aria-labelledby="pr-title">
+      <div class="pr-head">
+        <div>
+          <h2 id="pr-title">Complete your profile</h2>
+          <p>HR needs these on file. Upload each document under its own type; please don't combine them into one PDF.</p>
+        </div>
+        <span class="pr-count">{{ s.missing.length }} left</span>
+      </div>
+
+      @if (s.uploadedAsOther > 0) {
+        <div class="pr-note">
+          You have {{ s.uploadedAsOther }} file{{ s.uploadedAsOther === 1 ? '' : 's' }} saved as <b>Other</b>.
+          Those don't count. Upload each one below under its proper type.
+        </div>
+      }
+
+      <div class="pr-body">
+        @if (documents().length) {
+          <h3>Documents</h3>
+          <ul class="pr-list">
+            @for (m of documents(); track m.key) {
+              <li class="pr-row">
+                <div class="pr-row-text">
+                  <span class="pr-label">{{ m.label }}</span>
+                  @if (m.hint) { <span class="pr-hint">{{ m.hint }}</span> }
+                </div>
+                <label class="pr-upload" [class.busy]="uploading() === m.key">
+                  <input type="file" accept="image/*,application/pdf" (change)="onFile(m, $event)" [disabled]="!!uploading()" />
+                  {{ uploading() === m.key ? 'Uploading…' : 'Upload' }}
+                </label>
+              </li>
+            }
+          </ul>
+        }
+
+        @if (s.canBeFirstJob && (asksPreviousEmployment() || s.firstJob)) {
+          <label class="pr-firstjob">
+            <input type="checkbox" [checked]="s.firstJob" [disabled]="savingFirstJob()" (change)="setFirstJob($any($event.target).checked)" />
+            <span>This is my first job — I have no previous employer (no UAN, experience letter or salary slip).</span>
+          </label>
+        }
+
+        @if (details().length) {
+          <h3>Profile details</h3>
+          <ul class="pr-list">
+            @for (m of details(); track m.key) {
+              <li class="pr-row">
+                <div class="pr-row-text">
+                  <span class="pr-label">{{ m.label }}</span>
+                  @if (m.hint) { <span class="pr-hint">Missing: {{ m.hint }}</span> }
+                </div>
+                <button type="button" class="pr-link" (click)="goToProfile()">Fill in</button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      <div class="pr-foot">
+        <span class="pr-foot-note">This comes back every 15 minutes until everything is on file.</span>
+        <button type="button" class="pr-later" (click)="later()">Remind me later</button>
+      </div>
+    </div>
+  </div>
+}
