@@ -2,6 +2,26 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
+import {
+  LucideShieldCheck,
+  LucideTriangleAlert,
+  LucideUpload,
+  LucideFileText,
+  LucideCamera,
+  LucideGraduationCap,
+  LucideAward,
+  LucideFileBadge,
+  LucideUserCheck,
+  LucideBriefcase,
+  LucideFileSpreadsheet,
+  LucideUser,
+  LucideCheck,
+  LucideX,
+  LucideClock,
+  LucideExternalLink,
+  LucideChevronDown,
+  LucideLoaderCircle,
+} from '@lucide/angular';
 import { EmployeeService, ProfileCompleteness, ProfileMissingItem } from '../../../services/employee.service';
 
 /** How often the reminder comes back while anything is missing (HR, 16 Oct 2026). */
@@ -20,7 +40,27 @@ const REMIND_EVERY_MS = 15 * 60 * 1000;
 @Component({
   selector: 'app-profile-reminder',
   standalone: true,
-  imports: [CommonModule],
+  imports: [
+    CommonModule,
+    LucideShieldCheck,
+    LucideTriangleAlert,
+    LucideUpload,
+    LucideFileText,
+    LucideCamera,
+    LucideGraduationCap,
+    LucideAward,
+    LucideFileBadge,
+    LucideUserCheck,
+    LucideBriefcase,
+    LucideFileSpreadsheet,
+    LucideUser,
+    LucideCheck,
+    LucideX,
+    LucideClock,
+    LucideExternalLink,
+    LucideChevronDown,
+    LucideLoaderCircle,
+  ],
   templateUrl: './profile-reminder.html',
   styleUrl: './profile-reminder.css',
 })
@@ -132,5 +172,34 @@ export class ProfileReminderComponent implements OnInit, OnDestroy {
     const id = this.status()?.employeeId;
     this.open.set(false);
     if (id) this.router.navigate(['/employees', id, 'profile']);
+  }
+
+  getFileExt(fileName: string): string {
+    const parts = (fileName || '').split('.');
+    if (parts.length > 1) {
+      const ext = parts.pop()?.toUpperCase() || 'FILE';
+      return ext.length <= 5 ? ext : 'FILE';
+    }
+    return 'FILE';
+  }
+
+  getFileFormatClass(fileName: string): string {
+    const ext = this.getFileExt(fileName).toLowerCase();
+    if (ext === 'pdf') return 'format-pdf';
+    if (['jpg', 'jpeg', 'png', 'webp', 'svg'].includes(ext)) return 'format-img';
+    return 'format-doc';
+  }
+
+  getDocIconType(key: string): string {
+    const k = (key || '').toLowerCase();
+    if (k.includes('photo')) return 'photo';
+    if (k.includes('marksheet')) return 'education';
+    if (k.includes('degree') || k.includes('diploma') || k.includes('certificate')) return 'degree';
+    if (k.includes('bank') || k.includes('cheque')) return 'bank';
+    if (k.includes('reference')) return 'reference';
+    if (k.includes('uan')) return 'uan';
+    if (k.includes('experience') || k.includes('relieving')) return 'work';
+    if (k.includes('payslip') || k.includes('salary')) return 'payslip';
+    return 'default';
   }
 }

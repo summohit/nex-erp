@@ -1347,7 +1347,10 @@
 .grid-scroll-area {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
   padding-bottom: 0;
 }
 
@@ -1366,7 +1369,8 @@
   gap: 8px;
   padding: 6px 0;
   border-radius: 12px;
-  transition: background 0.2s ease;
+  border: 1.5px solid transparent;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .day-col.is-weekend {
@@ -1375,6 +1379,21 @@
 
 .day-col:hover {
   background: #F4F7F9;
+}
+
+.day-col.is-today {
+  background: #EFF6FF;
+  border-color: #3B82F6;
+}
+
+.day-col.is-today .day-num {
+  color: #1D4ED8;
+  font-weight: 800;
+}
+
+.day-col.is-today .day-week {
+  color: #2563EB;
+  font-weight: 700;
 }
 
 .total-col {
@@ -1529,6 +1548,298 @@
 /* Misc */
 .table-container {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ==========================================================================
+   Responsive Attendance Grid & Controls (Mobile & Tablet)
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .monthly-grid-container {
+    border: 1px solid #E2E8F0;
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  .grid-scroll-area {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+
+  .grid-scroll-area::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .grid-scroll-area::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .grid-scroll-area::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+
+  .monthly-grid {
+    display: flex !important;
+    width: max-content !important;
+    gap: 6px !important;
+    padding: 8px 6px !important;
+  }
+
+  .day-col {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    flex: 0 0 40px !important;
+    padding: 8px 2px !important;
+    gap: 6px !important;
+    border-radius: 10px !important;
+  }
+
+  .day-num {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+  }
+
+  .day-week {
+    font-size: 10px !important;
+    font-weight: 600 !important;
+  }
+
+  .day-cell {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    border-radius: 50% !important;
+  }
+
+  .status-icon {
+    width: 15px !important;
+    height: 15px !important;
+  }
+
+  .day-location-pin {
+    font-size: 10px !important;
+    top: 1px !important;
+    right: 1px !important;
+  }
+
+  .total-col {
+    position: sticky !important;
+    right: 0 !important;
+    background: #ffffff !important;
+    z-index: 5 !important;
+    border-left: 1px solid #e2e8f0 !important;
+    box-shadow: -8px 0 16px -4px rgba(0, 0, 0, 0.08) !important;
+    width: 62px !important;
+    min-width: 62px !important;
+    flex: 0 0 62px !important;
+    padding: 8px 4px !important;
+    margin-left: 0 !important;
+  }
+
+  .total-header {
+    font-size: 11px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .total-cell {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+
+  /* Skeleton Mobile/Tablet */
+  .skeleton-scroll-area {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .skeleton-monthly-grid {
+    display: flex !important;
+    width: max-content !important;
+    gap: 6px !important;
+    padding: 8px 6px !important;
+  }
+
+  .skeleton-day-col {
+    width: 40px !important;
+    min-width: 40px !important;
+    flex: 0 0 40px !important;
+    padding: 8px 2px !important;
+  }
+
+  .skeleton-header {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .skeleton-cell {
+    width: 28px !important;
+    height: 28px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Status Legend: Horizontal swipeable strip on mobile */
+  .status-legend {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 8px !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 16px !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  .status-legend::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .legend-item {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+    padding: 5px 10px !important;
+    font-size: 12px !important;
+    gap: 6px !important;
+  }
+
+  .legend-icon-wrapper {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .legend-item svg {
+    width: 11px !important;
+    height: 11px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .attendance-container {
+    padding: 0 4px;
+  }
+
+  .page-header {
+    padding: 0.75rem 0.875rem;
+    margin-bottom: 1rem;
+    border-radius: 10px;
+  }
+
+  .header-content h2 {
+    font-size: 1.25rem;
+  }
+
+  .header-content p {
+    font-size: 12px;
+  }
+
+  .tabs-nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    gap: 4px;
+    margin-bottom: 1rem;
+    padding-bottom: 2px;
+  }
+
+  .tabs-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs-nav button {
+    white-space: nowrap;
+    padding: 8px 10px;
+    font-size: 13.5px;
+    flex-shrink: 0;
+  }
+
+  .widget-card {
+    padding: 0.875rem;
+    border-radius: 14px;
+  }
+
+  .widget-header {
+    margin-bottom: 14px;
+  }
+
+  .widget-header h3 {
+    font-size: 16px;
+  }
+
+  /* Grid Header & Controls on mobile */
+  .grid-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .period-selectors {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  .attendance-period-summary {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+  }
+
+  .grid-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .attendance-search {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    order: 1 !important;
+    height: 38px !important;
+  }
+
+  .attendance-filter-button {
+    flex: 1 1 auto !important;
+    order: 2 !important;
+    justify-content: center !important;
+    min-height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 13px !important;
+  }
+
+  .grid-actions > .btn-outline:not(.attendance-filter-button) {
+    flex: 1 1 auto !important;
+    order: 3 !important;
+    justify-content: center !important;
+    min-height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 13px !important;
+  }
+
+  .view-toggle {
+    order: 4 !important;
+    flex-shrink: 0 !important;
+    height: 36px !important;
+  }
+
+  .table-container {
+    border-radius: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 .data-table {
@@ -2706,6 +3017,9 @@
 .skeleton-scroll-area {
   width: 100%;
   min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .skeleton-monthly-grid {

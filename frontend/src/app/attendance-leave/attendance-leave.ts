@@ -66,6 +66,7 @@ export interface DayStatus {
   status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Empty';
   tooltip?: string;
   isFuture: boolean;
+  isToday?: boolean;
   clockInStr?: string;
   clockOutStr?: string;
   clockInLat?: number | null;
@@ -3744,6 +3745,7 @@ export class AttendanceLeaveComponent implements OnInit {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
+      const isToday = date.getTime() === today.getTime();
       const dateString = this.getLocalDateString(date);
       const isFuture = date > today;
       const dayOfWeek = date.getDay();
@@ -3868,6 +3870,7 @@ export class AttendanceLeaveComponent implements OnInit {
         status,
         tooltip,
         isFuture,
+        isToday,
         clockInStr,
         clockOutStr,
         clockInLat,
@@ -3900,6 +3903,16 @@ export class AttendanceLeaveComponent implements OnInit {
     this.totalWorkingDays.set(totalWd);
     this.totalPresent.set(totalP);
     this.monthlyGrid.set(newGrid);
+    this.scrollToCurrentDay();
+  }
+
+  scrollToCurrentDay(): void {
+    setTimeout(() => {
+      const todayCol = document.querySelector('.day-col.is-today');
+      if (todayCol) {
+        todayCol.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }, 100);
   }
 
   exportToCsv() {

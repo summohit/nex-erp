@@ -84,7 +84,9 @@
         <div class="monthly-grid-container" *ngIf="viewMode() === 'grid' && !isLoadingTimesheet()">
           <div class="grid-scroll-area">
             <div class="monthly-grid" [style.grid-template-columns]="'repeat(' + filteredMonthlyGrid().length + ', minmax(0, 1fr))'">
-              <div class="day-col" *ngFor="let day of filteredMonthlyGrid()" [class.is-weekend]="day.status === 'Day Off' || day.weekdayStr === 'Sat' || day.weekdayStr === 'Sun'">
+              <div class="day-col" *ngFor="let day of filteredMonthlyGrid()"
+                   [class.is-weekend]="day.status === 'Day Off' || day.weekdayStr === 'Sat' || day.weekdayStr === 'Sun'"
+                   [class.is-today]="day.isToday">
                 <div class="day-header">
                   <span class="day-num">{{ day.dayNumber }}</span>
                   <span class="day-week">{{ day.weekdayStr }}</span>

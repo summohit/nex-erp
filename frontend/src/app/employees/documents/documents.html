@@ -1,14 +1,17 @@
 <div class="documents-container">
   <!-- Header -->
   <div class="documents-header">
-    <div>
+    <div class="header-left">
       <h1 class="page-title">Employee Documents Center</h1>
-      <p class="page-subtitle">Manage, audit, and organize legal documents, contracts, and compliance files for all employees.</p>
     </div>
 
-    <div class="flex items-center gap-2">
-      <a class="btn-secondary" routerLink="/employees/profile-completion">Profile completion</a>
-      <button class="btn-secondary" (click)="downloadAllAsZip()" [disabled]="isZipping() || filteredDocuments().length === 0">
+    <div class="header-action-group">
+      <a class="btn-doc-secondary btn-profile-comp" routerLink="/employees/profile-completion" title="Audit employee profile and document completion">
+        <svg lucideUserCheck size="16"></svg>
+        <span>Profile Completion</span>
+        <span class="btn-audit-pill">Audit</span>
+      </a>
+      <button class="btn-doc-secondary" (click)="downloadAllAsZip()" [disabled]="isZipping() || filteredDocuments().length === 0">
         <svg lucideArchive size="16" *ngIf="!isZipping()"></svg>
         <span>{{ isZipping() ? 'Zipping...' : 'Download All (ZIP)' }}</span>
       </button>

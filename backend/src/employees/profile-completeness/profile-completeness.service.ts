@@ -27,7 +27,7 @@ export interface Completeness {
 }
 
 const SELECT = {
-  id: true, firstName: true, lastName: true, employeeCode: true,
+  id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true,
   phone: true, gender: true, dateOfBirth: true, address: true,
   employmentType: true, firstJob: true,
   user: { select: { email: true, status: true } },
@@ -116,6 +116,7 @@ export class ProfileCompletenessService {
         employee: {
           id: e.id, firstName: e.firstName, lastName: e.lastName, employeeCode: e.employeeCode,
           email: e.user?.email, department: e.department?.name ?? null, designation: e.designation?.name ?? null,
+          avatarUrl: e.avatarUrl ?? null,
         },
         manager: e.manager ? `${e.manager.firstName} ${e.manager.lastName ?? ''}`.trim() : null,
         exempt: c.exempt, complete: c.complete, firstJob: c.firstJob,

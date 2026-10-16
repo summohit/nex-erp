@@ -9,7 +9,8 @@ import { SearchableSelectComponent } from '../../shared/components/searchable-se
 import {
   LucideFileText, LucideSearch, LucideUploadCloud,
   LucideTrash2, LucideFilter, LucideFileCheck, LucideFolder,
-  LucideX, LucideExternalLink, LucidePaperclip, LucideDownload, LucideArchive
+  LucideX, LucideExternalLink, LucidePaperclip, LucideDownload, LucideArchive,
+  LucideUserCheck
 } from '@lucide/angular';
 
 @Component({
@@ -21,7 +22,8 @@ import {
     SearchableSelectComponent,
     LucideFileText, LucideSearch, LucideUploadCloud,
     LucideTrash2, LucideFilter, LucideFileCheck, LucideFolder,
-    LucideX, LucideExternalLink, LucidePaperclip, LucideDownload, LucideArchive
+    LucideX, LucideExternalLink, LucidePaperclip, LucideDownload, LucideArchive,
+    LucideUserCheck
   ],
   templateUrl: './documents.html',
   styleUrls: ['./documents.css']

@@ -1,73 +1,385 @@
 <div class="pc-page">
+  <!-- Header -->
   <div class="pc-header">
-    <div>
-      <a routerLink="/employees/documents" class="pc-back">← Documents Center</a>
-      <h1>Profile completion</h1>
-      <p>Who still has documents or details missing. Everyone incomplete sees a reminder in MIRA every 15 minutes until they finish.</p>
+    <div class="pc-header-left">
+      <a routerLink="/employees/documents" class="pc-back-btn">
+        <svg lucideArrowLeft size="15"></svg>
+        <span>Documents Center</span>
+      </a>
+      <div class="pc-title-row">
+        <h1 class="pc-title">Profile Completion</h1>
+        <span class="pc-live-badge">
+          <span class="pulse-dot"></span>
+          Live Audit
+        </span>
+      </div>
+      <p class="pc-subtitle">
+        Track document submissions and statutory compliance across all active employees. Incomplete profiles see automated MIRA reminders every 15 minutes.
+      </p>
     </div>
-    <div class="pc-actions">
-      <button type="button" class="pc-btn" (click)="load()">Refresh</button>
-      <button type="button" class="pc-btn pc-primary" (click)="download()" [disabled]="!rows().length">Download CSV</button>
+
+    <div class="pc-header-actions">
+      <button type="button" class="pc-btn pc-btn-secondary" (click)="load()" [disabled]="loading()">
+        <svg lucideRefreshCw size="15" [class.spin-anim]="loading()"></svg>
+        <span>Refresh</span>
+      </button>
+      <button type="button" class="pc-btn pc-btn-primary" (click)="download()" [disabled]="!rows().length">
+        <svg lucideDownload size="15"></svg>
+        <span>Download CSV</span>
+      </button>
     </div>
   </div>
 
+  <!-- KPI Stats Grid -->
   @if (report(); as r) {
-    <div class="pc-stats">
-      <div class="pc-stat"><b>{{ r.total }}</b><span>employees</span></div>
-      <div class="pc-stat pc-ok"><b>{{ r.complete }}</b><span>complete</span></div>
-      <div class="pc-stat pc-warn"><b>{{ r.incomplete }}</b><span>incomplete</span></div>
+    <div class="pc-stats-grid">
+      <!-- Total Employees -->
+      <div class="pc-stat-card">
+        <div class="pc-stat-icon-wrap icon-blue">
+          <svg lucideUsers size="22"></svg>
+        </div>
+        <div class="pc-stat-content">
+          <span class="pc-stat-label">Total Workforce</span>
+          <div class="pc-stat-val-row">
+            <span class="pc-stat-val">{{ r.total }}</span>
+            <span class="pc-stat-unit">employees</span>
+          </div>
+          <span class="pc-stat-caption">Active accounts audited</span>
+        </div>
+      </div>
+
+      <!-- Incomplete Profiles -->
+      <div class="pc-stat-card card-warn">
+        <div class="pc-stat-icon-wrap icon-amber">
+          <svg lucideAlertCircle size="22"></svg>
+        </div>
+        <div class="pc-stat-content">
+          <span class="pc-stat-label">Incomplete Profiles</span>
+          <div class="pc-stat-val-row">
+            <span class="pc-stat-val text-amber-600">{{ r.incomplete }}</span>
+            <span class="pc-badge-pill badge-amber">{{ incompleteRate() }}% pending</span>
+          </div>
+          <span class="pc-stat-caption">Active reminder queue</span>
+        </div>
+      </div>
+
+      <!-- Complete Profiles -->
+      <div class="pc-stat-card card-ok">
+        <div class="pc-stat-icon-wrap icon-emerald">
+          <svg lucideCheckCircle2 size="22"></svg>
+        </div>
+        <div class="pc-stat-content">
+          <span class="pc-stat-label">Fully Completed</span>
+          <div class="pc-stat-val-row">
+            <span class="pc-stat-val text-emerald-600">{{ r.complete }}</span>
+            <span class="pc-badge-pill badge-emerald">Verified</span>
+          </div>
+          <span class="pc-stat-caption">All documents & info ready</span>
+        </div>
+      </div>
+
+      <!-- Compliance Rate -->
+      <div class="pc-stat-card">
+        <div class="pc-stat-icon-wrap icon-indigo">
+          <svg lucideSparkles size="22"></svg>
+        </div>
+        <div class="pc-stat-content">
+          <span class="pc-stat-label">Compliance Rate</span>
+          <div class="pc-stat-val-row">
+            <span class="pc-stat-val text-indigo-600">{{ completionRate() }}%</span>
+            <span class="pc-stat-ratio">{{ r.complete }}/{{ r.total }}</span>
+          </div>
+          <div class="pc-progress-track">
+            <div class="pc-progress-fill" [style.width.%]="completionRate()"></div>
+          </div>
+        </div>
+      </div>
     </div>
   }
 
+  <!-- Toolbar & Filters -->
   <div class="pc-toolbar">
-    <div class="pc-tabs" role="tablist">
-      <button type="button" [class.active]="filter() === 'INCOMPLETE'" (click)="filter.set('INCOMPLETE')">Incomplete</button>
-      <button type="button" [class.active]="filter() === 'COMPLETE'" (click)="filter.set('COMPLETE')">Complete</button>
-      <button type="button" [class.active]="filter() === 'ALL'" (click)="filter.set('ALL')">All</button>
+    <div class="pc-toolbar-left">
+      <!-- Tabs -->
+      <div class="pc-tab-pills" role="tablist">
+        <button
+          type="button"
+          class="pc-tab-pill"
+          [class.active]="filter() === 'INCOMPLETE'"
+          (click)="filter.set('INCOMPLETE')"
+        >
+          <svg lucideAlertCircle size="14"></svg>
+          <span>Incomplete</span>
+          <span class="tab-badge" *ngIf="report()">{{ report()?.incomplete }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="pc-tab-pill"
+          [class.active]="filter() === 'COMPLETE'"
+          (click)="filter.set('COMPLETE')"
+        >
+          <svg lucideCheckCircle2 size="14"></svg>
+          <span>Complete</span>
+          <span class="tab-badge" *ngIf="report()">{{ report()?.complete }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="pc-tab-pill"
+          [class.active]="filter() === 'ALL'"
+          (click)="filter.set('ALL')"
+        >
+          <svg lucideUsers size="14"></svg>
+          <span>All</span>
+          <span class="tab-badge" *ngIf="report()">{{ report()?.total }}</span>
+        </button>
+      </div>
+
+      <!-- Department Filter -->
+      @if (departments().length > 1) {
+        <div class="pc-select-wrap">
+          <select
+            class="pc-select"
+            [ngModel]="selectedDepartment()"
+            (ngModelChange)="selectedDepartment.set($event)"
+          >
+            <option value="ALL">All Departments</option>
+            @for (dept of departments(); track dept) {
+              <option [value]="dept">{{ dept }}</option>
+            }
+          </select>
+        </div>
+      }
     </div>
-    <input class="pc-search" type="search" placeholder="Search name, code, department, manager…"
-           [ngModel]="query()" (ngModelChange)="query.set($event)" aria-label="Search" />
+
+    <div class="pc-toolbar-right">
+      <!-- Search Input -->
+      <div class="pc-search-box">
+        <svg lucideSearch size="15" class="pc-search-icon"></svg>
+        <input
+          type="search"
+          class="pc-search-input"
+          placeholder="Search name, code, dept, manager, or missing item..."
+          [ngModel]="query()"
+          (ngModelChange)="query.set($event)"
+          aria-label="Search employee records"
+        />
+        <button
+          type="button"
+          class="pc-clear-btn"
+          *ngIf="query()"
+          (click)="query.set('')"
+          title="Clear search query"
+        >
+          <svg lucideX size="13"></svg>
+        </button>
+      </div>
+
+      <!-- Expand / Collapse All Toggle -->
+      <button
+        type="button"
+        class="pc-expand-btn"
+        (click)="toggleAllExpanded()"
+        [title]="allExpanded() ? 'Collapse all missing item lists' : 'Expand all missing item lists'"
+      >
+        @if (allExpanded()) {
+          <svg lucideChevronUp size="14"></svg>
+        } @else {
+          <svg lucideChevronDown size="14"></svg>
+        }
+        <span>{{ allExpanded() ? 'Collapse All' : 'Expand All' }}</span>
+      </button>
+    </div>
   </div>
 
+  <!-- Results Summary Bar -->
+  <div class="pc-results-bar">
+    <span class="pc-results-count">
+      Showing <strong>{{ rows().length }}</strong> of {{ report()?.rows?.length || 0 }} employees
+    </span>
+    <button
+      type="button"
+      class="pc-reset-btn"
+      *ngIf="query() || selectedDepartment() !== 'ALL' || filter() !== 'INCOMPLETE'"
+      (click)="clearFilters()"
+    >
+      Reset Filters
+    </button>
+  </div>
+
+  <!-- Content State -->
   @if (loading()) {
-    <p class="pc-muted">Loading…</p>
+    <div class="pc-loading-card">
+      <div class="spinner-circle"></div>
+      <p class="pc-loading-text">Loading profile completion records...</p>
+    </div>
   } @else if (error()) {
-    <p class="pc-error">{{ error() }}</p>
+    <div class="pc-error-card">
+      <svg lucideAlertCircle size="24" class="text-rose-500"></svg>
+      <div class="pc-error-info">
+        <div class="pc-error-title">Failed to load completion report</div>
+        <div class="pc-error-desc">{{ error() }}</div>
+      </div>
+      <button type="button" class="pc-btn pc-btn-secondary" (click)="load()">Try Again</button>
+    </div>
   } @else {
-    <div class="pc-table-wrap">
-      <table class="pc-table">
-        <thead>
-          <tr><th>Employee</th><th>Department</th><th>Manager</th><th>Missing</th></tr>
-        </thead>
-        <tbody>
-          @for (row of rows(); track row.employee.id) {
+    <!-- Table -->
+    <div class="pc-table-card">
+      <div class="pc-table-wrap">
+        <table class="pc-table">
+          <thead>
             <tr>
-              <td>
-                <a [routerLink]="['/employees', row.employee.id, 'profile']" class="pc-name">
-                  {{ row.employee.firstName }} {{ row.employee.lastName }}
-                </a>
-                <div class="pc-sub">{{ row.employee.employeeCode }}{{ row.firstJob ? ' · first job' : '' }}</div>
-              </td>
-              <td>{{ row.employee.department || '—' }}</td>
-              <td>{{ row.manager || '—' }}</td>
-              <td>
-                @if (row.complete) {
-                  <span class="pc-done">Complete</span>
-                } @else {
-                  <div class="pc-chips">
-                    @for (m of row.missing; track m) { <span class="pc-chip">{{ m }}</span> }
-                  </div>
-                  @if (row.uploadedAsOther) {
-                    <div class="pc-sub">{{ row.uploadedAsOther }} file(s) saved as Other</div>
-                  }
-                }
-              </td>
+              <th class="th-emp">EMPLOYEE</th>
+              <th class="th-dept">DEPARTMENT</th>
+              <th class="th-mgr">REPORTING MANAGER</th>
+              <th class="th-missing">STATUS & MISSING REQUIREMENTS</th>
             </tr>
-          } @empty {
-            <tr><td colspan="4" class="pc-muted">Nobody here.</td></tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.employee.id) {
+              <tr class="pc-table-row" [class.is-complete]="row.complete">
+                <!-- Employee Column -->
+                <td class="td-emp">
+                  <div class="emp-profile-wrap">
+                    <div class="emp-avatar" [style.background-color]="!row.employee.avatarUrl ? getAvatarBg(row.employee.id) : '#f1f5f9'">
+                      <img *ngIf="row.employee.avatarUrl" [src]="row.employee.avatarUrl" [alt]="row.employee.firstName" class="emp-avatar-img" (error)="row.employee.avatarUrl = null" />
+                      <span *ngIf="!row.employee.avatarUrl">{{ getInitials(row.employee.firstName, row.employee.lastName) }}</span>
+                    </div>
+                    <div class="emp-meta">
+                      <a [routerLink]="['/employees', row.employee.id, 'profile']" class="emp-name">
+                        {{ row.employee.firstName }} {{ row.employee.lastName || '' }}
+                      </a>
+                      <div class="emp-sub-row">
+                        <span class="emp-code">#{{ row.employee.employeeCode || 'N/A' }}</span>
+                        <span class="emp-designation" *ngIf="row.employee.designation">{{ row.employee.designation }}</span>
+                        <span class="emp-firstjob-pill" *ngIf="row.firstJob" title="First job (relieving letter not required)">
+                          First Job
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Department Column -->
+                <td class="td-dept">
+                  <span class="dept-chip" *ngIf="row.employee.department; else noDept">
+                    {{ row.employee.department }}
+                  </span>
+                  <ng-template #noDept>
+                    <span class="muted-dash">—</span>
+                  </ng-template>
+                </td>
+
+                <!-- Manager Column -->
+                <td class="td-mgr">
+                  <div class="mgr-wrap" *ngIf="row.manager; else noMgr">
+                    <span class="mgr-name">{{ row.manager }}</span>
+                  </div>
+                  <ng-template #noMgr>
+                    <span class="unassigned-chip">Unassigned</span>
+                  </ng-template>
+                </td>
+
+                <!-- Missing Requirements Column -->
+                <td class="td-missing">
+                  @if (row.complete) {
+                    <div class="complete-state">
+                      <div class="complete-badge">
+                        <svg lucideCheckCircle2 size="15"></svg>
+                        <span>Profile 100% Complete</span>
+                      </div>
+                      <span class="complete-hint">All mandatory documents & details submitted</span>
+                    </div>
+                  } @else {
+                    <div class="missing-layout">
+                      <!-- Count Header -->
+                      <div class="missing-top-row">
+                        <span class="missing-pill-count">
+                          <svg lucideAlertCircle size="12"></svg>
+                          <span>{{ row.missing.length }} {{ row.missing.length === 1 ? 'item' : 'items' }} missing</span>
+                        </span>
+
+                        @if (row.missing.length > 3 && !allExpanded()) {
+                          <button
+                            type="button"
+                            class="expand-text-btn"
+                            (click)="toggleRow(row.employee.id)"
+                          >
+                            {{ isRowExpanded(row.employee.id) ? 'Collapse' : ('Show all ' + row.missing.length) }}
+                          </button>
+                        }
+                      </div>
+
+                      <!-- Chips -->
+                      <div class="chips-container">
+                        @for (m of getDisplayMissing(row); track m) {
+                          <span
+                            class="req-chip"
+                            [class.chip-detail]="m === 'Personal details' || m === 'Emergency contact'"
+                          >
+                            {{ m }}
+                          </span>
+                        }
+
+                        @if (row.missing.length > 3 && !isRowExpanded(row.employee.id)) {
+                          <button
+                            type="button"
+                            class="more-chip-btn"
+                            (click)="toggleRow(row.employee.id)"
+                            title="Expand remaining items"
+                          >
+                            <span>+{{ row.missing.length - 3 }} more</span>
+                            <svg lucideChevronDown size="11"></svg>
+                          </button>
+                        }
+                      </div>
+
+                      <!-- Uploaded as Other Callout -->
+                      @if (row.uploadedAsOther) {
+                        <div class="other-alert-box">
+                          <svg lucideFileQuestion size="14"></svg>
+                          <span>
+                            <strong>{{ row.uploadedAsOther }}</strong> {{ row.uploadedAsOther === 1 ? 'file' : 'files' }} saved as "Other"
+                            <span class="other-alert-hint">· HR category reassignment required</span>
+                          </span>
+                        </div>
+                      }
+                    </div>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="4" class="pc-empty-cell">
+                  <div class="pc-empty-wrap">
+                    <div class="empty-icon-circle">
+                      <svg lucideCheckCircle2 size="32" class="text-emerald-500" *ngIf="filter() === 'INCOMPLETE' && !query()"></svg>
+                      <svg lucideUsers size="32" class="text-slate-400" *ngIf="filter() !== 'INCOMPLETE' || query()"></svg>
+                    </div>
+                    <h3 class="empty-title">
+                      {{ filter() === 'INCOMPLETE' && !query() ? 'All Profiles are Up to Date!' : 'No matching employees found' }}
+                    </h3>
+                    <p class="empty-sub">
+                      {{ filter() === 'INCOMPLETE' && !query()
+                         ? 'Every employee in this view has fulfilled their documentation and profile requirements.'
+                         : 'Try clearing your search terms or filter selection to see more employees.' }}
+                    </p>
+                    <button
+                      type="button"
+                      class="pc-btn pc-btn-secondary mt-2"
+                      *ngIf="query() || selectedDepartment() !== 'ALL' || filter() !== 'INCOMPLETE'"
+                      (click)="clearFilters()"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </div>
   }
 </div>

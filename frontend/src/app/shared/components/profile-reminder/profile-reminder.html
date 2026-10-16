@@ -1,86 +1,222 @@
 @if (open() && status(); as s) {
-  <div class="pr-backdrop" role="presentation">
-    <div class="pr-modal" role="dialog" aria-modal="true" aria-labelledby="pr-title">
+  <div class="pr-backdrop" role="presentation" (click)="later()">
+    <div class="pr-modal" role="dialog" aria-modal="true" aria-labelledby="pr-title" (click)="$event.stopPropagation()">
+      
+      <!-- Modal Header -->
       <div class="pr-head">
-        <div>
-          <h2 id="pr-title">Complete your profile</h2>
-          <p>HR needs these on file. Upload each document under its own type; please don't combine them into one PDF.</p>
+        <div class="pr-head-main">
+          <div class="pr-head-icon">
+            <svg lucideShieldCheck [size]="22"></svg>
+          </div>
+          <div class="pr-head-titles">
+            <div class="pr-title-row">
+              <h2 id="pr-title">Complete your profile</h2>
+              <span class="pr-count-badge">
+                <span class="pr-count-dot"></span>
+                {{ s.missing.length }} left
+              </span>
+            </div>
+            <p class="pr-subtitle">
+              HR needs these verified records on file. Upload each document individually in PDF or image format (please don't combine them into one PDF).
+            </p>
+          </div>
         </div>
-        <span class="pr-count">{{ s.missing.length }} left</span>
+        <button type="button" class="pr-close-btn" (click)="later()" aria-label="Dismiss reminder">
+          <svg lucideX [size]="18"></svg>
+        </button>
       </div>
 
       <div class="pr-body">
+        
+        <!-- SECTION 1: Already uploaded, saved as "Other" -->
         @if (s.otherDocuments.length) {
-          <h3>Already uploaded, saved as "Other"</h3>
-          <div class="pr-note">
-            You already uploaded {{ s.otherDocuments.length === 1 ? 'this file' : 'these ' + s.otherDocuments.length + ' files' }},
-            but as <b>Other</b>, so they don't count yet. Pick what each one is — no need to upload again.
-            Picked the wrong type? You can change it any time on your profile's <b>Documents</b> tab.
+          <div class="pr-section pr-section-retype">
+            <div class="pr-section-header">
+              <div class="pr-section-title-wrap">
+                <span class="pr-badge-pill pr-badge-amber">Action Needed</span>
+                <h3 class="pr-section-title">Already uploaded, saved as "Other"</h3>
+              </div>
+            </div>
+
+            <div class="pr-note-card">
+              <div class="pr-note-icon">
+                <svg lucideTriangleAlert [size]="18"></svg>
+              </div>
+              <div class="pr-note-content">
+                <p class="pr-note-title">Categorize your previously uploaded files</p>
+                <p class="pr-note-desc">
+                  You already uploaded {{ s.otherDocuments.length === 1 ? 'this file' : 'these ' + s.otherDocuments.length + ' files' }}, but as <strong>Other</strong>, so they don't count toward your profile yet. Pick what each one is — no need to upload again! Picked the wrong type? You can change it anytime on your profile's <strong>Documents</strong> tab.
+                </p>
+              </div>
+            </div>
+
+            <div class="pr-retype-list">
+              @for (d of s.otherDocuments; track d.id) {
+                <div class="pr-retype-item" [class.is-retyping]="retyping() === d.id">
+                  <div class="pr-file-info">
+                    <div class="pr-file-ext-box" [ngClass]="getFileFormatClass(d.fileName)">
+                      <span class="pr-file-ext">{{ getFileExt(d.fileName) }}</span>
+                    </div>
+                    <div class="pr-file-meta">
+                      <a class="pr-file-name" [href]="d.fileUrl" target="_blank" rel="noopener" title="Preview document">
+                        <span>{{ d.fileName }}</span>
+                        <svg lucideExternalLink [size]="13" class="pr-external-icon"></svg>
+                      </a>
+                      <span class="pr-file-subtext">Currently saved as Other</span>
+                    </div>
+                  </div>
+
+                  <div class="pr-select-wrapper">
+                    <span class="pr-select-prefix">Assign as:</span>
+                    <div class="pr-custom-select-box" [class.is-busy]="retyping() === d.id">
+                      <select class="pr-select-input" [disabled]="retyping() === d.id" (change)="retype(d.id, $any($event.target).value)" aria-label="What is this file?">
+                        <option value="" selected disabled>What is this?</option>
+                        @for (m of documents(); track m.key) { <option [value]="m.key">{{ m.label }}</option> }
+                        <option value="Passport">Passport</option>
+                        <option value="Post-Graduation Degree">Post-Graduation Degree</option>
+                        <option value="Driving License / Voter ID">Driving License / Voter ID</option>
+                        <option value="Educational Certificate">Other certificate</option>
+                      </select>
+                      <svg *ngIf="retyping() !== d.id" lucideChevronDown [size]="14" class="pr-select-chevron"></svg>
+                      <svg *ngIf="retyping() === d.id" lucideLoaderCircle [size]="14" class="pr-spin pr-select-loader"></svg>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
           </div>
-          <ul class="pr-list">
-            @for (d of s.otherDocuments; track d.id) {
-              <li class="pr-row">
-                <div class="pr-row-text">
-                  <a class="pr-file" [href]="d.fileUrl" target="_blank" rel="noopener">{{ d.fileName }}</a>
-                </div>
-                <select class="pr-select" [disabled]="retyping() === d.id" (change)="retype(d.id, $any($event.target).value)" aria-label="What is this file?">
-                  <option value="" selected disabled>What is this?</option>
-                  @for (m of documents(); track m.key) { <option [value]="m.key">{{ m.label }}</option> }
-                  <option value="Passport">Passport</option>
-                  <option value="Post-Graduation Degree">Post-Graduation Degree</option>
-                  <option value="Driving License / Voter ID">Driving License / Voter ID</option>
-                  <option value="Educational Certificate">Other certificate</option>
-                </select>
-              </li>
-            }
-          </ul>
         }
 
+        <!-- SECTION 2: Required Documents -->
         @if (documents().length) {
-          <h3>Documents</h3>
-          <ul class="pr-list">
-            @for (m of documents(); track m.key) {
-              <li class="pr-row">
-                <div class="pr-row-text">
-                  <span class="pr-label">{{ m.label }}</span>
-                  @if (m.hint) { <span class="pr-hint">{{ m.hint }}</span> }
+          <div class="pr-section">
+            <div class="pr-section-header">
+              <div class="pr-section-title-wrap">
+                <h3 class="pr-section-title">Documents</h3>
+                <span class="pr-badge-pill pr-badge-slate">{{ documents().length }} remaining</span>
+              </div>
+              <span class="pr-section-hint">PDF or Image up to 10MB</span>
+            </div>
+
+            <div class="pr-card-list">
+              @for (m of documents(); track m.key) {
+                <div class="pr-item-card">
+                  <div class="pr-item-left">
+                    <div class="pr-icon-box" [ngClass]="'theme-' + getDocIconType(m.key)">
+                      <svg *ngIf="getDocIconType(m.key) === 'photo'" lucideCamera [size]="18"></svg>
+                      <svg *ngIf="getDocIconType(m.key) === 'education'" lucideGraduationCap [size]="18"></svg>
+                      <svg *ngIf="getDocIconType(m.key) === 'degree'" lucideAward [size]="18"></svg>
+                      <svg *ngIf="getDocIconType(m.key) === 'bank'" lucideFileBadge [size]="18"></svg>
+                      <svg *ngIf="getDocIconType(m.key) === 'reference'" lucideUserCheck [size]="18"></svg>
+                      <svg *ngIf="getDocIconType(m.key) === 'uan'" lucideShieldCheck [size]="18"></svg>
+                      <svg *ngIf="getDocIconType(m.key) === 'work'" lucideBriefcase [size]="18"></svg>
+                      <svg *ngIf="getDocIconType(m.key) === 'payslip'" lucideFileSpreadsheet [size]="18"></svg>
+                      <svg *ngIf="getDocIconType(m.key) === 'default'" lucideFileText [size]="18"></svg>
+                    </div>
+                    <div class="pr-item-details">
+                      <span class="pr-item-title">{{ m.label }}</span>
+                      @if (m.hint) {
+                        <span class="pr-item-hint">{{ m.hint }}</span>
+                      }
+                    </div>
+                  </div>
+
+                  <label class="pr-upload-btn" [class.is-busy]="uploading() === m.key">
+                    <input type="file" accept="image/*,application/pdf" (change)="onFile(m, $event)" [disabled]="!!uploading()" />
+                    @if (uploading() === m.key) {
+                      <svg lucideLoaderCircle [size]="14" class="pr-spin"></svg>
+                      <span>Uploading…</span>
+                    } @else {
+                      <svg lucideUpload [size]="14"></svg>
+                      <span>Upload</span>
+                    }
+                  </label>
                 </div>
-                <label class="pr-upload" [class.busy]="uploading() === m.key">
-                  <input type="file" accept="image/*,application/pdf" (change)="onFile(m, $event)" [disabled]="!!uploading()" />
-                  {{ uploading() === m.key ? 'Uploading…' : 'Upload' }}
-                </label>
-              </li>
-            }
-          </ul>
+              }
+            </div>
+          </div>
         }
 
+        <!-- SECTION 3: First Job Exemption -->
         @if (s.canBeFirstJob && (asksPreviousEmployment() || s.firstJob)) {
-          <label class="pr-firstjob">
-            <input type="checkbox" [checked]="s.firstJob" [disabled]="savingFirstJob()" (change)="setFirstJob($any($event.target).checked)" />
-            <span>This is my first job — I have no previous employer (no UAN, experience letter or salary slip).</span>
-          </label>
-        }
-
-        @if (details().length) {
-          <h3>Profile details</h3>
-          <ul class="pr-list">
-            @for (m of details(); track m.key) {
-              <li class="pr-row">
-                <div class="pr-row-text">
-                  <span class="pr-label">{{ m.label }}</span>
-                  @if (m.hint) { <span class="pr-hint">Missing: {{ m.hint }}</span> }
+          <div class="pr-firstjob-card" [class.is-active]="s.firstJob">
+            <label class="pr-firstjob-label">
+              <div class="pr-checkbox-wrapper">
+                <input type="checkbox"
+                       class="pr-checkbox-native"
+                       [checked]="s.firstJob"
+                       [disabled]="savingFirstJob()"
+                       (change)="setFirstJob($any($event.target).checked)" />
+                <span class="pr-checkbox-custom">
+                  <svg *ngIf="s.firstJob" lucideCheck [size]="13"></svg>
+                </span>
+              </div>
+              <div class="pr-firstjob-content">
+                <div class="pr-firstjob-title-row">
+                  <span class="pr-firstjob-title">This is my first job</span>
+                  <span class="pr-firstjob-waived-pill" *ngIf="s.firstJob">
+                    <svg lucideCheck [size]="11"></svg>
+                    Exempted
+                  </span>
                 </div>
-                <button type="button" class="pr-link" (click)="goToProfile()">Fill in</button>
-              </li>
-            }
-          </ul>
+                <p class="pr-firstjob-desc">
+                  I have no previous employer — no UAN, experience letter, or salary slips required.
+                </p>
+              </div>
+              @if (savingFirstJob()) {
+                <svg lucideLoaderCircle [size]="16" class="pr-spin pr-firstjob-spin"></svg>
+              }
+            </label>
+          </div>
+        }
+
+        <!-- SECTION 4: Profile Details (if any missing) -->
+        @if (details().length) {
+          <div class="pr-section">
+            <div class="pr-section-header">
+              <div class="pr-section-title-wrap">
+                <h3 class="pr-section-title">Profile Details</h3>
+                <span class="pr-badge-pill pr-badge-slate">{{ details().length }} to complete</span>
+              </div>
+            </div>
+            <div class="pr-card-list">
+              @for (m of details(); track m.key) {
+                <div class="pr-item-card">
+                  <div class="pr-item-left">
+                    <div class="pr-icon-box theme-user">
+                      <svg lucideUser [size]="18"></svg>
+                    </div>
+                    <div class="pr-item-details">
+                      <span class="pr-item-title">{{ m.label }}</span>
+                      @if (m.hint) {
+                        <span class="pr-item-hint">Missing: {{ m.hint }}</span>
+                      }
+                    </div>
+                  </div>
+                  <button type="button" class="pr-fill-btn" (click)="goToProfile()">
+                    <span>Fill in</span>
+                    <svg lucideExternalLink [size]="13"></svg>
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
         }
       </div>
 
+      <!-- Modal Footer -->
       <div class="pr-foot">
-        <span class="pr-foot-note">This comes back every 15 minutes until everything is on file.</span>
-        <button type="button" class="pr-later" (click)="later()">Remind me later</button>
+        <div class="pr-foot-info">
+          <svg lucideClock [size]="15" class="pr-clock-icon"></svg>
+          <span>This comes back every 15 minutes until everything is on file.</span>
+        </div>
+        <div class="pr-foot-actions">
+          <button type="button" class="pr-btn-later" (click)="later()">
+            Remind me later
+          </button>
+        </div>
       </div>
+
     </div>
   </div>
 }
