@@ -1,3 +1,4 @@
+import { ALL_DOCUMENT_TYPES } from './profile-completeness/profile-documents';
 import { Injectable, ConflictException, NotFoundException, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -787,9 +788,24 @@ export class EmployeesService {
   async deleteDocument(id: number, documentId: number, companyId: number, currentUserId: number, role: string) {
     const employee = await this.checkProfileEditPermission(id, companyId, currentUserId, role);
 
-    return this.prisma.employeeDocument.delete({
-      where: { id: documentId }
-    });
+    // Scoped to this employee: permission was checked for them, not for
+    // whoever owns the document id in the URL.
+    const doc = await this.prisma.employeeDocument.findFirst({ where: { id: documentId, employeeId: employee.id } });
+    if (!doc) throw new NotFoundException('Document not found');
+    return this.prisma.employeeDocument.delete({ where: { id: doc.id } });
+  }
+
+  /**
+   * Change what a document is filed as, e.g. a resume uploaded as "Other"
+   * (16 Oct 2026). Same permission as uploading it.
+   */
+  async updateDocumentType(id: number, documentId: number, companyId: number, currentUserId: number, role: string, documentType: string) {
+    const employee = await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+    const type = String(documentType ?? '').trim();
+    if (!(ALL_DOCUMENT_TYPES as readonly string[]).includes(type)) throw new BadRequestException('Pick a document type from the list');
+    const doc = await this.prisma.employeeDocument.findFirst({ where: { id: documentId, employeeId: employee.id } });
+    if (!doc) throw new NotFoundException('Document not found');
+    return this.prisma.employeeDocument.update({ where: { id: doc.id }, data: { documentType: type } });
   }
 
   async sendWelcomeEmails(companyId: number, employeeIds: number[]) {

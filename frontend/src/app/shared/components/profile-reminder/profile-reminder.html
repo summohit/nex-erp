@@ -9,14 +9,32 @@
         <span class="pr-count">{{ s.missing.length }} left</span>
       </div>
 
-      @if (s.uploadedAsOther > 0) {
-        <div class="pr-note">
-          You have {{ s.uploadedAsOther }} file{{ s.uploadedAsOther === 1 ? '' : 's' }} saved as <b>Other</b>.
-          Those don't count. Upload each one below under its proper type.
-        </div>
-      }
-
       <div class="pr-body">
+        @if (s.otherDocuments.length) {
+          <h3>Already uploaded, saved as "Other"</h3>
+          <div class="pr-note">
+            You already uploaded {{ s.otherDocuments.length === 1 ? 'this file' : 'these ' + s.otherDocuments.length + ' files' }},
+            but as <b>Other</b>, so they don't count yet. Pick what each one is — no need to upload again.
+          </div>
+          <ul class="pr-list">
+            @for (d of s.otherDocuments; track d.id) {
+              <li class="pr-row">
+                <div class="pr-row-text">
+                  <a class="pr-file" [href]="d.fileUrl" target="_blank" rel="noopener">{{ d.fileName }}</a>
+                </div>
+                <select class="pr-select" [disabled]="retyping() === d.id" (change)="retype(d.id, $any($event.target).value)" aria-label="What is this file?">
+                  <option value="" selected disabled>What is this?</option>
+                  @for (m of documents(); track m.key) { <option [value]="m.key">{{ m.label }}</option> }
+                  <option value="Passport">Passport</option>
+                  <option value="Post-Graduation Degree">Post-Graduation Degree</option>
+                  <option value="Driving License / Voter ID">Driving License / Voter ID</option>
+                  <option value="Educational Certificate">Other certificate</option>
+                </select>
+              </li>
+            }
+          </ul>
+        }
+
         @if (documents().length) {
           <h3>Documents</h3>
           <ul class="pr-list">

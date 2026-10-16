@@ -33,6 +33,7 @@ export class ProfileReminderComponent implements OnInit, OnDestroy {
   open = signal(false);
   uploading = signal<string | null>(null);
   savingFirstJob = signal(false);
+  retyping = signal<number | null>(null);
   private timer: any = null;
 
   ngOnInit() {
@@ -102,6 +103,17 @@ export class ProfileReminderComponent implements OnInit, OnDestroy {
       error: (e) => { this.uploading.set(null); this.toast.error(e?.error?.message || 'Upload failed'); },
     });
     input.value = '';
+  }
+
+  /** File an "Other" upload under its proper type — no re-upload needed. */
+  retype(documentId: number, documentType: string) {
+    const s = this.status();
+    if (!s || !documentType) return;
+    this.retyping.set(documentId);
+    this.employees.updateDocumentType(s.employeeId, documentId, documentType).subscribe({
+      next: () => { this.retyping.set(null); this.toast.success(`Saved as ${documentType}`); this.check(true); },
+      error: (e) => { this.retyping.set(null); this.toast.error(e?.error?.message || 'Could not change the type'); },
+    });
   }
 
   setFirstJob(value: boolean) {

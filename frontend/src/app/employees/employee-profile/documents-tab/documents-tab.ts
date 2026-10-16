@@ -161,6 +161,18 @@ export class DocumentsTabComponent implements OnInit {
     });
   }
 
+  /** File a document saved as "Other" under its proper type. */
+  retype(doc: any, documentType: string) {
+    if (!documentType || documentType === doc.documentType) return;
+    this.employeeService.updateDocumentType(this.employeeData.id, doc.id, documentType).subscribe({
+      next: () => {
+        this.toast.success(`Saved as ${documentType}`);
+        this.refreshProfile.emit();
+      },
+      error: (err: any) => this.toast.error(err?.error?.message || 'Could not change the type'),
+    });
+  }
+
   deleteDocument(documentId: number) {
     if (!confirm('Are you sure you want to delete this document?')) return;
     

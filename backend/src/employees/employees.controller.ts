@@ -166,6 +166,12 @@ export class EmployeesController {
     return this.employeesService.addDocuments(+id, req.user.companyId, req.user.sub, req.user.role, data);
   }
 
+  /** { documentType } — re-file an uploaded document, e.g. one saved as "Other". */
+  @Put(':id/documents/:documentId')
+  updateDocumentType(@Request() req, @Param('id') id: string, @Param('documentId') documentId: string, @Body() body: { documentType: string }) {
+    return this.employeesService.updateDocumentType(+id, +documentId, req.user.companyId, req.user.sub, req.user.role, body?.documentType);
+  }
+
   @Delete(':id/documents/:documentId')
   deleteDocument(@Request() req, @Param('id') id: string, @Param('documentId') documentId: string) {
     return this.employeesService.deleteDocument(+id, +documentId, req.user.companyId, req.user.sub, req.user.role);

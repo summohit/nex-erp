@@ -52,6 +52,7 @@ export const EXEMPT_EMAILS = new Set([
   'info@ces-pl.com',
   'surajs@ces-pl.com',
   'hr@ces-pl.com',
+  'developer@ces-pl.com',
 ]);
 
 /** Interns sit outside previous-employment documents: employment type or designation. */

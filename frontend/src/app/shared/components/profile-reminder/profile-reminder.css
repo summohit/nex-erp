@@ -30,3 +30,8 @@
 .pr-foot-note { font-size: 12px; color: #64748b; }
 .pr-later { font: inherit; font-size: 14px; font-weight: 600; color: #fff; background: #1373e5; border: none; border-radius: 8px; padding: 9px 16px; cursor: pointer; }
 .pr-later:hover { background: #0f62c6; }
+
+.pr-file { font-size: 13.5px; font-weight: 600; color: #1d4ed8; text-decoration: none; word-break: break-all; }
+.pr-file:hover { text-decoration: underline; }
+.pr-select { flex-shrink: 0; max-width: 220px; padding: 6px 8px; border: 1px solid #fcd34d; border-radius: 8px; background: #fffbeb; font: inherit; font-size: 13px; }
+.pr-body .pr-note { margin: 0 0 8px; }

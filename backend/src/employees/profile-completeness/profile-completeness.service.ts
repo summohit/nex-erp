@@ -22,6 +22,8 @@ export interface Completeness {
   firstJob: boolean;
   /** Files uploaded as "Other": a nudge to upload each under its own type. */
   uploadedAsOther: number;
+  /** Those files, so the reminder can offer to re-file each one. */
+  otherDocuments: { id: number; fileName: string; fileUrl: string }[];
 }
 
 const SELECT = {
@@ -32,7 +34,7 @@ const SELECT = {
   designation: { select: { name: true } },
   department: { select: { name: true } },
   manager: { select: { id: true, firstName: true, lastName: true } },
-  documents: { select: { documentType: true } },
+  documents: { select: { id: true, fileName: true, fileUrl: true, documentType: true } },
   emergencyContacts: { select: { id: true } },
 } as const;
 
@@ -80,6 +82,9 @@ export class ProfileCompletenessService {
       canBeFirstJob: !intern,
       firstJob: !!emp.firstJob,
       uploadedAsOther: (emp.documents ?? []).filter((d: any) => d.documentType === 'Other').length,
+      otherDocuments: exempt ? [] : (emp.documents ?? [])
+        .filter((d: any) => d.documentType === 'Other')
+        .map((d: any) => ({ id: d.id, fileName: d.fileName, fileUrl: d.fileUrl })),
     };
   }
 

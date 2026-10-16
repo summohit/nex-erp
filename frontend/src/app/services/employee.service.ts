@@ -145,6 +145,14 @@ export class EmployeeService {
     });
   }
 
+  /** Re-file an uploaded document, e.g. one saved as "Other". */
+  updateDocumentType(id: number | string, documentId: number, documentType: string): Observable<any> {
+    const token = getAccessToken();
+    return this.http.put<any>(`${this.apiUrl}/${id}/documents/${documentId}`, { documentType }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   deleteDocument(id: number | string, documentId: number): Observable<any> {
     const token = getAccessToken();
     return this.http.delete<any>(`${this.apiUrl}/${id}/documents/${documentId}`, {
@@ -254,6 +262,7 @@ export interface ProfileCompleteness {
   canBeFirstJob: boolean;
   firstJob: boolean;
   uploadedAsOther: number;
+  otherDocuments: { id: number; fileName: string; fileUrl: string }[];
 }
 export interface ProfileCompletenessReport {
   total: number;

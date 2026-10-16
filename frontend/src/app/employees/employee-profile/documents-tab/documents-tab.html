@@ -21,6 +21,14 @@
         <span class="doc-badge">{{ doc.documentType || 'Document' }}</span>
         <h3>{{ doc.fileName }}</h3>
         <p>{{ timeAgo(doc.createdAt) }}</p>
+        <!-- Saved as Other: let them file it under its proper type. -->
+        <div class="doc-retype" *ngIf="doc.documentType === 'Other'">
+          <span class="doc-retype-note">Saved as Other — what is this file?</span>
+          <select class="doc-retype-select" (change)="retype(doc, $any($event.target).value)" aria-label="Set document type">
+            <option value="" selected disabled>Set type…</option>
+            <option *ngFor="let type of documentTypes" [value]="type" [disabled]="type === 'Other'">{{ type }}</option>
+          </select>
+        </div>
       </div>
       <div class="card-actions">
         <button class="action-btn view-btn" (click)="viewDocument(doc.fileUrl)" title="View File">
