@@ -3,6 +3,8 @@
  *
  *   node scripts/complete-old-onboarding.js            (shows who, changes nothing)
  *   node scripts/complete-old-onboarding.js --apply    (makes the change)
+ *   add --include-open-tasks to also complete old joiners whose only open
+ *   tasks are checklist items handed out when a template was created
  *
  * Every employee record starts as onboarding PENDING. Staff added directly or
  * by bulk import never go through onboarding, so they sat in the directory as
@@ -18,6 +20,7 @@ const { PrismaPg } = require('@prisma/adapter-pg');
 
 const DAYS = 40;
 const apply = process.argv.includes('--apply');
+const includeOpen = process.argv.includes('--include-open-tasks');
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
 (async () => {
@@ -33,11 +36,12 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: proc
   const name = (e) => `${e.firstName} ${e.lastName ?? ''}`.trim() + (e.employeeCode ? ` (#${e.employeeCode})` : '');
   const day = (d) => (d ? d.toISOString().slice(0, 10) : 'no date');
 
-  const toFix = emps.filter((e) => e.joiningDate && e.joiningDate < cutoff && e.onboardingTasks.length === 0);
-  const openTasks = emps.filter((e) => e.joiningDate && e.joiningDate < cutoff && e.onboardingTasks.length > 0);
+  const old = emps.filter((e) => e.joiningDate && e.joiningDate < cutoff);
+  const toFix = includeOpen ? old : old.filter((e) => e.onboardingTasks.length === 0);
+  const openTasks = includeOpen ? [] : old.filter((e) => e.onboardingTasks.length > 0);
   const noDate = emps.filter((e) => !e.joiningDate);
 
-  console.log(`\nWill mark COMPLETED (joined before ${day(cutoff)}, no open onboarding task): ${toFix.length}`);
+  console.log(`\nWill mark COMPLETED (joined before ${day(cutoff)}${includeOpen ? '' : ', no open onboarding task'}): ${toFix.length}`);
   for (const e of toFix) console.log(`  ${day(e.joiningDate)}  ${e.onboardingStatus.padEnd(11)} ${name(e)}`);
   console.log(`\nLeft alone, still have open onboarding tasks: ${openTasks.length}`);
   for (const e of openTasks) console.log(`  ${day(e.joiningDate)}  ${e.onboardingTasks.length} open  ${name(e)}`);
