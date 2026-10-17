@@ -27,16 +27,17 @@ export class EmailService {
   ): Promise<boolean> {
     try {
       const mailOptions = {
-        from: `"MIRA Payroll" <${process.env.SMTP_FROM || 'payroll@ces-pl.com'}>`,
+        from: `"MIRA by CES Tech" <${process.env.SMTP_FROM || 'payroll@ces-pl.com'}>`,
         to: toEmail,
-        subject: `Your Salary Payslip for ${monthName} ${year} - CES Tech ERP`,
+        subject: `Your Salary Payslip for ${monthName} ${year} | MIRA by CES Tech`,
         html: `
           <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
             <h2>Hello ${employeeName},</h2>
             <p>Your salary payslip for <strong>${monthName} ${year}</strong> has been generated and is attached to this email as a PDF document.</p>
             <p>Please review the attached document. If you have any questions regarding your earnings or deductions, contact the HR / Payroll department.</p>
             <br/>
-            <p>Best regards,<br/><strong>Payroll Team</strong><br/>CES Tech ERP</p>
+            <p>Best regards,<br/><strong>Payroll Team</strong></p>
+            <p style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px;"><strong style="color: #64748b;">MIRA by CES Tech</strong> · This is an automated email.</p>
           </div>
         `,
         attachments: [

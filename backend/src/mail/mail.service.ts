@@ -84,7 +84,33 @@ export class MailService {
     return error?.message || 'unknown error';
   }
 
+  /**
+   * Brand every MIRA email the same way (17 Oct 2026): sender "MIRA by CES Tech",
+   * the name at the end of the subject, and a one-line footer. Emails sent in a
+   * company's own name (quotations, offer letters, enquiry replies) are left as
+   * they are, since those go to people outside the company.
+   */
+  static readonly BRAND = 'MIRA by CES Tech';
+  private static readonly FOOTER = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 16px auto 0; padding-top: 12px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 12px;"><strong style="color: #64748b;">MIRA by CES Tech</strong> · This is an automated email.</div>`;
+
+  private brandSubject(subject?: string): string {
+    const s = (subject || '').replace(/\bMIRA\b(?! by CES Tech)/g, MailService.BRAND);
+    return s.includes(MailService.BRAND) ? s : `${s} | ${MailService.BRAND}`;
+  }
+
+  private brand<T extends { from?: any; subject?: string; html?: any }>(opts: T): T {
+    const from = typeof opts.from === 'string' ? opts.from : '';
+    if (from && !/^"MIRA[^"]*"/.test(from)) return opts;
+    return {
+      ...opts,
+      from: from ? from.replace(/^"MIRA[^"]*"/, `"${MailService.BRAND}"`) : opts.from,
+      subject: this.brandSubject(opts.subject),
+      html: typeof opts.html === 'string' ? opts.html + MailService.FOOTER : opts.html,
+    };
+  }
+
   private async sendWithRetry(mailOptions: nodemailer.SendMailOptions): Promise<nodemailer.SentMessageInfo> {
+    mailOptions = this.brand(mailOptions);
     const maxAttempts = 3;
     let lastError: any;
 
@@ -122,10 +148,11 @@ export class MailService {
     if (!this.brevoApiKey) {
       throw new Error('Brevo API key is not configured.');
     }
+    mailOptions = this.brand(mailOptions);
 
     const url = 'https://api.brevo.com/v3/smtp/email';
     const payload = {
-      sender: { email: this.fromEmail, name: 'MIRA' },
+      sender: { email: this.fromEmail, name: MailService.BRAND },
       to: [{ email: mailOptions.to }],
       subject: mailOptions.subject,
       htmlContent: mailOptions.html,
