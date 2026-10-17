@@ -1,18 +1,18 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Linking,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Linking, Image,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   MapPin,
-  Calendar,
   Clock,
-  Users,
   CheckCircle2,
   AlertTriangle,
   ChevronRight,
   Plus,
   ExternalLink,
+  Navigation2,
+  Crosshair,
   Briefcase,
   FolderKanban,
   LogIn,
@@ -21,6 +21,8 @@ import {
   Square,
 } from 'lucide-react-native';
 import AppScreen from '../../components/AppScreen';
+import GradientHero from '../../components/GradientHero';
+import { ds, colors as dsColors, status as dsStatus } from '../../theme/ds';
 import {
   fieldVisitRequestService as fv, FieldVisitRequest, FvDay, FvCapabilities, VisitLocationRequest, ROSTER_DAY_OFF_CLASH,
 } from '../../api/fieldVisitRequestService';
@@ -28,7 +30,7 @@ import ReasonSheet from './ReasonSheet';
 import JourneyPanel from './JourneyPanel';
 import { getCurrentLocation, requestLocationPermission } from '../../store/dashboardStore';
 import { theme } from '../../theme/theme';
-import { fvStatus, timeLabel, clockAt, range, mapsUrl, who, initials } from './fvFormat';
+import { fvStatus, timeLabel, clockAt, mapsUrl, who, initials } from './fvFormat';
 
 type Tab = 'TODAY' | 'MINE' | 'APPROVALS';
 
@@ -66,10 +68,10 @@ export default function FieldVisitsScreen() {
   // Raising visits is for project managers and administrators; employees see
   // their own visits and clock in and out. (Older servers lack canRaise.)
   const canRaise = caps ? (caps.canRaise ?? caps.isProjectManager) : false;
-  /** Waiting on an administrator: new requests, and changes to approved ones. */
+  /** Waiting on an administrator: new requests, and changes to approved ones (newest on top). */
   const awaiting = useMemo(
     () => mine.filter((r) => r.status === 'PENDING_APPROVAL' || !!r.pendingChange)
-      .sort((a, b) => a.startDate.localeCompare(b.startDate)),
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '') || (b.id - a.id)),
     [mine],
   );
   const pendingIds = awaiting.filter((r) => r.status === 'PENDING_APPROVAL').map((r) => r.id);
@@ -166,151 +168,227 @@ export default function FieldVisitsScreen() {
     }
   };
 
-  const mineSorted = useMemo(() => [...mine].sort((a, b) => b.startDate.localeCompare(a.startDate)), [mine]);
+  /** Newly created visits always appear on top. */
+  const daysSorted = useMemo(
+    () => [...days].sort((a, b) => (b.request?.id ?? b.id) - (a.request?.id ?? a.id)),
+    [days],
+  );
+  const mineSorted = useMemo(
+    () => [...mine].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '') || (b.id - a.id)),
+    [mine],
+  );
+
+  /** "Noida Sector 62 – CES Office" → main line and sub line. */
+  const splitSite = (loc: string) => {
+    const parts = (loc || '').split(/\s+[–—-]\s+/);
+    return { main: parts[0] || loc, sub: parts.length > 1 ? parts.slice(1).join(' - ') : null };
+  };
+  /** Visit dates are stored as UTC midnight: read them as the day they name. */
+  const dayNum = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', timeZone: 'UTC' });
+  const monShort = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { month: 'short', timeZone: 'UTC' }).toUpperCase();
+  const shortRange = (r: { startDate: string; endDate: string }) => {
+    const f = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    return r.startDate.slice(0, 10) === r.endDate.slice(0, 10) ? f(r.startDate) : `${f(r.startDate)} – ${f(r.endDate)}`;
+  };
+
+  /** Up to three faces, then "+n": who is going, at a glance. */
+  const AvatarStack = ({ people }: { people: { id: number; firstName: string; lastName?: string | null; avatarUrl?: string | null }[] }) => (
+    <View style={styles.stack}>
+      {people.slice(0, 3).map((p, i) => (
+        <View key={p.id} style={[styles.stackItem, { marginLeft: i ? -8 : 0, zIndex: 3 - i }]}>
+          {p.avatarUrl
+            ? <Image source={{ uri: p.avatarUrl }} style={styles.stackImg} />
+            : <Text style={styles.stackInitials}>{initials(p)}</Text>}
+        </View>
+      ))}
+      {people.length > 3 && (
+        <View style={[styles.stackItem, styles.stackMore, { marginLeft: -8 }]}>
+          <Text style={styles.stackMoreText}>+{people.length - 3}</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const StatusPill = ({ tone, label }: { tone: { bg: string; border: string; fg: string; strong?: string }; label: string }) => (
+    <View style={[ds.pill, { backgroundColor: tone.bg, borderColor: tone.border }]}>
+      <View style={[styles.statusDot, { backgroundColor: tone.fg }]} />
+      <Text style={[ds.pillText, { color: tone.strong ?? tone.fg }]}>{label}</Text>
+    </View>
+  );
 
   const renderDay = ({ item: d }: { item: FvDay }) => {
     const inside = !!d.clockInTime && !d.clockOutTime;
     const done = !!d.clockOutTime;
     const radiusStr = d.request.geofenceRadiusM >= 1000 ? `${(d.request.geofenceRadiusM / 1000).toFixed(1)} km` : `${d.request.geofenceRadiusM} m`;
+    const site = splitSite(d.request.location);
+    const tone = inside ? dsStatus.success : done ? dsStatus.neutral : dsStatus.info;
+    const chosenTask = taskFor[d.request.id] ?? (d.tasks.length === 1 ? d.tasks[0].id : undefined);
 
     return (
-      <View style={styles.card}>
-        {/* Top Header Row */}
-        <View style={styles.cardHeader}>
-          <View style={styles.badgeRow}>
-            <View style={styles.codeBadge}>
-              <Text style={styles.codeBadgeText}>{d.request.requestNumber}</Text>
-            </View>
-            <View style={styles.projectTag}>
-              <FolderKanban size={12} color="#64748B" strokeWidth={2} />
-              <Text style={styles.projectTagText} numberOfLines={1}>
-                {d.request.project?.name || 'General visit'}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.statusBadge, {
-            backgroundColor: inside ? '#DCFCE7' : done ? '#F1F5F9' : '#EFF6FF',
-            borderColor: inside ? '#86EFAC' : done ? '#E2E8F0' : '#BFDBFE',
-          }]}>
-            <View style={[styles.statusDot, {
-              backgroundColor: inside ? '#16A34A' : done ? '#64748B' : '#2563EB',
-            }]} />
-            <Text style={[styles.statusBadgeText, {
-              color: inside ? '#15803D' : done ? '#475569' : '#1D4ED8',
-            }]}>
-              {inside ? 'On Site' : done ? 'Completed' : 'Today'}
-            </Text>
-          </View>
+      <View style={[styles.card, styles.dayCard, inside && styles.dayCardLive]}>
+        {/* Band: when, and the state of the day */}
+        <View style={[styles.dayBand, { backgroundColor: tone.bg, borderBottomColor: tone.border }]}>
+          <Clock size={13} color={tone.strong} strokeWidth={2.4} />
+          <Text style={[styles.dayBandText, { color: tone.strong }]}>
+            {timeLabel(d.request.startTime)} – {timeLabel(d.request.endTime)}
+          </Text>
+          <Text style={styles.dayBandCode}>{d.request.requestNumber}</Text>
+          <StatusPill tone={tone} label={inside ? 'On site' : done ? 'Completed' : 'Today'} />
         </View>
 
-        {/* Location Section */}
-        <View style={styles.locationSection}>
-          <View style={styles.locationIconWrap}>
-            <MapPin size={18} color="#0284C7" strokeWidth={2.2} />
-          </View>
-          <View style={styles.locationContent}>
-            <Text style={styles.siteTitle}>{d.request.location}</Text>
-            <Text style={styles.geofenceText}>
-              Within {radiusStr} · {timeLabel(d.request.startTime)} – {timeLabel(d.request.endTime)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Maps Button */}
-        <TouchableOpacity
-          style={styles.mapsPillBtn}
-          activeOpacity={0.7}
-          onPress={() => Linking.openURL(mapsUrl(d.request.latitude, d.request.longitude))}
-        >
-          <ExternalLink size={13} color="#1373e5" strokeWidth={2.2} />
-          <Text style={styles.mapsPillBtnText}>Open site in Google Maps</Text>
-        </TouchableOpacity>
-
-        {/* Task Selection */}
-        {!d.clockInTime && d.tasks.length > 0 && (
-          <View style={styles.taskPickerContainer}>
-            <Text style={styles.sectionSmallTitle}>Select Active Task</Text>
-            {d.tasks.map((t) => {
-              const on = (taskFor[d.request.id] ?? (d.tasks.length === 1 ? t.id : undefined)) === t.id;
-              return (
-                <TouchableOpacity
-                  key={t.id}
-                  style={[styles.taskOptionCard, on && styles.taskOptionCardActive]}
-                  activeOpacity={0.75}
-                  onPress={() => setTaskFor((p) => ({ ...p, [d.request.id]: t.id }))}
-                >
-                  <View style={[styles.taskRadioCircle, on && styles.taskRadioCircleActive]}>
-                    {on && <View style={styles.taskRadioInner} />}
-                  </View>
-                  <View style={styles.taskInfoCol}>
-                    <Text style={[styles.taskKeyBadge, on && styles.taskKeyBadgeActive]}>
-                      #{t.key}
-                    </Text>
-                    <Text style={[styles.taskTitleText, on && styles.taskTitleTextActive]} numberOfLines={1}>
-                      {t.title}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Clock In / Out Log */}
-        {!!d.clockInTime && (
-          <View style={styles.attendanceLogBox}>
-            <View style={styles.logRow}>
-              <View style={[styles.logIndicator, { backgroundColor: '#16A34A' }]} />
-              <Text style={styles.logText}>
-                Clocked in at <Text style={styles.logBold}>{clockAt(d.clockInTime)}</Text>
-                {d.clockInDistanceKm != null ? ` (${Math.round(d.clockInDistanceKm * 1000)}m from site)` : ''}
-              </Text>
+        <View style={styles.cardInner}>
+          {/* Site */}
+          <View style={styles.siteRow}>
+            <View style={[styles.siteIcon, inside && { backgroundColor: dsStatus.success.bg, borderColor: dsStatus.success.border }]}>
+              <MapPin size={20} color={inside ? dsStatus.success.strong : dsColors.primary} strokeWidth={2.2} />
             </View>
-            {d.clockOutTime && (
-              <View style={[styles.logRow, { marginTop: 6 }]}>
-                <View style={[styles.logIndicator, { backgroundColor: '#64748B' }]} />
-                <Text style={styles.logText}>
-                  Clocked out at <Text style={styles.logBold}>{clockAt(d.clockOutTime)}</Text>
-                </Text>
+            <View style={styles.flex1}>
+              <Text style={styles.siteTitle} numberOfLines={1}>{site.main}</Text>
+              {!!site.sub && <Text style={styles.siteSub} numberOfLines={1}>{site.sub}</Text>}
+              <View style={styles.inlineMeta}>
+                <FolderKanban size={11} color={dsColors.textFaint} />
+                <Text style={styles.inlineMetaText} numberOfLines={1}>{d.request.project?.name || 'General visit'}</Text>
               </View>
-            )}
+              <View style={styles.radiusPill}>
+                <Crosshair size={11} color="#7C3AED" strokeWidth={2.4} />
+                <Text style={styles.radiusPillText}>Clock in within {radiusStr}</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.directionsBtn}
+              activeOpacity={0.75}
+              onPress={() => navigation.navigate('FieldVisitMap', { requestId: d.request.id })}
+            >
+              <Navigation2 size={14} color={dsColors.primary} strokeWidth={2.4} />
+              <Text style={styles.directionsText}>Route</Text>
+            </TouchableOpacity>
           </View>
-        )}
 
-        {/* Travel allowance: Start / End journey (Delhi NCR visits) */}
-        {d.request.travelZone === 'DELHI_NCR' && <JourneyPanel day={d} onChanged={load} />}
-
-        {/* Clock In/Out Action Button */}
-        {!done && (
-          <TouchableOpacity
-            style={[styles.primaryActionBtn, inside && styles.dangerActionBtn]}
-            activeOpacity={0.85}
-            disabled={busy === d.id}
-            onPress={() => clock(d, inside ? 'out' : 'in')}
-          >
-            {busy === d.id ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <View style={styles.btnRow}>
-                {inside ? (
-                  <LogOut size={18} color="#FFFFFF" strokeWidth={2.4} />
-                ) : (
-                  <LogIn size={18} color="#FFFFFF" strokeWidth={2.4} />
+          {/* Timeline: clock in → clock out */}
+          <View style={styles.timeline}>
+            <View style={styles.tlStep}>
+              <View style={[styles.tlDot, d.clockInTime ? styles.tlDotDone : styles.tlDotTodo]}>
+                <LogIn size={12} color={d.clockInTime ? '#FFFFFF' : dsColors.textFaint} strokeWidth={2.6} />
+              </View>
+              <View>
+                <Text style={styles.tlLabel}>Clock in</Text>
+                <Text style={[styles.tlValue, !d.clockInTime && styles.tlValueTodo]}>
+                  {d.clockInTime ? clockAt(d.clockInTime) : '--:--'}
+                </Text>
+                {d.clockInDistanceKm != null && (
+                  <Text style={styles.tlSub}>{Math.round(d.clockInDistanceKm * 1000)} m from site</Text>
                 )}
-                <Text style={styles.primaryActionBtnText}>
-                  {inside ? 'Clock out at site' : 'Clock in at site'}
+              </View>
+            </View>
+            <View style={[styles.tlLine, d.clockOutTime && styles.tlLineDone]} />
+            <View style={styles.tlStep}>
+              <View style={[styles.tlDot, d.clockOutTime ? styles.tlDotOut : styles.tlDotTodo]}>
+                <LogOut size={12} color={d.clockOutTime ? '#FFFFFF' : dsColors.textFaint} strokeWidth={2.6} />
+              </View>
+              <View>
+                <Text style={styles.tlLabel}>Clock out</Text>
+                <Text style={[styles.tlValue, !d.clockOutTime && styles.tlValueTodo]}>
+                  {d.clockOutTime ? clockAt(d.clockOutTime) : '--:--'}
                 </Text>
               </View>
-            )}
-          </TouchableOpacity>
-        )}
-
-        {done && (
-          <View style={styles.completedBadgeBanner}>
-            <CheckCircle2 size={16} color="#15803D" strokeWidth={2.2} />
-            <Text style={styles.completedBadgeBannerText}>Attendance completed for today</Text>
+            </View>
           </View>
-        )}
+
+          {/* Task to clock in against */}
+          {!d.clockInTime && d.tasks.length > 0 && (
+            <View style={styles.taskBlock}>
+              <Text style={styles.blockLabel}>{d.tasks.length > 1 ? 'PICK THE TASK YOU ARE ON' : 'TASK'}</Text>
+              {d.tasks.map((t) => {
+                const on = chosenTask === t.id;
+                return (
+                  <TouchableOpacity
+                    key={t.id}
+                    style={[styles.taskRow, on && styles.taskRowOn]}
+                    activeOpacity={0.75}
+                    onPress={() => setTaskFor((p) => ({ ...p, [d.request.id]: t.id }))}
+                  >
+                    <View style={[styles.taskRadioCircle, on && styles.taskRadioCircleActive]}>
+                      {on && <View style={styles.taskRadioInner} />}
+                    </View>
+                    <Text style={[styles.taskKey, on && { color: dsColors.primary }]}>{t.key}</Text>
+                    <Text style={[styles.taskTitle, on && { color: dsColors.text }]} numberOfLines={1}>{t.title}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Travel allowance: Start / End journey (Delhi NCR visits) */}
+          {d.request.travelZone === 'DELHI_NCR' && <JourneyPanel day={d} onChanged={load} />}
+
+          {!done ? (
+            <TouchableOpacity
+              style={[styles.clockBtn, inside && styles.clockBtnOut]}
+              activeOpacity={0.85}
+              disabled={busy === d.id}
+              onPress={() => clock(d, inside ? 'out' : 'in')}
+            >
+              {busy === d.id ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  {inside ? <LogOut size={17} color="#FFFFFF" strokeWidth={2.4} /> : <LogIn size={17} color="#FFFFFF" strokeWidth={2.4} />}
+                  <Text style={styles.clockBtnText}>{inside ? 'Clock out at site' : 'Clock in at site'}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.doneStrip}>
+              <CheckCircle2 size={15} color={dsStatus.success.strong} strokeWidth={2.4} />
+              <Text style={styles.doneStripText}>Attendance completed for today</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  /** One visit in a list (mine, or waiting on an approver). */
+  const VisitCard = ({ r, pill, top, bottom }: {
+    r: FieldVisitRequest; pill: React.ReactNode; top?: React.ReactNode; bottom?: React.ReactNode;
+  }) => {
+    const site = splitSite(r.location);
+    const people = r.members.map((m) => m.employee);
+    return (
+      <View style={styles.cardInner}>
+        <View style={styles.visitTop}>
+          {top}
+          <View style={ds.dateBox}>
+            <Text style={ds.dateBoxNum}>{dayNum(r.startDate)}</Text>
+            <Text style={ds.dateBoxDay}>{monShort(r.startDate)}</Text>
+          </View>
+          <View style={styles.flex1}>
+            <View style={styles.visitTitleRow}>
+              <Text style={[styles.siteTitle, styles.flex1]} numberOfLines={1}>{site.main}</Text>
+              {pill}
+            </View>
+            {!!site.sub && <Text style={styles.siteSub} numberOfLines={1}>{site.sub}</Text>}
+            <Text style={styles.visitWhen}>
+              {shortRange(r)} · {r.visitDays} {r.visitDays === 1 ? 'day' : 'days'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.visitFooter}>
+          <View style={[ds.chip, styles.flexShrink]}>
+            <FolderKanban size={11} color={dsColors.textMuted} />
+            <Text style={[ds.chipText, styles.flexShrink]} numberOfLines={1}>
+              {r.project?.isSystem ? 'General visit' : r.project?.name || 'General'}
+            </Text>
+          </View>
+          <View style={[ds.chip, styles.codeChip]}>
+            <Text style={[ds.chipText, styles.codeChipText]}>{r.requestNumber}</Text>
+          </View>
+          <View style={styles.flex1} />
+          {people.length > 0 && <AvatarStack people={people} />}
+          <ChevronRight size={16} color={dsColors.textFaint} strokeWidth={2.2} />
+        </View>
+        {bottom}
       </View>
     );
   };
@@ -323,72 +401,16 @@ export default function FieldVisitsScreen() {
         activeOpacity={0.85}
         onPress={() => navigation.navigate('FieldVisitDetail', { id: r.id })}
       >
-        {/* Top Header Row */}
-        <View style={styles.cardHeader}>
-          <View style={styles.badgeRow}>
-            <View style={styles.codeBadge}>
-              <Text style={styles.codeBadgeText}>{r.requestNumber}</Text>
+        <VisitCard
+          r={r}
+          pill={<StatusPill tone={{ bg: s.bg, border: s.border, fg: s.dot, strong: s.fg }} label={s.label} />}
+          bottom={r.status === 'REJECTED' && !!r.rejectionReason ? (
+            <View style={styles.rejectionNotice}>
+              <AlertTriangle size={14} color={dsStatus.danger.strong} strokeWidth={2.2} />
+              <Text style={styles.rejectionNoticeText} numberOfLines={2}>{r.rejectionReason}</Text>
             </View>
-            <View style={styles.projectTag}>
-              <FolderKanban size={12} color="#64748B" strokeWidth={2} />
-              <Text style={styles.projectTagText} numberOfLines={1}>
-                {r.project?.isSystem ? 'General visit' : r.project?.name || 'General'}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: s.bg, borderColor: s.border }]}>
-            <View style={[styles.statusDot, { backgroundColor: s.dot }]} />
-            <Text style={[styles.statusBadgeText, { color: s.fg }]}>{s.label}</Text>
-          </View>
-        </View>
-
-        {/* Location Section */}
-        <View style={styles.locationSection}>
-          <View style={styles.locationIconWrap}>
-            <MapPin size={18} color="#0284C7" strokeWidth={2.2} />
-          </View>
-          <View style={styles.locationContent}>
-            <Text style={styles.siteTitle} numberOfLines={2}>
-              {r.location}
-            </Text>
-          </View>
-        </View>
-
-        {/* Metadata Chips Grid */}
-        <View style={styles.chipsRow}>
-          <View style={styles.metaChip}>
-            <Calendar size={13} color="#64748B" strokeWidth={2} />
-            <Text style={styles.metaChipText}>{range(r)}</Text>
-          </View>
-          <View style={styles.metaChip}>
-            <Clock size={13} color="#64748B" strokeWidth={2} />
-            <Text style={styles.metaChipText}>
-              {r.visitDays} day{r.visitDays === 1 ? '' : 's'}
-            </Text>
-          </View>
-          <View style={styles.metaChip}>
-            <Users size={13} color="#64748B" strokeWidth={2} />
-            <Text style={styles.metaChipText}>
-              {r.members.length} {r.members.length === 1 ? 'person' : 'people'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Rejection Note if rejected */}
-        {r.status === 'REJECTED' && !!r.rejectionReason && (
-          <View style={styles.rejectionNotice}>
-            <AlertTriangle size={15} color="#DC2626" strokeWidth={2.2} />
-            <Text style={styles.rejectionNoticeText} numberOfLines={2}>
-              Rejected: {r.rejectionReason}
-            </Text>
-          </View>
-        )}
-
-        {/* Card Footer Chevron Hint */}
-        <View style={styles.cardFooter}>
-          <Text style={styles.footerHint}>View full trip details</Text>
-          <ChevronRight size={15} color="#94A3B8" strokeWidth={2.2} />
-        </View>
+          ) : undefined}
+        />
       </TouchableOpacity>
     );
   };
@@ -403,72 +425,25 @@ export default function FieldVisitsScreen() {
         onPress={() => navigation.navigate('FieldVisitDetail', { id: r.id })}
         onLongPress={() => isPending && toggle(r.id)}
       >
-        <View style={styles.cardHeader}>
-          <View style={styles.badgeRow}>
-            {isPending && (
-              <TouchableOpacity onPress={() => toggle(r.id)} hitSlop={10} style={styles.checkboxTouch}>
-                {on ? (
-                  <CheckSquare size={20} color="#1373e5" strokeWidth={2.4} />
-                ) : (
-                  <Square size={20} color="#94A3B8" strokeWidth={2} />
-                )}
-              </TouchableOpacity>
-            )}
-            <View style={styles.codeBadge}>
-              <Text style={styles.codeBadgeText}>{r.requestNumber}</Text>
+        <VisitCard
+          r={r}
+          top={isPending ? (
+            <TouchableOpacity onPress={() => toggle(r.id)} hitSlop={10} style={styles.checkboxTouch}>
+              {on ? <CheckSquare size={20} color={dsColors.primary} strokeWidth={2.4} /> : <Square size={20} color={dsColors.textFaint} strokeWidth={2} />}
+            </TouchableOpacity>
+          ) : undefined}
+          pill={<StatusPill tone={isPending ? dsStatus.warning : { bg: '#FFF7ED', border: '#FED7AA', fg: '#EA580C', strong: '#9A3412' }} label={isPending ? 'New' : 'Change'} />}
+          bottom={r.raisedBy ? (
+            <View style={styles.raisedByRow}>
+              {r.raisedBy.avatarUrl
+                ? <Image source={{ uri: r.raisedBy.avatarUrl }} style={styles.raisedByAvatar} />
+                : <View style={styles.raisedByAvatar}><Text style={styles.raisedByAvatarText}>{initials(r.raisedBy)}</Text></View>}
+              <Text style={styles.raisedByText}>
+                Raised by <Text style={styles.raisedByName}>{who(r.raisedBy)}</Text>
+              </Text>
             </View>
-          </View>
-          <View style={[styles.statusBadge, {
-            backgroundColor: isPending ? '#FFFBEB' : '#FFF7ED',
-            borderColor: isPending ? '#FDE68A' : '#FFEDD5',
-          }]}>
-            <View style={[styles.statusDot, { backgroundColor: isPending ? '#D97706' : '#EA580C' }]} />
-            <Text style={[styles.statusBadgeText, { color: isPending ? '#92400E' : '#9A3412' }]}>
-              {isPending ? 'New request' : 'Change requested'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.locationSection}>
-          <View style={styles.locationIconWrap}>
-            <MapPin size={18} color="#0284C7" strokeWidth={2.2} />
-          </View>
-          <View style={styles.locationContent}>
-            <Text style={styles.siteTitle} numberOfLines={2}>
-              {r.location}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.chipsRow}>
-          <View style={styles.metaChip}>
-            <Calendar size={13} color="#64748B" strokeWidth={2} />
-            <Text style={styles.metaChipText}>{range(r)}</Text>
-          </View>
-          <View style={styles.metaChip}>
-            <Users size={13} color="#64748B" strokeWidth={2} />
-            <Text style={styles.metaChipText}>
-              {r.members.length} {r.members.length === 1 ? 'person' : 'people'}
-            </Text>
-          </View>
-          <View style={styles.metaChip}>
-            <FolderKanban size={13} color="#64748B" strokeWidth={2} />
-            <Text style={styles.metaChipText}>
-              {r.project?.isSystem ? 'General' : r.project?.name || 'Project'}
-            </Text>
-          </View>
-        </View>
-
-        {!!r.raisedBy && (
-          <View style={styles.raisedByRow}>
-            <View style={styles.raisedByAvatar}>
-              <Text style={styles.raisedByAvatarText}>{initials(r.raisedBy)}</Text>
-            </View>
-            <Text style={styles.raisedByText}>
-              Raised by <Text style={styles.raisedByName}>{who(r.raisedBy)}</Text>
-            </Text>
-          </View>
-        )}
+          ) : undefined}
+        />
       </TouchableOpacity>
     );
   };
@@ -477,7 +452,7 @@ export default function FieldVisitsScreen() {
     <View style={styles.siteRequestsWrap}>
       <Text style={styles.sectionHead}>New site requests ({siteRequests.length})</Text>
       {siteRequests.map((r) => (
-        <View key={r.id} style={[styles.card, styles.siteCard]}>
+        <View key={r.id} style={[styles.card, styles.siteCard, styles.cardInner]}>
           <View style={styles.locationSection}>
             <View style={[styles.locationIconWrap, { backgroundColor: '#F3E8FF', borderColor: '#E9D5FF' }]}>
               <MapPin size={18} color="#9333EA" strokeWidth={2.2} />
@@ -535,59 +510,67 @@ export default function FieldVisitsScreen() {
   const tabName = (t: Tab) => (t === 'TODAY' ? 'Today' : t === 'MINE' ? (approver ? 'All Visits' : 'My Visits') : 'Approvals');
   const tabCount = (t: Tab) => (t === 'TODAY' ? days.length : t === 'MINE' ? mine.length : awaiting.length + siteRequests.length);
 
+  // Hero figures: what is on today, and what is coming or waiting.
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const onSite = days.filter((d) => d.clockInTime && !d.clockOutTime).length;
+  const doneToday = days.filter((d) => d.clockOutTime).length;
+  const upcoming = mine.filter((r) => r.status === 'APPROVED' && r.startDate.slice(0, 10) > todayKey).length;
+  const waiting = approver ? awaiting.length + siteRequests.length : mine.filter((r) => r.status === 'PENDING_APPROVAL').length;
+  const nextDay = days.find((d) => !d.clockOutTime) ?? days[0];
+
+  const header = (
+    <View>
+      <GradientHero
+        id="fvHeroGrad"
+        overline="FIELD VISITS · TODAY"
+        value={days.length}
+        unit={days.length === 1 ? 'visit today' : 'visits today'}
+        caption={nextDay ? `${(nextDay.request.location || '').split(/\s+[–—-]\s+/)[0]} · ${timeLabel(nextDay.request.startTime)}` : 'Nothing scheduled for today'}
+        action={canRaise ? (
+          <TouchableOpacity style={ds.heroButton} activeOpacity={0.85} onPress={() => navigation.navigate('FieldVisitRequestForm')}>
+            <Plus size={14} color={dsColors.text} strokeWidth={2.6} />
+            <Text style={ds.heroButtonText}>New</Text>
+          </TouchableOpacity>
+        ) : undefined}
+        stats={[
+          { label: 'On site', value: onSite, color: '#A7F3D0' },
+          { label: 'Done today', value: doneToday },
+          { label: 'Upcoming', value: upcoming, color: '#BAE6FD' },
+          { label: approver ? 'To review' : 'Pending', value: waiting, color: '#FDE68A' },
+        ]}
+      />
+      <View style={ds.segmented}>
+        {tabs.map((t) => {
+          const active = tab === t;
+          return (
+            <TouchableOpacity key={t} style={[ds.segment, styles.segmentRow, active && ds.segmentActive]} activeOpacity={0.85} onPress={() => setTab(t)}>
+              <Text style={[ds.segmentText, active && ds.segmentTextActive]} numberOfLines={1}>{tabName(t)}</Text>
+              <View style={[styles.countBadge, active && styles.countBadgeActive]}>
+                <Text style={[styles.countBadgeText, active && styles.countBadgeTextActive]}>{tabCount(t)}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  const emptyState = (icon: React.ReactNode, title: string, text: string, action?: { label: string; onPress: () => void }) => (
+    <View style={ds.empty}>
+      <View style={ds.emptyIcon}>{icon}</View>
+      <Text style={ds.emptyTitle}>{title}</Text>
+      <Text style={[ds.emptyText, !action && { marginBottom: 0 }]}>{text}</Text>
+      {action && (
+        <TouchableOpacity style={ds.primaryButton} activeOpacity={0.85} onPress={action.onPress}>
+          <Plus size={14} color="#FFFFFF" strokeWidth={2.6} />
+          <Text style={ds.primaryButtonText}>{action.label}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   return (
     <AppScreen title="Field Visits" subtitle="Requests and on-site attendance">
-      {/* Top Segmented Controls & Primary Action Row */}
-      <View style={styles.topContainer}>
-        {/* Segmented Tab Pill */}
-        <View style={styles.segmentBar}>
-          {tabs.map((t) => {
-            const active = tab === t;
-            const count = tabCount(t);
-            return (
-              <TouchableOpacity
-                key={t}
-                style={[styles.segmentTab, active && styles.segmentTabActive]}
-                activeOpacity={0.8}
-                onPress={() => setTab(t)}
-              >
-                <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]} numberOfLines={1}>
-                  {tabName(t)}
-                </Text>
-                <View style={[styles.countBadge, active && styles.countBadgeActive]}>
-                  <Text style={[styles.countBadgeText, active && styles.countBadgeTextActive]}>
-                    {count}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Action & Stats Row */}
-        <View style={styles.actionRow}>
-          <View style={styles.actionRowLeft}>
-            <Text style={styles.sectionSubtitle}>
-              {tab === 'TODAY'
-                ? `${days.length} visit${days.length === 1 ? '' : 's'} scheduled today`
-                : tab === 'MINE'
-                  ? `${mine.length} total request${mine.length === 1 ? '' : 's'}`
-                  : `${awaiting.length + siteRequests.length} waiting for review`}
-            </Text>
-          </View>
-          {canRaise && (
-            <TouchableOpacity
-              style={styles.primaryNewBtn}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('FieldVisitRequestForm')}
-            >
-              <Plus size={16} color="#FFFFFF" strokeWidth={2.6} />
-              <Text style={styles.primaryNewBtnText}>New Request</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
       {/* Bulk Approval Action Bar */}
       {tab === 'APPROVALS' && selected.length > 0 && (
         <View style={styles.bulkBar}>
@@ -613,9 +596,12 @@ export default function FieldVisitsScreen() {
 
       {/* Main Content Area */}
       {loading ? (
-        <View style={styles.loaderWrap}>
+        <View style={[styles.listContainer, { flex: 1 }]}>
+          {header}
+          <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loaderText}>Loading field visits…</Text>
+          </View>
         </View>
       ) : tab === 'APPROVALS' ? (
         <FlatList
@@ -624,57 +610,43 @@ export default function FieldVisitsScreen() {
           renderItem={renderAwaiting}
           contentContainerStyle={styles.listContainer}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-          ListHeaderComponent={pendingIds.length > 1 ? (
-            <TouchableOpacity
-              style={styles.selectAllBtn}
-              onPress={() => setSelected(selected.length === pendingIds.length ? [] : pendingIds)}
-            >
-              <Text style={styles.selectAllText}>
-                {selected.length === pendingIds.length ? 'Clear selection' : `Select all ${pendingIds.length} new requests`}
-              </Text>
-            </TouchableOpacity>
-          ) : undefined}
+          ListHeaderComponent={
+            <>
+              {header}
+              {pendingIds.length > 1 && (
+                <TouchableOpacity
+                  style={[ds.softButton, styles.selectAllBtn]}
+                  onPress={() => setSelected(selected.length === pendingIds.length ? [] : pendingIds)}
+                >
+                  <CheckSquare size={13} color={dsColors.primary} />
+                  <Text style={ds.softButtonText}>
+                    {selected.length === pendingIds.length ? 'Clear selection' : `Select all ${pendingIds.length} new requests`}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
+          }
           ListFooterComponent={siteRequestsFooter ?? undefined}
-          ListEmptyComponent={siteRequests.length ? undefined : (
-            <View style={styles.emptyContainer}>
-              <View style={[styles.emptyIconCircle, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
-                <CheckCircle2 size={34} color="#16A34A" strokeWidth={1.8} />
-              </View>
-              <Text style={styles.emptyTitle}>All Caught Up!</Text>
-              <Text style={styles.emptySubtitle}>
-                There are no field visit requests or custom site requests waiting for your approval.
-              </Text>
-            </View>
+          ListEmptyComponent={siteRequests.length ? undefined : emptyState(
+            <CheckCircle2 size={22} color={dsStatus.success.strong} />,
+            'All caught up',
+            'No field visit requests or site requests are waiting for your approval.',
           )}
         />
       ) : tab === 'TODAY' ? (
         <FlatList
-          data={days}
+          data={daysSorted}
           keyExtractor={(d) => String(d.id)}
           renderItem={renderDay}
           contentContainerStyle={styles.listContainer}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <View style={[styles.emptyIconCircle, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
-                <MapPin size={34} color="#1373e5" strokeWidth={1.8} />
-              </View>
-              <Text style={styles.emptyTitle}>No Visits Scheduled Today</Text>
-              <Text style={styles.emptySubtitle}>
-                When a field visit request is approved for today, your on-site attendance card will appear here for geofenced clock-in.
-              </Text>
-              {canRaise && (
-                <TouchableOpacity
-                  style={styles.emptyActionBtn}
-                  activeOpacity={0.85}
-                  onPress={() => navigation.navigate('FieldVisitRequestForm')}
-                >
-                  <Plus size={16} color="#FFFFFF" strokeWidth={2.6} />
-                  <Text style={styles.emptyActionBtnText}>Plan a Field Visit</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          }
+          ListHeaderComponent={header}
+          ListEmptyComponent={emptyState(
+            <MapPin size={22} color={dsColors.primary} />,
+            'No visits today',
+            'When a field visit is approved for today, it appears here so you can clock in at the site.',
+            canRaise ? { label: 'Plan a field visit', onPress: () => navigation.navigate('FieldVisitRequestForm') } : undefined,
+          )}
         />
       ) : (
         <FlatList
@@ -683,29 +655,15 @@ export default function FieldVisitsScreen() {
           renderItem={renderRequest}
           contentContainerStyle={styles.listContainer}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <View style={[styles.emptyIconCircle, { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' }]}>
-                <Briefcase size={34} color="#64748B" strokeWidth={1.8} />
-              </View>
-              <Text style={styles.emptyTitle}>No Field Visits Yet</Text>
-              <Text style={styles.emptySubtitle}>
-                {canRaise
-                  ? 'Raise a field visit request to log travel, assign team members, and record on-site attendance.'
-                  : 'Field visits you are sent on by your project manager appear here.'}
-              </Text>
-              {canRaise && (
-                <TouchableOpacity
-                  style={styles.emptyActionBtn}
-                  activeOpacity={0.85}
-                  onPress={() => navigation.navigate('FieldVisitRequestForm')}
-                >
-                  <Plus size={16} color="#FFFFFF" strokeWidth={2.6} />
-                  <Text style={styles.emptyActionBtnText}>Create Visit Request</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          }
+          ListHeaderComponent={header}
+          ListEmptyComponent={emptyState(
+            <Briefcase size={22} color={dsColors.primary} />,
+            'No field visits yet',
+            canRaise
+              ? 'Raise a field visit to plan travel, add the team, and record attendance at the site.'
+              : 'Field visits your project manager sends you on appear here.',
+            canRaise ? { label: 'New visit request', onPress: () => navigation.navigate('FieldVisitRequestForm') } : undefined,
+          )}
         />
       )}
 
@@ -768,6 +726,92 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     fontWeight: '700',
   },
+  cardInner: { padding: 14 },
+  flex1: { flex: 1, minWidth: 0 },
+  flexShrink: { flexShrink: 1 },
+  /* Today card */
+  dayCard: {},
+  dayCardLive: { borderColor: dsStatus.success.border },
+  dayBand: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderBottomWidth: 1,
+  },
+  dayBandText: { fontSize: 12.5, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  dayBandCode: { flex: 1, textAlign: 'right', fontSize: 11, fontWeight: '700', color: dsColors.textFaint, marginRight: 4 },
+  siteRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  siteIcon: {
+    width: 46, height: 46, borderRadius: 15, backgroundColor: dsColors.primarySoft,
+    borderWidth: 1, borderColor: dsColors.primaryBorder, alignItems: 'center', justifyContent: 'center',
+  },
+  siteSub: { fontSize: 12.5, fontWeight: '500', color: dsColors.textSecondary, marginTop: 1 },
+  inlineMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  inlineMetaText: { fontSize: 11.5, fontWeight: '600', color: dsColors.textMuted, flexShrink: 1 },
+  radiusPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: 5,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+    backgroundColor: '#F3E8FF', borderWidth: 1, borderColor: '#DDD6FE',
+  },
+  radiusPillText: { fontSize: 11, fontWeight: '800', color: '#6D28D9' },
+  directionsBtn: {
+    alignItems: 'center', gap: 2, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12,
+    backgroundColor: dsColors.primarySoft, borderWidth: 1, borderColor: dsColors.primaryBorder,
+  },
+  directionsText: { fontSize: 10.5, fontWeight: '800', color: dsColors.primary },
+  timeline: {
+    flexDirection: 'row', alignItems: 'center', marginTop: 14, padding: 12, borderRadius: 16,
+    backgroundColor: dsColors.bg, borderWidth: 1, borderColor: dsColors.borderSoft,
+  },
+  tlStep: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tlDot: { width: 26, height: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  tlDotDone: { backgroundColor: dsStatus.success.fg },
+  tlDotOut: { backgroundColor: dsColors.textMuted },
+  tlDotTodo: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: dsColors.border },
+  tlLine: { flex: 1, height: 2, borderRadius: 1, backgroundColor: dsColors.border, marginHorizontal: 10 },
+  tlLineDone: { backgroundColor: dsStatus.success.border },
+  tlLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5, color: dsColors.textFaint, textTransform: 'uppercase' },
+  tlValue: { fontSize: 14, fontWeight: '900', color: dsColors.text, fontVariant: ['tabular-nums'] },
+  tlValueTodo: { color: dsColors.textFaint },
+  tlSub: { fontSize: 10.5, fontWeight: '600', color: dsColors.textMuted },
+  taskBlock: { marginTop: 12, gap: 6 },
+  blockLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.7, color: dsColors.textFaint, marginBottom: 2 },
+  taskRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 9,
+    borderRadius: 12, borderWidth: 1, borderColor: dsColors.border, backgroundColor: '#FFFFFF',
+  },
+  taskRowOn: { borderColor: dsColors.primaryRing, backgroundColor: dsColors.primarySoft },
+  taskKey: { fontSize: 11, fontWeight: '800', color: dsColors.textMuted },
+  taskTitle: { flex: 1, fontSize: 13, fontWeight: '700', color: dsColors.textBody },
+  clockBtn: {
+    marginTop: 14, height: 48, borderRadius: 14, backgroundColor: dsStatus.success.fg,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    shadowColor: dsStatus.success.fg, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 4,
+  },
+  clockBtnOut: { backgroundColor: dsStatus.danger.fg, shadowColor: dsStatus.danger.fg },
+  clockBtnText: { color: '#FFFFFF', fontSize: 14.5, fontWeight: '800' },
+  doneStrip: {
+    marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11,
+    borderRadius: 14, backgroundColor: dsStatus.success.bg, borderWidth: 1, borderColor: dsStatus.success.border,
+  },
+  doneStripText: { fontSize: 13, fontWeight: '800', color: dsStatus.success.strong },
+  /* List cards */
+  visitTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  visitTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  visitWhen: { fontSize: 12.5, fontWeight: '700', color: dsColors.textBody, marginTop: 4 },
+  visitFooter: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: dsColors.borderSoft,
+  },
+  codeChip: { backgroundColor: '#EEF2FF', borderColor: '#E0E7FF' },
+  codeChipText: { color: '#4338CA', fontWeight: '800' },
+  stack: { flexDirection: 'row', alignItems: 'center', marginRight: 2 },
+  stackItem: {
+    width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#FFFFFF', backgroundColor: dsColors.primarySoft,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  stackImg: { width: '100%', height: '100%' },
+  stackInitials: { fontSize: 9.5, fontWeight: '900', color: dsColors.primary },
+  stackMore: { backgroundColor: dsColors.borderSoft },
+  stackMoreText: { fontSize: 9.5, fontWeight: '900', color: dsColors.textMuted },
+  segmentRow: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
   countBadge: {
     backgroundColor: '#E2E8F0',
     paddingHorizontal: 6.5,
@@ -821,23 +865,23 @@ const styles = StyleSheet.create({
   listContainer: {
     padding: 16,
     paddingBottom: 120,
-    gap: 12,
+    gap: 10,
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 15,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
+    borderColor: dsColors.border,
+    overflow: 'hidden',
+    shadowColor: dsColors.shadow,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
     elevation: 2,
   },
   cardSelected: {
-    borderColor: '#1373e5',
-    backgroundColor: '#F8FBFF',
+    borderColor: dsColors.primaryRing,
+    backgroundColor: '#FBFDFF',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -849,8 +893,9 @@ const styles = StyleSheet.create({
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     flex: 1,
+    minWidth: 0,
   },
   codeBadge: {
     backgroundColor: '#EEF2FF',
@@ -859,6 +904,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#E0E7FF',
+    flexShrink: 0,
   },
   codeBadgeText: {
     fontSize: 11.5,
@@ -876,12 +922,14 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    maxWidth: '55%',
+    flexShrink: 1,
+    minWidth: 0,
   },
   projectTagText: {
     fontSize: 11.5,
     color: '#64748B',
     fontWeight: '600',
+    flexShrink: 1,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -891,6 +939,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3.5,
     borderRadius: 999,
     borderWidth: 1,
+    flexShrink: 0,
   },
   statusDot: {
     width: 6,
@@ -898,35 +947,39 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   statusBadgeText: {
-    fontSize: 11.5,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
   },
   locationSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
     marginTop: 2,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   locationIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#F0F9FF',
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    backgroundColor: dsColors.primarySoft,
     borderWidth: 1,
-    borderColor: '#BAE6FD',
+    borderColor: dsColors.primaryBorder,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 1,
   },
   locationContent: {
     flex: 1,
+    minWidth: 0,
   },
   siteTitle: {
-    fontSize: 15.5,
-    fontWeight: '700',
-    color: '#0F172A',
-    lineHeight: 21,
+    fontSize: 15,
+    fontWeight: '800',
+    color: dsColors.text,
+  },
+  siteSubAddress: {
+    fontSize: 12.5,
+    color: '#475569',
+    marginTop: 2,
   },
   geofenceText: {
     fontSize: 12.5,
@@ -951,24 +1004,25 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   metaChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#334155',
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: dsColors.textBody,
   },
   rejectionNotice: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: dsStatus.danger.bg,
     borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 10,
-    padding: 9,
-    marginTop: 11,
+    borderColor: dsStatus.danger.border,
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 10,
   },
   rejectionNoticeText: {
     fontSize: 12.5,
-    color: '#991B1B',
+    color: dsStatus.danger.strong,
+    fontWeight: '600',
     flex: 1,
     lineHeight: 17,
   },
@@ -979,7 +1033,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     marginTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#F8FAFC',
+    borderTopColor: dsColors.borderSoft,
   },
   footerHint: {
     fontSize: 12,
@@ -997,7 +1051,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 9,
-    marginTop: 8,
+    marginTop: 4,
   },
   mapsPillBtnText: {
     fontSize: 12.5,
@@ -1025,8 +1079,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingVertical: 9,
-    paddingHorizontal: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: 10,
     marginBottom: 7,
   },
@@ -1146,22 +1200,22 @@ const styles = StyleSheet.create({
     color: '#15803D',
   },
   checkboxTouch: {
-    paddingRight: 2,
+    marginRight: -2,
   },
   raisedByRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 8,
     marginTop: 10,
-    paddingTop: 8,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#F8FAFC',
+    borderTopColor: dsColors.borderSoft,
   },
   raisedByAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#E0E7FF',
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: dsColors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1248,7 +1302,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   selectAllBtn: {
-    marginBottom: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
   },
   selectAllText: {
     color: '#1373e5',

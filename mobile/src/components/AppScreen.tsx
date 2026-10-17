@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import {
@@ -41,23 +41,25 @@ function getHeaderIcon(title: string): React.ComponentType<any> {
   return LayoutDashboard;
 }
 
-function getHeaderIconTheme(title: string): { bg: string; color: string } {
+function getHeaderIconTheme(title: string): { bg: string; color: string; border: string } {
   const t = title.toLowerCase();
-  if (t.includes('attendance') || t.includes('time') || t.includes('leave')) return { bg: '#eff6ff', color: '#1373e5' };
-  if (t.includes('project') || t.includes('board')) return { bg: '#f3efff', color: '#6b3fd6' };
-  if (t.includes('ticket') || t.includes('helpdesk')) return { bg: '#FAF5FF', color: '#9333EA' };
-  if (t.includes('hardware') || t.includes('asset')) return { bg: '#eff6ff', color: '#1373e5' };
-  if (t.includes('lead') || t.includes('crm')) return { bg: '#F0F9FF', color: '#0284C7' };
-  if (t.includes('payslip') || t.includes('payroll')) return { bg: '#F0FDF4', color: '#16A34A' };
-  if (t.includes('visit')) return { bg: '#F0F9FF', color: '#0284C7' };
-  if (t.includes('profile')) return { bg: '#EEF2FF', color: '#4F46E5' };
-  if (t.includes('notification')) return { bg: '#EFF6FF', color: '#2563EB' };
-  return { bg: '#eff6ff', color: '#1373e5' };
+  if (t.includes('attendance') || t.includes('time') || t.includes('leave')) return { bg: '#EFF6FF', color: '#1373E5', border: '#BFDBFE' };
+  if (t.includes('project') || t.includes('board')) return { bg: '#F3E8FF', color: '#7C3AED', border: '#DDD6FE' };
+  if (t.includes('ticket') || t.includes('helpdesk')) return { bg: '#FAF5FF', color: '#9333EA', border: '#E9D5FF' };
+  if (t.includes('hardware') || t.includes('asset')) return { bg: '#F0FDFA', color: '#0D9488', border: '#99F6E4' };
+  if (t.includes('lead') || t.includes('crm')) return { bg: '#F0F9FF', color: '#0284C7', border: '#BAE6FD' };
+  if (t.includes('payslip') || t.includes('payroll') || t.includes('expense')) return { bg: '#ECFDF5', color: '#047857', border: '#A7F3D0' };
+  if (t.includes('visit')) return { bg: '#F0F9FF', color: '#0284C7', border: '#BAE6FD' };
+  if (t.includes('profile')) return { bg: '#EEF2FF', color: '#4F46E5', border: '#C7D2FE' };
+  if (t.includes('notification')) return { bg: '#FFFBEB', color: '#D97706', border: '#FDE68A' };
+  return { bg: '#EFF6FF', color: '#1373E5', border: '#BFDBFE' };
 }
 
 /**
- * Modern header matching reference design: floating circular buttons,
- * squircle category icon badge, dark bold title, and light-blue rimmed avatar.
+ * The header on every app screen, in the Timesheet design system
+ * (theme/ds.ts): rounded-square buttons on a soft slate tile, the screen's
+ * icon in its own tinted tile, a heavy title, the unread count on the bell,
+ * and the person's photo.
  */
 export function ScreenHeader({
   title = '',
@@ -82,26 +84,25 @@ export function ScreenHeader({
 
   const HeaderIcon = getHeaderIcon(title);
   const iconTheme = getHeaderIconTheme(title);
+  const unread = unreadCount > 99 ? '99+' : String(unreadCount);
 
   return (
     <View style={[styles.headerContainer, transparent && styles.headerTransparent]}>
       <View style={styles.headerTitleRow}>
-        {/* Left: Floating circular white hamburger button */}
         <TouchableOpacity
-          style={styles.floatingCircleBtn}
+          style={styles.iconBtn}
           activeOpacity={0.7}
           onPress={onOpenDrawer}
           accessibilityRole="button"
           accessibilityLabel="Open menu"
         >
-          <Menu size={20} color="#0F172A" strokeWidth={2.4} />
+          <Menu size={19} color="#0F172A" strokeWidth={2.4} />
         </TouchableOpacity>
 
-        {/* Center: Themed Icon Badge + Title & Subtitle */}
-        {!hideTitle && !!title && (
+        {!hideTitle && !!title ? (
           <View style={styles.headerCenter}>
-            <View style={[styles.titleIconBadge, { backgroundColor: iconTheme.bg }]}>
-              <HeaderIcon size={21} color={iconTheme.color} strokeWidth={2.2} />
+            <View style={[styles.titleIconBadge, { backgroundColor: iconTheme.bg, borderColor: iconTheme.border }]}>
+              <HeaderIcon size={18} color={iconTheme.color} strokeWidth={2.3} />
             </View>
             <View style={styles.headerTitleCol}>
               <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
@@ -110,20 +111,25 @@ export function ScreenHeader({
               )}
             </View>
           </View>
+        ) : (
+          <View style={styles.headerCenter} />
         )}
 
-        {/* Right: Floating circular bell + Profile avatar with sky blue ring */}
         <View style={styles.headerRight}>
           {right}
           <TouchableOpacity
-            style={styles.floatingCircleBtn}
+            style={styles.iconBtn}
             activeOpacity={0.7}
             onPress={() => navigation.navigate('Notifications')}
             accessibilityRole="button"
-            accessibilityLabel="Notifications"
+            accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
           >
-            <Bell size={19} color="#0F172A" strokeWidth={2} />
-            {unreadCount > 0 && <View style={styles.notificationDot} />}
+            <Bell size={18} color="#0F172A" strokeWidth={2.2} />
+            {unreadCount > 0 && (
+              <View style={[styles.badge, unread.length > 1 && styles.badgeWide]}>
+                <Text style={styles.badgeText}>{unread}</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -197,126 +203,82 @@ export default function AppScreen({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  content: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  content: { flex: 1 },
   headerContainer: {
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 11,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#E2E8F0',
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  floatingCircleBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
     elevation: 3,
-    borderWidth: Platform.OS === 'ios' ? 1 : 0,
-    borderColor: '#F1F5F9',
+    zIndex: 2,
   },
-  headerCenter: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginLeft: 2,
-  },
-  titleIconBadge: {
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  iconBtn: {
     width: 42,
     height: 42,
     borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitleCol: {
-    flex: 1,
+  headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
+  titleIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.2,
-  },
-  headerSubtitle: {
-    fontSize: 11.5,
-    fontWeight: '500',
-    color: '#64748B',
-    marginTop: 1.5,
-  },
+  headerTitleCol: { flex: 1, minWidth: 0 },
+  headerTitle: { fontSize: 17, fontWeight: '900', color: '#0F172A', letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 11.5, fontWeight: '600', color: '#94A3B8', marginTop: 1 },
   headerTransparent: {
     backgroundColor: 'transparent',
     borderBottomWidth: 0,
     elevation: 0,
     shadowOpacity: 0,
   },
-  containerTransparent: {
-    backgroundColor: 'transparent',
-  },
-  headerRight: {
-    flexShrink: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  notificationDot: {
+  containerTransparent: { backgroundColor: 'transparent' },
+  headerRight: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  badge: {
     position: 'absolute',
-    top: 8,
-    right: 9,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#1373e5',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  avatarButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1373e5',
+    top: -5,
+    right: -5,
+    minWidth: 19,
+    height: 19,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    backgroundColor: '#EF4444',
     borderWidth: 2,
-    borderColor: '#BAE6FD',
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeWide: { paddingHorizontal: 5 },
+  badgeText: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  avatarButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#1373E5',
+    borderWidth: 2,
+    borderColor: '#BFDBFE',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
   },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 22,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  avatarImage: { width: '100%', height: '100%' },
+  avatarText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
 });

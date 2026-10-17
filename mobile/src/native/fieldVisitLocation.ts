@@ -16,6 +16,12 @@ interface FieldVisitLocationNativeModule {
   getBufferedPoints(): Promise<number[][]>;
   clearBufferedPoints(): Promise<boolean>;
   isTracking(visitId: number): Promise<boolean>;
+  /** Android: the recorder sends points itself every 90 s while a journey runs. */
+  setUploadConfig?(apiUrl: string, token: string, requestId: number): Promise<boolean>;
+  /** Android: true when MIRA may run without battery restrictions. */
+  isBatteryUnrestricted?(): Promise<boolean>;
+  /** Android: opens MIRA's system settings (Battery → Unrestricted). */
+  openAppSettings?(): Promise<boolean>;
 }
 
 const native: FieldVisitLocationNativeModule | undefined = NativeModules.FieldVisitLocation;
@@ -26,6 +32,7 @@ const noop: FieldVisitLocationNativeModule = {
   getBufferedPoints: async () => [],
   clearBufferedPoints: async () => false,
   isTracking: async () => false,
+  setUploadConfig: async () => false,
 };
 
 /**

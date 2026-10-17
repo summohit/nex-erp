@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { CheckSquare, Ticket, Award } from 'lucide-react-native';
+import { CheckSquare, Ticket, Award, ChevronRight, Sparkles, Calendar } from 'lucide-react-native';
 import { apiClient } from '../../api/apiClient';
 
 /**
@@ -54,10 +54,10 @@ export async function fetchHomeSections(): Promise<HomeSectionsData> {
   };
 }
 
-const MAX_ROWS = 5;
+const MAX_ROWS = 4;
 
 function shortDate(value?: string | null): string {
-  if (!value) return '—';
+  if (!value) return 'No due date';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
@@ -68,244 +68,482 @@ function humanize(value?: string): string {
   return value.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase());
 }
 
-function SectionShell({
-  title, subtitle, icon, iconBg, count, onViewAll, loading, emptyText, children,
+function getPriorityStyle(priority?: string) {
+  const p = (priority || '').toUpperCase();
+  if (p === 'CRITICAL' || p === 'URGENT' || p === 'HIGH') {
+    return { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA' };
+  }
+  if (p === 'MEDIUM') {
+    return { bg: '#FFFBEB', text: '#D97706', border: '#FDE68A' };
+  }
+  return { bg: '#F1F5F9', text: '#475569', border: '#E2E8F0' };
+}
+
+export function WorkspaceHubSection({
+  data,
+  loading,
+  onOpenTask,
+  onViewTasks,
+  onViewTickets,
 }: {
-  title: string;
-  subtitle: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  count: number;
-  onViewAll?: () => void;
+  data: HomeSectionsData;
   loading: boolean;
-  emptyText: string;
-  children: React.ReactNode;
+  onOpenTask: (task: HomeTask) => void;
+  onViewTasks: () => void;
+  onViewTickets: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<'tasks' | 'tickets' | 'kudos'>('tasks');
+
+  const tabs = [
+    {
+      key: 'tasks' as const,
+      label: 'Tasks',
+      count: data.myTasks.length,
+      Icon: CheckSquare,
+      activeColor: '#2563EB',
+      activeBg: '#EFF6FF',
+    },
+    {
+      key: 'tickets' as const,
+      label: 'Tickets',
+      count: data.myTickets.length,
+      Icon: Ticket,
+      activeColor: '#DB2777',
+      activeBg: '#FDF2F8',
+    },
+    {
+      key: 'kudos' as const,
+      label: 'Kudos',
+      count: data.appreciations.length,
+      Icon: Award,
+      activeColor: '#D97706',
+      activeBg: '#FFFBEB',
+    },
+  ];
+
   return (
-    <View style={styles.card}>
-      <View style={styles.header}>
-        <View style={[styles.iconBadge, { backgroundColor: iconBg }]}>{icon}</View>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
-        </View>
-        {onViewAll ? (
-          <TouchableOpacity activeOpacity={0.7} onPress={onViewAll}>
-            <Text style={styles.viewAll}>View all</Text>
-          </TouchableOpacity>
-        ) : null}
+    <View style={styles.hubCard}>
+      {/* Segmented Header Bar */}
+      <View style={styles.tabBar}>
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.key;
+          const TabIcon = tab.Icon;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tabPill, isActive && styles.tabPillActive]}
+              activeOpacity={0.8}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <TabIcon
+                size={14}
+                color={isActive ? tab.activeColor : '#64748B'}
+                strokeWidth={2.3}
+              />
+              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                {tab.label}
+              </Text>
+              <View
+                style={[
+                  styles.tabCountBadge,
+                  isActive ? { backgroundColor: tab.activeBg } : styles.tabCountBadgeIdle,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabCountText,
+                    isActive ? { color: tab.activeColor } : styles.tabCountTextIdle,
+                  ]}
+                >
+                  {tab.count}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
+
+      {/* Content Area */}
       {loading ? (
-        <ActivityIndicator style={styles.loader} color="#1373e5" />
-      ) : count === 0 ? (
-        <Text style={styles.empty}>{emptyText}</Text>
+        <View style={styles.loaderWrap}>
+          <ActivityIndicator color="#1373e5" />
+        </View>
+      ) : activeTab === 'tasks' ? (
+        data.myTasks.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <View style={[styles.emptyIconCircle, { backgroundColor: '#EFF6FF' }]}>
+              <CheckSquare size={20} color="#2563EB" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.emptyTitle}>All tasks cleared</Text>
+            <Text style={styles.emptySub}>You have no active tasks assigned right now.</Text>
+          </View>
+        ) : (
+          <View style={styles.listWrap}>
+            {data.myTasks.slice(0, MAX_ROWS).map((t, i) => {
+              const prio = getPriorityStyle(t.priority);
+              return (
+                <TouchableOpacity
+                  key={t.id}
+                  style={[styles.itemRow, i > 0 && styles.itemDivider]}
+                  activeOpacity={0.75}
+                  disabled={!(t.projectId ?? t.project?.id)}
+                  onPress={() => onOpenTask(t)}
+                >
+                  <View style={styles.itemLeftAccent} />
+                  <View style={styles.itemMain}>
+                    <View style={styles.itemTopMetaRow}>
+                      {t.key ? (
+                        <Text style={styles.itemCodeTag}>{t.key}</Text>
+                      ) : null}
+                      {t.priority ? (
+                        <View style={[styles.prioPill, { backgroundColor: prio.bg, borderColor: prio.border }]}>
+                          <Text style={[styles.prioPillText, { color: prio.text }]}>
+                            {humanize(t.priority)}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {t.status ? (
+                        <Text style={styles.statusText}>{humanize(t.status)}</Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.itemTitle} numberOfLines={1}>
+                      {t.title}
+                    </Text>
+                  </View>
+                  <View style={styles.itemRightCol}>
+                    <View style={styles.dateChip}>
+                      <Calendar size={11} color="#64748B" />
+                      <Text style={styles.dateChipText}>{shortDate(t.dueDate)}</Text>
+                    </View>
+                    <ChevronRight size={15} color="#CBD5E1" />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity style={styles.footerLinkBtn} activeOpacity={0.75} onPress={onViewTasks}>
+              <Text style={styles.footerLinkText}>Open Project Boards</Text>
+              <ChevronRight size={14} color="#1373e5" strokeWidth={2.4} />
+            </TouchableOpacity>
+          </View>
+        )
+      ) : activeTab === 'tickets' ? (
+        data.myTickets.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <View style={[styles.emptyIconCircle, { backgroundColor: '#FDF2F8' }]}>
+              <Ticket size={20} color="#DB2777" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.emptyTitle}>No open helpdesk tickets</Text>
+            <Text style={styles.emptySub}>Need IT or HR support? Raise a ticket anytime.</Text>
+            <TouchableOpacity style={styles.emptyCtaBtn} activeOpacity={0.8} onPress={onViewTickets}>
+              <Text style={styles.emptyCtaText}>Go to Helpdesk</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.listWrap}>
+            {data.myTickets.slice(0, MAX_ROWS).map((t, i) => {
+              const prio = getPriorityStyle(t.priority);
+              return (
+                <TouchableOpacity
+                  key={t.id}
+                  style={[styles.itemRow, i > 0 && styles.itemDivider]}
+                  activeOpacity={0.75}
+                  onPress={onViewTickets}
+                >
+                  <View style={[styles.itemLeftAccent, { backgroundColor: '#DB2777' }]} />
+                  <View style={styles.itemMain}>
+                    <View style={styles.itemTopMetaRow}>
+                      {t.ticketNumber ? (
+                        <Text style={[styles.itemCodeTag, { color: '#be185d', backgroundColor: '#fdf2f8' }]}>
+                          {t.ticketNumber}
+                        </Text>
+                      ) : null}
+                      {t.priority ? (
+                        <View style={[styles.prioPill, { backgroundColor: prio.bg, borderColor: prio.border }]}>
+                          <Text style={[styles.prioPillText, { color: prio.text }]}>
+                            {humanize(t.priority)}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {t.status ? (
+                        <Text style={styles.statusText}>{humanize(t.status)}</Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.itemTitle} numberOfLines={1}>
+                      {t.title}
+                    </Text>
+                  </View>
+                  <View style={styles.itemRightCol}>
+                    <Text style={styles.dateChipText}>{shortDate(t.createdAt)}</Text>
+                    <ChevronRight size={15} color="#CBD5E1" />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity style={styles.footerLinkBtn} activeOpacity={0.75} onPress={onViewTickets}>
+              <Text style={styles.footerLinkText}>View All Tickets</Text>
+              <ChevronRight size={14} color="#1373e5" strokeWidth={2.4} />
+            </TouchableOpacity>
+          </View>
+        )
+      ) : data.appreciations.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <View style={[styles.emptyIconCircle, { backgroundColor: '#FFFBEB' }]}>
+            <Sparkles size={20} color="#D97706" strokeWidth={2.2} />
+          </View>
+          <Text style={styles.emptyTitle}>Team Recognition</Text>
+          <Text style={styles.emptySub}>Employee awards and appreciations appear here.</Text>
+        </View>
       ) : (
-        children
+        <View style={styles.listWrap}>
+          {data.appreciations.slice(0, MAX_ROWS).map((a, i) => {
+            const name = a.employee ? `${a.employee.firstName} ${a.employee.lastName}`.trim() : 'Team member';
+            return (
+              <View key={a.id} style={[styles.itemRow, i > 0 && styles.itemDivider]}>
+                <View style={styles.kudosAvatar}>
+                  <Text style={styles.kudosAvatarText}>{(a.employee?.firstName || '?').charAt(0)}</Text>
+                </View>
+                <View style={styles.itemMain}>
+                  <Text style={styles.itemTitle} numberOfLines={1}>{name}</Text>
+                  <Text style={styles.kudosAwardTitle} numberOfLines={1}>
+                    {a.awardTitle || 'Excellence Award'}
+                  </Text>
+                  {a.summary ? (
+                    <Text style={styles.kudosSummary} numberOfLines={2}>{a.summary}</Text>
+                  ) : null}
+                </View>
+                <Text style={styles.dateChipText}>{shortDate(a.givenDate)}</Text>
+              </View>
+            );
+          })}
+        </View>
       )}
     </View>
   );
 }
 
-export function MyTasksSection({
-  tasks, loading, onOpenTask,
-}: { tasks: HomeTask[]; loading: boolean; onOpenTask: (task: HomeTask) => void }) {
-  return (
-    <SectionShell
-      title="My Tasks"
-      subtitle="Current items in progress"
-      icon={<CheckSquare size={18} color="#4F46E5" />}
-      iconBg="#EEF2FF"
-      count={tasks.length}
-      loading={loading}
-      emptyText="No pending tasks."
-    >
-      {tasks.slice(0, MAX_ROWS).map((t, i) => (
-        <TouchableOpacity
-          key={t.id}
-          style={[styles.row, i > 0 && styles.rowDivider]}
-          activeOpacity={0.7}
-          disabled={!(t.projectId ?? t.project?.id)}
-          onPress={() => onOpenTask(t)}
-        >
-          <View style={styles.rowMain}>
-            <Text style={styles.rowTitle} numberOfLines={1}>{t.title}</Text>
-            <Text style={styles.rowMeta} numberOfLines={1}>
-              {[t.key, humanize(t.status), t.priority ? humanize(t.priority) : null].filter(Boolean).join(' · ')}
-            </Text>
-          </View>
-          <Text style={styles.rowDate}>Due {shortDate(t.dueDate)}</Text>
-        </TouchableOpacity>
-      ))}
-    </SectionShell>
-  );
-}
-
-export function MyTicketsSection({
-  tickets, loading, onViewAll,
-}: { tickets: HomeTicket[]; loading: boolean; onViewAll: () => void }) {
-  return (
-    <SectionShell
-      title="My Tickets"
-      subtitle="Helpdesk requests you raised"
-      icon={<Ticket size={18} color="#DB2777" />}
-      iconBg="#FDF2F8"
-      count={tickets.length}
-      onViewAll={onViewAll}
-      loading={loading}
-      emptyText="No open tickets."
-    >
-      {tickets.slice(0, MAX_ROWS).map((t, i) => (
-        <TouchableOpacity
-          key={t.id}
-          style={[styles.row, i > 0 && styles.rowDivider]}
-          activeOpacity={0.7}
-          onPress={onViewAll}
-        >
-          <View style={styles.rowMain}>
-            <Text style={styles.rowTitle} numberOfLines={1}>{t.title}</Text>
-            <Text style={styles.rowMeta} numberOfLines={1}>
-              {[t.ticketNumber, humanize(t.status), t.priority ? humanize(t.priority) : null].filter(Boolean).join(' · ')}
-            </Text>
-          </View>
-          <Text style={styles.rowDate}>{shortDate(t.createdAt)}</Text>
-        </TouchableOpacity>
-      ))}
-    </SectionShell>
-  );
-}
-
-export function AppreciationsSection({
-  items, loading,
-}: { items: HomeAppreciation[]; loading: boolean }) {
-  return (
-    <SectionShell
-      title="Employee Appreciations"
-      subtitle="Recognition across the team"
-      icon={<Award size={18} color="#D97706" />}
-      iconBg="#FFFBEB"
-      count={items.length}
-      loading={loading}
-      emptyText="Appreciations will show up here when awarded."
-    >
-      {items.slice(0, MAX_ROWS).map((a, i) => {
-        const name = a.employee ? `${a.employee.firstName} ${a.employee.lastName}` : 'Team member';
-        return (
-          <View key={a.id} style={[styles.row, i > 0 && styles.rowDivider]}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{(a.employee?.firstName || '?').charAt(0)}</Text>
-            </View>
-            <View style={styles.rowMain}>
-              <Text style={styles.rowTitle} numberOfLines={1}>{name}</Text>
-              <Text style={styles.awardTitle} numberOfLines={1}>{a.awardTitle || 'Appreciation'}</Text>
-              {a.summary ? <Text style={styles.rowMeta} numberOfLines={2}>{a.summary}</Text> : null}
-            </View>
-            <Text style={styles.rowDate}>{shortDate(a.givenDate)}</Text>
-          </View>
-        );
-      })}
-    </SectionShell>
-  );
-}
-
 const styles = StyleSheet.create({
-  card: {
+  hubCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 22,
+    borderRadius: 24,
+    padding: 16,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
-    shadowRadius: 10,
+    shadowRadius: 12,
     elevation: 2,
   },
-  header: {
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+    marginBottom: 12,
+  },
+  tabPill: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 11,
+    gap: 5,
+  },
+  tabPillActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  tabLabel: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  tabLabelActive: {
+    color: '#0F172A',
+    fontWeight: '800',
+  },
+  tabCountBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  tabCountBadgeIdle: {
+    backgroundColor: '#E2E8F0',
+  },
+  tabCountText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  tabCountTextIdle: {
+    color: '#64748B',
+  },
+  loaderWrap: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  emptyBox: {
+    paddingVertical: 22,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  emptyIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 10,
   },
-  iconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 15,
+  emptyTitle: {
+    fontSize: 14.5,
     fontWeight: '800',
     color: '#0F172A',
+    marginBottom: 3,
   },
-  subtitle: {
-    fontSize: 12,
+  emptySub: {
+    fontSize: 12.5,
     color: '#64748B',
-    marginTop: 1,
-  },
-  viewAll: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1373e5',
-  },
-  loader: {
-    paddingVertical: 16,
-  },
-  empty: {
-    fontSize: 13,
-    color: '#94A3B8',
     textAlign: 'center',
-    paddingVertical: 14,
   },
-  row: {
+  emptyCtaBtn: {
+    marginTop: 12,
+    backgroundColor: '#FDF2F8',
+    borderWidth: 1,
+    borderColor: '#FBCFE8',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  emptyCtaText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DB2777',
+  },
+  listWrap: {
+    paddingTop: 2,
+  },
+  itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 11,
     gap: 10,
-    paddingVertical: 10,
   },
-  rowDivider: {
+  itemDivider: {
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
-  rowMain: {
-    flex: 1,
+  itemLeftAccent: {
+    width: 3.5,
+    height: 32,
+    borderRadius: 2,
+    backgroundColor: '#2563EB',
   },
-  rowTitle: {
-    fontSize: 14,
+  itemMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  itemTopMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 3,
+  },
+  itemCodeTag: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#1D4ED8',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  prioPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+    borderWidth: 1,
+  },
+  prioPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  statusText: {
+    fontSize: 11,
     fontWeight: '600',
+    color: '#64748B',
+  },
+  itemTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
     color: '#0F172A',
   },
-  rowMeta: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
+  itemRightCol: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: 6,
   },
-  rowDate: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
+  dateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 7,
+    paddingVertical: 3.5,
+    borderRadius: 7,
   },
-  awardTitle: {
+  dateChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  footerLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingTop: 11,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  footerLinkText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#1373e5',
+  },
+  kudosAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kudosAvatarText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#B45309',
+  },
+  kudosAwardTitle: {
     fontSize: 12,
     fontWeight: '700',
     color: '#D97706',
     marginTop: 1,
   },
-  avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#FEF3C7',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#B45309',
+  kudosSummary: {
+    fontSize: 11.5,
+    color: '#64748B',
+    marginTop: 2,
   },
 });

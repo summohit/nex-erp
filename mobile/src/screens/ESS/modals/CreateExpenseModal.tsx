@@ -1,16 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity, TextInput,
   ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { X, Calendar as CalendarIcon, Camera, Image as ImageIcon, FileText, ChevronDown, ZoomIn } from 'lucide-react-native';
+import {
+  X, Calendar as CalendarIcon, Camera, Image as ImageIcon, FileText, ChevronDown, ZoomIn, Receipt,
+  Car, Utensils, BedDouble, Laptop, MoreHorizontal, Store, FolderKanban, Check, AlertCircle, Send,
+} from 'lucide-react-native';
 import DocumentPicker from 'react-native-document-picker';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { payrollService } from '../../../api/payrollService';
 import { employeeService } from '../../../api/employeeService';
 import { projectService } from '../../../api/projectService';
+import { colors, status } from '../../../theme/ds';
 
 interface Props {
   visible: boolean;
@@ -34,6 +38,24 @@ interface Errors {
 }
 
 const CATEGORIES = ['TRAVEL', 'MEALS', 'ACCOMMODATION', 'EQUIPMENT', 'OTHER'];
+const CATEGORY_UI: Record<string, { label: string; icon: any }> = {
+  TRAVEL: { label: 'Travel', icon: Car },
+  MEALS: { label: 'Meals', icon: Utensils },
+  ACCOMMODATION: { label: 'Stay', icon: BedDouble },
+  EQUIPMENT: { label: 'Equipment', icon: Laptop },
+  OTHER: { label: 'Other', icon: MoreHorizontal },
+};
+
+/** The calendar day picked, in the phone's own time zone (not UTC). */
+const localYmd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Which form section each error belongs to, in the order they appear. */
+type SectionKey = 'details' | 'purchase' | 'receipt';
+const ERROR_SECTION: Record<keyof Errors, SectionKey> = {
+  title: 'details', amount: 'details', purchaseDate: 'purchase', receipt: 'receipt',
+};
+const ERROR_ORDER: (keyof Errors)[] = ['title', 'amount', 'purchaseDate', 'receipt'];
 
 export default function CreateExpenseModal({ visible, onClose, onSuccess, editingClaim }: Props) {
   const insets = useSafeAreaInsets();
@@ -55,9 +77,24 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
   const [errors, setErrors] = useState<Errors>({});
   const [lightboxVisible, setLightboxVisible] = useState(false);
 
+  // Where each section sits in the scroll view, so Submit can take the person
+  // straight to the first field that needs fixing.
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const sectionY = useRef<Partial<Record<SectionKey, number>>>({});
+  const titleRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const amountRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const onSectionLayout = (k: SectionKey) => (e: any) => { sectionY.current[k] = e.nativeEvent.layout.y; };
+
   useEffect(() => {
     if (visible) {
-      projectService.getProjects().then(setProjects).catch(() => {});
+      projectService.getProjects().then((list) => {
+        setProjects(list);
+        // Editing: claims store the project's name; find it again by name.
+        if (editingClaim && !(editingClaim as any).projectId && editingClaim.projectName) {
+          const match = list.find((p: any) => p.name === editingClaim.projectName);
+          if (match) setProjectId(match.id);
+        }
+      }).catch(() => {});
       if (editingClaim) {
         setTitle(editingClaim.title);
         setDescription(editingClaim.description || '');
@@ -66,6 +103,7 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
         setPurchaseDate(editingClaim.purchaseDate ? editingClaim.purchaseDate.split('T')[0] : '');
         setPurchasedFrom(editingClaim.purchasedFrom || '');
         setExistingReceiptUrl(editingClaim.receiptUrl || null);
+        setProjectId((editingClaim as any).projectId ?? null);
         setAttachment(null);
       }
     }
@@ -159,7 +197,18 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
     }
 
     setErrors(next);
-    return Object.keys(next).length === 0;
+    const first = ERROR_ORDER.find((k) => next[k]);
+    if (first) {
+      // Take them to it: scroll the section into view, then focus the input.
+      const y = sectionY.current[ERROR_SECTION[first]] ?? 0;
+      scrollRef.current?.scrollTo({ y: Math.max(y - 12, 0), animated: true });
+      setTimeout(() => {
+        if (first === 'title') titleRef.current?.focus();
+        else if (first === 'amount') amountRef.current?.focus();
+        else if (first === 'purchaseDate') setDatePickerVisible(true);
+      }, 350);
+    }
+    return !first;
   };
 
   const handleSubmit = async () => {
@@ -225,6 +274,23 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
   const existingIsImage = existingReceiptUrl
     ? /\.(jpg|jpeg|png|gif|webp)/i.test(existingReceiptUrl)
     : false;
+  const amountNum = parseFloat(amount);
+  const errorCount = Object.values(errors).filter(Boolean).length;
+
+  const Step = ({ n, title, hint }: { n: number; title: string; hint?: string }) => (
+    <View style={styles.stepHead}>
+      <View style={styles.stepBadge}><Text style={styles.stepBadgeText}>{n}</Text></View>
+      <Text style={styles.stepTitle}>{title}</Text>
+      {!!hint && <Text style={styles.stepHint}>{hint}</Text>}
+    </View>
+  );
+
+  const FieldError = ({ text }: { text?: string }) => (text ? (
+    <View style={styles.errorRow}>
+      <AlertCircle size={12} color={status.danger.strong} />
+      <Text style={styles.errorText}>{text}</Text>
+    </View>
+  ) : null);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
@@ -234,132 +300,165 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
       >
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
 
-        <View style={[styles.content, { paddingBottom: insets.bottom || 20 }]}>
+        <View style={[styles.content, { paddingBottom: insets.bottom || 16 }]}>
+          <View style={styles.dragHandle} />
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>{isEditing ? 'Edit Expense Claim' : 'Raise Expense Claim'}</Text>
+            <View style={styles.headerLeft}>
+              <View style={styles.headerIconBadge}>
+                <Receipt size={20} color={colors.primary} strokeWidth={2.3} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.headerTitle}>{isEditing ? 'Edit Expense Claim' : 'Raise Expense Claim'}</Text>
+                <Text style={styles.headerSubtitle}>Get reimbursed for work spending</Text>
+              </View>
+            </View>
             <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-              <X size={20} color="#64748B" />
+              <X size={18} color={colors.textMuted} strokeWidth={2.4} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            ref={scrollRef}
+            style={styles.body}
+            contentContainerStyle={styles.bodyContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {errorCount > 0 && (
+              <View style={styles.errorBanner}>
+                <AlertCircle size={14} color={status.danger.strong} />
+                <Text style={styles.errorBannerText}>
+                  {errorCount === 1 ? '1 field needs your attention.' : `${errorCount} fields need your attention.`}
+                </Text>
+              </View>
+            )}
 
-            {/* Title */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Title *</Text>
+            {/* 1. What was it */}
+            <View style={styles.card} onLayout={onSectionLayout('details')}>
+              <Step n={1} title="Expense details" />
+              <Text style={styles.label}>Amount *</Text>
+              <View style={[styles.amountBox, errors.amount && styles.inputError]}>
+                <Text style={styles.amountRupee}>₹</Text>
+                <TextInput
+                  ref={amountRef}
+                  style={styles.amountInput}
+                  placeholder="0"
+                  placeholderTextColor={colors.textFaint}
+                  keyboardType="decimal-pad"
+                  value={amount}
+                  onChangeText={v => { setAmount(v.replace(/[^0-9.]/g, '')); setErrors(e => ({ ...e, amount: undefined })); }}
+                />
+              </View>
+              <FieldError text={errors.amount} />
+
+              <Text style={[styles.label, styles.labelGap]}>Title *</Text>
               <TextInput
+                ref={titleRef}
                 style={[styles.input, errors.title && styles.inputError]}
-                placeholder="e.g. Flight to Mumbai"
+                placeholder="e.g. Cab to client site"
+                placeholderTextColor={colors.textFaint}
                 value={title}
                 onChangeText={v => { setTitle(v); setErrors(e => ({ ...e, title: undefined })); }}
+                returnKeyType="next"
               />
-              {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
-            </View>
+              <FieldError text={errors.title} />
 
-            {/* Amount */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Amount (₹) *</Text>
-              <TextInput
-                style={[styles.input, errors.amount && styles.inputError]}
-                placeholder="0.00"
-                keyboardType="numeric"
-                value={amount}
-                onChangeText={v => { setAmount(v); setErrors(e => ({ ...e, amount: undefined })); }}
-              />
-              {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
-            </View>
-
-            {/* Category */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Category</Text>
-              <View style={styles.categoryRow}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {CATEGORIES.map(cat => (
+              <Text style={[styles.label, styles.labelGap]}>Category</Text>
+              <View style={styles.categoryGrid}>
+                {CATEGORIES.map(cat => {
+                  const ui = CATEGORY_UI[cat];
+                  const Icon = ui.icon;
+                  const on = category === cat;
+                  return (
                     <TouchableOpacity
                       key={cat}
-                      style={[styles.categoryChip, category === cat && styles.categoryChipActive]}
+                      style={[styles.categoryTile, on && styles.categoryTileOn]}
                       onPress={() => setCategory(cat)}
+                      activeOpacity={0.8}
                     >
-                      <Text style={[styles.categoryText, category === cat && styles.categoryTextActive]}>
-                        {cat}
-                      </Text>
+                      <Icon size={16} color={on ? colors.primary : colors.textMuted} />
+                      <Text style={[styles.categoryText, on && styles.categoryTextOn]}>{ui.label}</Text>
                     </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                  );
+                })}
               </View>
             </View>
 
-            {/* Purchase Date */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Purchase Date</Text>
+            {/* 2. Where and when */}
+            <View style={styles.card} onLayout={onSectionLayout('purchase')}>
+              <Step n={2} title="Purchase" hint="Optional" />
+              <Text style={styles.label}>Purchase date</Text>
               <TouchableOpacity
-                style={[styles.datePickerInput, errors.purchaseDate && styles.inputError]}
+                style={[styles.selectBox, errors.purchaseDate && styles.inputError]}
                 onPress={() => setDatePickerVisible(true)}
+                activeOpacity={0.75}
               >
-                <Text style={purchaseDate ? styles.dateValue : styles.placeholderText}>
-                  {purchaseDate || 'Select Date'}
+                <CalendarIcon size={16} color={colors.textFaint} />
+                <Text style={[styles.selectText, !purchaseDate && styles.placeholderText]}>
+                  {purchaseDate
+                    ? new Date(`${purchaseDate}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+                    : 'Select date'}
                 </Text>
-                <CalendarIcon size={18} color="#94A3B8" />
               </TouchableOpacity>
-              {errors.purchaseDate && <Text style={styles.errorText}>{errors.purchaseDate}</Text>}
-            </View>
+              <FieldError text={errors.purchaseDate} />
 
-            {/* Vendor */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Purchased From / Vendor</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Indigo Airlines"
-                value={purchasedFrom}
-                onChangeText={setPurchasedFrom}
-              />
-            </View>
+              <Text style={[styles.label, styles.labelGap]}>Purchased from</Text>
+              <View style={styles.selectBox}>
+                <Store size={16} color={colors.textFaint} />
+                <TextInput
+                  style={styles.inlineInput}
+                  placeholder="e.g. Uber, Indigo, Croma"
+                  placeholderTextColor={colors.textFaint}
+                  value={purchasedFrom}
+                  onChangeText={setPurchasedFrom}
+                />
+              </View>
 
-            {/* Project */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Project</Text>
+              <Text style={[styles.label, styles.labelGap]}>Project</Text>
               <TouchableOpacity
-                style={styles.dropdownToggle}
+                style={styles.selectBox}
                 onPress={() => setShowProjectDropdown(!showProjectDropdown)}
+                activeOpacity={0.75}
               >
-                <Text style={[styles.dropdownValue, !selectedProject && styles.placeholderText]}>
-                  {selectedProject ? selectedProject.name : 'Select Project...'}
+                <FolderKanban size={16} color={colors.textFaint} />
+                <Text style={[styles.selectText, !selectedProject && styles.placeholderText]} numberOfLines={1}>
+                  {selectedProject ? selectedProject.name : 'Not for a project'}
                 </Text>
-                <ChevronDown size={18} color="#94A3B8" />
+                <ChevronDown size={16} color={colors.textFaint} />
               </TouchableOpacity>
               {showProjectDropdown && (
                 <View style={styles.dropdownList}>
-                  {projects.length === 0 ? (
-                    <Text style={styles.dropdownItemText}>No projects found</Text>
-                  ) : (
-                    projects.map(p => (
-                      <TouchableOpacity
-                        key={p.id}
-                        style={styles.dropdownItem}
-                        onPress={() => { setProjectId(p.id); setShowProjectDropdown(false); }}
-                      >
-                        <Text style={styles.dropdownItemText}>{p.name}</Text>
+                  <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }}>
+                    {projectId !== null && (
+                      <TouchableOpacity style={styles.dropdownItem} onPress={() => { setProjectId(null); setShowProjectDropdown(false); }}>
+                        <Text style={[styles.dropdownItemText, { color: colors.primary }]}>Not for a project</Text>
                       </TouchableOpacity>
-                    ))
-                  )}
-                  {projectId !== null && (
-                    <TouchableOpacity
-                      style={styles.dropdownItem}
-                      onPress={() => { setProjectId(null); setShowProjectDropdown(false); }}
-                    >
-                      <Text style={[styles.dropdownItemText, { color: '#1373e5' }]}>Clear Selection</Text>
-                    </TouchableOpacity>
-                  )}
+                    )}
+                    {projects.length === 0 ? (
+                      <Text style={[styles.dropdownItemText, styles.dropdownEmpty]}>No projects found</Text>
+                    ) : (
+                      projects.map(p => (
+                        <TouchableOpacity
+                          key={p.id}
+                          style={[styles.dropdownItem, p.id === projectId && styles.dropdownItemOn]}
+                          onPress={() => { setProjectId(p.id); setShowProjectDropdown(false); }}
+                        >
+                          <Text style={[styles.dropdownItemText, p.id === projectId && { color: colors.primary, fontWeight: '800' }]} numberOfLines={1}>
+                            {p.name}
+                          </Text>
+                          {p.id === projectId && <Check size={14} color={colors.primary} />}
+                        </TouchableOpacity>
+                      ))
+                    )}
+                  </ScrollView>
                 </View>
               )}
-            </View>
 
-            {/* Description */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Description</Text>
+              <Text style={[styles.label, styles.labelGap]}>Notes</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="Provide any additional details..."
+                placeholder="Anything finance should know"
+                placeholderTextColor={colors.textFaint}
                 multiline
                 numberOfLines={3}
                 value={description}
@@ -367,91 +466,72 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
               />
             </View>
 
-            {/* Receipt Attachment */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Receipt Attachment</Text>
-              <View style={styles.attachmentOptions}>
-                <TouchableOpacity style={styles.attachBtn} onPress={capturePhoto}>
-                  <Camera size={20} color="#2563EB" />
-                  <Text style={styles.attachText}>Camera</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.attachBtn} onPress={pickImage}>
-                  <ImageIcon size={20} color="#2563EB" />
-                  <Text style={styles.attachText}>Gallery</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.attachBtn} onPress={pickDocument}>
-                  <FileText size={20} color="#2563EB" />
-                  <Text style={styles.attachText}>File</Text>
-                </TouchableOpacity>
-              </View>
-
-              {errors.receipt && <Text style={[styles.errorText, { marginTop: 6 }]}>{errors.receipt}</Text>}
-
-              {/* New image preview */}
-              {previewImageUri ? (
+            {/* 3. Proof */}
+            <View style={styles.card} onLayout={onSectionLayout('receipt')}>
+              <Step n={3} title="Receipt" hint="Recommended" />
+              {!attachment && !existingReceiptUrl ? (
+                <View style={styles.attachmentOptions}>
+                  {[
+                    { label: 'Camera', icon: Camera, onPress: capturePhoto },
+                    { label: 'Gallery', icon: ImageIcon, onPress: pickImage },
+                    { label: 'PDF / File', icon: FileText, onPress: pickDocument },
+                  ].map(o => {
+                    const Icon = o.icon;
+                    return (
+                      <TouchableOpacity key={o.label} style={[styles.attachBtn, errors.receipt && styles.inputError]} onPress={o.onPress} activeOpacity={0.8}>
+                        <View style={styles.attachIcon}><Icon size={18} color={colors.primary} /></View>
+                        <Text style={styles.attachText}>{o.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : previewImageUri || (existingIsImage && existingReceiptUrl && !attachment) ? (
                 <View style={styles.previewContainer}>
                   <TouchableOpacity onPress={() => setLightboxVisible(true)} activeOpacity={0.85}>
-                    <Image source={{ uri: previewImageUri }} style={styles.previewImage} resizeMode="cover" />
-                    <View style={styles.previewOverlay}>
-                      <ZoomIn size={20} color="#FFFFFF" />
-                    </View>
+                    <Image source={{ uri: (previewImageUri || existingReceiptUrl)! }} style={styles.previewImage} resizeMode="cover" />
+                    <View style={styles.previewOverlay}><ZoomIn size={16} color="#FFFFFF" /></View>
                   </TouchableOpacity>
                   <View style={styles.previewMeta}>
-                    <Text style={styles.previewFileName} numberOfLines={1}>{attachment!.name}</Text>
-                    <TouchableOpacity onPress={() => setAttachment(null)}>
-                      <X size={18} color="#1373e5" />
+                    <Check size={14} color={status.success.strong} />
+                    <Text style={styles.previewFileName} numberOfLines={1}>{attachment ? attachment.name : 'Current receipt'}</Text>
+                    <TouchableOpacity onPress={() => (attachment ? setAttachment(null) : setExistingReceiptUrl(null))} style={styles.removeBtn}>
+                      <Text style={styles.removeText}>Replace</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
-              ) : attachment ? (
-                /* Non-image file */
+              ) : (
                 <View style={styles.selectedFileBox}>
-                  <FileText size={16} color="#64748B" />
-                  <Text style={styles.selectedFileName} numberOfLines={1}>{attachment.name}</Text>
-                  <TouchableOpacity onPress={() => setAttachment(null)}>
-                    <X size={18} color="#1373e5" />
+                  <FileText size={16} color={colors.primary} />
+                  <Text style={styles.selectedFileName} numberOfLines={1}>{attachment ? attachment.name : 'Current receipt'}</Text>
+                  <TouchableOpacity onPress={() => (attachment ? setAttachment(null) : setExistingReceiptUrl(null))} style={styles.removeBtn}>
+                    <Text style={styles.removeText}>Replace</Text>
                   </TouchableOpacity>
                 </View>
-              ) : existingIsImage && existingReceiptUrl ? (
-                /* Existing image from edit mode */
-                <View style={styles.previewContainer}>
-                  <TouchableOpacity onPress={() => setLightboxVisible(true)} activeOpacity={0.85}>
-                    <Image source={{ uri: existingReceiptUrl }} style={styles.previewImage} resizeMode="cover" />
-                    <View style={styles.previewOverlay}>
-                      <ZoomIn size={20} color="#FFFFFF" />
-                    </View>
-                  </TouchableOpacity>
-                  <View style={styles.previewMeta}>
-                    <Text style={styles.previewFileName} numberOfLines={1}>Current receipt</Text>
-                    <TouchableOpacity onPress={() => setExistingReceiptUrl(null)}>
-                      <X size={18} color="#1373e5" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : existingReceiptUrl ? (
-                /* Existing non-image file */
-                <View style={styles.selectedFileBox}>
-                  <FileText size={16} color="#64748B" />
-                  <Text style={styles.selectedFileName} numberOfLines={1}>Current receipt</Text>
-                  <TouchableOpacity onPress={() => setExistingReceiptUrl(null)}>
-                    <X size={18} color="#1373e5" />
-                  </TouchableOpacity>
-                </View>
-              ) : null}
+              )}
+              <FieldError text={errors.receipt} />
             </View>
-
           </ScrollView>
 
           <View style={styles.footer}>
+            <View style={styles.footerSummary}>
+              <Text style={styles.footerLabel}>{isEditing ? 'Updated claim' : 'You are claiming'}</Text>
+              <Text style={styles.footerAmount}>
+                {amountNum > 0 ? `₹${amountNum.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '₹0'}
+              </Text>
+            </View>
             <TouchableOpacity
               style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
               onPress={handleSubmit}
               disabled={isSubmitting}
+              activeOpacity={0.85}
             >
               {isSubmitting ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
-                <Text style={styles.submitBtnText}>{isEditing ? 'Save Changes' : 'Submit Claim'}</Text>
+                <>
+                  <Send size={16} color="#FFFFFF" />
+                  <Text style={styles.submitBtnText}>{isEditing ? 'Save' : 'Submit Claim'}</Text>
+                </>
               )}
             </TouchableOpacity>
           </View>
@@ -461,8 +541,9 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
           isVisible={isDatePickerVisible}
           mode="date"
           maximumDate={new Date()}
+          date={purchaseDate ? new Date(`${purchaseDate}T00:00:00`) : new Date()}
           onConfirm={(d) => {
-            setPurchaseDate(d.toISOString().split('T')[0]);
+            setPurchaseDate(localYmd(d));
             setDatePickerVisible(false);
             setErrors(e => ({ ...e, purchaseDate: undefined }));
           }}
@@ -498,257 +579,126 @@ export default function CreateExpenseModal({ visible, onClose, onSuccess, editin
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFill as any,
-  },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15, 23, 42, 0.5)' },
+  backdrop: { ...(StyleSheet.absoluteFill as any) },
   content: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '92%',
+    backgroundColor: colors.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '94%',
+    shadowColor: colors.shadow, shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.16, shadowRadius: 24, elevation: 12,
   },
+  dragHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16,
+    paddingTop: 8, paddingBottom: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: colors.border,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  headerIconBadge: {
+    width: 42, height: 42, borderRadius: 14, backgroundColor: colors.primarySoft, borderWidth: 1,
+    borderColor: colors.primaryBorder, alignItems: 'center', justifyContent: 'center',
   },
+  headerTitle: { fontSize: 17, fontWeight: '900', color: colors.text, letterSpacing: -0.2 },
+  headerSubtitle: { fontSize: 12, fontWeight: '500', color: colors.textMuted, marginTop: 1 },
   closeBtn: {
-    padding: 4,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 20,
+    width: 36, height: 36, borderRadius: 12, backgroundColor: colors.bg, borderWidth: 1,
+    borderColor: colors.border, alignItems: 'center', justifyContent: 'center',
   },
-  body: {
-    padding: 20,
+  body: { flexGrow: 0 },
+  bodyContent: { padding: 16, gap: 12 },
+  errorBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: status.danger.bg,
+    borderWidth: 1, borderColor: status.danger.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9,
   },
-  fieldGroup: {
-    marginBottom: 16,
+  errorBannerText: { flex: 1, fontSize: 12.5, fontWeight: '700', color: status.danger.strong },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 22, padding: 16, borderWidth: 1, borderColor: colors.border },
+  stepHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  stepBadge: {
+    width: 22, height: 22, borderRadius: 7, backgroundColor: colors.primarySoft, borderWidth: 1,
+    borderColor: colors.primaryBorder, alignItems: 'center', justifyContent: 'center',
   },
-  label: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#475569',
-    marginBottom: 6,
+  stepBadgeText: { fontSize: 11.5, fontWeight: '900', color: colors.primary },
+  stepTitle: { flex: 1, fontSize: 15, fontWeight: '800', color: colors.text },
+  stepHint: { fontSize: 11, fontWeight: '700', color: colors.textFaint },
+  label: { fontSize: 11, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.4, marginBottom: 6, textTransform: 'uppercase' },
+  labelGap: { marginTop: 14 },
+  amountBox: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg, borderWidth: 1,
+    borderColor: colors.border, borderRadius: 16, paddingHorizontal: 14,
   },
+  amountRupee: { fontSize: 24, fontWeight: '900', color: colors.textFaint, marginRight: 6 },
+  amountInput: { flex: 1, fontSize: 26, fontWeight: '900', color: colors.text, paddingVertical: 10, fontVariant: ['tabular-nums'] },
   input: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#0F172A',
+    backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: 12, fontSize: 14.5, color: colors.text,
   },
-  inputError: {
-    borderColor: '#1373e5',
-    backgroundColor: '#eff6ff',
+  inputError: { borderColor: status.danger.border, backgroundColor: status.danger.bg },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, marginLeft: 2 },
+  errorText: { fontSize: 12, fontWeight: '700', color: status.danger.strong },
+  textArea: { minHeight: 80, textAlignVertical: 'top' },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  categoryTile: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 9,
+    borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg,
   },
-  errorText: {
-    fontSize: 12,
-    color: '#1373e5',
-    marginTop: 4,
-    marginLeft: 4,
+  categoryTileOn: { borderColor: colors.primaryRing, backgroundColor: colors.primarySoft },
+  categoryText: { fontSize: 12.5, fontWeight: '700', color: colors.textSecondary },
+  categoryTextOn: { color: colors.primary, fontWeight: '800' },
+  selectBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg, borderWidth: 1,
+    borderColor: colors.border, borderRadius: 14, paddingHorizontal: 14, minHeight: 48,
   },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  datePickerInput: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  dateValue: {
-    fontSize: 15,
-    color: '#0F172A',
-  },
-  placeholderText: {
-    color: '#94A3B8',
-    fontSize: 15,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    marginHorizontal: -4,
-  },
-  categoryChip: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  categoryChipActive: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
-  },
-  categoryText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  categoryTextActive: {
-    color: '#1D4ED8',
-  },
-  dropdownToggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  dropdownValue: {
-    fontSize: 15,
-    color: '#0F172A',
-  },
+  selectText: { flex: 1, fontSize: 14.5, color: colors.text, fontWeight: '600' },
+  inlineInput: { flex: 1, fontSize: 14.5, color: colors.text, paddingVertical: 12 },
+  placeholderText: { color: colors.textFaint, fontWeight: '500' },
   dropdownList: {
-    marginTop: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    maxHeight: 180,
-    overflow: 'hidden',
+    marginTop: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: colors.border, borderRadius: 14,
+    overflow: 'hidden', shadowColor: colors.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
   dropdownItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.borderSoft,
   },
-  dropdownItemText: {
-    fontSize: 14,
-    color: '#0F172A',
-  },
-  attachmentOptions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
-  },
+  dropdownItemOn: { backgroundColor: colors.primarySoft },
+  dropdownItemText: { flex: 1, fontSize: 14, color: colors.textBody, fontWeight: '600' },
+  dropdownEmpty: { padding: 14, color: colors.textFaint },
+  attachmentOptions: { flexDirection: 'row', gap: 8 },
   attachBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
+    flex: 1, alignItems: 'center', gap: 6, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5,
+    borderStyle: 'dashed', borderColor: colors.primaryBorder, backgroundColor: colors.primarySoft,
   },
-  attachText: {
-    color: '#1D4ED8',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  previewContainer: {
-    marginTop: 12,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  previewImage: {
-    width: '100%',
-    height: 180,
-  },
-  previewOverlay: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 20,
-    padding: 6,
-  },
-  previewMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  previewFileName: {
-    fontSize: 13,
-    color: '#334155',
-    flex: 1,
-    marginRight: 12,
-  },
+  attachIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  attachText: { fontSize: 12, fontWeight: '800', color: colors.primary },
+  previewContainer: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg },
+  previewImage: { width: '100%', height: 160 },
+  previewOverlay: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(15,23,42,0.55)', borderRadius: 10, padding: 5 },
+  previewMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10, backgroundColor: '#FFFFFF' },
+  previewFileName: { flex: 1, fontSize: 12.5, fontWeight: '700', color: colors.textBody },
   selectedFileBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#F1F5F9',
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 14,
+    borderWidth: 1, borderColor: colors.primaryBorder, backgroundColor: colors.primarySoft,
   },
-  selectedFileName: {
-    fontSize: 13,
-    color: '#334155',
-    flex: 1,
+  selectedFileName: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.textBody },
+  removeBtn: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9, backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderColor: colors.border,
   },
+  removeText: { fontSize: 11.5, fontWeight: '800', color: colors.primary },
   footer: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    backgroundColor: '#FFFFFF',
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 12,
+    backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: colors.border,
   },
+  footerSummary: { flex: 1 },
+  footerLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.5, color: colors.textFaint, textTransform: 'uppercase' },
+  footerAmount: { fontSize: 20, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
   submitBtn: {
-    backgroundColor: '#1373e5',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary,
+    paddingHorizontal: 20, height: 50, borderRadius: 14,
+    shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 12, elevation: 5,
   },
-  submitBtnDisabled: {
-    opacity: 0.7,
-  },
-  submitBtnText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  // Lightbox
-  lightboxOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.92)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  submitBtnDisabled: { opacity: 0.6 },
+  submitBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  lightboxOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' },
   lightboxClose: {
-    position: 'absolute',
-    top: 52,
-    right: 20,
-    zIndex: 10,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 20,
-    padding: 8,
+    position: 'absolute', top: 52, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: 8,
   },
-  lightboxImage: {
-    width: '100%',
-    height: '80%',
-  },
+  lightboxImage: { width: '100%', height: '80%' },
 });

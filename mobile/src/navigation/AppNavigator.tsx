@@ -24,6 +24,7 @@ import SplashScreen from '../components/SplashScreen';
 import FieldVisitsScreen from '../screens/FieldVisit/FieldVisitsScreen';
 import FieldVisitRequestForm from '../screens/FieldVisit/FieldVisitRequestForm';
 import FieldVisitDetailScreen from '../screens/FieldVisit/FieldVisitDetailScreen';
+import FieldVisitMapScreen from '../screens/FieldVisit/FieldVisitMapScreen';
 import HardwareRequestScreen from '../screens/Assets/HardwareRequestScreen';
 import TicketsScreen from '../screens/Tickets/TicketsScreen';
 import SecurityScreen from '../screens/Security/SecurityScreen';
@@ -168,6 +169,7 @@ export default function AppNavigator() {
             <Stack.Screen name="FieldVisit" component={FieldVisitsScreen} />
             <Stack.Screen name="FieldVisitRequestForm" component={FieldVisitRequestForm} />
             <Stack.Screen name="FieldVisitDetail" component={FieldVisitDetailScreen} />
+            <Stack.Screen name="FieldVisitMap" component={FieldVisitMapScreen} />
             <Stack.Screen name="HardwareRequests" component={HardwareRequestScreen} />
             <Stack.Screen name="Tickets" component={TicketsScreen} />
             <Stack.Screen name="Security" component={SecurityScreen} />

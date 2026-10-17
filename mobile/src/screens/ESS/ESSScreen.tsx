@@ -18,14 +18,15 @@ const PulseSkeleton = ({ style }: { style: any }) => {
 };
 
 import AppScreen from '../../components/AppScreen';
+import GradientHero from '../../components/GradientHero';
+import { ds, colors as dsColors, status as dsStatus, shadow as dsShadow } from '../../theme/ds';
 import { TeamLeavePanel } from '../Team/TeamLeaveScreen';
 import LeaveQuotaTab from './LeaveQuotaTab';
 import { teamService, TeamLeaveRequest } from '../../api/teamService';
 import { 
   Calendar, Clock, CheckCircle, XCircle, 
   FileText, Send, HeartPulse, Briefcase, Umbrella, Sparkles, Info, Trash2, AlertCircle,
-  UploadCloud, Paperclip, X,
-  Users,
+  UploadCloud, Paperclip, X, ChevronDown,
 } from 'lucide-react-native';
 import { useLeaveStore } from '../../store/leaveStore';
 import { leaveService } from '../../api/leaveService';
@@ -57,6 +58,7 @@ export default function ESSScreen({ route }: any) {
   
   // Form State
   const [leaveTypeId, setLeaveTypeId] = useState<number | null>(null);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
@@ -254,16 +256,26 @@ export default function ESSScreen({ route }: any) {
   };
 
   const getStatusStyle = (status: string) => {
-    switch(status) {
-      case 'APPROVED': 
-        return { bg: '#ECFDF5', text: '#047857', border: '#A7F3D0', icon: CheckCircle };
-      case 'REJECTED': 
-        return { bg: '#eff6ff', text: '#0f4f9c', border: '#dbeafe', icon: XCircle };
-      case 'CANCELLED': 
-        return { bg: '#F1F5F9', text: '#64748B', border: '#CBD5E1', icon: XCircle };
-      default: 
-        return { bg: '#f3efff', text: '#4f2aa7', border: '#e0d7ff', icon: Clock };
+    switch (status) {
+      case 'APPROVED':
+        return { bg: dsStatus.success.bg, text: dsStatus.success.strong, border: dsStatus.success.border, icon: CheckCircle, label: 'Approved' };
+      case 'REJECTED':
+        return { bg: dsStatus.danger.bg, text: dsStatus.danger.strong, border: dsStatus.danger.border, icon: XCircle, label: 'Rejected' };
+      case 'CANCELLED':
+        return { bg: dsStatus.neutral.bg, text: dsStatus.neutral.fg, border: dsStatus.neutral.border, icon: XCircle, label: 'Cancelled' };
+      default:
+        return { bg: dsStatus.warning.bg, text: dsStatus.warning.fg, border: dsStatus.warning.border, icon: Clock, label: 'Pending' };
     }
+  };
+
+  /** Hero figures: days left across all leave types, and requests by status. */
+  const leaveTotals = {
+    allocated: balances.reduce((n, b) => n + (Number(b.allocated) || 0), 0),
+    used: balances.reduce((n, b) => n + (Number(b.used) || 0), 0),
+    left: balances.reduce((n, b) => n + ((Number(b.allocated) || 0) - (Number(b.used) || 0)), 0),
+    pending: requests.filter((r) => r.status === 'PENDING').length,
+    approved: requests.filter((r) => r.status === 'APPROVED').length,
+    rejected: requests.filter((r) => r.status === 'REJECTED').length,
   };
 
   const calculateDays = (start: string, end: string) => {
@@ -352,200 +364,168 @@ export default function ESSScreen({ route }: any) {
             refreshControl={<RefreshControl refreshing={isLoading} onRefresh={() => { fetchLeaveData(); setTeamRefresh((k) => k + 1); }} colors={['#1373e5']} />}
           >
             <View>
-              {/* --- Leave Balances Section --- */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Leave Balances</Text>
-          <Text style={styles.sectionBadge}>{balances.length} Available</Text>
-        </View>
+              {/* --- Hero: days left this year (Timesheet design system) --- */}
+              <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
+                <GradientHero
+                  id="lvHeroGrad"
+                  overline="LEAVE AVAILABLE"
+                  value={leaveTotals.left}
+                  unit={`/ ${leaveTotals.allocated} days`}
+                  action={
+                    <TouchableOpacity style={ds.heroButton} onPress={() => setActiveTab('apply')} activeOpacity={0.85}>
+                      <Calendar size={14} color={dsColors.text} />
+                      <Text style={ds.heroButtonText}>Apply</Text>
+                    </TouchableOpacity>
+                  }
+                  stats={[
+                    { label: 'Used', value: leaveTotals.used },
+                    { label: 'Pending', value: leaveTotals.pending, color: '#FDE68A' },
+                    { label: 'Approved', value: leaveTotals.approved, color: '#A7F3D0' },
+                    { label: 'Rejected', value: leaveTotals.rejected, color: '#FECACA' },
+                  ]}
+                />
 
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={styles.balancesScroll}
-        >
-          {isLoading && balances.length === 0 ? (
-            <>
-              <PulseSkeleton style={[styles.balanceCard, { height: 130, width: 155, borderColor: 'transparent' }]} />
-              <PulseSkeleton style={[styles.balanceCard, { height: 130, width: 155, marginLeft: 10, borderColor: 'transparent' }]} />
-            </>
-          ) : balances.length === 0 ? (
-            <View style={styles.emptyBalanceCard}>
-              <Info size={20} color="#94A3B8" />
-              <Text style={styles.emptyText}>No balances</Text>
-            </View>
-          ) : (
-            balances.map((balance) => {
-              const remaining = balance.allocated - balance.used;
-              const theme = getLeaveTypeTheme(balance.leaveType.name);
-              const IconComp = theme.icon;
-              const usedPercentage = Math.min(100, Math.max(0, (balance.used / balance.allocated) * 100));
-
-              return (
-                <View key={balance.id} style={[styles.balanceCard, { backgroundColor: theme.gradientStart }]}>
-                  <View style={styles.balanceCardHeader}>
-                    <View style={[styles.balanceIconBox, { backgroundColor: theme.bg }]}>
-                      <IconComp size={15} color={theme.accent} />
-                    </View>
-                    <View style={[styles.leaveBadgePill, { backgroundColor: theme.badgeBg }]}>
-                      <Text style={[styles.leaveBadgeText, { color: theme.accent }]}>{balance.allocated} Alloc</Text>
-                    </View>
+                {/* --- Balances card --- */}
+                <View style={ds.section}>
+                  <View style={ds.sectionHead}>
+                    <Text style={ds.sectionTitle}>Leave balances</Text>
+                    <Text style={ds.sectionHint}>{balances.length} {balances.length === 1 ? 'type' : 'types'}</Text>
                   </View>
-
-                  <Text style={styles.balanceTypeName} numberOfLines={1}>{balance.leaveType.name}</Text>
-                  
-                  <View style={styles.balanceCountRow}>
-                    <Text style={styles.balanceRemaining}>{remaining}</Text>
-                    <Text style={styles.balanceSubtext}>days left</Text>
-                  </View>
-
-                  {/* Custom Progress Bar */}
-                  <View style={styles.progressTrack}>
-                    <View style={[styles.progressFill, { width: `${usedPercentage}%`, backgroundColor: theme.accent }]} />
-                  </View>
-
-                  <View style={styles.balanceFooter}>
-                    <Text style={styles.balanceFooterText}><Text style={{ fontWeight: '700', color: '#334155' }}>{balance.used}</Text> used</Text>
-                    <Text style={styles.balanceFooterText}><Text style={{ fontWeight: '700', color: '#334155' }}>{remaining}</Text> avail</Text>
-                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.lvBalanceScroll}>
+                    {isLoading && balances.length === 0 ? (
+                      <>
+                        <PulseSkeleton style={styles.lvBalanceTile} />
+                        <PulseSkeleton style={styles.lvBalanceTile} />
+                      </>
+                    ) : balances.length === 0 ? (
+                      <View style={styles.lvBalanceEmpty}>
+                        <Info size={16} color={dsColors.textFaint} />
+                        <Text style={ds.sectionHint}>No leave allotted yet</Text>
+                      </View>
+                    ) : (
+                      balances.map((balance) => {
+                        const remaining = balance.allocated - balance.used;
+                        const theme = getLeaveTypeTheme(balance.leaveType.name);
+                        const IconComp = theme.icon;
+                        const usedPct = balance.allocated > 0 ? Math.min(100, Math.max(0, (balance.used / balance.allocated) * 100)) : 0;
+                        return (
+                          <View key={balance.id} style={styles.lvBalanceTile}>
+                            <View style={styles.lvBalanceHead}>
+                              <View style={[styles.lvBalanceIcon, { backgroundColor: theme.bg }]}>
+                                <IconComp size={14} color={theme.accent} />
+                              </View>
+                              <Text style={styles.lvBalanceName} numberOfLines={1}>{balance.leaveType.name}</Text>
+                            </View>
+                            <View style={styles.lvHeroScoreRow}>
+                              <Text style={styles.lvBalanceNum}>{remaining}</Text>
+                              <Text style={styles.lvBalanceOf}>/ {balance.allocated} left</Text>
+                            </View>
+                            <View style={styles.lvTrack}>
+                              <View style={[styles.lvFill, { width: `${usedPct}%`, backgroundColor: theme.accent }]} />
+                            </View>
+                            <Text style={styles.lvBalanceUsed}>{balance.used} used</Text>
+                          </View>
+                        );
+                      })
+                    )}
+                  </ScrollView>
                 </View>
-              );
-            })
-          )}
-        </ScrollView>
 
-        {/* --- Premium Floating Segmented Control --- */}
-        <View style={styles.segmentedWrapper}>
-          <View style={styles.segmentedControl}>
-            <TouchableOpacity 
-              style={[styles.segmentButton, activeTab === 'requests' && styles.segmentActive]} 
-              onPress={() => setActiveTab('requests')}
-              activeOpacity={0.85}
-            >
-              <FileText size={16} color={activeTab === 'requests' ? '#1373e5' : '#64748B'} />
-              <Text style={[styles.segmentText, activeTab === 'requests' && styles.segmentTextActive]}>My Requests</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.segmentButton, activeTab === 'apply' && styles.segmentActive]} 
-              onPress={() => setActiveTab('apply')}
-              activeOpacity={0.85}
-            >
-              <Calendar size={16} color={activeTab === 'apply' ? '#1373e5' : '#64748B'} />
-              <Text style={[styles.segmentText, activeTab === 'apply' && styles.segmentTextActive]}>{hasTeam ? 'Apply' : 'Apply for Leave'}</Text>
-            </TouchableOpacity>
-
-            {hasTeam && (
-              <TouchableOpacity
-                style={[styles.segmentButton, activeTab === 'team' && styles.segmentActive]}
-                onPress={() => setActiveTab('team')}
-                activeOpacity={0.85}
-              >
-                <Users size={16} color={activeTab === 'team' ? '#1373e5' : '#64748B'} />
-                <Text style={[styles.segmentText, activeTab === 'team' && styles.segmentTextActive]}>
-                  Team{teamPending ? ` (${teamPending})` : ''}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
+                {/* --- Segmented control --- */}
+                <View style={ds.segmented}>
+                  {([
+                    { key: 'requests', label: 'My Requests' },
+                    { key: 'apply', label: 'Apply' },
+                    ...(hasTeam ? [{ key: 'team', label: `Team${teamPending ? ` (${teamPending})` : ''}` }] : []),
+                  ] as { key: typeof activeTab; label: string }[]).map((t) => (
+                    <TouchableOpacity
+                      key={t.key}
+                      style={[ds.segment, activeTab === t.key && ds.segmentActive]}
+                      onPress={() => setActiveTab(t.key)}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={[ds.segmentText, activeTab === t.key && ds.segmentTextActive]}>{t.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
         {/* --- Tab Content --- */}
         {activeTab === 'team' ? (
           <TeamLeavePanel refreshKey={teamRefresh} onLoaded={setTeamRows} />
         ) : activeTab === 'requests' ? (
-          <View style={styles.requestsContainer}>
+          <View style={styles.lvList}>
             {isLoading && requests.length === 0 ? (
               <>
-                <PulseSkeleton style={[styles.requestCard, { height: 140, borderColor: 'transparent' }]} />
-                <PulseSkeleton style={[styles.requestCard, { height: 140, borderColor: 'transparent' }]} />
-                <PulseSkeleton style={[styles.requestCard, { height: 140, borderColor: 'transparent' }]} />
+                <PulseSkeleton style={styles.lvSkeletonRow} />
+                <PulseSkeleton style={styles.lvSkeletonRow} />
+                <PulseSkeleton style={styles.lvSkeletonRow} />
               </>
             ) : requests.length === 0 ? (
-              <View style={styles.emptyState}>
-                <View style={styles.emptyIconCircle}>
-                  <FileText size={32} color="#94A3B8" />
+              <View style={ds.empty}>
+                <View style={ds.emptyIcon}>
+                  <FileText size={22} color={dsColors.primary} />
                 </View>
-                <Text style={styles.emptyStateTitle}>No Leave Requests</Text>
-                <Text style={styles.emptyStateSub}>You haven't submitted any time off applications yet.</Text>
-                <TouchableOpacity 
-                  style={styles.emptyStateButton} 
-                  onPress={() => setActiveTab('apply')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.emptyStateButtonText}>Apply Now</Text>
+                <Text style={ds.emptyTitle}>No leave requests yet</Text>
+                <Text style={ds.emptyText}>When you apply for leave, it shows here with its approval status.</Text>
+                <TouchableOpacity style={ds.primaryButton} onPress={() => setActiveTab('apply')} activeOpacity={0.85}>
+                  <Calendar size={14} color="#FFFFFF" />
+                  <Text style={ds.primaryButtonText}>Apply for leave</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               requests.map((req) => {
-                const statusStyle = getStatusStyle(req.status);
-                const StatusIcon = statusStyle.icon;
+                const st = getStatusStyle(req.status);
+                const StatusIcon = st.icon;
                 const days = calculateDays(req.startDate, req.endDate);
+                const start = new Date(req.startDate);
+                const end = new Date(req.endDate);
+                const sameDay = start.toDateString() === end.toDateString();
+                const fmt = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                const rejection = req.rejectionReason || (req as any).rejection_reason;
 
                 return (
-                  <View key={req.id} style={styles.requestCard}>
-                    {/* Top Status Header */}
-                    <View style={styles.requestHeaderRow}>
-                      <View style={styles.requestTypeGroup}>
-                        <Text style={styles.requestTypeTitle}>{req.leaveType.name}</Text>
-                        {days && (
-                          <View style={styles.durationPill}>
-                            <Text style={styles.durationText}>{days} {days === 1 ? 'Day' : 'Days'}</Text>
+                  <View key={req.id} style={[ds.listCard, styles.lvRequestCard]}>
+                    <View style={styles.lvRequestTop}>
+                      <View style={ds.dateBox}>
+                        <Text style={ds.dateBoxNum}>{start.getDate()}</Text>
+                        <Text style={ds.dateBoxDay}>{start.toLocaleDateString('en-IN', { month: 'short' }).toUpperCase()}</Text>
+                      </View>
+                      <View style={styles.lvRequestCenter}>
+                        <View style={styles.lvRequestTitleRow}>
+                          <Text style={styles.lvRequestTitle} numberOfLines={1}>{req.leaveType.name}</Text>
+                          <View style={[ds.pill, { backgroundColor: st.bg, borderColor: st.border }]}>
+                            <StatusIcon size={11} color={st.text} />
+                            <Text style={[ds.pillText, { color: st.text }]}>{st.label}</Text>
                           </View>
-                        )}
-                      </View>
-
-                      <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg, borderColor: statusStyle.border }]}>
-                        <StatusIcon size={13} color={statusStyle.text} />
-                        <Text style={[styles.statusText, { color: statusStyle.text }]}>{req.status}</Text>
-                      </View>
-                    </View>
-
-                    {/* Date Block */}
-                    <View style={styles.requestDateBox}>
-                      <Calendar size={15} color="#64748B" />
-                      <Text style={styles.requestDateText}>
-                        {new Date(req.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        {'  →  '}
-                        {new Date(req.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </Text>
-                    </View>
-
-                    {/* Reason Quote */}
-                    <View style={styles.reasonQuoteBox}>
-                      <Text style={styles.reasonText} numberOfLines={2}>"{req.reason}"</Text>
-                    </View>
-
-                    {/* Rejection Reason Alert Box */}
-                    {req.status === 'REJECTED' && (req.rejectionReason || (req as any).rejection_reason) && (
-                      <View style={styles.rejectionBox}>
-                        <View style={styles.rejectionHeaderRow}>
-                          <AlertCircle size={14} color="#0f4f9c" />
-                          <Text style={styles.rejectionTitle}>Rejection Reason:</Text>
                         </View>
-                        <Text style={styles.rejectionText}>
-                          {req.rejectionReason || (req as any).rejection_reason}
-                        </Text>
+                        <View style={styles.lvRequestMetaRow}>
+                          <Text style={styles.lvRequestDates}>{sameDay ? fmt(start) : `${fmt(start)} – ${fmt(end)}`}</Text>
+                          {!!days && <Text style={styles.lvDaysPill}>{days} {days === 1 ? 'day' : 'days'}</Text>}
+                        </View>
+                      </View>
+                    </View>
+
+                    {!!req.reason && <Text style={styles.lvReason} numberOfLines={2}>“{req.reason}”</Text>}
+
+                    {req.status === 'REJECTED' && !!rejection && (
+                      <View style={styles.lvRejection}>
+                        <AlertCircle size={13} color={dsStatus.danger.strong} />
+                        <Text style={styles.lvRejectionText}>{rejection}</Text>
                       </View>
                     )}
 
-                    {/* Card Footer */}
-                    <View style={styles.requestFooterRow}>
-                      <View style={styles.requestAppliedGroup}>
-                        <Clock size={12} color="#94A3B8" />
-                        <Text style={styles.requestAppliedText}>
-                          Applied on {new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    <View style={styles.lvRequestFooter}>
+                      <View style={ds.chip}>
+                        <Clock size={11} color={dsColors.textMuted} />
+                        <Text style={ds.chipText}>
+                          Applied {new Date(req.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                         </Text>
                       </View>
-
-                      {/* Cancel Button for PENDING leaves */}
                       {req.status === 'PENDING' && (
-                        <TouchableOpacity 
-                          style={styles.cancelActionBtn} 
-                          onPress={() => handleCancel(req.id)}
-                          activeOpacity={0.7}
-                        >
-                          <Trash2 size={12} color="#1373e5" />
-                          <Text style={styles.cancelActionText}>Cancel</Text>
+                        <TouchableOpacity style={ds.softButton} onPress={() => handleCancel(req.id)} activeOpacity={0.7}>
+                          <Trash2 size={12} color={dsColors.primary} />
+                          <Text style={ds.softButtonText}>Cancel</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -558,43 +538,75 @@ export default function ESSScreen({ route }: any) {
           <View style={styles.formContainer}>
             {/* Step 1: Select Leave Type */}
             <View style={styles.formSection}>
-              <Text style={styles.formSectionTitle}>1. Select Leave Type</Text>
-              <View style={styles.typeGrid}>
-                {balances.map((b) => {
-                  const isSelected = leaveTypeId === b.leaveTypeId;
-                  const theme = getLeaveTypeTheme(b.leaveType.name);
-                  const Icon = theme.icon;
+              <View style={styles.stepHead}><View style={styles.stepBadge}><Text style={styles.stepBadgeText}>1</Text></View><Text style={styles.formSectionTitle}>Select Leave Type</Text></View>
+              {(() => {
+                const sel = balances.find((b) => b.leaveTypeId === leaveTypeId);
+                const theme = sel ? getLeaveTypeTheme(sel.leaveType.name) : null;
+                const Icon = theme?.icon;
+                return (
+                  <TouchableOpacity
+                    style={[styles.typeChip, sel && theme && { borderColor: theme.accent, backgroundColor: theme.bg }]}
+                    onPress={() => setTypePickerOpen(true)}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[styles.typeChipIconBox, { backgroundColor: sel ? '#FFFFFF' : '#F1F5F9' }]}>
+                      {Icon ? <Icon size={16} color={theme!.accent} /> : <FileText size={16} color="#64748B" />}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.typeChipTitle, sel && theme && { color: theme.accent }]}>
+                        {sel ? sel.leaveType.name : 'Choose a leave type'}
+                      </Text>
+                      <Text style={styles.typeChipSub}>
+                        {sel ? `${sel.allocated - sel.used} days available` : `${balances.length} types available`}
+                      </Text>
+                    </View>
+                    <ChevronDown size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+                );
+              })()}
 
-                  return (
-                    <TouchableOpacity 
-                      key={b.id} 
-                      style={[
-                        styles.typeChip, 
-                        isSelected && { borderColor: theme.accent, backgroundColor: theme.bg }
-                      ]}
-                      onPress={() => setLeaveTypeId(b.leaveTypeId)}
-                      activeOpacity={0.75}
-                    >
-                      <View style={[styles.typeChipIconBox, { backgroundColor: isSelected ? '#FFFFFF' : '#F1F5F9' }]}>
-                        <Icon size={16} color={isSelected ? theme.accent : '#64748B'} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.typeChipTitle, isSelected && { color: theme.accent, fontWeight: '700' }]}>
-                          {b.leaveType.name}
-                        </Text>
-                        <Text style={styles.typeChipSub}>
-                          {b.allocated - b.used} days available
-                        </Text>
-                      </View>
+              <Modal visible={typePickerOpen} transparent animationType="slide" onRequestClose={() => setTypePickerOpen(false)}>
+                <TouchableOpacity style={styles.typeSheetBackdrop} activeOpacity={1} onPress={() => setTypePickerOpen(false)} />
+                <View style={styles.typeSheet}>
+                  <View style={styles.typeSheetGrabber} />
+                  <View style={styles.calendarModalHead}>
+                    <Text style={styles.calendarModalTitle}>Select leave type</Text>
+                    <TouchableOpacity onPress={() => setTypePickerOpen(false)} style={styles.calendarModalClose}>
+                      <X size={16} color="#64748B" />
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
+                  </View>
+                  <ScrollView style={styles.typeSheetList} contentContainerStyle={styles.typeGrid}>
+                    {balances.map((b) => {
+                      const isSelected = leaveTypeId === b.leaveTypeId;
+                      const theme = getLeaveTypeTheme(b.leaveType.name);
+                      const Icon = theme.icon;
+                      const left = b.allocated - b.used;
+                      return (
+                        <TouchableOpacity
+                          key={b.id}
+                          style={[styles.typeChip, isSelected && { borderColor: theme.accent, backgroundColor: theme.bg }]}
+                          onPress={() => { setLeaveTypeId(b.leaveTypeId); setTypePickerOpen(false); }}
+                          activeOpacity={0.75}
+                        >
+                          <View style={[styles.typeChipIconBox, { backgroundColor: isSelected ? '#FFFFFF' : theme.bg }]}>
+                            <Icon size={16} color={theme.accent} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.typeChipTitle, isSelected && { color: theme.accent }]}>{b.leaveType.name}</Text>
+                            <Text style={styles.typeChipSub}>{left} of {b.allocated} days available</Text>
+                          </View>
+                          {isSelected && <CheckCircle size={18} color={theme.accent} />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              </Modal>
             </View>
             {/* Step 2: Choose Dates */}
             <View style={styles.formSection}>
               <View style={styles.dateSectionHeader}>
-                <Text style={styles.formSectionTitle}>2. Select Dates *</Text>
+                <View style={[styles.stepHead, { flex: 1 }]}><View style={styles.stepBadge}><Text style={styles.stepBadgeText}>2</Text></View><Text style={styles.formSectionTitle}>Select Dates *</Text></View>
                 {calculatedDays && (
                   <View style={styles.calculatedDaysBadge}>
                     <Sparkles size={12} color="#1373e5" />
@@ -611,7 +623,7 @@ export default function ESSScreen({ route }: any) {
                     onPress={() => setOpenStartPicker(true)}
                     activeOpacity={0.7}
                   >
-                    <Calendar size={16} color={isDateRangeInvalid ? "#1373e5" : "#94A3B8"} style={styles.inputIcon} />
+                    <Calendar size={16} color={isDateRangeInvalid ? dsStatus.danger.strong : "#94A3B8"} style={styles.inputIcon} />
                     <Text style={[styles.textInput, !startDate && { color: '#94A3B8' }]}>
                       {startDate || "YYYY-MM-DD"}
                     </Text>
@@ -628,6 +640,12 @@ export default function ESSScreen({ route }: any) {
                       onPressOut={() => setOpenStartPicker(false)}
                     >
                       <View style={styles.modalCalendarBox}>
+                        <View style={styles.calendarModalHead}>
+                          <Text style={styles.calendarModalTitle}>Select Start Date</Text>
+                          <TouchableOpacity onPress={() => setOpenStartPicker(false)} style={styles.calendarModalClose}>
+                            <X size={16} color="#64748B" />
+                          </TouchableOpacity>
+                        </View>
                         <RNCalendar
                           current={startDate || undefined}
                           onDayPress={(day: any) => {
@@ -638,6 +656,8 @@ export default function ESSScreen({ route }: any) {
                             todayTextColor: '#1373e5',
                             selectedDayBackgroundColor: '#1373e5',
                             arrowColor: '#1373e5',
+                            textDayFontWeight: '600',
+                            textMonthFontWeight: '800',
                           }}
                         />
                       </View>
@@ -652,7 +672,7 @@ export default function ESSScreen({ route }: any) {
                     onPress={() => setOpenEndPicker(true)}
                     activeOpacity={0.7}
                   >
-                    <Calendar size={16} color={isDateRangeInvalid ? "#1373e5" : "#94A3B8"} style={styles.inputIcon} />
+                    <Calendar size={16} color={isDateRangeInvalid ? dsStatus.danger.strong : "#94A3B8"} style={styles.inputIcon} />
                     <Text style={[styles.textInput, !endDate && { color: '#94A3B8' }]}>
                       {endDate || "YYYY-MM-DD"}
                     </Text>
@@ -669,6 +689,12 @@ export default function ESSScreen({ route }: any) {
                       onPressOut={() => setOpenEndPicker(false)}
                     >
                       <View style={styles.modalCalendarBox}>
+                        <View style={styles.calendarModalHead}>
+                          <Text style={styles.calendarModalTitle}>Select End Date</Text>
+                          <TouchableOpacity onPress={() => setOpenEndPicker(false)} style={styles.calendarModalClose}>
+                            <X size={16} color="#64748B" />
+                          </TouchableOpacity>
+                        </View>
                         <RNCalendar
                           current={endDate || startDate || undefined}
                           minDate={startDate || undefined}
@@ -680,6 +706,8 @@ export default function ESSScreen({ route }: any) {
                             todayTextColor: '#1373e5',
                             selectedDayBackgroundColor: '#1373e5',
                             arrowColor: '#1373e5',
+                            textDayFontWeight: '600',
+                            textMonthFontWeight: '800',
                           }}
                         />
                       </View>
@@ -691,7 +719,7 @@ export default function ESSScreen({ route }: any) {
               {/* Inline Date Validation Error */}
               {isDateRangeInvalid && (
                 <View style={styles.dateErrorBanner}>
-                  <AlertCircle size={14} color="#0f4f9c" />
+                  <AlertCircle size={14} color={dsStatus.danger.strong} />
                   <Text style={styles.dateErrorText}>End Date cannot be earlier than Start Date</Text>
                 </View>
               )}
@@ -699,7 +727,7 @@ export default function ESSScreen({ route }: any) {
 
             {/* Step 3: Provide Reason (Optional) */}
             <View style={styles.formSection}>
-              <Text style={styles.formSectionTitle}>3. Reason (Optional)</Text>
+              <View style={styles.stepHead}><View style={styles.stepBadge}><Text style={styles.stepBadgeText}>3</Text></View><Text style={styles.formSectionTitle}>Reason</Text><Text style={styles.stepOptional}>Optional</Text></View>
               <View style={[styles.inputWrapper, styles.textAreaWrapper]}>
                 <TextInput 
                   style={[styles.textInput, styles.textAreaInput]} 
@@ -716,7 +744,7 @@ export default function ESSScreen({ route }: any) {
 
             {/* Step 4: Attachment Upload (Optional) */}
             <View style={styles.formSection}>
-              <Text style={styles.formSectionTitle}>4. Attachment (Optional)</Text>
+              <View style={styles.stepHead}><View style={styles.stepBadge}><Text style={styles.stepBadgeText}>4</Text></View><Text style={styles.formSectionTitle}>Attachment</Text><Text style={styles.stepOptional}>Optional</Text></View>
               
               {!attachedFile ? (
                 <TouchableOpacity 
@@ -750,6 +778,56 @@ export default function ESSScreen({ route }: any) {
                 </View>
               )}
             </View>
+
+            {/* Live summary: what this request will cost (design system card) */}
+            {(() => {
+              const sel = balances.find((b) => b.leaveTypeId === leaveTypeId);
+              if (!sel) return null;
+              const left = sel.allocated - sel.used;
+              const after = calculatedDays != null ? left - calculatedDays : null;
+              const short = after != null && after < 0;
+              const theme = getLeaveTypeTheme(sel.leaveType.name);
+              const Icon = theme.icon;
+              return (
+                <View style={[styles.formSection, styles.applySummary, short && styles.applySummaryShort]}>
+                  <View style={styles.applySummaryHead}>
+                    <View style={[styles.typeChipIconBox, { backgroundColor: theme.bg }]}>
+                      <Icon size={16} color={theme.accent} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.applySummaryOver}>YOU ARE APPLYING FOR</Text>
+                      <Text style={styles.applySummaryTitle} numberOfLines={1}>
+                        {sel.leaveType.name}{calculatedDays != null ? ` · ${calculatedDays} ${calculatedDays === 1 ? 'day' : 'days'}` : ''}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.applySummaryStrip}>
+                    <View style={styles.applySummaryCol}>
+                      <Text style={styles.applySummaryNum}>{left}</Text>
+                      <Text style={styles.applySummaryLbl}>Available</Text>
+                    </View>
+                    <View style={styles.applySummaryDivider} />
+                    <View style={styles.applySummaryCol}>
+                      <Text style={styles.applySummaryNum}>{calculatedDays ?? '–'}</Text>
+                      <Text style={styles.applySummaryLbl}>This request</Text>
+                    </View>
+                    <View style={styles.applySummaryDivider} />
+                    <View style={styles.applySummaryCol}>
+                      <Text style={[styles.applySummaryNum, short && { color: dsStatus.danger.strong }, !short && after != null && { color: dsStatus.success.strong }]}>
+                        {after ?? '–'}
+                      </Text>
+                      <Text style={styles.applySummaryLbl}>Left after</Text>
+                    </View>
+                  </View>
+                  {short && (
+                    <View style={styles.dateErrorBanner}>
+                      <AlertCircle size={14} color={dsStatus.danger.strong} />
+                      <Text style={styles.dateErrorText}>That is {-after!} {-after! === 1 ? 'day' : 'days'} more than you have left of {sel.leaveType.name}.</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
 
             {/* Submit Action Button */}
             <TouchableOpacity 
@@ -801,6 +879,43 @@ const styles = StyleSheet.create({
   tabScrollView: {
     flex: 1,
   },
+  /* --- My Leaves (Timesheet design system, see theme/ds.ts) --- */
+  lvHeroScoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  lvBalanceScroll: { paddingHorizontal: 16, gap: 10 },
+  lvBalanceTile: {
+    width: 150, padding: 12, borderRadius: 16, backgroundColor: dsColors.bg,
+    borderWidth: 1, borderColor: dsColors.borderSoft, gap: 6, minHeight: 112,
+  },
+  lvBalanceEmpty: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
+  lvBalanceHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  lvBalanceIcon: { width: 26, height: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  lvBalanceName: { flex: 1, fontSize: 12.5, fontWeight: '800', color: dsColors.textBody },
+  lvBalanceNum: { fontSize: 22, fontWeight: '900', color: dsColors.text, fontVariant: ['tabular-nums'] },
+  lvBalanceOf: { fontSize: 11.5, fontWeight: '700', color: dsColors.textFaint },
+  lvTrack: { height: 5, borderRadius: 999, backgroundColor: dsColors.track, overflow: 'hidden' },
+  lvFill: { height: '100%', borderRadius: 999 },
+  lvBalanceUsed: { fontSize: 11, fontWeight: '600', color: dsColors.textMuted },
+  lvList: { paddingHorizontal: 16, gap: 10 },
+  lvSkeletonRow: { height: 104, borderRadius: 18 },
+  lvRequestCard: { flexDirection: 'column', alignItems: 'stretch', gap: 10 },
+  lvRequestTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  lvRequestCenter: { flex: 1, gap: 5 },
+  lvRequestTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  lvRequestTitle: { flex: 1, fontSize: 14.5, fontWeight: '800', color: dsColors.text },
+  lvRequestMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  lvRequestDates: { fontSize: 12.5, fontWeight: '700', color: dsColors.textBody },
+  lvDaysPill: {
+    fontSize: 11.5, fontWeight: '800', color: dsColors.text, backgroundColor: dsColors.borderSoft,
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden',
+  },
+  lvReason: { fontSize: 13, color: dsColors.textSecondary, fontStyle: 'italic', lineHeight: 18 },
+  lvRejection: {
+    flexDirection: 'row', gap: 6, alignItems: 'flex-start', backgroundColor: dsStatus.danger.bg,
+    borderWidth: 1, borderColor: dsStatus.danger.border, borderRadius: 10, padding: 10,
+  },
+  lvRejectionText: { flex: 1, fontSize: 12.5, color: dsStatus.danger.strong, fontWeight: '600', lineHeight: 17 },
+  lvRequestFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+
   scrollContentContainer: {
     paddingBottom: 120, // Generous padding so elements aren't cut off by floating bottom bar
   },
@@ -808,34 +923,38 @@ const styles = StyleSheet.create({
   /* --- Main Tabs --- */
   mainTabsHeader: {
     backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingVertical: 10,
   },
   mainTabsScroll: {
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    marginBottom: 0,
   },
   mainTabsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    gap: 8,
   },
   mainTabButton: {
-    paddingVertical: 14,
-    marginRight: 24,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   mainTabActive: {
-    borderBottomColor: '#1373e5',
+    backgroundColor: '#1373e5',
+    borderColor: '#1373e5',
   },
   mainTabText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#64748B',
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#475569',
   },
   mainTabTextActive: {
-    color: '#1373e5',
-    fontWeight: '700',
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
 
   /* --- Balances Section --- */
@@ -1194,27 +1313,50 @@ const styles = StyleSheet.create({
   },
 
   /* --- Apply Form Tab --- */
+  typeSheetBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)' },
+  typeSheet: {
+    backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 16, paddingBottom: 28, paddingTop: 8, maxHeight: '70%',
+  },
+  typeSheetGrabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: dsColors.border, marginBottom: 10 },
+  typeSheetList: { marginTop: 6 },
+  applySummary: { borderColor: dsColors.primaryBorder, backgroundColor: '#FBFDFF' },
+  applySummaryShort: { borderColor: dsStatus.danger.border },
+  applySummaryHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  applySummaryOver: { fontSize: 10, fontWeight: '800', letterSpacing: 0.7, color: dsColors.textFaint },
+  applySummaryTitle: { fontSize: 15, fontWeight: '800', color: dsColors.text, marginTop: 1 },
+  applySummaryStrip: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: dsColors.bg, borderWidth: 1,
+    borderColor: dsColors.borderSoft, borderRadius: 14, paddingVertical: 10,
+  },
+  applySummaryCol: { flex: 1, alignItems: 'center' },
+  applySummaryDivider: { width: 1, height: 24, backgroundColor: dsColors.border },
+  applySummaryNum: { fontSize: 18, fontWeight: '900', color: dsColors.text, fontVariant: ['tabular-nums'] },
+  applySummaryLbl: { fontSize: 10.5, fontWeight: '700', color: dsColors.textMuted, marginTop: 1 },
+  stepHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  stepBadge: {
+    width: 22, height: 22, borderRadius: 7, backgroundColor: dsColors.primarySoft,
+    borderWidth: 1, borderColor: dsColors.primaryBorder, alignItems: 'center', justifyContent: 'center',
+  },
+  stepBadgeText: { fontSize: 11.5, fontWeight: '900', color: dsColors.primary },
+  stepOptional: { fontSize: 11, fontWeight: '700', color: dsColors.textFaint },
   formContainer: {
-    paddingHorizontal: 20,
-    gap: 20,
+    paddingHorizontal: 16,
+    gap: 14,
   },
   formSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: dsColors.card,
     padding: 16,
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
+    borderColor: dsColors.border,
+    ...dsShadow.card,
   },
   formSectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 12,
+    fontSize: 15,
+    fontWeight: '800',
+    color: dsColors.text,
+    flex: 1,
   },
   typeGrid: {
     gap: 10,
@@ -1223,27 +1365,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderColor: dsColors.border,
+    backgroundColor: dsColors.bg,
     gap: 12,
   },
   typeChipIconBox: {
     width: 34,
     height: 34,
-    borderRadius: 10,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
   typeChipTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#334155',
+    fontWeight: '700',
+    color: dsColors.textBody,
   },
   typeChipSub: {
-    fontSize: 11,
-    color: '#94A3B8',
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: dsColors.textFaint,
     marginTop: 1,
   },
   dateSectionHeader: {
@@ -1254,17 +1397,19 @@ const styles = StyleSheet.create({
   calculatedDaysBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eff6ff',
+    backgroundColor: dsColors.primarySoft,
+    borderWidth: 1,
+    borderColor: dsColors.primaryBorder,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 999,
     gap: 4,
     marginBottom: 12,
   },
   calculatedDaysText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#1373e5',
+    fontWeight: '800',
+    color: dsColors.primary,
   },
   dateRow: {
     flexDirection: 'row',
@@ -1274,18 +1419,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   inputLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '800',
+    color: dsColors.textMuted,
+    letterSpacing: 0.4,
     marginBottom: 6,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: dsColors.bg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
+    borderColor: dsColors.border,
+    borderRadius: 14,
     paddingHorizontal: 12,
   },
   inputIcon: {
@@ -1308,76 +1454,98 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   submitBtn: {
-    backgroundColor: '#1373e5',
+    backgroundColor: dsColors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 16,
-    gap: 10,
-    shadowColor: '#1373e5',
+    paddingVertical: 15,
+    borderRadius: 14,
+    gap: 8,
+    shadowColor: dsColors.primary,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.28,
     shadowRadius: 12,
-    elevation: 6,
-    marginTop: 4,
+    elevation: 5,
+    marginTop: 2,
   },
   submitBtnDisabled: {
     opacity: 0.6,
   },
   submitBtnText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    fontSize: 15,
+    fontWeight: '800',
   },
   /* Date Validation Error */
   inputWrapperError: {
-    borderColor: '#dbeafe',
-    backgroundColor: '#eff6ff',
+    borderColor: dsStatus.danger.border,
+    backgroundColor: dsStatus.danger.bg,
   },
   dateErrorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eff6ff',
+    backgroundColor: dsStatus.danger.bg,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
     marginTop: 10,
     gap: 6,
     borderWidth: 1,
-    borderColor: '#dbeafe',
+    borderColor: dsStatus.danger.border,
   },
   dateErrorText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#0f4f9c',
+    fontWeight: '700',
+    color: dsStatus.danger.strong,
   },
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalCalendarBox: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 14,
     width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 5,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  calendarModalHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: 6,
+  },
+  calendarModalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  calendarModalClose: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   /* Dropzone Attachment */
   dropzoneContainer: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: dsColors.primarySoft,
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
+    borderColor: dsColors.primaryBorder,
     borderStyle: 'dashed',
     borderRadius: 16,
     paddingVertical: 20,
@@ -1388,16 +1556,16 @@ const styles = StyleSheet.create({
   dropzoneIconBox: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: '#eff6ff',
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
   },
   dropzoneTitle: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#334155',
+    fontWeight: '800',
+    color: dsColors.textBody,
   },
   dropzoneSub: {
     fontSize: 11,
@@ -1409,9 +1577,9 @@ const styles = StyleSheet.create({
   attachmentCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eff6ff',
+    backgroundColor: dsColors.primarySoft,
     borderWidth: 1,
-    borderColor: '#e5e5e6',
+    borderColor: dsColors.primaryBorder,
     borderRadius: 14,
     padding: 12,
     gap: 12,

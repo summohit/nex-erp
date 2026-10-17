@@ -6,6 +6,8 @@ import { History, X, Plus, Minus, Calendar } from 'lucide-react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { leaveService, LeaveBalance, CompOffPerson } from '../../api/leaveService';
 import { theme } from '../../theme/theme';
+import GradientHero from '../../components/GradientHero';
+import { ds, colors as dsColors, status as dsStatus, shadow as dsShadow } from '../../theme/ds';
 
 type Row = { id: number; name: string; isPaid: boolean; allocated: number; used: number };
 
@@ -59,6 +61,11 @@ export default function LeaveQuotaTab() {
 
   useEffect(() => { load(); }, [load]);
 
+  const totals = useMemo(() => ({
+    allocated: rows.reduce((t, r) => t + r.allocated, 0),
+    used: rows.reduce((t, r) => t + r.used, 0),
+    over: rows.reduce((t, r) => t + Math.max(r.used - r.allocated, 0), 0),
+  }), [rows]);
   const remaining = useMemo(() => rows.reduce((s, r) => s + Math.max(r.allocated - r.used, 0), 0), [rows]);
   // Types in use first, empty ones after, so the cards that matter are on top.
   const [active, empty] = useMemo(() => [
@@ -99,16 +106,35 @@ export default function LeaveQuotaTab() {
         contentContainerStyle={styles.body}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
-        <View style={styles.summary}>
-          <Text style={styles.summaryLabel}>Remaining leaves</Text>
-          <Text style={styles.summaryValue}>{n(remaining)}</Text>
-          <Text style={styles.summarySub}>{year} · all leave types</Text>
-        </View>
+        <GradientHero
+          id="quotaHeroGrad"
+          overline={`LEAVE QUOTA · ${year}`}
+          value={n(remaining)}
+          unit={`/ ${n(totals.allocated)} days left`}
+          caption="All leave types"
+          stats={[
+            { label: 'Allotted', value: n(totals.allocated) },
+            { label: 'Taken', value: n(totals.used), color: '#FDE68A' },
+            { label: 'Remaining', value: n(remaining), color: '#A7F3D0' },
+            { label: 'Over used', value: n(totals.over), color: totals.over > 0 ? '#FECACA' : undefined },
+          ]}
+        />
 
         {loading ? <ActivityIndicator style={styles.loader} color={theme.colors.primary} /> : (
           <>
+            {active.length > 0 && (
+              <View style={styles.listHeadRow}>
+                <Text style={ds.sectionTitle}>Your leave types</Text>
+                <Text style={ds.sectionHint}>{active.length} in use</Text>
+              </View>
+            )}
             {active.map(card)}
-            {empty.length > 0 && <Text style={styles.section}>Not allotted this year</Text>}
+            {empty.length > 0 && (
+              <View style={styles.listHeadRow}>
+                <Text style={ds.sectionTitle}>Not allotted this year</Text>
+                <Text style={ds.sectionHint}>{empty.length}</Text>
+              </View>
+            )}
             {empty.map(card)}
           </>
         )}
@@ -293,58 +319,54 @@ function Tile({ label, value, sub, highlight }: { label: string; value: string; 
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  listHeadRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, paddingHorizontal: 2 },
   body: { padding: 16, paddingBottom: 120, gap: 10 },
   loader: { marginTop: 30 },
-  summary: { backgroundColor: '#EFF6FF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#DBEAFE' },
-  summaryLabel: { fontSize: 13, color: '#1E40AF', fontWeight: '600' },
-  summaryValue: { fontSize: 32, fontWeight: '800', color: '#1373e5', marginTop: 2 },
-  summarySub: { fontSize: 12, color: '#475569' },
-  section: { marginTop: 8, fontSize: 12, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' },
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: theme.colors.border },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#16A34A' },
-  dotUnpaid: { backgroundColor: '#0EA5E9' },
-  typeName: { flex: 1, fontSize: 15, fontWeight: '700', color: theme.colors.textPrimary },
-  historyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: '#EFF6FF' },
-  historyText: { fontSize: 12, fontWeight: '700', color: theme.colors.primary },
-  bar: { height: 6, borderRadius: 3, backgroundColor: '#F1F5F9', marginTop: 10, overflow: 'hidden' },
-  barFill: { height: 6, backgroundColor: '#1373e5' },
-  barOver: { backgroundColor: '#DC2626' },
-  stats: { flexDirection: 'row', marginTop: 10 },
-  stat: { flex: 1 },
-  statValue: { fontSize: 16, fontWeight: '700', color: theme.colors.textPrimary },
-  statStrong: { color: '#15803D' },
-  statDanger: { color: '#DC2626' },
-  statLabel: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 1 },
-  sheet: { flex: 1, backgroundColor: '#F8FAFC', paddingTop: 54 },
+  card: { backgroundColor: dsColors.card, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: dsColors.border, ...dsShadow.card },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dot: { width: 10, height: 10, borderRadius: 4, backgroundColor: dsStatus.success.fg },
+  dotUnpaid: { backgroundColor: dsStatus.info.fg },
+  typeName: { flex: 1, fontSize: 14.5, fontWeight: '800', color: dsColors.text },
+  historyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: dsColors.primarySoft, borderWidth: 1, borderColor: dsColors.primaryBorder },
+  historyText: { fontSize: 11.5, fontWeight: '800', color: dsColors.primary },
+  bar: { height: 6, borderRadius: 999, backgroundColor: dsColors.track, marginTop: 12, overflow: 'hidden' },
+  barFill: { height: 6, borderRadius: 999, backgroundColor: dsColors.primary },
+  barOver: { backgroundColor: dsStatus.danger.fg },
+  stats: { flexDirection: 'row', marginTop: 12, backgroundColor: dsColors.bg, borderWidth: 1, borderColor: dsColors.borderSoft, borderRadius: 14, paddingVertical: 8 },
+  stat: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: 16, fontWeight: '900', color: dsColors.text, fontVariant: ['tabular-nums'] },
+  statStrong: { color: dsStatus.success.strong },
+  statDanger: { color: dsStatus.danger.strong },
+  statLabel: { fontSize: 10.5, fontWeight: '700', color: dsColors.textMuted, marginTop: 1 },
+  sheet: { flex: 1, backgroundColor: dsColors.bg, paddingTop: 54 },
   sheetHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 16 },
-  sheetTitle: { fontSize: 20, fontWeight: '800', color: theme.colors.textPrimary },
+  sheetTitle: { fontSize: 20, fontWeight: '900', color: dsColors.text },
   sheetSub: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 2 },
-  close: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' },
+  close: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: dsColors.border, alignItems: 'center', justifyContent: 'center' },
   yearsWrap: { flexGrow: 0, marginTop: 12 },
   years: { flexDirection: 'row', gap: 8, paddingHorizontal: 16 },
   rangeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, marginTop: 10 },
   rangeText: { fontSize: 13, fontWeight: '700', color: theme.colors.primary, textDecorationLine: 'underline' },
   rangeDash: { fontSize: 13, color: '#64748B' },
-  yearChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: '#fff', borderWidth: 1, borderColor: theme.colors.border },
-  yearOn: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  yearText: { fontWeight: '700', color: '#475569' },
+  yearChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: '#fff', borderWidth: 1, borderColor: dsColors.border },
+  yearOn: { backgroundColor: dsColors.primary, borderColor: dsColors.primary },
+  yearText: { fontSize: 12.5, fontWeight: '700', color: dsColors.textSecondary },
   yearTextOn: { color: '#fff' },
   sheetBody: { padding: 16, paddingBottom: 60 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tile: { width: '47%', flexGrow: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: theme.colors.border },
-  tileOn: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
-  tileLabel: { fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' },
-  tileValue: { fontSize: 24, fontWeight: '800', color: theme.colors.textPrimary, marginTop: 4 },
-  tileValueOn: { color: '#15803D' },
+  tile: { width: '47%', flexGrow: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: dsColors.border },
+  tileOn: { backgroundColor: dsStatus.success.bg, borderColor: dsStatus.success.border },
+  tileLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.7, color: dsColors.textMuted, textTransform: 'uppercase' },
+  tileValue: { fontSize: 24, fontWeight: '900', color: dsColors.text, marginTop: 4, fontVariant: ['tabular-nums'] },
+  tileValueOn: { color: dsStatus.success.strong },
   tileSub: { fontSize: 12, color: theme.colors.textSecondary },
   listHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20, marginBottom: 6 },
-  listTitle: { fontSize: 13, fontWeight: '800', color: theme.colors.textPrimary, textTransform: 'uppercase' },
-  entry: { backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 8 },
+  listTitle: { fontSize: 15, fontWeight: '800', color: dsColors.text },
+  entry: { backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: dsColors.border, marginBottom: 8 },
   entryRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  entryDate: { fontWeight: '700', color: theme.colors.textPrimary },
-  entryDays: { fontWeight: '700', color: '#15803D' },
+  entryDate: { fontSize: 13.5, fontWeight: '800', color: dsColors.text },
+  entryDays: { fontSize: 12, fontWeight: '800', color: dsStatus.success.strong, backgroundColor: dsStatus.success.bg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, overflow: 'hidden' },
   entryReason: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 3 },
   entryMeta: { fontSize: 12, color: theme.colors.textMuted, marginTop: 2 },
-  none: { fontSize: 13, color: theme.colors.textSecondary, padding: 12, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1' },
+  none: { fontSize: 12.5, color: dsColors.textMuted, padding: 14, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: dsColors.primaryBorder, backgroundColor: '#fff', textAlign: 'center' },
 });

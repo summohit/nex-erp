@@ -49,6 +49,7 @@ export interface FvDay {
   journeyVehicle?: string | null;
   journeyStartAt?: string | null;
   journeyEndAt?: string | null;
+  journeyTrackedKm?: number | null;
   issue?: { id: number; key: string; title: string } | null;
   request: {
     id: number; requestNumber: string; status: string; location: string;
@@ -364,7 +365,32 @@ export const fieldVisitRequestService = {
     });
     return data;
   },
+  /** Road route from here to today's site, with the path recorded so far. */
+  async routePreview(requestId: number, lat: number, lng: number): Promise<RoutePreview> {
+    const { data } = await apiClient.get('/travel-allowance/route-preview', { params: { requestId, lat, lng } });
+    return data;
+  },
 };
 
+export interface RoutePreview {
+  site: { name: string; lat: number; lng: number; radiusM: number };
+  from: { lat: number; lng: number };
+  roadKm: number;
+  minutes: number;
+  path: number[][];
+  routed: boolean;
+  straightKm: number;
+  recorded: number[][];
+  trackedKm: number | null;
+  journeyActive: boolean;
+}
+
 export interface TravelRate { vehicle: string; kind?: 'PER_KM' | 'ACTUAL_FARE'; ratePerKm: number; receiptRequired?: boolean }
-export interface TravelConfig { ncrRadiusKm: number; maxFarePerDay?: number; rates: TravelRate[] }
+export interface TravelConfig {
+  ncrRadiusKm: number;
+  maxFarePerDay?: number;
+  defaultRatePerKm?: number;
+  myGrade?: string;
+  myRatePerKm?: number;
+  rates: TravelRate[];
+}
