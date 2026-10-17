@@ -341,7 +341,8 @@ export class IssuesService {
             raisedBy: { select: { id: true, firstName: true, lastName: true } },
           },
         },
-        _count: { select: { comments: true } }
+        // attachments: the proof files, so cards can show evidence was given.
+        _count: { select: { comments: true, attachments: true } }
       },
       orderBy: { position: 'asc' }
     });

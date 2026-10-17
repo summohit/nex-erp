@@ -3049,6 +3049,14 @@
                     </span>
                   </ng-container>
 
+                  <!-- Evidence / attachments: green once the task is in Review or Done -->
+                  <div *ngIf="issue._count?.attachments > 0" class="card-evidence-badge"
+                       [class.is-evidence]="issue.status === 'IN_REVIEW' || issue.status === 'DONE'"
+                       title="{{ issue._count.attachments }} file(s) attached{{ (issue.status === 'IN_REVIEW' || issue.status === 'DONE') ? ' as proof' : '' }}">
+                    <svg lucidePaperclip size="11"></svg>
+                    <span>{{ issue._count.attachments }}</span>
+                  </div>
+
                   <!-- Comments Indicator -->
                   <div *ngIf="issue._count?.comments > 0" title="{{ issue._count.comments }} comment(s)" class="card-comment-badge">
                     <svg lucideMessageSquare size="11"></svg>
@@ -5045,6 +5053,14 @@
         </div>
       </div>
 
+      <!-- Remark for the reviewer, saved as a comment on the task -->
+      <div class="proof-remark">
+        <label class="proof-remark-label" for="proofRemark">Remark for the reviewer <span>(optional)</span></label>
+        <textarea id="proofRemark" class="proof-remark-input" rows="3" maxlength="1000"
+                  placeholder="What was done, anything the reviewer should check"
+                  [ngModel]="proofNotes()" (ngModelChange)="proofNotes.set($event)"
+                  [disabled]="isUploadingProof()"></textarea>
+      </div>
       <!-- Upload Progress -->
       <div class="proof-progress-section" *ngIf="isUploadingProof()">
         <div class="proof-progress-label">

@@ -11485,3 +11485,14 @@ input[type=text], input[type=email], input[type=password] {
 .budget-kpi:hover .budget-kpi-edit { opacity: 1; }
 .budget-kpi-edit:hover { color: #4f46e5; border-color: #c7d2fe; background: #eef2ff; }
 .summary-key-edit { position: static; width: 26px; height: 26px; opacity: 1; }
+
+/* Proof modal: remark for the reviewer (17 Oct 2026) */
+.proof-remark { margin: 12px 0 4px; display: flex; flex-direction: column; gap: 6px; }
+.proof-remark-label { font-size: 12.5px; font-weight: 700; color: #334155; }
+.proof-remark-label span { font-weight: 500; color: #94a3b8; }
+.proof-remark-input { width: 100%; box-sizing: border-box; resize: vertical; min-height: 72px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; font: inherit; font-size: 13.5px; color: #0f172a; }
+.proof-remark-input:focus { outline: none; border-color: #93c5fd; background: #fff; box-shadow: 0 0 0 3px rgba(19,115,229,.12); }
+
+/* Card: attachments / evidence count (17 Oct 2026) */
+.card-evidence-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 999px; padding: 1px 7px; }
+.card-evidence-badge.is-evidence { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }

@@ -5305,6 +5305,14 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.proofUploadProgress.set(100);
         this.isUploadingProof.set(false);
 
+        // The remark goes on the task as a comment, beside the proof files.
+        const remark = this.proofNotes().trim();
+        if (remark) {
+          this.projectsService.addIssueComment(this.projectId, issue.id, `Proof for ${colName}: ${remark}`).subscribe({
+            error: () => this.toast.error('The files were uploaded, but the remark could not be saved.'),
+          });
+        }
+
         this.optimisticallyUpdateIssueColumn(issue.id, targetColId, this.proofInsertIndex());
         this.setIssueUpdating(issue.id, true);
         this.closeProofModal();
