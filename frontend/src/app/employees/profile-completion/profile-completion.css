@@ -929,3 +929,32 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* HR's document lock card (17 Oct 2026) */
+.pc-lock { display: flex; gap: 14px; padding: 16px 18px; margin-bottom: 20px; border-radius: 16px; border: 1px solid #e2e8f0; background: #fff; }
+.pc-lock.on { border-color: #fecaca; background: #fff7f7; }
+.pc-lock.scheduled { border-color: #fde68a; background: #fffdf5; }
+.pc-lock-icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: #f1f5f9; color: #475569; flex-shrink: 0; }
+.pc-lock.on .pc-lock-icon { background: #fee2e2; color: #b91c1c; }
+.pc-lock.scheduled .pc-lock-icon { background: #fef3c7; color: #b45309; }
+.pc-lock-main { flex: 1; min-width: 0; }
+.pc-lock-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 15px; font-weight: 800; color: #0f172a; }
+.pc-lock-pill { font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px; letter-spacing: .3px; }
+.pc-lock-pill.on { background: #fee2e2; color: #b91c1c; }
+.pc-lock-pill.off { background: #f1f5f9; color: #64748b; }
+.pc-lock-pill.scheduled { background: #fef3c7; color: #b45309; }
+.pc-lock-desc { margin: 6px 0 12px; font-size: 13px; color: #475569; line-height: 1.5; }
+.pc-lock-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.pc-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.pc-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.pc-switch-track { width: 40px; height: 22px; border-radius: 999px; background: #cbd5e1; position: relative; transition: background .15s; }
+.pc-switch-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 3px rgba(15,23,42,.3); }
+.pc-switch input:checked + .pc-switch-track { background: #dc2626; }
+.pc-switch input:checked + .pc-switch-track .pc-switch-thumb { transform: translateX(18px); }
+.pc-switch input:focus-visible + .pc-switch-track { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.pc-switch-label { font-size: 13px; font-weight: 700; color: #334155; }
+.pc-lock-date { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #475569; }
+.pc-lock-date input { height: 34px; padding: 0 10px; border: 1px solid #e2e8f0; border-radius: 8px; font: inherit; color: #0f172a; background: #f8fafc; }
+.pc-lock-date input:disabled { opacity: .5; }
+.pc-lock-clear { border: 0; background: none; color: #1373e5; font-weight: 700; font-size: 12.5px; cursor: pointer; }
+.pc-lock-saved { font-size: 12.5px; font-weight: 700; color: #047857; }

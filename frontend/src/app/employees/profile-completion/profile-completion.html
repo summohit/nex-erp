@@ -30,6 +30,42 @@
     </div>
   </div>
 
+  <!-- HR's document lock -->
+  @if (lock(); as l) {
+    <div class="pc-lock" [class.on]="l.active" [class.scheduled]="l.enabled && !l.active">
+      <div class="pc-lock-icon"><svg lucideLock size="18"></svg></div>
+      <div class="pc-lock-main">
+        <div class="pc-lock-title">
+          Require documents before using MIRA
+          @if (l.active) { <span class="pc-lock-pill on">ON</span> }
+          @else if (l.enabled) { <span class="pc-lock-pill scheduled">Starts {{ l.from | date:'d MMM y' }}</span> }
+          @else { <span class="pc-lock-pill off">OFF</span> }
+        </div>
+        <p class="pc-lock-desc">
+          When on, employees with anything missing see the document reminder on the website with <b>no close or "Remind me later"</b>
+          until every required document and detail is uploaded. They can still open their own profile to fill in details.
+          Exempt accounts are never locked. The mobile app is not affected.
+        </p>
+        <div class="pc-lock-controls">
+          <label class="pc-switch">
+            <input type="checkbox" [(ngModel)]="lockEnabled" (ngModelChange)="lockSaved.set(false)" />
+            <span class="pc-switch-track"><span class="pc-switch-thumb"></span></span>
+            <span class="pc-switch-label">{{ lockEnabled ? 'Lock on' : 'Lock off' }}</span>
+          </label>
+          <label class="pc-lock-date">
+            <span>Start from</span>
+            <input type="date" [(ngModel)]="lockFrom" (ngModelChange)="lockSaved.set(false)" [disabled]="!lockEnabled" />
+            @if (lockFrom) { <button type="button" class="pc-lock-clear" (click)="lockFrom = ''; lockSaved.set(false)">Start now</button> }
+          </label>
+          <button type="button" class="pc-btn pc-btn-primary" (click)="saveLock()" [disabled]="savingLock() || !lockDirty">
+            {{ savingLock() ? 'Saving…' : 'Save' }}
+          </button>
+          @if (lockSaved() && !lockDirty) { <span class="pc-lock-saved">Saved</span> }
+        </div>
+      </div>
+    </div>
+  }
+
   <!-- KPI Stats Grid -->
   @if (report(); as r) {
     <div class="pc-stats-grid">

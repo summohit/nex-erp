@@ -109,7 +109,9 @@ export class ProfileCompletenessService {
     });
     const enabled = !!s?.profileLockEnabled;
     const from = s?.profileLockFrom ?? null;
-    return { enabled, from: from ? from.toISOString().slice(0, 10) : null, active: enabled && (!from || from.getTime() <= Date.now()) };
+    // Stored as midnight IST of the chosen day; read it back as that same IST day.
+    const fromIst = from ? new Date(from.getTime() + 330 * 60_000).toISOString().slice(0, 10) : null;
+    return { enabled, from: fromIst, active: enabled && (!from || from.getTime() <= Date.now()) };
   }
 
   /** HR, admins and the super admin turn the lock on or off and set its start date. */

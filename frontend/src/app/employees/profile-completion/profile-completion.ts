@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { EmployeeService, ProfileCompletenessReport } from '../../services/employee.service';
+import { EmployeeService, ProfileCompletenessReport, ProfileLock } from '../../services/employee.service';
 import {
   LucideArrowLeft,
   LucideRefreshCw,
@@ -17,7 +17,8 @@ import {
   LucideChevronUp,
   LucideFileQuestion,
   LucideBuilding,
-  LucideUserCheck
+  LucideUserCheck,
+  LucideLock,
 } from '@lucide/angular';
 
 /**
@@ -45,7 +46,8 @@ import {
     LucideChevronUp,
     LucideFileQuestion,
     LucideBuilding,
-    LucideUserCheck
+    LucideUserCheck,
+    LucideLock,
   ],
   templateUrl: './profile-completion.html',
   styleUrl: './profile-completion.css',
@@ -102,8 +104,43 @@ export class ProfileCompletionComponent implements OnInit {
     });
   });
 
+  /**
+   * HR's document lock (17 Oct 2026): when on (from the start date, or at once),
+   * the reminder cannot be closed until every required document and detail is
+   * uploaded. Exempt accounts are never locked.
+   */
+  lock = signal<ProfileLock | null>(null);
+  lockEnabled = false;
+  lockFrom = '';
+  savingLock = signal(false);
+  lockSaved = signal(false);
+
   ngOnInit() {
     this.load();
+    this.employees.getProfileLock().subscribe({
+      next: (l) => { this.lock.set(l); this.lockEnabled = l.enabled; this.lockFrom = l.from ?? ''; },
+      error: () => this.lock.set(null),
+    });
+  }
+
+  saveLock() {
+    this.savingLock.set(true);
+    this.lockSaved.set(false);
+    this.employees.setProfileLock({ enabled: this.lockEnabled, from: this.lockFrom || null }).subscribe({
+      next: (l) => {
+        this.lock.set(l);
+        this.lockEnabled = l.enabled;
+        this.lockFrom = l.from ?? '';
+        this.savingLock.set(false);
+        this.lockSaved.set(true);
+      },
+      error: () => this.savingLock.set(false),
+    });
+  }
+
+  get lockDirty(): boolean {
+    const l = this.lock();
+    return !!l && (l.enabled !== this.lockEnabled || (l.from ?? '') !== this.lockFrom);
   }
 
   load() {
