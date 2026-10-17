@@ -31,6 +31,10 @@ import {
 } from 'lucide-react-native';
 import { useLeaveStore } from '../../store/leaveStore';
 import { leaveService } from '../../api/leaveService';
+import { apiClient } from '../../api/apiClient';
+import { employeeService } from '../../api/employeeService';
+import { attendanceService } from '../../api/attendanceService';
+import { isRestDay } from '../../utils/weeklyOffs';
 import { Calendar as RNCalendar } from 'react-native-calendars';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import FeedbackModal, { ModalType } from '../../components/FeedbackModal';
@@ -129,7 +133,55 @@ export default function ESSScreen({ route }: any) {
 
   const dayResult = validateAndCalculateDays(startDate, endDate);
   const isDateRangeInvalid = dayResult === 'INVALID_RANGE';
-  const calculatedDays = typeof dayResult === 'number' ? dayResult : null;
+  const calendarDays = typeof dayResult === 'number' ? dayResult : null;
+
+  // Half day (as on the web): single day only, and only for leave types that allow it.
+  const [isHalfDay, setIsHalfDay] = useState(false);
+  const [halfDayPeriod, setHalfDayPeriod] = useState<'AM' | 'PM'>('AM');
+  const selectedBalance = balances.find((b) => b.leaveTypeId === leaveTypeId);
+  const halfDayAllowed = !!startDate && startDate === endDate && selectedBalance?.leaveType?.allowHalfDay !== false;
+  useEffect(() => { if (!halfDayAllowed) setIsHalfDay(false); }, [halfDayAllowed]);
+
+  // Working days, the server's rule: rest days (roster, then shift, then
+  // branch) and holidays are not counted. Calendar days were shown before, so
+  // Friday-Monday read "4 days" while the server charged 2.
+  const [restCtx, setRestCtx] = useState<{ shiftDays: string | null; weeklyOffs: string | null; holidays: Set<string> } | null>(null);
+  const [rosterOff, setRosterOff] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    Promise.allSettled([employeeService.getMyProfile(), attendanceService.getHolidays()]).then(([p, h]) => {
+      const prof: any = p.status === 'fulfilled' ? p.value : null;
+      const hol: any[] = h.status === 'fulfilled' ? (h.value || []) : [];
+      setRestCtx({
+        shiftDays: prof?.shift?.workingDays ?? null,
+        weeklyOffs: prof?.branch ? (prof.branch.weeklyOffs ?? '') : null,
+        holidays: new Set(hol.map((x: any) => String(x.date).slice(0, 10))),
+      });
+    });
+  }, []);
+  useEffect(() => {
+    if (!startDate || !endDate || isDateRangeInvalid) return;
+    apiClient.get('/attendance/roster-days/me', { params: { from: startDate, to: endDate } })
+      .then(({ data }) => {
+        const m: Record<string, boolean> = {};
+        for (const r of (data || []) as { date: string; isDayOff: boolean }[]) m[String(r.date).slice(0, 10)] = r.isDayOff;
+        setRosterOff(m);
+      })
+      .catch(() => setRosterOff({}));
+  }, [startDate, endDate, isDateRangeInvalid]);
+  const workingDays = (() => {
+    if (calendarDays == null || !restCtx) return null;
+    const [y, mo, d] = startDate.split('-').map(Number);
+    let n = 0;
+    for (let i = 0; i < calendarDays; i++) {
+      const day = new Date(y, mo - 1, d + i);
+      const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+      const rest = isRestDay(day, rosterOff[key], restCtx.shiftDays, restCtx.weeklyOffs ?? '0');
+      if (!rest && !restCtx.holidays.has(key)) n++;
+    }
+    return n;
+  })();
+  const calculatedDays = workingDays == null ? calendarDays : (isHalfDay && workingDays > 0 ? 0.5 : workingDays);
+  const noWorkingDays = workingDays === 0;
 
   const handlePickAttachment = () => {
     Alert.alert(
@@ -188,12 +240,18 @@ export default function ESSScreen({ route }: any) {
       return;
     }
 
+    if (noWorkingDays) {
+      showModal('No working days', 'These dates are all rest days or holidays for you, so there is nothing to apply for.', 'error');
+      return;
+    }
+
     const success = await submitLeaveRequest({
       leaveTypeId,
       startDate,
       endDate,
       reason: reason || 'Not specified',
       attachmentUrl: attachedFile ? attachedFile.url : undefined,
+      ...(isHalfDay ? { isHalfDay: true, halfDayPeriod } : {}),
     });
 
     if (success) {
@@ -204,6 +262,7 @@ export default function ESSScreen({ route }: any) {
       setReason('');
       setLeaveTypeId(null);
       setAttachedFile(null);
+      setIsHalfDay(false);
     } else {
       const errorMsg = useLeaveStore.getState().error;
       showModal('Request Failed', errorMsg || 'There was an error submitting your request.', 'error');
@@ -613,10 +672,12 @@ export default function ESSScreen({ route }: any) {
             <View style={styles.formSection}>
               <View style={styles.dateSectionHeader}>
                 <View style={[styles.stepHead, { flex: 1 }]}><View style={styles.stepBadge}><Text style={styles.stepBadgeText}>2</Text></View><Text style={styles.formSectionTitle}>Select Dates *</Text></View>
-                {calculatedDays && (
-                  <View style={styles.calculatedDaysBadge}>
-                    <Sparkles size={12} color="#1373e5" />
-                    <Text style={styles.calculatedDaysText}>{calculatedDays} {calculatedDays === 1 ? 'Day' : 'Days'} Selected</Text>
+                {calculatedDays != null && (
+                  <View style={[styles.calculatedDaysBadge, noWorkingDays && styles.zeroDaysBadge]}>
+                    <Sparkles size={12} color={noWorkingDays ? dsStatus.danger.strong : '#1373e5'} />
+                    <Text style={[styles.calculatedDaysText, noWorkingDays && { color: dsStatus.danger.strong }]}>
+                      {isHalfDay && !noWorkingDays ? 'Half day' : `${calculatedDays} working ${calculatedDays === 1 ? 'day' : 'days'}`}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -727,6 +788,50 @@ export default function ESSScreen({ route }: any) {
                 <View style={styles.dateErrorBanner}>
                   <AlertCircle size={14} color={dsStatus.danger.strong} />
                   <Text style={styles.dateErrorText}>End Date cannot be earlier than Start Date</Text>
+                </View>
+              )}
+
+              {/* Rest days and holidays are not counted (server rule) */}
+              {!isDateRangeInvalid && noWorkingDays && (
+                <View style={styles.dateErrorBanner}>
+                  <AlertCircle size={14} color={dsStatus.danger.strong} />
+                  <Text style={styles.dateErrorText}>These dates are your rest days or holidays: 0 working days to apply for.</Text>
+                </View>
+              )}
+              {!isDateRangeInvalid && !noWorkingDays && workingDays != null && calendarDays != null && workingDays < calendarDays && (
+                <Text style={styles.restNote}>
+                  {calendarDays - workingDays} rest {calendarDays - workingDays === 1 ? 'day or holiday is' : 'days or holidays are'} not counted.
+                </Text>
+              )}
+
+              {/* Half day: same start and end date, leave type allows it (as on the web) */}
+              {halfDayAllowed && !noWorkingDays && (
+                <View style={styles.halfCard}>
+                  <TouchableOpacity style={styles.halfToggle} onPress={() => setIsHalfDay((v) => !v)} activeOpacity={0.8}>
+                    <View style={[styles.halfCheck, isHalfDay && styles.halfCheckOn]}>
+                      {isHalfDay && <CheckCircle size={14} color="#FFFFFF" />}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.halfTitle}>Half day</Text>
+                      <Text style={styles.halfSub}>Counts as 0.5 day</Text>
+                    </View>
+                  </TouchableOpacity>
+                  {isHalfDay && (
+                    <View style={styles.halfPeriods}>
+                      {(['AM', 'PM'] as const).map((p) => (
+                        <TouchableOpacity
+                          key={p}
+                          style={[styles.halfPeriod, halfDayPeriod === p && styles.halfPeriodOn]}
+                          onPress={() => setHalfDayPeriod(p)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.halfPeriodText, halfDayPeriod === p && styles.halfPeriodTextOn]}>
+                            {p === 'AM' ? 'Morning session' : 'Afternoon session'}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -1326,6 +1431,19 @@ const styles = StyleSheet.create({
   },
   typeSheetGrabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: dsColors.border, marginBottom: 10 },
   typeSheetList: { marginTop: 6 },
+  zeroDaysBadge: { backgroundColor: dsStatus.danger.bg, borderColor: dsStatus.danger.border },
+  restNote: { fontSize: 12, fontWeight: '600', color: dsColors.textMuted, marginTop: 8 },
+  halfCard: { marginTop: 12, borderWidth: 1, borderColor: dsColors.primaryBorder, backgroundColor: dsColors.primarySoft, borderRadius: 14, padding: 12, gap: 10 },
+  halfToggle: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  halfCheck: { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, borderColor: dsColors.primaryRing, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  halfCheckOn: { backgroundColor: dsColors.primary, borderColor: dsColors.primary },
+  halfTitle: { fontSize: 14, fontWeight: '800', color: dsColors.text },
+  halfSub: { fontSize: 11.5, fontWeight: '600', color: dsColors.textMuted },
+  halfPeriods: { flexDirection: 'row', gap: 8 },
+  halfPeriod: { flex: 1, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: dsColors.border, backgroundColor: '#FFFFFF', alignItems: 'center' },
+  halfPeriodOn: { borderColor: dsColors.primary, backgroundColor: dsColors.primary },
+  halfPeriodText: { fontSize: 12.5, fontWeight: '700', color: dsColors.textBody },
+  halfPeriodTextOn: { color: '#FFFFFF' },
   applySummary: { borderColor: dsColors.primaryBorder, backgroundColor: '#FBFDFF' },
   applySummaryShort: { borderColor: dsStatus.danger.border },
   applySummaryHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },

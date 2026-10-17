@@ -46,7 +46,9 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
       set({ isSubmitting: false });
       return true;
     } catch (error: any) {
-      set({ error: error.message || 'Failed to submit leave request', isSubmitting: false });
+      // The server's own reason ("0 working days", "already applied for…").
+      const m = error?.response?.data?.message;
+      set({ error: (Array.isArray(m) ? m.join('\n') : m) || error.message || 'Failed to submit leave request', isSubmitting: false });
       return false;
     }
   },

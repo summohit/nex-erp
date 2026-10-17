@@ -8,6 +8,8 @@ export interface LeaveBalance {
   leaveType: {
     id: number;
     name: string;
+    /** Whether a half day may be taken (server default: true). */
+    allowHalfDay?: boolean;
   };
 }
 
@@ -55,6 +57,10 @@ export interface CreateLeaveRequestDto {
   endDate: string;
   reason: string;
   attachmentUrl?: string;
+  /** Single day only; counts 0.5. */
+  isHalfDay?: boolean;
+  /** 'AM' morning session, 'PM' afternoon session. */
+  halfDayPeriod?: 'AM' | 'PM';
 }
 
 export const leaveService = {
