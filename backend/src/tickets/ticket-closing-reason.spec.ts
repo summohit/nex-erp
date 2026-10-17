@@ -63,7 +63,7 @@ describe('TicketsService.update — resolving and rejecting', () => {
     await move('RESOLVED', { statusReason: 'Router delivered and configured on site' });
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     const comment = written.find((w) => w.kind === 'comment');
-    expect(comment.data).toMatchObject({ ticketId: 27, authorId: DEV, body: 'Resolved: Router delivered and configured on site' });
+    expect(comment.data).toMatchObject({ ticketId: 27, authorId: DEV, body: 'Resolved. Remark: "Router delivered and configured on site"' });
   });
 
   it('attaches the evidence when given', async () => {
@@ -73,6 +73,22 @@ describe('TicketsService.update — resolving and rejecting', () => {
     });
     const att = written.find((w) => w.kind === 'attachment');
     expect(att.data).toMatchObject({ ticketId: 27, fileName: 'proof.png', fileUrl: 'https://cdn/proof.png', uploadedById: DEV });
+  });
+
+  it('requires a remark and evidence to close, then links the evidence from its comment', async () => {
+    expect(await move('CLOSED', { statusReason: 'Confirmed by the reporter' })).toBeInstanceOf(BadRequestException);
+    expect(await move('CLOSED', { statusAttachment: { fileUrl: 'https://cdn/proof.png' } })).toBeInstanceOf(BadRequestException);
+
+    written = [];
+    await move('CLOSED', {
+      statusReason: 'Confirmed by the reporter',
+      statusAttachment: { fileName: 'closure-proof.png', fileUrl: 'https://cdn/closure-proof.png', fileSize: 800 },
+    });
+    const comment = written.find((w) => w.kind === 'comment');
+    expect(comment.data.body).toContain('Closed. Remark: "Confirmed by the reporter"');
+    expect(comment.data.body).toContain('Evidence attached: <a href="https://cdn/closure-proof.png"');
+    expect(written.find((w) => w.kind === 'attachment').data)
+      .toMatchObject({ ticketId: 27, fileName: 'closure-proof.png', fileUrl: 'https://cdn/closure-proof.png' });
   });
 
   it('does not write the reason fields as ticket columns', async () => {

@@ -4,6 +4,7 @@ import { ProjectTicketsService } from '../tickets/project-tickets.service';
 import axios from 'axios';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
 import FormData from 'form-data';
 import { TasksGateway } from '../../events/tasks/tasks.gateway';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -1160,6 +1161,22 @@ export class IssuesService {
 
     if (isRestrictedTarget) {
       await this.assertCanCompleteOrArchive(companyId, employeeId, oldIssue, role);
+      const isManager = await this.mayManageTask(companyId, projectId, employeeId, role);
+      const isAssigned = oldIssue.assigneeId === employeeId
+        || !!(await this.prisma.issueMember.findUnique({
+          where: { issueId_employeeId: { issueId, employeeId } },
+          select: { issueId: true },
+        }));
+      const completionRemark = String(data.completionRemark ?? '').trim();
+
+      // The person doing the assigned work records what they completed. Project
+      // owners, PMs and everyone else moving a card on the assignee's behalf
+      // are intentionally not forced to invent that update.
+      if (isAssigned && !isManager && !completionRemark) {
+        throw new BadRequestException(
+          'Add a completion remark before moving an assigned task to review or done.',
+        );
+      }
       // The one place a dependency is enforced rather than advised.
       //
       // Everywhere else an open blocker is a chip and a note, because a stale
@@ -1271,6 +1288,42 @@ export class IssuesService {
           }
         }
       });
+      this.tasksGateway.emitActivityAdded(issueId, activity);
+    }
+
+    const completionRemark = String(data.completionRemark ?? '').trim();
+    if (completionRemark && data.columnId && Number(data.columnId) !== oldIssue.columnId) {
+      const safeRemark = completionRemark
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      const requestedAttachmentIds: number[] = Array.isArray(data.completionAttachmentIds)
+        ? [...new Set<number>((data.completionAttachmentIds as unknown[])
+            .map((value) => Number(value))
+            .filter((id) => Number.isInteger(id) && id > 0))]
+        : [];
+      const completionAttachments = requestedAttachmentIds.length
+        ? await this.prisma.issueAttachment.findMany({
+            where: { id: { in: requestedAttachmentIds }, issueId, uploadedBy: employeeId },
+            select: { fileName: true, fileUrl: true },
+          })
+        : [];
+      const proofLinks = completionAttachments.length
+        ? `<div data-completion-proofs="true">${completionAttachments.map((attachment) => {
+            const name = attachment.fileName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const url = attachment.fileUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `<a data-completion-proof="true" href="${url}" target="_blank" rel="noopener noreferrer">${name}</a>`;
+          }).join('')}</div>`
+        : '';
+      const comment = await this.prisma.issueComment.create({
+        data: { body: `<p><strong>Completion remark:</strong> ${safeRemark}</p>${proofLinks}`, issueId, authorId: employeeId },
+        include: { author: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } } },
+      });
+      const activity = await this.prisma.issueActivity.create({
+        data: { action: 'COMMENT_ADDED', issueId, actorId: employeeId },
+        include: { actor: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } } },
+      });
+      this.tasksGateway.emitCommentAdded(issueId, comment);
       this.tasksGateway.emitActivityAdded(issueId, activity);
     }
 
@@ -2172,32 +2225,31 @@ export class IssuesService {
     if (!issue) throw new NotFoundException('Issue not found');
     if (!file) throw new HttpException('No file provided', HttpStatus.BAD_REQUEST);
 
-    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
-    if (!privateKey) throw new HttpException('ImageKit not configured', HttpStatus.INTERNAL_SERVER_ERROR);
-
     let fileUrl: string;
-    try {
-      const ext = path.extname(file.originalname);
-      const filename = `${crypto.randomBytes(12).toString('hex')}${ext}`;
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    if (!privateKey) {
+      // Local development must remain usable without a cloud-storage secret.
+      // `main.ts` exposes this folder through /uploads.
+      fileUrl = this.saveLocalAttachment(file);
+    } else {
+      try {
+        const ext = path.extname(file.originalname);
+        const filename = `${crypto.randomBytes(12).toString('hex')}${ext}`;
 
-      const form = new FormData();
-      form.append('file', file.buffer.toString('base64'));
-      form.append('fileName', filename);
-      form.append('folder', '/card_attachments');
+        const form = new FormData();
+        form.append('file', file.buffer.toString('base64'));
+        form.append('fileName', filename);
+        form.append('folder', '/card_attachments');
 
-      const authHeader = 'Basic ' + Buffer.from(privateKey + ':').toString('base64');
-
-      const response = await axios.post('https://upload.imagekit.io/api/v1/files/upload', form, {
-        headers: {
-          ...form.getHeaders(),
-          Authorization: authHeader
-        }
-      });
-
-      fileUrl = response.data.url;
-    } catch (error: any) {
-      console.error('Attachment ImageKit upload error:', error.response?.data || error.message);
-      throw new HttpException('Failed to upload file to ImageKit', HttpStatus.INTERNAL_SERVER_ERROR);
+        const authHeader = 'Basic ' + Buffer.from(privateKey + ':').toString('base64');
+        const response = await axios.post('https://upload.imagekit.io/api/v1/files/upload', form, {
+          headers: { ...form.getHeaders(), Authorization: authHeader }
+        });
+        fileUrl = response.data.url;
+      } catch (error: any) {
+        console.error('Attachment ImageKit upload error:', error.response?.data || error.message);
+        throw new HttpException('Failed to upload file to ImageKit', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
     }
 
     // Outside the try on purpose. This used to sit inside it, so a failed row
@@ -2224,6 +2276,15 @@ export class IssuesService {
       console.error('Attachment record create failed:', error.message);
       throw new HttpException('Failed to save the attachment record', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  private saveLocalAttachment(file: Express.Multer.File): string {
+    const directory = path.join(process.cwd(), 'uploads', 'card_attachments');
+    fs.mkdirSync(directory, { recursive: true });
+    const filename = `${crypto.randomBytes(16).toString('hex')}${path.extname(file.originalname)}`;
+    fs.writeFileSync(path.join(directory, filename), file.buffer);
+    const baseUrl = (process.env.PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+    return `${baseUrl}/uploads/card_attachments/${filename}`;
   }
 
   async addLinkAttachment(companyId: number, employeeId: number, projectId: number, issueId: number, linkUrl: string, linkName?: string) {

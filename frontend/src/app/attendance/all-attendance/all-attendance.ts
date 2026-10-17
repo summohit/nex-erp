@@ -286,6 +286,11 @@ export class AllAttendanceComponent implements OnInit {
 
   ngOnInit() {
     this.loadToday();
+    // The attendance overview is an operational dashboard. Start with today's
+    // calendar day so its KPI cards answer "who is here today?" rather than
+    // silently aggregating the whole current month. Month/year remain aligned
+    // with this date for the matrix and can still be changed in Filters.
+    this.filterDate = this.getLocalDateString(new Date());
     this.employeeService.getEmployeesBasicList().subscribe({ next: (res) => this.employees.set(res || []) });
     this.masterDataService.getDepartments(true).subscribe({ next: (res) => this.departments.set(res || []) });
     this.masterDataService.getHolidays().subscribe({ next: (res: any) => this.holidays.set(res || []) });
