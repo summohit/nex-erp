@@ -6,6 +6,10 @@ require Pod::Executable.execute_command('node', ['-p',
   )', __dir__]).strip
 
 platform :ios, min_ios_version_supported
+
+# Firebase through CocoaPods, not Swift Package Manager: react-native-firebase
+# refuses SPM with static linkage (duplicate Firebase copies at link time).
+$RNFirebaseDisableSPM = true
 prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']
@@ -27,6 +31,17 @@ target 'NexMobileApp' do
   # symbols after adding Firebase, run `USE_FRAMEWORKS=static pod install`
   # rather than hard-coding it — that is what the mechanism above is for.
   $RNFirebaseAsStaticFramework = true
+
+  # Firebase's Swift pods import these as modules; give just them module maps
+  # rather than turning on use_modular_headers! for the whole graph.
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'FirebaseCore', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  pod 'FirebaseCoreExtension', :modular_headers => true
+  pod 'FirebaseInstallations', :modular_headers => true
+  pod 'GoogleDataTransport', :modular_headers => true
+  pod 'nanopb', :modular_headers => true
+  pod 'PromisesObjC', :modular_headers => true
 
   use_react_native!(
     :path => config[:reactNativePath],

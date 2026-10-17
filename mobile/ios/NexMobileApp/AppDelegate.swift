@@ -40,19 +40,56 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     reactNativeDelegate = delegate
     reactNativeFactory = factory
 
-    window = UIWindow(frame: UIScreen.main.bounds)
+    // The window and React Native start in SceneDelegate: apps built with the
+    // iOS 27 SDK must use the UIScene life cycle or they are refused at launch.
+    return true
+  }
+
+  func application(
+    _ application: UIApplication,
+    configurationForConnecting connectingSceneSession: UISceneSession,
+    options: UIScene.ConnectionOptions
+  ) -> UISceneConfiguration {
+    let config = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+    config.delegateClass = SceneDelegate.self
+    return config
+  }
+}
+
+/// The UIScene life cycle (required from the iOS 27 SDK, 17 Oct 2026): one
+/// window per scene, with React Native started in it as AppDelegate used to.
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+  var window: UIWindow?
+
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard let windowScene = scene as? UIWindowScene,
+          let appDelegate = UIApplication.shared.delegate as? AppDelegate,
+          let factory = appDelegate.reactNativeFactory else { return }
+
+    let window = UIWindow(windowScene: windowScene)
+    self.window = window
+    appDelegate.window = window
 
     factory.startReactNative(
       withModuleName: "NexMobileApp",
       in: window,
-      launchOptions: launchOptions
+      launchOptions: nil
     )
-    
-    if let rootViewController = window?.rootViewController {
+
+    if let rootViewController = window.rootViewController {
       RNBootSplash.initWithStoryboard("BootSplash", rootView: rootViewController.view)
     }
+  }
 
-    return true
+  // Deep links (e.g. a notification tap that opens a URL) arrive on the scene now.
+  func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+    for context in URLContexts {
+      RCTLinkingManager.application(UIApplication.shared, open: context.url, options: [:])
+    }
   }
 }
 
