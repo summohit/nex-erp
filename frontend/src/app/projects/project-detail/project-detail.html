@@ -4607,7 +4607,8 @@
                 <strong>{{ item.author?.firstName || 'Unknown' }} {{ item.author?.lastName || '' }}</strong>
                 <a class="activity-time-link">{{ item.createdAt | date:'shortTime' }}</a>
               </div>
-              <div class="comment-white-bubble" [innerHTML]="completionRemarkHtml(item.body)"></div>
+              <div class="comment-white-bubble" [class.completion-remark-bubble]="isCompletionRemark(item.body)"
+                   [innerHTML]="completionRemarkHtml(item.body)"></div>
               <div class="comment-proof-attachments" *ngIf="completionProofAttachments(item.body).length">
                 <button type="button" class="comment-proof-trigger" (click)="toggleCompletionProofs(item.id)"
                         [attr.aria-expanded]="openCompletionProofCommentId() === item.id"
@@ -5077,14 +5078,6 @@
         </div>
       </div>
 
-      <!-- Remark for the reviewer, saved as a comment on the task -->
-      <div class="proof-remark">
-        <label class="proof-remark-label" for="proofRemark">Remark for the reviewer <span>(optional)</span></label>
-        <textarea id="proofRemark" class="proof-remark-input" rows="3" maxlength="1000"
-                  placeholder="What was done, anything the reviewer should check"
-                  [ngModel]="proofNotes()" (ngModelChange)="proofNotes.set($event)"
-                  [disabled]="isUploadingProof()"></textarea>
-      </div>
       <!-- Upload Progress -->
       <div class="proof-progress-section" *ngIf="isUploadingProof()">
         <div class="proof-progress-label">

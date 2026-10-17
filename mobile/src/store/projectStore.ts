@@ -21,7 +21,8 @@ interface ProjectStoreState {
   createIssue: (projectId: number, data: any) => Promise<any>;
   updateIssue: (projectId: number, issueId: number, data: any) => Promise<void>;
   updateIssueStatus: (projectId: number, issueId: number, status: string) => Promise<void>;
-  updateIssueColumn: (projectId: number, issueId: number, columnId: number) => Promise<void>;
+  /** extra: completionRemark / completionAttachmentIds when moving to Review or Done. */
+  updateIssueColumn: (projectId: number, issueId: number, columnId: number, extra?: Record<string, any>) => Promise<void>;
   updateIssuePriority: (projectId: number, issueId: number, priority: string) => Promise<void>;
   toggleIssueArchive: (projectId: number, issueId: number) => Promise<void>;
   reviewIssue: (projectId: number, issueId: number, action: 'APPROVE' | 'REJECT', reason?: string) => Promise<void>;
@@ -158,7 +159,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     }
   },
 
-  updateIssueColumn: async (projectId: number, issueId: number, columnId: number) => {
+  updateIssueColumn: async (projectId: number, issueId: number, columnId: number, extra?: Record<string, any>) => {
     try {
       // Optimistic update
       set((state) => ({
@@ -169,7 +170,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       // Merge the server response — moving columns can auto-derive a new status
       // server-side (e.g. IN_PROGRESS/IN_REVIEW) and auto start/stop the work
       // timer as a side effect; a plain columnId patch would lose that.
-      const updated = await projectService.updateIssue(projectId, issueId, { columnId });
+      const updated = await projectService.updateIssue(projectId, issueId, { columnId, ...(extra ?? {}) });
       set((state) => ({
         currentIssues: state.currentIssues.map(i => i.id === issueId ? { ...i, ...updated } : i)
       }));

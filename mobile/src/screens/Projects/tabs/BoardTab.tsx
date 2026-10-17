@@ -185,9 +185,9 @@ export default function BoardTab() {
   };
 
   const [proofFor, setProofFor] = useState<{ issue: any; col: any } | null>(null);
-  const moveAfterProof = async () => {
+  const moveAfterProof = async (completion: { completionRemark?: string; completionAttachmentIds?: number[] }) => {
     if (!proofFor || !currentProject?.id) return;
-    await updateIssueColumn(currentProject.id, proofFor.issue.id, proofFor.col.id);
+    await updateIssueColumn(currentProject.id, proofFor.issue.id, proofFor.col.id, completion);
     setProofFor(null);
     fetchProjectDetails(currentProject.id);
   };
@@ -642,6 +642,7 @@ export default function BoardTab() {
           stageName={proofFor.col.name}
           onCancel={() => setProofFor(null)}
           canSkip={perms.canSkipProof}
+          remarkRequired={perms.isMyTask(proofFor.issue) && !perms.canSkipProof}
           onSkip={moveAfterProof}
           onUploaded={moveAfterProof}
         />

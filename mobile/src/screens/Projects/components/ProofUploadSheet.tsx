@@ -10,6 +10,7 @@ import { projectService } from '../../../api/projectService';
 import { colors } from '../../../theme/ds';
 
 type ProofFile = { uri: string; name: string; type: string; size?: number };
+export type Completion = { completionRemark?: string; completionAttachmentIds?: number[] };
 
 /**
  * Proof before a task moves to Review or Done (17 Oct 2026), matching the
@@ -19,6 +20,7 @@ type ProofFile = { uri: string; name: string; type: string; size?: number };
  */
 export default function ProofUploadSheet({
   visible, projectId, issueId, stageName, bottomInset = 0, onCancel, onUploaded, canSkip = false, onSkip,
+  remarkRequired = false,
 }: {
   visible: boolean;
   projectId: number;
@@ -26,11 +28,16 @@ export default function ProofUploadSheet({
   stageName: string;
   bottomInset?: number;
   onCancel: () => void;
-  /** Files are attached (and the remark saved): now move the task. */
-  onUploaded: () => Promise<void> | void;
+  /**
+   * Files are attached: now move the task, sending the remark and the files
+   * with the move (the server saves them as the task's completion remark).
+   */
+  onUploaded: (completion: Completion) => Promise<void> | void;
   /** Owners and PMs may move without proof, as on the web ("Skip & Move"). */
   canSkip?: boolean;
-  onSkip?: () => Promise<void> | void;
+  onSkip?: (completion: Completion) => Promise<void> | void;
+  /** The assignee moving their own task must say what was done (server rule). */
+  remarkRequired?: boolean;
 }) {
   const [skipping, setSkipping] = useState(false);
   const [files, setFiles] = useState<ProofFile[]>([]);
@@ -68,20 +75,21 @@ export default function ProofUploadSheet({
 
   const submit = async () => {
     if (!files.length) { Alert.alert('Add proof', 'Attach at least one photo or document.'); return; }
+    if (remarkRequired && !remark.trim()) { Alert.alert('Add a remark', 'Say briefly what was completed or delivered.'); return; }
     setProgress(0);
     try {
+      const ids: number[] = [];
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         const fd = new FormData();
         fd.append('file', { uri: f.uri, name: f.name, type: f.type } as any);
-        await projectService.uploadAttachment(projectId, issueId, fd);
+        const up: any = await projectService.uploadAttachment(projectId, issueId, fd);
+        const first = Array.isArray(up) ? up[0] : up;
+        if (Number.isInteger(first?.id)) ids.push(first.id);
         setProgress(Math.round(((i + 1) / files.length) * 90));
       }
-      if (remark.trim()) {
-        await projectService.addIssueComment(projectId, issueId, `Proof for ${stageName}: ${remark.trim()}`);
-      }
       setProgress(100);
-      await onUploaded();
+      await onUploaded({ completionRemark: remark.trim() || undefined, completionAttachmentIds: ids });
     } catch (e: any) {
       Alert.alert('Upload failed', e?.response?.data?.message || 'Some files did not upload. Please try again.');
       setProgress(null);
@@ -133,10 +141,10 @@ export default function ProofUploadSheet({
             </ScrollView>
           )}
 
-          <Text style={styles.label}>REMARK FOR THE REVIEWER</Text>
+          <Text style={styles.label}>COMPLETION REMARK{remarkRequired ? ' · REQUIRED' : ''}</Text>
           <TextInput
             style={styles.input}
-            placeholder="What was done, anything to check (optional)"
+            placeholder={remarkRequired ? 'Briefly describe what was completed or delivered' : 'What was completed (optional)'}
             placeholderTextColor={colors.textFaint}
             value={remark}
             onChangeText={setRemark}
@@ -158,9 +166,8 @@ export default function ProofUploadSheet({
               onPress={async () => {
                 setSkipping(true);
                 try {
-                  // A remark is still worth keeping when the proof is skipped.
-                  if (remark.trim()) await projectService.addIssueComment(projectId, issueId, `Moved to ${stageName}: ${remark.trim()}`);
-                  await onSkip();
+                  // A remark is still sent when the proof is skipped.
+                  await onSkip({ completionRemark: remark.trim() || undefined });
                 } catch (e: any) {
                   Alert.alert('Could not move', e?.response?.data?.message || 'Please try again.');
                 } finally {
@@ -177,9 +184,9 @@ export default function ProofUploadSheet({
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.btn, styles.submit, (!files.length || busy) && { opacity: 0.55 }]}
+              style={[styles.btn, styles.submit, (!files.length || busy || (remarkRequired && !remark.trim())) && { opacity: 0.55 }]}
               onPress={submit}
-              disabled={!files.length || busy}
+              disabled={!files.length || busy || (remarkRequired && !remark.trim())}
             >
               {busy ? <ActivityIndicator color="#FFFFFF" /> : (
                 <>

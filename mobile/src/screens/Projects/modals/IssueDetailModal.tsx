@@ -30,7 +30,7 @@ import {
   ChevronDown, 
   Tag, 
   Users, 
-  Paperclip, 
+  Paperclip, CheckCircle, 
   Calendar,
   Send,
   Edit3,
@@ -68,6 +68,27 @@ interface IssueDetailModalProps {
 }
 
 // Utility to clean raw HTML tags from rich text descriptions
+const decodeEntities = (t: string) =>
+  t.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+
+/**
+ * The server's completion-remark comment (moving a task to Review/Done):
+ * `<p><strong>Completion remark:</strong> …</p>` and, when files were sent
+ * with it, `<a data-completion-proof="true" href=…>name</a>` links.
+ */
+const parseCompletionRemark = (body: string): { remark: string; files: { name: string; url: string }[] } | null => {
+  if (!/<strong>\s*Completion remark:\s*<\/strong>/i.test(body)) return null;
+  const files = Array.from(body.matchAll(/<a\s+[^>]*data-completion-proof="true"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi))
+    .map((m) => ({ url: decodeEntities(m[1]), name: decodeEntities(m[2].replace(/<[^>]+>/g, '')) || 'Attachment' }));
+  const remark = decodeEntities(
+    body
+      .replace(/<div data-completion-proofs="true">[\s\S]*?<\/div>/gi, '')
+      .replace(/<strong>\s*Completion remark:\s*<\/strong>/i, '')
+      .replace(/<[^>]+>/g, ''),
+  ).trim();
+  return { remark, files };
+};
+
 const stripHtml = (html?: string): string => {
   if (!html) return '';
   return html
@@ -379,19 +400,20 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
     }
   };
 
-  const commitStatusMove = async (columnId: number, statusStr: string) => {
+  const commitStatusMove = async (columnId: number, statusStr: string, extra?: Record<string, any>) => {
     setStatusChanging(true);
     try {
       issue.columnId = columnId;
       issue.status = statusStr;
       const { updateIssueColumn } = useProjectStore.getState();
-      await updateIssueColumn(projectId, issue.id, columnId);
+      await updateIssueColumn(projectId, issue.id, columnId, extra);
       loadDetails();
       refreshIssueFromServer();
       setFeedback({ visible: true, type: 'success', title: 'Status Updated', message: `Card moved to ${statusStr.replace(/_/g, ' ')}` });
     } catch (error) {
       console.error('Failed to update status', error);
-      setFeedback({ visible: true, type: 'error', title: 'Update Failed', message: 'Could not change the card status.' });
+      const msg = (error as any)?.response?.data?.message;
+      setFeedback({ visible: true, type: 'error', title: 'Update Failed', message: (Array.isArray(msg) ? msg.join('\n') : msg) || 'Could not change the card status.' });
     } finally {
       setStatusChanging(false);
     }
@@ -1439,8 +1461,47 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                       );
                     }
 
-                    // Comment Item
-                    if (!item.content || !item.content.trim()) return null;
+                    // Comment Item. The server stores the text in `body` (HTML);
+                    // older code read `content`, so no comment ever showed.
+                    const rawBody: string = item.body ?? item.content ?? '';
+                    const completion = parseCompletionRemark(rawBody);
+                    const text = completion ? completion.remark : stripHtml(rawBody).trim();
+                    if (!text && !completion?.files.length) return null;
+
+                    if (completion) {
+                      return (
+                        <View key={item.id ? `comm-${item.id}` : `comm-${index}`} style={styles.commentCard}>
+                          <View style={[styles.commentAvatar, styles.completionAvatar]}>
+                            <CheckCircle size={14} color="#FFFFFF" />
+                          </View>
+                          <View style={styles.commentBody}>
+                            <View style={styles.commentHeader}>
+                              <Text style={styles.commentAuthor}>{userName}</Text>
+                              <Text style={styles.commentTime}>{formatTimeAgo(item.createdAt)}</Text>
+                            </View>
+                            <View style={styles.completionCard}>
+                              <Text style={styles.completionLabel}>COMPLETION REMARK</Text>
+                              {!!text && <Text style={styles.completionText}>{text}</Text>}
+                              {completion.files.length > 0 && (
+                                <View style={styles.completionFiles}>
+                                  {completion.files.map((f, fi) => (
+                                    <TouchableOpacity
+                                      key={`${f.url}-${fi}`}
+                                      style={styles.completionFile}
+                                      onPress={() => Linking.openURL(f.url).catch(() => undefined)}
+                                      activeOpacity={0.75}
+                                    >
+                                      <Paperclip size={12} color="#047857" />
+                                      <Text style={styles.completionFileText} numberOfLines={1}>{f.name}</Text>
+                                    </TouchableOpacity>
+                                  ))}
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    }
 
                     return (
                       <View key={item.id ? `comm-${item.id}` : `comm-${index}`} style={styles.commentCard}>
@@ -1453,7 +1514,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                             <Text style={styles.commentTime}>{formatTimeAgo(item.createdAt)}</Text>
                           </View>
                           <View style={styles.commentBubble}>
-                            <Text style={styles.commentText}>{item.content}</Text>
+                            <Text style={styles.commentText}>{text}</Text>
                           </View>
                         </View>
                       </View>
@@ -1611,15 +1672,16 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
           bottomInset={insets.bottom}
           onCancel={() => setProofPending(null)}
           canSkip={perms.canSkipProof}
-          onSkip={async () => {
+          remarkRequired={perms.isMyTask(issue) && !perms.canSkipProof}
+          onSkip={async (completion) => {
             if (!proofPending) return;
-            await commitStatusMove(proofPending.columnId, proofPending.statusStr);
+            await commitStatusMove(proofPending.columnId, proofPending.statusStr, completion);
             setProofPending(null);
             loadDetails();
           }}
-          onUploaded={async () => {
+          onUploaded={async (completion) => {
             if (!proofPending) return;
-            await commitStatusMove(proofPending.columnId, proofPending.statusStr);
+            await commitStatusMove(proofPending.columnId, proofPending.statusStr, completion);
             setProofPending(null);
             loadDetails();
           }}
@@ -2500,6 +2562,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2563EB',
   },
+  completionAvatar: { backgroundColor: '#10B981' },
+  completionCard: {
+    backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderLeftWidth: 4, borderLeftColor: '#10B981',
+    borderRadius: 12, padding: 10, gap: 6,
+  },
+  completionLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.7, color: '#047857' },
+  completionText: { fontSize: 13.5, color: '#064E3B', lineHeight: 19, fontWeight: '500' },
+  completionFiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  completionFile: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: 8, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#A7F3D0',
+  },
+  completionFileText: { fontSize: 12, fontWeight: '700', color: '#047857', flexShrink: 1 },
   commentBody: {
     flex: 1,
   },

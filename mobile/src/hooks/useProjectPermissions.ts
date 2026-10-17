@@ -173,6 +173,8 @@ export interface ProjectPermissions {
   isStatusMoveBlocked: (issue: any, columnId: number | string) => boolean;
   isAwaitingApproval: (issue: any) => boolean;
   canDecideApproval: (issue: any) => boolean;
+  /** The signed-in person is the assignee or a member of this task. */
+  isMyTask: (issue: any) => boolean;
   approvalLabel: (issue: any) => string;
 }
 
@@ -203,6 +205,10 @@ export function useProjectPermissions(project: any, columns: any[] = []): Projec
         isStatusMoveBlocked(issue, columnId, project, user, columns),
       isAwaitingApproval,
       canDecideApproval: (issue: any) => canDecideApproval(issue, project, user),
+      isMyTask: (issue: any) => !!user?.employeeId && (
+        issue?.assigneeId === user.employeeId
+        || (issue?.members ?? []).some((m: any) => m.employeeId === user.employeeId || m.employee?.id === user.employeeId)
+      ),
       approvalLabel,
     };
   }, [project, user, columns]);
