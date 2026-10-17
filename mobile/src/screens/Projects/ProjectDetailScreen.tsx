@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppScreen from '../../components/AppScreen';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { Globe, Kanban, List, GanttChart, Calendar, Paperclip, BarChart, Archive, Users, Lock, MessageSquare, Ticket, FileSpreadsheet } from 'lucide-react-native';
+import { Globe, Kanban, List, GanttChart, Calendar, Paperclip, BarChart, Archive, Users, Lock, MessageSquare, Ticket, FileSpreadsheet, FileCheck } from 'lucide-react-native';
 import TaskImportSheet from './components/TaskImportSheet';
 import { useProjectPermissions } from '../../hooks/useProjectPermissions';
 import { useProjectStore } from '../../store/projectStore';
@@ -16,6 +16,7 @@ import ListTab from './tabs/ListTab';
 import RoadmapTab from './tabs/RoadmapTab';
 import CalendarTab from './tabs/CalendarTab';
 import AttachmentsTab from './tabs/AttachmentsTab';
+import EvidenceTab from './tabs/EvidenceTab';
 import ReportsTab from './tabs/ReportsTab';
 import ArchivedTab from './tabs/ArchivedTab';
 import FieldVisitsTab from './tabs/FieldVisitsTab';
@@ -32,6 +33,7 @@ const TABS = [
   { id: 'fieldvisits',  label: 'Visits',   icon: Users },
   { id: 'discussions',  label: 'Discussions', icon: MessageSquare },
   { id: 'tickets',      label: 'Tickets',  icon: Ticket },
+  { id: 'evidence',     label: 'Evidence', icon: FileCheck },
   { id: 'attachments',  label: 'Files',    icon: Paperclip },
   { id: 'reports',      label: 'Reports',  icon: BarChart },
   { id: 'archived',     label: 'Archived', icon: Archive },
@@ -47,6 +49,7 @@ function TabContent({ activeTab, projectId }: { activeTab: string; projectId: nu
     case 'fieldvisits': return <FieldVisitsTab projectId={projectId} />;
     case 'discussions': return <DiscussionsTab projectId={projectId} />;
     case 'tickets':     return <TicketsTab projectId={projectId} />;
+    case 'evidence':    return <EvidenceTab />;
     case 'attachments': return <AttachmentsTab />;
     case 'reports':     return <ReportsTab />;
     case 'archived':    return <ArchivedTab />;
@@ -107,6 +110,7 @@ export default function ProjectDetailScreen() {
   );
 
   const archivedCount = currentIssues.filter(i => i.isArchived).length;
+  const evidenceCount = currentIssues.filter((i: any) => !i.isArchived).reduce((n: number, i: any) => n + (i.attachments?.length || 0), 0);
 
   const handleUpload = async () => {
     if (isUploading) return;
@@ -176,7 +180,8 @@ export default function ProjectDetailScreen() {
             {TABS.map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
-              const showBadge = tab.id === 'archived' && archivedCount > 0;
+              const badgeCount = tab.id === 'archived' ? archivedCount : tab.id === 'evidence' ? evidenceCount : 0;
+              const showBadge = badgeCount > 0;
               return (
                 <TouchableOpacity
                   key={tab.id}
@@ -190,7 +195,7 @@ export default function ProjectDetailScreen() {
                   {showBadge && (
                     <View style={[styles.tabBadge, isActive && styles.tabBadgeActive]}>
                       <Text style={[styles.tabBadgeText, isActive && styles.tabBadgeTextActive]}>
-                        {archivedCount}
+                        {badgeCount}
                       </Text>
                     </View>
                   )}
