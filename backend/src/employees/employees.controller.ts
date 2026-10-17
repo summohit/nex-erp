@@ -116,6 +116,17 @@ export class EmployeesController {
     return this.profileCompleteness.setFirstJob(req.user.companyId, req.user.employeeId ?? null, !!body?.firstJob);
   }
 
+  /** HR: the document lock (on/off and start date). */
+  @Get('profile-completeness/lock')
+  getProfileLock(@Request() req) {
+    return this.profileCompleteness.getLock(req.user.companyId);
+  }
+
+  @Put('profile-completeness/lock')
+  setProfileLock(@Request() req, @Body() body: { enabled?: boolean; from?: string | null }) {
+    return this.profileCompleteness.setLock(req.user.companyId, req.user.role, body);
+  }
+
   /** HR: everyone's profile completion, with what is missing and their manager. */
   @Get('profile-completeness')
   getProfileCompletenessReport(@Request() req) {

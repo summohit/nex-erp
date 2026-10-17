@@ -3077,6 +3077,11 @@ model SystemSetting {
   // SUPERADMIN switch: when true, every user in the company must complete TOTP
   // enrolment at next sign-in, and nobody may turn their own 2FA off.
   twoFactorRequired             Boolean  @default(false)
+  /// HR's switch (17 Oct 2026): from profileLockFrom (or at once when null),
+  /// the profile reminder cannot be closed until every required document and
+  /// detail is on file. Exempt accounts are never locked.
+  profileLockEnabled            Boolean  @default(false)
+  profileLockFrom               DateTime?
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @updatedAt
 }

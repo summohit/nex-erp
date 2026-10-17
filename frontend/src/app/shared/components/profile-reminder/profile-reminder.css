@@ -739,3 +739,7 @@
     padding: 10px 12px;
   }
 }
+
+/* HR's lock: the footer explains why there is no way to close. */
+.pr-lock-icon { color: #dc2626; }
+.pr-lock-text { color: #b91c1c; font-weight: 600; }

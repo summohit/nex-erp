@@ -1,6 +1,7 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucideShieldCheck,
@@ -26,6 +27,8 @@ import { EmployeeService, ProfileCompleteness, ProfileMissingItem } from '../../
 
 /** How often the reminder comes back while anything is missing (HR, 16 Oct 2026). */
 const REMIND_EVERY_MS = 15 * 60 * 1000;
+/** While HR's lock is on, re-check every minute so it is never out of date. */
+const LOCKED_CHECK_MS = 60 * 1000;
 
 /**
  * HR's profile-completion reminder.
@@ -75,14 +78,28 @@ export class ProfileReminderComponent implements OnInit, OnDestroy {
   savingFirstJob = signal(false);
   retyping = signal<number | null>(null);
   private timer: any = null;
+  private navSub: any = null;
+  /** HR's lock (17 Oct 2026): the reminder cannot be closed until complete. */
+  locked = signal(false);
 
   ngOnInit() {
     this.check(true);
     this.timer = setInterval(() => this.check(true), REMIND_EVERY_MS);
+    // Locked: the only page reachable is the person's own profile (details and
+    // emergency contact are filled in there). Any other page brings it back.
+    this.navSub = this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => {
+      if (this.locked() && !this.onOwnProfile()) this.open.set(true);
+    });
   }
 
   ngOnDestroy() {
     if (this.timer) clearInterval(this.timer);
+    this.navSub?.unsubscribe();
+  }
+
+  private onOwnProfile(): boolean {
+    const id = this.status()?.employeeId;
+    return !!id && this.router.url.startsWith(`/employees/${id}/profile`);
   }
 
   /** Ask the server; open the reminder when something is still missing. */
@@ -91,10 +108,18 @@ export class ProfileReminderComponent implements OnInit, OnDestroy {
       next: (s) => {
         this.status.set(s);
         if (!s || s.exempt || s.complete) {
+          this.locked.set(false);
           this.open.set(false);
           if (s && (s.exempt || s.complete) && this.timer) { clearInterval(this.timer); this.timer = null; }
           return;
         }
+        const wasLocked = this.locked();
+        this.locked.set(!!s.locked);
+        if (!!s.locked !== wasLocked && this.timer) {
+          clearInterval(this.timer);
+          this.timer = setInterval(() => this.check(true), s.locked ? LOCKED_CHECK_MS : REMIND_EVERY_MS);
+        }
+        if (s.locked && this.onOwnProfile()) return;
         if (show) this.open.set(true);
       },
       error: () => undefined,
@@ -102,6 +127,8 @@ export class ProfileReminderComponent implements OnInit, OnDestroy {
   }
 
   later() {
+    // HR's lock: no closing, no "later" — only uploads or the profile page.
+    if (this.locked()) return;
     this.open.set(false);
   }
 

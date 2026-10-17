@@ -24,7 +24,11 @@ export interface Completeness {
   uploadedAsOther: number;
   /** Those files, so the reminder can offer to re-file each one. */
   otherDocuments: { id: number; fileName: string; fileUrl: string }[];
+  /** HR's lock is on for this person: the reminder has no close or "later". */
+  locked?: boolean;
 }
+
+export interface ProfileLock { enabled: boolean; from: string | null; active: boolean }
 
 const SELECT = {
   id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true,
@@ -92,7 +96,35 @@ export class ProfileCompletenessService {
   async mine(companyId: number, employeeId: number | null): Promise<Completeness | null> {
     if (employeeId == null) return null;
     const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId }, select: SELECT });
-    return emp ? this.evaluate(emp) : null;
+    if (!emp) return null;
+    const c = this.evaluate(emp);
+    const lock = await this.getLock(companyId);
+    return { ...c, locked: lock.active && !c.exempt && !c.complete };
+  }
+
+  /** HR's lock: on/off, the date it starts, and whether it is in force now. */
+  async getLock(companyId: number): Promise<ProfileLock> {
+    const s = await this.prisma.systemSetting.findUnique({
+      where: { companyId }, select: { profileLockEnabled: true, profileLockFrom: true },
+    });
+    const enabled = !!s?.profileLockEnabled;
+    const from = s?.profileLockFrom ?? null;
+    return { enabled, from: from ? from.toISOString().slice(0, 10) : null, active: enabled && (!from || from.getTime() <= Date.now()) };
+  }
+
+  /** HR, admins and the super admin turn the lock on or off and set its start date. */
+  async setLock(companyId: number, role: string, body: { enabled?: boolean; from?: string | null }): Promise<ProfileLock> {
+    if (!isHrAdmin(role)) throw new ForbiddenException('Only HR and admins can change the profile lock');
+    const from = body?.from && /^\d{4}-\d{2}-\d{2}$/.test(body.from)
+      // The date in IST: the lock starts at midnight India time on that day.
+      ? new Date(`${body.from}T00:00:00+05:30`)
+      : null;
+    await this.prisma.systemSetting.upsert({
+      where: { companyId },
+      create: { companyId, profileLockEnabled: !!body?.enabled, profileLockFrom: from },
+      update: { profileLockEnabled: !!body?.enabled, profileLockFrom: from },
+    });
+    return this.getLock(companyId);
   }
 
   /** "This is my first job": previous-employment documents are not asked for. */

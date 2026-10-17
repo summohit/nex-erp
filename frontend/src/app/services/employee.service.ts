@@ -220,6 +220,17 @@ export class EmployeeService {
     });
   }
 
+  /** HR: the document lock. */
+  getProfileLock(): Observable<ProfileLock> {
+    const token = getAccessToken();
+    return this.http.get<ProfileLock>(`${this.apiUrl}/profile-completeness/lock`, { headers: { Authorization: `Bearer ${token}` } });
+  }
+
+  setProfileLock(body: { enabled: boolean; from: string | null }): Observable<ProfileLock> {
+    const token = getAccessToken();
+    return this.http.put<ProfileLock>(`${this.apiUrl}/profile-completeness/lock`, body, { headers: { Authorization: `Bearer ${token}` } });
+  }
+
   /** HR: everyone's profile completion. */
   getProfileCompletenessReport(): Observable<ProfileCompletenessReport> {
     const token = getAccessToken();
@@ -263,7 +274,11 @@ export interface ProfileCompleteness {
   firstJob: boolean;
   uploadedAsOther: number;
   otherDocuments: { id: number; fileName: string; fileUrl: string }[];
+  /** HR's lock is on for this person: no close, no "Remind me later". */
+  locked?: boolean;
 }
+/** HR's document lock: on/off, the IST date it starts, and whether it is in force now. */
+export interface ProfileLock { enabled: boolean; from: string | null; active: boolean }
 export interface ProfileCompletenessReport {
   total: number;
   complete: number;

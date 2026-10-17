@@ -21,9 +21,11 @@
             </p>
           </div>
         </div>
-        <button type="button" class="pr-close-btn" (click)="later()" aria-label="Dismiss reminder">
-          <svg lucideX [size]="18"></svg>
-        </button>
+        @if (!locked()) {
+          <button type="button" class="pr-close-btn" (click)="later()" aria-label="Dismiss reminder">
+            <svg lucideX [size]="18"></svg>
+          </button>
+        }
       </div>
 
       <div class="pr-body">
@@ -207,14 +209,21 @@
       <!-- Modal Footer -->
       <div class="pr-foot">
         <div class="pr-foot-info">
-          <svg lucideClock [size]="15" class="pr-clock-icon"></svg>
-          <span>This comes back every 15 minutes until everything is on file.</span>
+          @if (locked()) {
+            <svg lucideTriangleAlert [size]="15" class="pr-clock-icon pr-lock-icon"></svg>
+            <span class="pr-lock-text">HR requires these before you can continue using MIRA. Upload everything listed to unlock.</span>
+          } @else {
+            <svg lucideClock [size]="15" class="pr-clock-icon"></svg>
+            <span>This comes back every 15 minutes until everything is on file.</span>
+          }
         </div>
-        <div class="pr-foot-actions">
-          <button type="button" class="pr-btn-later" (click)="later()">
-            Remind me later
-          </button>
-        </div>
+        @if (!locked()) {
+          <div class="pr-foot-actions">
+            <button type="button" class="pr-btn-later" (click)="later()">
+              Remind me later
+            </button>
+          </div>
+        }
       </div>
 
     </div>
