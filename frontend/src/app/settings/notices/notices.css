@@ -656,7 +656,9 @@
   font-size: 14px;
   line-height: 1.65;
   color: #334155;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 /* Collapsed by height: the body is formatted HTML, not one run of text. */
@@ -668,19 +670,111 @@
 }
 
 /* The editor's HTML, rendered. innerHTML content is outside view encapsulation. */
-.nb-rich ::ng-deep p { margin: 0 0 6px; }
-.nb-rich ::ng-deep h1 { font-size: 20px; margin: 10px 0 6px; }
-.nb-rich ::ng-deep h2 { font-size: 17px; margin: 10px 0 6px; }
-.nb-rich ::ng-deep h3 { font-size: 15px; margin: 8px 0 4px; }
-.nb-rich ::ng-deep ol, .nb-rich ::ng-deep ul { margin: 0 0 6px; padding-left: 22px; }
-.nb-rich ::ng-deep li[data-list="bullet"] { list-style-type: disc; }
-.nb-rich ::ng-deep li[data-list="ordered"] { list-style-type: decimal; }
+.nb-rich ::ng-deep p {
+  margin: 0 0 8px;
+  line-height: 1.65;
+}
+.nb-rich ::ng-deep p:last-child {
+  margin-bottom: 0;
+}
+.nb-rich ::ng-deep p.nb-blank-p,
+.nb-rich ::ng-deep p:empty,
+.nb-rich ::ng-deep p:has(br:only-child) {
+  min-height: 1.25em;
+  margin-bottom: 8px;
+}
+.nb-rich ::ng-deep h1 {
+  font-size: 19px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 14px 0 6px;
+  line-height: 1.35;
+}
+.nb-rich ::ng-deep h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 12px 0 6px;
+  line-height: 1.35;
+}
+.nb-rich ::ng-deep h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 10px 0 4px;
+  line-height: 1.4;
+}
+.nb-rich ::ng-deep h4 {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 10px 0 4px;
+  line-height: 1.4;
+}
+.nb-rich ::ng-deep strong,
+.nb-rich ::ng-deep b {
+  font-weight: 700;
+  color: #0f172a;
+}
+.nb-rich ::ng-deep em,
+.nb-rich ::ng-deep i {
+  font-style: italic;
+}
+.nb-rich ::ng-deep ol {
+  list-style-type: decimal !important;
+  margin: 6px 0 10px;
+  padding-left: 22px;
+}
+.nb-rich ::ng-deep ul {
+  list-style-type: disc !important;
+  margin: 6px 0 10px;
+  padding-left: 22px;
+}
+.nb-rich ::ng-deep li {
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+.nb-rich ::ng-deep ul ul,
+.nb-rich ::ng-deep ol ul {
+  list-style-type: circle !important;
+  margin-top: 3px;
+}
+.nb-rich ::ng-deep ol ol,
+.nb-rich ::ng-deep ul ol {
+  list-style-type: lower-alpha !important;
+  margin-top: 3px;
+}
+.nb-rich ::ng-deep li[data-list="bullet"] { list-style-type: disc !important; }
+.nb-rich ::ng-deep li[data-list="ordered"] { list-style-type: decimal !important; }
 .nb-rich ::ng-deep li > .ql-ui { display: none; }
-.nb-rich ::ng-deep blockquote { margin: 6px 0; padding: 4px 12px; border-left: 3px solid #cbd5e1; color: #475569; }
-.nb-rich ::ng-deep a { color: #2563eb; text-decoration: underline; }
+.nb-rich ::ng-deep blockquote {
+  margin: 10px 0;
+  padding: 6px 12px;
+  border-left: 3px solid #3b82f6;
+  background: #f8fafc;
+  border-radius: 0 6px 6px 0;
+  color: #475569;
+}
+.nb-rich ::ng-deep a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.nb-rich ::ng-deep a:hover {
+  color: #1d4ed8;
+}
+.nb-rich ::ng-deep u {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.nb-rich ::ng-deep s,
+.nb-rich ::ng-deep strike {
+  text-decoration: line-through;
+}
 .nb-rich ::ng-deep table { border-collapse: collapse; margin: 8px 0; width: 100%; }
 .nb-rich ::ng-deep td, .nb-rich ::ng-deep th { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; }
 .nb-rich ::ng-deep pre { background: #f1f5f9; padding: 8px 10px; border-radius: 6px; overflow-x: auto; }
+.nb-rich ::ng-deep hr { border: none; border-top: 1px solid #e2e8f0; margin: 12px 0; }
 
 .nb-btn-expand {
   display: inline-flex;

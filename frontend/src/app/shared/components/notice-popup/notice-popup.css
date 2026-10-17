@@ -64,7 +64,7 @@
 
 .notice-modal {
   width: 100%;
-  max-width: 580px;
+  max-width: 620px;
   max-height: 85vh;
   overflow-y: auto;
   background: #ffffff;
@@ -150,22 +150,122 @@
   font-size: 14.5px;
   line-height: 1.65;
   color: #334155;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 /* The notice's editor HTML. innerHTML content is outside view encapsulation. */
-.notice-rich ::ng-deep p { margin: 0 0 6px; }
-.notice-rich ::ng-deep h1 { font-size: 20px; margin: 10px 0 6px; }
-.notice-rich ::ng-deep h2 { font-size: 17px; margin: 10px 0 6px; }
-.notice-rich ::ng-deep h3 { font-size: 15px; margin: 8px 0 4px; }
-.notice-rich ::ng-deep ol, .notice-rich ::ng-deep ul { margin: 0 0 6px; padding-left: 22px; }
-.notice-rich ::ng-deep li[data-list="bullet"] { list-style-type: disc; }
-.notice-rich ::ng-deep li[data-list="ordered"] { list-style-type: decimal; }
+.notice-rich ::ng-deep p {
+  margin: 0 0 10px;
+  line-height: 1.65;
+}
+.notice-rich ::ng-deep p:last-child {
+  margin-bottom: 0;
+}
+.notice-rich ::ng-deep p.nb-blank-p,
+.notice-rich ::ng-deep p:empty,
+.notice-rich ::ng-deep p:has(br:only-child) {
+  min-height: 1.25em;
+  margin-bottom: 10px;
+}
+.notice-rich ::ng-deep h1 {
+  font-size: 19px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 16px 0 8px;
+  line-height: 1.35;
+}
+.notice-rich ::ng-deep h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 14px 0 6px;
+  line-height: 1.35;
+}
+.notice-rich ::ng-deep h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 14px 0 6px;
+  line-height: 1.4;
+}
+.notice-rich ::ng-deep h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 12px 0 4px;
+  line-height: 1.4;
+}
+.notice-rich ::ng-deep strong,
+.notice-rich ::ng-deep b {
+  font-weight: 700;
+  color: #0f172a;
+}
+.notice-rich ::ng-deep em,
+.notice-rich ::ng-deep i {
+  font-style: italic;
+}
+.notice-rich ::ng-deep ol {
+  list-style-type: decimal !important;
+  margin: 8px 0 12px;
+  padding-left: 24px;
+}
+.notice-rich ::ng-deep ul {
+  list-style-type: disc !important;
+  margin: 8px 0 12px;
+  padding-left: 24px;
+}
+.notice-rich ::ng-deep li {
+  margin-bottom: 5px;
+  line-height: 1.6;
+}
+.notice-rich ::ng-deep ul ul,
+.notice-rich ::ng-deep ol ul {
+  list-style-type: circle !important;
+  margin-top: 4px;
+}
+.notice-rich ::ng-deep ol ol,
+.notice-rich ::ng-deep ul ol {
+  list-style-type: lower-alpha !important;
+  margin-top: 4px;
+}
+.notice-rich ::ng-deep li[data-list="bullet"] { list-style-type: disc !important; }
+.notice-rich ::ng-deep li[data-list="ordered"] { list-style-type: decimal !important; }
 .notice-rich ::ng-deep li > .ql-ui { display: none; }
-.notice-rich ::ng-deep blockquote { margin: 6px 0; padding: 4px 12px; border-left: 3px solid #cbd5e1; color: #475569; }
-.notice-rich ::ng-deep a { color: #2563eb; text-decoration: underline; }
-.notice-rich ::ng-deep table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+.notice-rich ::ng-deep blockquote {
+  margin: 12px 0;
+  padding: 8px 14px;
+  border-left: 3px solid #3b82f6;
+  background: #f8fafc;
+  border-radius: 0 6px 6px 0;
+  color: #475569;
+  font-style: normal;
+}
+.notice-rich ::ng-deep a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2.5px;
+  transition: color 0.15s ease;
+}
+.notice-rich ::ng-deep a:hover {
+  color: #1d4ed8;
+}
+.notice-rich ::ng-deep u {
+  text-decoration: underline;
+  text-underline-offset: 2.5px;
+}
+.notice-rich ::ng-deep s,
+.notice-rich ::ng-deep strike {
+  text-decoration: line-through;
+}
+.notice-rich ::ng-deep table { border-collapse: collapse; margin: 10px 0; width: 100%; }
 .notice-rich ::ng-deep td, .notice-rich ::ng-deep th { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; }
+.notice-rich ::ng-deep hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 14px 0;
+}
 
 /* Attachments in Modal */
 .notice-modal-attachments {

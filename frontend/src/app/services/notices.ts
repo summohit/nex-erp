@@ -101,15 +101,51 @@ export interface NewNotice {
 }
 
 /**
+ * Auto-links URLs in an HTML string that are not already inside an <a> tag.
+ */
+function autoLinkHtmlUrls(html: string): string {
+  return html.replace(
+    /(<a\b[^>]*>[\s\S]*?<\/a>)|((?:https?:\/\/|www\.)[^\s<>()]+|[a-zA-Z0-9-]+\.ces-pl\.com[^\s<>()]*)/gi,
+    (match, aTag, url) => {
+      if (aTag) return aTag;
+      let punc = '';
+      const m = url.match(/[.,;:?!]+$/);
+      if (m) {
+        punc = m[0];
+        url = url.slice(0, -punc.length);
+      }
+      let href = url;
+      if (!href.startsWith('http://') && !href.startsWith('https://')) {
+        href = 'https://' + href;
+      }
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>${punc}`;
+    },
+  );
+}
+
+/**
  * A notice body as HTML. Notices from before the rich text editor are plain
  * text; shown as HTML they would lose their line breaks, so they become
  * paragraphs. Editor output is already HTML, cleaned by the server.
  */
 export function noticeBodyHtml(body: string): string {
   const b = body || '';
-  if (/^\s*</.test(b)) return b;
-  const esc = b.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return esc.split(/\n/).map((line) => `<p>${line || '<br>'}</p>`).join('');
+  let html = b;
+  if (!/^\s*</.test(b)) {
+    const esc = b.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    html = esc.split(/\n/).map((line) => `<p>${line || '<br>'}</p>`).join('');
+  }
+
+  // 1. Normalize non-breaking spaces (\u00A0 and \u202F) that prevent natural line wrapping
+  html = html.replace(/[\u00A0\u202F]/g, ' ');
+
+  // 2. Ensure empty or whitespace-only paragraphs render with proper blank line spacing
+  html = html.replace(/<p>\s*(?:&nbsp;|\s|<br\s*\/?>)*\s*<\/p>/gi, '<p class="nb-blank-p"><br></p>');
+
+  // 3. Auto-link bare URLs
+  html = autoLinkHtmlUrls(html);
+
+  return html;
 }
 
 /** A notice body as plain text, for snippets, search and copying. */

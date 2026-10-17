@@ -7,7 +7,8 @@ import sanitizeHtml from 'sanitize-html';
  * comments.
  */
 export function cleanRichHtml(html: string): string {
-  return sanitizeHtml(html, {
+  const normalized = (html || '').replace(/[\u00A0\u202F]/g, ' ');
+  return sanitizeHtml(normalized, {
     allowedTags: [
       'p', 'br', 'h1', 'h2', 'h3', 'h4', 'strong', 'b', 'em', 'i', 'u', 's', 'strike',
       'blockquote', 'pre', 'code', 'ol', 'ul', 'li', 'a', 'span', 'sub', 'sup',
