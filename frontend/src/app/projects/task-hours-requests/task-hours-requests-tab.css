@@ -1914,7 +1914,8 @@
   inset: 0;
   background: rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(4px);
-  z-index: 10000;
+  /* Above the filter bar (20000) and its pickers, which sat over the details. */
+  z-index: 2147483647;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2729,7 +2730,7 @@
 .ta-bulk.is-visible { border-color:#e2e8f0; background:#fff; box-shadow:0 1px 2px rgba(15,23,42,.06); visibility:visible; pointer-events:auto; }
 .ta-bulk-count { font-size: 13px; font-weight: 700; color: #1e3a8a; white-space:nowrap; }
 .ta-bulk .prq-btn { min-width:0; padding:7px 11px; font-size:12px; gap:5px; white-space:nowrap; }
-.ta-table-wrap { overflow: visible; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+.ta-table-wrap { overflow-x: auto; overflow-y: visible; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
 .ta-table tbody tr { min-height: 76px; }
 .hours-requests-table tbody td:nth-child(3) { display: none; }
 .ta-table td { padding-top: 14px; padding-bottom: 14px; vertical-align: middle; }
@@ -2805,3 +2806,10 @@
 .ea-hint { font-size: 11.5px; color: #94a3b8; }
 .ea-reason label { color: #b45309; }
 .ea-req { color: #dc2626; }
+
+/* 17 Oct 2026: on narrower screens the table scrolls sideways instead of
+   running off the edge (Actions was out of reach); task codes stay on one line,
+   and the row menu has room to open below the last row. */
+.task-approvals-table { min-width: 1100px; }
+.task-approvals-table td:nth-child(2) a, .task-approvals-table td:nth-child(2) span { white-space: nowrap; }
+.ta-table-wrap:has(.task-approvals-table) { padding-bottom: 150px; margin-bottom: -150px; }

@@ -1069,6 +1069,11 @@ export class TaskHoursRequestsTabComponent {
   }
 
   /** Who the task is for: its assignee, then any other members. */
+  /** The face for the "Assigned to" column: the assignee, else the first member. */
+  taskPerson(t: any): any {
+    return t?.assignee ?? (t?.members || []).map((m: any) => m.employee).find(Boolean) ?? null;
+  }
+
   taskPeople(t: any): string {
     const names: string[] = [];
     const seen = new Set<number>();
