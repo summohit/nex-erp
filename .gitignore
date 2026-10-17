@@ -34,6 +34,7 @@ scraper/__pycache__/
 # backend/config/firebase.example.json documents its shape.
 backend/config/firebase.json
 mobile/android/app/google-services.json
+mobile/ios/NexMobileApp/GoogleService-Info.plist
 mobile/ios/GoogleService-Info.plist
 
 # Scraped Workway exports that carry pay data.
