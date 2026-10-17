@@ -11,7 +11,7 @@ const full = {
   documents: docs([...REQUIRED_DOCUMENTS, ...PREVIOUS_EMPLOYMENT_DOCUMENTS]),
 };
 function service(emp: any) {
-  const prisma: any = { employee: { findFirst: jest.fn(async () => emp), findMany: jest.fn(async () => [emp]), updateMany: jest.fn() } };
+  const prisma: any = { employee: { findFirst: jest.fn(async () => emp), findMany: jest.fn(async () => [emp]), updateMany: jest.fn() }, systemSetting: { findUnique: jest.fn(async () => null) } };
   return new ProfileCompletenessService(prisma);
 }
 

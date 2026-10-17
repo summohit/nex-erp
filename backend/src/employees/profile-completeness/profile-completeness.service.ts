@@ -33,7 +33,7 @@ export interface ProfileLock { enabled: boolean; from: string | null; active: bo
 const SELECT = {
   id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true,
   phone: true, gender: true, dateOfBirth: true, address: true,
-  employmentType: true, firstJob: true,
+  employmentType: true, firstJob: true, profileExempt: true,
   user: { select: { email: true, status: true } },
   designation: { select: { name: true } },
   department: { select: { name: true } },
@@ -53,7 +53,7 @@ export class ProfileCompletenessService {
 
   private evaluate(emp: any): Completeness {
     const email = String(emp.user?.email ?? '').toLowerCase();
-    const exempt = EXEMPT_EMAILS.has(email);
+    const exempt = EXEMPT_EMAILS.has(email) || !!emp.profileExempt;
     const intern = isIntern(emp.employmentType, emp.designation?.name);
     const have = new Set<string>((emp.documents ?? []).map((d: any) => d.documentType));
 
@@ -127,6 +127,35 @@ export class ProfileCompletenessService {
       update: { profileLockEnabled: !!body?.enabled, profileLockFrom: from },
     });
     return this.getLock(companyId);
+  }
+
+  /**
+   * Who never sees the document reminder or lock: the fixed accounts in
+   * EXEMPT_EMAILS, plus anyone HR has excused from the Profile Completion page.
+   */
+  async listExempt(companyId: number, role: string) {
+    if (!isHrAdmin(role)) throw new ForbiddenException('Only HR and admins can manage exemptions');
+    const emps = await this.prisma.employee.findMany({
+      where: { companyId, OR: [{ profileExempt: true }, { user: { email: { in: [...EXEMPT_EMAILS], mode: 'insensitive' } } }] },
+      select: {
+        id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true, profileExempt: true,
+        user: { select: { email: true } }, designation: { select: { name: true } },
+      },
+      orderBy: [{ firstName: 'asc' }],
+    });
+    return emps.map((e) => ({
+      id: e.id, firstName: e.firstName, lastName: e.lastName, employeeCode: e.employeeCode, avatarUrl: e.avatarUrl,
+      email: e.user?.email ?? null, designation: e.designation?.name ?? null,
+      // Built-in accounts cannot be removed from the page.
+      fixed: EXEMPT_EMAILS.has(String(e.user?.email ?? '').toLowerCase()),
+    }));
+  }
+
+  async setExempt(companyId: number, role: string, employeeId: number, exempt: boolean) {
+    if (!isHrAdmin(role)) throw new ForbiddenException('Only HR and admins can manage exemptions');
+    const res = await this.prisma.employee.updateMany({ where: { id: employeeId, companyId }, data: { profileExempt: !!exempt } });
+    if (!res.count) throw new BadRequestException('Employee not found');
+    return this.listExempt(companyId, role);
   }
 
   /** "This is my first job": previous-employment documents are not asked for. */

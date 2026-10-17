@@ -3,7 +3,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { EmployeeService, ProfileCompletenessReport, ProfileLock } from '../../services/employee.service';
+import { EmployeeService, ExemptEmployee, ProfileCompletenessReport, ProfileLock } from '../../services/employee.service';
 import {
   LucideArrowLeft,
   LucideRefreshCw,
@@ -117,8 +117,44 @@ export class ProfileCompletionComponent implements OnInit {
   savingLock = signal(false);
   lockSaved = signal(false);
 
+  /**
+   * Excused from the reminder and lock (17 Oct 2026): HR searches for a person
+   * and adds them; the built-in accounts are listed but cannot be removed.
+   */
+  exempt = signal<ExemptEmployee[]>([]);
+  exemptQuery = signal('');
+  exemptBusy = signal<number | null>(null);
+  exemptMatches = computed(() => {
+    const q = this.exemptQuery().trim().toLowerCase();
+    if (!q) return [];
+    const taken = new Set(this.exempt().map((e) => e.id));
+    return (this.report()?.rows ?? [])
+      .map((r) => r.employee)
+      .filter((e) => !taken.has(e.id))
+      .filter((e) => `${e.firstName || ''} ${e.lastName || ''} ${e.employeeCode || ''} ${e.email || ''}`.toLowerCase().includes(q))
+      .slice(0, 8);
+  });
+
+  loadExempt() {
+    this.employees.getProfileExempt().subscribe({ next: (l) => this.exempt.set(l), error: () => this.exempt.set([]) });
+  }
+
+  setExempt(employeeId: number, exempt: boolean) {
+    this.exemptBusy.set(employeeId);
+    this.employees.setProfileExempt(employeeId, exempt).subscribe({
+      next: (l) => {
+        this.exempt.set(l);
+        this.exemptQuery.set('');
+        this.exemptBusy.set(null);
+        this.load(); // the report leaves exempt people out
+      },
+      error: () => this.exemptBusy.set(null),
+    });
+  }
+
   ngOnInit() {
     this.load();
+    this.loadExempt();
     this.employees.getProfileLock().subscribe({
       next: (l) => { this.lock.set(l); this.lockEnabled = l.enabled; this.lockFrom = l.from ?? ''; },
       error: () => this.lock.set(null),

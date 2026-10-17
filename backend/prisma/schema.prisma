@@ -392,6 +392,8 @@ model Employee {
   /// Ticked by the person in the profile reminder: no previous employer, so
   /// no UAN, experience letter or salary slip is asked for (16 Oct 2026).
   firstJob             Boolean      @default(false)
+  /// HR has excused this person from the document reminder and lock (17 Oct 2026).
+  profileExempt        Boolean      @default(false)
   managerId            Int?
   manager              Employee?    @relation("EmployeeToManager", fields: [managerId], references: [id], onDelete: SetNull)
   subordinates         Employee[]   @relation("EmployeeToManager")

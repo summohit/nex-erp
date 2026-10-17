@@ -231,6 +231,17 @@ export class EmployeeService {
     return this.http.put<ProfileLock>(`${this.apiUrl}/profile-completeness/lock`, body, { headers: { Authorization: `Bearer ${token}` } });
   }
 
+  /** HR: who never sees the document reminder or lock. */
+  getProfileExempt(): Observable<ExemptEmployee[]> {
+    const token = getAccessToken();
+    return this.http.get<ExemptEmployee[]>(`${this.apiUrl}/profile-completeness/exempt`, { headers: { Authorization: `Bearer ${token}` } });
+  }
+
+  setProfileExempt(employeeId: number, exempt: boolean): Observable<ExemptEmployee[]> {
+    const token = getAccessToken();
+    return this.http.put<ExemptEmployee[]>(`${this.apiUrl}/profile-completeness/exempt/${employeeId}`, { exempt }, { headers: { Authorization: `Bearer ${token}` } });
+  }
+
   /** HR: everyone's profile completion. */
   getProfileCompletenessReport(): Observable<ProfileCompletenessReport> {
     const token = getAccessToken();
@@ -278,6 +289,10 @@ export interface ProfileCompleteness {
   locked?: boolean;
 }
 /** HR's document lock: on/off, the IST date it starts, and whether it is in force now. */
+export interface ExemptEmployee {
+  id: number; firstName: string; lastName: string | null; employeeCode: string | null; avatarUrl: string | null;
+  email: string | null; designation: string | null; fixed: boolean;
+}
 export interface ProfileLock { enabled: boolean; from: string | null; active: boolean }
 export interface ProfileCompletenessReport {
   total: number;

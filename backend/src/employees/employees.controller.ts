@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile, BadRequestException, ParseIntPipe } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProfileCompletenessService } from './profile-completeness/profile-completeness.service';
 import {
@@ -125,6 +125,17 @@ export class EmployeesController {
   @Put('profile-completeness/lock')
   setProfileLock(@Request() req, @Body() body: { enabled?: boolean; from?: string | null }) {
     return this.profileCompleteness.setLock(req.user.companyId, req.user.role, body);
+  }
+
+  /** HR: who is excused from the document reminder and lock. */
+  @Get('profile-completeness/exempt')
+  getProfileExempt(@Request() req) {
+    return this.profileCompleteness.listExempt(req.user.companyId, req.user.role);
+  }
+
+  @Put('profile-completeness/exempt/:employeeId')
+  setProfileExempt(@Request() req, @Param('employeeId', ParseIntPipe) employeeId: number, @Body() body: { exempt: boolean }) {
+    return this.profileCompleteness.setExempt(req.user.companyId, req.user.role, employeeId, !!body?.exempt);
   }
 
   /** HR: everyone's profile completion, with what is missing and their manager. */

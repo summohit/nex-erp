@@ -62,6 +62,37 @@
           </button>
           @if (lockSaved() && !lockDirty) { <span class="pc-lock-saved">Saved</span> }
         </div>
+
+        <!-- Excused accounts: never see the reminder or the lock -->
+        <div class="pc-exempt">
+          <div class="pc-exempt-head">Excused from documents <span class="pc-exempt-count">{{ exempt().length }}</span></div>
+          <div class="pc-exempt-chips">
+            @for (e of exempt(); track e.id) {
+              <span class="pc-exempt-chip" [title]="e.email || ''">
+                {{ e.firstName }} {{ e.lastName }}
+                @if (e.fixed) { <span class="pc-exempt-fixed">built-in</span> }
+                @else {
+                  <button type="button" (click)="setExempt(e.id, false)" [disabled]="exemptBusy() === e.id" title="Remove">×</button>
+                }
+              </span>
+            }
+          </div>
+          <div class="pc-exempt-search">
+            <input type="text" placeholder="Search a person to excuse…" [ngModel]="exemptQuery()" (ngModelChange)="exemptQuery.set($event)" />
+            @if (exemptMatches().length) {
+              <div class="pc-exempt-results">
+                @for (m of exemptMatches(); track m.id) {
+                  <button type="button" (click)="setExempt(m.id, true)" [disabled]="exemptBusy() === m.id">
+                    <b>{{ m.firstName }} {{ m.lastName }}</b>
+                    <span>{{ m.employeeCode ? '#' + m.employeeCode + ' · ' : '' }}{{ m.email }}</span>
+                  </button>
+                }
+              </div>
+            } @else if (exemptQuery().trim()) {
+              <div class="pc-exempt-results"><div class="pc-exempt-none">No one found</div></div>
+            }
+          </div>
+        </div>
       </div>
     </div>
   }
