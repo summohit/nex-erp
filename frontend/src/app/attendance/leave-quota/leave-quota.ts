@@ -1,3 +1,4 @@
+import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -37,6 +38,7 @@ export type QuickFilterType = 'ALL' | 'LOW_REMAINING' | 'HIGH_USED' | 'UNASSIGNE
 export class LeaveQuotaComponent implements OnInit {
   private leavesService = inject(LeavesService);
   private toast = inject(HotToastService);
+  profileModal = inject(ProfileModalService);
 
   loading = signal(true);
   report = signal<QuotaReport | null>(null);

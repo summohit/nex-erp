@@ -90,7 +90,7 @@
   <!-- Cards View (for mobile or toggle) -->
   <div class="employee-cards-view" *ngIf="viewMode() === 'cards' && !isLoading()">
     <div class="employee-cards-grid" *ngIf="getFilteredEmployees().length > 0">
-      <div class="emp-card" *ngFor="let emp of getFilteredEmployees()" (click)="openDrawer(emp)">
+      <div class="emp-card" *ngFor="let emp of getFilteredEmployees()" (click)="openProfile(emp)">
         <div class="emp-card-header">
           <div class="emp-card-avatar">
             <img *ngIf="emp.avatarUrl || emp.user?.avatarUrl" [src]="emp.avatarUrl || emp.user?.avatarUrl" alt="Avatar">

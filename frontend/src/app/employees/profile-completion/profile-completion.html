@@ -283,7 +283,7 @@
                       <span *ngIf="!row.employee.avatarUrl">{{ getInitials(row.employee.firstName, row.employee.lastName) }}</span>
                     </div>
                     <div class="emp-meta">
-                      <a [routerLink]="['/employees', row.employee.id, 'profile']" class="emp-name">
+                      <a [routerLink]="['/employees', row.employee.id, 'profile']" (click)="$event.preventDefault(); profileModal.open(row.employee.id)" class="emp-name">
                         {{ row.employee.firstName }} {{ row.employee.lastName || '' }}
                       </a>
                       <div class="emp-sub-row">

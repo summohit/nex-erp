@@ -120,3 +120,6 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* Inside the profile popup: no page padding or title. */
+.page-container.embedded { padding: 0; max-width: none; }

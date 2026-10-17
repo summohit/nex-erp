@@ -1015,6 +1015,9 @@
 .salary-table-wrapper {
   width: 100%;
   overflow-x: auto;
+  /* Sideways scroll only (17 Oct 2026): with overflow-x set, the browser
+     also gives the box its own vertical scrollbar; the page scrolls instead. */
+  overflow-y: hidden;
   border: 1px solid #E2E8F0;
   border-radius: 12px;
   background: #FFFFFF;

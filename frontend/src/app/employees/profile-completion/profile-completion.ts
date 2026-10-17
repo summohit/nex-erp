@@ -1,3 +1,4 @@
+import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -54,6 +55,7 @@ import {
 })
 export class ProfileCompletionComponent implements OnInit {
   private employees = inject(EmployeeService);
+  profileModal = inject(ProfileModalService);
 
   report = signal<ProfileCompletenessReport | null>(null);
   loading = signal(true);

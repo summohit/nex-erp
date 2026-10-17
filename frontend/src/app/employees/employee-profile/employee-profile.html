@@ -1,5 +1,5 @@
-<div class="page-container">
-  <div class="page-header">
+<div class="page-container" [class.embedded]="embedded">
+  <div class="page-header" *ngIf="!embedded">
     <div class="header-content">
       <h1>Profile Settings</h1>
       <p>Manage your profile, emergency contacts, and personal documents.</p>

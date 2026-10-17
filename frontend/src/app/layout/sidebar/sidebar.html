@@ -49,7 +49,9 @@
         <nav class="sidebar-nav">
         <ng-container *ngFor="let item of section.items">
           <div class="nav-section">
-            <a href="#"
+            <!-- Real addresses (17 Oct 2026), so right-click → "Open in new tab"
+                 opens that page instead of falling back to the dashboard. -->
+            <a [attr.href]="(!item.subItems?.length && item.route) ? item.route : '#'"
                class="nav-item"
                [class.has-sub]="item.subItems && item.subItems.length > 0"
                [class.active]="isMainItemActive(item)"
@@ -97,7 +99,7 @@
                 <ng-container *ngFor="let sub of item.subItems; let last = last">
                   <div class="sub-nav-item-wrapper">
                     <div class="tree-line" [class.last]="last"></div>
-                    <a href="#" class="sub-nav-item" [class.active]="isSubItemActive(sub)" (click)="handleSubMenuClick(sub, $event)">
+                    <a [attr.href]="sub.route || '#'" class="sub-nav-item" [class.active]="isSubItemActive(sub)" (click)="handleSubMenuClick(sub, $event)">
                       {{ sub.title }}
                     </a>
                   </div>

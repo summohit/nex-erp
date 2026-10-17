@@ -256,7 +256,14 @@ export class SidebarComponent implements OnInit {
     });
   }
 
+  /** Ctrl/Cmd/Shift-click or middle-click: let the browser open the link itself. */
+  private opensElsewhere(event: Event): boolean {
+    const e = event as MouseEvent;
+    return !!(e && (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1));
+  }
+
   toggleMenu(menuItem: any, event: Event) {
+    if (!menuItem.subItems?.length && menuItem.route && this.opensElsewhere(event)) return;
     event.preventDefault();
 
     // If sidebar is collapsed, auto-expand it so submenus and labels are accessible
@@ -285,6 +292,7 @@ export class SidebarComponent implements OnInit {
   }
 
   handleSubMenuClick(subItem: any, event: Event) {
+    if (subItem.route && !subItem.external && subItem.route !== '/careers' && this.opensElsewhere(event)) return;
     event.preventDefault();
     if (subItem.external || subItem.route === '/careers') {
       let route = subItem.route;

@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal, HostListener, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
@@ -46,6 +47,7 @@ export class EmployeeListComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
   private toast = inject(HotToastService);
   private router = inject(Router);
+  private profileModal = inject(ProfileModalService);
   private route = inject(ActivatedRoute);
   public authService = inject(AuthService);
 
@@ -129,10 +131,7 @@ export class EmployeeListComponent implements OnInit {
 
   selectModalEmployee(emp: Employee) {
     this.closeSearchModal();
-    // For now, let's just open the drawer to view their profile, 
-    // or navigate to their profile page.
-    // We'll open the drawer.
-    this.openDrawer(emp);
+    this.openProfile(emp);
   }
   // -------------------------
 
@@ -150,8 +149,8 @@ export class EmployeeListComponent implements OnInit {
     sortable: true
   };
 
-  paginationPageSize = 20;
-  paginationPageSizeSelector = [10, 20, 50, 100];
+  paginationPageSize = 100;
+  paginationPageSizeSelector = [20, 50, 100, 200];
 
   gridOptions = {
     rowSelection: {
@@ -159,8 +158,16 @@ export class EmployeeListComponent implements OnInit {
       checkboxes: true,
       headerCheckbox: true,
       enableClickSelection: false
-    }
+    },
+    // Clicking the person opens their full profile in a popup (17 Oct 2026).
+    onCellClicked: (e: any) => {
+      if (e.colDef?.field === 'firstName' && e.data?.id) this.openProfile(e.data);
+    },
   };
+
+  openProfile(emp: any) {
+    this.profileModal.open(emp?.id);
+  }
 
   colDefs: ColDef[] = [
     { 
@@ -285,7 +292,7 @@ export class EmployeeListComponent implements OnInit {
         onEdit: (data: any) => this.openDrawer(data),
         onDelete: (data: any) => this.deleteEmployee(data),
         deleteLabel: (data: any) => data?.user?.status === 'SUSPENDED' ? 'Activate' : 'Deactivate',
-        onViewProfile: (data: any) => this.router.navigate(['/employees', data.id, 'profile']),
+        onViewProfile: (data: any) => this.openProfile(data),
         onResendVerification: (data: any) => this.resendVerification(data)
       }
     }
@@ -302,7 +309,7 @@ export class EmployeeListComponent implements OnInit {
 
   viewProfile(emp: any) {
     this.closeSearchModal();
-    this.router.navigate(['/employees', emp.id, 'profile']);
+    this.openProfile(emp);
   }
 
   /** Opens the edit drawer for a search-modal result. */

@@ -1,3 +1,4 @@
+import { ProfileModalService } from '../../../shared/profile-modal/profile-modal.service';
 import { Component, inject, signal, computed, HostListener, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -45,6 +46,7 @@ export interface SearchResultItem {
 })
 export class SpotlightSearchComponent {
   private router = inject(Router);
+  profileModal = inject(ProfileModalService);
   private employeeService = inject(EmployeeService);
   private projectsService = inject(ProjectsService);
   private menusService = inject(MenusService);
@@ -189,7 +191,7 @@ export class SpotlightSearchComponent {
         title: `${e.firstName} ${e.lastName}`,
         subtitle: `${e.designation?.name || 'Staff'} • ${e.department?.name || 'General'}`,
         iconName: 'user',
-        action: () => this.navigate(`/employees/${e.id}/profile`),
+        action: () => this.openProfile(e.id),
         actions: this.employeeRowActions(e),
       }));
 
@@ -217,6 +219,12 @@ export class SpotlightSearchComponent {
     );
   });
 
+  /** Someone else's profile opens in the popup, not as a page. */
+  private openProfile(id: number) {
+    this.close();
+    this.profileModal.open(id);
+  }
+
   private navigate(path: string) {
     this.close();
     this.router.navigate([path]);
@@ -240,7 +248,7 @@ export class SpotlightSearchComponent {
   /** Mirrors the Employee Directory row menu: View Profile, Edit, Resend, Deactivate. */
   private employeeRowActions(e: any): SearchRowAction[] {
     const actions: SearchRowAction[] = [
-      { label: 'View Profile', run: () => this.navigate(`/employees/${e.id}/profile`) },
+      { label: 'View Profile', run: () => this.openProfile(e.id) },
     ];
     if (!this.canManageEmployees) return actions;
 

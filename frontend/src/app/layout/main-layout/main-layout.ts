@@ -1,4 +1,5 @@
 import { ProfileReminderComponent } from '../../shared/components/profile-reminder/profile-reminder';
+import { ProfileModalComponent } from '../../shared/profile-modal/profile-modal';
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
@@ -10,7 +11,7 @@ import { NoticePopupComponent } from '../../shared/components/notice-popup/notic
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule, SidebarComponent, HeaderComponent, DialogHostComponent, NoticePopupComponent, ProfileReminderComponent],
+  imports: [CommonModule, RouterModule, SidebarComponent, HeaderComponent, DialogHostComponent, NoticePopupComponent, ProfileReminderComponent, ProfileModalComponent],
   templateUrl: './main-layout.html',
   styleUrls: ['./main-layout.css']
 })

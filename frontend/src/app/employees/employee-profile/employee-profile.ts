@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, Input, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { EmployeeService } from '../../services/employee.service';
@@ -15,6 +15,9 @@ import { DocumentsTabComponent } from './documents-tab/documents-tab';
   styleUrls: ['./employee-profile.css']
 })
 export class EmployeeProfileComponent implements OnInit {
+  /** Set when shown in the profile popup instead of on its own page. */
+  @Input() employeeId: number | string | null = null;
+  @Input() embedded = false;
   private route = inject(ActivatedRoute);
   private employeeService = inject(EmployeeService);
   private toast = inject(HotToastService);
@@ -27,6 +30,10 @@ export class EmployeeProfileComponent implements OnInit {
   canManageDocuments = signal(false);
 
   ngOnInit() {
+    if (this.employeeId != null) {
+      this.loadProfile(String(this.employeeId));
+      return;
+    }
     this.route.paramMap.subscribe(params => {
       let id = params.get('id');
       if (id) {

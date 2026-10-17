@@ -379,7 +379,7 @@
 
       <div class="modal-header-actions">
         <a
-          [routerLink]="['/employees', row.employee.id, 'profile']"
+          [routerLink]="['/employees', row.employee.id, 'profile']" (click)="$event.preventDefault(); profileModal.open(row.employee.id)"
           class="btn-view-profile"
           target="_blank"
           title="Open employee profile in new tab">
