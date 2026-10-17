@@ -15,7 +15,15 @@ const APP_DIR = join(process.cwd(), 'uploads', 'app');
 const APK_PATH = join(APP_DIR, 'nex-workspace.apk');
 const VERSION_PATH = join(APP_DIR, 'version.json');
 
-function readVersion(): { version?: string; notes?: string } {
+type VersionFile = {
+  version?: string; notes?: string;
+  // Update policy for the installed app (17 Oct 2026). Builds below
+  // minVersionCode must update before they can be used; builds below
+  // latestVersionCode are offered the update and can say "Later".
+  latestVersionCode?: number; minVersionCode?: number; updateMessage?: string;
+};
+
+function readVersion(): VersionFile {
   try {
     if (fs.existsSync(VERSION_PATH)) {
       return JSON.parse(fs.readFileSync(VERSION_PATH, 'utf8'));
@@ -40,6 +48,19 @@ export class AppDownloadController {
       notes: notes || null,
       sizeBytes: stat.size,
       updatedAt: stat.mtime.toISOString(),
+    };
+  }
+
+  // Public: the app asks before sign-in, so even a logged-out old build is told.
+  @Get('android/policy')
+  getAndroidPolicy() {
+    const v = readVersion();
+    return {
+      latestVersion: v.version || null,
+      latestVersionCode: Number(v.latestVersionCode) || 0,
+      minVersionCode: Number(v.minVersionCode) || 0,
+      message: v.updateMessage || v.notes || null,
+      storeUrl: 'https://play.google.com/store/apps/details?id=com.cestech.nexerp',
     };
   }
 

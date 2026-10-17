@@ -4,6 +4,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { initPushListeners } from './src/native/pushNotifications';
 import { navigateTo, navigationRef } from './src/navigation/navigationUtils';
 import { routeForLink } from './src/native/notificationRoutes';
+import UpdateGate from './src/components/UpdateGate';
 
 function App(): React.JSX.Element {
   useEffect(() => {
@@ -44,6 +45,7 @@ function App(): React.JSX.Element {
   return (
     <SafeAreaProvider>
       <AppNavigator />
+      <UpdateGate />
     </SafeAreaProvider>
   );
 }
