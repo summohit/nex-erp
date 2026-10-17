@@ -4263,13 +4263,14 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   };
 
   listGridColDefs: ColDef[] = [
-    { field: 'key', headerName: 'ID', width: 135, pinned: 'left' },
+    { field: 'key', headerName: 'ID', width: 165, minWidth: 165, pinned: 'left', tooltipField: 'key' },
     { field: 'title', headerName: 'Task', width: 330, minWidth: 260, filter: true },
     { 
       field: 'status',
       headerName: 'Status', 
-      // Wide enough for the badge plus the approval buttons beside it.
-      width: 175,
+      // Wide enough for the badge plus the two icon approval buttons beside it.
+      width: 215,
+      minWidth: 215,
       editable: () => this.canManageTask,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: { values: ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'] },
@@ -4287,11 +4288,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
             <span style="width: 5px; height: 5px; border-radius: 50%; background-color: #d97706; flex-shrink: 0;"></span>
             Pending Approval
           </span>${this.canDecideApproval(i) ? `
-          <span style="display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle;">
-            <button type="button" data-approval="REJECT" title="Reject this task"
-              style="border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; border-radius: 6px; padding: 1px 8px; font-size: 11px; font-weight: 600; line-height: 18px; cursor: pointer;">Reject</button>
-            <button type="button" data-approval="APPROVE" title="Approve this task"
-              style="border: 1px solid #bbf7d0; background: #f0fdf4; color: #15803d; border-radius: 6px; padding: 1px 8px; font-size: 11px; font-weight: 600; line-height: 18px; cursor: pointer;">Approve</button>
+          <span style="display: inline-flex; gap: 5px; margin-left: 6px; vertical-align: middle;">
+            <button type="button" data-approval="REJECT" title="Reject this task" aria-label="Reject this task"
+              style="width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; border-radius: 8px; padding: 0; cursor: pointer;"><svg data-approval="REJECT" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" style="pointer-events: none;"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            <button type="button" data-approval="APPROVE" title="Approve this task" aria-label="Approve this task"
+              style="width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #bbf7d0; background: #f0fdf4; color: #15803d; border-radius: 8px; padding: 0; cursor: pointer;"><svg data-approval="APPROVE" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none;"><path d="M20 6 9 17l-5-5"/></svg></button>
           </span>` : ''}`;
         }
         if (this.isRejectedApproval(i)) {
