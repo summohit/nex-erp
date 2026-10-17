@@ -4599,7 +4599,22 @@
                 <strong>{{ item.author?.firstName || 'Unknown' }} {{ item.author?.lastName || '' }}</strong>
                 <a class="activity-time-link">{{ item.createdAt | date:'shortTime' }}</a>
               </div>
-              <div class="comment-white-bubble" [innerHTML]="item.body"></div>
+              <div class="comment-white-bubble" [innerHTML]="completionRemarkHtml(item.body)"></div>
+              <div class="comment-proof-attachments" *ngIf="completionProofAttachments(item.body).length">
+                <button type="button" class="comment-proof-trigger" (click)="toggleCompletionProofs(item.id)"
+                        [attr.aria-expanded]="openCompletionProofCommentId() === item.id"
+                        aria-label="Show completion attachments">
+                  <svg lucidePaperclip [size]="14"></svg>
+                  <span>{{ completionProofAttachments(item.body).length }}</span>
+                </button>
+                <div class="comment-proof-popover" *ngIf="openCompletionProofCommentId() === item.id">
+                  <a *ngFor="let attachment of completionProofAttachments(item.body)"
+                     [href]="attachment.url" target="_blank" rel="noopener noreferrer">
+                    <svg lucidePaperclip [size]="14"></svg>
+                    <span>{{ attachment.name }}</span>
+                  </a>
+                </div>
+              </div>
               <div class="comment-footer-actions">
                 <span class="action-reaction-btn" title="Add reaction">😊</span>
                 <span class="action-dot">•</span>
@@ -5003,6 +5018,15 @@
         <input #proofFileInput type="file" multiple (change)="onProofFileSelected($event)" style="display: none;" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip">
       </div>
 
+      <label class="proof-remark-field">
+        <span>Completion remark <em *ngIf="proofRemarkRequired">Required</em></span>
+        <textarea [ngModel]="proofNotes()"
+                  (ngModelChange)="proofNotes.set($event)"
+                  [required]="proofRemarkRequired"
+                  [disabled]="isUploadingProof()"
+                  placeholder="Briefly describe what was completed or delivered..."></textarea>
+      </label>
+
       <!-- File List -->
       <div class="proof-file-list" *ngIf="proofFiles().length > 0">
         <div class="proof-file-item" *ngFor="let entry of proofFiles(); let i = index">
@@ -5060,7 +5084,7 @@
       <div class="proof-modal-footer">
         <button class="proof-btn-cancel" (click)="closeProofModal()" [disabled]="isUploadingProof()">Cancel</button>
         <button class="proof-btn-cancel" *ngIf="canSkipProofUpload" (click)="skipProofUpload()" [disabled]="isUploadingProof()">Skip &amp; Move</button>
-        <button class="proof-btn-submit" (click)="confirmProofUpload()" [disabled]="isUploadingProof() || proofFiles().length === 0">
+        <button class="proof-btn-submit" (click)="confirmProofUpload()" [disabled]="isUploadingProof() || proofFiles().length === 0 || (proofRemarkRequired && !proofNotes().trim())">
           <svg lucideUpload size="14" *ngIf="!isUploadingProof()"></svg>
           {{ isUploadingProof() ? 'Uploading...' : 'Upload & Move' }}
         </button>

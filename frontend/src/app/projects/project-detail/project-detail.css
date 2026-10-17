@@ -1837,6 +1837,64 @@ svg[lucide], svg[class*=lucide] {
   gap: 10px;
 }
 
+.comment-proof-attachments {
+  position: relative;
+  display: inline-flex;
+  margin: -1px 0 5px;
+}
+
+.comment-proof-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 3px 8px;
+  color: #52627c;
+  background: #f5f8fc;
+  border: 1px solid #dce5f0;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.comment-proof-trigger:hover,
+.comment-proof-trigger[aria-expanded="true"] {
+  color: #1769d8;
+  background: #eef5ff;
+  border-color: #9fc4f6;
+}
+
+.comment-proof-popover {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 190px;
+  max-width: 280px;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid #dce5f0;
+  border-radius: 7px;
+  box-shadow: 0 8px 18px rgba(19, 47, 76, .16);
+}
+
+.comment-proof-popover a {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  color: #1769d8;
+  border-radius: 4px;
+  font-size: 12px;
+  text-decoration: none;
+  overflow: hidden;
+}
+
+.comment-proof-popover a:hover { background: #f1f6fd; }
+.comment-proof-popover a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .comment-editor-box {
   border-radius: 8px;
   background: #ffffff;
@@ -6671,6 +6729,41 @@ input[type=text], input[type=email], input[type=password] {
 
 .proof-dropzone:hover .proof-dropzone-browse {
   text-decoration-color: #2563eb;
+}
+
+.proof-remark-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0 0 16px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.proof-remark-field em {
+  margin-left: 5px;
+  color: #dc2626;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.proof-remark-field textarea {
+  min-height: 78px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.45;
+  outline: none;
+}
+
+.proof-remark-field textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .proof-file-list {

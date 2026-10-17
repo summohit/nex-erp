@@ -706,8 +706,10 @@ export class TicketsService {
       const closingOnly =
         Object.keys(data).length === 1 && (data.status === 'CLOSED' || data.status === 'IN_PROGRESS');
 
+      const closeFields = ['status', 'statusReason', 'statusAttachment'];
       const mayClose =
-        isReporter && ticket.status === 'RESOLVED' && Object.keys(data).length === 1 && data.status === 'CLOSED';
+        isReporter && ticket.status === 'RESOLVED' && data.status === 'CLOSED' &&
+        Object.keys(data).every((field) => closeFields.includes(field));
 
       if (!mayClose) {
         throw new ForbiddenException(
@@ -724,7 +726,7 @@ export class TicketsService {
     // change with no explanation leaves them asking "how?" or "why?" with
     // nobody to answer. Required here, not only in the form, so no screen and
     // no API caller can close a ticket out silently.
-    const closing = (data.status === 'RESOLVED' || data.status === 'REJECTED') && data.status !== ticket.status;
+    const closing = ['RESOLVED', 'REJECTED', 'CLOSED'].includes(data.status) && data.status !== ticket.status;
     const statusReason = String(data.statusReason ?? '').trim();
     const statusAttachment =
       data.statusAttachment?.fileUrl ? data.statusAttachment as { fileName?: string; fileUrl: string; fileSize?: number } : null;
@@ -732,8 +734,13 @@ export class TicketsService {
       throw new BadRequestException(
         data.status === 'RESOLVED'
           ? 'Describe how this ticket was resolved.'
-          : 'Say why this ticket is being rejected.',
+          : data.status === 'REJECTED'
+            ? 'Say why this ticket is being rejected.'
+            : 'Add a remark before closing this ticket.',
       );
+    }
+    if (closing && data.status === 'CLOSED' && !statusAttachment) {
+      throw new BadRequestException('Attach evidence before closing this ticket.');
     }
     // Not ticket columns — strip them before anything treats them as such.
     delete data.statusReason;
@@ -840,6 +847,10 @@ export class TicketsService {
       ? await this.prisma.employee.findFirst({ where: { id: actorId, companyId }, select: { firstName: true, lastName: true } })
       : null;
     const moveActorName = TicketsService.ticketActorName(moveActor);
+    const statusLabel = data.status === 'RESOLVED' ? 'Resolved' : data.status === 'REJECTED' ? 'Rejected' : 'Closed';
+    const statusEvidenceLine = statusAttachment
+      ? `\nEvidence attached: <a href="${statusAttachment.fileUrl}" target="_blank" rel="noopener noreferrer">${statusAttachment.fileName || 'attachment'}</a>`
+      : '';
     const moveEvidenceLines = moveAttachments
       .map((a) => `\nEvidence: ${a.fileName} — ${a.fileUrl}`)
       .join('');
@@ -860,7 +871,7 @@ export class TicketsService {
               data: {
                 ticketId: id,
                 authorId: actorId,
-                body: `${data.status === 'RESOLVED' ? 'Resolved' : 'Rejected'}: ${statusReason}`,
+                body: `${statusLabel}. Remark: "${statusReason}"${statusEvidenceLine}`,
               },
             }),
           ]

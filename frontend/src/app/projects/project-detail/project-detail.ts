@@ -3990,6 +3990,31 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   activities = signal<any[]>([]);
   feedItems = signal<any[]>([]);
+  openCompletionProofCommentId = signal<number | null>(null);
+
+  /** Removes the hidden proof metadata before rendering a completion remark. */
+  completionRemarkHtml(body: string | null | undefined): string {
+    return (body || '').replace(/<div data-completion-proofs="true">[\s\S]*?<\/div>/gi, '');
+  }
+
+  completionProofAttachments(body: string | null | undefined): { name: string; url: string }[] {
+    const source = body || '';
+    const matches = source.matchAll(/<a\s+[^>]*data-completion-proof="true"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi);
+    return Array.from(matches).map((match) => ({
+      url: this.decodeHtmlEntities(match[1]),
+      name: this.decodeHtmlEntities(match[2]).replace(/<[^>]+>/g, '') || 'Attachment',
+    }));
+  }
+
+  toggleCompletionProofs(commentId: number) {
+    this.openCompletionProofCommentId.update((openId) => openId === commentId ? null : commentId);
+  }
+
+  private decodeHtmlEntities(value: string): string {
+    const element = document.createElement('textarea');
+    element.innerHTML = value;
+    return element.value;
+  }
   
   loadFeedItems(issueId: number) {
     // Fetch comments and activities, then merge and sort
@@ -5242,16 +5267,31 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return this.isProjectOwner || this.isCurrentUserPM();
   }
 
+  /** Only a person assigned to this task must explain their completion work. */
+  get proofRemarkRequired(): boolean {
+    const issue = this.proofIssue();
+    const employeeId = this.currentEmployeeId();
+    if (!issue || !employeeId || this.canSkipProofUpload) return false;
+    return issue.assigneeId === employeeId
+      || (issue.members || []).some((member: any) =>
+        member.employeeId === employeeId || member.employee?.id === employeeId,
+      );
+  }
+
   skipProofUpload() {
     const issue = this.proofIssue();
     const targetColId = this.proofTargetColumnId();
     if (!issue || !targetColId || !this.canSkipProofUpload) return;
+    const completionRemark = this.proofNotes().trim();
 
     this.optimisticallyUpdateIssueColumn(issue.id, targetColId, this.proofInsertIndex());
     this.setIssueUpdating(issue.id, true);
     this.closeProofModal();
 
-    this.projectsService.updateIssue(this.projectId, issue.id, { columnId: targetColId }).subscribe({
+    this.projectsService.updateIssue(this.projectId, issue.id, {
+      columnId: targetColId,
+      completionRemark: completionRemark || undefined,
+    }).subscribe({
       next: () => {
         this.setIssueUpdating(issue.id, false);
         this.toast.success('Task moved.');
@@ -5271,6 +5311,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (!issue || !targetColId) return;
 
     const files = this.proofFiles();
+    const completionRemark = this.proofNotes().trim();
+    if (this.proofRemarkRequired && !completionRemark) {
+      this.toast.error('Add a completion remark before moving this task.');
+      return;
+    }
     if (files.length === 0) {
       this.toast.error('Please upload at least one proof document.');
       return;
@@ -5284,6 +5329,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
     let uploadedCount = 0;
     const totalFiles = files.length;
+    const uploadedProofs: any[] = [];
 
     const uploadNext = (index: number) => {
       if (index >= files.length) {
@@ -5296,7 +5342,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.setIssueUpdating(issue.id, true);
         this.closeProofModal();
 
-        this.projectsService.updateIssue(this.projectId, issue.id, { columnId: targetColId }).subscribe({
+        this.projectsService.updateIssue(this.projectId, issue.id, {
+          columnId: targetColId,
+          completionRemark: completionRemark || undefined,
+          completionAttachmentIds: uploadedProofs.map((attachment) => attachment.id),
+        }).subscribe({
           next: () => {
             this.setIssueUpdating(issue.id, false);
             this.toast.success('Task moved and proof uploaded successfully.');
@@ -5317,7 +5367,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       this.projectsService.uploadAttachment(
         this.projectId, issue.id, files[index].file, [files[index].name],
       ).subscribe({
-        next: () => {
+        next: (uploaded) => {
+          uploadedProofs.push(...(Array.isArray(uploaded) ? uploaded : [uploaded]));
           uploadedCount++;
           this.proofUploadProgress.set(Math.round((uploadedCount / totalFiles) * 90));
           uploadNext(index + 1);
