@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator,
   Alert, TextInput, Modal, Image,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AppScreen from '../../components/AppScreen';
 import { workService, MyTask, TaskScope, PersonLite } from '../../api/workService';
 import { theme } from '../../theme/theme';
@@ -89,7 +89,9 @@ export default function MyTasksScreen() {
     }
   }, [scope, includeDone, person]);
 
-  useEffect(() => { setLoading(true); load(); }, [load]);
+  // Reload whenever this screen comes back into view, so changes made on the
+  // web or from a notification show up without pulling down.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const openPicker = () => {
     setPicker(true);

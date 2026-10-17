@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, TextInput, Image,
 } from 'react-native';
@@ -79,7 +80,9 @@ export default function TeamAttendanceScreen() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Reload whenever this screen comes back into view, so changes made on the
+  // web or from a notification show up without pulling down.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const counts = useMemo(() => Object.fromEntries(BUCKETS.map((b) => [b.key, rows.filter((r) => r.bucket === b.key).length])) as Record<Bucket, number>, [rows]);
   const shown = useMemo(() => {

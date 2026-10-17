@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
   TextInput, ActivityIndicator, RefreshControl, Alert, Animated, Modal
@@ -89,9 +90,14 @@ export default function ESSScreen({ route }: any) {
     setModalVisible(true);
   };
 
-  useEffect(() => {
-    fetchLeaveData();
-  }, [fetchLeaveData]);
+  // Reload whenever this screen comes back into view, so changes made on the
+  // web or from a notification show up without pulling down.
+  useFocusEffect(
+    useCallback(() => {
+      fetchLeaveData();
+      setTeamRefresh((k) => k + 1);
+    }, [fetchLeaveData]),
+  );
 
   const validateAndCalculateDays = (startStr: string, endStr: string) => {
     if (!startStr.trim() || !endStr.trim()) return null;

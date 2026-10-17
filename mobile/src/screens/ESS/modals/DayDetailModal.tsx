@@ -1,4 +1,5 @@
 import React from 'react';
+import GradientBg from '../../../components/GradientBg';
 import {
   View,
   Text,
@@ -9,7 +10,6 @@ import {
   Platform,
   Linking,
 } from 'react-native';
-import Svg, { Defs, LinearGradient, Stop, Rect, Circle } from 'react-native-svg';
 import {
   X,
   MapPin,
@@ -247,16 +247,7 @@ export default function DayDetailModal({
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
             {/* 1. Gradient Hero Date & Status Banner */}
             <View style={styles.heroDateBanner}>
-              <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
-                <Defs>
-                  <LinearGradient id="dayHeroGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <Stop offset="0%" stopColor={statusTheme.gradStart} />
-                    <Stop offset="100%" stopColor={statusTheme.gradEnd} />
-                  </LinearGradient>
-                </Defs>
-                <Rect x="0" y="0" width="100%" height="100%" fill="url(#dayHeroGrad)" />
-                <Circle cx="90%" cy="20%" r="65" fill="#FFFFFF" fillOpacity="0.08" />
-              </Svg>
+              <GradientBg />
 
               <View style={styles.heroDateContent}>
                 <View style={styles.heroDateCol}>

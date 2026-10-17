@@ -8,7 +8,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import AppScreen from '../../components/AppScreen';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import {
   Bell,
   CheckCheck,
@@ -160,6 +160,9 @@ function resolveLink(linkUrl: string | undefined, projects: any[]): { screen: st
 export default function NotificationsScreen() {
   const navigation = useNavigation<any>();
   const { notifications, unreadCount, isLoading, markNotificationRead, markAllNotificationsRead, fetchDashboardData, projects } = useDashboardStore();
+  // Reload whenever this screen comes back into view, so changes made on the
+  // web or from a notification show up without pulling down.
+  useFocusEffect(useCallback(() => { fetchDashboardData(); }, [fetchDashboardData]));
 
   const sections = useMemo(() => groupNotifications(notifications), [notifications]);
 

@@ -64,7 +64,12 @@ function TabBarItem({
       <Animated.View style={[styles.tabInner, isFocused && styles.tabInnerActive, { transform: [{ scale: press }] }]}>
         <Icon size={isFocused ? 19 : 21} color={isFocused ? NAV.active : NAV.idle} strokeWidth={isFocused ? 2.5 : 2} />
         {isFocused ? (
-          <Animated.Text style={[styles.activeLabel, { opacity: reveal }]} numberOfLines={1}>
+          <Animated.Text
+            style={[styles.activeLabel, { opacity: reveal }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+          >
             {label}
           </Animated.Text>
         ) : (
@@ -152,7 +157,8 @@ const styles = StyleSheet.create({
     height: 54,
   },
   tabItemActive: {
-    flex: 1.9,
+    // Room for the longest name ("Attendance") on narrow phones.
+    flex: 2.5,
   },
   tabInner: {
     flex: 1,
@@ -163,9 +169,9 @@ const styles = StyleSheet.create({
   },
   tabInnerActive: {
     flexDirection: 'row',
-    gap: 7,
+    gap: 6,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     shadowColor: NAV.active,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,

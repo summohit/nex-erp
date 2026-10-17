@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert,
   Modal, TextInput, Image, KeyboardAvoidingView, Platform, Linking, ScrollView,
@@ -70,7 +71,9 @@ export default function ApprovalsScreen() {
     setRefreshing(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Reload whenever this screen comes back into view, so changes made on the
+  // web or from a notification show up without pulling down.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // A queue the server refused (not this person's to decide) has no tab.
   const visibleTabs = TABS.filter((t) => data[t.kind] !== null);

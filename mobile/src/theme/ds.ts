@@ -82,7 +82,8 @@ export const ds = StyleSheet.create({
   pageContent: { padding: space.page, paddingBottom: 110 },
 
   // Hero: gradient card at the top of a screen (draw the gradient with react-native-svg)
-  hero: { borderRadius: radius.hero, overflow: 'hidden', marginBottom: space.page, ...shadow.hero },
+  // backgroundColor: the hero's base colour, so white text never sits on a pale card while the gradient lays out.
+  hero: { borderRadius: radius.hero, overflow: 'hidden', marginBottom: space.page, backgroundColor: colors.heroVia, ...shadow.hero },
   heroInner: { padding: space.hero },
   heroOverline: { ...type.overline, color: colors.heroOverline, marginBottom: 2 },
   heroNumber: { ...type.heroNumber, color: '#FFFFFF' },

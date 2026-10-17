@@ -67,6 +67,7 @@ export function ScreenHeader({
   right,
   transparent = false,
   hideTitle = false,
+  light = false,
   onOpenDrawer,
 }: {
   title?: string;
@@ -76,6 +77,8 @@ export function ScreenHeader({
   showBreadcrumbs?: boolean;
   transparent?: boolean;
   hideTitle?: boolean;
+  /** White title and subtitle, for a header over a coloured banner (project page). */
+  light?: boolean;
   onOpenDrawer: () => void;
 }) {
   const navigation = useNavigation<any>();
@@ -105,9 +108,9 @@ export function ScreenHeader({
               <HeaderIcon size={18} color={iconTheme.color} strokeWidth={2.3} />
             </View>
             <View style={styles.headerTitleCol}>
-              <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
+              <Text style={[styles.headerTitle, light && styles.headerTitleLight]} numberOfLines={1}>{title}</Text>
               {!!subtitle && (
-                <Text style={styles.headerSubtitle} numberOfLines={1}>{subtitle}</Text>
+                <Text style={[styles.headerSubtitle, light && styles.headerSubtitleLight]} numberOfLines={1}>{subtitle}</Text>
               )}
             </View>
           </View>
@@ -162,6 +165,7 @@ export default function AppScreen({
   showBottomNav = true,
   transparent = false,
   hideTitle = false,
+  light = false,
   children,
 }: {
   title?: string;
@@ -172,6 +176,8 @@ export default function AppScreen({
   showBottomNav?: boolean;
   transparent?: boolean;
   hideTitle?: boolean;
+  /** White header text, for screens with a coloured background behind the header. */
+  light?: boolean;
   children: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -179,7 +185,7 @@ export default function AppScreen({
 
   return (
     <SafeAreaView style={[styles.container, transparent && styles.containerTransparent]} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={light ? 'light-content' : 'dark-content'} />
       <ScreenHeader
         title={title}
         subtitle={subtitle}
@@ -188,6 +194,7 @@ export default function AppScreen({
         showBreadcrumbs={showBreadcrumbs}
         transparent={transparent}
         hideTitle={hideTitle}
+        light={light}
         onOpenDrawer={() => setDrawerOpen(true)}
       />
       <View style={styles.content}>{children}</View>
@@ -244,6 +251,11 @@ const styles = StyleSheet.create({
   headerTitleCol: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 17, fontWeight: '900', color: '#0F172A', letterSpacing: -0.3 },
   headerSubtitle: { fontSize: 11.5, fontWeight: '600', color: '#94A3B8', marginTop: 1 },
+  headerTitleLight: {
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(15, 23, 42, 0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  headerSubtitleLight: { color: 'rgba(255, 255, 255, 0.8)' },
   headerTransparent: {
     backgroundColor: 'transparent',
     borderBottomWidth: 0,

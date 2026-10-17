@@ -8,7 +8,6 @@ import {
   FlatList,
   RefreshControl,
 } from 'react-native';
-import Svg, { Defs, LinearGradient, Stop, Rect, Circle } from 'react-native-svg';
 import {
   ChevronLeft,
   ChevronRight,
@@ -27,6 +26,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useTimesheetStore } from '../../../store/timesheetStore';
 import { isRestDay } from '../../../utils/weeklyOffs';
+import GradientBg from '../../../components/GradientBg';
 
 import RegularizationFormModal from '../modals/RegularizationFormModal';
 import DayDetailModal from '../modals/DayDetailModal';
@@ -281,18 +281,7 @@ export default function TimesheetTab() {
     >
       {/* 1. EXECUTIVE MONTHLY ATTENDANCE HERO */}
       <View style={styles.heroCard}>
-        <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
-          <Defs>
-            <LinearGradient id="tsHeroGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor="#0F172A" />
-              <Stop offset="55%" stopColor="#1E3A8A" />
-              <Stop offset="100%" stopColor="#1373E5" />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="100%" height="100%" fill="url(#tsHeroGrad)" />
-          <Circle cx="90%" cy="15%" r="85" fill="#FFFFFF" fillOpacity="0.07" />
-          <Circle cx="12%" cy="90%" r="65" fill="#38BDF8" fillOpacity="0.08" />
-        </Svg>
+        <GradientBg />
 
         <View style={styles.heroInner}>
           {/* Month Switcher + Regularize Button */}

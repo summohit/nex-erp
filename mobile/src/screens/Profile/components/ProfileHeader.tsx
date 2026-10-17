@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Camera, ShieldCheck, Mail, Briefcase, Hash } from 'lucide-react-native';
-import Svg, { Defs, LinearGradient, Stop, Rect, Circle } from 'react-native-svg';
+import GradientBg from '../../../components/GradientBg';
 
 interface ProfileHeaderProps {
   profileData: any;
@@ -22,19 +22,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({ profileData, onAvatarPres
     <View style={styles.container}>
       {/* Dynamic Background with SVG Gradient and soft ambient glow circles */}
       <View style={styles.bannerContainer}>
-        <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
-          <Defs>
-            <LinearGradient id="profileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor="#1373e5" />
-              <Stop offset="50%" stopColor="#1373e5" />
-              <Stop offset="100%" stopColor="#0f4f9c" />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="100%" height="100%" fill="url(#profileGrad)" />
-          {/* Subtle Ambient Decorative Circles */}
-          <Circle cx="85%" cy="20%" r="90" fill="#FFFFFF" fillOpacity="0.08" />
-          <Circle cx="15%" cy="90%" r="70" fill="#FFFFFF" fillOpacity="0.06" />
-        </Svg>
+        <GradientBg from="#1373e5" via="#1373e5" to="#0f4f9c" />
 
         <View style={styles.headerContent}>
           {/* Avatar Section */}

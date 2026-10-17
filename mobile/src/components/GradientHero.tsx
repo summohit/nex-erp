@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Defs, LinearGradient, Stop, Rect, Circle } from 'react-native-svg';
+import GradientBg from './GradientBg';
 import { ds, colors } from '../theme/ds';
 
 export interface HeroStat { label: string; value: string | number; color?: string }
@@ -11,10 +11,10 @@ export interface HeroStat { label: string; value: string | number; color?: strin
  * its unit, an optional action on the right, and a strip of stats.
  */
 export default function GradientHero({
-  id, overline, value, unit, caption, action, stats, children,
+  overline, value, unit, caption, action, stats, children,
 }: {
-  /** Unique per screen: SVG gradient ids are global on Android. */
-  id: string;
+  /** No longer needed (GradientBg makes its own); kept so callers compile. */
+  id?: string;
   overline: string;
   value: string | number;
   unit?: string;
@@ -25,18 +25,7 @@ export default function GradientHero({
 }) {
   return (
     <View style={ds.hero}>
-      <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
-        <Defs>
-          <LinearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor={colors.heroFrom} />
-            <Stop offset="55%" stopColor={colors.heroVia} />
-            <Stop offset="100%" stopColor={colors.heroTo} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
-        <Circle cx="90%" cy="15%" r="85" fill="#FFFFFF" fillOpacity="0.07" />
-        <Circle cx="12%" cy="90%" r="65" fill={colors.heroGlow} fillOpacity="0.08" />
-      </Svg>
+      <GradientBg />
       <View style={ds.heroInner}>
         <View style={styles.top}>
           <View style={styles.flex}>

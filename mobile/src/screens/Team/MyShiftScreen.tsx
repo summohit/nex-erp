@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import AppScreen from '../../components/AppScreen';
 import { teamService, ShiftDay } from '../../api/teamService';
@@ -36,7 +37,9 @@ export default function MyShiftScreen() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Reload whenever this screen comes back into view, so changes made on the
+  // web or from a notification show up without pulling down.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const today = days[0];
   const overnight = (d?: ShiftDay) => !!d?.startTime && !!d?.endTime && d.endTime <= d.startTime;
