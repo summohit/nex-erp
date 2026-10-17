@@ -350,9 +350,9 @@ export class AttendanceService {
     // What the roster says about today — an on-site assignment, a rostered
     // shift, or (the usual case) nothing, in which case the standing shift
     // still applies exactly as before.
-    const effective = await this.roster.getEffectiveShift(
+    const effective = this.workingWindow(await this.roster.getEffectiveShift(
       employee.id, todayKey, employee.shift, employee.branch ? employee.branch.weeklyOffs ?? '' : null,
-    );
+    ));
 
     // A field visit day may also be clocked from here (TKT-029). Late and
     // half-day are still measured against the visit's own hours, because the
@@ -516,6 +516,27 @@ export class AttendanceService {
       include: { logs: true }
     });
     return this.withTotalHours(updated);
+  }
+
+  /**
+   * The hours a day is scored against (16 Oct 2026).
+   *
+   * An approved field visit writes its window into the roster (say 07:00 to
+   * 21:00). That window is when someone may be on site, not hours they must
+   * work: scoring it as the shift made a 9:28–18:39 day "late" against 07:00
+   * and a "left early" half day against 21:00. On an on-site day the person
+   * is held to the overlap of their shift and the window, the later start and
+   * the earlier end. Overnight times are left as they are.
+   */
+  private workingWindow<T extends { startTime: string | null; endTime: string | null; onsite?: any; shift?: any }>(effective: T): T {
+    const shiftStart: string | null = effective.shift?.startTime ?? null;
+    const shiftEnd: string | null = effective.shift?.endTime ?? null;
+    if (!effective.onsite || !shiftStart || !shiftEnd || !effective.startTime || !effective.endTime) return effective;
+    if (shiftEnd <= shiftStart || effective.endTime <= effective.startTime) return effective;
+    const startTime = effective.startTime > shiftStart ? effective.startTime : shiftStart;
+    const endTime = effective.endTime < shiftEnd ? effective.endTime : shiftEnd;
+    if (endTime <= startTime) return effective;
+    return { ...effective, startTime, endTime };
   }
 
   /**
@@ -753,9 +774,9 @@ export class AttendanceService {
       throw new LateClockOutError(existing.date);
     }
 
-    const effective = await this.roster.getEffectiveShift(
+    const effective = this.workingWindow(await this.roster.getEffectiveShift(
       employee.id, existing.date, employee.shift, employee.branch ? employee.branch.weeklyOffs ?? '' : null,
-    );
+    ));
 
     // Office geofence (B3), on the same on-site exemption as clock-in — and
     // skipped entirely for a previous day. Someone closing Monday's session at
@@ -1472,7 +1493,7 @@ export class AttendanceService {
   private async scoreRegularizedDay(
     employeeId: number, companyId: number, date: Date, clockIn: Date | null, clockOut: Date | null,
   ): Promise<{ status: string; isLate: boolean; isEarlyLeave: boolean; shiftId: number | null }> {
-    const effective = await this.roster.getEffectiveShift(employeeId, date);
+    const effective = this.workingWindow(await this.roster.getEffectiveShift(employeeId, date));
     const onHoliday = effective.isDayOff || await this.isHoliday(companyId, date);
     const shiftId = effective.shift?.id ?? null;
     if (onHoliday) return { status: 'PRESENT', isLate: false, isEarlyLeave: false, shiftId };
