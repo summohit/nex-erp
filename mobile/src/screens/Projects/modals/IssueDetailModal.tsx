@@ -1438,11 +1438,14 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                 <View style={styles.feedList}>
                   {feed.map((item, index) => {
                     const isAct = item.isActivity;
-                    const userName = item.user?.firstName 
-                      ? `${item.user.firstName} ${item.user.lastName || ''}`.trim()
-                      : (item.actor?.firstName ? `${item.actor.firstName} ${item.actor.lastName || ''}`.trim() : 'User');
-                    
-                    const initial = (userName?.[0] || 'U').toUpperCase();
+                    // Comments come with `author`, activities with `actor` (the
+                    // server's names); `user` is kept for older responses.
+                    const person = item.author ?? item.actor ?? item.user ?? null;
+                    const userName = person?.firstName
+                      ? `${person.firstName} ${person.lastName || ''}`.trim()
+                      : 'User';
+                    const avatarUrl: string | undefined = person?.avatarUrl || undefined;
+                    const initial = ((person?.firstName?.[0] || '') + (person?.lastName?.[0] || '')).toUpperCase() || 'U';
 
                     if (isAct) {
                       return (
@@ -1472,7 +1475,9 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                       return (
                         <View key={item.id ? `comm-${item.id}` : `comm-${index}`} style={styles.commentCard}>
                           <View style={[styles.commentAvatar, styles.completionAvatar]}>
-                            <CheckCircle size={14} color="#FFFFFF" />
+                            {avatarUrl
+                              ? <Image source={{ uri: avatarUrl }} style={styles.commentAvatarImg} />
+                              : <CheckCircle size={14} color="#FFFFFF" />}
                           </View>
                           <View style={styles.commentBody}>
                             <View style={styles.commentHeader}>
@@ -1506,7 +1511,9 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                     return (
                       <View key={item.id ? `comm-${item.id}` : `comm-${index}`} style={styles.commentCard}>
                         <View style={styles.commentAvatar}>
-                          <Text style={styles.commentAvatarText}>{initial}</Text>
+                          {avatarUrl
+                            ? <Image source={{ uri: avatarUrl }} style={styles.commentAvatarImg} />
+                            : <Text style={styles.commentAvatarText}>{initial}</Text>}
                         </View>
                         <View style={styles.commentBody}>
                           <View style={styles.commentHeader}>
@@ -2551,6 +2558,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
+    overflow: 'hidden',
     backgroundColor: '#EFF6FF',
     borderWidth: 1,
     borderColor: '#DBEAFE',
@@ -2562,7 +2570,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2563EB',
   },
-  completionAvatar: { backgroundColor: '#10B981' },
+  completionAvatar: { backgroundColor: '#10B981', borderWidth: 2, borderColor: '#10B981' },
+  commentAvatarImg: { width: '100%', height: '100%', borderRadius: 999 },
   completionCard: {
     backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderLeftWidth: 4, borderLeftColor: '#10B981',
     borderRadius: 12, padding: 10, gap: 6,
