@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppScreen from '../../components/AppScreen';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { Globe, Kanban, List, GanttChart, Calendar, Paperclip, BarChart, Archive, Users, Lock, MessageSquare, Ticket } from 'lucide-react-native';
+import { Globe, Kanban, List, GanttChart, Calendar, Paperclip, BarChart, Archive, Users, Lock, MessageSquare, Ticket, FileSpreadsheet } from 'lucide-react-native';
+import TaskImportSheet from './components/TaskImportSheet';
+import { useProjectPermissions } from '../../hooks/useProjectPermissions';
 import { useProjectStore } from '../../store/projectStore';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { projectService } from '../../api/projectService';
@@ -80,6 +82,10 @@ export default function ProjectDetailScreen() {
   const { fetchProjectDetails, isLoading, currentProject, currentIssues, accessDenied } = useProjectStore();
 
   const [activeTab, setActiveTab] = useState('board');
+  // Excel export / import of tasks, as on the web: owner, PMs and admins.
+  const [transferOpen, setTransferOpen] = useState(false);
+  const perms = useProjectPermissions(currentProject);
+  const canTransfer = perms.isOwner || perms.isPM;
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
@@ -140,12 +146,23 @@ export default function ProjectDetailScreen() {
         showBottomNav={false}
         title={projectName || currentProject?.name || 'Project'}
         right={
-          <TouchableOpacity
-            style={styles.teamBtn}
-            onPress={() => navigation.navigate('TeamMembers', { projectId, projectName })}
-          >
-            <Users size={18} color="#0F172A" />
-          </TouchableOpacity>
+          <View style={styles.headerBtns}>
+            {canTransfer && (
+              <TouchableOpacity
+                style={styles.teamBtn}
+                onPress={() => setTransferOpen(true)}
+                accessibilityLabel="Export or import tasks with Excel"
+              >
+                <FileSpreadsheet size={18} color="#16A34A" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.teamBtn}
+              onPress={() => navigation.navigate('TeamMembers', { projectId, projectName })}
+            >
+              <Users size={18} color="#0F172A" />
+            </TouchableOpacity>
+          </View>
         }
       >
 
@@ -195,6 +212,15 @@ export default function ProjectDetailScreen() {
             <TabContent activeTab={activeTab} projectId={currentProject?.id ?? 0} />
           )}
         </View>
+        {!!projectId && (
+          <TaskImportSheet
+            visible={transferOpen}
+            projectId={projectId}
+            projectName={projectName || currentProject?.name || 'Project'}
+            onClose={() => setTransferOpen(false)}
+            onImported={() => fetchProjectDetails(projectId)}
+          />
+        )}
       </AppScreen>
     </GradientBanner>
   );
@@ -215,6 +241,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.7)',
   },
+  headerBtns: { flexDirection: 'row', gap: 8 },
   teamBtn: {
     padding: 8,
     marginLeft: 8,
