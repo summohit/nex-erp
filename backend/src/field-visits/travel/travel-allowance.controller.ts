@@ -9,10 +9,10 @@ import { TravelAllowanceService, TravelConfig } from './travel-allowance.service
 export class TravelAllowanceController {
   constructor(private readonly travel: TravelAllowanceService) {}
 
-  /** Rates and the NCR radius. Anyone signed in may read them (the app lists vehicles). */
+  /** Rates, NCR radius, and the signed-in employee's salary grade & per-km rate. */
   @Get('settings')
   settings(@Req() req) {
-    return this.travel.getConfig(req.user.companyId);
+    return this.travel.getSettingsForUser(req.user.companyId, req.user.sub);
   }
 
   /** Super admin only. */
@@ -46,6 +46,18 @@ export class TravelAllowanceController {
       employeeId: req.user.employeeId ?? null,
       mayApprove: isPayrollRole(req.user.role),
     });
+  }
+
+  /** Finance / super admin: today's Delhi NCR journeys with live positions and paths. */
+  @Get('live')
+  live(@Req() req, @Query('date') date?: string) {
+    return this.travel.liveJourneys(req.user.companyId, req.user.role, date);
+  }
+
+  /** The employee's map: road route from ?lat&lng to today's site, plus the path so far. */
+  @Get('route-preview')
+  routePreview(@Req() req, @Query() q: { requestId?: string; lat?: string; lng?: string }) {
+    return this.travel.routePreview(req.user.sub, q);
   }
 
   /** { requestId?, lat, lng } — optional, where they finished. */

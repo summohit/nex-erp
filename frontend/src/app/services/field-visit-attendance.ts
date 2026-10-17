@@ -38,6 +38,7 @@ export interface FieldVisitDay {
   journeyVehicle?: string | null;
   journeyStartAt?: string | null;
   journeyEndAt?: string | null;
+  journeyTrackedKm?: number | null;
   issue?: { id: number; key: string; title: string } | null;
   request: FieldVisitSite;
   tasks: FieldVisitTask[];

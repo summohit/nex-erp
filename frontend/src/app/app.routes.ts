@@ -343,6 +343,13 @@ export const routes: Routes = [
         loadComponent: () => import('./field-visits/my-field-visit/my-field-visit').then(m => m.MyFieldVisitComponent)
       },
       {
+        // Finance and the super admin watch today's journeys on a map.
+        path: 'field-visits/live',
+        canActivate: [permissionGuard],
+        data: { module: 'field-visits/live' },
+        loadComponent: () => import('./field-visits/live/live-field-visits').then(m => m.LiveFieldVisitsComponent)
+      },
+      {
         // Raising and approving trips. Shares the projects permission like the
         // visits log above — a field visit is always against a project.
         path: 'field-visits/requests',

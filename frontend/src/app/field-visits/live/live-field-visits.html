@@ -1,0 +1,150 @@
+<div class="lfv-page">
+  <!-- Header -->
+  <div class="lfv-header">
+    <div class="lfv-title">
+      <div class="lfv-title-icon"><svg lucideNavigation [size]="20"></svg></div>
+      <div>
+        <h1>
+          Live Field Visits
+          @if (isToday()) { <span class="lfv-live"><i></i>Live</span> } @else { <span class="lfv-past">Past day</span> }
+        </h1>
+        <p>Delhi NCR journeys. Phones share their route only between Start journey and End journey.</p>
+      </div>
+    </div>
+    <div class="lfv-header-actions">
+      @if (updatedAt()) { <span class="lfv-updated">Updated {{ updatedAt() | date:'h:mm:ss a' }}</span> }
+      <button class="lfv-btn" (click)="refresh()"><svg lucideRefreshCw [size]="15"></svg> Refresh</button>
+    </div>
+  </div>
+
+  <!-- KPI tiles -->
+  <div class="lfv-kpis">
+    <div class="lfv-kpi"><span class="k-label">People</span><b>{{ counts().ALL }}</b></div>
+    <div class="lfv-kpi blue"><span class="k-label">On the road</span><b>{{ counts().TRAVELLING }}</b></div>
+    <div class="lfv-kpi green"><span class="k-label">On site</span><b>{{ counts().ON_SITE }}</b></div>
+    <div class="lfv-kpi amber"><span class="k-label">Returning</span><b>{{ counts().RETURNING }}</b></div>
+    <div class="lfv-kpi grey"><span class="k-label">Ended</span><b>{{ counts().DONE }}</b></div>
+    <div class="lfv-kpi"><span class="k-label">Recorded</span><b>{{ counts().km }} <small>km</small></b></div>
+    @if (counts().quiet) {
+      <div class="lfv-kpi red"><span class="k-label">Gone quiet</span><b>{{ counts().quiet }}</b></div>
+    }
+  </div>
+
+  <!-- Filters -->
+  <div class="lfv-filters">
+    <div class="lfv-date">
+      <button class="lfv-icon-btn" (click)="shiftDay(-1)" title="Previous day"><svg lucideChevronLeft [size]="16"></svg></button>
+      <input type="date" [value]="date()" [max]="today" (change)="setDate($any($event.target).value)" />
+      <button class="lfv-icon-btn" (click)="shiftDay(1)" [disabled]="isToday()" title="Next day"><svg lucideChevronRight [size]="16"></svg></button>
+      @if (!isToday()) { <button class="lfv-link" (click)="setDate(today)">Back to today</button> }
+    </div>
+    <div class="lfv-search">
+      <svg lucideSearch [size]="15"></svg>
+      <input type="text" placeholder="Search person, code, site or FV number" [value]="query()" (input)="setQuery($any($event.target).value)" />
+      @if (query()) { <button class="lfv-clear" (click)="setQuery('')"><svg lucideX [size]="14"></svg></button> }
+    </div>
+    <div class="lfv-chips">
+      @for (s of stages; track s) {
+        <button class="lfv-chip" [class.on]="stageFilter() === s" (click)="setStage(s)">
+          @if (s !== 'ALL') { <i [style.background]="stage[s].color"></i> }
+          {{ s === 'ALL' ? 'All' : stage[s].label }} <span>{{ counts()[s] }}</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="lfv-body">
+    <!-- List -->
+    <aside class="lfv-list">
+      @if (loading()) {
+        @for (i of [1, 2, 3]; track i) { <div class="lfv-skel"></div> }
+      } @else if (error() && !journeys().length) {
+        <div class="lfv-empty error">{{ error() }}</div>
+      } @else if (!shown().length) {
+        <div class="lfv-empty">
+          <div class="lfv-empty-icon"><svg lucideNavigation [size]="22"></svg></div>
+          <b>{{ journeys().length ? 'No journeys match these filters' : (isToday() ? 'No one has started a journey today' : 'No journeys on this day') }}</b>
+          <span>{{ journeys().length ? 'Clear the search or pick another stage.' : 'A journey appears here when someone taps Start journey in the MIRA app.' }}</span>
+        </div>
+      }
+
+      @for (j of shown(); track j.attendanceId) {
+        <button class="lfv-card" [class.selected]="selectedId() === j.attendanceId" (click)="select(j)">
+          <span class="lfv-card-bar" [style.background]="stage[j.stage].color"></span>
+          <div class="lfv-card-top">
+            <div class="lfv-avatar" [style.border-color]="stage[j.stage].color">
+              @if (j.employee.avatarUrl) { <img [src]="j.employee.avatarUrl" alt=""> } @else { {{ initials(j) }} }
+            </div>
+            <div class="lfv-who">
+              <b>{{ name(j) }}</b>
+              <span>{{ j.employee.designation?.name || j.employee.department?.name || j.employee.employeeCode || '' }}</span>
+            </div>
+            <span class="lfv-pill" [style.color]="stage[j.stage].color" [style.background]="stage[j.stage].bg">{{ stage[j.stage].label }}</span>
+          </div>
+          <div class="lfv-site-line"><svg lucideMapPin [size]="13"></svg><span>{{ j.request.location }}</span></div>
+          <div class="lfv-meta">
+            <span><svg lucideClock [size]="12"></svg>{{ j.startedAt | date:'h:mm a' }}</span>
+            <span><svg lucideRoute [size]="12"></svg>{{ j.trackedKm ?? 0 }} km</span>
+            <span><svg lucideTimer [size]="12"></svg>{{ duration(j.durationMinutes) }}</span>
+            @if (j.toSiteKm != null && j.stage === 'TRAVELLING') { <span class="hl">{{ j.toSiteKm }} km to site</span> }
+          </div>
+          @if (j.gap) {
+            <div class="lfv-gap"><svg lucideWifiOff [size]="12"></svg> Route incomplete: nothing recorded {{ j.gap.from | date:'h:mm a' }} – {{ j.gap.to | date:'h:mm a' }}</div>
+          }
+          @if (isToday() && j.stage !== 'DONE') {
+            <div class="lfv-seen" [class.quiet]="quiet(j)">
+              @if (quiet(j)) { <svg lucideWifiOff [size]="12"></svg> No update for {{ seen(j) }} } @else { <i class="pulse"></i> Updated {{ seen(j) }} }
+            </div>
+          }
+        </button>
+      }
+    </aside>
+
+    <!-- Map -->
+    <div class="lfv-map-wrap">
+      <div #mapEl class="lfv-map"></div>
+
+      @if (selected(); as j) {
+        <div class="lfv-detail">
+          <div class="lfv-detail-head">
+            <div class="lfv-avatar sm" [style.border-color]="stage[j.stage].color">
+              @if (j.employee.avatarUrl) { <img [src]="j.employee.avatarUrl" alt=""> } @else { {{ initials(j) }} }
+            </div>
+            <div class="lfv-who">
+              <b>{{ name(j) }}</b>
+              <span>{{ j.request.requestNumber }}</span>
+            </div>
+            <button class="lfv-icon-btn" (click)="closeDetail()" title="Close"><svg lucideX [size]="15"></svg></button>
+          </div>
+          <div class="lfv-detail-stats">
+            <div><b>{{ j.trackedKm ?? 0 }} km</b><span>travelled</span></div>
+            <div><b>{{ duration(j.durationMinutes) }}</b><span>journey</span></div>
+            <div><b>{{ j.route.length }}</b><span>points</span></div>
+          </div>
+          @if (j.gap) {
+            <div class="lfv-gap box">
+              <svg lucideWifiOff [size]="13"></svg>
+              <span>No route recorded from {{ j.gap.from | date:'h:mm a' }} to {{ j.gap.to | date:'h:mm a' }} ({{ duration(j.gap.minutes) }}). The phone stopped recording, so km travelled is too low; the claim is paid on road distance.</span>
+            </div>
+          }
+          <ol class="lfv-timeline">
+            <li [class.done]="!!j.startedAt"><svg lucideFlag [size]="13"></svg><span>Started journey</span><b>{{ j.startedAt ? (j.startedAt | date:'h:mm a') : '—' }}</b></li>
+            <li [class.done]="!!j.clockInTime"><svg lucideLogIn [size]="13"></svg><span>Clocked in at site @if (j.clockInDistanceKm != null) { <small>({{ (j.clockInDistanceKm * 1000) | number:'1.0-0' }} m away)</small> }</span><b>{{ j.clockInTime ? (j.clockInTime | date:'h:mm a') : '—' }}</b></li>
+            <li [class.done]="!!j.clockOutTime"><svg lucideLogOut [size]="13"></svg><span>Left site</span><b>{{ j.clockOutTime ? (j.clockOutTime | date:'h:mm a') : '—' }}</b></li>
+            <li [class.done]="!!j.endedAt"><svg lucideFlag [size]="13"></svg><span>Ended journey</span><b>{{ j.endedAt ? (j.endedAt | date:'h:mm a') : '—' }}</b></li>
+          </ol>
+          <div class="lfv-detail-site"><svg lucideMapPin [size]="13"></svg>{{ j.request.location }}</div>
+        </div>
+      }
+
+      <div class="lfv-legend">
+        <span><i style="background:#1373E5"></i>Travelling</span>
+        <span><i style="background:#047857"></i>On site</span>
+        <span><i style="background:#B45309"></i>Returning</span>
+        <span><i class="dot" style="background:#10B981"></i>Start</span>
+        <span><i class="dot" style="background:#EF4444"></i>End</span>
+        <span><i class="ring"></i>Site &amp; clock-in area</span>
+      </div>
+    </div>
+  </div>
+</div>

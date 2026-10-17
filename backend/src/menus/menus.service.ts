@@ -158,9 +158,11 @@ export class MenusService implements OnModuleInit {
             // The employee's own trip for today (/field-visits/my) is reached
             // from a button on this page, not a sidebar row of its own.
             { title: 'Field Visits', route: '/field-visits/requests', displayOrder: 4 },
+            // Finance and the super admin watch today's journeys on a map (16 Oct 2026).
+            { title: 'Live Field Visits', route: '/field-visits/live', displayOrder: 5 },
             // §4: additional-hours requests across every project. "Approval"
             // because what waits here is someone's sign-off, not a ticket.
-            { title: 'Approval Requests', route: '/task-requests', displayOrder: 5 },
+            { title: 'Approval Requests', route: '/task-requests', displayOrder: 6 },
           ];
 
           for (const child of deliveryChildren) {
@@ -419,6 +421,10 @@ export class MenusService implements OnModuleInit {
     // Who has documents or details missing: the report HR and admins follow
     // up with (the endpoint allows the same roles).
     if (['ADMIN', 'HR'].includes(roleName)) allowedModules.add('employees/profile-completion');
+
+    // Live journeys map: finance (the super admin sees every module anyway).
+    // The endpoint enforces the same rule.
+    if (roleName === 'FINANCE') allowedModules.add('field-visits/live');
 
     // The Delivery section's children all ride on the single 'projects'
     // permission. Renaming the sidebar entry must not quietly revoke access:

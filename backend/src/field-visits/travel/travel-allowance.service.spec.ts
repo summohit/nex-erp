@@ -89,19 +89,25 @@ describe('travel allowance', () => {
     expect(created[0].amount).toBe(64);
   });
 
-  it('flags a metro day with no fare entered', async () => {
-    const { service, created } = make({ requests: [visit([day({ journeyVehicle: 'Metro' })])] });
+  it('pays public transport by salary grade per-km when no separate fare is entered', async () => {
+    const { service, created } = make({
+      requests: [visit([day({ journeyVehicle: 'Metro' })])],
+      grades: [{ name: 'G3', minGross: 30001, maxGross: 60000, kmRate: 7 }],
+      gross: 40000,
+    });
     await service.sweep();
-    expect(created[0].travelDetail.days[0]).toMatchObject({ amount: 0, note: expect.stringMatching(/No fare/) });
+    const d = created[0].travelDetail.days[0];
+    expect(d).toMatchObject({ kind: 'PER_KM', vehicle: 'Metro', grade: 'G3', ratePerKm: 7 });
+    expect(created[0].amount).toBeCloseTo(d.km * 7, 1);
   });
 
-  it('starts a company with no saved settings on the default vehicles', async () => {
+  it('starts a company with no saved settings on the default vehicles (all per-km by grade)', async () => {
     const { service } = make({ config: null });
     const c = await service.getConfig(1);
     expect(c.isDefault).toBe(true);
     expect(c.maxFarePerDay).toBe(500);
     expect(c.rates.map((r) => r.vehicle)).toEqual(['Bike / Scooter', 'Car', 'Metro', 'Bus', 'Auto / Cab']);
-    expect(c.rates.find((r) => r.vehicle === 'Auto / Cab')).toMatchObject({ kind: 'ACTUAL_FARE', receiptRequired: true });
+    expect(c.rates.every((r) => r.kind === 'PER_KM')).toBe(true);
   });
 
   it('measures a recorded route and ignores GPS jumps', () => {
@@ -146,9 +152,17 @@ describe('travel allowance', () => {
     expect(created[0].travelDetail.days[0]).toMatchObject({ grade: 'Intern', ratePerKm: 2.5 });
   });
 
-  it('keeps metro at the fare, whatever the grade', async () => {
+  it('keeps metro at the fare when an explicit fare is recorded', async () => {
     const { service, created } = make({ requests: [visit([day({ journeyVehicle: 'Metro', journeyFare: 50 })])], grades: GRADES });
     await service.sweep();
     expect(created[0].travelDetail.days[0]).toMatchObject({ amount: 50, grade: null });
+  });
+
+  it('returns the employee grade and per-km rate in getSettingsForUser', async () => {
+    const { service, prisma } = make({ grades: GRADES, gross: 40000 });
+    prisma.employee.findFirst = jest.fn(async () => ({ id: 60 }));
+    const s = await service.getSettingsForUser(1, 100);
+    expect(s.myGrade).toBe('G3');
+    expect(s.myRatePerKm).toBe(7);
   });
 });

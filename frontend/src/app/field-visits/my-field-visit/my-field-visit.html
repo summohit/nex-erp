@@ -274,58 +274,50 @@
         </div>
       </div>
 
-      <!-- Travel allowance (Delhi NCR): one location read per tap, no tracking. -->
+      <!-- Travel allowance (Delhi NCR): clean per-km rate & Start / End Journey actions. -->
       @if (isNcrDay()) {
         <div class="journey-panel">
           <div class="journey-head">
-            <svg lucideRoute [size]="16"></svg>
-            <strong>Travel allowance</strong>
-            <span class="journey-zone">Delhi NCR</span>
+            <div class="journey-head-left">
+              <svg lucideNavigation [size]="15"></svg>
+              <strong>Travel allowance</strong>
+            </div>
+            <span class="journey-zone">Delhi NCR@if (myRatePerKm() !== null) { · ₹{{ myRatePerKm() }}/km }</span>
           </div>
+
           @if (!day()!.journeyStartAt) {
             @if (!day()!.clockInTime) {
-              <p class="journey-note">Tap when you set off — from the office, home or anywhere. Only this one location is recorded.</p>
-              <div class="journey-row">
-                @if (travelRates().length) {
-                  <select class="journey-select" [(ngModel)]="vehicle" aria-label="How are you travelling?">
-                    @for (r of travelRates(); track r.vehicle) {
-                      <option [value]="r.vehicle">{{ r.vehicle }} · {{ r.kind === 'ACTUAL_FARE' ? 'fare paid' : 'own vehicle' }}</option>
-                    }
-                  </select>
-                }
-                <button class="primary-btn journey-btn" type="button" [disabled]="journeyWorking()" (click)="startJourney()">
-                  <svg lucideNavigation [size]="16"></svg>
-                  <span>{{ journeyWorking() ? 'Reading location…' : 'Start journey' }}</span>
-                </button>
-              </div>
+              <p class="journey-note">Tap Start Journey when you set off from home, office, or your current location.</p>
+              <button class="primary-btn journey-btn" type="button" [disabled]="journeyWorking()" (click)="startJourney()">
+                <svg lucideNavigation [size]="16"></svg>
+                <span>{{ journeyWorking() ? 'Reading location…' : 'Start Journey' }}</span>
+              </button>
             } @else {
-              <p class="journey-note">No journey was started today, so your trip is counted from your office.</p>
+              <p class="journey-note">No journey was started today, so your trip is counted from your office@if (myRatePerKm() !== null) { at ₹{{ myRatePerKm() }}/km }.</p>
             }
           } @else {
-            <p class="journey-note">
-              Started {{ day()!.journeyStartAt | date:'h:mm a' }}@if (day()!.journeyVehicle) { · {{ day()!.journeyVehicle }}}.
-              @if (day()!.journeyEndAt) { Ended {{ day()!.journeyEndAt | date:'h:mm a' }}. }
-              @else { The return is counted as the same distance unless you tap End journey where you finish. }
-            </p>
-            @if (!day()!.journeyEndAt && isActualFare()) {
-              <div class="journey-fare">
-                <label class="journey-fare-field">
-                  <span>{{ journeyRate()!.vehicle }} fare for today (₹)</span>
-                  <input type="number" min="1" [max]="maxFarePerDay() || null" step="1" [(ngModel)]="fare" placeholder="e.g. 60" />
-                </label>
-                <label class="journey-receipt">
-                  <span>{{ journeyRate()!.receiptRequired ? 'Receipt or app screenshot (required)' : 'Ticket photo (optional)' }}</span>
-                  <input type="file" accept="image/*,application/pdf" (change)="onReceiptPicked($event)" />
-                  @if (uploadingReceipt()) { <small>Uploading…</small> }
-                  @else if (fareReceiptName) { <small>Attached: {{ fareReceiptName }}</small> }
-                </label>
-              </div>
-            }
+            <div class="journey-status-row">
+              <span class="journey-status-text">
+                Started at <strong>{{ day()!.journeyStartAt | date:'h:mm a' }}</strong>
+                @if (day()!.journeyEndAt) { · Ended at <strong>{{ day()!.journeyEndAt | date:'h:mm a' }}</strong> }
+              </span>
+              @if (day()!.journeyTrackedKm) {
+                <span class="journey-tracked-pill">
+                  {{ day()!.journeyTrackedKm }} km route recorded
+                </span>
+              }
+            </div>
+
             @if (!day()!.journeyEndAt) {
-              <button class="ghost-btn journey-btn" type="button" [disabled]="journeyWorking() || uploadingReceipt()" (click)="endJourney()">
+              <button class="ghost-btn journey-end-btn" type="button" [disabled]="journeyWorking()" (click)="endJourney()">
                 <svg lucideMapPin [size]="16"></svg>
-                <span>{{ journeyWorking() ? 'Reading location…' : 'End journey' }}</span>
+                <span>{{ journeyWorking() ? 'Reading location…' : 'End Journey' }}</span>
               </button>
+            } @else {
+              <div class="journey-completed-strip">
+                <svg lucideCheckCircle2 [size]="16"></svg>
+                <span>Journey recorded@if (myRatePerKm() !== null) { · paid at ₹{{ myRatePerKm() }}/km by road distance }</span>
+              </div>
             }
           }
         </div>

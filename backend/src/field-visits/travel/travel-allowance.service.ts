@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
-import { isSuperAdmin } from '../../common/company-roles';
+import { isSuperAdmin, hasRole } from '../../common/company-roles';
 import { istDateKey } from '../../common/timezone.util';
 import { FIELD_VISIT_STATUS } from '../field-visit-status';
 
@@ -24,15 +24,19 @@ export interface TravelRate { vehicle: string; kind: TravelKind; ratePerKm: numb
  */
 export interface TravelConfig {
   ncrRadiusKm: number; maxFarePerDay: number; defaultRatePerKm: number; rates: TravelRate[]; isDefault?: boolean;
+  /** Signed-in employee's resolved salary grade label (e.g. "G3", "Intern", "Standard"). */
+  myGrade?: string;
+  /** Signed-in employee's effective per-km rate from their salary grade (or default fallback). */
+  myRatePerKm?: number;
 }
 
-/** Starting list for a company that has not set its own (decided 15 Oct 2026). */
+/** Starting list for a company that has not set its own: all modes use salary grade per-km rate. */
 export const DEFAULT_RATES: TravelRate[] = [
   { vehicle: 'Bike / Scooter', kind: 'PER_KM', ratePerKm: 0 },
   { vehicle: 'Car', kind: 'PER_KM', ratePerKm: 0 },
-  { vehicle: 'Metro', kind: 'ACTUAL_FARE', ratePerKm: 0, receiptRequired: false },
-  { vehicle: 'Bus', kind: 'ACTUAL_FARE', ratePerKm: 0, receiptRequired: false },
-  { vehicle: 'Auto / Cab', kind: 'ACTUAL_FARE', ratePerKm: 0, receiptRequired: true },
+  { vehicle: 'Metro', kind: 'PER_KM', ratePerKm: 0 },
+  { vehicle: 'Bus', kind: 'PER_KM', ratePerKm: 0 },
+  { vehicle: 'Auto / Cab', kind: 'PER_KM', ratePerKm: 0 },
 ];
 const DEFAULT_CONFIG: TravelConfig = { ncrRadiusKm: 60, maxFarePerDay: 500, defaultRatePerKm: 4, rates: DEFAULT_RATES };
 
@@ -98,6 +102,30 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
       rates: Array.isArray(raw.rates)
         ? raw.rates.filter((r: any) => r?.vehicle).map((r: any) => this.cleanRate(r))
         : [],
+    };
+  }
+
+  /**
+   * Settings enriched with the signed-in employee's salary grade & per-km rate,
+   * so both own-vehicle and public-transport options display their grade rate in the UI.
+   */
+  async getSettingsForUser(companyId: number, userId?: number): Promise<TravelConfig> {
+    const config = await this.getConfig(companyId);
+    if (!userId) return config;
+    const emp = await this.prisma.employee?.findFirst?.({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!emp) {
+      return { ...config, myGrade: 'Standard', myRatePerKm: config.defaultRatePerKm };
+    }
+    const graded = await this.gradeRate(companyId, emp.id);
+    const myRatePerKm = graded.rate != null ? graded.rate : config.defaultRatePerKm;
+    const myGrade = graded.label && graded.label !== 'No grade' ? graded.label : 'Standard';
+    return {
+      ...config,
+      myGrade,
+      myRatePerKm,
     };
   }
 
@@ -204,10 +232,8 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     if (day.clockInTime) throw new BadRequestException('You have already reached the site today, so the journey cannot start now.');
     const { la, lo } = this.coords(body?.lat, body?.lng);
     const config = await this.getConfig(day.companyId);
+    // Optional and only a label: every journey is paid per km by grade.
     const vehicle = String(body?.vehicle ?? '').trim();
-    if (config.rates.length && !config.rates.some((r) => r.vehicle.toLowerCase() === vehicle.toLowerCase())) {
-      throw new BadRequestException(`Pick how you are travelling: ${config.rates.map((r) => r.vehicle).join(', ')}`);
-    }
     return this.prisma.fieldVisitAttendance.update({
       where: { id: day.id },
       data: { journeyStartAt: new Date(), journeyStartLat: la, journeyStartLng: lo, journeyVehicle: vehicle || null },
@@ -224,14 +250,12 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     if (day.journeyEndAt) throw new BadRequestException('You already ended your journey today.');
     const { la, lo } = this.coords(body?.lat, body?.lng);
 
-    // An actual-fare vehicle (metro, bus, auto/cab) is paid what they enter here.
     const config = await this.getConfig(day.companyId);
     const rate = config.rates.find((r) => r.vehicle.toLowerCase() === String(day.journeyVehicle ?? '').toLowerCase());
     let fare: number | null = null;
     let receiptUrl: string | null = null;
-    if (rate?.kind === 'ACTUAL_FARE') {
-      fare = Number(body?.fare);
-      if (!(fare > 0)) throw new BadRequestException(`Enter the ${rate.vehicle} fare you paid for the day.`);
+    if (rate?.kind === 'ACTUAL_FARE' && body?.fare != null && Number(body.fare) > 0) {
+      fare = Number(body.fare);
       if (config.maxFarePerDay > 0 && fare > config.maxFarePerDay) {
         throw new BadRequestException(`That is more than the ₹${config.maxFarePerDay} daily limit — check the amount, or ask finance.`);
       }
@@ -241,9 +265,19 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
       }
       fare = Math.round(fare * 100) / 100;
     }
+    // The End journey tap is a real location reading: add it to the route,
+    // so a recording that stopped early (app reinstalled, phone killed it)
+    // still counts the last stretch instead of showing 0 km.
+    const endedAt = new Date();
+    const row = await this.prisma.fieldVisitAttendance.findUnique({ where: { id: day.id }, select: { journeyRoute: true } });
+    const route: number[][] = Array.isArray(row?.journeyRoute) ? [...(row!.journeyRoute as any)] : [];
+    route.push([la, lo, endedAt.getTime()]);
     return this.prisma.fieldVisitAttendance.update({
       where: { id: day.id },
-      data: { journeyEndAt: new Date(), journeyEndLat: la, journeyEndLng: lo, journeyFare: fare, journeyFareReceiptUrl: receiptUrl },
+      data: {
+        journeyEndAt: endedAt, journeyEndLat: la, journeyEndLng: lo, journeyFare: fare, journeyFareReceiptUrl: receiptUrl,
+        journeyRoute: route as any, journeyTrackedKm: TravelAllowanceService.trackedKm(route),
+      },
       select: { id: true, journeyEndAt: true, journeyFare: true },
     });
   }
@@ -363,6 +397,171 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
     return Math.round(straightKm(aLat, aLng, bLat, bLng) * 1.3 * 10) / 10;
   }
 
+  // ─── Live view ───────────────────────────────────────────────────────────
+
+  /** Finance and super admin watch journeys; nobody else (16 Oct 2026). */
+  static mayWatch(role?: string | null): boolean {
+    return hasRole(role, 'SUPERADMIN', 'FINANCE');
+  }
+
+  /**
+   * Today's Delhi NCR journeys, for the live map. Only what the phone sends
+   * between Start and End journey exists here; nothing is recorded outside a
+   * journey. A journey whose phone has gone quiet shows its last position
+   * and how long ago that was, rather than pretending to be live.
+   */
+  async liveJourneys(companyId: number, role?: string | null, date?: string) {
+    if (!TravelAllowanceService.mayWatch(role)) throw new ForbiddenException('Only finance or the super admin can watch journeys');
+    // ?date=YYYY-MM-DD looks back at a past day; nothing is live then.
+    const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00.000Z`) : istDateKey(new Date());
+    const rows = await this.prisma.fieldVisitAttendance.findMany({
+      where: {
+        companyId,
+        visitDate: day,
+        journeyStartAt: { not: null },
+        request: { travelZone: TRAVEL_ZONE.NCR },
+      },
+      select: {
+        id: true, journeyStartAt: true, journeyEndAt: true, journeyTrackedKm: true, journeyRoute: true,
+        journeyStartLat: true, journeyStartLng: true, journeyEndLat: true, journeyEndLng: true,
+        clockInTime: true, clockOutTime: true, clockInDistanceKm: true,
+        employee: {
+          select: {
+            id: true, firstName: true, lastName: true, avatarUrl: true, employeeCode: true,
+            department: { select: { name: true } },
+            designation: { select: { name: true } },
+          },
+        },
+        request: {
+          select: { id: true, requestNumber: true, location: true, latitude: true, longitude: true, geofenceRadiusM: true },
+        },
+      },
+      orderBy: { journeyStartAt: 'desc' },
+    });
+    const now = Date.now();
+    return rows.map((r) => {
+      const route: number[][] = Array.isArray(r.journeyRoute) ? (r.journeyRoute as any) : [];
+      const last = route.length ? route[route.length - 1] : null;
+      const stage = r.journeyEndAt ? 'DONE'
+        : r.clockOutTime ? 'RETURNING'
+          : r.clockInTime ? 'ON_SITE'
+            : 'TRAVELLING';
+      const lastAt = last ? last[2] : r.journeyStartAt ? new Date(r.journeyStartAt).getTime() : null;
+      const position = last
+        ? { lat: last[0], lng: last[1] }
+        : r.journeyStartLat != null ? { lat: r.journeyStartLat, lng: r.journeyStartLng } : null;
+      const toSiteKm = position && r.request.latitude != null
+        ? Math.round(straightKm(position.lat, position.lng!, r.request.latitude, r.request.longitude) * 10) / 10
+        : null;
+      return {
+        attendanceId: r.id,
+        stage,
+        employee: r.employee,
+        request: r.request,
+        startedAt: r.journeyStartAt,
+        endedAt: r.journeyEndAt,
+        clockInTime: r.clockInTime,
+        clockOutTime: r.clockOutTime,
+        trackedKm: r.journeyTrackedKm,
+        start: r.journeyStartLat != null ? { lat: r.journeyStartLat, lng: r.journeyStartLng } : null,
+        end: r.journeyEndLat != null ? { lat: r.journeyEndLat, lng: r.journeyEndLng } : null,
+        position,
+        lastSeenAt: lastAt ? new Date(lastAt).toISOString() : null,
+        /** Minutes since the phone last sent a point; over ~5 while travelling means it went quiet. */
+        lastSeenMinutes: lastAt ? Math.round((now - lastAt) / 60000) : null,
+        toSiteKm,
+        clockInDistanceKm: r.clockInDistanceKm,
+        gap: TravelAllowanceService.longestGap(route),
+        /** Minutes from Start journey to End journey (or to now, if still going). */
+        durationMinutes: r.journeyStartAt
+          ? Math.round(((r.journeyEndAt ? new Date(r.journeyEndAt).getTime() : now) - new Date(r.journeyStartAt).getTime()) / 60000)
+          : null,
+        route: route.map((p) => [p[0], p[1]]),
+      };
+    });
+  }
+
+  /**
+   * The longest stretch with no points (over 15 minutes), so finance can see
+   * when a route is incomplete — the phone stopped recording — instead of
+   * trusting a short "km travelled".
+   */
+  static longestGap(route: number[][]): { from: string; to: string; minutes: number } | null {
+    let best: { a: number; b: number } | null = null;
+    for (let i = 1; i < route.length; i++) {
+      const a = route[i - 1][2], b = route[i][2];
+      if (b - a > 15 * 60000 && (!best || b - a > best.b - best.a)) best = { a, b };
+    }
+    return best
+      ? { from: new Date(best.a).toISOString(), to: new Date(best.b).toISOString(), minutes: Math.round((best.b - best.a) / 60000) }
+      : null;
+  }
+
+  /**
+   * The employee's own map: the road from where they are to today's site,
+   * with distance and time, plus the path recorded so far. Works for any
+   * approved visit today (not only Delhi NCR), as it is only directions.
+   */
+  async routePreview(userId: number, q: { requestId?: string; lat?: string; lng?: string }) {
+    const lat = Number(q.lat), lng = Number(q.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new BadRequestException('Your location is needed');
+    const employee = await this.prisma.employee.findFirst({ where: { userId }, select: { id: true } });
+    if (!employee) throw new BadRequestException('No employee profile');
+    const day = await this.prisma.fieldVisitAttendance.findFirst({
+      where: {
+        employeeId: employee.id,
+        visitDate: istDateKey(new Date()),
+        request: { status: FIELD_VISIT_STATUS.APPROVED, ...(q.requestId ? { id: Number(q.requestId) } : {}) },
+      },
+      select: {
+        journeyRoute: true, journeyTrackedKm: true, journeyStartAt: true, journeyEndAt: true,
+        request: { select: { id: true, location: true, latitude: true, longitude: true, geofenceRadiusM: true } },
+      },
+      orderBy: { requestId: 'desc' },
+    });
+    if (!day) throw new BadRequestException('You are not scheduled on an approved field visit today.');
+    const site = day.request;
+    const road = await this.roadPath(lat, lng, site.latitude, site.longitude);
+    const route: number[][] = Array.isArray(day.journeyRoute) ? (day.journeyRoute as any) : [];
+    return {
+      site: { name: site.location, lat: site.latitude, lng: site.longitude, radiusM: site.geofenceRadiusM },
+      from: { lat, lng },
+      ...road,
+      straightKm: Math.round(straightKm(lat, lng, site.latitude, site.longitude) * 10) / 10,
+      recorded: route.map((p) => [p[0], p[1]]),
+      trackedKm: day.journeyTrackedKm,
+      journeyActive: !!day.journeyStartAt && !day.journeyEndAt,
+    };
+  }
+
+  /** Road path, distance and time via ROUTING_URL (OSRM); a straight line if it is not set or fails. */
+  private async roadPath(aLat: number, aLng: number, bLat: number, bLng: number) {
+    const base = process.env.ROUTING_URL?.replace(/\/+$/, '');
+    if (base) {
+      try {
+        const res = await fetch(
+          `${base}/route/v1/driving/${aLng},${aLat};${bLng},${bLat}?overview=full&geometries=geojson`,
+          { signal: AbortSignal.timeout(8000) },
+        );
+        const json: any = await res.json();
+        const r = json?.routes?.[0];
+        if (r && Number.isFinite(r.distance)) {
+          return {
+            roadKm: Math.round((r.distance / 1000) * 10) / 10,
+            minutes: Math.max(1, Math.round(r.duration / 60)),
+            path: (r.geometry?.coordinates ?? []).map((c: number[]) => [c[1], c[0]]),
+            routed: true,
+          };
+        }
+      } catch (err: any) {
+        this.logger.warn(`Route preview failed, using a straight line: ${err?.message}`);
+      }
+    }
+    const km = Math.round(straightKm(aLat, aLng, bLat, bLng) * 1.3 * 10) / 10;
+    // City traffic: about 25 km/h door to door.
+    return { roadKm: km, minutes: Math.max(1, Math.round((km / 25) * 60)), path: [[aLat, aLng], [bLat, bLng]], routed: false };
+  }
+
   // ─── Claims ──────────────────────────────────────────────────────────────
 
   /** Create the missing claims for completed Delhi NCR visits. Safe to repeat. */
@@ -450,24 +649,25 @@ export class TravelAllowanceService implements OnModuleInit, OnModuleDestroy {
       const returnKm = a.journeyEndLat != null
         ? await this.roadKm(r.latitude, r.longitude, a.journeyEndLat, a.journeyEndLng)
         : goingKm;
-      // The vehicle they picked; without one (no Start journey), the first
-      // per-km rate, as the office fallback assumes their own transport.
+      // Both own vehicle and public transport are paid per km by the employee's
+      // salary grade, unless an explicit actual fare was recorded.
       const rate = config.rates.find((x) => x.vehicle.toLowerCase() === String(a.journeyVehicle ?? '').toLowerCase())
-        ?? config.rates.find((x) => x.kind === 'PER_KM') ?? config.rates[0];
+        ?? config.rates.find((x) => x.kind === 'PER_KM')
+        ?? config.rates[0]
+        ?? { vehicle: a.journeyVehicle || 'Own Vehicle', kind: 'PER_KM' as const, ratePerKm: 0 };
       const km = Math.round((goingKm + returnKm) * 10) / 10;
-      const actual = rate.kind === 'ACTUAL_FARE';
-      // Own vehicle: the grade's rate, or the default when the grade has none.
+      const actual = rate.kind === 'ACTUAL_FARE' && a.journeyFare != null && Number(a.journeyFare) > 0;
+      const effectiveKind: TravelKind = actual ? 'ACTUAL_FARE' : 'PER_KM';
       const perKm = graded.rate != null ? graded.rate : config.defaultRatePerKm;
       days.push({
         date: a.visitDate.toISOString().slice(0, 10), from: from.label,
         returnTo: a.journeyEndLat != null ? 'End journey' : 'Same as going',
-        goingKm, returnKm, km, vehicle: rate.vehicle, kind: rate.kind,
+        goingKm, returnKm, km, vehicle: a.journeyVehicle || 'Per km (grade rate)', kind: effectiveKind,
         ratePerKm: actual ? null : perKm,
         grade: actual ? null : graded.rate != null ? graded.label : `${graded.label} · default rate`,
         fare: actual ? (a.journeyFare ?? 0) : null,
         receiptUrl: actual ? a.journeyFareReceiptUrl ?? null : null,
         trackedKm: a.journeyTrackedKm ?? null,
-        ...(actual && a.journeyFare == null ? { note: 'No fare entered — check with the employee' } : {}),
         // A recorded route much longer or shorter than the road estimate is
         // worth a look; it does not change the amount.
         ...(!actual && a.journeyTrackedKm != null && km > 0 && Math.abs(a.journeyTrackedKm - km) / km > 0.3

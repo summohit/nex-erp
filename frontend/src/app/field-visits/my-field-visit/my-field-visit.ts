@@ -2,8 +2,7 @@ import { Component, HostBinding, Input, OnInit, OnDestroy, inject, signal, compu
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { TravelAllowanceService, TravelRate } from '../../services/travel-allowance';
-import { UploadService } from '../../services/upload.service';
+import { TravelAllowanceService } from '../../services/travel-allowance';
 import {
   LucideMapPin, LucideNavigation, LucideClock, LucideCheckCircle,
   LucideAlertTriangle, LucideRefreshCw, LucideCalendarDays,
@@ -47,17 +46,12 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
   private api = inject(FieldVisitAttendanceService);
   private travel = inject(TravelAllowanceService);
 
-  /** Travel allowance (Delhi NCR visits): vehicles the super admin priced. */
-  travelRates = signal<TravelRate[]>([]);
-  vehicle = '';
+  /**
+   * Travel allowance (Delhi NCR visits): every journey is paid per km at the
+   * person's salary-grade rate. Null until it loads, so no rate is guessed.
+   */
+  myRatePerKm = signal<number | null>(null);
   journeyWorking = signal(false);
-  /** Actual-fare vehicles: what they paid, and the ticket or receipt. */
-  fare: number | null = null;
-  fareReceiptUrl: string | null = null;
-  fareReceiptName = '';
-  uploadingReceipt = signal(false);
-  private upload = inject(UploadService);
-  maxFarePerDay = signal(500);
 
   today = new Date();
   days = signal<FieldVisitDay[]>([]);
@@ -107,16 +101,15 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
     this.isLoading.set(true);
     this.travel.getSettings().subscribe({
       next: (c) => {
-        this.travelRates.set(c.rates || []);
-        this.maxFarePerDay.set(c.maxFarePerDay ?? 500);
-        if (!this.vehicle && c.rates?.length) this.vehicle = c.rates[0].vehicle;
+        this.myRatePerKm.set(c.myRatePerKm ?? c.defaultRatePerKm ?? null);
       },
-      error: () => this.travelRates.set([]),
+      error: () => this.myRatePerKm.set(null),
     });
     this.api.getToday().subscribe({
       next: (days) => {
-        this.days.set(days);
-        const current = days[0];
+        const sorted = [...(days || [])].sort((a, b) => (b.request?.id ?? b.id) - (a.request?.id ?? a.id));
+        this.days.set(sorted);
+        const current = sorted[0];
         // Carry forward the task already clocked against, so the screen reads
         // the same after a refresh mid-visit.
         this.selectedTaskId.set(current?.issue?.id ?? current?.tasks?.[0]?.id ?? null);
@@ -263,12 +256,11 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
   async startJourney(): Promise<void> {
     const day = this.day();
     if (!day) return;
-    if (this.travelRates().length && !this.vehicle) { this.error.set('Pick how you are travelling.'); return; }
     this.journeyWorking.set(true);
     this.error.set(null);
     try {
       const here = await this.locateOnce();
-      this.travel.startJourney({ requestId: day.request.id, ...here, vehicle: this.vehicle || undefined }).subscribe({
+      this.travel.startJourney({ requestId: day.request.id, ...here }).subscribe({
         next: () => { this.journeyWorking.set(false); this.load(); },
         error: (err) => { this.error.set(this.messageOf(err)); this.journeyWorking.set(false); },
       });
@@ -278,39 +270,14 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** The rate for the vehicle picked at Start journey. */
-  journeyRate = computed(() => {
-    const v = (this.day()?.journeyVehicle || '').toLowerCase();
-    return this.travelRates().find((r) => r.vehicle.toLowerCase() === v) ?? null;
-  });
-  isActualFare = computed(() => this.journeyRate()?.kind === 'ACTUAL_FARE');
-
-  onReceiptPicked(event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-    this.uploadingReceipt.set(true);
-    this.upload.uploadAttendanceProof(file).subscribe({
-      next: (res) => { this.fareReceiptUrl = res.url; this.fareReceiptName = file.name; this.uploadingReceipt.set(false); },
-      error: (err) => { this.error.set(this.messageOf(err)); this.uploadingReceipt.set(false); },
-    });
-  }
-
   async endJourney(): Promise<void> {
     const day = this.day();
     if (!day) return;
-    const rate = this.journeyRate();
-    if (rate?.kind === 'ACTUAL_FARE') {
-      if (!(Number(this.fare) > 0)) { this.error.set(`Enter the ${rate.vehicle} fare you paid today.`); return; }
-      if (rate.receiptRequired && !this.fareReceiptUrl) { this.error.set(`Attach the ${rate.vehicle} receipt or app screenshot.`); return; }
-    }
     this.journeyWorking.set(true);
     this.error.set(null);
     try {
       const here = await this.locateOnce();
-      const fareBits = rate?.kind === 'ACTUAL_FARE'
-        ? { fare: Number(this.fare), receiptUrl: this.fareReceiptUrl ?? undefined }
-        : {};
-      this.travel.endJourney({ requestId: day.request.id, ...here, ...fareBits }).subscribe({
+      this.travel.endJourney({ requestId: day.request.id, ...here }).subscribe({
         next: () => { this.journeyWorking.set(false); this.load(); },
         error: (err) => { this.error.set(this.messageOf(err)); this.journeyWorking.set(false); },
       });

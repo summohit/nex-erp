@@ -301,9 +301,9 @@
                 >
                   + Car
                 </button>
-                <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Metro')" (click)="addPresetVehicle('Metro', 0, 'ACTUAL_FARE', false)">+ Metro (fare)</button>
-                <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Bus')" (click)="addPresetVehicle('Bus', 0, 'ACTUAL_FARE', false)">+ Bus (fare)</button>
-                <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Cab')" (click)="addPresetVehicle('Auto / Cab', 0, 'ACTUAL_FARE', true)">+ Auto / Cab (fare + receipt)</button>
+                <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Metro')" (click)="addPresetVehicle('Metro', 0, 'PER_KM', false)">+ Metro</button>
+                <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Bus')" (click)="addPresetVehicle('Bus', 0, 'PER_KM', false)">+ Bus</button>
+                <button type="button" class="fv-quick-add-link" *ngIf="!hasVehicle('Cab')" (click)="addPresetVehicle('Auto / Cab', 0, 'PER_KM', false)">+ Auto / Cab</button>
               </div>
             </div>
           </div>
@@ -317,7 +317,7 @@
               <h4>Per-km Rate</h4>
             </div>
             <span class="fv-section-desc">
-              Own-vehicle trips (bike, car) are paid by the person's <b>salary grade</b> — set the rate for each grade, and for interns, in
+              Field visit trips (both own vehicle and public transport) are paid per km by the person's <b>salary grade</b> — set the rate for each grade, and for interns, in
               <b>Payroll → Salary Structure → Grades &amp; Template</b>. This default is used only when their grade has no rate.
             </span>
           </div>
