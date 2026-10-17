@@ -4,6 +4,8 @@ import { MailService } from "../mail/mail.service";
 import { Injectable, NotFoundException, BadRequestException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import axios from 'axios';
 import FormData from 'form-data';
 import PizZip from 'pizzip';
@@ -470,6 +472,13 @@ export class OfferLettersService {
     });
     if (!letter) return null;
 
+    // Older signed offers were rendered from the shared template instead of
+    // the candidate's saved body. Repair that immutable download on access so
+    // both ATS and the candidate portal always receive the version signed.
+    const countersignedPdfUrl = letter.status === 'ACCEPTED'
+      ? await this.refreshCountersignedPdf(letter.id) || letter.countersignedPdfUrl
+      : letter.countersignedPdfUrl;
+
     const application = await this.prisma.jobApplication.findUnique({
       where: { id: applicationId },
       select: { fullName: true, phone: true },
@@ -477,6 +486,7 @@ export class OfferLettersService {
 
     return {
       ...letter,
+      countersignedPdfUrl,
       signingPath: `/offer/${letter.accessToken}`,
       documentPassword: application ? this.derivePassword(application) : null,
     };
@@ -1030,6 +1040,9 @@ export class OfferLettersService {
           rendered.salaryTableHtml,
         )
       : rendered.html;
+    const signedPdfUrl = letter.status === 'ACCEPTED'
+      ? await this.refreshCountersignedPdf(letter.id) || letter.countersignedPdfUrl || letter.pdfUrl
+      : letter.countersignedPdfUrl || letter.pdfUrl;
 
     return {
       html,
@@ -1039,9 +1052,70 @@ export class OfferLettersService {
       candidateName: letter.application.fullName,
       jobTitle: letter.application.job?.title,
       companyName: letter.application.job?.company?.name,
-      signedPdfUrl: letter.countersignedPdfUrl || letter.pdfUrl,
+      signedPdfUrl,
       respondedAt: letter.respondedAt,
     };
+  }
+
+  /**
+   * Recreate the signed artifact from the candidate-specific body saved with
+   * the application. This also repairs offers signed before that body was used
+   * by the PDF generator, without changing the signature metadata itself.
+   */
+  private async refreshCountersignedPdf(letterId: number): Promise<string | null> {
+    const letter = await this.prisma.offerLetter.findUnique({
+      where: { id: letterId },
+      include: { application: { include: { job: { include: { company: true } } } } },
+    });
+    if (!letter || letter.status !== 'ACCEPTED' || !letter.signatureName) {
+      return letter?.countersignedPdfUrl || null;
+    }
+
+    try {
+      const settings = await this.prisma.systemSetting.findUnique({ where: { companyId: letter.companyId } });
+      const rendered = await this.generateHtmlFromSettings(settings, letter.application, letter.issuedAt || new Date());
+      let merged = letter.application.offerLetterBody?.trim()
+        ? this.applySalaryTable(this.printableBody(letter.application.offerLetterBody), rendered.salaryTableHtml)
+        : rendered.html;
+      const signatureMark = letter.signatureImage
+        ? `<img src="${letter.signatureImage}" style="max-height:56px;max-width:250px;object-fit:contain;" />`
+        : `<span style="font-family:'Brush Script MT',cursive;font-size:26px;color:#1e3a8a;">${letter.signatureName}</span>`;
+
+      merged += `
+        <div style="page-break-inside:avoid; margin-top:34px; padding-top:18px; border-top:1px solid #e5e7eb; font-family:'Helvetica Neue',Arial,sans-serif; max-width:760px; margin-left:auto; margin-right:auto;">
+          <p style="margin:0 0 14px; font-size:11px; color:#6b7280;">Accepted and electronically signed by the candidate:</p>
+          <div style="display:inline-block; min-width:260px;">
+            <div style="min-height:58px; display:flex; align-items:flex-end;">${signatureMark}</div>
+            <div style="border-top:1px solid #9ca3af; padding-top:6px; margin-top:4px;">
+              <p style="margin:0; font-weight:700; font-size:11.5px; color:#111827;">${letter.signatureName}</p>
+              <p style="margin:2px 0 0; font-size:10px; color:#6b7280;">Signed ${letter.respondedAt?.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+            </div>
+          </div>
+        </div>`;
+      merged += this.buildCertificateOfCompletion({
+        signatureName: letter.signatureName,
+        signatureMark,
+        signedAt: letter.respondedAt,
+        issuedAt: letter.issuedAt,
+        viewedAt: letter.viewedAt,
+        unlockedAt: letter.unlockedAt,
+        ip: letter.signatureIp || undefined,
+        userAgent: letter.signatureUserAgent || undefined,
+        companyName: letter.application.job.company.name,
+        candidateEmail: letter.application.email,
+        documentTitle: `Offer of Employment — ${letter.application.job.title}`,
+        envelopeId: letter.accessToken,
+      });
+      const { buffer, isPdf } = await this.htmlToPdf(merged, rendered.header, rendered.footer);
+      const countersignedPdfUrl = await this.uploadPdf(buffer, isPdf, letter.applicationId);
+      if (countersignedPdfUrl) {
+        await this.prisma.offerLetter.update({ where: { id: letter.id }, data: { countersignedPdfUrl } });
+      }
+      return countersignedPdfUrl || letter.countersignedPdfUrl;
+    } catch (error) {
+      this.logger.error(`Failed to refresh signed offer ${letterId}`, error);
+      return letter.countersignedPdfUrl;
+    }
   }
 
   async getByToken(token: string) {
@@ -1119,12 +1193,21 @@ export class OfferLettersService {
       // Generate Countersigned PDF
       try {
         const settings = await this.prisma.systemSetting.findUnique({ where: { companyId: letter.companyId } });
-        const { html, header, footer } = await this.generateHtmlFromSettings(
+        const rendered = await this.generateHtmlFromSettings(
           settings,
           letter.application,
           letter.issuedAt || new Date(),
         );
-        let merged = html;
+        // The candidate signs the exact body served by getSigningDocument().
+        // Never rebuild this from the shared template here: a recruiter may
+        // have saved candidate-specific edits, and the signed download must
+        // preserve those terms rather than silently reverting to the default.
+        let merged = letter.application.offerLetterBody?.trim()
+          ? this.applySalaryTable(
+              this.printableBody(letter.application.offerLetterBody),
+              rendered.salaryTableHtml,
+            )
+          : rendered.html;
 
         // Signature block placed on the document itself, then a separate
         // Certificate of Completion page mirroring what DocuSign issues.
@@ -1159,7 +1242,7 @@ export class OfferLettersService {
           envelopeId: letter.accessToken,
         });
 
-        const { buffer, isPdf } = await this.htmlToPdf(merged, header, footer);
+        const { buffer, isPdf } = await this.htmlToPdf(merged, rendered.header, rendered.footer);
         const countersignedPdfUrl = await this.uploadPdf(buffer, isPdf, letter.applicationId);
 
         if (countersignedPdfUrl) {
@@ -1841,8 +1924,15 @@ export class OfferLettersService {
   private async uploadPdf(buffer: Buffer, isPdf: boolean, applicationId: number): Promise<string | null> {
     const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
     if (!privateKey) {
-      this.logger.warn('ImageKit not configured; offer letter PDF will not be persisted to a URL');
-      return null;
+      // Local development has no ImageKit key. Persist the generated document
+      // instead of falling back to an older letter URL, which could otherwise
+      // make a signed download show the default template.
+      const directory = path.join(process.cwd(), 'uploads', 'offer_letters');
+      fs.mkdirSync(directory, { recursive: true });
+      const filename = `offer-letter-${applicationId}-${Date.now()}.${isPdf ? 'pdf' : 'html'}`;
+      fs.writeFileSync(path.join(directory, filename), buffer);
+      const baseUrl = (process.env.PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+      return `${baseUrl}/uploads/offer_letters/${filename}`;
     }
 
     try {
