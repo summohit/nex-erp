@@ -13,6 +13,8 @@ interface ProjectStoreState {
 
   fetchProjects: () => Promise<void>;
   fetchProjectDetails: (id: number) => Promise<void>;
+  /** Re-read only the tasks, without the loading spinner (background sync). */
+  refreshIssues: (id: number) => Promise<void>;
   toggleStar: (id: number) => Promise<void>;
   archiveProject: (id: number, force?: boolean) => Promise<void>;
   unarchiveProject: (id: number) => Promise<void>;
@@ -79,6 +81,16 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     } catch (error) {
       console.error('Failed to unarchive project', error);
       throw error;
+    }
+  },
+
+  refreshIssues: async (id: number) => {
+    try {
+      const issues = await projectService.getIssues(id);
+      // Only if still on the same project when the answer arrives.
+      if (get().currentProject?.id === id && Array.isArray(issues)) set({ currentIssues: issues });
+    } catch {
+      // A missed background refresh is fine; the next one catches up.
     }
   },
 

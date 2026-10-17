@@ -2,10 +2,12 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform, FlatList, RefreshControl, Animated, Image, Modal, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { useAuthStore } from '../../../store/authStore';
 import { useProjectStore } from '../../../store/projectStore';
-import { AlertCircle, CheckCircle, Clock, Plus, ArrowDown, Minus, ArrowUp, Flame, MessageSquare } from 'lucide-react-native';
+import { AlertCircle, CheckCircle, Clock, Plus, ArrowDown, Minus, ArrowUp, Flame, MessageSquare, Paperclip } from 'lucide-react-native';
 import IssueFormModal from '../modals/IssueFormModal';
 import IssueDetailModal from '../modals/IssueDetailModal';
 import { useProjectPermissions } from '../../../hooks/useProjectPermissions';
+import TaskApprovalBar from '../components/TaskApprovalBar';
+import ProofUploadSheet from '../components/ProofUploadSheet';
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = width * 0.85;
@@ -182,16 +184,23 @@ export default function BoardTab() {
     return 'One step at a time';
   };
 
+  const [proofFor, setProofFor] = useState<{ issue: any; col: any } | null>(null);
+  const moveAfterProof = async () => {
+    if (!proofFor || !currentProject?.id) return;
+    await updateIssueColumn(currentProject.id, proofFor.issue.id, proofFor.col.id);
+    setProofFor(null);
+    fetchProjectDetails(currentProject.id);
+  };
+
   const moveTo = async (issue: any, col: any) => {
     // Review and Done need proof from most people; that upload lives in the
     // task itself, so hand over to it rather than move without proof.
-    const needsProof = (perms.isReviewColumn(col.id) || perms.isDoneOrArchiveColumn(col.id)) && !perms.canSkipProof;
+    // Review and Done always ask for proof (photos, files, remark), as the web
+    // does; owners and PMs can skip it from the same sheet.
+    const needsProof = perms.isReviewColumn(col.id) || perms.isDoneOrArchiveColumn(col.id);
     if (needsProof) {
       setMoving(null);
-      Alert.alert('Proof needed', `Moving to ${col.name} needs proof attached. Open the task to attach it and move it there.`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open task', onPress: () => openIssueDetails(issue) },
-      ]);
+      setProofFor({ issue, col });
       return;
     }
     setMoveBusy(true);
@@ -281,13 +290,26 @@ export default function BoardTab() {
     }
   };
 
+  // Tick once a second, but only while some task's timer is running.
+  const [now, setNow] = useState(Date.now());
+  const anyRunning = currentIssues.some((i: any) => i.workStartedAt && !i.workCompletedAt);
+  useEffect(() => {
+    if (!anyRunning) return undefined;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [anyRunning]);
+
   const formatTimeSummary = (min: number) => (min < 60 ? `${Math.round(min)}m` : `${(min / 60).toFixed(1)}h`);
 
   const getIssueTimeSummary = (issue: any): { display: string; isRunning: boolean; isOver: boolean } | null => {
     const isRunning = !!(issue.workStartedAt && !issue.workCompletedAt);
     let loggedMin = 0;
+    let openStartedAt: number | null = null;
     if (Array.isArray(issue.timeLogs) && issue.timeLogs.length > 0) {
-      loggedMin = issue.timeLogs.reduce((acc: number, log: any) => acc + (log.durationMin || 0), 0);
+      for (const log of issue.timeLogs) {
+        if (log.endedAt || log.durationMin) loggedMin += log.durationMin || 0;
+        else if (log.startedAt) openStartedAt = Math.max(openStartedAt ?? 0, new Date(log.startedAt).getTime());
+      }
     }
     const estHours = issue.estimatedHours || 0;
     const estMin = estHours * 60;
@@ -295,7 +317,23 @@ export default function BoardTab() {
     if (!isRunning && loggedMin === 0 && estHours === 0) return null;
 
     if (isRunning) {
-      return { display: 'Timer Active', isRunning: true, isOver: false };
+      // Live, ticking every second (as on the web): time on this task so far,
+      // and what is left of its estimate.
+      const startMs = openStartedAt ?? new Date(issue.workStartedAt).getTime();
+      const totalSec = Math.max(0, Math.floor(loggedMin * 60 + (now - startMs) / 1000));
+      const hh = Math.floor(totalSec / 3600);
+      const mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+      const ss = String(totalSec % 60).padStart(2, '0');
+      const clock = `${hh}:${mm}:${ss}`;
+      if (estMin > 0) {
+        const leftMin = estMin - totalSec / 60;
+        return {
+          display: leftMin >= 0 ? `${clock} · ${formatTimeSummary(leftMin)} left` : `${clock} · over ${formatTimeSummary(-leftMin)}`,
+          isRunning: true,
+          isOver: leftMin < 0,
+        };
+      }
+      return { display: clock, isRunning: true, isOver: false };
     }
     if (estHours > 0) {
       return {
@@ -312,6 +350,8 @@ export default function BoardTab() {
     const PriorityIconComp = priorityConfig.icon;
     const timeSummary = getIssueTimeSummary(item);
     const commentCount = item._count?.comments || 0;
+    const fileCount = item._count?.attachments || 0;
+    const isEvidence = fileCount > 0 && (item.status === 'IN_REVIEW' || item.status === 'DONE');
 
     return (
       <TouchableOpacity
@@ -343,6 +383,17 @@ export default function BoardTab() {
 
           <Text style={styles.issueTitle} numberOfLines={2}>{item.title}</Text>
 
+          {perms.approvalLabel(item) !== '' && (
+            <TaskApprovalBar
+              compact
+              issue={item}
+              projectId={currentProject?.id}
+              label={perms.approvalLabel(item)}
+              canDecide={perms.canDecideApproval(item)}
+              onDone={() => { if (currentProject?.id) fetchProjectDetails(currentProject.id); }}
+            />
+          )}
+
           {item.labels && item.labels.length > 0 && (
             <View style={styles.cardLabelsRow}>
               {item.labels.slice(0, 3).map((l: any) => (
@@ -357,7 +408,7 @@ export default function BoardTab() {
             </View>
           )}
 
-          {(timeSummary || commentCount > 0) && (
+          {(timeSummary || commentCount > 0 || fileCount > 0) && (
             <View style={styles.cardMetaRow}>
               {timeSummary && (
                 <View style={[styles.timeBadge, timeSummary.isRunning && styles.timeBadgeRunning, timeSummary.isOver && styles.timeBadgeOver]}>
@@ -365,6 +416,14 @@ export default function BoardTab() {
                   <Clock size={11} color={timeSummary.isRunning ? '#16A34A' : timeSummary.isOver ? '#1373e5' : '#64748B'} />
                   <Text style={[styles.timeBadgeText, timeSummary.isRunning && { color: '#16A34A' }, timeSummary.isOver && { color: '#1373e5' }]}>
                     {timeSummary.display}
+                  </Text>
+                </View>
+              )}
+              {fileCount > 0 && (
+                <View style={[styles.commentBadge, isEvidence && styles.evidenceBadge]}>
+                  <Paperclip size={11} color={isEvidence ? '#047857' : '#64748B'} />
+                  <Text style={[styles.commentBadgeText, isEvidence && { color: '#047857' }]}>
+                    {isEvidence ? `Proof ${fileCount}` : fileCount}
                   </Text>
                 </View>
               )}
@@ -575,6 +634,19 @@ export default function BoardTab() {
       </Modal>
 
       {/* Issue Detail Modal */}
+      {proofFor && currentProject?.id && (
+        <ProofUploadSheet
+          visible
+          projectId={currentProject.id}
+          issueId={proofFor.issue.id}
+          stageName={proofFor.col.name}
+          onCancel={() => setProofFor(null)}
+          canSkip={perms.canSkipProof}
+          onSkip={moveAfterProof}
+          onUploaded={moveAfterProof}
+        />
+      )}
+
       <IssueDetailModal
         visible={detailModalVisible}
         issue={selectedIssue}
@@ -809,6 +881,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#16A34A',
   },
+  evidenceBadge: { backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' },
   commentBadge: {
     flexDirection: 'row',
     alignItems: 'center',

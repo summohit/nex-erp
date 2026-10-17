@@ -108,6 +108,30 @@ export function canMoveIntoReviewOrDone(
   return true;
 }
 
+/** A new task that still needs approval before work starts (as on the web). */
+export function isAwaitingApproval(issue: any): boolean {
+  return issue?.approvalState === 'PENDING_TECHNICAL' || issue?.approvalState === 'PENDING_ADMIN';
+}
+
+export function approvalLabel(issue: any): string {
+  if (issue?.approvalState === 'PENDING_TECHNICAL') return 'Awaiting technical approval';
+  if (issue?.approvalState === 'PENDING_ADMIN') return 'Awaiting admin approval';
+  if (issue?.approvalState === 'REJECTED') return 'Rejected';
+  return '';
+}
+
+/**
+ * Who may approve or reject a pending task, the same rule as the web: admins
+ * at either step; at the technical step, the project's Technical Architect.
+ * The server checks it again.
+ */
+export function canDecideApproval(issue: any, project: any, user: UserLike | null | undefined): boolean {
+  if (!isAwaitingApproval(issue)) return false;
+  if (isCompanyAdmin(user)) return true;
+  if (issue.approvalState !== 'PENDING_TECHNICAL') return false;
+  return findMember(project, user?.employeeId)?.role === 'TECHNICAL_ARCHITECT';
+}
+
 export function isStatusMoveBlocked(
   issue: any,
   columnId: number | string,
@@ -147,6 +171,9 @@ export interface ProjectPermissions {
   isReviewColumn: (columnId: number | string | null | undefined) => boolean;
   isDoneOrArchiveColumn: (columnId: number | string | null | undefined) => boolean;
   isStatusMoveBlocked: (issue: any, columnId: number | string) => boolean;
+  isAwaitingApproval: (issue: any) => boolean;
+  canDecideApproval: (issue: any) => boolean;
+  approvalLabel: (issue: any) => string;
 }
 
 export function useProjectPermissions(project: any, columns: any[] = []): ProjectPermissions {
@@ -174,6 +201,9 @@ export function useProjectPermissions(project: any, columns: any[] = []): Projec
       isDoneOrArchiveColumn: (columnId: number | string | null | undefined) => isDoneOrArchiveColumn(columnId, columns),
       isStatusMoveBlocked: (issue: any, columnId: number | string) =>
         isStatusMoveBlocked(issue, columnId, project, user, columns),
+      isAwaitingApproval,
+      canDecideApproval: (issue: any) => canDecideApproval(issue, project, user),
+      approvalLabel,
     };
   }, [project, user, columns]);
 }

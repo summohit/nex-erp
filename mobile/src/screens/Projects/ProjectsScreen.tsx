@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, RefreshControl, Dimensions, Animated, Image
 } from 'react-native';
 import AppScreen from '../../components/AppScreen';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import {
   Search, Star, Clock, Archive, User, Plus, Sparkles,
   ChevronRight, Kanban, Activity, LayoutGrid, Users
@@ -57,9 +57,14 @@ export default function ProjectsScreen() {
     setModalVisible(true);
   };
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  // Reload whenever this screen comes back into view, so changes made on the
+  // web or from a notification show up without pulling down.
+  useFocusEffect(
+    useCallback(() => {
+      fetchProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- store action, stable
+    }, []),
+  );
 
   const handleToggleStar = async (projectId: number, e?: any) => {
     e?.stopPropagation?.();

@@ -52,6 +52,8 @@ import {
 } from 'lucide-react-native';
 import { projectService } from '../../../api/projectService';
 import { useProjectStore } from '../../../store/projectStore';
+import TaskApprovalBar from '../components/TaskApprovalBar';
+import ProofUploadSheet from '../components/ProofUploadSheet';
 import { useAuthStore } from '../../../store/authStore';
 import { useProjectPermissions } from '../../../hooks/useProjectPermissions';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
@@ -141,6 +143,25 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
   // Pickers & Modals
   const [timerActive, setTimerActive] = useState(false);
   const [timerLoading, setTimerLoading] = useState(false);
+  // Live clock while the timer runs (time on this task, ticking each second).
+  const [tick, setTick] = useState(Date.now());
+  useEffect(() => {
+    if (!timerActive) return undefined;
+    const t = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [timerActive]);
+  const liveClock = (() => {
+    if (!timerActive || !issue) return '';
+    let closedMin = 0;
+    let openAt: number | null = null;
+    for (const log of issue.timeLogs ?? []) {
+      if (log.endedAt || log.durationMin) closedMin += log.durationMin || 0;
+      else if (log.startedAt) openAt = Math.max(openAt ?? 0, new Date(log.startedAt).getTime());
+    }
+    const start = openAt ?? (issue.workStartedAt ? new Date(issue.workStartedAt).getTime() : tick);
+    const sec = Math.max(0, Math.floor(closedMin * 60 + (tick - start) / 1000));
+    return `${Math.floor(sec / 3600)}:${String(Math.floor((sec % 3600) / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+  })();
 
   // Log Work (manual time entry)
   const [logWorkModalVisible, setLogWorkModalVisible] = useState(false);
@@ -165,8 +186,6 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
 
   // Proof-upload gate (shown when a manager-hierarchy approver, not owner/PM, moves a card to Review/Done)
   const [proofPending, setProofPending] = useState<{ columnId: number; statusStr: string } | null>(null);
-  const [proofAttached, setProofAttached] = useState(false);
-  const [proofUploading, setProofUploading] = useState(false);
 
   // Reject reason prompt
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
@@ -393,9 +412,9 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
       return;
     }
 
-    const needsProof = (perms.isReviewColumn(columnId) || perms.isDoneOrArchiveColumn(columnId)) && !perms.canSkipProof;
+    // Always ask for proof, as the web does; owners and PMs get "Skip proof & move".
+    const needsProof = perms.isReviewColumn(columnId) || perms.isDoneOrArchiveColumn(columnId);
     if (needsProof) {
-      setProofAttached(false);
       setProofPending({ columnId, statusStr });
       return;
     }
@@ -424,23 +443,6 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
       refreshIssueFromServer();
     } catch (error) {
       console.error('Failed to toggle member', error);
-    }
-  };
-
-  const handleProofConfirm = async () => {
-    if (!proofPending) return;
-    await commitStatusMove(proofPending.columnId, proofPending.statusStr);
-    setProofPending(null);
-    setProofAttached(false);
-  };
-
-  const handleProofPickImage = async () => {
-    setProofUploading(true);
-    try {
-      await handlePickImage();
-      setProofAttached(true);
-    } finally {
-      setProofUploading(false);
     }
   };
 
@@ -904,6 +906,15 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
             {/* Title */}
             <Text style={styles.title}>{issue.title}</Text>
 
+            {/* New task waiting on approval: badge, and Approve / Reject for deciders */}
+            <TaskApprovalBar
+              issue={issue}
+              projectId={projectId || issue.projectId}
+              label={perms.approvalLabel(issue)}
+              canDecide={perms.canDecideApproval(issue)}
+              onDone={() => { loadDetails(); useProjectStore.getState().fetchProjectDetails(projectId || issue.projectId).catch(() => {}); }}
+            />
+
             {/* Approve / Reject — PM reviewing a task in the Review column */}
             {perms.canApprove && perms.isReviewColumn(issue.columnId) && (
               <View style={styles.reviewBanner}>
@@ -1163,7 +1174,7 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
                     ) : (
                       <Play size={14} color="#FFFFFF" />
                     )}
-                    <Text style={styles.timerBtnText}>{timerActive ? 'Stop Timer' : 'Start Timer'}</Text>
+                    <Text style={styles.timerBtnText}>{timerActive ? (liveClock ? `Stop · ${liveClock}` : 'Stop Timer') : 'Start Timer'}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1592,41 +1603,27 @@ export default function IssueDetailModal({ visible, issue, onClose, projectId }:
         </Modal>
 
         {/* Proof Upload Gate — required for manager-hierarchy approvers moving to Review/Done */}
-        <Modal visible={!!proofPending} transparent animationType="fade" onRequestClose={() => setProofPending(null)}>
-          <View style={styles.pickerOverlay}>
-            <TouchableOpacity style={styles.pickerBackdrop} onPress={() => setProofPending(null)} />
-            <View style={[styles.pickerCard, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-              <Text style={styles.pickerTitle}>Attach Proof to Continue</Text>
-              <Text style={styles.proofSubtitle}>
-                Moving this task to this stage requires at least one attachment as proof of completion.
-              </Text>
-              <TouchableOpacity style={styles.proofUploadBtn} onPress={handleProofPickImage} disabled={proofUploading}>
-                {proofUploading ? (
-                  <ActivityIndicator size="small" color="#3B82F6" />
-                ) : (
-                  <>
-                    <Paperclip size={16} color="#3B82F6" />
-                    <Text style={styles.proofUploadBtnText}>
-                      {proofAttached ? 'Attached ✓ — Add another' : 'Choose Photo'}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              <View style={styles.proofActionsRow}>
-                <TouchableOpacity style={styles.proofCancelBtn} onPress={() => setProofPending(null)}>
-                  <Text style={styles.proofCancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.proofMoveBtn, !proofAttached && styles.proofMoveBtnDisabled]}
-                  onPress={handleProofConfirm}
-                  disabled={!proofAttached}
-                >
-                  <Text style={styles.proofMoveBtnText}>Move Task</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
+        <ProofUploadSheet
+          visible={!!proofPending}
+          projectId={projectId || issue.projectId}
+          issueId={issue.id}
+          stageName={columns.find((c: any) => c.id === proofPending?.columnId)?.name || 'Review'}
+          bottomInset={insets.bottom}
+          onCancel={() => setProofPending(null)}
+          canSkip={perms.canSkipProof}
+          onSkip={async () => {
+            if (!proofPending) return;
+            await commitStatusMove(proofPending.columnId, proofPending.statusStr);
+            setProofPending(null);
+            loadDetails();
+          }}
+          onUploaded={async () => {
+            if (!proofPending) return;
+            await commitStatusMove(proofPending.columnId, proofPending.statusStr);
+            setProofPending(null);
+            loadDetails();
+          }}
+        />
 
         {/* Reject Reason Modal */}
         <Modal visible={rejectModalVisible} transparent animationType="fade" onRequestClose={() => setRejectModalVisible(false)}>

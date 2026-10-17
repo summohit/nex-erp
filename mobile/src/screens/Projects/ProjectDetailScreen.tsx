@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppScreen from '../../components/AppScreen';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Globe, Kanban, List, GanttChart, Calendar, Paperclip, BarChart, Archive, Users, Lock, MessageSquare, Ticket } from 'lucide-react-native';
 import { useProjectStore } from '../../store/projectStore';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -88,6 +88,18 @@ export default function ProjectDetailScreen() {
     }
   }, [projectId]);
 
+  // Keep in step with changes made elsewhere (the web, a teammate): re-read the
+  // tasks quietly when the screen comes back into view and every 30 s on it.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!projectId) return undefined;
+      const { refreshIssues } = useProjectStore.getState();
+      refreshIssues(projectId);
+      const timer = setInterval(() => refreshIssues(projectId), 30_000);
+      return () => clearInterval(timer);
+    }, [projectId]),
+  );
+
   const archivedCount = currentIssues.filter(i => i.isArchived).length;
 
   const handleUpload = async () => {
@@ -124,6 +136,7 @@ export default function ProjectDetailScreen() {
     <GradientBanner colorStr={currentProject?.color} index={currentProject?.id || 1} style={styles.container}>
       <AppScreen
         transparent
+        light
         showBottomNav={false}
         title={projectName || currentProject?.name || 'Project'}
         right={

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Image,
   RefreshControl,
 } from 'react-native';
+import { useProjectPermissions } from '../../../hooks/useProjectPermissions';
+import TaskApprovalBar from '../components/TaskApprovalBar';
 import {
   Search,
   X,
@@ -22,7 +24,10 @@ import {
   XCircle,
   RotateCcw,
   ChevronRight,
+  Paperclip,
+  MessageSquare,
 } from 'lucide-react-native';
+import { taskTime, isTimerRunning } from '../taskTime';
 import { useProjectStore } from '../../../store/projectStore';
 import IssueDetailModal from '../modals/IssueDetailModal';
 
@@ -43,7 +48,18 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: React.Com
 
 const STATUS_FILTERS = ['ALL', 'TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CANCELLED'];
 
-const IssueRow = React.memo(({ issue, onPress }: { issue: any; onPress: () => void }) => {
+const IssueRow = React.memo(({ issue, onPress, approval, now }: {
+  issue: any;
+  onPress: () => void;
+  /** Pending-approval badge and buttons, when the task needs a decision. */
+  approval?: React.ReactNode;
+  /** Current time, passed only to rows whose timer runs, so they alone tick. */
+  now?: number;
+}) => {
+  const time = taskTime(issue, now ?? Date.now());
+  const files = issue._count?.attachments || 0;
+  const comments = issue._count?.comments || 0;
+  const isProof = files > 0 && (issue.status === 'IN_REVIEW' || issue.status === 'DONE');
   const p = PRIORITY_CONFIG[issue.priority] || PRIORITY_CONFIG.MEDIUM;
   const s = STATUS_CONFIG[issue.status] || STATUS_CONFIG.TODO;
   const PriorityIcon = p.icon;
@@ -63,6 +79,30 @@ const IssueRow = React.memo(({ issue, onPress }: { issue: any; onPress: () => vo
           </View>
         </View>
         <Text style={styles.issueTitle} numberOfLines={2}>{issue.title}</Text>
+        {approval}
+        {(time || files > 0 || comments > 0) && (
+          <View style={styles.metaRow}>
+            {time && (
+              <View style={[styles.metaChip, time.isRunning && styles.metaRunning, time.isOver && styles.metaOver]}>
+                {time.isRunning && <View style={styles.liveDot} />}
+                <Clock size={11} color={time.isRunning ? '#16A34A' : time.isOver ? '#DC2626' : '#64748B'} />
+                <Text style={[styles.metaText, time.isRunning && { color: '#16A34A' }, time.isOver && { color: '#DC2626' }]}>{time.display}</Text>
+              </View>
+            )}
+            {files > 0 && (
+              <View style={[styles.metaChip, isProof && styles.metaProof]}>
+                <Paperclip size={11} color={isProof ? '#047857' : '#64748B'} />
+                <Text style={[styles.metaText, isProof && { color: '#047857' }]}>{isProof ? `Proof ${files}` : files}</Text>
+              </View>
+            )}
+            {comments > 0 && (
+              <View style={styles.metaChip}>
+                <MessageSquare size={11} color="#64748B" />
+                <Text style={styles.metaText}>{comments}</Text>
+              </View>
+            )}
+          </View>
+        )}
         <View style={styles.issueFooterRow}>
           <View style={[styles.priorityChip, { backgroundColor: p.bg }]}>
             <PriorityIcon size={11} color={p.color} />
@@ -94,7 +134,17 @@ const IssueRow = React.memo(({ issue, onPress }: { issue: any; onPress: () => vo
 });
 
 export default function ListTab() {
-  const { currentIssues, currentProject, fetchProjectDetails } = useProjectStore();
+  const { currentIssues, currentProject, currentBoard, fetchProjectDetails } = useProjectStore();
+  const perms = useProjectPermissions(currentProject, currentBoard?.columns || []);
+
+  // Tick once a second, only while some task's timer is running.
+  const [now, setNow] = useState(Date.now());
+  const anyRunning = currentIssues.some(isTimerRunning);
+  useEffect(() => {
+    if (!anyRunning) return undefined;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [anyRunning]);
   const [search, setSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState('ALL');
   const [selectedIssue, setSelectedIssue] = useState<any>(null);
@@ -127,8 +177,24 @@ export default function ListTab() {
   }, []);
 
   const renderItem = useCallback(
-    ({ item }: { item: any }) => <IssueRow issue={item} onPress={() => handlePress(item)} />,
-    [handlePress]
+    ({ item }: { item: any }) => (
+      <IssueRow
+        issue={item}
+        now={isTimerRunning(item) ? now : undefined}
+        onPress={() => handlePress(item)}
+        approval={perms.approvalLabel(item) ? (
+          <TaskApprovalBar
+            compact
+            issue={item}
+            projectId={currentProject?.id}
+            label={perms.approvalLabel(item)}
+            canDecide={perms.canDecideApproval(item)}
+            onDone={() => { if (currentProject?.id) fetchProjectDetails(currentProject.id); }}
+          />
+        ) : undefined}
+      />
+    ),
+    [handlePress, perms, currentProject?.id, fetchProjectDetails, now]
   );
 
   const keyExtractor = useCallback((item: any) => item.id.toString(), []);
@@ -281,6 +347,16 @@ const styles = StyleSheet.create({
   statusChipText: { fontSize: 10, fontWeight: '700' },
   issueTitle: { fontSize: 14, fontWeight: '600', color: '#0F172A', lineHeight: 20, marginBottom: 10 },
   issueFooterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6, marginBottom: 2 },
+  metaChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3,
+    borderRadius: 6, backgroundColor: '#F1F5F9',
+  },
+  metaRunning: { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0' },
+  metaOver: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
+  metaProof: { backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' },
+  metaText: { fontSize: 10.5, fontWeight: '700', color: '#475569', fontVariant: ['tabular-nums'] },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#16A34A' },
   priorityChip: {
     flexDirection: 'row',
     alignItems: 'center',

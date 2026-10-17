@@ -85,7 +85,8 @@ export const projectService = {
   },
 
   addIssueComment: async (projectId: number, issueId: number, content: string): Promise<any> => {
-    const response = await apiClient.post(`/projects/${projectId}/issues/${issueId}/comments`, { content });
+    // The server reads `body` (issues.controller addComment); `content` arrived empty.
+    const response = await apiClient.post(`/projects/${projectId}/issues/${issueId}/comments`, { body: content });
     return response.data;
   },
 
@@ -201,6 +202,11 @@ export const projectService = {
   },
 
   // --- Review (Approve / Reject) ---
+  /** A new task waiting on approval (technical, then admin): approve or reject it. */
+  decideIssueApproval: async (projectId: number, issueId: number, action: 'APPROVE' | 'REJECT', reason?: string): Promise<any> => {
+    const response = await apiClient.post(`/projects/${projectId}/issues/${issueId}/approval`, { action, reason });
+    return response.data;
+  },
   reviewIssue: async (projectId: number, issueId: number, action: 'APPROVE' | 'REJECT', reason?: string): Promise<any> => {
     const response = await apiClient.post(`/projects/${projectId}/issues/${issueId}/review`, { action, reason });
     return response.data;
