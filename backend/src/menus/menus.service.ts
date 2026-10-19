@@ -26,6 +26,16 @@ export class MenusService implements OnModuleInit {
           this.logger.log('Performance menu auto-seeded successfully.');
         }
 
+        // One approvals inbox (19 Oct 2026): leave, WFH, regularization,
+        // late clock-outs and out-of-office clocks, right below Dashboard.
+        const approvalsMenu = await this.prisma.menu.findFirst({ where: { route: '/approvals', parentId: parent.id } });
+        if (!approvalsMenu) {
+          await this.prisma.menu.create({
+            data: { title: 'Approvals', icon: 'check-circle', route: '/approvals', displayOrder: 1, parentId: parent.id, isActive: true },
+          });
+          this.logger.log('Approvals menu auto-seeded successfully.');
+        }
+
         const offMenu = await this.prisma.menu.findFirst({ where: { title: 'Offboarding', parentId: parent.id } });
         if (!offMenu) {
           await this.prisma.menu.create({
@@ -417,6 +427,14 @@ export class MenusService implements OnModuleInit {
     // the Notices service; this grant makes the board visible in HR's sidebar
     // even when no explicit RolePermission row exists yet.
     if (roleName === 'HR') allowedModules.add('notices');
+
+    // Approvals: anyone who can decide something — every role but a plain
+    // employee, and a plain employee who manages people (19 Oct 2026).
+    if (roleName !== 'EMPLOYEE') allowedModules.add('approvals');
+    else {
+      const me = await this.prisma.employee.findFirst({ where: { userId }, select: { id: true } });
+      if (me && (await this.prisma.employee.count({ where: { managerId: me.id } })) > 0) allowedModules.add('approvals');
+    }
 
     // Who has documents or details missing: the report HR and admins follow
     // up with (the endpoint allows the same roles).
