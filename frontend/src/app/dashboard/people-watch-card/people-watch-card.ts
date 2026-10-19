@@ -38,7 +38,7 @@ type Item = { kind: 'Probation' | 'Notice' | 'PIP'; name: string; avatarUrl: str
           </div>
           <div>
             <div class="pwc-title-row">
-              <h3>Lifecycle Watch: Probation · Notice · PIP</h3>
+              <h3>Lifecycle Watch: PIP · Notice</h3>
               <span class="pwc-inline-zero" *ngIf="!items().length">All clear · 0 active deadlines</span>
             </div>
             <span class="pwc-sub">Employee lifecycle checkpoints &amp; transition progress</span>
@@ -53,7 +53,8 @@ type Item = { kind: 'Probation' | 'Notice' | 'PIP'; name: string; avatarUrl: str
       <div class="pwc-body">
         <!-- Compact Stat Chips with Mini Progress Bars -->
         <div class="pwc-counts">
-          <div class="pwc-stat indigo">
+          <!-- Probation hidden for now (19 Oct 2026) -->
+          <div class="pwc-stat indigo" *ngIf="false">
             <div class="pwc-stat-top">
               <span>On Probation</span>
               <b>{{ d.probation.length }}</b>
@@ -221,7 +222,8 @@ export class PeopleWatchCardComponent implements OnInit {
     const d = this.data();
     if (!d) return [];
     const all: Item[] = [
-      ...d.probation.map((p) => ({ kind: 'Probation' as const, name: p.name, avatarUrl: p.avatarUrl, date: p.endDate, daysLeft: p.daysLeft })),
+      // Probation hidden for now (19 Oct 2026).
+      ...[].map((p: any) => ({ kind: 'Probation' as const, name: p.name, avatarUrl: p.avatarUrl, date: p.endDate, daysLeft: p.daysLeft })),
       ...d.notice.map((n) => ({ kind: 'Notice' as const, name: n.name, avatarUrl: n.avatarUrl, date: n.lastWorkingDay, daysLeft: n.daysLeft })),
       ...d.pips.map((p) => ({ kind: 'PIP' as const, name: p.name, avatarUrl: p.avatarUrl, date: p.endDate, daysLeft: p.daysLeft })),
     ];

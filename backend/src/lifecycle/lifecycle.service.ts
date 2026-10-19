@@ -234,7 +234,33 @@ export class LifecycleService {
     const pip = await this.prisma.pip.create({
       data: { companyId: v.companyId, employeeId, raisedById: v.employeeId, reason, goals, startDate: start, endDate: end },
     });
+    await this.pipNotify(v, employeeId, 'PIP started',
+      (who) => `A Performance Improvement Plan has started for ${who}, ${this.d(start)} to ${this.d(end)}.`,
+      `A Performance Improvement Plan has started for you, ${this.d(start)} to ${this.d(end)}. Please open it and acknowledge it.`);
     return this.getPip(v, pip.id);
+  }
+
+  private d(x: Date) { return x.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }); }
+
+  /**
+   * Tell everyone a PIP concerns (19 Oct 2026): the employee, their reporting
+   * manager, HR and the super admin — never the person who acted.
+   */
+  private async pipNotify(v: Viewer, employeeId: number, title: string, others: (who: string) => string, toEmployee: string) {
+    try {
+      const e = await this.prisma.employee.findUnique({ where: { id: employeeId }, select: { firstName: true, lastName: true, managerId: true } });
+      const who = `${e?.firstName ?? ''} ${e?.lastName ?? ''}`.trim();
+      const hr = await this.prisma.employee.findMany({
+        where: { companyId: v.companyId, user: { role: { in: ['HR', 'SUPERADMIN'] }, status: { not: 'SUSPENDED' } } }, select: { id: true },
+      });
+      const watchers = [...new Set([e?.managerId, ...hr.map((h) => h.id)].filter((x): x is number => !!x && x !== employeeId))];
+      await this.notifications.notifyEmployees([employeeId], {
+        companyId: v.companyId, title, message: toEmployee, type: 'PERFORMANCE', linkUrl: '/performance?tab=people', excludeEmployeeId: v.employeeId,
+      });
+      await this.notifications.notifyEmployees(watchers, {
+        companyId: v.companyId, title, message: others(who), type: 'PERFORMANCE', linkUrl: '/performance?tab=people', excludeEmployeeId: v.employeeId,
+      });
+    } catch { /* the PIP change stands even if a notification fails */ }
   }
 
   async getPip(v: Viewer, id: number) {
@@ -293,7 +319,7 @@ export class LifecycleService {
   }
 
   /** Extend (new end date) or close as COMPLETED, FAILED or CANCELLED. */
-  async updatePip(v: Viewer, id: number, body: { action: 'EXTEND' | 'COMPLETED' | 'FAILED' | 'CANCELLED'; endDate?: string; note?: string }) {
+  async updatePip(v: Viewer, id: number, body: { action: 'EXTEND' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'REVOKED'; endDate?: string; note?: string }) {
     const p = await this.prisma.pip.findFirst({ where: { id, companyId: v.companyId } });
     if (!p) throw new NotFoundException('PIP not found');
     if (!(await this.canManage(v, p.employeeId))) throw new ForbiddenException('Only HR, admins or the reporting manager can change a PIP');
@@ -304,9 +330,15 @@ export class LifecycleService {
       if (end <= p.endDate) throw new BadRequestException('The new end date must be later than the current one');
       await this.prisma.pip.update({ where: { id }, data: { status: 'EXTENDED', endDate: end } });
       if (note) await this.prisma.pipCheckIn.create({ data: { pipId: id, authorId: v.employeeId, note: `Extended: ${note}` } });
-    } else if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(body?.action)) {
-      if (body.action !== 'CANCELLED' && !note) throw new BadRequestException('Write the outcome');
+      await this.pipNotify(v, p.employeeId, 'PIP extended',
+        (who) => `${who}'s PIP is extended to ${this.d(end)}.`, `Your PIP is extended to ${this.d(end)}.`);
+    } else if (['COMPLETED', 'FAILED', 'CANCELLED', 'REVOKED'].includes(body?.action)) {
+      // REVOKED (19 Oct 2026): ended early, before its end date, with a reason.
+      if (body.action !== 'CANCELLED' && !note) throw new BadRequestException(body.action === 'REVOKED' ? 'Write why it is revoked early' : 'Write the outcome');
       await this.prisma.pip.update({ where: { id }, data: { status: body.action, outcomeNote: note, closedAt: new Date() } });
+      const label = ({ COMPLETED: 'completed', FAILED: 'closed as not improved', CANCELLED: 'cancelled', REVOKED: 'revoked early' } as any)[body.action];
+      await this.pipNotify(v, p.employeeId, `PIP ${label}`,
+        (who) => `${who}'s PIP is ${label}${note ? ': ' + note : ''}.`, `Your PIP is ${label}${note ? ': ' + note : ''}.`);
     } else {
       throw new BadRequestException('Unknown action');
     }
@@ -320,6 +352,8 @@ export class LifecycleService {
       data: { acknowledgedAt: new Date() },
     });
     if (!r.count) throw new BadRequestException('Nothing to acknowledge');
+    const p = await this.prisma.pip.findUnique({ where: { id }, select: { employeeId: true } });
+    if (p) await this.pipNotify(v, p.employeeId, 'PIP acknowledged', (who) => `${who} has read and acknowledged their PIP.`, 'You acknowledged your PIP.');
     return this.getPip(v, id);
   }
 }

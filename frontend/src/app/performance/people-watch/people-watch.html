@@ -36,7 +36,9 @@
     <!-- Top KPI Stat Metric Cards -->
     <div class="pw-stats">
       <!-- 1. Probation Card -->
+      <!-- Probation hidden for now (19 Oct 2026): it gets its own flow later. -->
       <button 
+        *ngIf="showProbation"
         type="button" 
         class="pw-stat" 
         [class.on]="section() === 'probation'" 
@@ -94,7 +96,7 @@
     </div>
 
     <!-- Section 1: Probation -->
-    <section class="pw-card" *ngIf="section() === 'probation'">
+    <section class="pw-card" *ngIf="showProbation && section() === 'probation'">
       <div class="pw-card-head">
         <div class="pw-card-title-group">
           <div class="pw-card-icon-tag probation-tag">
@@ -826,6 +828,11 @@
           <input type="date" class="pw-input-date" [(ngModel)]="pipForm.endDate" />
         </div>
       </div>
+      <!-- Or by months from the start date (19 Oct 2026) -->
+      <div class="pw-pip-months">
+        <span>Or set the length:</span>
+        <button type="button" *ngFor="let m of [1, 2, 3, 6]" [class.on]="pipMonths === m" (click)="setPipMonths(m)">{{ m }} month{{ m === 1 ? '' : 's' }}</button>
+      </div>
     </div>
 
     <!-- Actions -->
@@ -948,6 +955,7 @@
           <button type="button" [class.on]="closeAction === 'EXTEND'" (click)="closeAction = 'EXTEND'">Extend</button>
           <button type="button" [class.on]="closeAction === 'COMPLETED'" (click)="closeAction = 'COMPLETED'">Completed</button>
           <button type="button" [class.on]="closeAction === 'FAILED'" (click)="closeAction = 'FAILED'">Not improved</button>
+          <button type="button" [class.on]="closeAction === 'REVOKED'" (click)="closeAction = 'REVOKED'">Revoke early</button>
           <button type="button" [class.on]="closeAction === 'CANCELLED'" (click)="closeAction = 'CANCELLED'">Cancel</button>
         </div>
 
@@ -958,7 +966,7 @@
 
         <div class="pw-field-group" *ngIf="closeAction">
           <label class="pw-field-label">
-            {{ closeAction === 'EXTEND' ? 'Reason for Extension (Optional)' : closeAction === 'CANCELLED' ? 'Cancellation Note (Optional)' : 'Final Outcome Summary' }}
+            {{ closeAction === 'EXTEND' ? 'Reason for Extension (Optional)' : closeAction === 'CANCELLED' ? 'Cancellation Note (Optional)' : closeAction === 'REVOKED' ? 'Why it is revoked early' : 'Final Outcome Summary' }}
           </label>
           <textarea rows="2" class="pw-textarea" [(ngModel)]="closeNote"></textarea>
         </div>

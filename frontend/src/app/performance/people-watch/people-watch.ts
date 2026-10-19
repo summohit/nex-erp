@@ -73,13 +73,15 @@ export class PeopleWatchComponent implements OnInit {
   private toast = inject(HotToastService);
   profile = inject(ProfileModalService);
 
-  @Input() initialSection: 'probation' | 'notice' | 'pip' = 'probation';
+  @Input() initialSection: 'probation' | 'notice' | 'pip' = 'pip';
+  /** Probation is hidden for now (19 Oct 2026); its own flow comes later. */
+  readonly showProbation = false;
 
   data = signal<LcOverview | null>(null);
   myPips = signal<LcPip[]>([]);
   history = signal<LcPip[]>([]);
   loading = signal(true);
-  section = signal<'probation' | 'notice' | 'pip'>('probation');
+  section = signal<'probation' | 'notice' | 'pip'>('pip');
   showHistory = signal(false);
   busy = signal(false);
 
@@ -185,7 +187,13 @@ export class PeopleWatchComponent implements OnInit {
 
   detail = signal<LcPipDetail | null>(null);
   checkInNote = '';
-  closeAction: '' | 'EXTEND' | 'COMPLETED' | 'FAILED' | 'CANCELLED' = '';
+  closeAction: '' | 'EXTEND' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'REVOKED' = '';
+  pipMonths: number | null = null;
+  /** Length by months from the start date, like probation's months option. */
+  setPipMonths(m: number) {
+    this.pipMonths = m;
+    this.pipForm.endDate = this.addMonths(this.pipForm.startDate || this.today(), m);
+  }
   closeNote = '';
   extendDate = '';
 
@@ -264,7 +272,7 @@ export class PeopleWatchComponent implements OnInit {
   }
   initials(name: string) { return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(); }
   statusLabel(s: string) {
-    return ({ ACTIVE: 'Active', EXTENDED: 'Extended', COMPLETED: 'Completed', FAILED: 'Not improved', CANCELLED: 'Cancelled', PENDING: 'Pending approval', APPROVED: 'Approved' } as any)[s] ?? s;
+    return ({ ACTIVE: 'Active', EXTENDED: 'Extended', COMPLETED: 'Completed', FAILED: 'Not improved', CANCELLED: 'Cancelled', REVOKED: 'Revoked early', PENDING: 'Pending approval', APPROVED: 'Approved' } as any)[s] ?? s;
   }
 
   // ---- Probation
@@ -322,6 +330,7 @@ export class PeopleWatchComponent implements OnInit {
 
   // ---- PIP
   openPipForm() {
+    this.pipMonths = 1;
     this.pipForm = { employeeId: null, employeeName: '', reason: '', goals: '', startDate: this.today(), endDate: this.addMonths(this.today(), 1) };
     this.pipQuery.set('');
     this.pipOpen.set(true);
@@ -359,7 +368,7 @@ export class PeopleWatchComponent implements OnInit {
     const d = this.detail();
     if (!d || !this.closeAction) return;
     if (this.closeAction === 'EXTEND' && !this.extendDate) { this.toast.error('Choose the new end date'); return; }
-    if ((this.closeAction === 'COMPLETED' || this.closeAction === 'FAILED') && !this.closeNote.trim()) { this.toast.error('Write the outcome'); return; }
+    if ((this.closeAction === 'COMPLETED' || this.closeAction === 'FAILED' || this.closeAction === 'REVOKED') && !this.closeNote.trim()) { this.toast.error(this.closeAction === 'REVOKED' ? 'Write why it is revoked early' : 'Write the outcome'); return; }
     this.busy.set(true);
     this.api.updatePip(d.id, { action: this.closeAction, endDate: this.extendDate || undefined, note: this.closeNote || undefined }).subscribe({
       next: (r) => { this.busy.set(false); this.closeAction = ''; this.closeNote = ''; this.extendDate = ''; this.detail.set(r); this.load(); this.toast.success('PIP updated'); },

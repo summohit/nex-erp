@@ -1566,3 +1566,8 @@
 /* Make permanent (19 Oct 2026) */
 .pw-btn.perm { background: #1373e5; border-color: #1373e5; color: #fff; }
 .pw-btn.perm:hover { background: #0f62c4; }
+
+/* PIP length by months (19 Oct 2026) */
+.pw-pip-months { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; font-size: 12.5px; color: #64748b; font-weight: 600; }
+.pw-pip-months button { height: 30px; padding: 0 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; font-weight: 700; font-size: 12px; color: #334155; cursor: pointer; }
+.pw-pip-months button.on { border-color: #1373e5; color: #1373e5; background: #eff6ff; }

@@ -80,7 +80,8 @@
                 <span class="prob-status">{{ employeeData?.employmentCategory === 'TRAINEE' ? 'Trainee' : employeeData?.employmentCategory === 'CONTRACT' ? 'Contract' : 'Permanent' }}</span>
               </div>
             </div>
-            <div class="form-row-item" *ngIf="employeeData?.probationEndDate">
+            <!-- Probation hidden for now (19 Oct 2026) -->
+            <div class="form-row-item" *ngIf="false && employeeData?.probationEndDate">
               <label class="item-label">Probation</label>
               <div class="item-value">
                 <span class="prob-status ok" *ngIf="employeeData?.probationConfirmedAt">Confirmed on {{ employeeData.probationConfirmedAt | date:'d MMM y' }}</span>
