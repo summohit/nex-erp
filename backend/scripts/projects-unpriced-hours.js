@@ -19,15 +19,22 @@ const h = (min) => Math.round((Number(min || 0) / 60) * 10) / 10;
 const rs = (n) => '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN');
 
 (async () => {
+  // Same rule as the app (19 Oct 2026): own hourly rate, else monthly salary / 234 h.
   const rows = await prisma.$queryRaw`
+    WITH salary AS (
+      SELECT ss."employeeId", SUM(ss.amount) AS monthly FROM "SalaryStructure" ss
+        JOIN "SalaryComponent" sc ON sc.id = ss."componentId" WHERE sc.type = 'EARNING' GROUP BY ss."employeeId"
+    )
     SELECT p.id, p.name, p.key, p."budgetAmount" AS budget,
-           e.id AS "employeeId", e."firstName", e."lastName", e."employeeCode", e."hourlyCostRate" AS rate,
+           e.id AS "employeeId", e."firstName", e."lastName", e."employeeCode",
+           COALESCE(e."hourlyCostRate", CASE WHEN s.monthly > 0 THEN s.monthly / 234.0 END) AS rate,
            SUM(COALESCE(t."durationMin", 0)) AS minutes
       FROM "IssueTimeLog" t
       JOIN "Issue" i    ON i.id = t."issueId"
       JOIN "Project" p  ON p.id = i."projectId"
       JOIN "Employee" e ON e.id = t."employeeId"
-     GROUP BY p.id, p.name, p.key, p."budgetAmount", e.id, e."firstName", e."lastName", e."employeeCode", e."hourlyCostRate"`;
+      LEFT JOIN salary s ON s."employeeId" = e.id
+     GROUP BY p.id, p.name, p.key, p."budgetAmount", e.id, e."firstName", e."lastName", e."employeeCode", e."hourlyCostRate", s.monthly`;
 
   const byProject = new Map();
   for (const r of rows) {
@@ -55,6 +62,6 @@ const rs = (n) => '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN');
 
   const people = await prisma.employee.count({ where: { hourlyCostRate: null, user: { status: { not: 'SUSPENDED' } } } });
   const all = await prisma.employee.count({ where: { user: { status: { not: 'SUSPENDED' } } } });
-  console.log(`\nActive employees with no hourly cost rate: ${people} of ${all}.\n`);
+  console.log(`\nActive employees with no hourly cost rate set by hand: ${people} of ${all} (their salary is used instead when they have one).\n`);
   await prisma.$disconnect();
 })().catch(async (e) => { console.error(e.message); await prisma.$disconnect(); process.exit(1); });
