@@ -3429,6 +3429,10 @@ export class AttendanceLeaveComponent implements OnInit {
     if (this.route.snapshot.queryParamMap.get('regularize')) {
       setTimeout(() => this.openRegularizationModal(), 300);
     }
+    // Deep link from the dashboard's "Apply Leave": ?apply=1 opens the leave form.
+    if (this.route.snapshot.queryParamMap.get('apply')) {
+      setTimeout(() => this.openRequestModal(), 300);
+    }
     this.employeeService.getMyProfile().subscribe({
       next: (p: any) => {
         this.myWeeklyOffs.set(p?.branch ? (p.branch.weeklyOffs ?? '') : null);

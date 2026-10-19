@@ -175,7 +175,7 @@
 
       <!-- Quick Access Actions -->
       <nav class="quick-access-inline" aria-label="Quick navigation">
-        <a routerLink="/leaves" class="qa-pill">
+        <a routerLink="/attendance/leaves" [queryParams]="{ apply: 1 }" class="qa-pill">
           <span class="qa-ico purple"><svg lucideCalendar size="14"></svg></span>
           <span>Apply Leave</span>
         </a>
@@ -187,7 +187,7 @@
           <span class="qa-ico emerald"><svg lucideClock size="14"></svg></span>
           <span>Attendance</span>
         </a>
-        <a routerLink="/payroll" class="qa-pill">
+        <a routerLink="/payroll/payslips" class="qa-pill">
           <span class="qa-ico amber"><svg lucideReceipt size="14"></svg></span>
           <span>Payslips</span>
         </a>
@@ -469,7 +469,7 @@
                   <p class="cmd-card-sub">IT, HR &amp; facilities helpdesk requests</p>
                 </div>
               </div>
-              <a routerLink="/tickets" class="cmd-card-action">
+              <a routerLink="/crm/tickets" class="cmd-card-action">
                 <span>Helpdesk</span>
                 <svg lucideArrowRight size="13"></svg>
               </a>
@@ -717,7 +717,7 @@
                     {{ isBulkApproving() ? 'Approving...' : 'Approve Selected (' + selectedApprovalIds().size + ')' }}
                   </span>
                 </button>
-                <a routerLink="/leaves" class="cmd-card-action">
+                <a routerLink="/attendance/approvals" class="cmd-card-action">
                   <span>All Requests</span>
                   <svg lucideArrowRight size="13"></svg>
                 </a>
@@ -1063,7 +1063,7 @@
                   <p class="cmd-card-sub">Next gazetted &amp; company holidays</p>
                 </div>
               </div>
-              <a routerLink="/holidays" class="cmd-card-action">
+              <a routerLink="/attendance/holidays" class="cmd-card-action">
                 <span>Calendar</span>
                 <svg lucideArrowRight size="13"></svg>
               </a>
@@ -1141,7 +1141,7 @@
                   <p class="cmd-card-sub">Recent peer &amp; leadership recognition</p>
                 </div>
               </div>
-              <a routerLink="/appreciations" class="cmd-card-action">
+              <a routerLink="/appreciation" class="cmd-card-action">
                 <span>View all</span>
                 <svg lucideArrowRight size="13"></svg>
               </a>
