@@ -1589,13 +1589,11 @@ export class ProjectsComponent implements OnInit {
       } else if (q) {
         this.selectBoardOption(q);
       }
-    } else {
-      const boards = this.filteredBoardsForSelect();
-      if (boards.length > 0) {
-        this.selectBoardOption(boards[0].name);
-      } else if (q) {
-        this.selectBoardOption(q);
-      }
+    } else if (q) {
+      // Enter searches (19 Oct 2026): every board matching the text, as cards
+      // under "Your boards" — not just the first match. Picking one option
+      // from the list still narrows to that board.
+      this.selectBoardOption(q);
     }
   }
 

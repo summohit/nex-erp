@@ -7240,3 +7240,7 @@
   animation: cbmFieldPulse 1.2s ease-in-out 2;
 }
 @keyframes cbmFieldPulse { 50% { box-shadow: 0 0 0 3px #6366f1, 0 0 0 9px rgba(99, 102, 241, 0.25); } }
+
+/* Search results note beside "Your boards" (19 Oct 2026) */
+.boards-search-note { margin-left: 10px; font-size: 13px; font-weight: 600; color: #475569; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 999px; padding: 3px 4px 3px 12px; display: inline-flex; align-items: center; gap: 8px; }
+.boards-search-note button { border: 0; background: #fff; color: #1373e5; font-weight: 700; font-size: 12px; border-radius: 999px; padding: 2px 10px; cursor: pointer; }

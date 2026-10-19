@@ -401,7 +401,7 @@
   </div>
 
   <!-- 🕒 Recently Viewed Section -->
-  <div class="section-container" *ngIf="recentlyViewedProjects().length > 0 && (activeTab() === 'all' || activeTab() === 'recent')">
+  <div class="section-container" *ngIf="recentlyViewedProjects().length > 0 && !searchQuery() && (activeTab() === 'all' || activeTab() === 'recent')">
     <div class="section-header">
       <div class="section-title-group">
         <svg lucideClock size="20" class="section-icon"></svg>
@@ -474,6 +474,10 @@
       <div class="section-title-group">
         <svg lucideUser size="20" class="section-icon"></svg>
         <h2>Your boards</h2>
+        <span class="boards-search-note" *ngIf="searchQuery()">
+          {{ filteredProjects().length }} {{ filteredProjects().length === 1 ? 'match' : 'matches' }} for “{{ searchQuery() }}”
+          <button type="button" (click)="selectBoardOption('')">Clear</button>
+        </span>
       </div>
       <div class="view-toggle">
         <button
