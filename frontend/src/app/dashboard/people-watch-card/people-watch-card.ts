@@ -13,7 +13,8 @@ type Item = { kind: 'Probation' | 'Notice' | 'PIP'; name: string; avatarUrl: str
   imports: [CommonModule, RouterModule, LucideAlertTriangle, LucideChevronRight, LucideUserCheck],
   template: `
     <!-- Own PIP now shows in app-my-pip-card (19 Oct 2026). -->
-    <div class="pwc-card pwc-alert" *ngIf="false && minePip() as p">
+<ng-container *ngIf="showMineBanner">
+    <div class="pwc-card pwc-alert" *ngIf="minePip() as p">
       <div class="pwc-mine">
         <div class="pwc-mine-left">
           <div class="pwc-alert-ico">
@@ -30,6 +31,7 @@ type Item = { kind: 'Probation' | 'Notice' | 'PIP'; name: string; avatarUrl: str
         </a>
       </div>
     </div>
+    </ng-container>
 
     <div class="pwc-card" *ngIf="data() as d">
       <div class="pwc-head">
@@ -218,6 +220,8 @@ export class PeopleWatchCardComponent implements OnInit {
   private api = inject(LifecycleService);
   data = signal<LcOverview | null>(null);
   minePip = signal<LcPip | null>(null);
+  /** The employee's own PIP shows in app-my-pip-card now (19 Oct 2026). */
+  readonly showMineBanner = false;
 
   items = computed<Item[]>(() => {
     const d = this.data();
