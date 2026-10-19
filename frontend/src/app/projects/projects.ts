@@ -1450,8 +1450,9 @@ export class ProjectsComponent implements OnInit {
   });
   memberMatches = computed(() => {
     const q = this.memberQuery().trim().toLowerCase();
-    const picked = new Set(this.filterMemberIds());
-    return this.memberOptions().filter((m) => !picked.has(m.id) && (!q || m.name.toLowerCase().includes(q))).slice(0, 30);
+    return this.memberOptions()
+      .filter((m) => !q || m.name.toLowerCase().includes(q))
+      .slice(0, 50);
   });
   pickedMembers = computed(() => {
     const ids = new Set(this.filterMemberIds());
@@ -1459,11 +1460,44 @@ export class ProjectsComponent implements OnInit {
   });
   addMemberFilter(id: number) {
     this.filterMemberIds.update((l) => (l.includes(id) ? l : [...l, id]));
-    this.memberQuery.set('');
     if (this.activeTab() !== 'all') this.setActiveTab('all');
     this.scrollToYourBoards();
   }
-  removeMemberFilter(id: number) { this.filterMemberIds.update((l) => l.filter((x) => x !== id)); }
+  removeMemberFilter(id: number) { 
+    this.filterMemberIds.update((l) => l.filter((x) => x !== id)); 
+  }
+  toggleMemberFilter(id: number) {
+    if (this.filterMemberIds().includes(id)) {
+      this.removeMemberFilter(id);
+    } else {
+      this.addMemberFilter(id);
+    }
+  }
+  isMemberPicked(id: number): boolean {
+    return this.filterMemberIds().includes(id);
+  }
+  toggleMemberPicker(event?: Event) {
+    if (event) event.stopPropagation();
+    const willOpen = !this.memberPickerOpen();
+    this.memberPickerOpen.set(willOpen);
+    if (willOpen) {
+      this.boardDropdownOpen.set(false);
+      this.memberQuery.set('');
+      setTimeout(() => {
+        const input = document.querySelector('.member-filter-search-input') as HTMLInputElement;
+        if (input) input.focus();
+      }, 50);
+    }
+  }
+  closeMemberPicker() {
+    this.memberPickerOpen.set(false);
+    this.memberQuery.set('');
+  }
+  clearAllMemberFilters(event?: Event) {
+    if (event) event.stopPropagation();
+    this.filterMemberIds.set([]);
+    this.memberQuery.set('');
+  }
   filterDepartmentId = signal<string>('ALL');
   filterCategory = signal<string>('ALL');
   filterStatus = signal<string>('ALL');
@@ -1591,6 +1625,7 @@ export class ProjectsComponent implements OnInit {
     const willOpen = !this.boardDropdownOpen();
     this.boardDropdownOpen.set(willOpen);
     if (willOpen) {
+      this.memberPickerOpen.set(false);
       this.boardFilterSearch.set('');
       setTimeout(() => {
         const inputEl = document.querySelector('.dropdown-search-input') as HTMLInputElement;
@@ -1659,21 +1694,31 @@ export class ProjectsComponent implements OnInit {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
     if (this.boardDropdownOpen()) {
-      const target = event.target as HTMLElement;
       if (!target.closest('.search-select-box')) {
         this.closeBoardDropdown();
+      }
+    }
+    if (this.memberPickerOpen()) {
+      if (!target.closest('.member-filter')) {
+        this.closeMemberPicker();
       }
     }
     // The in-row status menu closes on any click that is neither an option in
     // the menu nor another status button. Opening a button sets the menu, and
     // this handler skips the same button so the open survives this listener.
-    const target = event.target as HTMLElement;
     if (this.myTasksStatusMenu()
         && !target.closest('.my-tasks-status-menu')
         && !target.closest('[data-act="board-status"]')) {
       this.myTasksStatusMenu.set(null);
     }
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    if (this.boardDropdownOpen()) this.closeBoardDropdown();
+    if (this.memberPickerOpen()) this.closeMemberPicker();
   }
 
   // Create / Edit Modal Searchable Selects

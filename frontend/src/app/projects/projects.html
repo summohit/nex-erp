@@ -170,15 +170,16 @@
 <div class="boards-page">
   <!-- Search & Filter Control Bar -->
   <div class="hub-control-bar">
-    <div class="search-select-box" [class.open]="boardDropdownOpen()">
+    <!-- Searchable Select for My Tasks only -->
+    <div class="search-select-box" [class.open]="boardDropdownOpen()" *ngIf="activeTab() === 'my-tasks'">
       <button 
         type="button" 
         class="search-select-trigger" 
         (click)="toggleBoardDropdown($event)"
-        [title]="searchQuery() || (activeTab() === 'my-tasks' ? 'All Tasks (Select to filter)' : 'All Boards (Select to filter)')">
+        [title]="searchQuery() || 'All Tasks (Select to filter)'">
         <svg lucideSearch size="15" class="search-select-icon"></svg>
         <span class="search-select-label" [class.placeholder]="!searchQuery()">
-          {{ searchQuery() || (activeTab() === 'my-tasks' ? 'All Tasks (Select to filter)' : 'All Boards (Select to filter)') }}
+          {{ searchQuery() || 'All Tasks (Select to filter)' }}
         </span>
         <div class="search-select-actions">
           <button 
@@ -193,14 +194,14 @@
         </div>
       </button>
 
-      <!-- Searchable Dropdown Panel -->
+      <!-- Searchable Dropdown Panel (Tasks) -->
       <div class="search-select-dropdown" *ngIf="boardDropdownOpen()" (click)="$event.stopPropagation()">
         <div class="search-select-dropdown-header">
           <svg lucideSearch size="14" class="dropdown-search-icon"></svg>
           <input 
             type="text" 
             class="dropdown-search-input" 
-            [placeholder]="activeTab() === 'my-tasks' ? 'Search tasks by title...' : 'Search boards by name or code...'" 
+            placeholder="Search tasks by title or code..." 
             [ngModel]="boardFilterSearch()" 
             (ngModelChange)="boardFilterSearch.set($event)"
             (keydown.escape)="closeBoardDropdown()"
@@ -214,102 +215,54 @@
             title="Clear search">
             <svg lucideX size="12"></svg>
           </button>
+          <button 
+            type="button" 
+            class="dropdown-header-close" 
+            (click)="closeBoardDropdown()" 
+            title="Close dropdown (Esc)">
+            <svg lucideX size="14"></svg>
+          </button>
         </div>
 
         <div class="search-select-options">
-          <!-- Reset / All option -->
           <div 
             class="search-select-option reset-option" 
             [class.selected]="!searchQuery()" 
             (click)="selectBoardOption('')">
             <div class="option-content">
-              <span class="option-name">{{ activeTab() === 'my-tasks' ? 'All Tasks (Select to filter)' : 'All Boards (Select to filter)' }}</span>
+              <span class="option-name">All Tasks (Select to filter)</span>
             </div>
             <svg *ngIf="!searchQuery()" lucideCheck size="14" class="option-check"></svg>
           </div>
 
-          <!-- Boards List -->
-          <ng-container *ngIf="activeTab() !== 'my-tasks'">
-            <div 
-              class="search-select-option" 
-              *ngFor="let p of filteredBoardsForSelect()" 
-              [class.selected]="searchQuery() === p.name" 
-              (click)="selectBoardOption(p.name)">
-              <div class="option-content">
-                <span class="option-avatar-icon" [style.background]="p.color || '#3b82f6'">
-                  {{ (p.name || 'B')[0] | uppercase }}
-                </span>
-                <div class="option-text-stack">
-                  <div class="option-title-row">
-                    <span class="option-name" [title]="p.name">{{ p.name }}</span>
-                    <span class="option-badge" *ngIf="p.key">{{ p.key }}</span>
-                  </div>
-                  <span class="option-sub" *ngIf="p.client?.name">{{ p.client.name }}</span>
+          <div 
+            class="search-select-option" 
+            *ngFor="let t of filteredTasksForSelect()" 
+            [class.selected]="searchQuery() === t.title" 
+            (click)="selectBoardOption(t.title)">
+            <div class="option-content">
+              <span class="option-avatar-icon task-avatar">
+                <svg lucideCheckSquare size="12"></svg>
+              </span>
+              <div class="option-text-stack">
+                <div class="option-title-row">
+                  <span class="option-name" [title]="t.title">{{ t.title }}</span>
+                  <span class="option-badge" *ngIf="t.refKey">#{{ t.refKey }}</span>
                 </div>
               </div>
-              <svg *ngIf="searchQuery() === p.name" lucideCheck size="14" class="option-check"></svg>
             </div>
-            <div class="search-select-empty" *ngIf="filteredBoardsForSelect().length === 0">
-              <svg lucideSearch size="20" class="empty-search-icon"></svg>
-              <span>No boards found matching "<strong>{{ boardFilterSearch() }}</strong>"</span>
-            </div>
-          </ng-container>
-
-          <!-- Tasks List -->
-          <ng-container *ngIf="activeTab() === 'my-tasks'">
-            <div 
-              class="search-select-option" 
-              *ngFor="let t of filteredTasksForSelect()" 
-              [class.selected]="searchQuery() === t.title" 
-              (click)="selectBoardOption(t.title)">
-              <div class="option-content">
-                <span class="option-avatar-icon task-avatar">
-                  <svg lucideCheckSquare size="12"></svg>
-                </span>
-                <div class="option-text-stack">
-                  <div class="option-title-row">
-                    <span class="option-name" [title]="t.title">{{ t.title }}</span>
-                    <span class="option-badge" *ngIf="t.refKey">#{{ t.refKey }}</span>
-                  </div>
-                </div>
-              </div>
-              <svg *ngIf="searchQuery() === t.title" lucideCheck size="14" class="option-check"></svg>
-            </div>
-            <div class="search-select-empty" *ngIf="filteredTasksForSelect().length === 0">
-              <svg lucideSearch size="20" class="empty-search-icon"></svg>
-              <span>No tasks found matching "<strong>{{ boardFilterSearch() }}</strong>"</span>
-            </div>
-          </ng-container>
+            <svg *ngIf="searchQuery() === t.title" lucideCheck size="14" class="option-check"></svg>
+          </div>
+          <div class="search-select-empty" *ngIf="filteredTasksForSelect().length === 0">
+            <svg lucideSearch size="20" class="empty-search-icon"></svg>
+            <span>No tasks found matching "<strong>{{ boardFilterSearch() }}</strong>"</span>
+          </div>
         </div>
 
         <div class="search-select-footer">
-          <span>{{ activeTab() === 'my-tasks' ? filteredTasksForSelect().length : filteredBoardsForSelect().length }} items</span>
+          <span>{{ filteredTasksForSelect().length }} tasks</span>
           <span class="footer-hint">Esc to close</span>
         </div>
-      </div>
-    </div>
-
-    <!-- Employees filter (19 Oct 2026): boards any picked person is on -->
-    <div class="member-filter" *ngIf="activeTab() !== 'my-tasks'">
-      <div class="member-filter-box" (click)="memberPickerOpen.set(true)">
-        <svg lucideUsers size="15"></svg>
-        <span class="member-chip" *ngFor="let m of pickedMembers()">
-          {{ m.name }}
-          <button type="button" (click)="$event.stopPropagation(); removeMemberFilter(m.id)" title="Remove">×</button>
-        </span>
-        <input type="text" [placeholder]="pickedMembers().length ? 'Add employee…' : 'Filter by employees…'"
-               [ngModel]="memberQuery()" (ngModelChange)="memberQuery.set($event); memberPickerOpen.set(true)"
-               (focus)="memberPickerOpen.set(true)" (keydown.escape)="memberPickerOpen.set(false)"
-               (keydown.enter)="memberMatches().length && addMemberFilter(memberMatches()[0].id)" />
-      </div>
-      <div class="member-filter-menu" *ngIf="memberPickerOpen()" (click)="$event.stopPropagation()">
-        <div class="member-filter-empty" *ngIf="!memberMatches().length">No one found</div>
-        <button type="button" *ngFor="let m of memberMatches()" (click)="addMemberFilter(m.id)">
-          <span class="member-av"><img *ngIf="m.avatarUrl" [src]="m.avatarUrl" alt=""><span *ngIf="!m.avatarUrl">{{ m.name.charAt(0) }}</span></span>
-          <span class="member-name">{{ m.name }}</span>
-          <span class="member-count">{{ m.count }} {{ m.count === 1 ? 'board' : 'boards' }}</span>
-        </button>
-        <div class="member-filter-foot"><button type="button" (click)="memberPickerOpen.set(false)">Done</button></div>
       </div>
     </div>
 
@@ -527,67 +480,308 @@
       </div>
     </div>
 
-    <!-- Quick Filter Chips -->
-    <div class="quick-filter-chips">
-      <button
-        type="button"
-        class="quick-filter-chip"
-        [class.active]="quickFilter() === 'overdue'"
-        (click)="setQuickFilter('overdue')">
-        <svg lucideAlertTriangle size="13"></svg>
-        Overdue
-        <span class="quick-filter-count" *ngIf="quickFilterCounts().overdue > 0">{{ quickFilterCounts().overdue }}</span>
-      </button>
-      <button
-        type="button"
-        class="quick-filter-chip"
-        [class.active]="quickFilter() === 'due-week'"
-        (click)="setQuickFilter('due-week')">
-        <svg lucideClock size="13"></svg>
-        Due this week
-        <span class="quick-filter-count" *ngIf="quickFilterCounts().dueWeek > 0">{{ quickFilterCounts().dueWeek }}</span>
-      </button>
-      <button
-        type="button"
-        class="quick-filter-chip"
-        [class.active]="quickFilter() === 'led-by-me'"
-        (click)="setQuickFilter('led-by-me')">
-        <svg lucideUser size="13"></svg>
-        Led by me
-        <span class="quick-filter-count" *ngIf="quickFilterCounts().ledByMe > 0">{{ quickFilterCounts().ledByMe }}</span>
-      </button>
-    </div>
+    <!-- 🔍 Your Boards Control Bar: Board Search, Employee Multi-Filter, Quick Filters & Drawer -->
+    <div class="your-boards-controls-bar">
+      <div class="your-boards-filters-group">
+        <!-- Board Search / Select Filter -->
+        <div class="search-select-box" [class.open]="boardDropdownOpen()">
+          <button 
+            type="button" 
+            class="search-select-trigger" 
+            (click)="toggleBoardDropdown($event)"
+            [title]="searchQuery() || 'All Boards (Select to filter)'">
+            <svg lucideSearch size="15" class="search-select-icon"></svg>
+            <span class="search-select-label" [class.placeholder]="!searchQuery()">
+              {{ searchQuery() || 'All Boards (Select to filter)' }}
+            </span>
+            <div class="search-select-actions">
+              <button 
+                *ngIf="searchQuery()" 
+                type="button" 
+                class="search-select-clear" 
+                (click)="clearBoardFilter($event)"
+                title="Clear selection">
+                <svg lucideX size="13"></svg>
+              </button>
+              <svg lucideChevronDown size="14" class="search-select-chevron" [class.rotated]="boardDropdownOpen()"></svg>
+            </div>
+          </button>
 
-    <!-- Filters stay out of the table. The drawer uses draft values, so the
-         result list only changes after the user presses Apply. -->
-    <div class="project-filters">
-      <div class="project-filters-head">
-        <button type="button" class="project-filters-toggle" (click)="openProjectFilters()">
-          <svg lucideFilter size="14"></svg>
-          Filters
-          <span class="project-filters-count" *ngIf="activeFilterCount() > 0">{{ activeFilterCount() }}</span>
-        </button>
-        <button
-          type="button"
-          class="project-filters-clear"
-          *ngIf="activeFilterCount() > 0"
-          (click)="clearProjectFilters()">
-          <svg lucideX size="13"></svg> Clear all
-        </button>
+          <!-- Searchable Dropdown Panel (Boards) -->
+          <div class="search-select-dropdown" *ngIf="boardDropdownOpen()" (click)="$event.stopPropagation()">
+            <div class="search-select-dropdown-header">
+              <svg lucideSearch size="14" class="dropdown-search-icon"></svg>
+              <input 
+                type="text" 
+                class="dropdown-search-input" 
+                placeholder="Search boards by name or code..." 
+                [ngModel]="boardFilterSearch()" 
+                (ngModelChange)="boardFilterSearch.set($event)"
+                (keydown.escape)="closeBoardDropdown()"
+                (keydown.enter)="onBoardFilterSearchEnter()"
+                autofocus />
+              <button 
+                *ngIf="boardFilterSearch()" 
+                type="button" 
+                class="dropdown-search-clear" 
+                (click)="boardFilterSearch.set('')"
+                title="Clear search">
+                <svg lucideX size="12"></svg>
+              </button>
+              <button 
+                type="button" 
+                class="dropdown-header-close" 
+                (click)="closeBoardDropdown()" 
+                title="Close dropdown (Esc)">
+                <svg lucideX size="14"></svg>
+              </button>
+            </div>
+
+            <div class="search-select-options">
+              <!-- Reset / All option -->
+              <div 
+                class="search-select-option reset-option" 
+                [class.selected]="!searchQuery()" 
+                (click)="selectBoardOption('')">
+                <div class="option-content">
+                  <span class="option-name">All Boards (Select to filter)</span>
+                </div>
+                <svg *ngIf="!searchQuery()" lucideCheck size="14" class="option-check"></svg>
+              </div>
+
+              <!-- Boards List -->
+              <div 
+                class="search-select-option" 
+                *ngFor="let p of filteredBoardsForSelect()" 
+                [class.selected]="searchQuery() === p.name" 
+                (click)="selectBoardOption(p.name)">
+                <div class="option-content">
+                  <span class="option-avatar-icon" [style.background]="p.color || '#3b82f6'">
+                    {{ (p.name || 'B')[0] | uppercase }}
+                  </span>
+                  <div class="option-text-stack">
+                    <div class="option-title-row">
+                      <span class="option-name" [title]="p.name">{{ p.name }}</span>
+                      <span class="option-badge" *ngIf="p.key">{{ p.key }}</span>
+                    </div>
+                    <span class="option-sub" *ngIf="p.client?.name">{{ p.client.name }}</span>
+                  </div>
+                </div>
+                <svg *ngIf="searchQuery() === p.name" lucideCheck size="14" class="option-check"></svg>
+              </div>
+              <div class="search-select-empty" *ngIf="filteredBoardsForSelect().length === 0">
+                <svg lucideSearch size="20" class="empty-search-icon"></svg>
+                <span>No boards found matching "<strong>{{ boardFilterSearch() }}</strong>"</span>
+              </div>
+            </div>
+
+            <div class="search-select-footer">
+              <span>{{ filteredBoardsForSelect().length }} boards</span>
+              <span class="footer-hint">Esc to close</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Enhanced Employee Multi-Filter Dropdown -->
+        <div class="member-filter" [class.open]="memberPickerOpen()">
+          <button 
+            type="button" 
+            class="member-filter-trigger" 
+            (click)="toggleMemberPicker($event)"
+            [title]="pickedMembers().length ? pickedMembers().length + ' employees selected' : 'Filter by employees...'">
+            <svg lucideUsers size="15" class="member-trigger-icon"></svg>
+            <div class="member-trigger-content">
+              <span *ngIf="!pickedMembers().length" class="member-placeholder">Filter by employees...</span>
+              <div class="member-trigger-chips" *ngIf="pickedMembers().length">
+                <span class="member-chip-pill" *ngFor="let m of pickedMembers().slice(0, 2)">
+                  <span class="pill-name">{{ m.name }}</span>
+                  <span class="chip-remove" (click)="$event.stopPropagation(); removeMemberFilter(m.id)" title="Remove">×</span>
+                </span>
+                <span class="member-more-count" *ngIf="pickedMembers().length > 2">
+                  +{{ pickedMembers().length - 2 }} more
+                </span>
+              </div>
+            </div>
+            <div class="member-trigger-actions">
+              <button 
+                *ngIf="pickedMembers().length" 
+                type="button" 
+                class="member-clear-btn" 
+                (click)="clearAllMemberFilters($event)"
+                title="Clear all selected employees">
+                <svg lucideX size="13"></svg>
+              </button>
+              <svg lucideChevronDown size="14" class="member-chevron" [class.rotated]="memberPickerOpen()"></svg>
+            </div>
+          </button>
+
+          <!-- Enhanced Member Filter Dropdown Menu -->
+          <div class="member-filter-menu" *ngIf="memberPickerOpen()" (click)="$event.stopPropagation()">
+            <!-- Dropdown Header with Close Button -->
+            <div class="member-filter-menu-header">
+              <div class="menu-header-title">
+                <svg lucideUsers size="15" class="menu-header-icon"></svg>
+                <span>Filter by Employees</span>
+                <span class="member-header-badge" *ngIf="pickedMembers().length">{{ pickedMembers().length }}</span>
+              </div>
+              <button 
+                type="button" 
+                class="btn-close-dropdown" 
+                (click)="closeMemberPicker()" 
+                title="Close dropdown (Esc)">
+                <svg lucideX size="15"></svg>
+              </button>
+            </div>
+
+            <!-- Employee Search Input -->
+            <div class="member-filter-search-box">
+              <svg lucideSearch size="14" class="search-input-icon"></svg>
+              <input 
+                type="text" 
+                class="member-filter-search-input" 
+                placeholder="Search employees by name..." 
+                [ngModel]="memberQuery()" 
+                (ngModelChange)="memberQuery.set($event)"
+                (keydown.escape)="closeMemberPicker()" />
+              <button 
+                *ngIf="memberQuery()" 
+                type="button" 
+                class="search-input-clear" 
+                (click)="memberQuery.set('')"
+                title="Clear search">
+                <svg lucideX size="12"></svg>
+              </button>
+            </div>
+
+            <!-- Selected Chips Strip (if any picked) -->
+            <div class="member-filter-selected-strip" *ngIf="pickedMembers().length">
+              <div class="selected-strip-header">
+                <span class="selected-label">Selected ({{ pickedMembers().length }})</span>
+                <button type="button" class="btn-clear-all-link" (click)="clearAllMemberFilters($event)">Clear all</button>
+              </div>
+              <div class="selected-chips-scroll">
+                <span class="member-chip-pill" *ngFor="let m of pickedMembers()">
+                  <span class="pill-name">{{ m.name }}</span>
+                  <button type="button" class="pill-remove" (click)="removeMemberFilter(m.id)" title="Remove">×</button>
+                </span>
+              </div>
+            </div>
+
+            <!-- Member Options List -->
+            <div class="member-filter-options-list">
+              <div class="member-filter-empty" *ngIf="!memberMatches().length">
+                <svg lucideUsers size="22" class="empty-icon"></svg>
+                <span>No employees found matching "<strong>{{ memberQuery() }}</strong>"</span>
+              </div>
+
+              <button 
+                type="button" 
+                class="member-option-row" 
+                *ngFor="let m of memberMatches()" 
+                [class.selected]="isMemberPicked(m.id)"
+                (click)="toggleMemberFilter(m.id)">
+                <span class="member-av">
+                  <img *ngIf="m.avatarUrl" [src]="m.avatarUrl" [alt]="m.name">
+                  <span *ngIf="!m.avatarUrl" [style.background]="getPmColor(m.id)">{{ m.name.charAt(0) }}</span>
+                </span>
+                <div class="member-info-col">
+                  <span class="member-name">{{ m.name }}</span>
+                  <span class="member-count">{{ m.count }} {{ m.count === 1 ? 'board' : 'boards' }}</span>
+                </div>
+                <div class="member-checkbox" [class.checked]="isMemberPicked(m.id)">
+                  <svg *ngIf="isMemberPicked(m.id)" lucideCheck size="13"></svg>
+                </div>
+              </button>
+            </div>
+
+            <!-- Dropdown Footer -->
+            <div class="member-filter-foot">
+              <div class="member-foot-info">
+                <span *ngIf="pickedMembers().length">{{ pickedMembers().length }} selected</span>
+                <span *ngIf="!pickedMembers().length">{{ memberMatches().length }} employees</span>
+              </div>
+              <div class="member-foot-actions">
+                <button 
+                  type="button" 
+                  class="btn-foot-clear" 
+                  *ngIf="pickedMembers().length" 
+                  (click)="clearAllMemberFilters($event)">
+                  Clear all
+                </button>
+                <button 
+                  type="button" 
+                  class="btn-foot-done" 
+                  (click)="closeMemberPicker()">
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="project-filters-backdrop" *ngIf="filtersOpen()" (click)="closeProjectFilters()"></div>
-      <aside class="project-filters-drawer" *ngIf="filtersOpen()" role="dialog" aria-modal="true" aria-label="Project filters">
-        <div class="project-filters-drawer-head">
-          <div>
-            <h3>Filter projects</h3>
-            <p>Choose filters, then apply them to the table.</p>
-          </div>
-          <button type="button" class="project-filter-icon-button" (click)="closeProjectFilters()" aria-label="Close filters">
-            <svg lucideX size="18"></svg>
+      <div class="your-boards-actions-group">
+        <!-- Quick Filter Chips -->
+        <div class="quick-filter-chips">
+          <button
+            type="button"
+            class="quick-filter-chip"
+            [class.active]="quickFilter() === 'overdue'"
+            (click)="setQuickFilter('overdue')">
+            <svg lucideAlertTriangle size="13"></svg>
+            Overdue
+            <span class="quick-filter-count" *ngIf="quickFilterCounts().overdue > 0">{{ quickFilterCounts().overdue }}</span>
+          </button>
+          <button
+            type="button"
+            class="quick-filter-chip"
+            [class.active]="quickFilter() === 'due-week'"
+            (click)="setQuickFilter('due-week')">
+            <svg lucideClock size="13"></svg>
+            Due this week
+            <span class="quick-filter-count" *ngIf="quickFilterCounts().dueWeek > 0">{{ quickFilterCounts().dueWeek }}</span>
+          </button>
+          <button
+            type="button"
+            class="quick-filter-chip"
+            [class.active]="quickFilter() === 'led-by-me'"
+            (click)="setQuickFilter('led-by-me')">
+            <svg lucideUser size="13"></svg>
+            Led by me
+            <span class="quick-filter-count" *ngIf="quickFilterCounts().ledByMe > 0">{{ quickFilterCounts().ledByMe }}</span>
           </button>
         </div>
-        <div class="project-filters-grid">
+
+        <!-- Filters stay out of the table. The drawer uses draft values, so the
+             result list only changes after the user presses Apply. -->
+        <div class="project-filters">
+          <div class="project-filters-head">
+            <button type="button" class="project-filters-toggle" (click)="openProjectFilters()">
+              <svg lucideFilter size="14"></svg>
+              Filters
+              <span class="project-filters-count" *ngIf="activeFilterCount() > 0">{{ activeFilterCount() }}</span>
+            </button>
+            <button
+              type="button"
+              class="project-filters-clear"
+              *ngIf="activeFilterCount() > 0"
+              (click)="clearProjectFilters()">
+              <svg lucideX size="13"></svg> Clear all
+            </button>
+          </div>
+
+          <div class="project-filters-backdrop" *ngIf="filtersOpen()" (click)="closeProjectFilters()"></div>
+          <aside class="project-filters-drawer" *ngIf="filtersOpen()" role="dialog" aria-modal="true" aria-label="Project filters">
+            <div class="project-filters-drawer-head">
+              <div>
+                <h3>Filter projects</h3>
+                <p>Choose filters, then apply them to the table.</p>
+              </div>
+              <button type="button" class="project-filter-icon-button" (click)="closeProjectFilters()" aria-label="Close filters">
+                <svg lucideX size="18"></svg>
+              </button>
+            </div>
+            <div class="project-filters-grid">
         <label class="project-filter-field">
           <span>Client</span>
           <select [ngModel]="draftFilterClientId()" (ngModelChange)="draftFilterClientId.set($event)">
@@ -664,6 +858,8 @@
         </div>
       </aside>
     </div>
+  </div>
+</div>
 
     <!-- Boards Grid / Table -->
     <div class="boards-container">

@@ -1,8 +1,33 @@
-import { Component, computed, inject, Input, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, Input, OnInit, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LifecycleService, LcOverview, LcPip, LcPipDetail } from '../../services/lifecycle.service';
+import {
+  LucideUserCheck,
+  LucideUserMinus,
+  LucideClock,
+  LucideAlertTriangle,
+  LucidePlus,
+  LucideX,
+  LucideSearch,
+  LucideCheck,
+  LucideCalendar,
+  LucideTarget,
+  LucideShieldCheck,
+  LucideTrash2,
+  LucideEdit2,
+  LucideUser,
+  LucideSparkles,
+  LucideArrowRight,
+  LucideInfo,
+  LucideTrendingUp,
+  LucideAward,
+  LucideCheckCircle2,
+  LucideRotateCcw,
+  LucideBuilding,
+  LucideChevronRight
+} from '@lucide/angular';
+import { LifecycleService, LcOverview, LcPip, LcPipDetail, LcPerson, LcProbation, LcNotice } from '../../services/lifecycle.service';
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
 
 /**
@@ -13,7 +38,33 @@ import { ProfileModalService } from '../../shared/profile-modal/profile-modal.se
 @Component({
   selector: 'app-people-watch',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucideUserCheck,
+    LucideUserMinus,
+    LucideClock,
+    LucideAlertTriangle,
+    LucidePlus,
+    LucideX,
+    LucideSearch,
+    LucideCheck,
+    LucideCalendar,
+    LucideTarget,
+    LucideShieldCheck,
+    LucideTrash2,
+    LucideEdit2,
+    LucideUser,
+    LucideSparkles,
+    LucideArrowRight,
+    LucideInfo,
+    LucideTrendingUp,
+    LucideAward,
+    LucideCheckCircle2,
+    LucideRotateCcw,
+    LucideBuilding,
+    LucideChevronRight
+  ],
   templateUrl: './people-watch.html',
   styleUrls: ['./people-watch.css'],
 })
@@ -31,6 +82,38 @@ export class PeopleWatchComponent implements OnInit {
   section = signal<'probation' | 'notice' | 'pip'>('probation');
   showHistory = signal(false);
   busy = signal(false);
+
+  // Search filters for tables
+  probationSearch = signal('');
+  noticeSearch = signal('');
+  pipSearch = signal('');
+
+  filteredProbation = computed(() => {
+    const list = this.data()?.probation || [];
+    const q = this.probationSearch().trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((p) =>
+      `${p.name} ${p.employeeCode ?? ''} ${p.designation ?? ''} ${p.department ?? ''}`.toLowerCase().includes(q)
+    );
+  });
+
+  filteredNotice = computed(() => {
+    const list = this.data()?.notice || [];
+    const q = this.noticeSearch().trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((p) =>
+      `${p.name} ${p.employeeCode ?? ''} ${p.designation ?? ''}`.toLowerCase().includes(q)
+    );
+  });
+
+  filteredPips = computed(() => {
+    const list = this.data()?.pips || [];
+    const q = this.pipSearch().trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((p) =>
+      `${p.name} ${p.employeeCode ?? ''} ${p.designation ?? ''} ${p.raisedBy ?? ''}`.toLowerCase().includes(q)
+    );
+  });
 
   canSee = computed(() => {
     const d = this.data();
@@ -52,9 +135,31 @@ export class PeopleWatchComponent implements OnInit {
     const on = new Set(d.probation.map((p) => p.employeeId));
     return d.people
       .filter((p) => !on.has(p.id))
-      .filter((p) => `${p.name} ${p.employeeCode ?? ''} ${p.designation ?? ''}`.toLowerCase().includes(q))
-      .slice(0, 8);
+      .filter((p) => `${p.name} ${p.employeeCode ?? ''} ${p.designation ?? ''} ${p.department ?? ''}`.toLowerCase().includes(q))
+      .slice(0, 10);
   });
+
+  get selectedProbPerson(): LcPerson | null {
+    if (!this.probEmployeeId) return null;
+    const d = this.data();
+    if (!d) return null;
+    const person = d.people.find((p) => p.id === this.probEmployeeId);
+    if (person) return person;
+    const prob = d.probation.find((p) => p.employeeId === this.probEmployeeId);
+    if (prob) {
+      return {
+        id: prob.employeeId,
+        name: prob.name,
+        employeeCode: prob.employeeCode,
+        avatarUrl: prob.avatarUrl,
+        designation: prob.designation,
+        department: prob.department,
+        joiningDate: prob.joiningDate,
+        employmentCategory: prob.employmentCategory
+      };
+    }
+    return null;
+  }
 
   // ---- PIP dialogs
   pipOpen = signal(false);
@@ -67,14 +172,55 @@ export class PeopleWatchComponent implements OnInit {
     const open = new Set(d.pips.map((p) => p.employeeId));
     return d.people
       .filter((p) => !open.has(p.id))
-      .filter((p) => `${p.name} ${p.employeeCode ?? ''} ${p.designation ?? ''}`.toLowerCase().includes(q))
-      .slice(0, 8);
+      .filter((p) => `${p.name} ${p.employeeCode ?? ''} ${p.designation ?? ''} ${p.department ?? ''}`.toLowerCase().includes(q))
+      .slice(0, 10);
   });
+
+  get selectedPipPerson(): LcPerson | null {
+    if (!this.pipForm.employeeId) return null;
+    const d = this.data();
+    if (!d) return null;
+    return d.people.find((p) => p.id === this.pipForm.employeeId) || null;
+  }
+
   detail = signal<LcPipDetail | null>(null);
   checkInNote = '';
   closeAction: '' | 'EXTEND' | 'COMPLETED' | 'FAILED' | 'CANCELLED' = '';
   closeNote = '';
   extendDate = '';
+
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    if (this.probOpen()) this.probOpen.set(false);
+    if (this.pipOpen()) this.pipOpen.set(false);
+    if (this.detail()) this.detail.set(null);
+  }
+
+  getAvatarColor(id: number | string): string {
+    const colors = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#059669', '#0891b2', '#4f46e5', '#d97706'];
+    const num = typeof id === 'number' ? id : (id ? String(id).charCodeAt(0) : 0);
+    return colors[Math.abs(num) % colors.length];
+  }
+
+  clearProbPerson() {
+    this.probEmployeeId = null;
+    this.probEmployeeName = '';
+    this.probQuery.set('');
+    setTimeout(() => {
+      const input = document.getElementById('prob-employee-input') as HTMLInputElement;
+      if (input) input.focus();
+    }, 50);
+  }
+
+  clearPipPerson() {
+    this.pipForm.employeeId = null;
+    this.pipForm.employeeName = '';
+    this.pipQuery.set('');
+    setTimeout(() => {
+      const input = document.getElementById('pip-employee-input') as HTMLInputElement;
+      if (input) input.focus();
+    }, 50);
+  }
 
   ngOnInit() {
     this.section.set(this.initialSection);
