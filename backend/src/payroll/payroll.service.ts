@@ -589,7 +589,7 @@ export class PayrollService {
           employeeId: emp.id,
           date: { gte: startDate, lte: endDate },
         },
-        select: { date: true, status: true, clockOutApproval: true, missedClockOut: true, clockIn: true, clockOut: true },
+        select: { date: true, status: true, clockOutApproval: true, missedClockOut: true, autoClockedOut: true, clockOutReason: true, clockIn: true, clockOut: true },
       });
       const byDay = new Map<string, string>();
       for (const a of attendances) {

@@ -640,6 +640,7 @@
                   <span *ngIf="day.record?.fieldVisit || day.record?.isOnsite" class="day-fv-pin" title="Field Visit on site">🚗</span>
                   <span *ngIf="day.record?.clockInLat && !day.record?.fieldVisit && !day.record?.isOnsite" class="day-location-pin" title="GPS location logged">📍</span>
                   <svg *ngIf="showResolvedClockOutMarker(day.record)" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" title="Approved clock-out"></svg>
+                  <svg *ngIf="day.record && clockOutHalfDay(day.record)" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" [attr.title]="'Half day — ' + clockOutHalfDayReason(day.record)"></svg>
                 </ng-container>
                 <span *ngIf="day.isFuture && day.status === 'Empty'" class="future-dot">·</span>
               </div>

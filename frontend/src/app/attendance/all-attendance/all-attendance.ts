@@ -1568,14 +1568,18 @@ export class AllAttendanceComponent implements OnInit {
    * Today's open session is still being worked, so it is not counted.
    */
   clockOutHalfDay(r: AttendanceRecord | null | undefined): boolean {
-    if (!r?.clockIn) return false;
+    if (!r?.clockIn || r.clockOutApproval === 'APPROVED') return false;
     if (this.needsClockOutApproval(r)) return true;
-    return !!r.missedClockOut && !r.clockOut;
+    // Same rule as payroll: open after the shift, closed automatically, or
+    // closed late with a reason (older days too) — until approved.
+    return (!!r.missedClockOut && !r.clockOut) || !!r.autoClockedOut || !!r.clockOutReason;
   }
 
   clockOutHalfDayReason(r: AttendanceRecord): string {
     if (r.clockOutApproval === 'PENDING') return 'clock-out waiting for approval';
-    if (r.clockOutApproval === 'REJECTED') return 'clock-out rejected';
+    if (r.clockOutApproval === 'REJECTED') return `clock-out rejected${r.clockOutReviewNote ? ': ' + r.clockOutReviewNote : ''}`;
+    if (r.autoClockedOut) return 'never clocked out (closed automatically)';
+    if (r.clockOutReason) return `clocked out late, not approved yet — "${r.clockOutReason}"`;
     return 'missed clock-out';
   }
 
@@ -1586,7 +1590,7 @@ export class AllAttendanceComponent implements OnInit {
 
   /** Keep the small clock marker once an approved (or legacy) clock-out is settled. */
   showResolvedClockOutMarker(r: AttendanceRecord | null | undefined): boolean {
-    return !!r?.clockOutReason && !this.needsClockOutApproval(r);
+    return r?.clockOutApproval === 'APPROVED' && (!!r.clockOutReason || !!r.autoClockedOut);
   }
 
   recordMatchesStatus(r: AttendanceRecord): boolean {

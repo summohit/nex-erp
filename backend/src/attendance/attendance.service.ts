@@ -1153,8 +1153,19 @@ export class AttendanceService {
     await this.assertMayApproveClockOut(companyId, role, employeeId);
     const rows = await this.prisma.attendance.findMany({
       where: {
-        clockOutApproval: CLOCK_OUT_APPROVAL.PENDING,
         employee: { companyId },
+        // Waiting for approval, plus (19 Oct 2026) older late or automatic
+        // clock-outs that never entered the queue: they count as half days
+        // until approved, so they need to be approvable.
+        OR: [
+          { clockOutApproval: CLOCK_OUT_APPROVAL.PENDING },
+          {
+            clockOutApproval: null, clockIn: { not: null },
+            // A session still open is not here: it has to be clocked out first.
+            clockOut: { not: null },
+            OR: [{ clockOutReason: { not: null } }, { autoClockedOut: true }],
+          },
+        ],
       },
       include: {
         employee: {
@@ -1273,7 +1284,8 @@ export class AttendanceService {
       include: { employee: { select: { id: true, userId: true, firstName: true } } },
     });
     if (!record) throw new BadRequestException('Attendance record not found');
-    if (record.clockOutApproval !== CLOCK_OUT_APPROVAL.PENDING) {
+    // Null too (19 Oct 2026): older late clock-outs that never entered the queue.
+    if (record.clockOutApproval !== CLOCK_OUT_APPROVAL.PENDING && record.clockOutApproval !== null) {
       throw new BadRequestException(
         `This clock-out has already been ${String(record.clockOutApproval ?? 'settled').toLowerCase()}.`,
       );
