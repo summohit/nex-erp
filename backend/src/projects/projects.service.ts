@@ -15,6 +15,12 @@ import * as mammoth from 'mammoth';
 import * as xlsx from 'xlsx';
 import { resolveProjectViewer, taskVisibilityFilter, seesProjectFinancials, PROJECT_ROLE, hasCompanyWideProjectAccess } from './project-roles';
 
+/**
+ * Working hours in a month for pricing time from salary when an employee has
+ * no hourly cost rate: 26 days x 9 hours (company standard, 19 Oct 2026).
+ */
+export const STANDARD_MONTH_HOURS = 234;
+
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
@@ -1706,18 +1712,35 @@ export class ProjectsService {
     });
     const approvalRequired = settings?.timesheetApprovalRequired ?? false;
 
+    // The rate per hour (19 Oct 2026): the employee's own hourlyCostRate when
+    // set; otherwise their monthly salary (the earnings in their salary
+    // structure) over STANDARD_MONTH_HOURS. Only hours with neither are
+    // "unrated" and priced at 0.
     const rows = await this.prisma.$queryRaw<
       { projectId: number; minutes: bigint | null; cost: number | null; unratedMinutes: bigint | null }[]
     >`
+      WITH salary AS (
+        SELECT ss."employeeId", SUM(ss.amount) AS monthly
+          FROM "SalaryStructure" ss
+          JOIN "SalaryComponent" sc ON sc.id = ss."componentId"
+         WHERE sc.type = 'EARNING'
+         GROUP BY ss."employeeId"
+      ), rate AS (
+        SELECT e.id,
+               COALESCE(e."hourlyCostRate",
+                        CASE WHEN s.monthly > 0 THEN s.monthly / ${Prisma.raw(String(STANDARD_MONTH_HOURS) + '.0')} END) AS r
+          FROM "Employee" e
+          LEFT JOIN salary s ON s."employeeId" = e.id
+      )
       SELECT i."projectId"                        AS "projectId",
              SUM(COALESCE(t."durationMin", 0))    AS minutes,
              SUM(COALESCE(t."durationMin", 0) / 60.0
-                 * COALESCE(e."hourlyCostRate", 0)) AS cost,
-             SUM(CASE WHEN e."hourlyCostRate" IS NULL
+                 * COALESCE(rt.r, 0))             AS cost,
+             SUM(CASE WHEN rt.r IS NULL
                       THEN COALESCE(t."durationMin", 0) ELSE 0 END) AS "unratedMinutes"
         FROM "IssueTimeLog" t
         JOIN "Issue" i    ON i.id = t."issueId"
-        JOIN "Employee" e ON e.id = t."employeeId"
+        JOIN rate rt      ON rt.id = t."employeeId"
         -- The day this log belongs to, if anybody has judged it. LEFT, because
         -- most days have no row at all and those hours still count.
         LEFT JOIN "TimesheetDay" d
