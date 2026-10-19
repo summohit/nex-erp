@@ -1330,19 +1330,119 @@ export class AllAttendanceComponent implements OnInit {
    * Today's strip uses the server's lists; the cards below use the records
    * the current filters show, so the list always matches the number.
    */
-  kpiModal = signal<{ title: string; status: string | null; rows: any[] } | null>(null);
+  kpiModal = signal<{
+    title: string;
+    heading: string;
+    scope: string;
+    tone: 'indigo' | 'emerald' | 'amber' | 'rose' | 'violet' | 'danger' | 'slate';
+    status: string | null;
+    rows: any[];
+  } | null>(null);
   kpiQuery = signal('');
+  kpiQuickFilter = signal<'ALL' | 'OFFICE' | 'WFH' | 'ONSITE' | 'WORKING' | 'LATE'>('ALL');
+  kpiDeptFilter = signal<string>('ALL');
+  kpiVisibleLimit = signal<number>(60);
+
+  kpiDepartments = computed(() => {
+    const m = this.kpiModal();
+    if (!m) return [];
+    const set = new Set<string>();
+    for (const r of m.rows) {
+      if (r.department) set.add(r.department);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  });
+
+  kpiBreakdown = computed(() => {
+    const m = this.kpiModal();
+    const rows = m?.rows || [];
+    let office = 0;
+    let wfh = 0;
+    let onsite = 0;
+    let working = 0;
+    let late = 0;
+    for (const r of rows) {
+      if (r.where === 'Office') office++;
+      else if (r.where === 'WFH / outside') wfh++;
+      else if (r.where === 'On site') onsite++;
+      if (r.clockIn && !r.clockOut) working++;
+      if (r.isLate) late++;
+    }
+    return { total: rows.length, office, wfh, onsite, working, late };
+  });
+
   kpiRows = computed(() => {
     const m = this.kpiModal();
     if (!m) return [];
     const q = this.kpiQuery().trim().toLowerCase();
-    return q ? m.rows.filter((r) => `${r.name} ${r.department ?? ''} ${r.designation ?? ''} ${r.employeeCode ?? ''}`.toLowerCase().includes(q)) : m.rows;
+    const qf = this.kpiQuickFilter();
+    const dept = this.kpiDeptFilter();
+
+    return m.rows.filter((r) => {
+      if (dept !== 'ALL' && (r.department || '') !== dept) return false;
+      if (qf === 'OFFICE' && r.where !== 'Office') return false;
+      if (qf === 'WFH' && r.where !== 'WFH / outside') return false;
+      if (qf === 'ONSITE' && r.where !== 'On site') return false;
+      if (qf === 'WORKING' && !(r.clockIn && !r.clockOut)) return false;
+      if (qf === 'LATE' && !r.isLate) return false;
+      if (q) {
+        const hay = `${r.name} ${r.department ?? ''} ${r.designation ?? ''} ${r.employeeCode ?? ''} ${r.where ?? ''} ${r.dayStatus ?? ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
   });
+
+  kpiVisibleRows = computed(() => {
+    return this.kpiRows().slice(0, this.kpiVisibleLimit());
+  });
+
+  hasKpiActiveFilters = computed(() => {
+    return (
+      !!this.kpiQuery().trim() ||
+      this.kpiQuickFilter() !== 'ALL' ||
+      this.kpiDeptFilter() !== 'ALL'
+    );
+  });
+
+  resetKpiModalFilters() {
+    this.kpiQuery.set('');
+    this.kpiQuickFilter.set('ALL');
+    this.kpiDeptFilter.set('ALL');
+    this.kpiVisibleLimit.set(60);
+  }
+
+  setKpiQuickFilter(f: 'ALL' | 'OFFICE' | 'WFH' | 'ONSITE' | 'WORKING' | 'LATE') {
+    this.kpiQuickFilter.set(this.kpiQuickFilter() === f && f !== 'ALL' ? 'ALL' : f);
+    this.kpiVisibleLimit.set(60);
+  }
+
+  loadMoreKpiRows() {
+    this.kpiVisibleLimit.update((n) => n + 60);
+  }
+
+  private resolveKpiTone(keyOrStatus: string): 'indigo' | 'emerald' | 'amber' | 'rose' | 'violet' | 'danger' | 'slate' {
+    const k = (keyOrStatus || '').toLowerCase();
+    if (k.includes('present') || k === 'ontime') return 'emerald';
+    if (k.includes('late')) return 'amber';
+    if (k.includes('half')) return 'rose';
+    if (k.includes('leave')) return 'violet';
+    if (k.includes('absent') || k.includes('notclockedin')) return 'danger';
+    if (k.includes('off')) return 'slate';
+    return 'indigo';
+  }
 
   openTodayKpi(key: string, title: string) {
     const rows = this.today()?.lists?.[key] ?? [];
-    this.kpiQuery.set('');
-    this.kpiModal.set({ title: `${title} · today`, status: null, rows });
+    this.resetKpiModalFilters();
+    this.kpiModal.set({
+      title: `${title} · today`,
+      heading: title,
+      scope: 'Today',
+      tone: this.resolveKpiTone(key),
+      status: null,
+      rows,
+    });
   }
 
   openStatKpi(status: string, title: string) {
@@ -1365,8 +1465,39 @@ export class AllAttendanceComponent implements OnInit {
       leaveType: r.leaveType ?? null,
       halfDayLeave: !!r.isHalfDay,
     }));
-    this.kpiQuery.set('');
-    this.kpiModal.set({ title: `${title} · ${this.statsScopeLabel()}`, status: status === 'ALL' ? null : status, rows });
+    const scope = this.statsScopeLabel();
+    this.resetKpiModalFilters();
+    this.kpiModal.set({
+      title: `${title} · ${scope}`,
+      heading: title,
+      scope,
+      tone: this.resolveKpiTone(status),
+      status: status === 'ALL' ? null : status,
+      rows,
+    });
+  }
+
+  exportKpiModalCsv() {
+    const m = this.kpiModal();
+    const list = this.kpiRows();
+    if (!m || !list.length) return;
+    const header = ['Employee', 'Employee Code', 'Designation', 'Department', 'Date', 'Clock In', 'Clock Out', 'Work Mode', 'Status'];
+    const csvData = [
+      header,
+      ...list.map((r) => [
+        r.name || '',
+        r.employeeCode || '',
+        r.designation || '',
+        r.department || '',
+        r.date || this.today()?.date || '',
+        r.clockIn ? new Date(r.clockIn).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '',
+        r.clockOut ? new Date(r.clockOut).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : (r.clockIn ? 'Still working' : ''),
+        r.where || '',
+        r.leaveType || r.dayStatus || (r.isLate ? 'Late' : 'Present'),
+      ]),
+    ];
+    const slug = m.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    this.downloadCsv(csvData, `attendance-${slug || 'kpi'}.csv`);
   }
 
   /** From the pop-up: narrow the table below to the same records. */
@@ -1378,6 +1509,7 @@ export class AllAttendanceComponent implements OnInit {
   }
 
   kpiInitials(n: string) { return (n || '?').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(); }
+  trackByKpiRow = (idx: number, r: any) => `${r.id || idx}-${r.date || ''}-${idx}`;
 
   toggleKpiStatus(status: string) {
     if (this.filterStatus === status) {
@@ -1486,6 +1618,13 @@ export class AllAttendanceComponent implements OnInit {
 
   // Mirrors the grid's day-cell classification for a single record.
   recordDayStatus(r: AttendanceRecord): string {
+    // A day still ahead is planned, not missed (19 Oct 2026): a booked field
+    // visit or leave on a future date must not count as Absent.
+    if (!r.clockIn && this.getBackendDateString(r.date) > this.getLocalDateString(new Date())) {
+      return r.status === 'ON_LEAVE' ? 'On Leave' : 'Upcoming';
+    }
+    // A planned field visit with no clock-in, as the grid shows it.
+    if (!r.clockIn && (r as any).fieldVisit) return 'Present';
     if (r.clockIn) {
       if (this.clockOutHalfDay(r)) return 'Half Day';
       if (r.clockOutApproval === 'APPROVED') return 'Present';
