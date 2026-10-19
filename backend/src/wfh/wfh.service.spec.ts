@@ -29,6 +29,14 @@ describe('WFH requests', () => {
     expect(rows[0].status).toBe('PENDING_MANAGER');
   });
 
+  it('refuses today once clocked in', async () => {
+    const { svc, prisma } = setup();
+    prisma.attendance = { findFirst: jest.fn(async () => ({ id: 3 })) };
+    const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+    await expect(svc.create({ companyId: 1, role: 'EMPLOYEE', employeeId: 5 }, { date: today, reason: 'x' }))
+      .rejects.toThrow(/already clocked in/);
+  });
+
   it('refuses a second day when the monthly limit is used', async () => {
     const { svc } = setup({ used: 1 });
     await expect(svc.create({ companyId: 1, role: 'EMPLOYEE', employeeId: 5 }, { date: future(), reason: 'x' }))

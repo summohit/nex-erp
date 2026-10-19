@@ -99,6 +99,15 @@ export class WfhService {
     const reason = String(body?.reason ?? '').trim();
     if (!reason) throw new BadRequestException('Write the reason');
 
+    // Already clocked in today: the day has started where it started, so WFH
+    // for it can no longer be asked for (19 Oct 2026).
+    if (date.getTime() === this.todayUtc().getTime() && this.prisma.attendance?.findFirst) {
+      const clocked = await this.prisma.attendance.findFirst({
+        where: { employeeId: v.employeeId, date, clockIn: { not: null } }, select: { id: true },
+      });
+      if (clocked) throw new BadRequestException('You have already clocked in today, so WFH cannot be requested for today');
+    }
+
     const clash = await this.prisma.wfhRequest.findFirst({
       where: { employeeId: v.employeeId, date, status: { in: COUNTS } }, select: { id: true },
     });
