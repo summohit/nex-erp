@@ -7,17 +7,20 @@ import {
 import AppScreen from '../../components/AppScreen';
 import { workService, Regularization, AttendanceApproval, PersonLite } from '../../api/workService';
 import { teamService, TeamLeaveRequest } from '../../api/teamService';
+import { wfhService, WfhRequest } from '../../api/wfhService';
 import { theme } from '../../theme/theme';
 
-type Kind = 'LEAVE' | 'REG' | 'CLOCKOUT' | 'OUTSIDE';
+type Kind = 'LEAVE' | 'WFH' | 'REG' | 'CLOCKOUT' | 'OUTSIDE';
 type Item =
   | { kind: 'LEAVE'; id: number; row: TeamLeaveRequest }
+  | { kind: 'WFH'; id: number; row: WfhRequest }
   | { kind: 'REG'; id: number; row: Regularization }
   | { kind: 'CLOCKOUT'; id: number; row: AttendanceApproval }
   | { kind: 'OUTSIDE'; id: number; row: AttendanceApproval };
 
 const TABS: { kind: Kind; label: string }[] = [
   { kind: 'LEAVE', label: 'Leave' },
+  { kind: 'WFH', label: 'WFH' },
   { kind: 'REG', label: 'Regularization' },
   { kind: 'CLOCKOUT', label: 'Late clock-out' },
   { kind: 'OUTSIDE', label: 'Out of office' },
@@ -38,7 +41,7 @@ const km = (v?: number | null) => (v == null ? 'no GPS' : `${v < 10 ? v.toFixed(
  * team), so a tab simply does not appear for someone who cannot act on it.
  */
 export default function ApprovalsScreen() {
-  const [data, setData] = useState<Record<Kind, Item[] | null>>({ LEAVE: null, REG: null, CLOCKOUT: null, OUTSIDE: null });
+  const [data, setData] = useState<Record<Kind, Item[] | null>>({ LEAVE: null, WFH: null, REG: null, CLOCKOUT: null, OUTSIDE: null });
   const [tab, setTab] = useState<Kind>('LEAVE');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,19 +50,22 @@ export default function ApprovalsScreen() {
   const [reason, setReason] = useState('');
 
   const load = useCallback(async () => {
-    const [leave, reg, coOk, outOk] = await Promise.allSettled([
+    const [leave, reg, coOk, outOk, wfhOk] = await Promise.allSettled([
       teamService.getTeamLeaveRequests(),
       workService.getPendingRegularizations(),
       workService.canApproveClockOuts(),
       workService.canApproveOutOfOffice(),
+      wfhService.canApprove(),
     ]);
-    const [co, out] = await Promise.allSettled([
+    const [co, out, wfh] = await Promise.allSettled([
       coOk.status === 'fulfilled' && coOk.value ? workService.getPendingClockOuts() : Promise.resolve(null),
       outOk.status === 'fulfilled' && outOk.value ? workService.getPendingOutOfOffice() : Promise.resolve(null),
+      wfhOk.status === 'fulfilled' && wfhOk.value ? wfhService.pending() : Promise.resolve(null),
     ]);
     const next: Record<Kind, Item[] | null> = {
       LEAVE: leave.status === 'fulfilled'
         ? leave.value.filter((r) => r.status === 'PENDING').map((row) => ({ kind: 'LEAVE' as const, id: row.id, row })) : null,
+      WFH: wfh.status === 'fulfilled' && wfh.value ? wfh.value.map((row) => ({ kind: 'WFH' as const, id: row.id, row })) : null,
       REG: reg.status === 'fulfilled' ? reg.value.map((row) => ({ kind: 'REG' as const, id: row.id, row })) : null,
       CLOCKOUT: co.status === 'fulfilled' && co.value ? co.value.map((row) => ({ kind: 'CLOCKOUT' as const, id: row.id, row })) : null,
       OUTSIDE: out.status === 'fulfilled' && out.value ? out.value.map((row) => ({ kind: 'OUTSIDE' as const, id: row.id, row })) : null,
@@ -85,6 +91,7 @@ export default function ApprovalsScreen() {
     setBusy(key);
     try {
       if (it.kind === 'LEAVE') await teamService.decideLeave(it.id, approve ? 'APPROVED' : 'REJECTED', note);
+      if (it.kind === 'WFH') await wfhService.decide(it.id, approve ? 'APPROVE' : 'REJECT', note);
       if (it.kind === 'REG') await workService.decideRegularization(it.id, approve ? 'APPROVED' : 'REJECTED', note);
       if (it.kind === 'CLOCKOUT') await workService.decideClockOut(it.id, approve ? 'APPROVE' : 'REJECT', note);
       if (it.kind === 'OUTSIDE') await workService.decideOutOfOffice(it.id, approve ? 'APPROVE' : 'REJECT', note);
@@ -107,6 +114,7 @@ export default function ApprovalsScreen() {
       const r = it.row;
       return `${r.leaveType?.name}, ${day(r.startDate)}${r.startDate.slice(0, 10) !== r.endDate.slice(0, 10) ? ` → ${day(r.endDate)}` : ''}`;
     }
+    if (it.kind === 'WFH') return `Work from home, ${day(it.row.date)}${it.row.status === 'PENDING_HR' ? ' (manager approved)' : ''}`;
     if (it.kind === 'REG') return `${day(it.row.date)}: ${time(it.row.proposedClockIn)} – ${time(it.row.proposedClockOut)}`;
     if (it.kind === 'CLOCKOUT') return `${day(it.row.date)}: clocked out ${time(it.row.clockOut)}`;
     const r = it.row;
@@ -115,6 +123,7 @@ export default function ApprovalsScreen() {
 
   const reasons = (it: Item): string[] => {
     if (it.kind === 'LEAVE') return it.row.reason ? [it.row.reason] : [];
+    if (it.kind === 'WFH') return it.row.reason ? [it.row.reason] : [];
     if (it.kind === 'REG') return [it.row.reason];
     if (it.kind === 'CLOCKOUT') return it.row.clockOutReason ? [it.row.clockOutReason] : [];
     return [

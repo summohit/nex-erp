@@ -23,6 +23,7 @@ import GradientHero from '../../components/GradientHero';
 import { ds, colors as dsColors, status as dsStatus, shadow as dsShadow } from '../../theme/ds';
 import { TeamLeavePanel } from '../Team/TeamLeaveScreen';
 import LeaveQuotaTab from './LeaveQuotaTab';
+import WfhRequestSheet from './modals/WfhRequestSheet';
 import { teamService, TeamLeaveRequest } from '../../api/teamService';
 import { 
   Calendar, Clock, CheckCircle, XCircle, 
@@ -64,6 +65,7 @@ export default function ESSScreen({ route }: any) {
   // Form State
   const [leaveTypeId, setLeaveTypeId] = useState<number | null>(null);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const [wfhOpen, setWfhOpen] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
@@ -359,6 +361,7 @@ export default function ESSScreen({ route }: any) {
       title="Attendance"
       subtitle="Timesheets, leaves & holidays"
     >
+      <WfhRequestSheet visible={wfhOpen} onClose={() => setWfhOpen(false)} />
       {/* --- Main Navigation Tabs --- */}
       <View style={styles.mainTabsHeader}>
         <ScrollView 
@@ -437,10 +440,15 @@ export default function ESSScreen({ route }: any) {
                   value={leaveTotals.left}
                   unit={`/ ${leaveTotals.allocated} days`}
                   action={
-                    <TouchableOpacity style={ds.heroButton} onPress={() => setActiveTab('apply')} activeOpacity={0.85}>
-                      <Calendar size={14} color={dsColors.text} />
-                      <Text style={ds.heroButtonText}>Apply</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity style={ds.heroButton} onPress={() => setWfhOpen(true)} activeOpacity={0.85}>
+                        <Text style={ds.heroButtonText}>WFH</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={ds.heroButton} onPress={() => setActiveTab('apply')} activeOpacity={0.85}>
+                        <Calendar size={14} color={dsColors.text} />
+                        <Text style={ds.heroButtonText}>Apply</Text>
+                      </TouchableOpacity>
+                    </View>
                   }
                   stats={[
                     { label: 'Used', value: leaveTotals.used },
@@ -641,7 +649,7 @@ export default function ESSScreen({ route }: any) {
                     </TouchableOpacity>
                   </View>
                   <ScrollView style={styles.typeSheetList} contentContainerStyle={styles.typeGrid}>
-                    {balances.map((b) => {
+                    {balances.filter((b) => !/work\s*from\s*home|wfh|remote/i.test(b.leaveType?.name || '')).map((b) => {
                       const isSelected = leaveTypeId === b.leaveTypeId;
                       const theme = getLeaveTypeTheme(b.leaveType.name);
                       const Icon = theme.icon;
