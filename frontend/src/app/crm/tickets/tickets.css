@@ -1536,6 +1536,15 @@ label {
   font-size: 13px;
 }
 
+.ticket-quill ::ng-deep .ql-editor img {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 8px;
+  margin: 6px 0;
+}
+
 /* Attachments Dropzone & Preview */
 .label-attachment-counter {
   font-size: 11.5px;

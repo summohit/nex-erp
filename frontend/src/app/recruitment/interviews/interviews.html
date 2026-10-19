@@ -1,4 +1,4 @@
-<div class="page-container" style="padding: 24px;">
+<div class="page-container">
   <!-- TOP BREADCRUMB & CONTEXT NAVIGATION -->
   <div class="ats-breadcrumb-bar">
     <div class="breadcrumb-left">
@@ -18,85 +18,239 @@
     </div>
   </div>
 
-  <!-- PAGE HEADER -->
-  <div class="page-header">
-    <div class="header-content">
-      <div class="header-title-row">
-        <h1>My Interviews</h1>
-        <span class="interviews-count-pill">{{ interviews().length }} Assigned</span>
+  <!-- ── 1. Compact Horizontal Hero Banner ──────────────────────────────────── -->
+  <div class="iv-hero-banner">
+    <div class="iv-hero-left">
+      <div class="iv-hero-icon">
+        <svg lucideCalendar size="22"></svg>
       </div>
-      <p>Review candidate profiles, access interview links, and submit scorecard evaluations.</p>
+      <div class="iv-hero-text">
+        <div class="iv-title-row">
+          <h1>My Interviews</h1>
+          <span class="iv-status-pill assigned">{{ stats().total }} Assigned</span>
+          <span class="iv-status-pill review" *ngIf="stats().needsReview > 0">
+            {{ stats().needsReview }} Needs Feedback
+          </span>
+          <span class="iv-status-pill upcoming" *ngIf="stats().upcoming > 0">
+            {{ stats().upcoming }} Upcoming
+          </span>
+        </div>
+        <p class="iv-subtitle">
+          Review candidate profiles, access interview links, and submit scorecard evaluations.
+        </p>
+      </div>
+    </div>
+
+    <div class="iv-hero-right">
+      <div class="iv-date-pills">
+        <span class="date-pills-label">Period</span>
+        <button type="button" class="date-pill" [class.active]="dateFilter() === 'all'" (click)="onDateFilterChange('all')">All</button>
+        <button type="button" class="date-pill" [class.active]="dateFilter() === 'today'" (click)="onDateFilterChange('today')">Today</button>
+        <button type="button" class="date-pill" [class.active]="dateFilter() === 'this_week'" (click)="onDateFilterChange('this_week')">Week</button>
+        <button type="button" class="date-pill" [class.active]="dateFilter() === 'last_30'" (click)="onDateFilterChange('last_30')">30d</button>
+        <button type="button" class="date-pill" [class.active]="dateFilter() === 'last_90'" (click)="onDateFilterChange('last_90')">90d</button>
+      </div>
+
+      <button type="button" class="iv-btn-refresh" (click)="fetchMyInterviews()" [disabled]="isLoading()">
+        <svg lucideRotateCcw size="14" [class.spin-anim]="isLoading()"></svg>
+        <span>Refresh</span>
+      </button>
     </div>
   </div>
 
-  <!-- Search and Tab Controls Bar -->
-  <div class="interviews-controls-bar">
-    <div class="search-input-box">
-      <svg lucideSearch size="16" class="search-svg"></svg>
-      <input 
-        type="text" 
-        placeholder="Search candidate name, job title, round..." 
-        [ngModel]="searchText()" 
-        (ngModelChange)="searchText.set($event)">
-      <button *ngIf="searchText()" class="btn-clear-search" (click)="clearSearch()">
-        <svg lucideX size="14"></svg>
-      </button>
-    </div>
+  <!-- ── 2. Interactive KPI Strip ───────────────────────────────────────────── -->
+  <div class="iv-kpi-strip">
+    <button
+      type="button"
+      class="iv-kpi-card tone-indigo"
+      [class.active]="activeTab() === 'all'"
+      (click)="setTab('all')">
+      <div class="kpi-icon-box">
+        <svg lucideCalendar size="19"></svg>
+      </div>
+      <div class="kpi-meta">
+        <span class="kpi-label">All Interviews</span>
+        <strong class="kpi-val">{{ stats().total }}</strong>
+        <span class="kpi-sub">Total assigned rounds</span>
+      </div>
+    </button>
 
-    <!-- DATE FILTER DROPDOWN -->
-    <div class="date-filter-group" style="position: relative; margin-left: 12px; margin-right: auto; display: flex; gap: 8px; align-items: center;">
-      <select class="form-select date-filter-select" [ngModel]="dateFilter()" (ngModelChange)="dateFilter.set($event)" style="min-width: 140px; padding: 6px 30px 6px 12px; border-radius: 6px; font-size: 13px;">
-        <option value="all">All Time</option>
-        <option value="today">Today</option>
-        <option value="this_week">This Week</option>
-        <option value="this_month">This Month</option>
-        <option value="last_month">Last Month</option>
-        <option value="last_30">Last 30 Days</option>
-        <option value="last_90">Last 90 Days</option>
-        <option value="this_year">This Year</option>
-        <option value="last_year">Last Year</option>
-        <option value="custom">Custom Dates</option>
-      </select>
+    <button
+      type="button"
+      class="iv-kpi-card tone-blue"
+      [class.active]="activeTab() === 'upcoming'"
+      (click)="setTab('upcoming')">
+      <div class="kpi-icon-box">
+        <svg lucideClock size="19"></svg>
+      </div>
+      <div class="kpi-meta">
+        <span class="kpi-label">Upcoming</span>
+        <strong class="kpi-val">{{ stats().upcoming }}</strong>
+        <span class="kpi-sub">Scheduled sessions</span>
+      </div>
+    </button>
 
-      <div class="custom-date-range" *ngIf="dateFilter() === 'custom'" style="display: flex; gap: 6px; align-items: center;">
-        <input type="date" class="form-control" [ngModel]="customStartDate()" (ngModelChange)="customStartDate.set($event)" style="padding: 6px; font-size: 13px;">
-        <span style="color: #64748b;">-</span>
-        <input type="date" class="form-control" [ngModel]="customEndDate()" (ngModelChange)="customEndDate.set($event)" style="padding: 6px; font-size: 13px;">
-        <button class="btn-clear-search" (click)="customStartDate.set(''); customEndDate.set('')" style="position: static; margin-left: 4px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px;">
+    <button
+      type="button"
+      class="iv-kpi-card tone-violet"
+      [class.active]="activeTab() === 'needs-review'"
+      (click)="setTab('needs-review')">
+      <div class="kpi-icon-box">
+        <svg lucideAlertCircle size="19"></svg>
+      </div>
+      <div class="kpi-meta">
+        <span class="kpi-label">Needs Feedback</span>
+        <strong class="kpi-val">{{ stats().needsReview }}</strong>
+        <span class="kpi-sub">Awaiting scorecard</span>
+      </div>
+    </button>
+
+    <button
+      type="button"
+      class="iv-kpi-card tone-emerald"
+      [class.active]="activeTab() === 'completed'"
+      (click)="setTab('completed')">
+      <div class="kpi-icon-box">
+        <svg lucideCheckCircle2 size="19"></svg>
+      </div>
+      <div class="kpi-meta">
+        <span class="kpi-label">Completed</span>
+        <strong class="kpi-val">{{ stats().completed }}</strong>
+        <span class="kpi-sub">Evaluated candidates</span>
+      </div>
+    </button>
+  </div>
+
+  <!-- ── 3. Unified Search & Filter Toolbar Card ────────────────────────────── -->
+  <div class="iv-toolbar-card">
+    <div class="iv-toolbar-top">
+      <!-- Search Input -->
+      <div class="iv-search-box">
+        <svg lucideSearch size="15" class="search-ico"></svg>
+        <input
+          type="text"
+          placeholder="Search candidate name, email, job title, or round…"
+          [ngModel]="searchText()"
+          (ngModelChange)="searchText.set($event)" />
+        <button *ngIf="searchText()" type="button" class="btn-clear-search" (click)="clearSearch()" title="Clear search">
           <svg lucideX size="14"></svg>
+        </button>
+      </div>
+
+      <!-- Status Filter Pills -->
+      <div class="iv-filter-pills">
+        <button type="button" class="iv-pill" [class.on]="activeTab() === 'all'" (click)="setTab('all')">
+          <span>All</span>
+          <span class="pill-count">{{ stats().total }}</span>
+        </button>
+        <button type="button" class="iv-pill" [class.on]="activeTab() === 'upcoming'" (click)="setTab('upcoming')">
+          <span>Upcoming</span>
+          <span class="pill-count">{{ stats().upcoming }}</span>
+        </button>
+        <button type="button" class="iv-pill" [class.on]="activeTab() === 'needs-review'" (click)="setTab('needs-review')">
+          <span>Needs Feedback</span>
+          <span class="pill-count">{{ stats().needsReview }}</span>
+        </button>
+        <button type="button" class="iv-pill" [class.on]="activeTab() === 'completed'" (click)="setTab('completed')">
+          <span>Completed</span>
+          <span class="pill-count">{{ stats().completed }}</span>
         </button>
       </div>
     </div>
 
-    <div class="filter-tabs-pills">
-      <button 
-        type="button" 
-        class="filter-tab" 
-        [class.active]="activeTab() === 'all'" 
-        (click)="setTab('all')">
-        All ({{ stats().total }})
-      </button>
-      <button 
-        type="button" 
-        class="filter-tab" 
-        [class.active]="activeTab() === 'upcoming'" 
-        (click)="setTab('upcoming')">
-        Upcoming ({{ stats().upcoming }})
-      </button>
-      <button 
-        type="button" 
-        class="filter-tab" 
-        [class.active]="activeTab() === 'needs-review'" 
-        (click)="setTab('needs-review')">
-        Needs Feedback ({{ stats().needsReview }})
-      </button>
-      <button 
-        type="button" 
-        class="filter-tab" 
-        [class.active]="activeTab() === 'completed'" 
-        (click)="setTab('completed')">
-        Completed ({{ stats().completed }})
-      </button>
+    <div class="iv-toolbar-bottom">
+      <div class="iv-filters-left">
+        <!-- Date Period Select -->
+        <select
+          class="iv-select"
+          [ngModel]="dateFilter()"
+          (ngModelChange)="onDateFilterChange($event)"
+          aria-label="Filter by period">
+          <option value="all">All Dates</option>
+          <option value="today">Today</option>
+          <option value="this_week">This Week</option>
+          <option value="this_month">This Month</option>
+          <option value="last_month">Last Month</option>
+          <option value="last_30">Last 30 Days</option>
+          <option value="last_90">Last 90 Days</option>
+          <option value="this_year">This Year</option>
+          <option value="last_year">Last Year</option>
+          <option value="custom">Custom Range</option>
+        </select>
+
+        <!-- Custom Date Range Picker (From -> To) -->
+        <div class="iv-date-range-box" [class.has-dates]="customStartDate() || customEndDate()">
+          <svg lucideCalendar size="14" class="date-range-ico"></svg>
+          <span class="date-range-lbl">From</span>
+          <input
+            type="date"
+            class="date-range-input"
+            [ngModel]="customStartDate()"
+            (ngModelChange)="onStartDateChange($event)"
+            [max]="customEndDate() || ''"
+            aria-label="From date" />
+          <span class="date-range-sep">→</span>
+          <span class="date-range-lbl">To</span>
+          <input
+            type="date"
+            class="date-range-input"
+            [ngModel]="customEndDate()"
+            (ngModelChange)="onEndDateChange($event)"
+            [min]="customStartDate() || ''"
+            aria-label="To date" />
+          <button
+            type="button"
+            class="btn-clear-dates"
+            *ngIf="customStartDate() || customEndDate()"
+            (click)="clearCustomDates()"
+            title="Clear date range">
+            <svg lucideX size="13"></svg>
+          </button>
+        </div>
+
+        <!-- Job Role Filter -->
+        <select
+          class="iv-select"
+          [ngModel]="jobFilter()"
+          (ngModelChange)="jobFilter.set($event)"
+          aria-label="Filter by job role">
+          <option value="">All Job Roles</option>
+          <option *ngFor="let j of availableJobs()" [value]="j">{{ j }}</option>
+        </select>
+
+        <!-- Interview Round Filter -->
+        <select
+          class="iv-select"
+          [ngModel]="roundFilter()"
+          (ngModelChange)="roundFilter.set($event)"
+          aria-label="Filter by interview round">
+          <option value="">All Rounds</option>
+          <option *ngFor="let r of availableRounds()" [value]="r">{{ r }}</option>
+        </select>
+
+        <!-- Sort Button (Newest First / Oldest First) -->
+        <button type="button" class="iv-btn-sort" (click)="toggleSort()" title="Toggle sort order">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m21 16-4 4-4-4"></path>
+            <path d="M17 20V4"></path>
+            <path d="m3 8 4-4 4 4"></path>
+            <path d="M7 4v16"></path>
+          </svg>
+          <span>{{ sortOrder() === 'NEWEST' ? 'Newest First' : 'Oldest First' }}</span>
+        </button>
+
+        <!-- Reset All Filters -->
+        <button type="button" class="iv-btn-reset" *ngIf="hasActiveFilters()" (click)="resetAllFilters()">
+          <svg lucideRotateCcw size="13"></svg>
+          <span>Reset Filters</span>
+        </button>
+      </div>
+
+      <div class="iv-toolbar-right">
+        <span class="iv-showing-label">
+          Showing <strong>{{ filteredInterviews().length }}</strong> of <strong>{{ stats().total }}</strong>
+        </span>
+      </div>
     </div>
   </div>
 
@@ -247,10 +401,10 @@
       </div>
       <h3>No interviews found</h3>
       <p *ngIf="searchText()">No interviews match your search "{{ searchText() }}".</p>
-      <p *ngIf="!searchText() && activeTab() !== 'all'">You have no interviews under the "{{ activeTab() }}" tab.</p>
-      <p *ngIf="!searchText() && activeTab() === 'all'">You do not have any assigned candidate interviews at the moment.</p>
-      <button *ngIf="searchText() || activeTab() !== 'all'" class="btn-reset-filters" (click)="clearSearch(); setTab('all')">
-        View All Interviews
+      <p *ngIf="!searchText() && hasActiveFilters()">No interviews match your current filter selection.</p>
+      <p *ngIf="!hasActiveFilters()">You do not have any assigned candidate interviews at the moment.</p>
+      <button *ngIf="hasActiveFilters()" class="btn-reset-filters" (click)="resetAllFilters()">
+        Reset All Filters
       </button>
     </div>
   </div>
@@ -372,4 +526,3 @@
     </div>
   </div>
 </div>
-

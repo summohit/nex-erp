@@ -140,6 +140,10 @@ export class ClockOutApprovalsComponent implements OnInit {
     this.geoFrom.set(from); this.geoTo.set(to);
     this.filterStartDate.set(from); this.filterEndDate.set(to);
     this.filterDatePreset.set(from || to ? 'CUSTOM' : 'ALL');
+    this.geoPage.set(1);
+    this.geoSelected.set(new Set());
+    this.latePage.set(1);
+    this.lateSelected.set(new Set());
   }
 
   // ── Habitual late-comers KPI: 5+ late days in the last 30 ──
@@ -453,9 +457,14 @@ export class ClockOutApprovalsComponent implements OnInit {
     });
   }
 
+  latePage = signal(1);
+  latePageSize = signal(25);
+  lateSelected = signal<Set<number>>(new Set());
+
   visibleRows = computed(() => {
     const q = this.search().toLowerCase().trim();
     const tab = this.filterTab();
+    const deptFilter = this.filterDepartment();
     let list = this.rows();
 
     if (tab === 'URGENT') {
@@ -465,6 +474,11 @@ export class ClockOutApprovalsComponent implements OnInit {
     } else if (tab === 'HAS_PROOF') {
       list = list.filter(r => !!r.clockOutProofUrl);
     }
+
+    if (deptFilter) {
+      list = list.filter(r => this.employeeDepartment(r) === deptFilter);
+    }
+
     const proof = this.filterProofStatus();
     if (proof === 'HAS_PROOF') list = list.filter(r => !!r.clockOutProofUrl);
     else if (proof === 'NO_PROOF') list = list.filter(r => !r.clockOutProofUrl);
@@ -508,6 +522,53 @@ export class ClockOutApprovalsComponent implements OnInit {
     });
   });
 
+  latePageCount = computed(() => Math.max(1, Math.ceil(this.visibleRows().length / this.latePageSize())));
+
+  latePageRows = computed(() => {
+    const size = this.latePageSize();
+    const page = Math.min(this.latePage(), this.latePageCount());
+    return this.visibleRows().slice((page - 1) * size, page * size);
+  });
+
+  lateRangeLabel = computed(() => {
+    const total = this.visibleRows().length;
+    if (!total) return '0 of 0';
+    const size = this.latePageSize();
+    const page = Math.min(this.latePage(), this.latePageCount());
+    const start = (page - 1) * size + 1;
+    return `${start}–${Math.min(total, page * size)} of ${total}`;
+  });
+
+  lateAllOnPageSelected = computed(() => {
+    const rows = this.latePageRows();
+    return rows.length > 0 && rows.every((r) => this.lateSelected().has(r.id));
+  });
+
+  goLatePage(p: number): void {
+    this.latePage.set(Math.min(Math.max(1, p), this.latePageCount()));
+    this.lateSelected.set(new Set());
+  }
+
+  setLatePageSize(size: number): void {
+    this.latePageSize.set(Number(size) || 25);
+    this.latePage.set(1);
+    this.lateSelected.set(new Set());
+  }
+
+  toggleLateRow(id: number): void {
+    const next = new Set(this.lateSelected());
+    next.has(id) ? next.delete(id) : next.add(id);
+    this.lateSelected.set(next);
+  }
+
+  toggleLatePage(): void {
+    this.lateSelected.set(this.lateAllOnPageSelected() ? new Set() : new Set(this.latePageRows().map((r) => r.id)));
+  }
+
+  clearLateSelection(): void {
+    this.lateSelected.set(new Set());
+  }
+
   hasActiveLateFilters = computed(() => {
     return !!(
       this.search().trim() ||
@@ -532,15 +593,32 @@ export class ClockOutApprovalsComponent implements OnInit {
     this.search.set(filters.employeeQuery);
     this.filterDepartment.set(filters.filters['department'] || '');
     this.filterProofStatus.set(filters.filters['proof'] || '');
+    this.latePage.set(1);
+    this.lateSelected.set(new Set());
     this.filterDrawerOpen.set(false);
   }
 
   setFilterTab(tab: 'ALL' | 'URGENT' | 'RECENT' | 'HAS_PROOF'): void {
     this.filterTab.set(tab);
+    this.latePage.set(1);
+    this.lateSelected.set(new Set());
+  }
+
+  setLateDeptFilter(dept: string): void {
+    this.filterDepartment.set(dept || '');
+    this.latePage.set(1);
+    this.lateSelected.set(new Set());
+  }
+
+  onLateSearchChange(val: string): void {
+    this.search.set(val);
+    this.latePage.set(1);
+    this.lateSelected.set(new Set());
   }
 
   toggleSortOrder(): void {
     this.sortOrder.update(curr => curr === 'OLDEST' ? 'NEWEST' : 'OLDEST');
+    this.latePage.set(1);
   }
 
   clearFilters(): void {
@@ -552,6 +630,8 @@ export class ClockOutApprovalsComponent implements OnInit {
     this.filterDatePreset.set('ALL');
     this.filterDepartment.set('');
     this.filterProofStatus.set('');
+    this.latePage.set(1);
+    this.lateSelected.set(new Set());
   }
 
   employeeName(row: any): string {
@@ -638,6 +718,8 @@ export class ClockOutApprovalsComponent implements OnInit {
     this.attendanceService.reviewClockOut(row.id, action, note).subscribe({
       next: () => {
         this.rows.update((rs) => rs.filter((r) => r.id !== row.id));
+        const nextSel = new Set(this.lateSelected());
+        if (nextSel.delete(row.id)) this.lateSelected.set(nextSel);
         this.busyId.set(null);
         this.toast.success(
           action === 'APPROVE'
@@ -653,13 +735,55 @@ export class ClockOutApprovalsComponent implements OnInit {
     });
   }
 
+  async decideLateBulk(action: 'APPROVE' | 'REJECT'): Promise<void> {
+    const ids = [...this.lateSelected()];
+    if (!ids.length || this.isBatchApproving()) return;
+    let note: string | undefined;
+    if (action === 'REJECT') {
+      const typed = await this.dialog.prompt(
+        `Rejecting ${ids.length} late clock-out request${ids.length === 1 ? '' : 's'}. Tell the employees why — they will see this reason.`,
+        'Reason for rejection',
+        { placeholder: 'e.g. Please submit valid shift completion proof', confirmLabel: `Reject ${ids.length}`, required: true },
+      );
+      if (!typed?.trim()) return;
+      note = typed.trim();
+    } else {
+      const ok = await this.dialog.confirm(
+        `Approve ${ids.length} selected clock-out request${ids.length === 1 ? '' : 's'}? They will immediately count towards attendance and payroll.`,
+        'Approve Selected',
+        `Approve ${ids.length}`,
+        'Cancel',
+      );
+      if (!ok) return;
+    }
+
+    this.isBatchApproving.set(true);
+    let done = 0, failed = 0;
+    for (const id of ids) {
+      try {
+        await firstValueFrom(this.attendanceService.reviewClockOut(id, action, note));
+        done++;
+      } catch {
+        failed++;
+      }
+    }
+    this.isBatchApproving.set(false);
+    this.lateSelected.set(new Set());
+    this.load();
+    if (failed) {
+      this.toast.error(`${done} ${action === 'APPROVE' ? 'approved' : 'rejected'}, ${failed} failed`);
+    } else {
+      this.toast.success(`Successfully ${action === 'APPROVE' ? 'approved' : 'rejected'} ${done} request${done === 1 ? '' : 's'}`);
+    }
+  }
+
   async approveAllVisible(): Promise<void> {
-    const items = this.visibleRows();
+    const items = this.latePageRows();
     if (!items.length || this.isBatchApproving()) return;
 
     const confirmed = await this.dialog.confirm(
-      `Are you sure you want to approve all ${items.length} clock-out requests currently displayed? They will immediately count towards attendance and payroll.`,
-      'Approve All Shown',
+      `Are you sure you want to approve all ${items.length} clock-out requests on this page? They will immediately count towards attendance and payroll.`,
+      'Approve Page',
       `Approve ${items.length} Requests`,
       'Cancel'
     );
@@ -677,6 +801,7 @@ export class ClockOutApprovalsComponent implements OnInit {
     }
 
     this.isBatchApproving.set(false);
+    this.lateSelected.set(new Set());
     this.toast.success(`Successfully approved ${succeeded} clock-out request${succeeded === 1 ? '' : 's'}`);
     this.load();
   }

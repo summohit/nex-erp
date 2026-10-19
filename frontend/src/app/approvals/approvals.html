@@ -1,63 +1,551 @@
-<div class="ap">
-  <div class="ap-head">
-    <div>
-      <h1>Approvals</h1>
-      <p>Everything waiting on your decision, in one place.</p>
+<div class="ap-page">
+
+  <!-- ── 1. Compact Horizontal Hero Banner ──────────────────────────────────── -->
+  <div class="ap-hero-banner">
+    <div class="ap-hero-left">
+      <div class="ap-hero-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+      </div>
+      <div class="ap-hero-text">
+        <div class="ap-title-row">
+          <h1>Approvals</h1>
+          <span class="ap-status-pill pending" *ngIf="(counts()['ALL'] || 0) > 0">
+            <span>{{ counts()['ALL'] || 0 }} Pending Review</span>
+          </span>
+          <span class="ap-status-pill urgent" *ngIf="urgentTotalCount() > 0">
+            <span>{{ urgentTotalCount() }} Urgent (&ge;7d)</span>
+          </span>
+          <span class="ap-status-pill clear" *ngIf="!loading() && (counts()['ALL'] || 0) === 0">
+            <span>All Clear</span>
+          </span>
+        </div>
+        <p class="ap-subtitle">
+          Everything waiting on your decision across leave, WFH, attendance regularizations, late clock-outs, and out-of-office punches.
+        </p>
+      </div>
     </div>
-    <button type="button" class="ap-btn" (click)="load()" [disabled]="loading()">↻ Refresh</button>
+
+    <div class="ap-hero-right">
+      <!-- Quick Date Filter Pills -->
+      <div class="ap-date-pills">
+        <span class="date-pills-label">Period</span>
+        <button type="button" class="date-pill" [class.active]="quickRange() === 'ALL'" (click)="setQuickRange('ALL')">All</button>
+        <button type="button" class="date-pill" [class.active]="quickRange() === 'TODAY'" (click)="setQuickRange('TODAY')">Today</button>
+        <button type="button" class="date-pill" [class.active]="quickRange() === '7'" (click)="setQuickRange('7')">7d</button>
+        <button type="button" class="date-pill" [class.active]="quickRange() === '30'" (click)="setQuickRange('30')">30d</button>
+        <button type="button" class="date-pill" [class.active]="quickRange() === 'MONTH'" (click)="setQuickRange('MONTH')">Month</button>
+        <span class="date-pill active custom-tag" *ngIf="quickRange() === 'CUSTOM'">Custom</span>
+      </div>
+
+      <!-- Refresh Button -->
+      <button type="button" class="ap-btn-refresh" (click)="load()" [disabled]="loading()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" [class.spin-anim]="loading()">
+          <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+          <path d="M21 3v5h-5"></path>
+        </svg>
+        <span>Refresh</span>
+      </button>
+    </div>
   </div>
 
-  <div class="ap-tabs">
-    <button type="button" [class.on]="tab() === 'ALL'" (click)="tab.set('ALL')">All <span>{{ counts()['ALL'] || 0 }}</span></button>
+  <!-- ── 2. Interactive Queue KPI Strip ─────────────────────────────────────── -->
+  <div class="ap-kpi-strip">
+    <!-- All Queues Card -->
+    <button
+      type="button"
+      class="ap-kpi-card tone-indigo"
+      [class.active]="tab() === 'ALL'"
+      (click)="setTab('ALL')">
+      <div class="kpi-icon-box">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
+          <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+        </svg>
+      </div>
+      <div class="kpi-meta">
+        <span class="kpi-label">All Queues</span>
+        <strong class="kpi-val">{{ counts()['ALL'] || 0 }}</strong>
+        <span class="kpi-sub">Total awaiting action</span>
+      </div>
+    </button>
+
+    <!-- Individual Queue Cards -->
     <ng-container *ngFor="let t of tabs">
-      <button type="button" *ngIf="available().has(t.kind)" [class.on]="tab() === t.kind" (click)="tab.set(t.kind)">
-        {{ t.label }} <span>{{ counts()[t.kind] || 0 }}</span>
+      <button
+        type="button"
+        class="ap-kpi-card tone-{{ t.tone }}"
+        *ngIf="available().has(t.kind)"
+        [class.active]="tab() === t.kind"
+        (click)="setTab(t.kind)">
+        <div class="kpi-icon-box">
+          <!-- Leave Icon -->
+          <svg *ngIf="t.kind === 'LEAVE'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <!-- WFH Icon -->
+          <svg *ngIf="t.kind === 'WFH'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          <!-- Regularization Icon -->
+          <svg *ngIf="t.kind === 'REG'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+          <!-- Late Clock-out Icon -->
+          <svg *ngIf="t.kind === 'CLOCKOUT'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <!-- Out of Office Icon -->
+          <svg *ngIf="t.kind === 'OUTSIDE'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+            <circle cx="12" cy="10" r="3"></circle>
+          </svg>
+        </div>
+        <div class="kpi-meta">
+          <span class="kpi-label">{{ t.label }}</span>
+          <strong class="kpi-val">{{ counts()[t.kind] || 0 }}</strong>
+          <span class="kpi-sub">{{ t.shortDesc }}</span>
+        </div>
       </button>
     </ng-container>
   </div>
 
-  <div class="ap-tools">
-    <input type="text" placeholder="Search name, type or reason…" [value]="query()" (input)="query.set($any($event.target).value)" />
-    <label class="ap-all"><input type="checkbox" [checked]="allSelected()" (change)="toggleAll()" /> Select all</label>
-    <button type="button" class="ap-btn ok" *ngIf="selected().size" (click)="approveSelected()" [disabled]="busy() === 'bulk'">
-      Approve selected ({{ selected().size }})
+  <!-- ── 3. Unified Search & Filter Toolbar ─────────────────────────────────── -->
+  <div class="ap-toolbar-card">
+    <div class="ap-toolbar-top">
+      <!-- Search Input -->
+      <div class="ap-search-box">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="search-ico">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input
+          type="search"
+          placeholder="Search employee name, #code, department, type, or reason…"
+          [ngModel]="query()"
+          (ngModelChange)="onSearchChange($event)" />
+        <button
+          type="button"
+          class="btn-clear-search"
+          *ngIf="query()"
+          (click)="onSearchChange('')"
+          title="Clear search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Queue Filter Pills -->
+      <div class="ap-filter-pills">
+        <button type="button" class="ap-pill" [class.on]="tab() === 'ALL'" (click)="setTab('ALL')">
+          <span>All</span>
+          <span class="pill-count">{{ counts()['ALL'] || 0 }}</span>
+        </button>
+        <ng-container *ngFor="let t of tabs">
+          <button
+            type="button"
+            class="ap-pill"
+            *ngIf="available().has(t.kind)"
+            [class.on]="tab() === t.kind"
+            (click)="setTab(t.kind)">
+            <span>{{ t.label }}</span>
+            <span class="pill-count">{{ counts()[t.kind] || 0 }}</span>
+          </button>
+        </ng-container>
+      </div>
+    </div>
+
+    <div class="ap-toolbar-bottom">
+      <div class="ap-filters-left">
+        <!-- Department Select -->
+        <select
+          class="ap-select"
+          [ngModel]="departmentFilter()"
+          (ngModelChange)="onDeptChange($event)"
+          aria-label="Filter by department">
+          <option value="">All Departments</option>
+          <option *ngFor="let d of departments()" [value]="d">{{ d }}</option>
+        </select>
+
+        <!-- Custom Date Range Picker (From -> To) -->
+        <div class="ap-date-range-box" [class.has-dates]="fromDate() || toDate()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="date-range-ico">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span class="date-range-lbl">From</span>
+          <input
+            type="date"
+            class="date-range-input"
+            [ngModel]="fromDate()"
+            (ngModelChange)="onFromDateChange($event)"
+            [max]="toDate() || ''"
+            aria-label="From date" />
+          <span class="date-range-sep">→</span>
+          <span class="date-range-lbl">To</span>
+          <input
+            type="date"
+            class="date-range-input"
+            [ngModel]="toDate()"
+            (ngModelChange)="onToDateChange($event)"
+            [min]="fromDate() || ''"
+            aria-label="To date" />
+          <button
+            type="button"
+            class="btn-clear-dates"
+            *ngIf="fromDate() || toDate()"
+            (click)="clearDateRange()"
+            title="Clear date range">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Sort Button -->
+        <button type="button" class="ap-btn-sort" (click)="toggleSort()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m21 16-4 4-4-4"></path>
+            <path d="M17 20V4"></path>
+            <path d="m3 8 4-4 4 4"></path>
+            <path d="M7 4v16"></path>
+          </svg>
+          <span>{{ sortOrder() === 'NEWEST' ? 'Newest First' : 'Oldest First' }}</span>
+        </button>
+
+        <!-- Reset Filters -->
+        <button type="button" class="ap-btn-reset" *ngIf="hasActiveFilters()" (click)="resetFilters()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+            <path d="M3 3v5h5"></path>
+          </svg>
+          <span>Reset Filters</span>
+        </button>
+      </div>
+
+      <div class="ap-toolbar-right">
+        <span class="ap-showing-label">
+          Showing <strong>{{ rangeLabel() }}</strong>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. Contextual Bulk Selection Bar ───────────────────────────────────── -->
+  <div class="ap-bulk-bar" *ngIf="selected().size > 0">
+    <div class="bulk-left">
+      <span class="bulk-count-badge">{{ selected().size }} selected</span>
+      <button type="button" class="btn-bulk-link" *ngIf="!allOnPageSelected()" (click)="togglePageSelection()">
+        Select all {{ pageRows().length }} on this page
+      </button>
+      <button type="button" class="btn-bulk-link muted" (click)="clearSelection()">
+        Clear selection
+      </button>
+    </div>
+
+    <div class="bulk-right">
+      <button type="button" class="ap-action-btn reject" (click)="openBulkReject()" [disabled]="busy() === 'bulk'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+        <span>Reject Selected ({{ selected().size }})</span>
+      </button>
+      <button type="button" class="ap-action-btn approve" (click)="approveSelected()" [disabled]="busy() === 'bulk'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span>{{ busy() === 'bulk' ? 'Approving…' : 'Approve Selected (' + selected().size + ')' }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── 5. Loading Skeleton State ──────────────────────────────────────────── -->
+  <div class="ap-skeleton-card" *ngIf="loading()">
+    <div class="sk-row" *ngFor="let i of [1, 2, 3, 4, 5]">
+      <div class="sk-circle"></div>
+      <div class="sk-lines">
+        <div class="sk-line w35"></div>
+        <div class="sk-line w20"></div>
+      </div>
+      <div class="sk-pill"></div>
+      <div class="sk-btns"></div>
+    </div>
+  </div>
+
+  <!-- ── 6. Empty State (With Cross-Tab Search Hint) ────────────────────────── -->
+  <div class="ap-empty-card" *ngIf="!loading() && !shown().length">
+    <div class="ap-empty-icon">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      </svg>
+    </div>
+    <h3>{{ hasActiveFilters() ? 'No matching requests in this view' : 'You’re all caught up!' }}</h3>
+    <p *ngIf="!hasActiveFilters()">
+      Every pending request across leave, WFH, regularization, and attendance queues has been settled.
+    </p>
+    <p *ngIf="hasActiveFilters() && (tab() === 'ALL' || allTabsMatchCount() === 0)">
+      No pending requests match your current search or filter criteria.
+    </p>
+
+    <!-- Helpful Cross-Queue Hint when user searches inside one tab but matches exist in another tab -->
+    <div class="ap-cross-tab-hint" *ngIf="tab() !== 'ALL' && allTabsMatchCount() > 0">
+      <span>Found <strong>{{ allTabsMatchCount() }}</strong> matching request{{ allTabsMatchCount() === 1 ? '' : 's' }} in other approval queues!</span>
+      <button type="button" class="btn-switch-all-matches" (click)="setTab('ALL')">
+        Show All {{ allTabsMatchCount() }} Match{{ allTabsMatchCount() === 1 ? '' : 'es' }}
+      </button>
+    </div>
+
+    <button type="button" class="btn-empty-reset" *ngIf="hasActiveFilters()" (click)="resetFilters()">
+      Reset All Filters
     </button>
   </div>
 
-  <div class="ap-loading" *ngIf="loading()">Loading…</div>
-  <div class="ap-empty" *ngIf="!loading() && !shown().length">Nothing waiting. 🎉</div>
+  <!-- ── 7. Structured Approval Table Card ──────────────────────────────────── -->
+  <div class="ap-table-card" *ngIf="!loading() && shown().length > 0">
+    <div class="ap-table-scroll">
+      <table class="ap-table">
+        <thead>
+          <tr>
+            <th class="th-check">
+              <input
+                type="checkbox"
+                [checked]="allOnPageSelected()"
+                (change)="togglePageSelection()"
+                aria-label="Select all on this page" />
+            </th>
+            <th class="th-emp">Employee</th>
+            <th class="th-type">Queue &amp; Stage</th>
+            <th class="th-date">Date, Schedule &amp; Urgency</th>
+            <th class="th-reason">Stated Reason &amp; Evidence</th>
+            <th class="th-actions text-right sticky-actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let r of pageRows()"
+            [class.row-selected]="selected().has(key(r))"
+            [class.stale-row]="isStale(r)"
+            [class.busy-row]="busy() === key(r)">
 
-  <div class="ap-list" *ngIf="!loading()">
-    <div class="ap-row" *ngFor="let r of shown()">
-      <input type="checkbox" [checked]="selected().has(key(r))" (change)="toggle(r)" />
-      <button type="button" class="ap-person" (click)="profile.open(r.employeeId)">
-        <span class="ap-av"><img *ngIf="r.avatarUrl" [src]="r.avatarUrl" alt=""><span *ngIf="!r.avatarUrl">{{ initials(r.name) }}</span></span>
-        <span class="ap-ptext"><b>{{ r.name }}</b><small>{{ r.designation || '—' }}</small></span>
-      </button>
-      <div class="ap-what">
-        <div class="ap-what-top">
-          <span class="ap-kind k-{{ r.kind }}">{{ r.title }}</span>
-          <span class="ap-badge" *ngIf="r.badge">{{ r.badge }}</span>
-        </div>
-        <div class="ap-detail">{{ r.detail }}</div>
-        <div class="ap-reason" *ngIf="r.reason">“{{ r.reason }}”</div>
+            <!-- Checkbox -->
+            <td class="td-check">
+              <input
+                type="checkbox"
+                [checked]="selected().has(key(r))"
+                (change)="toggle(r)"
+                [attr.aria-label]="'Select ' + r.name" />
+            </td>
+
+            <!-- Employee -->
+            <td class="td-emp">
+              <button type="button" class="ap-person-btn" (click)="profile.open(r.employeeId)" title="View employee profile">
+                <div class="ap-avatar" [style.background-color]="getAvatarColor(r.name)">
+                  <img *ngIf="r.avatarUrl" [src]="r.avatarUrl" [alt]="r.name" />
+                  <span *ngIf="!r.avatarUrl">{{ initials(r.name) }}</span>
+                </div>
+                <div class="ap-person-info">
+                  <div class="ap-person-name-row">
+                    <span class="ap-person-name">{{ r.name }}</span>
+                    <span class="ap-emp-code" *ngIf="r.employeeCode">#{{ r.employeeCode }}</span>
+                  </div>
+                  <div class="ap-person-sub">
+                    <span>{{ r.designation || 'Staff Member' }}</span>
+                    <span class="ap-dept-inline" *ngIf="r.department"> &middot; {{ r.department }}</span>
+                  </div>
+                </div>
+              </button>
+            </td>
+
+            <!-- Queue & Stage -->
+            <td class="td-type">
+              <div class="ap-type-stack">
+                <span class="ap-kind-badge k-{{ r.kind }}">
+                  <span class="kind-dot"></span>
+                  <span>{{ r.title }}</span>
+                </span>
+                <span class="ap-extra-badge" *ngIf="r.badge">{{ r.badge }}</span>
+              </div>
+            </td>
+
+            <!-- Date, Schedule & Urgency -->
+            <td class="td-date">
+              <div class="ap-date-stack">
+                <div class="ap-date-top">
+                  <span class="ap-date-primary">{{ formatDate(r.date) }}</span>
+                  <span class="ap-age-badge" [class.urgent]="isStale(r)">
+                    {{ waitingDays(r) === 0 ? 'Today' : (isStale(r) ? 'Urgent · ' + waitingDays(r) + 'd' : 'Waiting ' + waitingDays(r) + 'd') }}
+                  </span>
+                </div>
+                <span class="ap-schedule-detail">{{ r.detail }}</span>
+              </div>
+            </td>
+
+            <!-- Stated Reason & Proof -->
+            <td class="td-reason">
+              <div class="ap-reason-cell">
+                <div class="ap-reason-quote" *ngIf="r.reason" [title]="r.reason">
+                  &ldquo;{{ r.reason }}&rdquo;
+                </div>
+                <div class="ap-reason-empty" *ngIf="!r.reason">
+                  No explanation provided
+                </div>
+                <a
+                  *ngIf="r.proofUrl"
+                  [href]="r.proofUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="ap-proof-chip">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                  </svg>
+                  <span>View Proof</span>
+                </a>
+              </div>
+            </td>
+
+            <!-- Sticky Actions -->
+            <td class="td-actions text-right sticky-actions-col">
+              <div class="ap-row-actions">
+                <button
+                  type="button"
+                  class="ap-action-btn reject"
+                  (click)="openReject(r)"
+                  [disabled]="busy() === key(r) || busy() === 'bulk'"
+                  title="Reject request">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                  <span>Reject</span>
+                </button>
+                <button
+                  type="button"
+                  class="ap-action-btn approve"
+                  (click)="approve(r)"
+                  [disabled]="busy() === key(r) || busy() === 'bulk'"
+                  title="Approve request">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  <span>{{ busy() === key(r) ? 'Saving…' : 'Approve' }}</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination Footer -->
+    <div class="ap-table-footer">
+      <div class="footer-left">
+        <span class="pager-info">Showing <strong>{{ rangeLabel() }}</strong></span>
+        <label class="page-size-label">
+          <span>Rows:</span>
+          <select class="page-size-select" [ngModel]="pageSize()" (ngModelChange)="setPageSize($event)">
+            <option [ngValue]="25">25</option>
+            <option [ngValue]="50">50</option>
+            <option [ngValue]="100">100</option>
+          </select>
+        </label>
       </div>
-      <div class="ap-actions">
-        <button type="button" class="ap-btn no" (click)="openReject(r)" [disabled]="busy() === key(r)">Reject</button>
-        <button type="button" class="ap-btn ok" (click)="approve(r)" [disabled]="busy() === key(r)">Approve</button>
+
+      <div class="ap-pager" *ngIf="pageCount() > 1">
+        <button type="button" (click)="goPage(1)" [disabled]="page() <= 1" title="First page">«</button>
+        <button type="button" (click)="goPage(page() - 1)" [disabled]="page() <= 1">‹ Prev</button>
+        <span class="pager-indicator">Page <strong>{{ page() }}</strong> of {{ pageCount() }}</span>
+        <button type="button" (click)="goPage(page() + 1)" [disabled]="page() >= pageCount()">Next ›</button>
+        <button type="button" (click)="goPage(pageCount())" [disabled]="page() >= pageCount()" title="Last page">»</button>
       </div>
     </div>
   </div>
 </div>
 
-<div class="ap-overlay" *ngIf="rejecting() as r" (click)="rejecting.set(null)">
-  <div class="ap-dialog" (click)="$event.stopPropagation()">
-    <h3>Reject {{ r.title.toLowerCase() }} · {{ r.name }}</h3>
-    <p>{{ r.detail }}</p>
-    <textarea rows="3" [(ngModel)]="rejectNote" placeholder="Why (the employee sees this)"></textarea>
-    <div class="ap-dialog-actions">
-      <button type="button" class="ap-btn" (click)="rejecting.set(null)">Cancel</button>
-      <button type="button" class="ap-btn no solid" (click)="confirmReject()" [disabled]="busy() === key(r)">Reject</button>
+<!-- ── 8. Enhanced Rejection Modal (Single & Bulk) ────────────────────────── -->
+<div class="ap-overlay" *ngIf="rejecting() || bulkRejecting()" (click)="closeRejectModal()">
+  <div class="ap-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+    <div class="ap-dialog-header">
+      <div class="ap-dialog-title-group">
+        <div class="ap-dialog-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+          </svg>
+        </div>
+        <div>
+          <h3 *ngIf="rejecting() as r">Reject {{ r.title }}</h3>
+          <h3 *ngIf="bulkRejecting()">Reject {{ selected().size }} Selected Requests</h3>
+          <p class="ap-dialog-sub">The employee will be notified with your reason.</p>
+        </div>
+      </div>
+
+      <button type="button" class="ap-dialog-close" (click)="closeRejectModal()" aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <div class="ap-dialog-body">
+      <!-- Request Summary Card (Single Reject) -->
+      <div class="ap-reject-summary" *ngIf="rejecting() as r">
+        <div class="ap-avatar sm" [style.background-color]="getAvatarColor(r.name)">
+          <img *ngIf="r.avatarUrl" [src]="r.avatarUrl" [alt]="r.name" />
+          <span *ngIf="!r.avatarUrl">{{ initials(r.name) }}</span>
+        </div>
+        <div class="ap-reject-meta">
+          <strong>{{ r.name }}</strong>
+          <span>{{ formatDate(r.date) }} &middot; {{ r.detail }}</span>
+        </div>
+      </div>
+
+      <label class="ap-dialog-label">
+        <span>Reason for Rejection <span class="req-star">*</span></span>
+      </label>
+      <textarea
+        rows="3"
+        class="ap-dialog-textarea"
+        [(ngModel)]="rejectNote"
+        placeholder="Explain why this request is being rejected (visible to the employee)…"></textarea>
+
+      <div class="ap-quick-reasons">
+        <span class="quick-prefix">Quick fill:</span>
+        <button type="button" class="quick-reason-btn" (click)="applyQuickRejectNote('Please attach supporting proof / documentation.')">Missing proof</button>
+        <button type="button" class="quick-reason-btn" (click)="applyQuickRejectNote('Punch times do not match shift / site logs.')">Incorrect timings</button>
+        <button type="button" class="quick-reason-btn" (click)="applyQuickRejectNote('Prior approval from reporting manager was not taken.')">No prior approval</button>
+      </div>
+    </div>
+
+    <div class="ap-dialog-footer">
+      <button type="button" class="ap-btn-cancel" (click)="closeRejectModal()">Cancel</button>
+      <button
+        type="button"
+        class="ap-btn-confirm-reject"
+        (click)="confirmReject()"
+        [disabled]="!rejectNote.trim() || busy() !== null">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+        <span>{{ busy() ? 'Rejecting…' : (bulkRejecting() ? 'Reject ' + selected().size + ' Requests' : 'Confirm Rejection') }}</span>
+      </button>
     </div>
   </div>
 </div>
