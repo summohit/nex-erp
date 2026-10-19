@@ -1,3 +1,4 @@
+import { TaskHoursRequestsTabComponent } from '../projects/task-hours-requests/task-hours-requests-tab';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -109,6 +110,7 @@ export type TaskSortColumn = 'title' | 'priority' | 'status' | 'dueDate';
     StatCardComponent,
     MyCalendarComponent,
     PeopleWatchCardComponent,
+    TaskHoursRequestsTabComponent,
     ApexChartCardComponent,
     WorkHoursHeatmapWidgetComponent,
     LeaveBalanceGaugeWidgetComponent,

@@ -1,6 +1,6 @@
-<div class="thr-page-container">
+<div class="thr-page-container" [class.thr-embedded]="embedded">
   <!-- Top Navigation & Actions Bar -->
-  <div class="thr-top-nav">
+  <div class="thr-top-nav" *ngIf="!embedded">
     <div class="thr-breadcrumbs">
       <span class="crumb-section">Delivery</span>
       <span class="crumb-sep">/</span>
@@ -21,7 +21,7 @@
   </div>
 
   <!-- Hero Header Banner -->
-  <div class="thr-hero-card">
+  <div class="thr-hero-card" *ngIf="!embedded">
     <div class="thr-hero-left">
       <div class="thr-hero-icon-wrap">
         <svg *ngIf="requestType() !== 'VISIT_LOCATIONS' && requestType() !== 'FIELD_VISITS'" lucideTimer size="28"></svg>

@@ -1018,6 +1018,21 @@
       <section class="grid-12">
         <div class="col-12">
           <app-people-watch-card></app-people-watch-card>
+
+  <!-- Approval Requests, the same component as Delivery → Approval Requests
+       (19 Oct 2026). Loaded when scrolled to; empty queues for people who
+       approve nothing. -->
+  <section class="dashboard-card dash-approvals" *ngIf="canSeeTeamAndOrg()">
+    <div class="dash-approvals-head">
+      <h3>Approval Requests</h3>
+      <a routerLink="/task-requests" class="dash-approvals-link">Open full page</a>
+    </div>
+    @defer (on viewport) {
+      <app-task-hours-requests-tab [embedded]="true"></app-task-hours-requests-tab>
+    } @placeholder {
+      <div class="dash-approvals-loading">Loading approval requests…</div>
+    }
+  </section>
         </div>
       </section>
 

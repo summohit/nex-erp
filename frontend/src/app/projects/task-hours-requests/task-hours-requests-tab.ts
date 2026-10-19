@@ -1,5 +1,5 @@
 import { firstValueFrom } from 'rxjs';
-import { Component, inject, signal, computed, HostListener } from '@angular/core';
+import { Component, inject, signal, computed, HostListener, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
@@ -122,6 +122,8 @@ type QueueKpi = { label: string; value: string | number; detail: string; tone: '
   styleUrls: ['./task-hours-requests-tab.css'],
 })
 export class TaskHoursRequestsTabComponent {
+  /** Shown as a dashboard card (19 Oct 2026): no breadcrumb or hero banner. */
+  @Input() embedded = false;
   /** Templates cannot reach globals; the pickers compare ids as strings. */
   protected readonly String = String;
 

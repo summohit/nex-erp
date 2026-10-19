@@ -2813,3 +2813,6 @@
 .task-approvals-table { min-width: 1100px; }
 .task-approvals-table td:nth-child(2) a, .task-approvals-table td:nth-child(2) span { white-space: nowrap; }
 .ta-table-wrap:has(.task-approvals-table) { padding-bottom: 150px; margin-bottom: -150px; }
+
+/* As a dashboard card (19 Oct 2026) */
+.thr-page-container.thr-embedded { padding: 0; max-width: none; margin: 0; }

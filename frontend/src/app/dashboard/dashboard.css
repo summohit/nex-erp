@@ -1677,3 +1677,10 @@
     transform: none !important;
   }
 }
+
+/* Approval Requests card (19 Oct 2026) */
+.dash-approvals { padding: 16px 18px; margin-top: 16px; }
+.dash-approvals-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.dash-approvals-head h3 { margin: 0; font-size: 16px; font-weight: 800; color: #0f172a; }
+.dash-approvals-link { font-size: 13px; font-weight: 700; color: #1373e5; text-decoration: none; }
+.dash-approvals-loading { padding: 32px; text-align: center; color: #94a3b8; }
