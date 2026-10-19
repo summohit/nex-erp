@@ -1429,6 +1429,41 @@ export class ProjectsComponent implements OnInit {
   filtersOpen = signal<boolean>(false);
   filterClientId = signal<string>('ALL');
   filterPmId = signal<string>('ALL');
+  /** Employees filter (19 Oct 2026): boards any of these people are members of. */
+  filterMemberIds = signal<number[]>([]);
+  memberQuery = signal('');
+  memberPickerOpen = signal(false);
+  memberOptions = computed(() => {
+    const byId = new Map<number, { id: number; name: string; avatarUrl: string | null; count: number }>();
+    for (const p of this.myProjects()) {
+      for (const m of p.members || []) {
+        if (!m.employee) continue;
+        const cur = byId.get(m.employeeId);
+        if (cur) cur.count++;
+        else byId.set(m.employeeId, {
+          id: m.employeeId, name: `${m.employee.firstName || ''} ${m.employee.lastName || ''}`.trim(),
+          avatarUrl: m.employee.avatarUrl || null, count: 1,
+        });
+      }
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  });
+  memberMatches = computed(() => {
+    const q = this.memberQuery().trim().toLowerCase();
+    const picked = new Set(this.filterMemberIds());
+    return this.memberOptions().filter((m) => !picked.has(m.id) && (!q || m.name.toLowerCase().includes(q))).slice(0, 30);
+  });
+  pickedMembers = computed(() => {
+    const ids = new Set(this.filterMemberIds());
+    return this.memberOptions().filter((m) => ids.has(m.id));
+  });
+  addMemberFilter(id: number) {
+    this.filterMemberIds.update((l) => (l.includes(id) ? l : [...l, id]));
+    this.memberQuery.set('');
+    if (this.activeTab() !== 'all') this.setActiveTab('all');
+    this.scrollToYourBoards();
+  }
+  removeMemberFilter(id: number) { this.filterMemberIds.update((l) => l.filter((x) => x !== id)); }
   filterDepartmentId = signal<string>('ALL');
   filterCategory = signal<string>('ALL');
   filterStatus = signal<string>('ALL');
@@ -1811,11 +1846,13 @@ export class ProjectsComponent implements OnInit {
       this.filterCategory(), this.filterStatus(), this.filterPriority(),
       this.filterClosureStatus()
     ].filter(v => v !== 'ALL').length
+    + (this.filterMemberIds().length ? 1 : 0)
     + (this.filterStartFrom() ? 1 : 0)
     + (this.filterDeadlineTo() ? 1 : 0)
   );
 
   clearProjectFilters() {
+    this.filterMemberIds.set([]);
     this.filterClientId.set('ALL');
     this.filterPmId.set('ALL');
     this.filterDepartmentId.set('ALL');
@@ -1881,7 +1918,9 @@ export class ProjectsComponent implements OnInit {
     const startFrom = this.filterStartFrom();
     const deadlineTo = this.filterDeadlineTo();
 
+    const memberIds = this.filterMemberIds();
     return list.filter(p => {
+      if (memberIds.length && !(p.members || []).some((m: any) => memberIds.includes(m.employeeId))) return false;
       if (client !== 'ALL' && String(p.client?.id ?? '') !== client) return false;
       if (dept !== 'ALL' && String(p.department?.id ?? '') !== dept) return false;
       if (category !== 'ALL' && (p.category || '') !== category) return false;

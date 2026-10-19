@@ -289,6 +289,30 @@
       </div>
     </div>
 
+    <!-- Employees filter (19 Oct 2026): boards any picked person is on -->
+    <div class="member-filter" *ngIf="activeTab() !== 'my-tasks'">
+      <div class="member-filter-box" (click)="memberPickerOpen.set(true)">
+        <svg lucideUsers size="15"></svg>
+        <span class="member-chip" *ngFor="let m of pickedMembers()">
+          {{ m.name }}
+          <button type="button" (click)="$event.stopPropagation(); removeMemberFilter(m.id)" title="Remove">×</button>
+        </span>
+        <input type="text" [placeholder]="pickedMembers().length ? 'Add employee…' : 'Filter by employees…'"
+               [ngModel]="memberQuery()" (ngModelChange)="memberQuery.set($event); memberPickerOpen.set(true)"
+               (focus)="memberPickerOpen.set(true)" (keydown.escape)="memberPickerOpen.set(false)"
+               (keydown.enter)="memberMatches().length && addMemberFilter(memberMatches()[0].id)" />
+      </div>
+      <div class="member-filter-menu" *ngIf="memberPickerOpen()" (click)="$event.stopPropagation()">
+        <div class="member-filter-empty" *ngIf="!memberMatches().length">No one found</div>
+        <button type="button" *ngFor="let m of memberMatches()" (click)="addMemberFilter(m.id)">
+          <span class="member-av"><img *ngIf="m.avatarUrl" [src]="m.avatarUrl" alt=""><span *ngIf="!m.avatarUrl">{{ m.name.charAt(0) }}</span></span>
+          <span class="member-name">{{ m.name }}</span>
+          <span class="member-count">{{ m.count }} {{ m.count === 1 ? 'board' : 'boards' }}</span>
+        </button>
+        <div class="member-filter-foot"><button type="button" (click)="memberPickerOpen.set(false)">Done</button></div>
+      </div>
+    </div>
+
     <div class="filter-tabs">
       <button 
         class="tab-pill" 
@@ -474,6 +498,10 @@
       <div class="section-title-group">
         <svg lucideUser size="20" class="section-icon"></svg>
         <h2>Your boards</h2>
+        <span class="boards-search-note" *ngIf="pickedMembers().length">
+          {{ filteredProjects().length }} {{ filteredProjects().length === 1 ? 'board' : 'boards' }} with {{ pickedMembers().length === 1 ? pickedMembers()[0].name : pickedMembers().length + ' people' }}
+          <button type="button" (click)="filterMemberIds.set([])">Clear</button>
+        </span>
         <span class="boards-search-note" *ngIf="searchQuery()">
           {{ filteredProjects().length }} {{ filteredProjects().length === 1 ? 'match' : 'matches' }} for “{{ searchQuery() }}”
           <button type="button" (click)="selectBoardOption('')">Clear</button>
