@@ -699,11 +699,11 @@ export class AllAttendanceComponent implements OnInit {
           tooltip = `Scheduled field visit at ${record.fieldVisit.location || 'site'}`;
           countsWorking = true;
         } else if (record && record.clockIn) {
-          if (this.needsClockOutApproval(record)) {
-            status = 'Missed Clock Out';
-            tooltip = record.clockOutApproval === 'REJECTED'
-              ? 'Clock-out approval rejected'
-              : 'Clock-out approval pending';
+          if (this.clockOutHalfDay(record)) {
+            // 19 Oct 2026, HR's rule: until the clock-out is approved the day
+            // is a half day (payroll pays it the same way).
+            status = 'Half Day';
+            tooltip = `Half day — ${this.clockOutHalfDayReason(record)}`;
           } else if (record.clockOutApproval === 'APPROVED') {
             status = 'Present';
             tooltip = 'Clock-out approved';
@@ -1487,7 +1487,7 @@ export class AllAttendanceComponent implements OnInit {
   // Mirrors the grid's day-cell classification for a single record.
   recordDayStatus(r: AttendanceRecord): string {
     if (r.clockIn) {
-      if (this.needsClockOutApproval(r)) return 'Missed Clock Out';
+      if (this.clockOutHalfDay(r)) return 'Half Day';
       if (r.clockOutApproval === 'APPROVED') return 'Present';
       if (r.status === 'HALF_DAY') return 'Half Day';
       if (r.isLate) return 'Late';
@@ -1526,7 +1526,9 @@ export class AllAttendanceComponent implements OnInit {
     } else if (r.isOnsite) {
       parts.push('On-site work');
     }
-    if (status === 'Half Day') {
+    if (status === 'Half Day' && this.clockOutHalfDay(r)) {
+      parts.push(`Half day — ${this.clockOutHalfDayReason(r)}`);
+    } else if (status === 'Half Day') {
       parts.push(
         r.totalHours
           ? `Half day — ${this.formatHours(r.totalHours)} recorded`
@@ -1558,6 +1560,23 @@ export class AllAttendanceComponent implements OnInit {
 
   isMissedClockOut(r: AttendanceRecord): boolean {
     return this.needsClockOutApproval(r) || !!r.missedClockOut || (r.status === 'PRESENT' && !r.clockOut);
+  }
+
+  /**
+   * Half day because of the clock-out (19 Oct 2026): missed and still open,
+   * waiting for approval, or rejected. Approval gives the full day back.
+   * Today's open session is still being worked, so it is not counted.
+   */
+  clockOutHalfDay(r: AttendanceRecord | null | undefined): boolean {
+    if (!r?.clockIn) return false;
+    if (this.needsClockOutApproval(r)) return true;
+    return !!r.missedClockOut && !r.clockOut;
+  }
+
+  clockOutHalfDayReason(r: AttendanceRecord): string {
+    if (r.clockOutApproval === 'PENDING') return 'clock-out waiting for approval';
+    if (r.clockOutApproval === 'REJECTED') return 'clock-out rejected';
+    return 'missed clock-out';
   }
 
   /** A clock-out pending or rejected review cannot yet count as Present. */

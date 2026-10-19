@@ -786,6 +786,8 @@
                   <div class="date-cell-wrap">
                     <span class="date-primary">{{ formatDate(row.date) }}</span>
                     <span class="shift-subtext" *ngIf="row.shift?.name">{{ row.shift.name }}</span>
+                    <!-- Where they worked that day (19 Oct 2026) -->
+                    <span class="coa-where w-{{ row.workType }}" *ngIf="row.workType" [title]="whereTitle(row)">{{ whereLabel(row) }}</span>
                   </div>
                 </td>
 
@@ -919,6 +921,15 @@
                   <span>Shift Date</span>
                 </div>
                 <div class="chip-val bold">{{ formatDate(row.date) }}</div>
+              </div>
+
+              <!-- Where they worked that day -->
+              <div class="coa-info-chip" *ngIf="row.workType">
+                <div class="chip-label"><span>Worked from</span></div>
+                <div class="chip-val">{{ whereLabel(row) }}</div>
+                <div class="chip-val" *ngIf="row.fieldVisit" style="font-weight:500;font-size:12px;color:#64748b">
+                  {{ row.fieldVisit.requestNumber }}<ng-container *ngIf="row.fieldVisit.location"> · {{ row.fieldVisit.location }}</ng-container><ng-container *ngIf="row.fieldVisit.project"> · {{ row.fieldVisit.project.name }}</ng-container>
+                </div>
               </div>
 
               <!-- Assigned Shift -->

@@ -1871,3 +1871,9 @@
 .coa-off-sub { font-size: 12px; color: #64748b; }
 .coa-off-count { display: inline-block; min-width: 30px; padding: 2px 8px; border-radius: 999px; background: #fef3c7; color: #b45309; font-weight: 800; }
 .coa-off-count.severe { background: #fee2e2; color: #b91c1c; }
+
+/* Where they worked that day (19 Oct 2026) */
+.coa-where { display: inline-block; margin-top: 4px; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #f1f5f9; color: #475569; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.coa-where.w-FIELD_VISIT { background: #ecfdf5; color: #047857; }
+.coa-where.w-ON_SITE { background: #eff6ff; color: #1d4ed8; }
+.coa-where.w-OUTSIDE { background: #fffbeb; color: #b45309; }

@@ -43,3 +43,24 @@ describe('what is still in the queue', () => {
     expect(isAwaitingClockOutApproval(null)).toBe(false);
   });
 });
+
+describe('payableDayStatus (19 Oct 2026: unsettled clock-out = half day)', () => {
+  const { payableDayStatus } = require('./clock-out-approval');
+  const worked = { status: 'PRESENT', clockIn: new Date(), clockOut: new Date() };
+  it('keeps an ordinary day as recorded', () => {
+    expect(payableDayStatus({ ...worked, clockOutApproval: null })).toBe('PRESENT');
+  });
+  it('makes a pending or rejected clock-out a half day', () => {
+    expect(payableDayStatus({ ...worked, clockOutApproval: 'PENDING' })).toBe('HALF_DAY');
+    expect(payableDayStatus({ ...worked, clockOutApproval: 'REJECTED' })).toBe('HALF_DAY');
+  });
+  it('gives an approved clock-out its full day back', () => {
+    expect(payableDayStatus({ ...worked, clockOutApproval: 'APPROVED' })).toBe('PRESENT');
+  });
+  it('makes a missed, still-open clock-out a half day', () => {
+    expect(payableDayStatus({ status: 'PRESENT', clockIn: new Date(), clockOut: null, missedClockOut: true })).toBe('HALF_DAY');
+  });
+  it('leaves days nobody worked alone', () => {
+    expect(payableDayStatus({ status: 'ABSENT', clockIn: null, clockOutApproval: 'PENDING' })).toBe('ABSENT');
+  });
+});

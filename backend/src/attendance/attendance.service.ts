@@ -1151,7 +1151,7 @@ export class AttendanceService {
     companyId: number, role?: string | null, employeeId?: number | null,
   ) {
     await this.assertMayApproveClockOut(companyId, role, employeeId);
-    return this.prisma.attendance.findMany({
+    const rows = await this.prisma.attendance.findMany({
       where: {
         clockOutApproval: CLOCK_OUT_APPROVAL.PENDING,
         employee: { companyId },
@@ -1165,8 +1165,39 @@ export class AttendanceService {
           },
         },
         shift: { select: { id: true, name: true, startTime: true, endTime: true } },
+        project: { select: { id: true, name: true, key: true } },
       },
       orderBy: { date: 'asc' },
+    });
+    if (!rows.length) return rows;
+
+    // Where they were that day (19 Oct 2026): a field visit, on site for a
+    // project, outside the office, or in the office, so the approver can judge.
+    const visits = await this.prisma.fieldVisitAttendance.findMany({
+      where: {
+        companyId,
+        employeeId: { in: [...new Set(rows.map((r) => r.employeeId))] },
+        visitDate: { in: [...new Set(rows.map((r) => r.date.getTime()))].map((t) => new Date(t)) },
+        request: { status: { in: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] } },
+      },
+      include: {
+        request: { select: { id: true, requestNumber: true, location: true, project: { select: { id: true, name: true, key: true } } } },
+      },
+    });
+    const visitByKey = new Map(visits.map((v) => [`${v.employeeId}_${v.visitDate.toISOString().slice(0, 10)}`, v]));
+    return rows.map((r) => {
+      const v = visitByKey.get(`${r.employeeId}_${r.date.toISOString().slice(0, 10)}`);
+      const workType = v ? 'FIELD_VISIT' : r.isOnsite ? 'ON_SITE' : r.clockInOutside ? 'OUTSIDE' : 'OFFICE';
+      return {
+        ...r,
+        workType,
+        fieldVisit: v
+          ? {
+              requestId: v.request.id, requestNumber: v.request.requestNumber, location: v.request.location,
+              project: v.request.project, clockInTime: v.clockInTime, clockOutTime: v.clockOutTime, status: v.status,
+            }
+          : null,
+      };
     });
   }
 

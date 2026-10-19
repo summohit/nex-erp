@@ -49,3 +49,38 @@ export function isAwaitingClockOutApproval(
 ): boolean {
   return record?.clockOutApproval === CLOCK_OUT_APPROVAL.PENDING;
 }
+
+/**
+ * The status payroll and the attendance screens use for a day (19 Oct 2026,
+ * HR's rule). A clock-out that was missed and is still open, is waiting on
+ * approval, or was rejected counts as a HALF DAY; once approved the day counts
+ * as recorded (a full day when it was one). Days that were not worked
+ * (absent, leave, holiday, day off) keep their own status.
+ */
+export function payableDayStatus(
+  record: {
+    status?: string | null; clockOutApproval?: string | null;
+    missedClockOut?: boolean | null; clockIn?: Date | string | null; clockOut?: Date | string | null;
+  } | null | undefined,
+): string | null {
+  if (!record) return null;
+  const status = record.status ?? null;
+  if (!record.clockIn) return status;
+  const state = record.clockOutApproval;
+  const unsettled =
+    state === CLOCK_OUT_APPROVAL.PENDING ||
+    state === CLOCK_OUT_APPROVAL.REJECTED ||
+    (!!record.missedClockOut && !record.clockOut);
+  return unsettled ? 'HALF_DAY' : status;
+}
+
+/** Why a day reads as a half day because of its clock-out, or null. */
+export function clockOutHalfDayReason(
+  record: { clockOutApproval?: string | null; missedClockOut?: boolean | null; clockIn?: unknown; clockOut?: unknown } | null | undefined,
+): string | null {
+  if (!record?.clockIn) return null;
+  if (record.clockOutApproval === CLOCK_OUT_APPROVAL.PENDING) return 'Clock-out waiting for approval';
+  if (record.clockOutApproval === CLOCK_OUT_APPROVAL.REJECTED) return 'Clock-out rejected';
+  if (record.missedClockOut && !record.clockOut) return 'Missed clock-out';
+  return null;
+}

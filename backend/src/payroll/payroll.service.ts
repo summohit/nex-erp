@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from './pdf.service';
 import { EmailService } from './email.service';
-import { countsAsAttended } from '../attendance/clock-out-approval';
+import { payableDayStatus } from '../attendance/clock-out-approval';
 import {
   DEFAULT_TEMPLATE, LINE_COMPONENT_NAMES, SalaryTemplateRules, TemplateLine,
   gradeFor, splitGross,
@@ -589,7 +589,7 @@ export class PayrollService {
           employeeId: emp.id,
           date: { gte: startDate, lte: endDate },
         },
-        select: { date: true, status: true, clockOutApproval: true },
+        select: { date: true, status: true, clockOutApproval: true, missedClockOut: true, clockIn: true, clockOut: true },
       });
       const byDay = new Map<string, string>();
       for (const a of attendances) {
@@ -598,8 +598,10 @@ export class PayrollService {
         // as attendance — the day falls through to the absence check below,
         // exactly as it would if it had never been opened, until somebody
         // rules on it.
-        if (!countsAsAttended(a)) continue;
-        byDay.set(this.payrollDateKey(a.date), a.status);
+        // 19 Oct 2026: missed, pending or rejected clock-out = half day;
+        // approved = as recorded.
+        const st = payableDayStatus(a);
+        if (st) byDay.set(this.payrollDateKey(a.date), st);
       }
 
       // §Att10: deleted leave stops covering an absence. Left in, a removed
@@ -762,11 +764,12 @@ export class PayrollService {
 
       const attendanceMap = new Map();
       for (const att of attendances) {
-        // §Att5, same rule as the preview above: unapproved is not attended.
-        if (!countsAsAttended(att)) continue;
+        // Same rule as the preview above: missed, pending or rejected
+        // clock-out = half day; approved = as recorded.
+        const st = payableDayStatus(att);
         // Simple YYYY-MM-DD string for safe comparison ignoring timezones
         const dateStr = this.payrollDateKey(att.date);
-        attendanceMap.set(dateStr, att.status);
+        if (st) attendanceMap.set(dateStr, st);
       }
 
       let unexcusedAbsences = 0;

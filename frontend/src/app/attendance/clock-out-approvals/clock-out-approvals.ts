@@ -678,4 +678,19 @@ export class ClockOutApprovalsComponent implements OnInit {
     if (isNaN(d.getTime())) return '—';
     return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   }
+
+  /** Where the person worked on the day of the clock-out (19 Oct 2026). */
+  whereLabel(row: any): string {
+    switch (row?.workType) {
+      case 'FIELD_VISIT': return row.fieldVisit?.location ? `Field visit · ${row.fieldVisit.location}` : 'Field visit';
+      case 'ON_SITE': return row.project?.name ? `On site · ${row.project.name}` : 'On site';
+      case 'OUTSIDE': return 'Outside office / WFH';
+      default: return 'Office';
+    }
+  }
+  whereTitle(row: any): string {
+    const v = row?.fieldVisit;
+    if (!v) return this.whereLabel(row);
+    return [v.requestNumber, v.location, v.project?.name].filter(Boolean).join(' · ');
+  }
 }
