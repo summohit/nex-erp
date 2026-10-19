@@ -1,3 +1,4 @@
+import { WfhModule } from './wfh/wfh.module';
 import { LifecycleModule } from './lifecycle/lifecycle.module';
 import { Module } from '@nestjs/common';
 import { ApprovalsModule } from './approvals/approvals.module';
@@ -54,7 +55,7 @@ import { CommonModule } from './common/common.module';
     ThrottlerModule.forRoot({
       throttlers: [{ name: 'default', ttl: seconds(60), limit: 60 }],
     }),
-    CommonModule, AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LettersModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule, FieldVisitsModule, SystemSettingsModule, LeadFormsModule, AppDownloadModule, TicketsModule, TasksModule, TimesheetsModule, NoticesModule, ApprovalsModule, LifecycleModule],
+    CommonModule, AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LettersModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule, FieldVisitsModule, SystemSettingsModule, LeadFormsModule, AppDownloadModule, TicketsModule, TasksModule, TimesheetsModule, NoticesModule, ApprovalsModule, LifecycleModule, WfhModule],
   controllers: [AppController],
   providers: [AppService],
 })

@@ -1,3 +1,4 @@
+import { WfhRequestComponent } from '../shared/wfh-request/wfh-request';
 import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener } from '@angular/core';
 import { CompOffHistoryComponent } from '../shared/components/comp-off-history/comp-off-history';
 import { CommonModule, DatePipe } from '@angular/common';
@@ -83,6 +84,7 @@ import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDateP
   selector: 'app-attendance-leave',
   standalone: true,
   imports: [
+    WfhRequestComponent,
     CompOffHistoryComponent,
     CommonModule, RouterLink,
     FormsModule, 
@@ -1658,7 +1660,8 @@ export class AttendanceLeaveComponent implements OnInit {
       ? (targetBalances || [])
       : myBals;
 
-    return allTypes.map(type => {
+    // WFH is its own request now (19 Oct 2026), not a leave type to apply for.
+    return allTypes.filter(type => !/work\s*from\s*home|wfh|remote/i.test(type.name)).map(type => {
       const b = balances.find(bal => bal.leaveType?.id === type.id);
       const allocated = b ? b.allocated : 0;
       const used = b ? b.used : 0;

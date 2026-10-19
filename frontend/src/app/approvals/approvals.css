@@ -48,3 +48,4 @@
   .ap-row { grid-template-columns: auto 1fr; }
   .ap-what, .ap-actions { grid-column: 2; }
 }
+.ap-kind.k-WFH { background: #ecfdf5; color: #047857; }

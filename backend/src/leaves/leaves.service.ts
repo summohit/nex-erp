@@ -286,6 +286,15 @@ export class LeavesService {
     const startDate = new Date(data.startDate);
     const endDate = new Date(data.endDate);
 
+    // Work From Home is asked for as a WFH request now (19 Oct 2026), with its
+    // own approvals and monthly limit; the old leave type is history only.
+    const chosenType = await this.prisma.leaveType?.findFirst?.({
+      where: { id: data.leaveTypeId, companyId: employee.companyId }, select: { name: true },
+    });
+    if (chosenType && /work\s*from\s*home|wfh|remote/i.test(chosenType.name)) {
+      throw new BadRequestException('Work From Home is now a separate request: use "Request WFH" instead of leave.');
+    }
+
     const isHalfDay = !!data.isHalfDay;
     if (isHalfDay) {
       const sameDay = startDate.toISOString().split('T')[0] === endDate.toISOString().split('T')[0];

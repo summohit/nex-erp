@@ -599,7 +599,12 @@ export class AttendanceService {
   private async wfhSource(employeeId: number, day: Date): Promise<'REQUEST' | 'PROFILE' | null> {
     const ist = new Date(day.getTime() + 330 * 60_000);
     const d = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()));
-    // Focused unit tests stub only the delegates they use.
+    // An approved WFH request (19 Oct 2026), the way WFH is asked for now.
+    if (this.prisma.wfhRequest?.findFirst) {
+      const req = await this.prisma.wfhRequest.findFirst({ where: { employeeId, date: d, status: 'APPROVED' }, select: { id: true } });
+      if (req) return 'REQUEST';
+    }
+    // Older WFH taken as a leave type. Focused unit tests stub only the delegates they use.
     if (this.prisma.leaveRequest?.findMany) {
       const leaves = await this.prisma.leaveRequest.findMany({
         where: { employeeId, status: 'APPROVED', deletedAt: null, startDate: { lte: d }, endDate: { gte: d } },
@@ -1421,13 +1426,19 @@ export class AttendanceService {
       select: { employeeId: true, startDate: true, endDate: true, leaveType: { select: { name: true } } },
     });
     const wfh = leaves.filter((l) => WFH_NAME.test(l.leaveType?.name ?? ''));
+    const wfhReqs = this.prisma.wfhRequest?.findMany ? await this.prisma.wfhRequest.findMany({
+      where: { employeeId: { in: [...new Set(rows.map((r) => r.employeeId))] }, status: 'APPROVED', date: { in: rows.map((r) => r.date) } },
+      select: { employeeId: true, date: true },
+    }) : [];
+    const reqKey = new Set(wfhReqs.map((w) => `${w.employeeId}_${w.date.toISOString().slice(0, 10)}`));
     const profiles = await this.prisma.employee.findMany({
       where: { id: { in: [...new Set(rows.map((r) => r.employeeId))] } },
       select: { id: true, workLocation: true, usualWorkLocation: true },
     });
     const profileBy = new Map(profiles.map((p) => [p.id, p]));
     return rows.map((r) => {
-      const byRequest = wfh.some((l) => l.employeeId === r.employeeId && l.startDate <= r.date && l.endDate >= r.date);
+      const byRequest = reqKey.has(`${r.employeeId}_${r.date.toISOString().slice(0, 10)}`)
+        || wfh.some((l) => l.employeeId === r.employeeId && l.startDate <= r.date && l.endDate >= r.date);
       const byProfile = !byRequest && profileSaysWfh(profileBy.get(r.employeeId) ?? null, r.date);
       return { ...r, approvedWfh: byRequest, profileWfh: byProfile };
     });

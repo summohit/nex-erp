@@ -504,6 +504,8 @@ model Employee {
   probationEndDate     DateTime?
   probationConfirmedAt DateTime?
   pips                 Pip[]        @relation("PipEmployee")
+  wfhRequests          WfhRequest[] @relation("WfhRequester")
+  wfhReviews           WfhRequest[] @relation("WfhReviewer")
   pipsRaised           Pip[]        @relation("PipRaisedBy")
   pipCheckIns          PipCheckIn[]
 
@@ -3057,6 +3059,9 @@ model SystemSetting {
   companyId                     Int      @unique
   company                       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   shiftRosterVisibleToEmployees Boolean  @default(false)
+  /// Work From Home days a person may request per calendar month (19 Oct
+  /// 2026). Pending and approved requests both count.
+  wfhDaysPerMonth               Int      @default(1)
   /// Rule 2, "where applicable": when on, only APPROVED timesheet hours count
   /// toward project cost. Off by default — every existing project was costed
   /// on all logged time, and flipping that silently would rewrite history.
@@ -4569,4 +4574,29 @@ model PipCheckIn {
   author    Employee? @relation(fields: [authorId], references: [id], onDelete: SetNull)
   note      String    @db.Text
   createdAt DateTime  @default(now())
+}
+
+/// Work From Home request (19 Oct 2026), replacing the "Work From Home" leave
+/// type for new requests. One day each. Reporting manager approves first, then
+/// HR; the super admin may approve outright. Approved = a WFH day: the roster
+/// shows WFH and the office-distance check is skipped. Not leave, no balance.
+model WfhRequest {
+  id           Int       @id @default(autoincrement())
+  companyId    Int
+  employeeId   Int
+  employee     Employee  @relation("WfhRequester", fields: [employeeId], references: [id], onDelete: Cascade)
+  date         DateTime  @db.Date
+  reason       String    @db.Text
+  /// PENDING_MANAGER, PENDING_HR, APPROVED, REJECTED, CANCELLED
+  status       String    @default("PENDING_MANAGER")
+  managerApprovedAt DateTime?
+  reviewedById Int?
+  reviewedBy   Employee? @relation("WfhReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  reviewNote   String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([companyId, status])
+  @@index([employeeId, date])
 }

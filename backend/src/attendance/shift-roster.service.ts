@@ -176,6 +176,14 @@ export class ShiftRosterService {
       }),
     ]);
 
+    // Approved WFH requests (19 Oct 2026).
+    const wfhDays = new Set(
+      (await this.prisma.wfhRequest.findMany({
+        where: { employeeId: { in: empIds }, status: 'APPROVED', date: { gte: start, lte: end } },
+        select: { employeeId: true, date: true },
+      })).map((w) => `${w.employeeId}|${toKey(w.date)}`),
+    );
+
     const entryBy = new Map<string, typeof entries[number]>();
     for (const e of entries) entryBy.set(`${e.employeeId}|${toKey(e.date)}`, e);
 
@@ -214,7 +222,9 @@ export class ShiftRosterService {
         const leave = leaveBy.get(key);
         // Work From Home is a leave type but a working day (19 Oct 2026): the
         // cell shows the shift, with WFH as where it is worked.
-        const wfh = !!leave && WFH_PATTERN.test(leave.name);
+        // Real leave on the same day wins over a WFH request.
+        const wfhLeave = !!leave && WFH_PATTERN.test(leave.name);
+        const wfh = wfhLeave || (wfhDays.has(key) && !leave);
         const cell: any = this.rosterCell(day, key, wfh ? undefined : leave, entryBy, fieldVisitBy, emp);
         if (cell.type === 'SHIFT') {
           if (wfh) cell.workLocation = 'WFH';

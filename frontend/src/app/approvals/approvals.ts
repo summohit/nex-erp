@@ -5,6 +5,7 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { firstValueFrom } from 'rxjs';
 import { LeavesService } from '../services/leaves';
 import { AttendanceService } from '../services/attendance';
+import { WfhService } from '../services/wfh.service';
 import { ProfileModalService } from '../shared/profile-modal/profile-modal.service';
 
 /**
@@ -13,7 +14,7 @@ import { ProfileModalService } from '../shared/profile-modal/profile-modal.servi
  * queue is asked for separately and a tab only appears when the server lets
  * this person act on it (HR / admins the company, a manager their team).
  */
-type Kind = 'LEAVE' | 'REG' | 'CLOCKOUT' | 'OUTSIDE';
+type Kind = 'LEAVE' | 'WFH' | 'REG' | 'CLOCKOUT' | 'OUTSIDE';
 type Row = {
   kind: Kind; id: number; employeeId: number | null; name: string; avatarUrl: string | null;
   designation: string | null; date: string; title: string; detail: string; reason: string | null;
@@ -30,11 +31,13 @@ type Row = {
 export class ApprovalsComponent implements OnInit {
   private leaves = inject(LeavesService);
   private attendance = inject(AttendanceService);
+  private wfh = inject(WfhService);
   private toast = inject(HotToastService);
   profile = inject(ProfileModalService);
 
   readonly tabs: { kind: Kind; label: string }[] = [
     { kind: 'LEAVE', label: 'Leave' },
+    { kind: 'WFH', label: 'WFH' },
     { kind: 'REG', label: 'Regularization' },
     { kind: 'CLOCKOUT', label: 'Late clock-out' },
     { kind: 'OUTSIDE', label: 'Out of office' },
@@ -94,6 +97,7 @@ export class ApprovalsComponent implements OnInit {
       settle(firstValueFrom(this.attendance.canApproveClockOuts())),
       settle(firstValueFrom(this.attendance.canApproveGeofence())),
     ]);
+    const wf = await settle(firstValueFrom(this.wfh.pending()));
     const [co, oo] = await Promise.all([
       coCan.ok && coCan.v?.canApprove ? settle(firstValueFrom(this.attendance.getPendingClockOuts())) : Promise.resolve({ ok: false as const, v: null }),
       ooCan.ok && ooCan.v?.canApprove ? settle(firstValueFrom(this.attendance.getPendingGeofence())) : Promise.resolve({ ok: false as const, v: null }),
@@ -110,6 +114,17 @@ export class ApprovalsComponent implements OnInit {
           title: l.leaveType?.name ?? 'Leave',
           detail: s === e ? `${s}${l.isHalfDay ? ' · half day' + (l.halfDayPeriod ? ' (' + l.halfDayPeriod + ')' : '') : ''}` : `${s} → ${e}`,
           reason: l.reason ?? null,
+        });
+      }
+    }
+    if (wf.ok && (wf.v ?? []).length >= 0) {
+      const can = await settle(firstValueFrom(this.wfh.canApprove()));
+      if (can.ok && can.v?.canApprove) avail.add('WFH');
+      for (const w of wf.v ?? []) {
+        out.push({
+          kind: 'WFH', id: w.id, ...this.person(w.employee), date: this.day(w.date), raw: w,
+          title: 'Work From Home', detail: `${this.day(w.date)} · ${w.status === 'PENDING_HR' ? 'manager approved, needs HR' : 'needs the reporting manager'}`,
+          reason: w.reason ?? null,
         });
       }
     }
@@ -159,6 +174,7 @@ export class ApprovalsComponent implements OnInit {
   private decide(r: Row, approve: boolean, note?: string) {
     switch (r.kind) {
       case 'LEAVE': return firstValueFrom(this.leaves.updateRequestStatus(r.id, approve ? 'APPROVED' : 'REJECTED', note));
+      case 'WFH': return firstValueFrom(this.wfh.review(r.id, approve ? 'APPROVE' : 'REJECT', note));
       case 'REG': return firstValueFrom(this.attendance.resolveRegularization(r.id, approve ? 'APPROVED' : 'REJECTED', note));
       case 'CLOCKOUT': return firstValueFrom(this.attendance.reviewClockOut(r.id, approve ? 'APPROVE' : 'REJECT', note));
       case 'OUTSIDE': return firstValueFrom(this.attendance.reviewGeofence(r.id, approve ? 'APPROVE' : 'REJECT', note));
