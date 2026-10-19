@@ -7,7 +7,7 @@ import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY } from '../field-visits/field-visit
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShiftRosterService, EffectiveShift } from './shift-roster.service';
 import { ShiftPeriod, resolvePeriod, datesInRange } from './shift-period-summary';
-import { CLOCK_OUT_APPROVAL } from './clock-out-approval';
+import { CLOCK_OUT_APPROVAL, UNQUEUED_CLOCKOUT_FROM } from './clock-out-approval';
 import { isHalfDayStart } from './half-day-rule';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
@@ -1180,6 +1180,9 @@ export class AttendanceService {
         OR: [
           { clockOutApproval: CLOCK_OUT_APPROVAL.PENDING },
           {
+            // Only recent ones: older months are paid and closed, and pulling
+            // every historic auto clock-out in made this queue thousands long.
+            date: { gte: UNQUEUED_CLOCKOUT_FROM },
             clockOutApproval: null, clockIn: { not: null },
             // A session still open is not here: it has to be clocked out first.
             clockOut: { not: null },

@@ -1711,7 +1711,9 @@ export class AllAttendanceComponent implements OnInit {
     if (this.needsClockOutApproval(r)) return true;
     // Same rule as payroll: open after the shift, closed automatically, or
     // closed late with a reason (older days too) — until approved.
-    return (!!r.missedClockOut && !r.clockOut) || !!r.autoClockedOut || !!r.clockOutReason;
+    if (!!r.missedClockOut && !r.clockOut) return true;
+    // Older late/automatic clock-outs count only from 1 Sep 2026, as in payroll.
+    return this.getBackendDateString(r.date) >= '2026-09-01' && (!!r.autoClockedOut || !!r.clockOutReason);
   }
 
   clockOutHalfDayReason(r: AttendanceRecord): string {

@@ -1005,33 +1005,342 @@
 
 <!-- KPI pop-up: the people behind a number (19 Oct 2026) -->
 <div class="kpi-overlay" *ngIf="kpiModal() as m" (click)="kpiModal.set(null)">
-  <div class="kpi-dialog" (click)="$event.stopPropagation()" role="dialog" [attr.aria-label]="m.title">
+  <div
+    class="kpi-dialog"
+    [attr.data-tone]="m.tone"
+    (click)="$event.stopPropagation()"
+    role="dialog"
+    [attr.aria-label]="m.title"
+  >
+    <!-- Top Accent Bar -->
+    <div class="kpi-top-accent"></div>
+
+    <!-- Header -->
     <div class="kpi-head">
-      <div>
-        <h3>{{ m.title }}</h3>
-        <span>{{ m.rows.length }} {{ m.rows.length === 1 ? 'record' : 'records' }}</span>
-      </div>
-      <button type="button" class="kpi-x" (click)="kpiModal.set(null)" aria-label="Close">✕</button>
-    </div>
-    <div class="kpi-tools">
-      <input type="text" placeholder="Search name, department…" [value]="kpiQuery()" (input)="kpiQuery.set($any($event.target).value)" />
-      <button type="button" class="kpi-filter-btn" *ngIf="m.status !== null || m.title.indexOf('today') < 0" (click)="filterTableFromKpi()">Show in table</button>
-    </div>
-    <div class="kpi-list">
-      <div class="kpi-empty" *ngIf="!kpiRows().length">No one here.</div>
-      <div class="kpi-row" *ngFor="let r of kpiRows()">
-        <button type="button" class="kpi-person" (click)="profileModal.open(r.id)" title="Open profile">
-          <span class="kpi-av"><img *ngIf="r.avatarUrl" [src]="r.avatarUrl" alt=""><span *ngIf="!r.avatarUrl">{{ kpiInitials(r.name) }}</span></span>
-          <span class="kpi-text"><b>{{ r.name }}</b><small>{{ r.designation || '—' }}<ng-container *ngIf="r.department"> · {{ r.department }}</ng-container></small></span>
-        </button>
-        <div class="kpi-detail">
-          <span *ngIf="r.date" class="kpi-date">{{ r.date + 'T00:00:00' | date:'dd MMM' }}</span>
-          <span *ngIf="r.clockIn" class="kpi-time" [class.late]="r.isLate">In {{ r.clockIn | date:'h:mm a' }}</span>
-          <span *ngIf="r.clockIn" class="kpi-time">{{ r.clockOut ? 'Out ' + (r.clockOut | date:'h:mm a') : 'Still working' }}</span>
-          <span *ngIf="r.where" class="kpi-chip">{{ r.where }}</span>
-          <span *ngIf="r.leaveType" class="kpi-chip leave">{{ r.leaveType }}{{ r.halfDayLeave ? ' · half day' : '' }}</span>
-          <span *ngIf="r.dayStatus && m.status === null" class="kpi-chip">{{ r.dayStatus }}</span>
+      <div class="kpi-head-left">
+        <div class="kpi-head-icon">
+          <svg *ngIf="m.tone === 'emerald'" lucideUserCheck size="20"></svg>
+          <svg *ngIf="m.tone === 'amber'" lucideAlertTriangle size="20"></svg>
+          <svg *ngIf="m.tone === 'rose'" lucideTimer size="20"></svg>
+          <svg *ngIf="m.tone === 'violet'" lucidePlane size="20"></svg>
+          <svg *ngIf="m.tone === 'danger'" lucideUserX size="20"></svg>
+          <svg *ngIf="m.tone === 'slate'" lucideCalendar size="20"></svg>
+          <svg *ngIf="m.tone === 'indigo'" lucideCalendarDays size="20"></svg>
         </div>
+
+        <div class="kpi-head-copy">
+          <div class="kpi-title-row">
+            <h3>{{ m.heading || m.title }}</h3>
+            <span class="kpi-scope-pill" *ngIf="m.scope">{{ m.scope }}</span>
+            <span class="kpi-count-pill">
+              <ng-container *ngIf="kpiRows().length === m.rows.length">
+                {{ m.rows.length }} {{ m.rows.length === 1 ? 'record' : 'records' }}
+              </ng-container>
+              <ng-container *ngIf="kpiRows().length !== m.rows.length">
+                {{ kpiRows().length }} of {{ m.rows.length }} records
+              </ng-container>
+            </span>
+          </div>
+          <p class="kpi-sub">
+            Click any employee to inspect their full profile · Use filters below to narrow records
+          </p>
+        </div>
+      </div>
+
+      <div class="kpi-head-actions">
+        <button
+          type="button"
+          class="kpi-export-btn"
+          *ngIf="kpiRows().length > 0"
+          (click)="exportKpiModalCsv()"
+          title="Export current list to CSV"
+        >
+          <svg lucideDownload size="14"></svg>
+          <span>Export CSV</span>
+        </button>
+        <button
+          type="button"
+          class="kpi-filter-btn"
+          *ngIf="m.status !== null || m.title.indexOf('today') < 0"
+          (click)="filterTableFromKpi()"
+        >
+          <svg lucideFilter size="14"></svg>
+          <span>Show in table</span>
+        </button>
+        <button
+          type="button"
+          class="kpi-x"
+          (click)="kpiModal.set(null)"
+          aria-label="Close"
+          title="Close (Esc)"
+        >
+          <svg lucideX size="16"></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Toolbar: Search + Department Select + Quick Filter Chips -->
+    <div class="kpi-toolbar" *ngIf="m.rows.length > 0">
+      <div class="kpi-search-row">
+        <div class="kpi-search-box">
+          <svg lucideSearch size="15" class="kpi-search-ico"></svg>
+          <input
+            type="text"
+            placeholder="Search by employee name, code, designation, or department…"
+            [value]="kpiQuery()"
+            (input)="kpiQuery.set($any($event.target).value); kpiVisibleLimit.set(60)"
+          />
+          <button
+            type="button"
+            class="kpi-search-clear"
+            *ngIf="kpiQuery()"
+            (click)="kpiQuery.set(''); kpiVisibleLimit.set(60)"
+            aria-label="Clear search"
+          >
+            <svg lucideX size="13"></svg>
+          </button>
+        </div>
+
+        <div class="kpi-dept-select-wrap" *ngIf="kpiDepartments().length > 1">
+          <svg lucideBuilding size="14" class="kpi-dept-ico"></svg>
+          <select
+            class="kpi-dept-select"
+            [ngModel]="kpiDeptFilter()"
+            (ngModelChange)="kpiDeptFilter.set($event); kpiVisibleLimit.set(60)"
+            aria-label="Filter by department"
+          >
+            <option value="ALL">All Departments ({{ kpiDepartments().length }})</option>
+            <option *ngFor="let dept of kpiDepartments()" [value]="dept">{{ dept }}</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Quick Filter Pills (Work Mode & Live Status) -->
+      <div
+        class="kpi-quick-chips"
+        *ngIf="kpiBreakdown().office + kpiBreakdown().wfh + kpiBreakdown().onsite + kpiBreakdown().working + kpiBreakdown().late > 0"
+      >
+        <button
+          type="button"
+          class="kpi-qchip"
+          [class.active]="kpiQuickFilter() === 'ALL'"
+          (click)="setKpiQuickFilter('ALL')"
+        >
+          <span>All</span>
+          <b>{{ kpiBreakdown().total }}</b>
+        </button>
+
+        <button
+          type="button"
+          class="kpi-qchip office"
+          *ngIf="kpiBreakdown().office > 0"
+          [class.active]="kpiQuickFilter() === 'OFFICE'"
+          (click)="setKpiQuickFilter('OFFICE')"
+        >
+          <span class="qdot"></span>
+          <span>Office</span>
+          <b>{{ kpiBreakdown().office }}</b>
+        </button>
+
+        <button
+          type="button"
+          class="kpi-qchip wfh"
+          *ngIf="kpiBreakdown().wfh > 0"
+          [class.active]="kpiQuickFilter() === 'WFH'"
+          (click)="setKpiQuickFilter('WFH')"
+        >
+          <span class="qdot"></span>
+          <span>WFH / Outside</span>
+          <b>{{ kpiBreakdown().wfh }}</b>
+        </button>
+
+        <button
+          type="button"
+          class="kpi-qchip onsite"
+          *ngIf="kpiBreakdown().onsite > 0"
+          [class.active]="kpiQuickFilter() === 'ONSITE'"
+          (click)="setKpiQuickFilter('ONSITE')"
+        >
+          <span class="qdot"></span>
+          <span>On Site</span>
+          <b>{{ kpiBreakdown().onsite }}</b>
+        </button>
+
+        <button
+          type="button"
+          class="kpi-qchip working"
+          *ngIf="kpiBreakdown().working > 0"
+          [class.active]="kpiQuickFilter() === 'WORKING'"
+          (click)="setKpiQuickFilter('WORKING')"
+        >
+          <span class="qdot pulse"></span>
+          <span>Still Working</span>
+          <b>{{ kpiBreakdown().working }}</b>
+        </button>
+
+        <button
+          type="button"
+          class="kpi-qchip late"
+          *ngIf="kpiBreakdown().late > 0"
+          [class.active]="kpiQuickFilter() === 'LATE'"
+          (click)="setKpiQuickFilter('LATE')"
+        >
+          <span class="qdot"></span>
+          <span>Late In</span>
+          <b>{{ kpiBreakdown().late }}</b>
+        </button>
+
+        <button
+          type="button"
+          class="kpi-qreset"
+          *ngIf="hasKpiActiveFilters()"
+          (click)="resetKpiModalFilters()"
+        >
+          <svg lucideRotateCcw size="12"></svg>
+          <span>Reset</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Records List -->
+    <div class="kpi-list">
+      <div class="kpi-empty" *ngIf="!kpiRows().length">
+        <div class="kpi-empty-ico">
+          <svg lucideInbox size="22"></svg>
+        </div>
+        <strong>No matching attendance records</strong>
+        <span>
+          {{ hasKpiActiveFilters() ? 'Try clearing your search or quick filters.' : 'No employees are in this category right now.' }}
+        </span>
+        <button
+          type="button"
+          class="kpi-empty-reset"
+          *ngIf="hasKpiActiveFilters()"
+          (click)="resetKpiModalFilters()"
+        >
+          Reset Filters
+        </button>
+      </div>
+
+      <div
+        class="kpi-row"
+        *ngFor="let r of kpiVisibleRows(); trackBy: trackByKpiRow"
+      >
+        <button
+          type="button"
+          class="kpi-person"
+          (click)="profileModal.open(r.id)"
+          title="View employee profile"
+        >
+          <span class="kpi-av-wrap">
+            <span class="kpi-av">
+              <img
+                *ngIf="r.avatarUrl"
+                [src]="r.avatarUrl"
+                [alt]="r.name"
+                (error)="r.avatarUrl = null"
+              />
+              <span *ngIf="!r.avatarUrl">{{ kpiInitials(r.name) }}</span>
+            </span>
+            <span
+              class="kpi-av-dot"
+              *ngIf="r.clockIn || r.leaveType"
+              [class.working]="r.clockIn && !r.clockOut"
+              [class.done]="r.clockIn && r.clockOut"
+              [class.late]="r.isLate"
+              [class.leave]="r.leaveType"
+            ></span>
+          </span>
+
+          <span class="kpi-text">
+            <span class="kpi-name-line">
+              <b>{{ r.name }}</b>
+              <span class="kpi-emp-code" *ngIf="r.employeeCode">{{ r.employeeCode }}</span>
+            </span>
+            <small>
+              <span>{{ r.designation || 'Team Member' }}</span>
+              <ng-container *ngIf="r.department">
+                <span class="kpi-meta-sep">·</span>
+                <span class="kpi-dept-label">{{ r.department }}</span>
+              </ng-container>
+            </small>
+          </span>
+        </button>
+
+        <div class="kpi-detail">
+          <!-- Date Pill (when multi-day/month view) -->
+          <span *ngIf="r.date" class="kpi-date-pill">
+            <svg lucideCalendar size="11"></svg>
+            <span>{{ r.date + 'T00:00:00' | date:'d MMM yyyy' }}</span>
+          </span>
+
+          <!-- Punch In / Out Group -->
+          <div class="kpi-punch-group" *ngIf="r.clockIn">
+            <span class="kpi-time in" [class.late]="r.isLate">
+              <span class="kpi-time-dot"></span>
+              <span>In {{ r.clockIn | date:'h:mm a' }}</span>
+            </span>
+            <span class="kpi-punch-arrow">→</span>
+            <span class="kpi-time out" [class.working]="!r.clockOut">
+              <span class="kpi-working-pulse" *ngIf="!r.clockOut"></span>
+              <span>{{ r.clockOut ? 'Out ' + (r.clockOut | date:'h:mm a') : 'Still working' }}</span>
+            </span>
+          </div>
+
+          <!-- Work Location Badge -->
+          <span
+            *ngIf="r.where"
+            class="kpi-chip"
+            [class.loc-office]="r.where === 'Office'"
+            [class.loc-wfh]="r.where === 'WFH / outside'"
+            [class.loc-onsite]="r.where === 'On site'"
+          >
+            {{ r.where }}
+          </span>
+
+          <!-- Leave Pill -->
+          <span *ngIf="r.leaveType" class="kpi-chip leave">
+            {{ r.leaveType }}{{ r.halfDayLeave ? ' · Half Day' : '' }}
+          </span>
+
+          <!-- Day Status Pill -->
+          <span
+            *ngIf="r.dayStatus && m.status === null"
+            class="kpi-chip status-badge"
+            [attr.data-status]="r.dayStatus"
+          >
+            {{ r.dayStatus }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Load More Button for Large Lists -->
+      <div class="kpi-load-more-wrap" *ngIf="kpiRows().length > kpiVisibleRows().length">
+        <button type="button" class="kpi-load-more-btn" (click)="loadMoreKpiRows()">
+          <span>
+            Show more records ({{ kpiVisibleRows().length }} of {{ kpiRows().length }} shown)
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sticky Footer -->
+    <div class="kpi-foot">
+      <span class="kpi-foot-info">
+        Showing <strong>{{ kpiVisibleRows().length }}</strong> of <strong>{{ kpiRows().length }}</strong> matching records
+      </span>
+      <div class="kpi-foot-actions">
+        <button
+          type="button"
+          class="kpi-foot-btn secondary"
+          *ngIf="m.status !== null || m.title.indexOf('today') < 0"
+          (click)="filterTableFromKpi()"
+        >
+          Apply to Attendance Table
+        </button>
+        <button type="button" class="kpi-foot-btn primary" (click)="kpiModal.set(null)">
+          Done
+        </button>
       </div>
     </div>
   </div>

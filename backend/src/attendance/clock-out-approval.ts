@@ -50,7 +50,15 @@ export function isAwaitingClockOutApproval(
   return record?.clockOutApproval === CLOCK_OUT_APPROVAL.PENDING;
 }
 
+/**
+ * Late or automatic clock-outs that never went through approval count as half
+ * days only from this date (19 Oct 2026). Earlier months are paid and closed,
+ * and their thousands of old rows must not flood the approvals queue.
+ */
+export const UNQUEUED_CLOCKOUT_FROM = new Date('2026-09-01T00:00:00.000Z');
+
 type ClockOutDay = {
+  date?: Date | string | null;
   status?: string | null; clockOutApproval?: string | null; missedClockOut?: boolean | null;
   autoClockedOut?: boolean | null; clockOutReason?: string | null;
   clockIn?: Date | string | null; clockOut?: Date | string | null;
@@ -67,7 +75,9 @@ export function clockOutUnsettled(record: ClockOutDay | null | undefined): boole
   const state = record.clockOutApproval;
   if (state === CLOCK_OUT_APPROVAL.APPROVED) return false;
   if (state === CLOCK_OUT_APPROVAL.PENDING || state === CLOCK_OUT_APPROVAL.REJECTED) return true;
-  return (!!record.missedClockOut && !record.clockOut) || !!record.autoClockedOut || !!record.clockOutReason;
+  if (!!record.missedClockOut && !record.clockOut) return true;
+  const recent = !record.date || new Date(record.date) >= UNQUEUED_CLOCKOUT_FROM;
+  return recent && (!!record.autoClockedOut || !!record.clockOutReason);
 }
 
 /**
