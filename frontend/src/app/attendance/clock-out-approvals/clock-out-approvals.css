@@ -1347,8 +1347,8 @@
 .table-scroll-wrapper {
   width: 100%;
   overflow-x: auto;
-  max-height: calc(100vh - 270px);
-  min-height: 400px;
+  /* No inner up-and-down scroll (19 Oct 2026): the page scrolls. */
+  overflow-y: hidden;
 }
 
 .attendance-table {

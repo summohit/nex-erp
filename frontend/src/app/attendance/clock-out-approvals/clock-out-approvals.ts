@@ -56,7 +56,7 @@ export class ClockOutApprovalsComponent implements OnInit {
   filterDepartment = signal('');
   filterProofStatus = signal('');
   filterTab = signal<'ALL' | 'URGENT' | 'RECENT' | 'HAS_PROOF'>('ALL');
-  sortOrder = signal<'OLDEST' | 'NEWEST'>('OLDEST');
+  sortOrder = signal<'OLDEST' | 'NEWEST'>('NEWEST');
 
   get approvalFilterGroups() {
     const departments = [...new Set(
@@ -162,9 +162,10 @@ export class ClockOutApprovalsComponent implements OnInit {
   geoDistance = signal<'ALL' | 'NOGPS' | 'LT1' | '1TO10' | '10TO100' | 'GT100'>('ALL');
   geoFrom = signal('');
   geoTo = signal('');
-  geoSort = signal<'OLDEST' | 'NEWEST' | 'FARTHEST'>('OLDEST');
+  geoSort = signal<'OLDEST' | 'NEWEST' | 'FARTHEST'>('NEWEST');
   geoPage = signal(1);
-  readonly GEO_PAGE_SIZE = 100;
+  /** Everyone on one page (19 Oct 2026); the page scrolls, not the table. */
+  readonly GEO_PAGE_SIZE = 100000;
   geoSelected = signal<Set<number>>(new Set());
   geoBulkBusy = signal(false);
 
