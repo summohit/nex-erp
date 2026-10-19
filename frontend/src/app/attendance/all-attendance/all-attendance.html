@@ -68,13 +68,13 @@
       <button type="button" class="today-refresh" (click)="loadToday()" title="Refresh today's numbers">↻</button>
     </div>
     <div class="today-grid">
-      <div class="today-kpi k-in"><b>{{ t.clockedIn }}</b><span>Clocked in</span><small>{{ t.stillWorking }} still working</small></div>
-      <div class="today-kpi k-ok"><b>{{ t.present }}</b><span>On time</span></div>
-      <div class="today-kpi k-late"><b>{{ t.late }}</b><span>Late</span></div>
-      <div class="today-kpi k-half"><b>{{ t.halfDay }}</b><span>Half day</span></div>
-      <div class="today-kpi k-leave"><b>{{ t.onLeave }}</b><span>On leave</span></div>
-      <div class="today-kpi k-off"><b>{{ t.dayOff }}</b><span>Day off</span></div>
-      <div class="today-kpi k-miss"><b>{{ t.notClockedIn }}</b><span>Not clocked in yet</span></div>
+      <div class="today-kpi k-in" (click)="openTodayKpi('clockedIn', 'Clocked in')" title="Show who"><b>{{ t.clockedIn }}</b><span>Clocked in</span><small>{{ t.stillWorking }} still working</small></div>
+      <div class="today-kpi k-ok" (click)="openTodayKpi('present', 'On time')" title="Show who"><b>{{ t.present }}</b><span>On time</span></div>
+      <div class="today-kpi k-late" (click)="openTodayKpi('late', 'Late')" title="Show who"><b>{{ t.late }}</b><span>Late</span></div>
+      <div class="today-kpi k-half" (click)="openTodayKpi('halfDay', 'Half day')" title="Show who"><b>{{ t.halfDay }}</b><span>Half day</span></div>
+      <div class="today-kpi k-leave" (click)="openTodayKpi('onLeave', 'On leave')" title="Show who"><b>{{ t.onLeave }}</b><span>On leave</span></div>
+      <div class="today-kpi k-off" (click)="openTodayKpi('dayOff', 'Day off')" title="Show who"><b>{{ t.dayOff }}</b><span>Day off</span></div>
+      <div class="today-kpi k-miss" (click)="openTodayKpi('notClockedIn', 'Not clocked in yet')" title="Show who"><b>{{ t.notClockedIn }}</b><span>Not clocked in yet</span></div>
     </div>
     <div class="today-where">Where: Office {{ t.office }} · On site {{ t.onsite }} · WFH / outside {{ t.remote }}</div>
   </div>
@@ -82,7 +82,7 @@
   <!-- KPI / Stats Row -->
   <div class="stats-row">
     <!-- Total Shifts Tracked -->
-    <div class="stat-card stat-indigo" [class.active-card]="!filterStatus && filterFlag === 'ALL' && !filterDate" (click)="filterStatus=''; filterFlag='ALL'; filterDate=null; load()" title="Click to show all records">
+    <div class="stat-card stat-indigo" [class.active-card]="!filterStatus && filterFlag === 'ALL' && !filterDate" (click)="openStatKpi('ALL', 'All shifts')" title="Click to see everyone">
       <div class="stat-icon-wrapper">
         <svg lucideCalendarDays [size]="22"></svg>
       </div>
@@ -99,7 +99,7 @@
     </div>
 
     <!-- Present & On-Time -->
-    <div class="stat-card stat-green" [class.active-card]="filterStatus === 'Present' && filterFlag === 'ALL'" (click)="toggleKpiStatus('Present')" title="Click to filter Present records">
+    <div class="stat-card stat-green" [class.active-card]="filterStatus === 'Present' && filterFlag === 'ALL'" (click)="openStatKpi('Present', 'Present')" title="Click to see who">
       <div class="stat-icon-wrapper">
         <svg lucideUserCheck [size]="22"></svg>
       </div>
@@ -116,7 +116,7 @@
     </div>
 
     <!-- Late Arrivals -->
-    <div class="stat-card stat-amber" [class.active-card]="filterStatus === 'Late'" (click)="toggleKpiStatus('Late')" title="Click to filter Late Arrivals">
+    <div class="stat-card stat-amber" [class.active-card]="filterStatus === 'Late'" (click)="openStatKpi('Late', 'Late arrivals')" title="Click to see who">
       <div class="stat-icon-wrapper">
         <svg lucideAlertTriangle [size]="22"></svg>
       </div>
@@ -133,7 +133,7 @@
     </div>
 
     <!-- Half Day / Early Leave -->
-    <div class="stat-card stat-rose" [class.active-card]="filterStatus === 'Half Day'" (click)="toggleKpiStatus('Half Day')" title="Click to filter Half Day shifts">
+    <div class="stat-card stat-rose" [class.active-card]="filterStatus === 'Half Day'" (click)="openStatKpi('Half Day', 'Half day')" title="Click to see who">
       <div class="stat-icon-wrapper">
         <svg lucideTimer [size]="22"></svg>
       </div>
@@ -150,7 +150,7 @@
     </div>
 
     <!-- Absent -->
-    <div class="stat-card stat-red" [class.active-card]="filterStatus === 'Absent'" (click)="toggleKpiStatus('Absent')" title="Click to filter Absent records">
+    <div class="stat-card stat-red" [class.active-card]="filterStatus === 'Absent'" (click)="openStatKpi('Absent', 'Absent')" title="Click to see who">
       <div class="stat-icon-wrapper">
         <svg lucideUserX [size]="22"></svg>
       </div>
@@ -167,14 +167,14 @@
     </div>
 
     <!-- On Leave -->
-    <div class="stat-card stat-violet" [class.active-card]="filterStatus === 'On Leave'" (click)="toggleKpiStatus('On Leave')" title="Click to filter On Leave records">
+    <div class="stat-card stat-violet" [class.active-card]="filterStatus === 'On Leave'" (click)="openStatKpi('On Leave', 'On leave')" title="Click to see who">
       <div class="stat-icon-wrapper">
         <svg lucidePlane [size]="22"></svg>
       </div>
       <div class="stat-info">
         <span class="stat-label">On Leave</span>
         <div class="stat-value">{{ stats().onLeave }}</div>
-        <span class="stat-subtext">{{ stats().missedClockOut }} missed clock-outs</span>
+        <span class="stat-subtext">Approved leave days</span>
       </div>
       <div class="stat-location-breakdown">
         <span>Office {{ stats().leaveLocations.office }} ({{ stats().leaveLocations.officePercent }}%)</span>
@@ -998,6 +998,40 @@
     <!-- Modal Footer -->
     <div class="session-modal-footer">
       <button type="button" class="btn btn-outline" (click)="closeDayDetailsModal()">Close Log</button>
+    </div>
+  </div>
+</div>
+
+<!-- KPI pop-up: the people behind a number (19 Oct 2026) -->
+<div class="kpi-overlay" *ngIf="kpiModal() as m" (click)="kpiModal.set(null)">
+  <div class="kpi-dialog" (click)="$event.stopPropagation()" role="dialog" [attr.aria-label]="m.title">
+    <div class="kpi-head">
+      <div>
+        <h3>{{ m.title }}</h3>
+        <span>{{ m.rows.length }} {{ m.rows.length === 1 ? 'record' : 'records' }}</span>
+      </div>
+      <button type="button" class="kpi-x" (click)="kpiModal.set(null)" aria-label="Close">✕</button>
+    </div>
+    <div class="kpi-tools">
+      <input type="text" placeholder="Search name, department…" [value]="kpiQuery()" (input)="kpiQuery.set($any($event.target).value)" />
+      <button type="button" class="kpi-filter-btn" *ngIf="m.status !== null || m.title.indexOf('today') < 0" (click)="filterTableFromKpi()">Show in table</button>
+    </div>
+    <div class="kpi-list">
+      <div class="kpi-empty" *ngIf="!kpiRows().length">No one here.</div>
+      <div class="kpi-row" *ngFor="let r of kpiRows()">
+        <button type="button" class="kpi-person" (click)="profileModal.open(r.id)" title="Open profile">
+          <span class="kpi-av"><img *ngIf="r.avatarUrl" [src]="r.avatarUrl" alt=""><span *ngIf="!r.avatarUrl">{{ kpiInitials(r.name) }}</span></span>
+          <span class="kpi-text"><b>{{ r.name }}</b><small>{{ r.designation || '—' }}<ng-container *ngIf="r.department"> · {{ r.department }}</ng-container></small></span>
+        </button>
+        <div class="kpi-detail">
+          <span *ngIf="r.date" class="kpi-date">{{ r.date + 'T00:00:00' | date:'dd MMM' }}</span>
+          <span *ngIf="r.clockIn" class="kpi-time" [class.late]="r.isLate">In {{ r.clockIn | date:'h:mm a' }}</span>
+          <span *ngIf="r.clockIn" class="kpi-time">{{ r.clockOut ? 'Out ' + (r.clockOut | date:'h:mm a') : 'Still working' }}</span>
+          <span *ngIf="r.where" class="kpi-chip">{{ r.where }}</span>
+          <span *ngIf="r.leaveType" class="kpi-chip leave">{{ r.leaveType }}{{ r.halfDayLeave ? ' · half day' : '' }}</span>
+          <span *ngIf="r.dayStatus && m.status === null" class="kpi-chip">{{ r.dayStatus }}</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>

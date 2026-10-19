@@ -16,6 +16,7 @@ import {
   LucideRoute
 } from '@lucide/angular';
 import { forkJoin, firstValueFrom } from 'rxjs';
+import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
 import { AttendanceService, AttendanceRecord } from '../../services/attendance';
 import { isRestDay } from '../../shared/utils/weekly-offs';
 import { MasterDataService, Department } from '../../services/master-data.service';
@@ -81,6 +82,7 @@ export class AllAttendanceComponent implements OnInit {
   private masterDataService = inject(MasterDataService);
   private employeeService = inject(EmployeeService);
   private toast = inject(HotToastService);
+  profileModal = inject(ProfileModalService);
   private router = inject(Router);
 
   viewMode = signal<'grid' | 'table'>('grid');
@@ -286,11 +288,8 @@ export class AllAttendanceComponent implements OnInit {
 
   ngOnInit() {
     this.loadToday();
-    // The attendance overview is an operational dashboard. Start with today's
-    // calendar day so its KPI cards answer "who is here today?" rather than
-    // silently aggregating the whole current month. Month/year remain aligned
-    // with this date for the matrix and can still be changed in Filters.
-    this.filterDate = this.getLocalDateString(new Date());
+    // No date is picked on load (19 Oct 2026): the "Today" strip above already
+    // answers "who is here today?", and the cards and table show the month.
     this.employeeService.getEmployeesBasicList().subscribe({ next: (res) => this.employees.set(res || []) });
     this.masterDataService.getDepartments(true).subscribe({ next: (res) => this.departments.set(res || []) });
     this.masterDataService.getHolidays().subscribe({ next: (res: any) => this.holidays.set(res || []) });
@@ -1325,6 +1324,60 @@ export class AllAttendanceComponent implements OnInit {
       month: 'short', day: 'numeric', year: 'numeric'
     });
   }
+
+  /**
+   * KPI pop-up (19 Oct 2026): clicking a number shows the people behind it.
+   * Today's strip uses the server's lists; the cards below use the records
+   * the current filters show, so the list always matches the number.
+   */
+  kpiModal = signal<{ title: string; status: string | null; rows: any[] } | null>(null);
+  kpiQuery = signal('');
+  kpiRows = computed(() => {
+    const m = this.kpiModal();
+    if (!m) return [];
+    const q = this.kpiQuery().trim().toLowerCase();
+    return q ? m.rows.filter((r) => `${r.name} ${r.department ?? ''} ${r.designation ?? ''} ${r.employeeCode ?? ''}`.toLowerCase().includes(q)) : m.rows;
+  });
+
+  openTodayKpi(key: string, title: string) {
+    const rows = this.today()?.lists?.[key] ?? [];
+    this.kpiQuery.set('');
+    this.kpiModal.set({ title: `${title} · today`, status: null, rows });
+  }
+
+  openStatKpi(status: string, title: string) {
+    let list = this.baseFilteredRecords();
+    if (status === 'Late') list = list.filter((r) => r.isLate);
+    else if (status !== 'ALL') list = list.filter((r) => this.recordDayStatus(r) === status);
+    const rows = list.map((r: any) => ({
+      id: r.employeeId,
+      name: `${r.employee?.firstName ?? ''} ${r.employee?.lastName ?? ''}`.trim(),
+      employeeCode: r.employee?.employeeCode ?? null,
+      avatarUrl: r.employee?.avatarUrl ?? null,
+      department: r.employee?.department?.name ?? null,
+      designation: r.employee?.designation?.name ?? null,
+      date: this.getBackendDateString(r.date),
+      clockIn: r.clockIn ?? null,
+      clockOut: r.clockOut ?? null,
+      isLate: !!r.isLate,
+      dayStatus: this.recordDayStatus(r),
+      where: r.clockIn ? (r.isOnsite || r.fieldVisit ? 'On site' : r.clockInOutside || r.clockOutOutside ? 'WFH / outside' : 'Office') : null,
+      leaveType: r.leaveType ?? null,
+      halfDayLeave: !!r.isHalfDay,
+    }));
+    this.kpiQuery.set('');
+    this.kpiModal.set({ title: `${title} · ${this.statsScopeLabel()}`, status: status === 'ALL' ? null : status, rows });
+  }
+
+  /** From the pop-up: narrow the table below to the same records. */
+  filterTableFromKpi() {
+    const m = this.kpiModal();
+    this.kpiModal.set(null);
+    if (!m?.status) { this.filterStatus = ''; this.filterFlag = 'ALL'; return; }
+    if (this.filterStatus !== m.status) this.toggleKpiStatus(m.status);
+  }
+
+  kpiInitials(n: string) { return (n || '?').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(); }
 
   toggleKpiStatus(status: string) {
     if (this.filterStatus === status) {

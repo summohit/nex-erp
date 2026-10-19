@@ -930,7 +930,11 @@ export class AttendanceService {
 
     const people = await this.prisma.employee.findMany({
       where: { companyId, user: { status: { not: 'SUSPENDED' } } },
-      select: { id: true },
+      select: {
+        id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true,
+        department: { select: { name: true } }, designation: { select: { name: true } },
+      },
+      orderBy: { firstName: 'asc' },
     });
     const ids = people.map((p) => p.id);
 
@@ -941,7 +945,7 @@ export class AttendanceService {
       }),
       this.prisma.leaveRequest.findMany({
         where: { employeeId: { in: ids }, status: 'APPROVED', deletedAt: null, startDate: { lt: tomorrow }, endDate: { gte: today } },
-        select: { employeeId: true },
+        select: { employeeId: true, isHalfDay: true, leaveType: { select: { name: true } } },
       }),
       this.prisma.shiftRosterEntry.findMany({
         where: { employeeId: { in: ids }, date: today, isDayOff: true },
@@ -954,7 +958,35 @@ export class AttendanceService {
     const leaveIds = new Set(leaves.map((l) => l.employeeId).filter((id) => !clockedIds.has(id)));
     const offIds = new Set(daysOff.map((d) => d.employeeId).filter((id) => !clockedIds.has(id) && !leaveIds.has(id)));
 
+    // Who is behind each number (19 Oct 2026), for the KPI pop-up.
+    const byId = new Map(people.map((p) => [p.id, p]));
+    const recById = new Map(clocked.map((r) => [r.employeeId, r]));
+    const leaveById = new Map(leaves.map((l) => [l.employeeId, l]));
+    const person = (id: number) => {
+      const p = byId.get(id);
+      const r = recById.get(id);
+      const l = leaveById.get(id);
+      return {
+        id, name: `${p?.firstName ?? ''} ${p?.lastName ?? ''}`.trim(), employeeCode: p?.employeeCode ?? null,
+        avatarUrl: p?.avatarUrl ?? null, department: p?.department?.name ?? null, designation: p?.designation?.name ?? null,
+        clockIn: r?.clockIn ?? null, clockOut: r?.clockOut ?? null, isLate: !!r?.isLate, status: r?.status ?? null,
+        where: r ? (r.isOnsite ? 'On site' : r.clockInOutside ? 'WFH / outside' : 'Office') : null,
+        leaveType: l?.leaveType?.name ?? null, halfDayLeave: !!l?.isHalfDay,
+      };
+    };
+    const list = (rows: number[]) => rows.map(person);
+    const lists = {
+      clockedIn: list(clocked.map((r) => r.employeeId)),
+      present: list(clocked.filter((r) => r.status !== 'HALF_DAY' && !r.isLate).map((r) => r.employeeId)),
+      late: list(clocked.filter((r) => r.isLate).map((r) => r.employeeId)),
+      halfDay: list(clocked.filter((r) => r.status === 'HALF_DAY').map((r) => r.employeeId)),
+      onLeave: list([...leaveIds]),
+      dayOff: list([...offIds]),
+      notClockedIn: list(ids.filter((id) => !clockedIds.has(id) && !leaveIds.has(id) && !offIds.has(id))),
+    };
+
     return {
+      lists,
       date: today.toISOString().slice(0, 10),
       totalEmployees: ids.length,
       clockedIn: clocked.length,
