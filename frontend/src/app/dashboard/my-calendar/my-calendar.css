@@ -1,0 +1,86 @@
+/* My Calendar (19 Oct 2026) */
+:host { display: block; }
+.mc { padding: 0; overflow: hidden; }
+.mc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 18px 10px; }
+.mc-title { display: flex; align-items: center; gap: 10px; }
+.mc-title h3 { margin: 0; font-size: 15px; font-weight: 800; color: #0f172a; }
+.mc-period { font-size: 12.5px; font-weight: 600; color: #64748b; }
+.mc-tools { display: flex; align-items: center; gap: 8px; }
+.mc-today { height: 34px; padding: 0 12px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; font-size: 12.5px; font-weight: 700; color: #334155; cursor: pointer; }
+.mc-today:hover { background: #f8fafc; }
+.mc-nav { display: flex; border: 1px solid #e2e8f0; border-radius: 9px; overflow: hidden; }
+.mc-nav button { width: 34px; height: 32px; border: 0; background: #fff; color: #475569; cursor: pointer; display: grid; place-items: center; }
+.mc-nav button + button { border-left: 1px solid #e2e8f0; }
+.mc-nav button:hover { background: #f1f5f9; }
+.mc-switch { display: flex; padding: 3px; border-radius: 10px; background: #f1f5f9; }
+.mc-switch button { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; font-size: 12.5px; font-weight: 700; color: #64748b; cursor: pointer; }
+.mc-switch button.on { background: #fff; color: #1373e5; box-shadow: 0 1px 2px rgba(15,23,42,.08); }
+
+/* Colours per kind */
+.k-HOLIDAY { --c: #dc2626; --bg: #fef2f2; }
+.k-LEAVE { --c: #d97706; --bg: #fffbeb; }
+.k-TASK { --c: #1373e5; --bg: #eff6ff; }
+.k-SHIFT { --c: #0d9488; --bg: #f0fdfa; }
+.k-DAY_OFF { --c: #64748b; --bg: #f1f5f9; }
+.k-BIRTHDAY { --c: #db2777; --bg: #fdf2f8; }
+.k-ANNIVERSARY { --c: #7c3aed; --bg: #f5f3ff; }
+
+.mc-legend { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 18px 12px; }
+.mc-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; font-size: 11.5px; font-weight: 700; color: #334155; cursor: pointer; }
+.mc-chip .mc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.mc-chip.off { opacity: .45; text-decoration: line-through; }
+
+.mc-body { display: flex; border-top: 1px solid #e2e8f0; position: relative; }
+.mc-body.loading .mc-grid { opacity: .55; }
+.mc-grid { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); transition: opacity .15s; }
+.mc-wd { padding: 8px 10px; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #94a3b8; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+.mc-cell { min-height: 108px; padding: 6px; border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; cursor: pointer; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mc-grid.week .mc-cell { min-height: 240px; }
+.mc-cell:nth-child(7n + 7) { border-right: 0; }
+.mc-cell:hover { background: #f8fafc; }
+.mc-cell.weekend { background: #fcfcfd; }
+.mc-cell.out { background: #fafafa; }
+.mc-cell.out .mc-num { color: #cbd5e1; }
+.mc-cell.sel { background: #eff6ff; box-shadow: inset 0 0 0 2px #93c5fd; }
+.mc-num { display: flex; justify-content: flex-end; font-size: 12.5px; font-weight: 700; color: #334155; }
+.mc-num span { min-width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; }
+.mc-cell.today .mc-num span { background: #1373e5; color: #fff; }
+.mc-events { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mc-ev { display: flex; flex-direction: column; padding: 3px 7px; border-radius: 6px; background: var(--bg); border-left: 3px solid var(--c); min-width: 0; }
+.mc-ev.mine { box-shadow: inset 0 0 0 1px var(--c); }
+.mc-ev-title { font-size: 11.5px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mc-ev-sub { font-size: 10.5px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mc-more { font-size: 11px; font-weight: 700; color: #1373e5; padding: 1px 4px; }
+
+.mc-day { width: 300px; flex: 0 0 300px; border-left: 1px solid #e2e8f0; background: #fff; padding: 14px; max-height: 720px; overflow-y: auto; }
+.mc-day-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
+.mc-day-title { font-size: 14px; font-weight: 800; color: #0f172a; }
+.mc-day-count { font-size: 12px; color: #64748b; margin-top: 2px; }
+.mc-x { width: 30px; height: 30px; border: 0; border-radius: 8px; background: #f1f5f9; color: #64748b; cursor: pointer; display: grid; place-items: center; }
+.mc-day-empty { font-size: 13px; color: #94a3b8; padding: 20px 0; text-align: center; }
+.mc-day-item { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 10px; border-left: 3px solid var(--c); background: var(--bg); margin-bottom: 6px; }
+.mc-day-item.link { cursor: pointer; }
+.mc-day-item.link:hover { filter: brightness(.97); }
+.mc-av { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 50%; background: #fff; color: var(--c); display: grid; place-items: center; font-size: 11px; font-weight: 800; overflow: hidden; }
+.mc-av img { width: 100%; height: 100%; object-fit: cover; }
+.mc-day-text { min-width: 0; }
+.mc-day-name { font-size: 13px; font-weight: 700; color: #0f172a; overflow: hidden; text-overflow: ellipsis; }
+.mc-day-sub { font-size: 11.5px; color: #64748b; }
+.mc-you { font-size: 10px; font-weight: 800; color: #fff; background: var(--c); border-radius: 999px; padding: 1px 6px; margin-left: 4px; }
+
+@media (max-width: 1024px) {
+  .mc-body { flex-direction: column; }
+  .mc-day { width: auto; flex: none; border-left: 0; border-top: 1px solid #e2e8f0; max-height: none; }
+}
+@media (max-width: 640px) {
+  .mc-head { padding: 14px 12px 8px; }
+  .mc-legend { padding: 0 12px 10px; }
+  .mc-cell { min-height: 64px; padding: 3px; }
+  .mc-grid.week .mc-cell { min-height: 140px; }
+  .mc-wd { padding: 6px 3px; text-align: center; font-size: 10px; }
+  .mc-num { justify-content: center; font-size: 11.5px; }
+  /* Small screens: dots in month view, the day list shows the detail. */
+  .mc-grid:not(.week) .mc-events { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 3px; }
+  .mc-grid:not(.week) .mc-ev { width: 7px; height: 7px; padding: 0; border: 0; border-radius: 50%; background: var(--c); }
+  .mc-grid:not(.week) .mc-ev-title, .mc-grid:not(.week) .mc-more { display: none; }
+}

@@ -1,3 +1,4 @@
+import { MyCalendarComponent } from './my-calendar/my-calendar';
 import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { NoticesService, Notice, noticeBodyHtml, noticeBodyText } from '../services/notices';
 import { CommonModule } from '@angular/common';
@@ -32,6 +33,7 @@ import { GeolocationService } from '../shared/services/geolocation.service';
     CommonModule,
     RouterModule,
     StatCardComponent,
+    MyCalendarComponent,
     LucideCheckCircle2, LucideCircle, LucideClock,
     LucideFileText, LucideCheckSquare, LucideCalendar, LucideUserCheck,
     LucideAlertCircle, LucideArrowRight,

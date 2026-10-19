@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { approvedOrRaisedBy } from '../projects/project-roles';
 import { LeavesService } from '../leaves/leaves.service';
@@ -476,32 +476,73 @@ export class DashboardService {
    * employee or the company — holidays, colleagues' birthdays, their own
    * approved leave, and their rostered shift days.
    */
+  /** This week's calendar for the dashboard's first load. */
   private async getMyCalendar(companyId: number, employeeId: number | null) {
     const today = this.startOfToday();
     const dow = today.getDay();
     const monday = this.addDays(today, dow === 0 ? -6 : 1 - dow);
     const sunday = this.addDays(monday, 6);
-    const startKey = this.ymd(monday);
-    const endKey = this.ymd(sunday);
-    const startUtc = this.utcMidnight(monday);
-    const endUtc = this.utcMidnight(this.addDays(sunday, 1));
+    const cal = await this.buildCalendar(companyId, employeeId, monday, sunday);
+    return {
+      weekStart: this.ymd(monday),
+      weekEnd: this.ymd(sunday),
+      days: this.daysBetween(monday, sunday).map(d => ({ date: this.ymd(d), label: d.toLocaleDateString('en-US', { weekday: 'short' }), dayNum: d.getDate() })),
+      events: cal.events
+    };
+  }
 
-    const [holidays, employees, leaves, rosterEntries] = await Promise.all([
+  /**
+   * The calendar for any range (19 Oct 2026), for the dashboard's month and
+   * week views: holidays, birthdays and work anniversaries, everyone's approved
+   * leave, and the person's own shifts, days off and tasks due. Up to 62 days.
+   */
+  async getCalendar(user: DashboardUser, from: string, to: string) {
+    const re = /^\d{4}-\d{2}-\d{2}$/;
+    if (!re.test(from || '') || !re.test(to || '')) throw new BadRequestException('from and to must be YYYY-MM-DD');
+    const start = new Date(`${from}T00:00:00`);
+    const end = new Date(`${to}T00:00:00`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) throw new BadRequestException('Invalid range');
+    if ((end.getTime() - start.getTime()) / 86400000 > 62) throw new BadRequestException('Range is limited to 62 days');
+    const cal = await this.buildCalendar(user.companyId, user.employeeId ?? null, start, end);
+    return { from, to, events: cal.events };
+  }
+
+  private async buildCalendar(companyId: number, employeeId: number | null, first: Date, last: Date) {
+    const startKey = this.ymd(first);
+    const endKey = this.ymd(last);
+    const startUtc = this.utcMidnight(first);
+    const endUtc = this.utcMidnight(this.addDays(last, 1));
+    const days = this.daysBetween(first, last);
+
+    const [holidays, employees, leaves, rosterEntries, tasks] = await Promise.all([
       this.prisma.holiday.findMany({ where: { companyId, date: { gte: startUtc, lt: endUtc } }, select: { id: true, name: true, date: true } }),
-      this.prisma.employee.findMany({ where: { companyId }, select: { id: true, firstName: true, lastName: true, dateOfBirth: true } }),
+      this.prisma.employee.findMany({
+        where: { companyId, user: { status: { not: 'SUSPENDED' } } },
+        select: { id: true, firstName: true, lastName: true, dateOfBirth: true, joiningDate: true, avatarUrl: true },
+      }),
       this.prisma.leaveRequest.findMany({
         where: { employee: { companyId }, status: 'APPROVED', deletedAt: null, startDate: { lt: endUtc }, endDate: { gte: startUtc } },
         include: {
           leaveType: { select: { name: true } },
-          employee: { select: { id: true, firstName: true, lastName: true } }
+          employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } }
         }
       }),
       employeeId
         ? this.prisma.shiftRosterEntry.findMany({
             where: { employeeId, date: { gte: startUtc, lt: endUtc } },
-            include: { shift: { select: { name: true } } }
+            include: { shift: { select: { name: true, startTime: true, endTime: true } } }
           })
-        : Promise.resolve([])
+        : Promise.resolve([] as any[]),
+      employeeId
+        ? this.prisma.issue.findMany({
+            where: {
+              project: { companyId }, isArchived: false, status: { notIn: ['DONE', 'CANCELLED'] },
+              assigneeId: employeeId, dueDate: { gte: startUtc, lt: endUtc },
+              AND: [approvedOrRaisedBy(employeeId)],
+            },
+            select: { id: true, key: true, title: true, dueDate: true, priority: true, projectId: true, project: { select: { name: true } } },
+          })
+        : Promise.resolve([] as any[]),
     ]);
 
     const events: any[] = [];
@@ -510,14 +551,21 @@ export class DashboardService {
       events.push({ date: this.ymd(h.date), type: 'HOLIDAY', title: h.name, subtitle: 'Company holiday' });
     }
 
-    // Birthdays: pull the occurrence into this calendar week.
+    // Birthdays and work anniversaries: every occurrence inside the range.
+    const byMonthDay = new Map<string, string>();
+    for (const d of days) byMonthDay.set(`${d.getMonth()}-${d.getDate()}`, this.ymd(d));
     for (const e of employees) {
-      if (!e.dateOfBirth) continue;
-      const marker = new Date(monday.getFullYear(), e.dateOfBirth.getMonth(), e.dateOfBirth.getDate());
-      if (marker < monday) marker.setFullYear(marker.getFullYear() + 1);
-      const key = this.ymd(marker);
-      if (key >= startKey && key <= endKey) {
-        events.push({ date: key, type: 'BIRTHDAY', title: `${e.firstName} ${e.lastName}`, subtitle: 'Birthday' });
+      const name = `${e.firstName} ${e.lastName ?? ''}`.trim();
+      if (e.dateOfBirth) {
+        const key = byMonthDay.get(`${e.dateOfBirth.getMonth()}-${e.dateOfBirth.getDate()}`);
+        if (key) events.push({ date: key, type: 'BIRTHDAY', title: name, subtitle: 'Birthday', avatarUrl: e.avatarUrl, mine: e.id === employeeId });
+      }
+      if (e.joiningDate) {
+        const key = byMonthDay.get(`${e.joiningDate.getMonth()}-${e.joiningDate.getDate()}`);
+        const years = key ? Number(key.slice(0, 4)) - e.joiningDate.getFullYear() : 0;
+        if (key && years > 0) {
+          events.push({ date: key, type: 'ANNIVERSARY', title: name, subtitle: `${years} year${years > 1 ? 's' : ''} at work`, avatarUrl: e.avatarUrl, mine: e.id === employeeId });
+        }
       }
     }
 
@@ -525,7 +573,7 @@ export class DashboardService {
       const from = this.ymd(l.startDate);
       const to = this.ymd(l.endDate);
       const name = `${l.employee?.firstName || ''} ${l.employee?.lastName || ''}`.trim() || 'Employee';
-      for (const day of this.daysBetween(monday, sunday)) {
+      for (const day of days) {
         const key = this.ymd(day);
         if (key >= from && key <= to) {
           const mine = l.employeeId === employeeId;
@@ -534,6 +582,7 @@ export class DashboardService {
             type: 'LEAVE',
             title: name,
             subtitle: mine ? `${l.leaveType?.name || 'Leave'} (You)` : l.leaveType?.name || 'Leave',
+            avatarUrl: l.employee?.avatarUrl ?? null,
             mine
           });
         }
@@ -541,20 +590,30 @@ export class DashboardService {
     }
 
     for (const r of rosterEntries) {
+      const time = r.shift?.startTime && r.shift?.endTime ? `${r.shift.startTime}–${r.shift.endTime}` : '';
       events.push({
         date: this.ymd(r.date),
         type: r.isDayOff ? 'DAY_OFF' : 'SHIFT',
         title: r.isDayOff ? 'Day Off' : r.shift?.name || 'Shift',
-        subtitle: r.isDayOff ? '' : 'Your shift'
+        subtitle: r.isDayOff ? '' : time || 'Your shift',
+        mine: true
       });
     }
 
-    return {
-      weekStart: startKey,
-      weekEnd: endKey,
-      days: this.daysBetween(monday, sunday).map(d => ({ date: this.ymd(d), label: d.toLocaleDateString('en-US', { weekday: 'short' }), dayNum: d.getDate() })),
-      events
-    };
+    for (const t of tasks) {
+      if (!t.dueDate) continue;
+      events.push({
+        date: this.ymd(t.dueDate),
+        type: 'TASK',
+        title: t.title,
+        subtitle: `${t.key || '#' + t.id} · ${t.project?.name || 'Task'} · due`,
+        link: `/projects/${t.projectId}?task=${t.id}`,
+        priority: t.priority,
+        mine: true
+      });
+    }
+
+    return { startKey, endKey, events };
   }
 
   private async getProbationInfo(employeeId: number | null) {

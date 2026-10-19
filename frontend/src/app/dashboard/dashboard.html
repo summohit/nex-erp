@@ -299,36 +299,8 @@
     </ng-container>
   </div>
 
-  <!-- MY CALENDAR — directly under the KPIs -->
-  <div class="dashboard-card">
-    <div class="card-header flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <div class="card-icon-badge bg-indigo-tint">
-          <svg lucideCalendarDays size="16"></svg>
-        </div>
-        <div>
-          <h3>My Calendar</h3>
-          <span class="card-header-sub">{{ (dashboard()?.common?.myCalendar?.weekStart | date:'dd-MM-yyyy') }}<span class="date-to">to</span>{{ (dashboard()?.common?.myCalendar?.weekEnd | date:'dd-MM-yyyy') }}</span>
-        </div>
-      </div>
-    </div>
-    <div class="card-body p-0">
-      <div class="cal-week-grid">
-        <div class="cal-day-col" *ngFor="let day of dashboard()?.common?.myCalendar?.days" [class.is-today]="day.date === todayKey()">
-          <div class="cal-day-head">
-            <span class="cal-day-label">{{ day.label }}</span>
-            <span class="cal-day-num">{{ day.dayNum }}</span>
-          </div>
-          <div class="cal-day-events">
-            <div class="cal-event" *ngFor="let e of calendarEventsFor(day.date)" [ngClass]="calendarCalendarType(e.type)">
-              <span class="cal-event-title">{{ e.title }}</span>
-              <span class="cal-event-sub" *ngIf="e.subtitle">{{ e.subtitle }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- MY CALENDAR — directly under the KPIs (month / week calendar) -->
+  <app-my-calendar></app-my-calendar>
 
   <!-- ======================================================================= -->
   <!-- 3. MAIN DASHBOARD CONTENT GRID (Left: Analytics, Right: Punch Hub) -->
