@@ -192,6 +192,14 @@ export class CandidatesComponent implements OnInit {
     return this.stageBlockReason(app, target) === null;
   }
 
+  isTraineeConversion(app: JobApplication): boolean {
+    try {
+      return !!JSON.parse(app.answers || '{}')?.__traineeConversion?.sourceTraineeId;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * cdkDropList predicates are re-read on every drag, so the factory is memoised
    * per stage — a fresh arrow function each change-detection pass would make the

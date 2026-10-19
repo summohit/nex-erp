@@ -15,6 +15,13 @@
   border-radius: 10px;
 }
 
+.btn-convert-trainee { border: 0; border-radius: 8px; padding: 10px 15px; background: #2563eb; color: #fff; font-weight: 700; cursor: pointer; }
+.conversion-overlay { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 20px; background: rgba(15,23,42,.48); }
+.conversion-modal { width: min(540px, 100%); border-radius: 14px; overflow: hidden; background: #fff; box-shadow: 0 24px 60px rgba(15,23,42,.3); }
+.conversion-modal header { display: flex; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid #e2e8f0; }
+.conversion-modal h2 { margin: 0; color: #0f172a; font-size: 20px; }.conversion-modal header p { margin: 5px 0 0; color: #64748b; font-size: 13px; }.conversion-modal header button { border: 0; background: #f1f5f9; border-radius: 50%; width: 32px; height: 32px; font-size: 22px; color: #64748b; cursor: pointer; }
+.conversion-body { display: grid; gap: 15px; padding: 22px; }.trainee-summary { display: grid; gap: 3px; padding: 12px; border-radius: 8px; background: #eff6ff; color: #1e3a8a; }.trainee-summary span { font-size: 13px; color: #64748b; }.conversion-body label { display: grid; gap: 7px; color: #475569; font-size: 13px; font-weight: 700; }.conversion-body input, .conversion-body select, .conversion-body textarea { width: 100%; box-sizing: border-box; padding: 10px 11px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; color: #0f172a; }.conversion-body textarea { min-height: 76px; resize: vertical; }.conversion-modal footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px; border-top: 1px solid #e2e8f0; background: #f8fafc; }.btn-cancel-conversion, .btn-proceed-conversion { border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; }.btn-cancel-conversion { border: 1px solid #cbd5e1; background: #fff; color: #475569; }.btn-proceed-conversion { border: 1px solid #2563eb; background: #2563eb; color: #fff; }.btn-proceed-conversion:disabled { opacity: .6; cursor: wait; }
+
 .header-content h1 {
   font-size: calc(var(--fs-2xl) - 5px);
   font-weight: 700;
@@ -123,3 +130,14 @@
 
 /* Inside the profile popup: no page padding or title. */
 .page-container.embedded { padding: 0; max-width: none; }
+.employment-history { padding: 28px 36px; max-width: 900px; }
+.history-heading h2 { margin: 0; color: #14213d; font-size: 22px; }
+.history-heading p, .history-event p, .history-event time, .history-loading { color: #64748b; margin: 6px 0 0; }
+.history-timeline { margin-top: 26px; border-left: 2px solid #dbeafe; padding-left: 25px; }
+.history-event { position: relative; padding: 0 0 28px; }
+.history-dot { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: #2563eb; left: -32px; top: 5px; box-shadow: 0 0 0 4px #eff6ff; }
+.history-event strong { color: #172554; font-size: 16px; }
+.history-event time { display: block; font-size: 13px; }
+.history-facts { display: grid; grid-template-columns: max-content minmax(180px, 1fr); gap: 5px 16px; margin: 13px 0 4px; font-size: 14px; }
+.history-facts dt { color: #64748b; }
+.history-facts dd { margin: 0; color: #1e293b; font-weight: 600; }

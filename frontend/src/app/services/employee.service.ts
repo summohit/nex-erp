@@ -89,6 +89,10 @@ export class EmployeeService {
     });
   }
 
+  startTraineeConversion(id: number, data: { jobId: number; offeredSalary: number; joiningDate?: string; remarks?: string }): Observable<{ id: number }> {
+    return this.http.post<{ id: number }>(`${this.apiUrl}/${id}/convert-to-employee`, data);
+  }
+
   deleteEmployee(id: number): Observable<any> {
     const token = getAccessToken();
     return this.http.delete(`${this.apiUrl}/${id}`, {
@@ -108,6 +112,11 @@ export class EmployeeService {
     return this.http.get<any>(`${this.apiUrl}/${id}/profile`, {
       headers: { Authorization: `Bearer ${token}` }
     });
+  }
+
+  getEmploymentHistory(id: number | string): Observable<any[]> {
+    const token = getAccessToken();
+    return this.http.get<any[]>(`${this.apiUrl}/${id}/history`, { headers: { Authorization: `Bearer ${token}` } });
   }
 
   updateProfile(id: number | string, data: any): Observable<any> {

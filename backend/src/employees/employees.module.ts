@@ -6,9 +6,10 @@ import { EmployeesImportService } from './employees-import.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { MailModule } from '../mail/mail.module';
+import { PayrollModule } from '../payroll/payroll.module';
 
 @Module({
-  imports: [PrismaModule, PermissionsModule, MailModule],
+  imports: [PrismaModule, PermissionsModule, MailModule, PayrollModule],
   controllers: [EmployeesController],
   providers: [EmployeesService, EmployeesImportService, ProfileCompletenessService],
   exports: [EmployeesService]

@@ -438,6 +438,8 @@ model Employee {
   onboardingTasks  EmployeeOnboardingTask[]
   kioskPin         String? // 4-digit PIN for Kiosk Mode
   recruitedJobs    Job[]                    @relation("JobRecruiter")
+  /// The single offer workflow used to promote this existing trainee account.
+  /// The trainee remains this same Employee row; no replacement user is created.
   ownedMilestones  ProjectMilestone[]       @relation("MilestoneOwner")
 
   // Profile details

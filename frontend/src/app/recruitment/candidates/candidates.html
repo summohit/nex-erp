@@ -1154,7 +1154,7 @@
     <div class="footer-actions-group">
       <!-- Onboard button -->
       <button 
-        *ngIf="app.status === 'HIRED' && canMoveTo(app, 'ONBOARDED')" 
+        *ngIf="app.status === 'HIRED' && !isTraineeConversion(app) && canMoveTo(app, 'ONBOARDED')"
         class="btn-drawer-primary" 
         (click)="onboardCandidate()"
       >
