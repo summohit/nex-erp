@@ -2498,3 +2498,7 @@ textarea.form-control-enhanced:focus {
 }
 
 /* End of shift-roster styles */
+
+/* Where the day is worked (19 Oct 2026) */
+.chip-where { display: inline-block; margin-top: 3px; font-size: 10px; font-weight: 800; letter-spacing: .02em; padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,.25); color: #fff; }
+.chip-where.wfh { background: #fff; color: #047857; }

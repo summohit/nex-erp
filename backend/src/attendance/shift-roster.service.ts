@@ -86,6 +86,9 @@ function toKey(d: Date): string {
 }
 
 import { isBranchWeeklyOff } from '../common/weekly-offs';
+/** Leave types that are really Work From Home (same test as the dashboard). */
+const WFH_PATTERN = /work\s*from\s*home|wfh|remote/i;
+
 @Injectable()
 export class ShiftRosterService {
   constructor(
@@ -208,6 +211,26 @@ export class ShiftRosterService {
       cells: days.map(day => {
         const key = `${emp.id}|${day}`;
         const leave = leaveBy.get(key);
+        // Work From Home is a leave type but a working day (19 Oct 2026): the
+        // cell shows the shift, with WFH as where it is worked.
+        const wfh = !!leave && WFH_PATTERN.test(leave.name);
+        const cell: any = this.rosterCell(day, key, wfh ? undefined : leave, entryBy, fieldVisitBy, emp);
+        if (cell.type === 'SHIFT') {
+          cell.workLocation = wfh ? 'WFH' : cell.isFieldVisit ? 'FIELD_VISIT' : cell.onSite ? 'ON_SITE' : 'OFFICE';
+          if (wfh && leave?.isHalfDay) cell.wfhHalfDay = true;
+        }
+        return cell;
+      }),
+    }));
+
+    return { days, shifts: shifts.map(s => this.shiftBrief(s)), rows };
+  }
+
+  /** One roster cell, before its work location is added. */
+  private rosterCell(
+    day: string, key: string, leave: { name: string; isHalfDay: boolean } | undefined,
+    entryBy: Map<string, any>, fieldVisitBy: Map<string, any>, emp: any,
+  ): any {
         if (leave) {
           return { date: day, type: 'LEAVE', label: leave.name, isHalfDay: leave.isHalfDay };
         }
@@ -284,10 +307,6 @@ export class ShiftRosterService {
           return { date: day, type: 'SHIFT', isDefault: true, shift: this.shiftBrief(emp.shift) };
         }
         return { date: day, type: 'UNASSIGNED' };
-      }),
-    }));
-
-    return { days, shifts: shifts.map(s => this.shiftBrief(s)), rows };
   }
 
   private shiftBrief(s: any) {

@@ -136,6 +136,9 @@ export interface RosterCell {
   isFieldVisit?: boolean;
   /** Present when the roster entry carries on-site location/approval info. */
   onSite?: RosterOnSiteInfo;
+  /** Where a working day is worked (19 Oct 2026). */
+  workLocation?: 'OFFICE' | 'WFH' | 'ON_SITE' | 'FIELD_VISIT';
+  wfhHalfDay?: boolean;
 }
 
 export interface RosterRow {

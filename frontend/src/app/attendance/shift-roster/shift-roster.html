@@ -245,6 +245,9 @@
                 <span *ngIf="cell.onSite" class="chip-onsite" [class.fv-onsite]="cell.isFieldVisit" [class.pending]="cell.onSite.approvalStatus === 'PENDING'">
                   {{ cell.onSite.projectName || (cell.isFieldVisit ? (cell.note || 'On-site') : 'On-site') }}<span *ngIf="cell.onSite.approvalStatus === 'PENDING'"> · pending</span>
                 </span>
+                <!-- Where the day is worked (19 Oct 2026) -->
+                <span *ngIf="cell.workLocation === 'WFH'" class="chip-where wfh">WFH{{ cell.wfhHalfDay ? ' · half day' : '' }}</span>
+                <span *ngIf="cell.workLocation === 'OFFICE'" class="chip-where">Office</span>
               </div>
 
               <div *ngIf="cell.type === 'DAY_OFF'" class="chip chip-off" [class.is-default]="cell.isDefault">
