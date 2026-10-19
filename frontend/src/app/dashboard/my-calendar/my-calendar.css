@@ -3,7 +3,6 @@
    ========================================================================== */
 :host {
   display: block;
-  margin-bottom: 24px;
 }
 
 .mc {
@@ -217,6 +216,58 @@
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
+.mc-view-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mc-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mc-expand-btn:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.mc-collapse-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mc-collapse-btn:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
 /* -------------------- Semantic Colours per Kind -------------------- */
 .k-HOLIDAY {
   --c: #dc2626;
@@ -390,6 +441,11 @@
   position: relative;
 }
 
+.mc-body.week-compact {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
 .mc-body.loading .mc-grid {
   opacity: 0.55;
 }
@@ -441,7 +497,7 @@
 }
 
 .mc-grid.week .mc-cell {
-  min-height: 240px;
+  min-height: 196px;
 }
 
 .mc-cell:nth-child(7n + 7) {

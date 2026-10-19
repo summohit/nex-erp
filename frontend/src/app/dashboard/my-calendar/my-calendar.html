@@ -1,4 +1,4 @@
-<div class="dashboard-card mc">
+<div class="dashboard-card mc" [class.is-collapsed]="collapsed()">
   <div class="mc-accent-bar"></div>
 
   <!-- Header Toolbar -->
@@ -11,6 +11,7 @@
         <div class="mc-title-row">
           <h3>My Calendar</h3>
           <span class="mc-period-badge">{{ title() }}</span>
+          <span class="mc-view-tag">{{ view() === 'week' ? 'Week View' : 'Month View' }}</span>
         </div>
         <p class="mc-subtitle">Holidays, team leaves, celebrations &amp; your personal schedule</p>
       </div>
@@ -50,19 +51,41 @@
         </button>
       </div>
 
+      <button
+        type="button"
+        class="mc-expand-btn"
+        (click)="toggleExpandToMonth()"
+        [title]="view() === 'week' ? 'Expand calendar to full Month grid' : 'Return to compact Week view'"
+      >
+        <svg *ngIf="view() === 'week'" lucideMaximize2 size="13"></svg>
+        <svg *ngIf="view() === 'month'" lucideMinimize2 size="13"></svg>
+        <span>{{ view() === 'week' ? 'Expand to Month' : 'Compact Week' }}</span>
+      </button>
+
       <div class="mc-switch" role="tablist" aria-label="Calendar view mode">
-        <button type="button" role="tab" [attr.aria-selected]="view() === 'month'" [class.on]="view() === 'month'" (click)="setView('month')">Month</button>
         <button type="button" role="tab" [attr.aria-selected]="view() === 'week'" [class.on]="view() === 'week'" (click)="setView('week')">Week</button>
+        <button type="button" role="tab" [attr.aria-selected]="view() === 'month'" [class.on]="view() === 'month'" (click)="setView('month')">Month</button>
       </div>
+
+      <button
+        type="button"
+        class="mc-collapse-btn"
+        (click)="toggleCollapse()"
+        [attr.aria-expanded]="!collapsed()"
+        [title]="collapsed() ? 'Expand calendar card' : 'Collapse calendar card'"
+      >
+        <svg *ngIf="!collapsed()" lucideChevronUp size="15"></svg>
+        <svg *ngIf="collapsed()" lucideChevronDown size="15"></svg>
+      </button>
     </div>
   </div>
 
   <!-- Legend / Interactive Filter Bar -->
-  <div class="mc-legend-bar">
+  <div class="mc-legend-bar" *ngIf="!collapsed()">
     <div class="mc-legend">
       <button
         type="button"
-        *ngFor="let k of kinds"
+        *ngFor="let k of kinds; trackBy: trackByKind"
         class="mc-chip k-{{ k.type }}"
         [class.off]="hidden().has(k.type)"
         [attr.aria-pressed]="!hidden().has(k.type)"
@@ -84,17 +107,17 @@
         <span>Reset</span>
       </button>
     </div>
-    <span class="mc-legend-hint">Click a day to view full schedule</span>
+    <span class="mc-legend-hint">Hover chip for full title · Click a day to inspect</span>
   </div>
 
   <!-- Main Calendar Grid + Inspector -->
-  <div class="mc-body" [class.loading]="loading()">
+  <div class="mc-body" *ngIf="!collapsed()" [class.loading]="loading()" [class.week-compact]="view() === 'week'">
     <div class="mc-grid" [class.week]="view() === 'week'">
       <div class="mc-wd" *ngFor="let w of weekdays; let i = index" [class.weekend-hd]="i >= 5">{{ w }}</div>
 
       <div
         class="mc-cell"
-        *ngFor="let c of cells()"
+        *ngFor="let c of cells(); trackBy: trackByCell"
         [class.out]="!c.inMonth"
         [class.weekend]="c.weekend"
         [class.day-off]="isDayOff(c.date) && view() === 'month'"
@@ -115,7 +138,7 @@
         <div class="mc-events">
           <div
             class="mc-ev k-{{ e.type }}"
-            *ngFor="let e of shown(c.date)"
+            *ngFor="let e of shown(c.date); trackBy: trackByEvent"
             [class.mine]="e.mine"
             [class.clickable]="!!e.link"
             [title]="e.title + (e.subtitle ? ' — ' + e.subtitle : '')"

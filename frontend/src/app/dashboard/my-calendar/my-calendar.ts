@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -8,10 +8,14 @@ import {
   LucideCalendar,
   LucideCalendarDays,
   LucideCheckSquare,
+  LucideChevronDown,
   LucideChevronLeft,
   LucideChevronRight,
+  LucideChevronUp,
   LucideClock,
   LucideExternalLink,
+  LucideMaximize2,
+  LucideMinimize2,
   LucideRefreshCw,
   LucideSparkles,
   LucideUserCheck,
@@ -20,11 +24,9 @@ import {
 import { environment } from '../../../environments/environment';
 
 /**
- * My Calendar (19 Oct 2026): a real month and week calendar on the dashboard
- * instead of a fixed week strip. Previous / next / Today, Month or Week,
- * colour per kind of event, and a click on a day lists everything on it.
- * Data: GET /dashboard/calendar?from&to (holidays, birthdays, anniversaries,
- * everyone's approved leave, and my own shifts, days off and tasks due).
+ * My Calendar (19 Oct 2026): a collapsible week/month calendar on the dashboard.
+ * Defaults to compact Week view (max-height 420px) with an "Expand to Month" toggle,
+ * colour per kind of event, user avatars, and a Day Inspector drawer.
  */
 export type CalEvent = {
   date: string; type: string; title: string; subtitle?: string;
@@ -47,11 +49,16 @@ const DEFAULT_HIDDEN = ['SHIFT'];
 @Component({
   selector: 'app-my-calendar',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     LucideCalendarDays,
     LucideChevronLeft,
     LucideChevronRight,
+    LucideChevronDown,
+    LucideChevronUp,
+    LucideMaximize2,
+    LucideMinimize2,
     LucideX,
     LucideCake,
     LucideAward,
@@ -73,7 +80,10 @@ export class MyCalendarComponent implements OnInit {
   readonly kinds = KINDS;
   readonly weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  view = signal<'month' | 'week'>('month');
+  /** Default to compact Week view per command-center design spec. */
+  view = signal<'month' | 'week'>('week');
+  /** Collapsible card body state. */
+  collapsed = signal<boolean>(false);
   /** Any day inside the period on screen. */
   anchor = signal<Date>(this.startOfDay(new Date()));
   events = signal<CalEvent[]>([]);
@@ -181,8 +191,24 @@ export class MyCalendarComponent implements OnInit {
   setView(v: 'month' | 'week') {
     if (this.view() === v) return;
     this.view.set(v);
+    this.collapsed.set(false);
     this.load();
   }
+
+  toggleExpandToMonth() {
+    const next = this.view() === 'week' ? 'month' : 'week';
+    this.view.set(next);
+    this.collapsed.set(false);
+    this.load();
+  }
+
+  toggleCollapse() {
+    this.collapsed.set(!this.collapsed());
+  }
+
+  trackByCell = (_: number, cell: Cell) => cell.date;
+  trackByEvent = (idx: number, ev: CalEvent) => `${ev.date}-${ev.type}-${ev.title}-${idx}`;
+  trackByKind = (_: number, k: { type: string }) => k.type;
 
   move(step: number) {
     const a = this.anchor();

@@ -1,14 +1,52 @@
-<div class="kpi-card" [ngClass]="colorClass">
+<div class="kpi-card" [ngClass]="colorClass" [class.has-danger]="overdueCount > 0 || subtitleDanger">
   <div class="kpi-card-top">
     <div class="kpi-icon"><ng-content select="[icon]"></ng-content></div>
-    <span class="kpi-badge" *ngIf="badge && !loading">{{ badge }}</span>
+
+    <div class="kpi-top-right">
+      <span
+        class="kpi-delta"
+        *ngIf="delta && !loading"
+        [class.delta-good]="deltaTone === 'good'"
+        [class.delta-bad]="deltaTone === 'bad'"
+        [class.delta-neutral]="deltaTone === 'neutral'"
+        [title]="deltaLabel"
+      >
+        {{ delta }}
+      </span>
+      <span class="kpi-badge" *ngIf="badge && !delta && !loading">{{ badge }}</span>
+    </div>
   </div>
-  <div class="kpi-data">
-    <span class="kpi-value" *ngIf="!loading">{{ value }}</span>
-    <span class="kpi-skeleton kpi-skeleton-value" *ngIf="loading"></span>
-    <span class="kpi-label">{{ label }}</span>
-    <span class="kpi-subtitle" *ngIf="subtitle && !loading">{{ subtitle }}</span>
-    <span class="kpi-skeleton kpi-skeleton-sub" *ngIf="loading"></span>
+
+  <div class="kpi-middle">
+    <div class="kpi-data">
+      <div class="kpi-value-row" *ngIf="!loading">
+        <span class="kpi-value">{{ displayValue || value }}</span>
+        <span class="kpi-overdue-pill" *ngIf="overdueCount > 0">
+          {{ overdueCount }} overdue
+        </span>
+      </div>
+      <span class="kpi-skeleton kpi-skeleton-value" *ngIf="loading"></span>
+
+      <span class="kpi-label">{{ label }}</span>
+
+      <span
+        class="kpi-subtitle"
+        *ngIf="subtitle && !loading"
+        [class.is-danger]="subtitleDanger"
+      >
+        {{ subtitle }}
+      </span>
+      <span class="kpi-skeleton kpi-skeleton-sub" *ngIf="loading"></span>
+    </div>
+
+    <!-- Mini Sparkline SVG -->
+    <div class="kpi-sparkline" *ngIf="sparklinePath && !loading" aria-hidden="true">
+      <svg width="88" height="28" viewBox="0 0 88 28" preserveAspectRatio="none">
+        <path class="spark-area" [attr.d]="sparklineArea"></path>
+        <path class="spark-line" [attr.d]="sparklinePath"></path>
+      </svg>
+    </div>
   </div>
+
   <div class="kpi-accent-bar"></div>
 </div>
