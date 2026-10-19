@@ -51,6 +51,21 @@ export class ApplicationsController {
 
   // --- Dynamic Application Endpoints (:id) ---
 
+  @Get(':id/follow-ups')
+  getFollowUps(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.applicationsService.getFollowUps(id, req.user.companyId);
+  }
+
+  @Post(':id/follow-ups')
+  createFollowUp(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: any) {
+    return this.applicationsService.createFollowUp(id, req.user.companyId, body);
+  }
+
+  @Put(':id/follow-ups/:followUpId')
+  updateFollowUp(@Request() req, @Param('id', ParseIntPipe) id: number, @Param('followUpId', ParseIntPipe) followUpId: number, @Body() body: any) {
+    return this.applicationsService.updateFollowUp(id, followUpId, req.user.companyId, body);
+  }
+
   @Get(':id')
   findOne(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.applicationsService.findOne(id, req.user.companyId);

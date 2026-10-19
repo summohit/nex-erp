@@ -27,6 +27,8 @@ export interface Job {
   createdAt?: Date;
   updatedAt?: Date;
   _count?: { applications: number };
+  recruiter?: { id: number; firstName: string; lastName: string; avatarUrl?: string | null } | null;
+  workLocationType?: string;
   // frontend mapping fields
   location?: string;
   address?: string;

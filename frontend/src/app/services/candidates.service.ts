@@ -58,6 +58,14 @@ export interface JobApplication {
     minSalary?: number;
     maxSalary?: number;
   };
+  followUps?: CandidateFollowUp[];
+}
+
+export interface CandidateFollowUp {
+  id: number; title: string; type: string; scheduledAt: string; notes?: string | null;
+  completionRemarks?: string | null;
+  status: 'PENDING' | 'COMPLETED' | 'CANCELLED' | string; assignedToId?: number | null;
+  assignedTo?: { id: number; firstName: string; lastName: string; avatarUrl?: string | null } | null;
 }
 
 @Injectable({
@@ -113,6 +121,10 @@ export class CandidatesService {
   deleteApplication(id: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/${id}`);
   }
+
+  getFollowUps(applicationId: number): Observable<CandidateFollowUp[]> { return this.http.get<CandidateFollowUp[]>(`${this.apiUrl}/${applicationId}/follow-ups`); }
+  createFollowUp(applicationId: number, body: any): Observable<CandidateFollowUp> { return this.http.post<CandidateFollowUp>(`${this.apiUrl}/${applicationId}/follow-ups`, body); }
+  updateFollowUp(applicationId: number, followUpId: number, body: any): Observable<CandidateFollowUp> { return this.http.put<CandidateFollowUp>(`${this.apiUrl}/${applicationId}/follow-ups/${followUpId}`, body); }
 
   // --- Interviews ---
   

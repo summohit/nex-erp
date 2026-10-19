@@ -102,6 +102,7 @@ model Company {
   visitLocationRequests VisitLocationRequest[]
   scopeRequests         ProjectScopeRequest[]
   leadFollowUps         LeadFollowUp[]
+  candidateFollowUps    CandidateFollowUp[]
   leadContacts          LeadContact[]
   leadFiles             LeadFile[]
   leadNotes             LeadNote[]
@@ -586,6 +587,7 @@ model Employee {
   fieldVisitRequestActivities  FieldVisitRequestActivity[]   @relation("EmployeeFieldVisitRequestActivities")
   fieldVisitAttendances        FieldVisitAttendance[]        @relation("EmployeeFieldVisitAttendances")
   followUpsAssigned            LeadFollowUp[]                @relation("FollowUpAssignee")
+  candidateFollowUpsAssigned   CandidateFollowUp[]           @relation("CandidateFollowUpAssignee")
   leadContactsAdded            LeadContact[]                 @relation("LeadContactAddedBy")
   leadFilesUploaded            LeadFile[]                    @relation("LeadFileUploader")
   leadNotesCreated             LeadNote[]                    @relation("LeadNoteCreator")
@@ -1528,7 +1530,30 @@ model JobApplication {
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
   interviews             Interview[]
+  followUps              CandidateFollowUp[]
   offerLetter            OfferLetter?
+}
+
+/// A scheduled or completed recruiter interaction with an ATS candidate.
+model CandidateFollowUp {
+  id            Int            @id @default(autoincrement())
+  applicationId Int
+  application   JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  title         String
+  type          String         @default("CALL") // CALL, EMAIL, WHATSAPP, MEETING, NOTE, OTHER
+  scheduledAt   DateTime
+  notes         String?        @db.Text
+  status        String         @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  assignedToId  Int?
+  assignedTo    Employee?      @relation("CandidateFollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  companyId     Int
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([companyId, status, scheduledAt])
+  @@index([applicationId, scheduledAt])
+  @@index([assignedToId, scheduledAt])
 }
 
 // A generated offer letter for a hired/offered candidate. v1 uses a single
