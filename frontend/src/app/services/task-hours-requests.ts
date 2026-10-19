@@ -25,7 +25,7 @@ export interface TaskHoursRequest {
   createdAt: string;
   updatedAt: string;
   requestedBy: { id: number; firstName: string; lastName: string; avatarUrl?: string | null } | null;
-  reviewedBy: { id: number; firstName: string; lastName: string } | null;
+  reviewedBy: { id: number; firstName: string; lastName: string; avatarUrl?: string | null } | null;
   issue: {
     id: number; key: string; title: string;
     estimatedHours: number | null; additionalHours: number; assigneeId: number | null;
@@ -57,7 +57,7 @@ export interface TaskHoursActivity {
   oldValue: string | null;
   newValue: string | null;
   createdAt: string;
-  actor: { id: number; firstName: string; lastName: string } | null;
+  actor: { id: number; firstName: string; lastName: string; avatarUrl?: string | null } | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -93,7 +93,7 @@ export class TaskHoursRequestsService {
   }
 
   filterOptions() {
-    return this.http.get<{ projects: { id: number; name: string; key?: string | null }[]; requesters: { id: number; name: string }[] }>(
+    return this.http.get<{ projects: { id: number; name: string; key?: string | null }[]; requesters: { id: number; name: string; avatarUrl?: string | null }[] }>(
       `${this.api}/task-hours-requests/filter-options`,
     );
   }

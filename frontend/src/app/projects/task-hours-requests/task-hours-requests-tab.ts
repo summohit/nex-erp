@@ -308,7 +308,7 @@ export class TaskHoursRequestsTabComponent {
   otherSortBy = signal<'newest' | 'oldest'>('newest');
   otherSelectedProject = signal('ALL');
   deliveryProjects = signal<{ id: number; name: string; key?: string | null }[]>([]);
-  deliveryRequesters = signal<{ id: number; name: string }[]>([]);
+  deliveryRequesters = signal<{ id: number; name: string; avatarUrl?: string | null }[]>([]);
   isLoadingDeliveryProjects = signal(false);
   projectPicker = signal<'hours' | 'other' | null>(null);
   filterPicker = signal<'requester' | 'date' | 'hoursSort' | 'otherSort' | 'taskWhen' | null>(null);
@@ -474,13 +474,14 @@ export class TaskHoursRequestsTabComponent {
   });
 
   availableRequesters = computed(() => {
-    const map = new Map<string, { id: number; name: string }>();
+    const map = new Map<string, { id: number; name: string; avatarUrl?: string | null }>();
     for (const requester of this.deliveryRequesters()) map.set(String(requester.id), requester);
     for (const r of this.requests()) {
       if (r.requestedBy) {
         map.set(String(r.requestedBy.id), {
           id: r.requestedBy.id,
           name: this.fullName(r.requestedBy),
+          avatarUrl: r.requestedBy.avatarUrl,
         });
       }
     }
@@ -619,7 +620,11 @@ export class TaskHoursRequestsTabComponent {
       const requester = row.approvalRequestedBy ?? row.requestedBy ?? row.raisedBy;
       const requesterId = Number(requester?.id);
       if (Number.isInteger(requesterId) && requesterId > 0) {
-        requesters.set(requesterId, { id: requesterId, name: `${requester.firstName ?? ''} ${requester.lastName ?? ''}`.trim() || `Employee ${requesterId}` });
+        requesters.set(requesterId, {
+          id: requesterId,
+          name: `${requester.firstName ?? ''} ${requester.lastName ?? ''}`.trim() || `Employee ${requesterId}`,
+          avatarUrl: requester.avatarUrl ?? null,
+        });
       }
     }
     this.deliveryProjects.set([...projects.values()].sort((a, b) => a.name.localeCompare(b.name)));
@@ -802,7 +807,7 @@ export class TaskHoursRequestsTabComponent {
     return r.status === 'REQUESTED';
   }
 
-  fullName(p: { firstName: string; lastName: string } | null): string {
+  fullName(p: { firstName: string; lastName: string } | null | undefined): string {
     return p ? `${p.firstName} ${p.lastName}`.trim() : '—';
   }
 

@@ -31,8 +31,8 @@ export class TaskHoursRequestsService {
     id: true, requestedHours: true, approvedHours: true, reason: true,
     status: true, reviewedAt: true, rejectionReason: true,
     createdAt: true, updatedAt: true,
-    requestedBy: { select: { id: true, firstName: true, lastName: true } },
-    reviewedBy: { select: { id: true, firstName: true, lastName: true } },
+    requestedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+    reviewedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
     issue: {
       select: {
         id: true, key: true, title: true,
@@ -420,7 +420,7 @@ export class TaskHoursRequestsService {
       select: {
         id: true, action: true, detail: true, oldValue: true, newValue: true,
         createdAt: true,
-        actor: { select: { id: true, firstName: true, lastName: true } },
+        actor: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
       },
     });
   }
@@ -482,7 +482,8 @@ export class TaskHoursRequestsService {
       if (requester) requesters.set(requester.id, {
         id: requester.id,
         name: `${requester.firstName ?? ''} ${requester.lastName ?? ''}`.trim() || `Employee ${requester.id}`,
-      });
+        avatarUrl: (requester as any).avatarUrl ?? null,
+      } as any);
     }
     return {
       projects: [...projects.values()].sort((a, b) => a.name.localeCompare(b.name)),

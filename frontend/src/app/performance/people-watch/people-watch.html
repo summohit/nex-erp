@@ -850,17 +850,33 @@
 <!-- ✨ PIP DETAIL MODAL (ENHANCED)                          -->
 <!-- ======================================================= -->
 <div class="pw-overlay" *ngIf="detail() as p" (click)="detail.set(null)">
-  <div class="pw-dialog wide" (click)="$event.stopPropagation()">
+  <div class="pw-dialog wide pip-dialog" (click)="$event.stopPropagation()">
     <!-- Header -->
-    <div class="pw-dialog-header">
-      <div class="pw-dialog-title-wrap">
-        <div class="pw-dialog-icon-bubble pip-bubble">
-          <svg lucideTarget size="20"></svg>
+    <div class="pw-dialog-header pip-header">
+      <div class="pip-hero-profile">
+        <div class="pip-hero-avatar" [style.background]="getAvatarColor(p.employeeId)">
+          <img *ngIf="p.avatarUrl" [src]="p.avatarUrl" [alt]="cleanName(p.name)" />
+          <span *ngIf="!p.avatarUrl">{{ initials(cleanName(p.name)) }}</span>
+          <div class="pip-hero-target-badge" title="Performance Improvement Plan">
+            <svg lucideTarget size="12"></svg>
+          </div>
         </div>
-        <div>
-          <h3>{{ p.isMine ? 'Your Performance Improvement Plan' : 'PIP · ' + p.name }}</h3>
-          <div class="pw-detail-sub">
-            <span>{{ p.startDate | date:'d MMM y' }} – {{ p.endDate | date:'d MMM y' }}</span>
+        <div class="pip-hero-details">
+          <div class="pip-hero-title-row">
+            <h3 class="pip-hero-name">{{ p.isMine ? 'Your Performance Improvement Plan' : cleanName(p.name) }}</h3>
+            <span class="pip-type-badge">PIP Plan</span>
+          </div>
+          <div class="pip-hero-meta">
+            <span class="pip-meta-tag" *ngIf="p.employeeCode">
+              {{ p.employeeCode }}
+            </span>
+            <span class="pip-meta-dot" *ngIf="p.employeeCode && p.designation">·</span>
+            <span class="pip-meta-role" *ngIf="p.designation">{{ p.designation }}</span>
+            <span class="pip-meta-dot" *ngIf="p.designation">·</span>
+            <span class="pip-date-range">
+              <svg lucideCalendar size="12"></svg>
+              {{ p.startDate | date:'d MMM y' }} – {{ p.endDate | date:'d MMM y' }}
+            </span>
             <span class="pw-status s-{{ p.status }}">{{ statusLabel(p.status) }}</span>
             <span class="pw-due {{ dueClass(p.daysLeft) }}" *ngIf="p.status === 'ACTIVE' || p.status === 'EXTENDED'">
               <span class="due-dot"></span>
@@ -875,106 +891,291 @@
     </div>
 
     <!-- Body -->
-    <div class="pw-dialog-body">
-      <div class="pw-block">
-        <small>Reason</small>
-        <p>{{ p.reason }}</p>
+    <div class="pw-dialog-body pip-body">
+      <!-- Reason & Goals Cards Grid -->
+      <div class="pip-cards-grid">
+        <div class="pip-info-card pip-reason-card">
+          <div class="pip-card-head reason-head">
+            <div class="pip-card-head-left">
+              <span class="pip-card-icon"><svg lucideAlertCircle size="15"></svg></span>
+              <span class="pip-card-title">Reason & Context</span>
+            </div>
+          </div>
+          <div class="pip-card-body">
+            <p>{{ p.reason }}</p>
+          </div>
+        </div>
+
+        <div class="pip-info-card pip-goals-card">
+          <div class="pip-card-head goals-head">
+            <div class="pip-card-head-left">
+              <span class="pip-card-icon"><svg lucideTarget size="15"></svg></span>
+              <span class="pip-card-title">Goals & Expectations</span>
+            </div>
+          </div>
+          <div class="pip-card-body">
+            <p>{{ p.goals }}</p>
+          </div>
+        </div>
       </div>
 
-      <div class="pw-block">
-        <small>Goals to Meet</small>
-        <p>{{ p.goals }}</p>
+      <!-- Outcome Note (if concluded) -->
+      <div class="pip-info-card pip-outcome-card" *ngIf="p.outcomeNote">
+        <div class="pip-card-head outcome-head">
+          <div class="pip-card-head-left">
+            <span class="pip-card-icon"><svg lucideCheckCircle2 size="15"></svg></span>
+            <span class="pip-card-title">Resolution & Outcome Summary</span>
+          </div>
+          <span class="pip-outcome-date" *ngIf="p.closedAt">{{ p.closedAt | date:'d MMM y' }}</span>
+        </div>
+        <div class="pip-card-body">
+          <p>{{ p.outcomeNote }}</p>
+        </div>
       </div>
 
-      <div class="pw-block outcome-block" *ngIf="p.outcomeNote">
-        <small>Outcome Note</small>
-        <p>{{ p.outcomeNote }}</p>
-      </div>
-
-      <div class="pw-meta-strip">
-        <span *ngIf="p.raisedBy">
+      <!-- Metadata Strip -->
+      <div class="pip-meta-strip">
+        <div class="pip-meta-pill" *ngIf="p.raisedBy">
           <svg lucideUser size="13"></svg>
-          Initiated by {{ p.raisedBy }}
-        </span>
-        <span>
+          <span>Initiated by <b>{{ p.raisedBy }}</b></span>
+        </div>
+        <div class="pip-meta-pill" [class.pip-pill-success]="p.acknowledgedAt" [class.pip-pill-pending]="!p.acknowledgedAt">
           <svg *ngIf="p.acknowledgedAt" lucideCheckCircle2 size="13"></svg>
           <svg *ngIf="!p.acknowledgedAt" lucideClock size="13"></svg>
-          {{ p.acknowledgedAt ? 'Acknowledged on ' + (p.acknowledgedAt | date:'d MMM y') : 'Not acknowledged yet' }}
-        </span>
-      </div>
-
-      <!-- Acknowledge Banner for Employee -->
-      <div class="pw-ack-box" *ngIf="p.isMine && !p.acknowledgedAt && (p.status === 'ACTIVE' || p.status === 'EXTENDED')">
-        <div class="ack-text">
-          <b>Acknowledgment Required</b>
-          <span>Please review the expectations outlined above and confirm your acknowledgment.</span>
+          <span>{{ p.acknowledgedAt ? 'Acknowledged on ' + (p.acknowledgedAt | date:'d MMM y, h:mm a') : 'Awaiting employee acknowledgment' }}</span>
         </div>
-        <button type="button" class="pw-btn primary" (click)="acknowledge()">I have read it</button>
+        <div class="pip-meta-pill">
+          <svg lucideMessageSquare size="13"></svg>
+          <span><b>{{ p.checkIns.length }}</b> check-in{{ p.checkIns.length === 1 ? '' : 's' }}</span>
+        </div>
       </div>
 
-      <!-- Check-ins -->
-      <div class="pw-section-divider">
-        <div class="pw-sub-head">Check-ins ({{ p.checkIns.length }})</div>
-      </div>
-
-      <div class="pw-empty-checkins" *ngIf="!p.checkIns.length">
-        <p>No check-ins have been recorded yet.</p>
-      </div>
-
-      <div class="pw-checkins-list" *ngIf="p.checkIns.length > 0">
-        <div class="pw-check" *ngFor="let c of p.checkIns">
-          <div class="pw-check-meta">
-            <b>{{ c.author || 'Supervisor' }}</b> · {{ c.createdAt | date:'d MMM y, h:mm a' }}
+      <!-- Employee Acknowledgment Banner -->
+      <div class="pip-ack-card" *ngIf="p.isMine && !p.acknowledgedAt && (p.status === 'ACTIVE' || p.status === 'EXTENDED')">
+        <div class="pip-ack-left">
+          <div class="pip-ack-icon">
+            <svg lucideAlertTriangle size="18"></svg>
           </div>
-          <p>{{ c.note }}</p>
+          <div class="pip-ack-content">
+            <b>Formal Plan Acknowledgment Required</b>
+            <span>Please review the expectations, measurable targets, and timeline detailed above, then confirm acknowledgment.</span>
+          </div>
         </div>
+        <button type="button" class="pw-btn primary pip-ack-btn" (click)="acknowledge()">
+          <svg lucideCheck size="15"></svg>
+          <span>I Acknowledge & Agree</span>
+        </button>
       </div>
 
-      <!-- Manage PIP Actions -->
-      <ng-container *ngIf="p.canManage && (p.status === 'ACTIVE' || p.status === 'EXTENDED')">
-        <div class="pw-checkin-form">
+      <!-- Check-ins Section -->
+      <div class="pip-section-wrap">
+        <div class="pip-section-bar">
+          <div class="pip-section-title-wrap">
+            <svg lucideMessageSquare size="16"></svg>
+            <span class="pip-section-heading">Check-in Log</span>
+            <span class="pip-counter-badge">{{ p.checkIns.length }}</span>
+          </div>
+          <span class="pip-section-caption">Feedback meetings & progress notes</span>
+        </div>
+
+        <!-- Empty check-ins state -->
+        <div class="pip-empty-state" *ngIf="!p.checkIns.length">
+          <div class="pip-empty-icon-wrap">
+            <svg lucideMessageSquare size="22"></svg>
+          </div>
+          <div class="pip-empty-text">
+            <b>No check-ins recorded yet</b>
+            <p>Use check-ins to track progress milestones, feedback conversations, and periodic assessments.</p>
+          </div>
+        </div>
+
+        <!-- Check-ins Timeline list -->
+        <div class="pip-timeline-container" *ngIf="p.checkIns.length > 0">
+          <div class="pip-timeline-entry" *ngFor="let c of p.checkIns; let isLast = last">
+            <div class="pip-timeline-rail">
+              <div class="pip-timeline-avatar" [style.background]="getAvatarColor(c.author || 'User')">
+                <img *ngIf="c.authorAvatar" [src]="c.authorAvatar" [alt]="c.author || ''" />
+                <span *ngIf="!c.authorAvatar">{{ initials(c.author || 'U') }}</span>
+              </div>
+              <div class="pip-timeline-stem" *ngIf="!isLast"></div>
+            </div>
+            <div class="pip-timeline-bubble">
+              <div class="pip-timeline-bubble-head">
+                <div class="pip-bubble-author-wrap">
+                  <span class="pip-bubble-author">{{ c.author || 'Supervisor' }}</span>
+                </div>
+                <span class="pip-bubble-time">
+                  <svg lucideClock size="12"></svg>
+                  {{ c.createdAt | date:'d MMM y, h:mm a' }}
+                </span>
+              </div>
+              <div class="pip-timeline-bubble-text">{{ c.note }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add Check-in Composer for Manager -->
+        <div class="pip-composer-card" *ngIf="p.canManage && (p.status === 'ACTIVE' || p.status === 'EXTENDED')">
           <textarea 
             rows="2" 
-            class="pw-textarea"
+            class="pip-composer-textarea"
             [(ngModel)]="checkInNote" 
-            placeholder="Add a check-in: progress updates, guidance provided, next steps..."></textarea>
+            placeholder="Record check-in notes: milestones achieved, support needed, coaching notes..."></textarea>
+          <div class="pip-composer-bar">
+            <span class="pip-composer-tip">
+              <svg lucideInfo size="13"></svg>
+              Document continuous feedback and weekly guidance
+            </span>
+            <button 
+              type="button" 
+              class="pw-btn primary pip-composer-submit" 
+              (click)="addCheckIn()" 
+              [disabled]="busy() || !checkInNote.trim()">
+              <svg lucidePlus size="14"></svg>
+              <span>Add Check-in</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manage PIP Actions for Manager -->
+      <div class="pip-section-wrap pip-actions-section" *ngIf="p.canManage && (p.status === 'ACTIVE' || p.status === 'EXTENDED')">
+        <div class="pip-section-bar">
+          <div class="pip-section-title-wrap">
+            <svg lucideSparkles size="16"></svg>
+            <span class="pip-section-heading">Plan Outcome & Actions</span>
+          </div>
+          <span class="pip-section-caption">Select an action to update timeline or conclude plan</span>
+        </div>
+
+        <!-- Interactive Action Tiles Grid -->
+        <div class="pip-action-tiles">
           <button 
             type="button" 
-            class="pw-btn primary" 
-            (click)="addCheckIn()" 
-            [disabled]="busy() || !checkInNote.trim()">
-            Add Check-in
+            class="pip-action-tile tile-extend" 
+            [class.active]="closeAction === 'EXTEND'" 
+            (click)="closeAction = (closeAction === 'EXTEND' ? '' : 'EXTEND')">
+            <div class="tile-icon-bubble">
+              <svg lucideCalendar size="16"></svg>
+            </div>
+            <div class="tile-text">
+              <span class="tile-title">Extend</span>
+              <span class="tile-desc">Add more time</span>
+            </div>
+          </button>
+
+          <button 
+            type="button" 
+            class="pip-action-tile tile-complete" 
+            [class.active]="closeAction === 'COMPLETED'" 
+            (click)="closeAction = (closeAction === 'COMPLETED' ? '' : 'COMPLETED')">
+            <div class="tile-icon-bubble">
+              <svg lucideCheckCircle2 size="16"></svg>
+            </div>
+            <div class="tile-text">
+              <span class="tile-title">Completed</span>
+              <span class="tile-desc">Goals achieved</span>
+            </div>
+          </button>
+
+          <button 
+            type="button" 
+            class="pip-action-tile tile-failed" 
+            [class.active]="closeAction === 'FAILED'" 
+            (click)="closeAction = (closeAction === 'FAILED' ? '' : 'FAILED')">
+            <div class="tile-icon-bubble">
+              <svg lucideAlertTriangle size="16"></svg>
+            </div>
+            <div class="tile-text">
+              <span class="tile-title">Not Improved</span>
+              <span class="tile-desc">Criteria unmet</span>
+            </div>
+          </button>
+
+          <button 
+            type="button" 
+            class="pip-action-tile tile-revoke" 
+            [class.active]="closeAction === 'REVOKED'" 
+            (click)="closeAction = (closeAction === 'REVOKED' ? '' : 'REVOKED')">
+            <div class="tile-icon-bubble">
+              <svg lucideRotateCcw size="16"></svg>
+            </div>
+            <div class="tile-text">
+              <span class="tile-title">Revoke Early</span>
+              <span class="tile-desc">End premature</span>
+            </div>
+          </button>
+
+          <button 
+            type="button" 
+            class="pip-action-tile tile-cancel" 
+            [class.active]="closeAction === 'CANCELLED'" 
+            (click)="closeAction = (closeAction === 'CANCELLED' ? '' : 'CANCELLED')">
+            <div class="tile-icon-bubble">
+              <svg lucideX size="16"></svg>
+            </div>
+            <div class="tile-text">
+              <span class="tile-title">Cancel</span>
+              <span class="tile-desc">Void plan</span>
+            </div>
           </button>
         </div>
 
-        <div class="pw-section-divider">
-          <div class="pw-sub-head">Extend or Conclude Plan</div>
-        </div>
+        <!-- Action Input Drawer -->
+        <div class="pip-action-drawer" *ngIf="closeAction" [ngClass]="'drawer-' + closeAction.toLowerCase()">
+          <div class="drawer-header">
+            <div class="drawer-header-left">
+              <span class="drawer-tag">Action Selected</span>
+              <b class="drawer-action-name">
+                {{ closeAction === 'EXTEND' ? 'Extend Plan Timeline' : closeAction === 'COMPLETED' ? 'Mark Successfully Completed' : closeAction === 'FAILED' ? 'Mark as Not Improved' : closeAction === 'REVOKED' ? 'Revoke Improvement Plan Early' : 'Cancel Improvement Plan' }}
+              </b>
+            </div>
+            <button type="button" class="drawer-reset-btn" (click)="resetCloseAction()" title="Cancel action">
+              <svg lucideX size="14"></svg>
+              <span>Deselect</span>
+            </button>
+          </div>
 
-        <div class="pw-seg four">
-          <button type="button" [class.on]="closeAction === 'EXTEND'" (click)="closeAction = 'EXTEND'">Extend</button>
-          <button type="button" [class.on]="closeAction === 'COMPLETED'" (click)="closeAction = 'COMPLETED'">Completed</button>
-          <button type="button" [class.on]="closeAction === 'FAILED'" (click)="closeAction = 'FAILED'">Not improved</button>
-          <button type="button" [class.on]="closeAction === 'REVOKED'" (click)="closeAction = 'REVOKED'">Revoke early</button>
-          <button type="button" [class.on]="closeAction === 'CANCELLED'" (click)="closeAction = 'CANCELLED'">Cancel</button>
-        </div>
+          <div class="drawer-body">
+            <div class="pw-field-group" *ngIf="closeAction === 'EXTEND'">
+              <label class="pw-field-label">
+                <svg lucideCalendar size="13"></svg>
+                New End Date <span class="req">*</span>
+              </label>
+              <input type="date" class="pw-input-date" [(ngModel)]="extendDate" [min]="p.endDate" />
+            </div>
 
-        <div class="pw-field-group" *ngIf="closeAction === 'EXTEND'">
-          <label class="pw-field-label">New End Date</label>
-          <input type="date" class="pw-input-date" [(ngModel)]="extendDate" />
-        </div>
+            <div class="pw-field-group">
+              <label class="pw-field-label">
+                <svg lucideInfo size="13"></svg>
+                {{ closeAction === 'EXTEND' ? 'Reason for Extension (Optional)' : closeAction === 'CANCELLED' ? 'Cancellation Note (Optional)' : closeAction === 'REVOKED' ? 'Reason for Revocation *' : 'Final Outcome Summary & Evaluation *' }}
+              </label>
+              <textarea 
+                rows="3" 
+                class="pw-textarea" 
+                [(ngModel)]="closeNote" 
+                [placeholder]="closeAction === 'EXTEND' ? 'Add context on why more time is needed...' : closeAction === 'CANCELLED' ? 'Specify why this plan is cancelled...' : closeAction === 'REVOKED' ? 'Explain the basis for early revocation...' : 'Summarize the employee\'s final performance evaluation, goals met/missed, and next HR steps...'"></textarea>
+            </div>
 
-        <div class="pw-field-group" *ngIf="closeAction">
-          <label class="pw-field-label">
-            {{ closeAction === 'EXTEND' ? 'Reason for Extension (Optional)' : closeAction === 'CANCELLED' ? 'Cancellation Note (Optional)' : closeAction === 'REVOKED' ? 'Why it is revoked early' : 'Final Outcome Summary' }}
-          </label>
-          <textarea rows="2" class="pw-textarea" [(ngModel)]="closeNote"></textarea>
+            <div class="drawer-footer">
+              <button 
+                type="button" 
+                class="pw-btn secondary" 
+                (click)="resetCloseAction()">
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                class="pw-btn primary pip-apply-btn" 
+                (click)="applyAction()" 
+                [disabled]="busy() || (closeAction === 'EXTEND' && !extendDate) || ((closeAction === 'COMPLETED' || closeAction === 'FAILED' || closeAction === 'REVOKED') && !closeNote.trim())">
+                <svg lucideCheck size="15"></svg>
+                <span>Confirm & Apply</span>
+              </button>
+            </div>
+          </div>
         </div>
-
-        <div class="pw-dialog-actions" *ngIf="closeAction">
-          <button type="button" class="pw-btn primary" (click)="applyAction()" [disabled]="busy()">Save Updates</button>
-        </div>
-      </ng-container>
+      </div>
     </div>
   </div>
 </div>

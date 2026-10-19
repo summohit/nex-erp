@@ -25,7 +25,9 @@ import {
   LucideCheckCircle2,
   LucideRotateCcw,
   LucideBuilding,
-  LucideChevronRight
+  LucideChevronRight,
+  LucideMessageSquare,
+  LucideAlertCircle
 } from '@lucide/angular';
 import { LifecycleService, LcOverview, LcPip, LcPipDetail, LcPerson, LcProbation, LcNotice } from '../../services/lifecycle.service';
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
@@ -63,7 +65,9 @@ import { ProfileModalService } from '../../shared/profile-modal/profile-modal.se
     LucideCheckCircle2,
     LucideRotateCcw,
     LucideBuilding,
-    LucideChevronRight
+    LucideChevronRight,
+    LucideMessageSquare,
+    LucideAlertCircle
   ],
   templateUrl: './people-watch.html',
   styleUrls: ['./people-watch.css'],
@@ -269,6 +273,15 @@ export class PeopleWatchComponent implements OnInit {
     if (days <= 7) return 'due-soon';
     if (days <= 30) return 'due-near';
     return 'due-ok';
+  }
+  cleanName(name?: string | null): string {
+    if (!name) return 'Employee';
+    return name.replace(/[\s\.\-]+$/, '').trim() || name;
+  }
+  resetCloseAction() {
+    this.closeAction = '';
+    this.closeNote = '';
+    this.extendDate = '';
   }
   initials(name: string) { return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(); }
   statusLabel(s: string) {

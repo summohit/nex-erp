@@ -238,7 +238,20 @@
           <!-- Requester Filter -->
           <div class="thr-select-wrap">
             <button type="button" class="filter-picker-trigger" (click)="toggleFilterPicker('requester')"><svg lucideUser size="15"></svg><span>{{ requesterLabel() }}</span><svg lucideChevronDown size="16"></svg></button>
-            @if (filterPicker() === 'requester') { <div class="filter-picker-menu"><button type="button" [class.selected]="selectedRequester() === 'ALL'" (click)="chooseFilterPicker('requester', 'ALL')">All Requesters</button><button type="button" *ngFor="let r of availableRequesters()" [class.selected]="selectedRequester() === String(r.id)" (click)="chooseFilterPicker('requester', String(r.id))">{{ r.name }}</button></div> }
+            @if (filterPicker() === 'requester') {
+              <div class="filter-picker-menu">
+                <button type="button" [class.selected]="selectedRequester() === 'ALL'" (click)="chooseFilterPicker('requester', 'ALL')">All Requesters</button>
+                <button type="button" *ngFor="let r of availableRequesters()" [class.selected]="selectedRequester() === String(r.id)" (click)="chooseFilterPicker('requester', String(r.id))">
+                  <span class="filter-picker-user">
+                    <span class="filter-option-avatar" [style.background-color]="getAvatarBg(r.name)">
+                      <img *ngIf="r.avatarUrl" [src]="r.avatarUrl" alt="" />
+                      <span *ngIf="!r.avatarUrl">{{ getInitials(r.name) }}</span>
+                    </span>
+                    <span>{{ r.name }}</span>
+                  </span>
+                </button>
+              </div>
+            }
           </div>
 
           <div class="thr-select-wrap">
@@ -358,8 +371,17 @@
           <tr *ngFor="let r of filteredRequests()">
             <td><a class="prq-key clickable" [routerLink]="['/projects', r.issue?.project?.id]" [queryParams]="{ task: r.issue?.id }">{{ r.issue?.key }}</a></td>
             <td class="ta-task"><a class="ta-title clickable" [routerLink]="['/projects', r.issue?.project?.id]" [queryParams]="{ task: r.issue?.id }">{{ r.issue?.title }}</a><a class="ta-project-under clickable" [routerLink]="['/projects', r.issue?.project?.id]">{{ r.issue?.project?.name }}</a></td>
-            <td class="ta-muted">{{ r.issue?.project?.name || '—' }}</td>
-            <td class="ta-raised-by"><div class="ta-person-avatar"><img *ngIf="r.requestedBy?.avatarUrl" [src]="r.requestedBy?.avatarUrl" alt=""><span *ngIf="!r.requestedBy?.avatarUrl">{{ r.requestedBy ? (r.requestedBy.firstName || '?').slice(0,1) + (r.requestedBy.lastName || '').slice(0,1) : '?' }}</span><span class="ta-person-tooltip">{{ fullName(r.requestedBy) }}</span></div></td>
+            <td class="ta-raised-by">
+              <div class="ta-user-cell" *ngIf="r.requestedBy as raiser; else unkRaiser">
+                <div class="ta-person-avatar" [style.background-color]="getAvatarBg(fullName(raiser))">
+                  <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)">
+                  <span *ngIf="!raiser.avatarUrl">{{ getInitials(fullName(raiser)) }}</span>
+                  <span class="ta-person-tooltip">{{ fullName(raiser) }}</span>
+                </div>
+                <span class="ta-user-name">{{ fullName(raiser) }}</span>
+              </div>
+              <ng-template #unkRaiser><span class="ta-muted">—</span></ng-template>
+            </td>
             <td><strong>{{ r.requestedHours }}h</strong></td>
             <td class="ta-muted ta-wide-cell">{{ r.reason }}</td>
             <td><span class="ta-stage">{{ r.status === 'REQUESTED' ? 'Awaiting decision' : r.status }}</span></td>
@@ -509,7 +531,8 @@
                 class="thr-avatar"
                 [style.background-color]="getAvatarBg(fullName(r.requestedBy))"
               >
-                {{ getInitials(fullName(r.requestedBy)) }}
+                <img *ngIf="r.requestedBy?.avatarUrl" [src]="r.requestedBy.avatarUrl" [alt]="fullName(r.requestedBy)" class="thr-avatar-img" />
+                <span *ngIf="!r.requestedBy?.avatarUrl">{{ getInitials(fullName(r.requestedBy)) }}</span>
               </div>
               <div class="thr-person-info">
                 <span class="thr-person-name">{{ fullName(r.requestedBy) }}</span>
@@ -523,7 +546,8 @@
                 class="thr-avatar avatar-reviewer"
                 [style.background-color]="getAvatarBg(fullName(r.reviewedBy))"
               >
-                {{ getInitials(fullName(r.reviewedBy)) }}
+                <img *ngIf="r.reviewedBy?.avatarUrl" [src]="r.reviewedBy.avatarUrl" [alt]="fullName(r.reviewedBy)" class="thr-avatar-img" />
+                <span *ngIf="!r.reviewedBy?.avatarUrl">{{ getInitials(fullName(r.reviewedBy)) }}</span>
               </div>
               <div class="thr-person-info">
                 <span class="thr-person-name">{{ fullName(r.reviewedBy) }}</span>
@@ -726,6 +750,10 @@
 
                   <div class="thr-event-actor" *ngIf="e.actor">
                     <span class="thr-actor-label">By</span>
+                    <div class="prq-mini-avatar thr-timeline-avatar" [style.background-color]="getAvatarBg(fullName(e.actor))">
+                      <img *ngIf="e.actor.avatarUrl" [src]="e.actor.avatarUrl" [alt]="fullName(e.actor)" />
+                      <span *ngIf="!e.actor.avatarUrl">{{ getInitials(fullName(e.actor)) }}</span>
+                    </div>
                     <strong>{{ fullName(e.actor) }}</strong>
                   </div>
                 </div>
@@ -839,9 +867,30 @@
             <td class="ta-check"><input type="checkbox" [checked]="isTaskSelected(t.id)" (change)="toggleTaskSelected(t.id)" /></td>
             <td><a class="prq-key clickable" [routerLink]="['/projects', t.projectId || t.project?.id]" [queryParams]="{ task: t.id }">{{ t.key }}</a></td>
             <td class="ta-task"><a class="ta-title clickable" [routerLink]="['/projects', t.projectId || t.project?.id]" [queryParams]="{ task: t.id }">{{ t.title }}</a><a class="ta-project-under clickable" *ngIf="t.project" [routerLink]="['/projects', t.projectId || t.project?.id]">{{ t.project.name }}</a></td>
-            <td class="ta-person ta-assigned-avatar"><div class="ta-person-avatar"><ng-container *ngIf="taskPerson(t) as p; else nobody"><img *ngIf="p.avatarUrl" [src]="p.avatarUrl" alt=""><span *ngIf="!p.avatarUrl">{{ (p.firstName || '?').slice(0,1) + (p.lastName || '').slice(0,1) }}</span></ng-container><ng-template #nobody><span>?</span></ng-template><span class="ta-person-tooltip">{{ taskPeople(t) }}</span></div></td>
-            <td class="ta-raised-by"><div class="ta-person-avatar"><img *ngIf="t.approvalRequestedBy?.avatarUrl" [src]="t.approvalRequestedBy.avatarUrl" alt=""><span *ngIf="!t.approvalRequestedBy?.avatarUrl">{{ t.approvalRequestedBy ? (t.approvalRequestedBy.firstName || '?').slice(0,1) + (t.approvalRequestedBy.lastName || '').slice(0,1) : '?' }}</span><span class="ta-person-tooltip">{{ t.approvalRequestedBy ? t.approvalRequestedBy.firstName + ' ' + t.approvalRequestedBy.lastName : 'Unknown requester' }}</span></div></td>
-            <td class="ta-muted">{{ t.approvalRequestedBy ? t.approvalRequestedBy.firstName + ' ' + t.approvalRequestedBy.lastName : '—' }}</td>
+            <td class="ta-person ta-assigned-avatar">
+              <div class="ta-user-cell">
+                <div class="ta-person-avatar" [style.background-color]="taskPerson(t) ? getAvatarBg(taskPeople(t)) : '#e0e7ff'">
+                  <ng-container *ngIf="taskPerson(t) as p; else nobody">
+                    <img *ngIf="p.avatarUrl" [src]="p.avatarUrl" [alt]="taskPeople(t)">
+                    <span *ngIf="!p.avatarUrl">{{ (p.firstName || '?').slice(0,1) + (p.lastName || '').slice(0,1) }}</span>
+                  </ng-container>
+                  <ng-template #nobody><span>?</span></ng-template>
+                  <span class="ta-person-tooltip">{{ taskPeople(t) }}</span>
+                </div>
+                <span class="ta-user-name">{{ taskPeople(t) }}</span>
+              </div>
+            </td>
+            <td class="ta-raised-by">
+              <div class="ta-user-cell" *ngIf="t.approvalRequestedBy as raiser; else unkRaiser">
+                <div class="ta-person-avatar" [style.background-color]="getAvatarBg(fullName(raiser))">
+                  <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)">
+                  <span *ngIf="!raiser.avatarUrl">{{ (raiser.firstName || '?').slice(0,1) + (raiser.lastName || '').slice(0,1) }}</span>
+                  <span class="ta-person-tooltip">{{ fullName(raiser) }}</span>
+                </div>
+                <span class="ta-user-name">{{ fullName(raiser) }}</span>
+              </div>
+              <ng-template #unkRaiser><span class="ta-muted">—</span></ng-template>
+            </td>
             <td class="ta-muted ta-nowrap">{{ (t.startDate || t.dueDate) ? ((t.startDate || t.dueDate) | date: 'dd-MM-yyyy') : '—' }}</td>
             <td class="ta-muted ta-nowrap">{{ t.createdAt | date: 'dd-MM-yyyy' }}</td>
             <td><span class="ta-stage">{{ approvalStageLabel(t) }}</span></td>
@@ -850,7 +899,7 @@
             </td>
           </tr>
           <tr *ngIf="!filteredTaskApprovals().length">
-            <td colspan="8" class="ta-none">No waiting task matches these filters.</td>
+            <td colspan="9" class="ta-none">No waiting task matches these filters.</td>
           </tr>
         </tbody>
       </table>
@@ -872,12 +921,25 @@
 
       <h4 class="prq-title clickable" (click)="openTaskDetails(t)" title="View complete task details">{{ t.title }}</h4>
 
-      <div class="prq-meta">
-        <span *ngIf="t.approvalRequestedBy">
-          Raised by {{ t.approvalRequestedBy.firstName }} {{ t.approvalRequestedBy.lastName }}
+      <div class="prq-meta prq-meta-with-avatars">
+        <div class="prq-meta-user" *ngIf="t.approvalRequestedBy as raiser">
+          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(fullName(raiser))">
+            <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)" />
+            <span *ngIf="!raiser.avatarUrl">{{ (raiser.firstName || '?').slice(0,1) + (raiser.lastName || '').slice(0,1) }}</span>
+          </div>
+          <span class="prq-meta-user-text">Raised by <strong>{{ fullName(raiser) }}</strong></span>
+        </div>
+        <div class="prq-meta-user" *ngIf="taskPerson(t) as assignee">
+          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(taskPeople(t))">
+            <img *ngIf="assignee.avatarUrl" [src]="assignee.avatarUrl" [alt]="taskPeople(t)" />
+            <span *ngIf="!assignee.avatarUrl">{{ (assignee.firstName || '?').slice(0,1) + (assignee.lastName || '').slice(0,1) }}</span>
+          </div>
+          <span class="prq-meta-user-text">Assigned to <strong>{{ taskPeople(t) }}</strong></span>
+        </div>
+        <span class="prq-meta-date">
+          <svg lucideCalendar size="13"></svg>
+          {{ t.createdAt | date: 'dd-MM-yyyy, h:mm a' }}
         </span>
-        <span>{{ t.createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
-        <span class="ta-assigned">Assigned to {{ taskPeople(t) }}</span>
       </div>
 
       <p class="prq-note" *ngIf="t.description" [innerHTML]="t.description"></p>
@@ -940,11 +1002,18 @@
         </div>
       </div>
 
-      <div class="prq-meta">
-        <span *ngIf="b.requestedBy">
-          Raised by {{ b.requestedBy.firstName }} {{ b.requestedBy.lastName }}
+      <div class="prq-meta prq-meta-with-avatars">
+        <div class="prq-meta-user" *ngIf="b.requestedBy as raiser">
+          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(fullName(raiser))">
+            <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)" />
+            <span *ngIf="!raiser.avatarUrl">{{ getInitials(fullName(raiser)) }}</span>
+          </div>
+          <span class="prq-meta-user-text">Raised by <strong>{{ fullName(raiser) }}</strong></span>
+        </div>
+        <span class="prq-meta-date">
+          <svg lucideCalendar size="13"></svg>
+          {{ b.createdAt | date: 'dd-MM-yyyy, h:mm a' }}
         </span>
-        <span>{{ b.createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
       </div>
 
       <p class="prq-note" *ngIf="b.reason">{{ b.reason }}</p>
@@ -982,7 +1051,7 @@
       <p>No trip is waiting on your approval.</p>
     </div>
 
-    <div class="ta-table-wrap" *ngIf="filteredFieldVisitRequests().length"><table class="ta-table field-visit-table"><thead><tr><th>Visit Code</th><th>Project</th><th>Site</th><th>Dates</th><th>Team</th><th>Tasks</th><th>Stage</th><th class="ta-actions-col">Actions</th></tr></thead><tbody><tr *ngFor="let r of filteredFieldVisitRequests()"><td><a class="prq-key clickable" [routerLink]="['/field-visits/requests', r.id]">{{ r.requestNumber }}</a></td><td><a class="clickable" [routerLink]="['/projects', r.project?.id]">{{ r.project?.name }}</a></td><td class="ta-wide-cell">{{ r.location }}</td><td class="ta-nowrap">{{ r.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(r.startDate | date:'dd-MM-yyyy') !== (r.endDate | date:'dd-MM-yyyy')"><span class="date-to">to</span>{{ r.endDate | date:'dd-MM-yyyy' }}</ng-container></td><td><div class="fv-team-avatars"><div class="fv-team-avatar" *ngFor="let member of r.members.slice(0, 4)" [title]="member.employee.firstName + ' ' + member.employee.lastName"><img *ngIf="member.employee.avatarUrl" [src]="member.employee.avatarUrl" alt=""><span *ngIf="!member.employee.avatarUrl">{{ member.employee.firstName.slice(0,1) }}{{ member.employee.lastName.slice(0,1) }}</span><span class="fv-team-tooltip">{{ member.employee.firstName }} {{ member.employee.lastName }}</span></div><span class="fv-team-more" *ngIf="r.members.length > 4">+{{ r.members.length - 4 }}</span></div></td><td>{{ r.tasks.length }}</td><td><span class="ta-stage">Awaiting administrator</span></td><td class="ta-actions-col"><div class="ta-action-menu"><button class="ta-icon-btn" type="button" (click)="toggleHoursActionMenu(r.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === r.id"><button (click)="openVisitDetails(r); toggleHoursActionMenu(r.id)">View</button><a *ngIf="canEditApprovalRequest(r.status)" [routerLink]="['/field-visits/requests', r.id]" [queryParams]="{ edit: 1 }">Edit</a><button class="approve" (click)="decideFieldVisit(r, 'APPROVED'); toggleHoursActionMenu(r.id)">Approve</button><button class="reject" (click)="decideFieldVisit(r, 'REJECTED'); toggleHoursActionMenu(r.id)">Reject</button></div></div></td></tr></tbody></table></div>
+    <div class="ta-table-wrap" *ngIf="filteredFieldVisitRequests().length"><table class="ta-table field-visit-table"><thead><tr><th>Visit Code</th><th>Project</th><th>Raised by</th><th>Site</th><th>Dates</th><th>Team</th><th>Tasks</th><th class="ta-actions-col">Actions</th></tr></thead><tbody><tr *ngFor="let r of filteredFieldVisitRequests()"><td><a class="prq-key clickable" [routerLink]="['/field-visits/requests', r.id]">{{ r.requestNumber }}</a></td><td><a class="clickable" [routerLink]="['/projects', r.project?.id]">{{ r.project?.name }}</a></td><td class="ta-raised-by"><div class="ta-user-cell" *ngIf="r.raisedBy as raiser; else unkRaiser"><div class="ta-person-avatar" [style.background-color]="getAvatarBg(fullName(raiser))"><img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)"><span *ngIf="!raiser.avatarUrl">{{ (raiser.firstName || '?').slice(0,1) + (raiser.lastName || '').slice(0,1) }}</span><span class="ta-person-tooltip">{{ fullName(raiser) }}</span></div><span class="ta-user-name">{{ fullName(raiser) }}</span></div><ng-template #unkRaiser><span class="ta-muted">—</span></ng-template></td><td class="ta-wide-cell">{{ r.location }}</td><td class="ta-nowrap">{{ r.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(r.startDate | date:'dd-MM-yyyy') !== (r.endDate | date:'dd-MM-yyyy')"><span class="date-to">to</span>{{ r.endDate | date:'dd-MM-yyyy' }}</ng-container></td><td><div class="fv-team-avatars"><div class="fv-team-avatar" *ngFor="let member of r.members.slice(0, 4)" [title]="member.employee.firstName + ' ' + member.employee.lastName"><img *ngIf="member.employee.avatarUrl" [src]="member.employee.avatarUrl" alt=""><span *ngIf="!member.employee.avatarUrl">{{ member.employee.firstName.slice(0,1) }}{{ member.employee.lastName.slice(0,1) }}</span><span class="fv-team-tooltip">{{ member.employee.firstName }} {{ member.employee.lastName }}</span></div><span class="fv-team-more" *ngIf="r.members.length > 4">+{{ r.members.length - 4 }}</span></div></td><td>{{ r.tasks.length }}</td><td class="ta-actions-col"><div class="ta-action-menu"><button class="ta-icon-btn" type="button" (click)="toggleHoursActionMenu(r.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === r.id"><button (click)="openVisitDetails(r); toggleHoursActionMenu(r.id)">View</button><a *ngIf="canEditApprovalRequest(r.status)" [routerLink]="['/field-visits/requests', r.id]" [queryParams]="{ edit: 1 }">Edit</a><button class="approve" (click)="decideFieldVisit(r, 'APPROVED'); toggleHoursActionMenu(r.id)">Approve</button><button class="reject" (click)="decideFieldVisit(r, 'REJECTED'); toggleHoursActionMenu(r.id)">Reject</button></div></div></td></tr></tbody></table></div>
 
     <article class="prq-card" [hidden]="true" *ngFor="let r of filteredFieldVisitRequests()">
       <div class="prq-card-head">
@@ -1010,11 +1079,18 @@
         </div>
       </div>
 
-      <div class="prq-meta">
-        <span *ngIf="$any(r).raisedBy">
-          Raised by {{ $any(r).raisedBy.firstName }} {{ $any(r).raisedBy.lastName }}
+      <div class="prq-meta prq-meta-with-avatars">
+        <div class="prq-meta-user" *ngIf="r.raisedBy as raiser">
+          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(fullName(raiser))">
+            <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)" />
+            <span *ngIf="!raiser.avatarUrl">{{ (raiser.firstName || '?').slice(0,1) + (raiser.lastName || '').slice(0,1) }}</span>
+          </div>
+          <span class="prq-meta-user-text">Raised by <strong>{{ fullName(raiser) }}</strong></span>
+        </div>
+        <span class="prq-meta-date" *ngIf="r.submittedAt || r.createdAt">
+          <svg lucideCalendar size="13"></svg>
+          {{ (r.submittedAt || r.createdAt) | date: 'dd-MM-yyyy, h:mm a' }}
         </span>
-        <span *ngIf="$any(r).submittedAt">{{ $any(r).submittedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
       </div>
 
       <div class="prq-actions">
@@ -1061,11 +1137,18 @@
 
       <h4 class="prq-title">{{ r.title }}</h4>
 
-      <div class="prq-meta">
-        <span *ngIf="r.raisedBy"
-          >Raised by {{ r.raisedBy.firstName }} {{ r.raisedBy.lastName }}</span
-        >
-        <span>{{ r.createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
+      <div class="prq-meta prq-meta-with-avatars">
+        <div class="prq-meta-user" *ngIf="r.raisedBy as raiser">
+          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(fullName(raiser))">
+            <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)" />
+            <span *ngIf="!raiser.avatarUrl">{{ getInitials(fullName(raiser)) }}</span>
+          </div>
+          <span class="prq-meta-user-text">Raised by <strong>{{ fullName(raiser) }}</strong></span>
+        </div>
+        <span class="prq-meta-date">
+          <svg lucideCalendar size="13"></svg>
+          {{ r.createdAt | date: 'dd-MM-yyyy, h:mm a' }}
+        </span>
       </div>
 
       <!-- Angular sanitises this. Never bypassSecurityTrustHtml. -->
@@ -1124,12 +1207,30 @@
 
       <h4 class="prq-title">{{ t.title }}</h4>
 
-      <div class="prq-meta">
-        <span *ngIf="t.raisedBy">Raised by {{ t.raisedBy.firstName }} {{ t.raisedBy.lastName }}</span>
-        <span>{{ t.createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
-        <span *ngIf="t.proposedAssignee">For {{ t.proposedAssignee.firstName }} {{ t.proposedAssignee.lastName }}</span>
-        <span *ngIf="t.estimatedHours">{{ t.estimatedHours }}h estimated</span>
-        <span *ngIf="t.startDate || t.dueDate">
+      <div class="prq-meta prq-meta-with-avatars">
+        <div class="prq-meta-user" *ngIf="t.raisedBy as raiser">
+          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(fullName(raiser))">
+            <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)" />
+            <span *ngIf="!raiser.avatarUrl">{{ getInitials(fullName(raiser)) }}</span>
+          </div>
+          <span class="prq-meta-user-text">Raised by <strong>{{ fullName(raiser) }}</strong></span>
+        </div>
+        <div class="prq-meta-user" *ngIf="t.proposedAssignee as assignee">
+          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(fullName(assignee))">
+            <img *ngIf="assignee.avatarUrl" [src]="assignee.avatarUrl" [alt]="fullName(assignee)" />
+            <span *ngIf="!assignee.avatarUrl">{{ getInitials(fullName(assignee)) }}</span>
+          </div>
+          <span class="prq-meta-user-text">For <strong>{{ fullName(assignee) }}</strong></span>
+        </div>
+        <span class="prq-meta-date">
+          <svg lucideCalendar size="13"></svg>
+          {{ t.createdAt | date: 'dd-MM-yyyy, h:mm a' }}
+        </span>
+        <span *ngIf="t.estimatedHours" class="prq-meta-stat">
+          <svg lucideClock size="13"></svg>
+          {{ t.estimatedHours }}h estimated
+        </span>
+        <span *ngIf="t.startDate || t.dueDate" class="prq-meta-stat">
           {{ t.startDate ? (t.startDate | date:'dd-MM-yyyy') : '—' }}<span class="date-to">to</span>{{ t.dueDate ? (t.dueDate | date:'dd-MM-yyyy') : '—' }}
         </span>
       </div>
@@ -1186,9 +1287,18 @@
         </span>
       </div>
 
-      <div class="prq-meta">
-        <span>Raised by {{ fullName(request.requestedBy) }}</span>
-        <span>{{ request.createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
+      <div class="prq-meta prq-meta-with-avatars">
+        <div class="prq-meta-user" *ngIf="request.requestedBy as raiser">
+          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(fullName(raiser))">
+            <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)" />
+            <span *ngIf="!raiser.avatarUrl">{{ getInitials(fullName(raiser)) }}</span>
+          </div>
+          <span class="prq-meta-user-text">Raised by <strong>{{ fullName(raiser) }}</strong></span>
+        </div>
+        <span class="prq-meta-date">
+          <svg lucideCalendar size="13"></svg>
+          {{ request.createdAt | date: 'dd-MM-yyyy, h:mm a' }}
+        </span>
       </div>
 
       <div class="prq-location-details">
@@ -1213,11 +1323,14 @@
       </div>
 
       <div class="prq-location-outcome" *ngIf="request.status !== 'PENDING'">
-        <span *ngIf="request.reviewedBy">
-          {{ request.status === 'APPROVED' ? 'Approved' : 'Rejected' }} by
-          {{ fullName(request.reviewedBy) }}
-        </span>
-        <span *ngIf="request.reviewedAt">{{ request.reviewedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
+        <div class="prq-meta-user" *ngIf="request.reviewedBy as reviewer">
+          <div class="prq-mini-avatar reviewer" [style.background-color]="getAvatarBg(fullName(reviewer))">
+            <img *ngIf="$any(reviewer).avatarUrl" [src]="$any(reviewer).avatarUrl" [alt]="fullName(reviewer)" />
+            <span *ngIf="!$any(reviewer).avatarUrl">{{ getInitials(fullName(reviewer)) }}</span>
+          </div>
+          <span class="prq-meta-user-text">{{ request.status === 'APPROVED' ? 'Approved' : 'Rejected' }} by <strong>{{ fullName(reviewer) }}</strong></span>
+        </div>
+        <span *ngIf="request.reviewedAt" class="prq-meta-date">{{ request.reviewedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
       </div>
 
       <div
