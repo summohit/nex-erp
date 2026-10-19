@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 
 import { PermissionsService } from '../permissions/permissions.service';
 import { MailService } from '../mail/mail.service';
+import { PayrollService } from '../payroll/payroll.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -12,7 +13,8 @@ export class EmployeesService {
   constructor(
     private prisma: PrismaService,
     private permissions: PermissionsService,
-    private mailService: MailService
+    private mailService: MailService,
+    private payrollService: PayrollService,
   ) {}
 
   /**
@@ -302,6 +304,143 @@ export class EmployeesService {
   }
 
   /**
+   * Start an offer for an existing trainee without creating a second account.
+   * The resulting application deliberately uses the standard ATS Offered and
+   * offer-letter editor/signing flow. The durable source-trainee link is kept
+   * in the existing answers metadata so this works with the current database
+   * role without requiring a schema migration.
+   * used at signature time to promote this very Employee record.
+   */
+  async startTraineeConversion(employeeId: number, companyId: number, role: string, data: any) {
+    if (!['HR', 'ADMIN', 'SUPERADMIN'].includes(role)) {
+      throw new ForbiddenException('Only HR or an administrator can convert a trainee to an employee');
+    }
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      include: { user: { select: { email: true } }, designation: { select: { name: true } }, department: { select: { name: true } }, branch: { select: { name: true } } },
+    });
+    if (!employee) throw new NotFoundException('Trainee not found');
+    const isTrainee = employee.employmentCategory === 'TRAINEE'
+      || /^trainee$/i.test(employee.designation?.name || '');
+    if (!isTrainee) {
+      throw new BadRequestException('Only an active trainee can be converted');
+    }
+    const offeredSalary = Number(data?.offeredSalary);
+    if (!Number.isFinite(offeredSalary) || offeredSalary <= 0) {
+      throw new BadRequestException('A valid offered salary is required');
+    }
+    const jobId = Number(data?.jobId);
+    if (!Number.isInteger(jobId) || jobId <= 0) {
+      throw new BadRequestException('Choose the employee position for this conversion');
+    }
+    const job = await this.prisma.job.findFirst({ where: { id: jobId, companyId } });
+    if (!job) throw new NotFoundException('Selected job position was not found');
+    const previousApplication = await this.prisma.jobApplication.findFirst({
+      where: { companyId, email: { equals: employee.user.email, mode: 'insensitive' }, source: { not: 'TRAINEE_CONVERSION' } },
+      include: { job: { select: { title: true } } }, orderBy: { createdAt: 'desc' },
+    });
+    const previousProfile = {
+      employeeCode: employee.employeeCode,
+      employmentCategory: employee.employmentCategory,
+      position: employee.designation?.name || previousApplication?.job?.title || 'Trainee',
+      department: employee.department?.name || null,
+      branch: employee.branch?.name || null,
+      joiningDate: employee.joiningDate,
+      annualCtc: previousApplication?.offeredSalary || previousApplication?.expectedCtc || previousApplication?.currentCtc || null,
+    };
+
+    const candidates = await this.prisma.jobApplication.findMany({
+      where: { companyId }, select: { id: true, status: true, answers: true },
+    });
+    const existing = candidates.find((candidate) => {
+      try { return JSON.parse(candidate.answers || '{}')?.__traineeConversion?.sourceTraineeId === employee.id; }
+      catch { return false; }
+    });
+    if (existing && !['REJECTED'].includes(existing.status)) {
+      throw new ConflictException('This trainee already has an active or completed conversion request');
+    }
+
+    const [firstName, ...lastNameParts] = `${employee.firstName} ${employee.lastName || ''}`.trim().split(/\s+/);
+    const fullName = [firstName, ...lastNameParts].filter(Boolean).join(' ');
+    const payload: any = {
+      jobId: job.id,
+      companyId,
+      answers: JSON.stringify({ __traineeConversion: { sourceTraineeId: employee.id, startedAt: new Date().toISOString(), previousProfile } }),
+      fullName,
+      email: employee.user.email,
+      phone: employee.phone || '',
+      address: employee.address || null,
+      dateOfBirth: employee.dateOfBirth || null,
+      currentLocation: employee.workLocation || null,
+      offeredSalary,
+      profileBudget: offeredSalary,
+      joiningDate: data?.joiningDate ? new Date(data.joiningDate) : employee.joiningDate || null,
+      source: 'TRAINEE_CONVERSION',
+      coverLetter: data?.remarks?.trim() || null,
+      status: 'OFFERED',
+      completedStages: ['APPLIED', 'OFFERED'],
+      approvalStatus: 'APPROVED',
+    };
+    if (existing) {
+      return this.prisma.jobApplication.update({ where: { id: existing.id }, data: payload });
+    }
+    return this.prisma.jobApplication.create({ data: payload });
+  }
+
+  /**
+   * The signed-offer terminal action for a trainee conversion.  This promotes
+   * the existing employee/user pair and intentionally does not call create(),
+   * generate onboarding tasks, or send verification/onboarding credentials.
+   */
+  async promoteTraineeAfterSignedOffer(traineeId: number, applicationId: number, companyId: number) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const [trainee, application] = await Promise.all([
+        tx.employee.findFirst({ where: { id: traineeId, companyId } }),
+        tx.jobApplication.findFirst({ where: { id: applicationId, companyId }, include: { job: true } }),
+      ]);
+      const sourceTraineeId = (() => { try { return JSON.parse(application?.answers || '{}')?.__traineeConversion?.sourceTraineeId; } catch { return null; } })();
+      if (!trainee || !application || sourceTraineeId !== traineeId) throw new NotFoundException('Trainee conversion record was not found');
+
+      // The signing endpoint can be retried by browsers/webhooks. Once this
+      // trainee is permanent, return the existing profile without issuing a
+      // second employee code or changing their account again.
+      if (trainee.employmentCategory !== 'TRAINEE') {
+        return { employee: trainee, offeredSalary: application.offeredSalary };
+      }
+
+      const employeeCode = await this.generateEmployeeCode(tx, companyId, 'PERMANENT');
+      const employee = await tx.employee.update({
+        where: { id: trainee.id },
+        data: {
+          employeeCode,
+          employmentCategory: 'PERMANENT',
+          onboardingStatus: 'COMPLETED',
+          joiningDate: application.joiningDate || trainee.joiningDate,
+          departmentId: application.job.departmentId || trainee.departmentId,
+          designationId: application.job.designationId || trainee.designationId,
+          branchId: application.job.branchId || trainee.branchId,
+        },
+      });
+      await tx.jobApplication.update({
+        where: { id: application.id },
+        data: {
+          status: 'HIRED',
+          completedStages: Array.from(new Set([...(application.completedStages || []), 'HIRED'])),
+        },
+      });
+      return { employee, offeredSalary: application.offeredSalary };
+    });
+
+    // The offer CTC is annual, while salary structures store monthly amounts.
+    // Reapplying is safe for a retried signing callback and guarantees the
+    // converted employee's next payroll uses the accepted offer, not trainee pay.
+    if (result.offeredSalary && result.offeredSalary > 0) {
+      await this.payrollService.applyTemplate(companyId, result.employee.id, result.offeredSalary / 12);
+    }
+    return result.employee;
+  }
+
+  /**
    * Set an employee's internal charge-out rate (§23).
    *
    * Its own endpoint rather than a field on update(): that method is reachable
@@ -484,7 +623,51 @@ export class EmployeesService {
     // An employee opening their own profile does not get to read their own
     // charge-out rate either: it is what the company bills for their time,
     // not a fact about their employment, and it is not theirs to see.
-    return { ...this.stripCostRate(employee, role), isOwner, canManageDocuments: canViewDocuments };
+    const conversionApplications = await this.prisma.jobApplication.findMany({
+      where: { companyId, source: 'TRAINEE_CONVERSION' },
+      select: { answers: true, status: true, offerLetter: { select: { status: true } } },
+    });
+    const hasCompletedTraineeConversion = conversionApplications.some((application) => {
+      try {
+        const linked = JSON.parse(application.answers || '{}')?.__traineeConversion?.sourceTraineeId === id;
+        return linked && (application.offerLetter?.status === 'ACCEPTED' || ['HIRED', 'ONBOARDED'].includes(application.status));
+      } catch { return false; }
+    });
+    return { ...this.stripCostRate(employee, role), isOwner, canManageDocuments: canViewDocuments, hasCompletedTraineeConversion };
+  }
+
+  /** Timeline for the same employee record; conversion applications are linked
+   * through existing application metadata so no parallel employee is created. */
+  async getEmploymentHistory(id: number, companyId: number, currentUserId: number, role: string) {
+    const employee = await this.getProfile(id, companyId, currentUserId, role);
+    const applications = await this.prisma.jobApplication.findMany({
+      where: { companyId },
+      include: { job: { select: { title: true } }, offerLetter: { select: { status: true, issuedAt: true, respondedAt: true } } },
+    });
+    const conversion = applications.filter((application) => {
+      try { return JSON.parse(application.answers || '{}')?.__traineeConversion?.sourceTraineeId === id; }
+      catch { return false; }
+    });
+    const events: any[] = [{
+      type: 'PROFILE_CREATED', label: 'Trainee profile created',
+      detail: `Employee ID ${employee.employeeCode || 'pending'} · ${employee.designation?.name || 'Trainee'}`,
+      facts: [{ label: 'Employee ID', value: employee.employeeCode || 'Not assigned' }, { label: 'Position', value: employee.designation?.name || 'Trainee' }, { label: 'Department', value: employee.department?.name || 'Not specified' }],
+      at: employee.createdAt,
+    }];
+    for (const application of conversion) {
+      let metadata: any = {}; try { metadata = JSON.parse(application.answers || '{}')?.__traineeConversion || {}; } catch { /* legacy record */ }
+      const before = metadata.previousProfile || {};
+      events.push({ type: 'CONVERSION_STARTED', label: 'Trainee-to-employee offer created', detail: application.job?.title || 'Employee position', facts: [
+        { label: 'Previous position', value: before.position || 'Trainee' }, { label: 'Previous department', value: before.department || 'Not recorded' },
+        { label: 'Previous annual CTC', value: before.annualCtc ? `₹${Number(before.annualCtc).toLocaleString('en-IN')}` : 'Not recorded' },
+        { label: 'Offered position', value: application.job?.title || 'Not specified' }, { label: 'Offered annual CTC', value: application.offeredSalary ? `₹${Number(application.offeredSalary).toLocaleString('en-IN')}` : 'Not recorded' },
+        { label: 'Joining date', value: application.joiningDate ? new Date(application.joiningDate).toLocaleDateString('en-IN') : 'Not specified' },
+      ], at: application.createdAt });
+      if (application.offerLetter?.issuedAt) events.push({ type: 'OFFER_SENT', label: 'Offer letter sent for signature', detail: application.job?.title || '', facts: [{ label: 'Position', value: application.job?.title || 'Not specified' }, { label: 'Annual CTC', value: application.offeredSalary ? `₹${Number(application.offeredSalary).toLocaleString('en-IN')}` : 'Not recorded' }], at: application.offerLetter.issuedAt });
+      if (application.offerLetter?.status === 'ACCEPTED') events.push({ type: 'OFFER_SIGNED', label: 'Offer letter signed', detail: 'Existing account retained; no onboarding account created.', facts: [{ label: 'New position', value: application.job?.title || 'Not specified' }, { label: 'New annual CTC', value: application.offeredSalary ? `₹${Number(application.offeredSalary).toLocaleString('en-IN')}` : 'Not recorded' }], at: application.offerLetter.respondedAt || application.updatedAt });
+    }
+    events.push({ type: 'CURRENT_STATUS', label: `Current employment: ${employee.employmentCategory}`, detail: employee.designation?.name || '', at: employee.updatedAt });
+    return events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   }
 
   /**

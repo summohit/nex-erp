@@ -176,12 +176,13 @@ export class ApplicationsService {
       whereClause.jobId = jobId;
     }
 
-    return this.prisma.jobApplication.findMany({
+    const applications = await this.prisma.jobApplication.findMany({
       where: whereClause,
       include: {
         job: {
           select: {
             title: true,
+            recruiterId: true,
             // The board's offer modal compares against these, so the list
             // payload has to carry them too — not just findOne's.
             minSalary: true,
@@ -193,6 +194,7 @@ export class ApplicationsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    return applications.map(application => ({ ...application, followUps: this.readCandidateFollowUps(application.answers) }));
   }
 
   async findOne(id: number, companyId: number) {
@@ -202,6 +204,7 @@ export class ApplicationsService {
         job: {
           select: {
             title: true,
+            recruiterId: true,
             departmentId: true,
             designationId: true,
             branchId: true,
@@ -218,7 +221,71 @@ export class ApplicationsService {
     if (!application) {
       throw new NotFoundException(`Application #${id} not found`);
     }
-    return application;
+    return { ...application, followUps: this.readCandidateFollowUps(application.answers) };
+  }
+
+  /**
+   * Compatibility store for candidate follow-ups. The production database role
+   * currently cannot create the new table, so records are kept alongside the
+   * existing application answer payload without discarding any answers. Once
+   * the additive table is deployed this can be migrated transparently.
+   */
+  private readCandidateFollowUps(answers?: string | null): any[] {
+    if (!answers) return [];
+    try {
+      const parsed = JSON.parse(answers);
+      return Array.isArray(parsed?.__candidateFollowUps) ? parsed.__candidateFollowUps : [];
+    } catch { return []; }
+  }
+
+  private writeCandidateFollowUps(answers: string | null | undefined, followUps: any[]): string {
+    let parsed: any;
+    try { parsed = answers ? JSON.parse(answers) : []; } catch { parsed = answers || []; }
+    if (Array.isArray(parsed)) return JSON.stringify({ answers: parsed, __candidateFollowUps: followUps });
+    if (parsed && typeof parsed === 'object') return JSON.stringify({ ...parsed, __candidateFollowUps: followUps });
+    return JSON.stringify({ answers: parsed, __candidateFollowUps: followUps });
+  }
+
+  async getFollowUps(applicationId: number, companyId: number) {
+    const app = await this.findOne(applicationId, companyId);
+    return app.followUps || [];
+  }
+
+  async createFollowUp(applicationId: number, companyId: number, data: any) {
+    const app = await this.findOne(applicationId, companyId);
+    if (!data?.scheduledAt) throw new BadRequestException('Follow-up date and time are required');
+    if (!String(data?.title || '').trim()) throw new BadRequestException('Follow-up title is required');
+    // ATS follow-ups belong to the recruiter who owns the job. This keeps the
+    // responsibility consistent and avoids an extra HR-assignee choice per row.
+    const assignedToId = app.job?.recruiterId || null;
+    if (assignedToId) {
+      const assignee = await this.prisma.employee.findFirst({ where: { id: assignedToId, companyId } });
+      if (!assignee) throw new BadRequestException('Selected HR employee is not available');
+    }
+    const assignedTo = assignedToId
+      ? await this.prisma.employee.findFirst({ where: { id: assignedToId, companyId }, select: { id: true, firstName: true, lastName: true, avatarUrl: true } })
+      : null;
+    const followUp = { id: Date.now(), applicationId, companyId, title: String(data.title).trim(), type: data.type || 'CALL',
+      scheduledAt: new Date(data.scheduledAt).toISOString(), notes: data.notes?.trim() || null,
+      status: data.status || 'PENDING', assignedToId, assignedTo, createdAt: new Date().toISOString() };
+    const followUps = [...(app.followUps || []), followUp].sort((a: any, b: any) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt));
+    await this.prisma.jobApplication.update({ where: { id: applicationId }, data: { answers: this.writeCandidateFollowUps(app.answers, followUps) } });
+    return followUp;
+  }
+
+  async updateFollowUp(applicationId: number, followUpId: number, companyId: number, data: any) {
+    const app = await this.findOne(applicationId, companyId);
+    const followUp = (app.followUps || []).find((item: any) => Number(item.id) === followUpId);
+    if (!followUp) throw new NotFoundException('Candidate follow-up not found');
+    const updated = { ...followUp,
+      ...(data.title !== undefined ? { title: String(data.title).trim() } : {}),
+      ...(data.type !== undefined ? { type: data.type } : {}), ...(data.notes !== undefined ? { notes: data.notes?.trim() || null } : {}),
+      ...(data.status !== undefined ? { status: data.status } : {}),
+      ...(data.completionRemarks !== undefined ? { completionRemarks: data.completionRemarks?.trim() || null } : {}),
+      ...(data.scheduledAt ? { scheduledAt: new Date(data.scheduledAt).toISOString() } : {}) };
+    const followUps = (app.followUps || []).map((item: any) => Number(item.id) === followUpId ? updated : item);
+    await this.prisma.jobApplication.update({ where: { id: applicationId }, data: { answers: this.writeCandidateFollowUps(app.answers, followUps) } });
+    return updated;
   }
 
   async updateStatus(
@@ -813,6 +880,9 @@ export class ApplicationsService {
     return this.prisma.interview.findMany({
       where: whereClause,
       include: {
+        interviewer: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true }
+        },
         application: {
           select: {
             id: true,

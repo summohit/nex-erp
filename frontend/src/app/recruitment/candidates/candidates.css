@@ -1211,12 +1211,12 @@
 
 .table-container {
   flex: 1;
-  min-height: 560px;
-  height: calc(100vh - 275px);
+  min-height: 0;
+  height: auto;
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   display: flex;
   flex-direction: column;
@@ -1249,28 +1249,15 @@
   overflow: hidden;
 }
 
-/* Custom sleek scrollbars for AG Grid */
-::ng-deep .custom-ats-grid ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-
-::ng-deep .custom-ats-grid ::-webkit-scrollbar-track {
-  background: #f8fafc;
-}
-
-::ng-deep .custom-ats-grid ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-
-::ng-deep .custom-ats-grid ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+/* Auto-height makes the page own scrolling. Never show nested grid tracks. */
+::ng-deep .custom-ats-grid .ag-body-horizontal-scroll,
+::ng-deep .custom-ats-grid .ag-body-vertical-scroll {
+  display: none !important;
 }
 
 /* Pinned column separators */
 ::ng-deep .custom-ats-grid .ag-root-wrapper {
-  height: 100%;
+  height: auto;
 }
 
 ::ng-deep .custom-ats-grid .ag-pinned-left-header,
@@ -5055,3 +5042,51 @@
 .annexure-toggle input { margin-top: 3px; width: 16px; height: 16px; accent-color: #2563eb; }
 .annexure-toggle b { display: block; font-size: 13.5px; color: #0f172a; }
 .annexure-toggle small { display: block; font-size: 12px; color: #64748b; }
+
+.ats-inline-followups { margin: -1px 0 16px; padding: 18px 22px 22px; border: 1px solid #dbeafe; border-top: 3px solid #2563eb; border-radius: 0 0 12px 12px; background: #f8fbff; }
+.ats-inline-followups-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; color: #0f172a; }.ats-inline-label { margin-right: 14px; color: #475569; font-size: 12px; font-weight: 800; letter-spacing: .05em; }
+.btn-inline-add { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #a5b4fc; border-radius: 8px; padding: 8px 12px; color: #2563eb; background: #fff; font-weight: 700; cursor: pointer; }.btn-inline-add:hover { background: #eff6ff; }
+.ats-inline-followups-scroll { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }.ats-inline-followups table { width: 100%; min-width: 960px; border-collapse: collapse; }.ats-inline-followups th { padding: 14px 16px; color: #64748b; background: #f8fafc; text-align: left; font-size: 12px; font-weight: 800; text-transform: uppercase; }.ats-inline-followups td { padding: 12px 16px; border-top: 1px solid #eef2f7; color: #334155; font-size: 13px; vertical-align: top; }.ats-inline-followups td:first-child { border-left: 3px solid #2563eb; }.ats-inline-followups td strong,.ats-inline-followups td small { display: block; }.ats-inline-followups td small { margin-top: 3px; color: #64748b; }.ats-followup-type,.ats-followup-status { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 999px; background: #eff6ff; color: #2563eb; font-size: 12px; font-weight: 700; }.ats-followup-status { background: #fff7ed; color: #c2410c; }.ats-followup-status.completed { background: #dcfce7; color: #15803d; }.ats-followup-status.cancelled { background: #fee2e2; color: #b91c1c; }.ats-followup-objective { max-width: 280px; }.ats-followup-objective strong { color: #2563eb; }.ats-followup-objective small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; }.ats-followup-contact small,.ats-followup-date { display: flex !important; align-items: center; gap: 5px; }.ats-followup-date { color: #2563eb; font-weight: 700; }.ats-followup-owner { font-size: 11px; }.btn-complete-followup { border: 0; border-radius: 7px; padding: 6px 9px; color: #fff; background: #16a34a; cursor: pointer; font-weight: 700; }.ats-inline-empty { padding: 26px; color: #64748b; text-align: center; border: 1px dashed #cbd5e1; border-radius: 10px; background: #fff; }
+
+.candidate-followup-overlay { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 20px; background: rgba(15,23,42,.45); }
+.candidate-followup-modal { width: min(560px, 100%); border-radius: 16px; background: #fff; box-shadow: 0 20px 55px rgba(15,23,42,.28); overflow: hidden; }
+.candidate-followup-header, .candidate-followup-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px; border-bottom: 1px solid #e2e8f0; }
+.candidate-followup-header h3 { margin: 0; color: #0f172a; font-size: 18px; }.candidate-followup-header p { margin: 4px 0 0; color: #64748b; font-size: 13px; }
+.candidate-followup-body { display: flex; flex-direction: column; gap: 14px; padding: 22px; }.candidate-followup-body label { display: flex; flex-direction: column; gap: 6px; color: #475569; font-size: 13px; font-weight: 600; }
+.candidate-followup-body input, .candidate-followup-body select, .candidate-followup-body textarea { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; color: #1e293b; font: inherit; }.candidate-followup-body textarea { resize: vertical; }
+.candidate-followup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }.candidate-followup-footer { border-top: 1px solid #e2e8f0; border-bottom: 0; justify-content: flex-end; }
+@media (max-width: 560px) { .candidate-followup-grid { grid-template-columns: 1fr; } }
+
+::ng-deep .btn-tbl-more { width: 32px; height: 32px; border: 0; border-radius: 8px; color: #475569; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; }
+::ng-deep .btn-tbl-more:hover { color: #1d4ed8; background: #eff6ff; }
+.ats-action-menu-backdrop { position: fixed; inset: 0; z-index: 1300; }
+.ats-action-menu { position: fixed; z-index: 1301; width: 156px; padding: 5px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; box-shadow: 0 10px 26px rgba(15,23,42,.16); }
+.ats-action-menu button { display: flex; align-items: center; gap: 9px; width: 100%; border: 0; border-radius: 7px; padding: 9px 10px; color: #334155; background: transparent; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }.ats-action-menu button:hover { color: #1d4ed8; background: #eff6ff; }
+
+/* Full-width AG Grid renderers are created outside Angular's scoped template.
+   Repeat the existing follow-up visual language through ::ng-deep so the row
+   looks the same as the original inline panel. */
+::ng-deep .ats-inline-followups { box-sizing: border-box; height: 100%; padding: 18px 22px 22px; border: 1px solid #dbeafe; border-top: 3px solid #2563eb; border-radius: 0 0 12px 12px; background: #f8fbff; }
+::ng-deep .ats-inline-followups-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; color: #0f172a; }
+::ng-deep .ats-inline-label { margin-right: 14px; color: #475569; font-size: 12px; font-weight: 800; letter-spacing: .05em; }
+::ng-deep .btn-inline-add { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #a5b4fc; border-radius: 8px; padding: 8px 12px; color: #2563eb; background: #fff; font-weight: 700; cursor: pointer; }
+::ng-deep .btn-inline-add:hover { background: #eff6ff; }
+::ng-deep .ats-inline-followups-scroll { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+::ng-deep .ats-inline-followups table { width: 100%; min-width: 960px; border-collapse: collapse; }
+::ng-deep .ats-inline-followups th { padding: 14px 16px; color: #64748b; background: #f8fafc; text-align: left; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+::ng-deep .ats-inline-followups td { padding: 12px 16px; border-top: 1px solid #eef2f7; color: #334155; font-size: 13px; vertical-align: top; }
+::ng-deep .ats-inline-followups td:first-child { border-left: 3px solid #2563eb; }
+::ng-deep .ats-inline-followups td strong, ::ng-deep .ats-inline-followups td small { display: block; }
+::ng-deep .ats-inline-followups td small { margin-top: 3px; color: #64748b; }
+::ng-deep .ats-followup-type, ::ng-deep .ats-followup-status { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 999px; background: #eff6ff; color: #2563eb; font-size: 12px; font-weight: 700; }
+::ng-deep .ats-followup-status { background: #fff7ed; color: #c2410c; }
+::ng-deep .ats-followup-status.completed { background: #dcfce7; color: #15803d; }
+::ng-deep .ats-followup-status.cancelled { background: #fee2e2; color: #b91c1c; }
+::ng-deep .ats-followup-objective { max-width: 280px; }
+::ng-deep .ats-followup-objective strong { color: #2563eb; }
+::ng-deep .ats-followup-objective small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; }
+::ng-deep .ats-followup-date { display: inline-flex; color: #2563eb; font-weight: 700; }
+::ng-deep .btn-complete-followup { border: 0; border-radius: 7px; padding: 6px 9px; color: #fff; background: #16a34a; cursor: pointer; font-weight: 700; }
+::ng-deep .ats-inline-empty { padding: 26px !important; color: #64748b !important; text-align: center; border: 1px dashed #cbd5e1; border-radius: 10px; background: #fff; }
+::ng-deep .ats-followup-stage-select { min-width: 118px; border: 0; border-radius: 999px; padding: 6px 28px 6px 10px; color: #c2410c; background: #fff7ed; font-size: 12px; font-weight: 700; cursor: pointer; }
+::ng-deep .ats-followup-stage-select:focus { outline: 2px solid #bfdbfe; }

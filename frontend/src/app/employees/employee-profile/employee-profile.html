@@ -4,6 +4,7 @@
       <h1>Profile Settings</h1>
       <p>Manage your profile, emergency contacts, and personal documents.</p>
     </div>
+    <button type="button" class="btn-convert-trainee" *ngIf="canConvertTrainee()" (click)="openConversion()">Convert to Employee</button>
   </div>
 
   <div class="profile-layout" *ngIf="!isLoading()">
@@ -24,6 +25,9 @@
         </button>
         <button class="tab-btn" [class.active]="activeTab() === 'documents'" (click)="setTab('documents')" *ngIf="canManageDocuments()">
           Documents
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'history'" (click)="setTab('history')">
+          History
         </button>
       </div>
     </div>
@@ -48,6 +52,17 @@
         [employeeData]="employeeData()" 
         (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')">
       </app-documents-tab>
+
+      <section *ngIf="activeTab() === 'history'" class="employment-history">
+        <div class="history-heading"><h2>Employment History</h2><p>History remains attached to this same profile after trainee conversion.</p></div>
+        <p class="history-loading" *ngIf="historyLoading()">Loading history…</p>
+        <div class="history-timeline" *ngIf="!historyLoading()">
+          <article class="history-event" *ngFor="let event of employmentHistory()">
+            <span class="history-dot"></span><div><strong>{{ event.label }}</strong><p *ngIf="event.detail">{{ event.detail }}</p><dl class="history-facts" *ngIf="event.facts?.length"><ng-container *ngFor="let fact of event.facts"><dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd></ng-container></dl><time>{{ event.at | date:'dd MMM yyyy, h:mm a' }}</time></div>
+          </article>
+          <p class="history-loading" *ngIf="!employmentHistory().length">No employment events recorded yet.</p>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -56,4 +71,18 @@
     <div class="spinner"></div>
     <p>Loading profile...</p>
   </div>
+</div>
+
+<div class="conversion-overlay" *ngIf="conversionOpen()" (click)="conversionOpen.set(false)">
+  <section class="conversion-modal" (click)="$event.stopPropagation()">
+    <header><div><h2>Convert Trainee to Employee</h2><p>Creates an editable offer letter. The existing account is reused after signing.</p></div><button type="button" (click)="conversionOpen.set(false)">×</button></header>
+    <div class="conversion-body">
+      <div class="trainee-summary"><strong>{{ employeeData()?.firstName }} {{ employeeData()?.lastName }}</strong><span>{{ employeeData()?.user?.email || employeeData()?.email }}</span></div>
+      <label>Employee position<select [(ngModel)]="conversionForm.jobId"><option [ngValue]="null">Select a position</option><option *ngFor="let job of jobs()" [ngValue]="job.id">{{ job.title }}</option></select></label>
+      <label>Offered annual CTC (₹)<input type="number" min="1" [(ngModel)]="conversionForm.offeredSalary" placeholder="Enter offered CTC"></label>
+      <label>Joining date <input type="date" [(ngModel)]="conversionForm.joiningDate"></label>
+      <label>Remarks <textarea [(ngModel)]="conversionForm.remarks" placeholder="Optional internal remarks"></textarea></label>
+    </div>
+    <footer><button type="button" class="btn-cancel-conversion" (click)="conversionOpen.set(false)">Cancel</button><button type="button" class="btn-proceed-conversion" [disabled]="isStartingConversion()" (click)="startConversion()">{{ isStartingConversion() ? 'Saving…' : 'Proceed to Offered' }}</button></footer>
+  </section>
 </div>

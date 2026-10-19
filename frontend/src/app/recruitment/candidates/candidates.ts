@@ -5,7 +5,7 @@ import { DragDropModule, CdkDrag, CdkDragDrop, moveItemInArray, transferArrayIte
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { CandidatesService, JobApplication } from '../../services/candidates.service';
+import { CandidatesService, JobApplication, CandidateFollowUp } from '../../services/candidates.service';
 import { JobsService, Job } from '../../services/jobs.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { 
@@ -190,6 +190,14 @@ export class CandidatesComponent implements OnInit {
   canMoveTo(app: JobApplication | null, target: string): boolean {
     if (!app) return true;
     return this.stageBlockReason(app, target) === null;
+  }
+
+  isTraineeConversion(app: JobApplication): boolean {
+    try {
+      return !!JSON.parse(app.answers || '{}')?.__traineeConversion?.sourceTraineeId;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -563,7 +571,10 @@ export class CandidatesComponent implements OnInit {
     const app = this.selectedApp();
     if (!app || !app.answers) return [];
     try {
-      return JSON.parse(app.answers);
+      const parsed = JSON.parse(app.answers);
+      // Candidate follow-ups are stored beside screening answers until the
+      // database migration is available; keep the existing answer UI intact.
+      return Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.answers) ? parsed.answers : []);
     } catch {
       return [];
     }
@@ -575,6 +586,15 @@ export class CandidatesComponent implements OnInit {
     suppressColumnVirtualisation: true,
     rowBuffer: 15,
     animateRows: false,
+    // The page scrolls as needed; keep the grid itself free of nested tracks.
+    domLayout: 'autoHeight',
+    suppressHorizontalScroll: true,
+    isFullWidthRow: (params: any) => !!params.rowNode.data?.__followUpDetail,
+    fullWidthCellRenderer: (params: any) => this.renderFollowUpDetailRow(params.data.application),
+    getRowHeight: (params: any) => params.data?.__followUpDetail
+      ? Math.max(190, 132 + ((params.data.application?.followUps?.length || 0) * 72))
+      : 60,
+    getRowId: (params: any) => params.data?.__followUpDetail ? `follow-ups-${params.data.application.id}` : String(params.data.id),
   };
 
   defaultColDef: ColDef = { flex: 1, minWidth: 130, filter: true, sortable: true, resizable: true };
@@ -711,6 +731,17 @@ export class CandidatesComponent implements OnInit {
       valueGetter: (p: any) => this.stageLabel(p.data?.status),
       cellRenderer: (p: any) => this.renderStatusBadge(p.data?.status)
     },
+    {
+      headerName: 'Next Follow-up', colId: 'nextFollowUp', minWidth: 175, flex: 1,
+      valueGetter: (p: any) => this.nextFollowUp(p.data)?.scheduledAt || '',
+      cellRenderer: (p: any) => {
+        const followUp = this.nextFollowUp(p.data);
+        if (!followUp) return '<span class="tbl-empty">No follow-up</span>';
+        const overdue = followUp.status === 'PENDING' && new Date(followUp.scheduledAt) < new Date();
+        const date = this.datePipe.transform(followUp.scheduledAt, 'dd MMM, h:mm a');
+        return `<span class="tbl-notice-pill tone-${overdue ? 'red' : 'purple'}">${overdue ? 'Overdue' : date}</span>`;
+      }
+    },
     { 
       headerName: 'Applied Date', 
       colId: 'appliedDate',
@@ -721,17 +752,17 @@ export class CandidatesComponent implements OnInit {
     },
     {
       headerName: '',
-      width: 80,
-      minWidth: 80,
-      maxWidth: 80,
+      width: 76,
+      minWidth: 76,
+      maxWidth: 76,
       flex: 0,
       pinned: 'right',
       lockPinned: true,
       suppressMovable: true,
       sortable: false,
       filter: false,
-      cellRenderer: () => `<button class="btn-tbl-action" title="View Application">View</button>`,
-      onCellClicked: (p: any) => this.openApplication(p.data)
+      cellRenderer: () => `<button class="btn-tbl-more" title="Actions" aria-label="Candidate actions">&#8942;</button>`,
+      onCellClicked: (p: any) => this.openActionMenu(p.data, p.event)
     }
   ];
 
@@ -756,6 +787,14 @@ export class CandidatesComponent implements OnInit {
   }
 
   onRowClicked(event: any) {
+    if (event?.data?.__followUpDetail) {
+      const action = event?.event?.target?.dataset?.followupAction;
+      if (action === 'add') this.openFollowUpModal(event.data.application);
+      return;
+    }
+    // The actions cell has its own menu. It must never trigger the row's
+    // default "open application" interaction.
+    if (event?.event?.target?.closest?.('.btn-tbl-more')) return;
     if (event && event.data) {
       this.openApplication(event.data);
     }
@@ -763,6 +802,7 @@ export class CandidatesComponent implements OnInit {
 
   ngOnInit() {
     this.loadJobs();
+    this.http.get<any[]>(`${environment.apiUrl}/employees`).subscribe({ next: emps => this.employees.set(emps || []), error: () => {} });
     // Company-wide, not per-job: an approver should see everything waiting on
     // them regardless of which job the board is filtered to.
     this.loadPendingApprovals();
@@ -808,6 +848,12 @@ export class CandidatesComponent implements OnInit {
     this.candidatesService.getApplications(jobId).subscribe({
       next: (apps) => {
         this.applications.set(apps);
+        // Keep an expanded inline panel connected to the fresh row so a newly
+        // saved or completed follow-up appears immediately in its table.
+        const expandedId = this.expandedFollowUpApp()?.id;
+        if (expandedId) {
+          this.expandedFollowUpApp.set(apps.find(app => app.id === expandedId) || null);
+        }
         this.isLoadingApplications.set(false);
       },
       error: (err) => {
@@ -1717,6 +1763,7 @@ export class CandidatesComponent implements OnInit {
   filterLocation = signal<string>('');
   filterNotice = signal<string>('');
   filterStatus = signal<string>('');
+  filterFollowUpStatus = signal<string>('');
   filterMinCtc = signal<string>('');
   filterMaxCtc = signal<string>('');
 
@@ -1756,6 +1803,10 @@ export class CandidatesComponent implements OnInit {
     return this.noticeOptions().map(n => ({ id: n, name: n }));
   });
 
+  followUpStatusOptions: SearchableSelectOption[] = [
+    { id: 'PENDING', name: 'Pending' }, { id: 'OVERDUE', name: 'Overdue' }, { id: 'COMPLETED', name: 'Completed' }, { id: 'NONE', name: 'No follow-up' }
+  ];
+
   activeFilterCount = computed(() => {
     let count = 0;
     if (this.searchQuery().trim()) count++;
@@ -1764,6 +1815,7 @@ export class CandidatesComponent implements OnInit {
     if (this.filterLocation()) count++;
     if (this.filterNotice()) count++;
     if (this.filterStatus()) count++;
+    if (this.filterFollowUpStatus()) count++;
     if (this.filterMinCtc() || this.filterMaxCtc()) count++;
     return count;
   });
@@ -1777,6 +1829,7 @@ export class CandidatesComponent implements OnInit {
     this.filterLocation.set('');
     this.filterNotice.set('');
     this.filterStatus.set('');
+    this.filterFollowUpStatus.set('');
     this.filterMinCtc.set('');
     this.filterMaxCtc.set('');
     this.onFilterChange();
@@ -1786,7 +1839,7 @@ export class CandidatesComponent implements OnInit {
   filteredApplications = computed(() => {
     const q = this.searchQuery().trim().toLowerCase();
     const pos = this.filterPosition(), loc = this.filterLocation(), nt = this.filterNotice();
-    const st = this.filterStatus();
+    const st = this.filterStatus(), followUpStatus = this.filterFollowUpStatus();
     const min = parseFloat(this.filterMinCtc()), max = parseFloat(this.filterMaxCtc());
     return this.applications().filter(a => {
       if (q) {
@@ -1800,6 +1853,10 @@ export class CandidatesComponent implements OnInit {
       if (loc && (a.currentLocation || '') !== loc) return false;
       if (nt && (a.noticePeriod || '') !== nt) return false;
       if (st && this.normaliseStage(a.status) !== st) return false;
+      const followUp = this.nextFollowUp(a);
+      if (followUpStatus === 'NONE' && followUp) return false;
+      if (followUpStatus === 'OVERDUE' && (!followUp || followUp.status !== 'PENDING' || new Date(followUp.scheduledAt) >= new Date())) return false;
+      if (followUpStatus && !['NONE', 'OVERDUE'].includes(followUpStatus) && (!followUp || followUp.status !== followUpStatus)) return false;
 
       const ctc = Number(a.expectedCtc);
       // Compare like with like: bring LPA-entered values onto the rupee scale.
@@ -1809,6 +1866,126 @@ export class CandidatesComponent implements OnInit {
       return true;
     });
   });
+
+  followUpModalApp = signal<JobApplication | null>(null);
+  completingFollowUp = signal<{ app: JobApplication; followUp: CandidateFollowUp } | null>(null);
+  completionRemarks = '';
+  expandedFollowUpApp = signal<JobApplication | null>(null);
+  actionMenuApp = signal<JobApplication | null>(null);
+  actionMenuPosition = signal({ top: 0, left: 0 });
+  isSavingFollowUp = signal(false);
+  followUpForm: any = { title: '', type: 'CALL', scheduledAt: '', assignedToId: '', notes: '' };
+
+  nextFollowUp(app: JobApplication | null | undefined): CandidateFollowUp | null {
+    const pending = (app?.followUps || []).filter(f => f.status === 'PENDING').sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt));
+    return pending[0] || null;
+  }
+
+  openFollowUpModal(app: JobApplication) {
+    this.followUpModalApp.set(app);
+    this.followUpForm = { title: `Follow-up with ${app.fullName}`, type: 'CALL', scheduledAt: '', notes: '' };
+  }
+
+  toggleFollowUps(app: JobApplication) {
+    this.expandedFollowUpApp.update(current => current?.id === app.id ? null : app);
+
+    // AG Grid owns the rendered rows after initialisation.  Updating the
+    // signal alone does not reliably re-read the bound rowData when the
+    // action is selected from a cell renderer, so explicitly give the grid
+    // the newly-expanded data set as well.
+    queueMicrotask(() => {
+      this.gridApi?.setGridOption('rowData', this.tableRows());
+      this.gridApi?.redrawRows();
+    });
+  }
+
+  tableRows = computed<any[]>(() => {
+    const expandedId = this.expandedFollowUpApp()?.id;
+    return this.filteredApplications().flatMap(application =>
+      application.id === expandedId
+        ? [application, { __followUpDetail: true, application }]
+        : [application]
+    );
+  });
+
+  private escapeFollowUpHtml(value: unknown): string {
+    return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character] || character));
+  }
+
+  private renderFollowUpDetailRow(app: JobApplication): HTMLElement {
+    const followUps = app.followUps || [];
+    const rows = followUps.length
+      ? followUps.map(followUp => {
+          const scheduled = this.datePipe.transform(followUp.scheduledAt, 'dd-MM-yyyy, h:mm a') || '';
+          const remark = this.escapeFollowUpHtml(followUp.completionRemarks || '—');
+          return `<tr><td><span class="ats-followup-type">${this.escapeFollowUpHtml(followUp.type)}</span></td><td class="ats-followup-objective"><strong>${this.escapeFollowUpHtml(followUp.title)}</strong><small>${this.escapeFollowUpHtml(followUp.notes || '')}</small></td><td class="ats-followup-contact"><strong>${this.escapeFollowUpHtml(app.fullName)}</strong><small>${this.escapeFollowUpHtml(app.phone || 'No phone')}</small><small>${this.escapeFollowUpHtml(app.email || 'No email')}</small></td><td><span class="ats-followup-date">${scheduled}</span></td><td>${remark}</td><td><select class="ats-followup-stage-select" data-followup-id="${followUp.id}"><option value="PENDING" ${followUp.status === 'PENDING' ? 'selected' : ''}>Pending</option><option value="COMPLETED" ${followUp.status === 'COMPLETED' ? 'selected' : ''}>Completed</option><option value="CANCELLED" ${followUp.status === 'CANCELLED' ? 'selected' : ''}>Cancelled</option></select></td></tr>`;
+        }).join('')
+      : '<tr><td colspan="6" class="ats-inline-empty">No follow-ups have been scheduled for this candidate.</td></tr>';
+    const element = document.createElement('div');
+    element.innerHTML = `<section class="ats-inline-followups"><div class="ats-inline-followups-head"><div><span class="ats-inline-label">FOLLOW-UPS</span><strong>${this.escapeFollowUpHtml(app.fullName)}</strong></div><button class="btn-inline-add" data-followup-action="add">+ Add Follow-up</button></div><div class="ats-inline-followups-scroll"><table><thead><tr><th>Type</th><th>Objective / Notes</th><th>Contact Details</th><th>Scheduled For</th><th>Completion Remarks</th><th>Stage</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+    element.querySelector('[data-followup-action="add"]')?.addEventListener('click', event => { event.stopPropagation(); this.openFollowUpModal(app); });
+    element.querySelectorAll<HTMLSelectElement>('.ats-followup-stage-select').forEach(select => select.addEventListener('change', event => {
+      event.stopPropagation();
+      const followUp = followUps.find(item => String(item.id) === select.dataset['followupId']);
+      if (!followUp) return;
+      if (select.value === 'COMPLETED') this.openCompleteFollowUp(app, followUp);
+      else this.updateFollowUpStage(app, followUp, select.value);
+    }));
+    return element;
+  }
+
+  openActionMenu(app: JobApplication, event: MouseEvent) {
+    event?.stopPropagation();
+    const target = (event?.target as HTMLElement | null)?.closest?.('.btn-tbl-more') || event?.currentTarget as HTMLElement | null;
+    const rect = target?.getBoundingClientRect();
+    this.actionMenuPosition.set({ top: rect ? rect.bottom + 4 : event?.clientY || 0, left: rect ? Math.max(8, rect.right - 156) : event?.clientX || 0 });
+    this.actionMenuApp.update(current => current?.id === app.id ? null : app);
+  }
+
+  closeActionMenu() { this.actionMenuApp.set(null); }
+
+  chooseAction(action: 'view' | 'followups' | 'addFollowup', event?: MouseEvent) {
+    event?.stopPropagation();
+    const app = this.actionMenuApp();
+    this.closeActionMenu();
+    if (!app) return;
+    if (action === 'view') this.openApplication(app);
+    else if (action === 'followups') this.toggleFollowUps(app);
+    else this.openFollowUpModal(app);
+  }
+
+  openCompleteFollowUp(app: JobApplication, followUp: CandidateFollowUp) {
+    this.completionRemarks = followUp.completionRemarks || '';
+    this.completingFollowUp.set({ app, followUp });
+  }
+
+  saveCompletionRemarks() {
+    const target = this.completingFollowUp();
+    if (!target || !this.completionRemarks.trim()) return;
+    this.candidatesService.updateFollowUp(target.app.id, target.followUp.id, { status: 'COMPLETED', completionRemarks: this.completionRemarks }).subscribe({
+      next: () => { this.completingFollowUp.set(null); this.toast.success('Follow-up marked completed'); this.loadApplications(false); },
+      error: () => this.toast.error('Could not update follow-up')
+    });
+  }
+
+  updateFollowUpStage(app: JobApplication, followUp: CandidateFollowUp, status: string) {
+    this.candidatesService.updateFollowUp(app.id, followUp.id, { status }).subscribe({
+      next: () => { this.toast.success('Follow-up stage updated'); this.loadApplications(false); },
+      error: () => this.toast.error('Could not update follow-up stage')
+    });
+  }
+
+  closeFollowUpModal() { this.followUpModalApp.set(null); }
+
+  saveFollowUp() {
+    const app = this.followUpModalApp();
+    if (!app || !this.followUpForm.title.trim() || !this.followUpForm.scheduledAt) return;
+    this.isSavingFollowUp.set(true);
+    this.candidatesService.createFollowUp(app.id, this.followUpForm).subscribe({
+      next: () => { this.isSavingFollowUp.set(false); this.closeFollowUpModal(); this.toast.success('Candidate follow-up scheduled'); this.loadApplications(false); },
+      error: (err) => { this.isSavingFollowUp.set(false); this.toast.error(err?.error?.message || 'Could not schedule follow-up'); }
+    });
+  }
 
   renderStatusBadge(status: string) {
     const key = this.normaliseStage(status);

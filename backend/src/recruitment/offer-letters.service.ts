@@ -1,5 +1,6 @@
 import { NotificationsService } from "../notifications/notifications.service";
 import { MailService } from "../mail/mail.service";
+import { EmployeesService } from '../employees/employees.service';
 
 import { Injectable, NotFoundException, BadRequestException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -459,6 +460,7 @@ export class OfferLettersService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
     private mailService: MailService,
+    private employeesService: EmployeesService,
   ) {}
 
   /**
@@ -1253,6 +1255,20 @@ export class OfferLettersService {
         }
       } catch (e) {
         this.logger.error('Failed to generate countersigned PDF', e);
+      }
+
+      // A trainee conversion signs into the employee role directly.  The
+      // existing account is retained, so deliberately do not invoke the normal
+      // candidate onboarding path (it creates a second login and emails fresh
+      // credentials).  The promotion is idempotent for a retried sign request.
+      let sourceTraineeId: number | null = null;
+      try { sourceTraineeId = JSON.parse(letter.application.answers || '{}')?.__traineeConversion?.sourceTraineeId || null; } catch { /* ordinary application */ }
+      if (sourceTraineeId) {
+        await this.employeesService.promoteTraineeAfterSignedOffer(
+          sourceTraineeId,
+          letter.applicationId,
+          letter.companyId,
+        );
       }
 
       // ─── NOTIFY RECRUITER, HR AND ADMINS ───────────────────────

@@ -143,6 +143,10 @@
           </app-searchable-select>
         </div>
 
+        <div class="filter-searchable-pill" [class.filter-active]="!!filterFollowUpStatus()">
+          <app-searchable-select [options]="followUpStatusOptions" placeholder="Follow-up status" [value]="filterFollowUpStatus()" [clearable]="true" (valueChange)="filterFollowUpStatus.set($event || '')"><svg prefix lucideClock size="13.5"></svg></app-searchable-select>
+        </div>
+
         <!-- Location Filter -->
         <div class="filter-searchable-pill" [class.filter-active]="!!filterLocation()">
           <app-searchable-select
@@ -379,7 +383,7 @@
       *ngIf="!isLoadingApplications()"
       class="ag-theme-quartz custom-ats-grid"
       [theme]="'legacy'"
-      [rowData]="filteredApplications()"
+      [rowData]="tableRows()"
       [columnDefs]="colDefs"
       [defaultColDef]="defaultColDef"
       [rowClassRules]="rowClassRules"
@@ -391,8 +395,37 @@
       [headerHeight]="42"
       (gridReady)="onGridReady($event)"
       (rowClicked)="onRowClicked($event)"
-      style="width: 100%; height: calc(100vh - 300px); min-height: 520px;">
+      style="width: 100%;">
     </ag-grid-angular>
+
+  </div>
+</div>
+
+  <div class="ats-action-menu-backdrop" *ngIf="actionMenuApp()" (click)="closeActionMenu()"></div>
+  <div class="ats-action-menu" *ngIf="actionMenuApp()" [style.top.px]="actionMenuPosition().top" [style.left.px]="actionMenuPosition().left">
+    <button type="button" (click)="chooseAction('view', $event)"><svg lucideEye size="15"></svg> View</button>
+    <button type="button" (click)="chooseAction('followups', $event)"><svg lucideClock size="15"></svg> Follow-ups</button>
+    <button type="button" (click)="chooseAction('addFollowup', $event)"><svg lucideCirclePlus size="15"></svg> Add Follow-up</button>
+  </div>
+
+  <div class="candidate-followup-overlay" *ngIf="completingFollowUp()" (click)="completingFollowUp.set(null)">
+    <div class="candidate-followup-modal completion-modal" (click)="$event.stopPropagation()">
+      <div class="candidate-followup-header"><div><h3>Complete Follow-up</h3><p>Add the outcome or completion remarks.</p></div><button type="button" class="close-btn" (click)="completingFollowUp.set(null)"><svg lucideX size="18"></svg></button></div>
+      <div class="candidate-followup-body"><label>Completion remarks<textarea [(ngModel)]="completionRemarks" rows="4" placeholder="What was discussed or completed?"></textarea></label></div>
+      <div class="candidate-followup-footer"><button class="btn-secondary" (click)="completingFollowUp.set(null)">Cancel</button><button class="btn-primary" [disabled]="!completionRemarks.trim()" (click)="saveCompletionRemarks()">Save & Complete</button></div>
+    </div>
+  </div>
+
+  <!-- CANDIDATE FOLLOW-UP MODAL -->
+<div class="candidate-followup-overlay" *ngIf="followUpModalApp()" (click)="closeFollowUpModal()">
+  <div class="candidate-followup-modal" (click)="$event.stopPropagation()">
+    <div class="candidate-followup-header"><div><h3>Schedule Follow-up</h3><p>{{ followUpModalApp()?.fullName }} · {{ followUpModalApp()?.job?.title }}</p></div><button type="button" class="close-btn" (click)="closeFollowUpModal()"><svg lucideX size="18"></svg></button></div>
+    <div class="candidate-followup-body">
+      <label>Title<input [(ngModel)]="followUpForm.title" placeholder="Follow-up title"></label>
+      <div class="candidate-followup-grid"><label>Type<select [(ngModel)]="followUpForm.type"><option value="CALL">Call</option><option value="EMAIL">Email</option><option value="WHATSAPP">WhatsApp</option><option value="MEETING">Meeting</option><option value="NOTE">Note</option></select></label><label>Follow-up date & time<input type="datetime-local" [(ngModel)]="followUpForm.scheduledAt"></label></div>
+      <label>Remarks<textarea [(ngModel)]="followUpForm.notes" rows="3" placeholder="Add follow-up notes or outcome context"></textarea></label>
+    </div>
+    <div class="candidate-followup-footer"><button class="btn-secondary" (click)="closeFollowUpModal()">Cancel</button><button class="btn-primary" [disabled]="isSavingFollowUp() || !followUpForm.title || !followUpForm.scheduledAt" (click)="saveFollowUp()">{{ isSavingFollowUp() ? 'Saving...' : 'Schedule Follow-up' }}</button></div>
   </div>
 </div>
 
@@ -1121,7 +1154,7 @@
     <div class="footer-actions-group">
       <!-- Onboard button -->
       <button 
-        *ngIf="app.status === 'HIRED' && canMoveTo(app, 'ONBOARDED')" 
+        *ngIf="app.status === 'HIRED' && !isTraineeConversion(app) && canMoveTo(app, 'ONBOARDED')"
         class="btn-drawer-primary" 
         (click)="onboardCandidate()"
       >

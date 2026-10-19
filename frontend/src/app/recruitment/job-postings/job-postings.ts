@@ -9,7 +9,8 @@ import {
   LucidePlus, LucideBriefcase, LucideMapPin, LucideClock, LucideSparkles,
   LucideX, LucideMoreVertical, LucideSearch, LucideBold, LucideItalic,
   LucideList, LucideListOrdered, LucideHelpCircle, LucideTrash2, LucideBuilding,
-  LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff, LucideAlertCircle
+  LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff, LucideAlertCircle,
+  LucideSlidersHorizontal
 } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
@@ -36,7 +37,7 @@ declare var Quill: any;
     LucideSparkles, LucideX, LucideSearch,
     LucideHelpCircle, LucideTrash2, LucideBuilding,
     LucideUser, LucideChevronDown, LucideCheck, LucideEye, LucideEyeOff,
-    LucideAlertCircle,
+    LucideAlertCircle, LucideSlidersHorizontal,
     AgGridAngular, DatePipe, SkeletonComponent
   ],
   templateUrl: './job-postings.html',
@@ -154,8 +155,25 @@ export class JobPostingsComponent implements OnInit {
   // Grid State
   gridApi: any;
   searchText = '';
-  filterStatus = '';   // '' = All Statuses; showing only Open hid closed postings by default
+  filterStatus = '';
   filterDepartment = '';
+  filterRecruiter = '';
+  filterLocation = '';
+  filterWorkLocationType = '';
+  filterEmploymentType = '';
+  filterDuration = '';
+  filterPostedFrom = '';
+  filterPostedTo = '';
+  isFilterDrawerOpen = signal(false);
+
+  /** Values are derived from the postings so historical data is always filterable. */
+  get postingLocations(): string[] {
+    return [...new Set(this.jobs().map(job => job.location).filter(Boolean) as string[])].sort();
+  }
+
+  get postingEmploymentTypes(): string[] {
+    return [...new Set(this.jobs().map(job => job.type).filter(Boolean))].sort();
+  }
 
   defaultColDef: ColDef = {
     flex: 1,
@@ -168,6 +186,10 @@ export class JobPostingsComponent implements OnInit {
     pagination: true,
     paginationPageSize: 10,
     paginationPageSizeSelector: [10, 25, 50, 100],
+    // Let the page own scrolling. This avoids separate vertical and horizontal
+    // scrollbars inside the postings table.
+    domLayout: 'autoHeight' as const,
+    suppressHorizontalScroll: true,
     // Tint each row by posting status — kept light so the status badge and the
     // row-hover highlight both stay readable.
     getRowStyle: (params: any) => {
@@ -177,7 +199,9 @@ export class JobPostingsComponent implements OnInit {
         case 'Draft':  return { backgroundColor: '#f3efff' };  // yellow-50
         default:       return undefined;
       }
-    }
+    },
+    isExternalFilterPresent: () => this.hasAdditionalFilters(),
+    doesExternalFilterPass: (params: any) => this.matchesAdditionalFilters(params.data)
   };
 
   colDefs: ColDef[] = [
@@ -322,14 +346,121 @@ export class JobPostingsComponent implements OnInit {
       filterModel['department'] = { filterType: 'text', type: 'equals', filter: this.filterDepartment };
     }
     this.gridApi.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
+    this.gridApi.onFilterChanged();
+  }
+
+  private hasAdditionalFilters(): boolean {
+    return !!(
+      this.filterRecruiter ||
+      this.filterLocation ||
+      this.filterWorkLocationType ||
+      this.filterEmploymentType ||
+      this.filterPostedFrom ||
+      this.filterPostedTo
+    );
+  }
+
+  private matchesAdditionalFilters(job: any): boolean {
+    const recruiterId = job?.recruiter?.id ? String(job.recruiter.id) : '';
+    if (this.filterRecruiter && recruiterId !== this.filterRecruiter) return false;
+    if (this.filterLocation && job?.location !== this.filterLocation) return false;
+    if (this.filterWorkLocationType && job?.workLocationType !== this.filterWorkLocationType) return false;
+    if (this.filterEmploymentType && job?.type !== this.filterEmploymentType) return false;
+
+    if (this.filterPostedFrom || this.filterPostedTo) {
+      const dateValue = job?.postedDate;
+      if (!dateValue) return false;
+      const date = new Date(dateValue);
+      date.setHours(0, 0, 0, 0);
+      if (this.filterPostedFrom) {
+        const from = new Date(`${this.filterPostedFrom}T00:00:00`);
+        if (date < from) return false;
+      }
+      if (this.filterPostedTo) {
+        const to = new Date(`${this.filterPostedTo}T00:00:00`);
+        if (date > to) return false;
+      }
+    }
+    return true;
   }
 
   clearFilters() {
     this.searchText = '';
     this.filterStatus = '';
     this.filterDepartment = '';
+    this.filterRecruiter = '';
+    this.filterLocation = '';
+    this.filterWorkLocationType = '';
+    this.filterEmploymentType = '';
+    this.filterDuration = '';
+    this.filterPostedFrom = '';
+    this.filterPostedTo = '';
     this.onSearch();
-    if (this.gridApi) this.gridApi.setFilterModel(null);
+    if (this.gridApi) {
+      this.gridApi.setFilterModel(null);
+      this.gridApi.onFilterChanged();
+    }
+  }
+
+  onDurationChange() {
+    if (!this.filterDuration || this.filterDuration === 'custom') {
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let from = new Date(today);
+    let to = new Date(today);
+
+    switch (this.filterDuration) {
+      case 'today':
+        break;
+      case 'last30':
+        from.setDate(from.getDate() - 29);
+        break;
+      case 'thisMonth':
+        from = new Date(today.getFullYear(), today.getMonth(), 1);
+        break;
+      case 'lastMonth':
+        from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        to = new Date(today.getFullYear(), today.getMonth(), 0);
+        break;
+      case 'last90':
+        from.setDate(from.getDate() - 89);
+        break;
+      case 'last6Months':
+        from.setMonth(from.getMonth() - 6);
+        from.setDate(from.getDate() + 1);
+        break;
+      case 'lastYear':
+        from.setFullYear(from.getFullYear() - 1);
+        from.setDate(from.getDate() + 1);
+        break;
+    }
+
+    this.filterPostedFrom = this.toDateInputValue(from);
+    this.filterPostedTo = this.toDateInputValue(to);
+    this.applyFilters();
+  }
+
+  onCustomDateChange() {
+    this.filterDuration = 'custom';
+    this.applyFilters();
+  }
+
+  private toDateInputValue(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  openFilterDrawer() {
+    this.isFilterDrawerOpen.set(true);
+  }
+
+  closeFilterDrawer() {
+    this.isFilterDrawerOpen.set(false);
   }
 
   // Drawer & Form State

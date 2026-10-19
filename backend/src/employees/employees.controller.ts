@@ -74,6 +74,12 @@ export class EmployeesController {
     return this.employeesService.create(req.user.companyId, data);
   }
 
+  /** Begin the normal ATS offer flow for an existing trainee account. */
+  @Post(':id/convert-to-employee')
+  convertTrainee(@Request() req, @Param('id') id: string, @Body() data: any) {
+    return this.employeesService.startTraineeConversion(+id, req.user.companyId, req.user.role, data);
+  }
+
   @Put(':id')
   update(@Request() req, @Param('id') id: string, @Body() data: any) {
     return this.employeesService.update(+id, req.user.companyId, data);
@@ -161,6 +167,11 @@ export class EmployeesController {
   @Get(':id/profile')
   getProfile(@Request() req, @Param('id') id: string) {
     return this.employeesService.getProfile(+id, req.user.companyId, req.user.sub, req.user.role);
+  }
+
+  @Get(':id/history')
+  getEmploymentHistory(@Request() req, @Param('id') id: string) {
+    return this.employeesService.getEmploymentHistory(+id, req.user.companyId, req.user.sub, req.user.role);
   }
 
   @Put(':id/profile')
