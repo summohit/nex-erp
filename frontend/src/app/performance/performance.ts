@@ -5,6 +5,9 @@ import { PerformanceService, PerformanceGoal, PerformanceReview, CompanyOKR, App
 import { EmployeeService, Employee } from '../services/employee.service';
 import { AuthService } from '../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
+import { ActivatedRoute } from '@angular/router';
+import { PeopleWatchComponent } from './people-watch/people-watch';
+import { LifecycleService } from '../services/lifecycle.service';
 import { 
   LucideTarget, 
   LucideAward, 
@@ -23,6 +26,7 @@ import {
   selector: 'app-performance',
   standalone: true,
   imports: [
+    PeopleWatchComponent,
     CommonModule,
     FormsModule,
     LucideTarget, 
@@ -48,7 +52,16 @@ export class PerformanceComponent implements OnInit {
   private toast = inject(HotToastService);
   private datePipe = inject(DatePipe);
 
-  activeTab = signal<'goals' | 'reviews' | 'okrs' | 'cycles'>('goals');
+  activeTab = signal<'goals' | 'reviews' | 'okrs' | 'cycles' | 'people'>('goals');
+  private route = inject(ActivatedRoute);
+  private lifecycle = inject(LifecycleService);
+  /** Has a PIP of their own: sees the Probation & PIP tab for it. */
+  hasOwnPip = signal(false);
+  /** Probation, notice and PIP: HR, admins, managers, and anyone with a PIP. */
+  canSeePeople = computed(() => {
+    const r = this.authService.currentUser()?.role;
+    return r === 'HR' || r === 'ADMIN' || r === 'SUPERADMIN' || r === 'SUPER_ADMIN' || this.isManager() || this.hasOwnPip();
+  });
   
   myGoals = signal<PerformanceGoal[]>([]);
   myReviews = signal<PerformanceReview[]>([]);
@@ -98,6 +111,8 @@ export class PerformanceComponent implements OnInit {
   }
 
   ngOnInit() {
+    if (this.route.snapshot.queryParamMap.get('tab') === 'people') this.activeTab.set('people');
+    this.lifecycle.myPips().subscribe({ next: (l) => this.hasOwnPip.set(l.length > 0), error: () => {} });
     this.loadGoals();
     this.loadReviews();
     this.loadSubordinates();
@@ -106,7 +121,7 @@ export class PerformanceComponent implements OnInit {
     this.loadPeerRequests();
   }
 
-  setTab(tab: 'goals' | 'reviews' | 'okrs' | 'cycles') {
+  setTab(tab: 'goals' | 'reviews' | 'okrs' | 'cycles' | 'people') {
     this.activeTab.set(tab);
   }
 

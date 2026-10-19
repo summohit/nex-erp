@@ -33,7 +33,13 @@
     <button class="tab-btn" [class.active]="activeTab() === 'cycles'" *ngIf="isHR() || isManager()" (click)="setTab('cycles')">
       <svg lucideCalendar size="18"></svg> Appraisal Cycles
     </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'people'" *ngIf="canSeePeople()" (click)="setTab('people')">
+      <svg lucideAward size="18"></svg> Probation, Notice & PIP
+    </button>
   </div>
+
+  <!-- Probation, notice period and PIPs (19 Oct 2026) -->
+  <app-people-watch *ngIf="activeTab() === 'people'"></app-people-watch>
 
   <!-- Goals Tab -->
   <div *ngIf="activeTab() === 'goals'">

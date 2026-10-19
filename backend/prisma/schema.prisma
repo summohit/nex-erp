@@ -499,6 +499,14 @@ model Employee {
   nextAppraisalDate DateTime?
   offboardingStatus String    @default("NONE") // NONE, IN_PROGRESS, SEPARATED
 
+  /// Probation (19 Oct 2026): HR puts someone on probation until this day,
+  /// by months or a date; confirmed when HR closes it.
+  probationEndDate     DateTime?
+  probationConfirmedAt DateTime?
+  pips                 Pip[]        @relation("PipEmployee")
+  pipsRaised           Pip[]        @relation("PipRaisedBy")
+  pipCheckIns          PipCheckIn[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -4525,4 +4533,40 @@ model FieldVisitAttendance {
   @@unique([requestId, employeeId, visitDate])
   @@index([companyId, visitDate])
   @@index([employeeId, visitDate])
+}
+
+/// Performance Improvement Plan (19 Oct 2026). Raised by HR, the super admin
+/// or the person's reporting manager; the employee sees and acknowledges it.
+model Pip {
+  id             Int          @id @default(autoincrement())
+  companyId      Int
+  employeeId     Int
+  employee       Employee     @relation("PipEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  raisedById     Int?
+  raisedBy       Employee?    @relation("PipRaisedBy", fields: [raisedById], references: [id], onDelete: SetNull)
+  reason         String       @db.Text
+  goals          String       @db.Text
+  startDate      DateTime     @db.Date
+  endDate        DateTime     @db.Date
+  /// ACTIVE, EXTENDED, COMPLETED (improved), FAILED, CANCELLED
+  status         String       @default("ACTIVE")
+  outcomeNote    String?      @db.Text
+  acknowledgedAt DateTime?
+  closedAt       DateTime?
+  checkIns       PipCheckIn[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([companyId, status])
+  @@index([employeeId])
+}
+
+model PipCheckIn {
+  id        Int       @id @default(autoincrement())
+  pipId     Int
+  pip       Pip       @relation(fields: [pipId], references: [id], onDelete: Cascade)
+  authorId  Int?
+  author    Employee? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  note      String    @db.Text
+  createdAt DateTime  @default(now())
 }

@@ -1,0 +1,242 @@
+<div class="pw">
+  <!-- My own PIP, for anyone who has one -->
+  <div class="pw-mine" *ngFor="let p of myPips()" [class.closed]="p.status !== 'ACTIVE' && p.status !== 'EXTENDED'">
+    <div class="pw-mine-head">
+      <div>
+        <div class="pw-mine-title">Your Performance Improvement Plan</div>
+        <div class="pw-mine-sub">{{ p.startDate | date:'d MMM y' }} – {{ p.endDate | date:'d MMM y' }} · {{ statusLabel(p.status) }}<ng-container *ngIf="p.raisedBy"> · by {{ p.raisedBy }}</ng-container></div>
+      </div>
+      <button type="button" class="pw-btn" (click)="openPip(p.id)">Open</button>
+    </div>
+    <div class="pw-mine-ack" *ngIf="!p.acknowledgedAt && (p.status === 'ACTIVE' || p.status === 'EXTENDED')">Please open it and acknowledge that you have read it.</div>
+  </div>
+
+  <div class="pw-loading" *ngIf="loading()">Loading…</div>
+
+  <ng-container *ngIf="!loading() && canSee() && data() as d">
+    <div class="pw-stats">
+      <button type="button" class="pw-stat" [class.on]="section() === 'probation'" (click)="section.set('probation')">
+        <span class="pw-stat-num">{{ d.probation.length }}</span><span class="pw-stat-label">On probation</span>
+      </button>
+      <button type="button" class="pw-stat" [class.on]="section() === 'notice'" (click)="section.set('notice')">
+        <span class="pw-stat-num">{{ d.notice.length }}</span><span class="pw-stat-label">On notice period</span>
+      </button>
+      <button type="button" class="pw-stat" [class.on]="section() === 'pip'" (click)="section.set('pip')">
+        <span class="pw-stat-num">{{ d.pips.length }}</span><span class="pw-stat-label">Open PIPs</span>
+      </button>
+    </div>
+
+    <!-- Probation -->
+    <section class="pw-card" *ngIf="section() === 'probation'">
+      <div class="pw-card-head">
+        <div><h3>Probation</h3><p>People still on probation, ending soonest first.</p></div>
+        <button type="button" class="pw-btn primary" *ngIf="d.canManageProbation" (click)="openProbation()">+ Add to probation</button>
+      </div>
+      <div class="pw-empty" *ngIf="!d.probation.length">No one is on probation.</div>
+      <div class="pw-row" *ngFor="let r of d.probation">
+        <button type="button" class="pw-person" (click)="profile.open(r.employeeId)">
+          <span class="pw-av"><img *ngIf="r.avatarUrl" [src]="r.avatarUrl" alt=""><span *ngIf="!r.avatarUrl">{{ initials(r.name) }}</span></span>
+          <span class="pw-person-text"><b>{{ r.name }}</b><small>{{ r.designation || '—' }}<ng-container *ngIf="r.employeeCode"> · #{{ r.employeeCode }}</ng-container></small></span>
+        </button>
+        <div class="pw-col"><small>Joined</small>{{ r.joiningDate ? (r.joiningDate | date:'d MMM y') : '—' }}</div>
+        <div class="pw-col"><small>Ends</small>{{ r.endDate | date:'d MMM y' }}</div>
+        <span class="pw-due {{ dueClass(r.daysLeft) }}">{{ dueText(r.daysLeft) }}</span>
+        <div class="pw-actions" *ngIf="d.canManageProbation">
+          <button type="button" class="pw-btn ok" (click)="confirmProbation(r)">Confirm</button>
+          <button type="button" class="pw-btn" (click)="openProbation(r)">Change date</button>
+          <button type="button" class="pw-btn ghost" (click)="clearProbation(r)" title="Remove from probation">✕</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Notice period -->
+    <section class="pw-card" *ngIf="section() === 'notice'">
+      <div class="pw-card-head">
+        <div><h3>Notice period</h3><p>Resignations pending or approved, by last working day. Manage them in Offboarding.</p></div>
+      </div>
+      <div class="pw-empty" *ngIf="!d.notice.length">No one is serving notice.</div>
+      <div class="pw-row" *ngFor="let r of d.notice">
+        <button type="button" class="pw-person" (click)="profile.open(r.employeeId)">
+          <span class="pw-av"><img *ngIf="r.avatarUrl" [src]="r.avatarUrl" alt=""><span *ngIf="!r.avatarUrl">{{ initials(r.name) }}</span></span>
+          <span class="pw-person-text"><b>{{ r.name }}</b><small>{{ r.designation || '—' }}<ng-container *ngIf="r.employeeCode"> · #{{ r.employeeCode }}</ng-container></small></span>
+        </button>
+        <div class="pw-col"><small>Resigned</small>{{ r.appliedOn | date:'d MMM y' }}</div>
+        <div class="pw-col"><small>Last working day</small>{{ r.lastWorkingDay ? (r.lastWorkingDay | date:'d MMM y') : '—' }}</div>
+        <span class="pw-due {{ dueClass(r.daysLeft) }}">{{ dueText(r.daysLeft) }}</span>
+        <span class="pw-status s-{{ r.status }}">{{ statusLabel(r.status) }}</span>
+      </div>
+    </section>
+
+    <!-- PIP -->
+    <section class="pw-card" *ngIf="section() === 'pip'">
+      <div class="pw-card-head">
+        <div><h3>Performance Improvement Plans</h3><p>Open plans, ending soonest first.</p></div>
+        <div class="pw-head-actions">
+          <button type="button" class="pw-btn" (click)="loadHistory()">{{ showHistory() ? 'Hide closed' : 'Show closed' }}</button>
+          <button type="button" class="pw-btn primary" (click)="openPipForm()">+ Start a PIP</button>
+        </div>
+      </div>
+      <div class="pw-empty" *ngIf="!d.pips.length">No open PIPs.</div>
+      <div class="pw-row clickable" *ngFor="let r of d.pips" (click)="openPip(r.id)">
+        <div class="pw-person">
+          <span class="pw-av"><img *ngIf="r.avatarUrl" [src]="r.avatarUrl" alt=""><span *ngIf="!r.avatarUrl">{{ initials(r.name) }}</span></span>
+          <span class="pw-person-text"><b>{{ r.name }}</b><small>{{ r.designation || '—' }}<ng-container *ngIf="r.raisedBy"> · by {{ r.raisedBy }}</ng-container></small></span>
+        </div>
+        <div class="pw-col"><small>Period</small>{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'d MMM y' }}</div>
+        <div class="pw-col"><small>Check-ins</small>{{ r.checkInCount }}</div>
+        <span class="pw-due {{ dueClass(r.daysLeft) }}">{{ dueText(r.daysLeft) }}</span>
+        <span class="pw-status s-{{ r.status }}">{{ statusLabel(r.status) }}</span>
+        <span class="pw-ack" [class.yes]="!!r.acknowledgedAt">{{ r.acknowledgedAt ? 'Acknowledged' : 'Not acknowledged' }}</span>
+      </div>
+
+      <ng-container *ngIf="showHistory()">
+        <div class="pw-sub-head">Closed</div>
+        <div class="pw-empty" *ngIf="!history().length">No closed PIPs.</div>
+        <div class="pw-row clickable" *ngFor="let r of history()" (click)="openPip(r.id)">
+          <div class="pw-person">
+            <span class="pw-av"><img *ngIf="r.avatarUrl" [src]="r.avatarUrl" alt=""><span *ngIf="!r.avatarUrl">{{ initials(r.name) }}</span></span>
+            <span class="pw-person-text"><b>{{ r.name }}</b><small>{{ r.designation || '—' }}</small></span>
+          </div>
+          <div class="pw-col"><small>Period</small>{{ r.startDate | date:'d MMM' }} – {{ r.endDate | date:'d MMM y' }}</div>
+          <div class="pw-col"><small>Closed</small>{{ r.closedAt ? (r.closedAt | date:'d MMM y') : '—' }}</div>
+          <span class="pw-status s-{{ r.status }}">{{ statusLabel(r.status) }}</span>
+        </div>
+      </ng-container>
+    </section>
+  </ng-container>
+
+  <div class="pw-empty big" *ngIf="!loading() && !canSee() && !myPips().length">
+    Probation, notice period and PIPs are visible to HR, admins and reporting managers.
+  </div>
+</div>
+
+<!-- Add to / change probation -->
+<div class="pw-overlay" *ngIf="probOpen()" (click)="probOpen.set(false)">
+  <div class="pw-dialog" (click)="$event.stopPropagation()">
+    <h3>{{ probEmployeeName && !probQuery() ? 'Probation for ' + probEmployeeName : 'Add to probation' }}</h3>
+    <label class="pw-field" *ngIf="!probEmployeeId">
+      <span>Employee</span>
+      <input type="text" placeholder="Search name or code…" [ngModel]="probQuery()" (ngModelChange)="probQuery.set($event)" />
+      <div class="pw-results" *ngIf="probMatches().length">
+        <button type="button" *ngFor="let m of probMatches()" (click)="pickProbPerson(m)">
+          <b>{{ m.name }}</b><span>{{ m.designation || '—' }}<ng-container *ngIf="m.joiningDate"> · joined {{ m.joiningDate | date:'d MMM y' }}</ng-container></span>
+        </button>
+      </div>
+    </label>
+    <div class="pw-picked" *ngIf="probEmployeeId">
+      <b>{{ probEmployeeName }}</b>
+      <button type="button" class="pw-link" (click)="probEmployeeId = null; probEmployeeName = ''">Change</button>
+    </div>
+
+    <div class="pw-seg">
+      <button type="button" [class.on]="probMode === 'months'" (click)="probMode = 'months'">By months</button>
+      <button type="button" [class.on]="probMode === 'date'" (click)="probMode = 'date'">By end date</button>
+    </div>
+
+    <label class="pw-field" *ngIf="probMode === 'months'">
+      <span>Months from joining date</span>
+      <div class="pw-month-picks">
+        <button type="button" *ngFor="let m of [3, 6, 9, 12]" [class.on]="probMonths === m" (click)="probMonths = m">{{ m }}</button>
+        <input type="number" min="1" max="24" [(ngModel)]="probMonths" />
+      </div>
+    </label>
+    <label class="pw-field" *ngIf="probMode === 'date'">
+      <span>Probation ends on</span>
+      <input type="date" [(ngModel)]="probDate" />
+    </label>
+    <div class="pw-preview" *ngIf="probEmployeeId && probPreview()">Ends on <b>{{ probPreview() | date:'d MMM y' }}</b></div>
+
+    <div class="pw-dialog-actions">
+      <button type="button" class="pw-btn" (click)="probOpen.set(false)">Cancel</button>
+      <button type="button" class="pw-btn primary" (click)="saveProbation()" [disabled]="busy() || !probEmployeeId">{{ busy() ? 'Saving…' : 'Save' }}</button>
+    </div>
+  </div>
+</div>
+
+<!-- Start a PIP -->
+<div class="pw-overlay" *ngIf="pipOpen()" (click)="pipOpen.set(false)">
+  <div class="pw-dialog wide" (click)="$event.stopPropagation()">
+    <h3>Start a Performance Improvement Plan</h3>
+    <label class="pw-field" *ngIf="!pipForm.employeeId">
+      <span>Employee</span>
+      <input type="text" placeholder="Search name or code…" [ngModel]="pipQuery()" (ngModelChange)="pipQuery.set($event)" />
+      <div class="pw-results" *ngIf="pipMatches().length">
+        <button type="button" *ngFor="let m of pipMatches()" (click)="pickPipPerson(m)">
+          <b>{{ m.name }}</b><span>{{ m.designation || '—' }}</span>
+        </button>
+      </div>
+    </label>
+    <div class="pw-picked" *ngIf="pipForm.employeeId">
+      <b>{{ pipForm.employeeName }}</b>
+      <button type="button" class="pw-link" (click)="pipForm.employeeId = null; pipForm.employeeName = ''">Change</button>
+    </div>
+    <label class="pw-field"><span>Reason</span><textarea rows="3" [(ngModel)]="pipForm.reason" placeholder="What is not meeting expectations"></textarea></label>
+    <label class="pw-field"><span>Goals to meet</span><textarea rows="4" [(ngModel)]="pipForm.goals" placeholder="Clear, measurable goals for the period"></textarea></label>
+    <div class="pw-two">
+      <label class="pw-field"><span>Start</span><input type="date" [(ngModel)]="pipForm.startDate" /></label>
+      <label class="pw-field"><span>End</span><input type="date" [(ngModel)]="pipForm.endDate" /></label>
+    </div>
+    <div class="pw-dialog-actions">
+      <button type="button" class="pw-btn" (click)="pipOpen.set(false)">Cancel</button>
+      <button type="button" class="pw-btn primary" (click)="savePip()" [disabled]="busy()">{{ busy() ? 'Saving…' : 'Start PIP' }}</button>
+    </div>
+  </div>
+</div>
+
+<!-- PIP detail -->
+<div class="pw-overlay" *ngIf="detail() as p" (click)="detail.set(null)">
+  <div class="pw-dialog wide" (click)="$event.stopPropagation()">
+    <div class="pw-detail-head">
+      <div>
+        <h3>{{ p.isMine ? 'Your PIP' : 'PIP · ' + p.name }}</h3>
+        <div class="pw-detail-sub">
+          {{ p.startDate | date:'d MMM y' }} – {{ p.endDate | date:'d MMM y' }}
+          <span class="pw-status s-{{ p.status }}">{{ statusLabel(p.status) }}</span>
+          <span class="pw-due {{ dueClass(p.daysLeft) }}" *ngIf="p.status === 'ACTIVE' || p.status === 'EXTENDED'">{{ dueText(p.daysLeft) }}</span>
+        </div>
+      </div>
+      <button type="button" class="pw-x" (click)="detail.set(null)">✕</button>
+    </div>
+
+    <div class="pw-block"><small>Reason</small><p>{{ p.reason }}</p></div>
+    <div class="pw-block"><small>Goals</small><p>{{ p.goals }}</p></div>
+    <div class="pw-block" *ngIf="p.outcomeNote"><small>Outcome</small><p>{{ p.outcomeNote }}</p></div>
+    <div class="pw-meta">
+      <span *ngIf="p.raisedBy">Raised by {{ p.raisedBy }}</span>
+      <span>{{ p.acknowledgedAt ? 'Acknowledged ' + (p.acknowledgedAt | date:'d MMM y') : 'Not acknowledged yet' }}</span>
+    </div>
+
+    <div class="pw-ack-box" *ngIf="p.isMine && !p.acknowledgedAt && (p.status === 'ACTIVE' || p.status === 'EXTENDED')">
+      <span>Please confirm you have read this plan.</span>
+      <button type="button" class="pw-btn primary" (click)="acknowledge()">I have read it</button>
+    </div>
+
+    <div class="pw-sub-head">Check-ins</div>
+    <div class="pw-empty" *ngIf="!p.checkIns.length">No check-ins yet.</div>
+    <div class="pw-check" *ngFor="let c of p.checkIns">
+      <div class="pw-check-meta"><b>{{ c.author || '—' }}</b> · {{ c.createdAt | date:'d MMM y, h:mm a' }}</div>
+      <p>{{ c.note }}</p>
+    </div>
+
+    <ng-container *ngIf="p.canManage && (p.status === 'ACTIVE' || p.status === 'EXTENDED')">
+      <div class="pw-checkin-form">
+        <textarea rows="2" [(ngModel)]="checkInNote" placeholder="Add a check-in: progress, support given, what is next"></textarea>
+        <button type="button" class="pw-btn" (click)="addCheckIn()" [disabled]="busy() || !checkInNote.trim()">Add</button>
+      </div>
+
+      <div class="pw-sub-head">Extend or close</div>
+      <div class="pw-seg four">
+        <button type="button" [class.on]="closeAction === 'EXTEND'" (click)="closeAction = 'EXTEND'">Extend</button>
+        <button type="button" [class.on]="closeAction === 'COMPLETED'" (click)="closeAction = 'COMPLETED'">Completed</button>
+        <button type="button" [class.on]="closeAction === 'FAILED'" (click)="closeAction = 'FAILED'">Not improved</button>
+        <button type="button" [class.on]="closeAction === 'CANCELLED'" (click)="closeAction = 'CANCELLED'">Cancel</button>
+      </div>
+      <label class="pw-field" *ngIf="closeAction === 'EXTEND'"><span>New end date</span><input type="date" [(ngModel)]="extendDate" /></label>
+      <label class="pw-field" *ngIf="closeAction"><span>{{ closeAction === 'EXTEND' ? 'Why (optional)' : closeAction === 'CANCELLED' ? 'Note (optional)' : 'Outcome' }}</span>
+        <textarea rows="2" [(ngModel)]="closeNote"></textarea></label>
+      <div class="pw-dialog-actions" *ngIf="closeAction">
+        <button type="button" class="pw-btn primary" (click)="applyAction()" [disabled]="busy()">Save</button>
+      </div>
+    </ng-container>
+  </div>
+</div>

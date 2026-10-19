@@ -1,3 +1,4 @@
+import { PeopleWatchCardComponent } from './people-watch-card/people-watch-card';
 import { MyCalendarComponent } from './my-calendar/my-calendar';
 import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { NoticesService, Notice, noticeBodyHtml, noticeBodyText } from '../services/notices';
@@ -34,6 +35,7 @@ import { GeolocationService } from '../shared/services/geolocation.service';
     RouterModule,
     StatCardComponent,
     MyCalendarComponent,
+    PeopleWatchCardComponent,
     LucideCheckCircle2, LucideCircle, LucideClock,
     LucideFileText, LucideCheckSquare, LucideCalendar, LucideUserCheck,
     LucideAlertCircle, LucideArrowRight,
