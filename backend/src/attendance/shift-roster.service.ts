@@ -125,8 +125,9 @@ export class ShiftRosterService {
         department: { select: { id: true, name: true } },
         designation: { select: { name: true } },
         shift: true,
-        branch: { select: { weeklyOffs: true } },
+        branch: { select: { weeklyOffs: true, name: true } },
         user: { select: { status: true } },
+        workLocation: true, usualWorkLocation: true,
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
@@ -216,7 +217,10 @@ export class ShiftRosterService {
         const wfh = !!leave && WFH_PATTERN.test(leave.name);
         const cell: any = this.rosterCell(day, key, wfh ? undefined : leave, entryBy, fieldVisitBy, emp);
         if (cell.type === 'SHIFT') {
-          cell.workLocation = wfh ? 'WFH' : cell.isFieldVisit ? 'FIELD_VISIT' : cell.onSite ? 'ON_SITE' : 'OFFICE';
+          if (wfh) cell.workLocation = 'WFH';
+          else if (cell.isFieldVisit) cell.workLocation = 'FIELD_VISIT';
+          else if (cell.onSite) cell.workLocation = 'ON_SITE';
+          else Object.assign(cell, this.usualLocation(emp, day));
           if (wfh && leave?.isHalfDay) cell.wfhHalfDay = true;
         }
         return cell;
@@ -224,6 +228,24 @@ export class ShiftRosterService {
     }));
 
     return { days, shifts: shifts.map(s => this.shiftBrief(s)), rows };
+  }
+
+  /**
+   * Where the person usually works on this weekday, from their profile: the
+   * day's own setting (Home, a branch, Other), else their Work Location
+   * (Work from Home, On Site, an office). Office when nothing is set.
+   */
+  private usualLocation(emp: any, day: string): { workLocation: string; workLocationLabel?: string } {
+    const weekday = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date(`${day}T00:00:00Z`).getUTCDay()];
+    const usual = emp.usualWorkLocation && typeof emp.usualWorkLocation === 'object' ? String(emp.usualWorkLocation[weekday] ?? '') : '';
+    if (usual && usual !== 'Unspecified') {
+      if (/^home$/i.test(usual)) return { workLocation: 'WFH' };
+      return { workLocation: 'OFFICE', workLocationLabel: usual };
+    }
+    const general = String(emp.workLocation ?? '');
+    if (WFH_PATTERN.test(general)) return { workLocation: 'WFH' };
+    if (/on\s*site/i.test(general)) return { workLocation: 'ON_SITE', workLocationLabel: 'On site' };
+    return { workLocation: 'OFFICE', workLocationLabel: general || emp.branch?.name || undefined };
   }
 
   /** One roster cell, before its work location is added. */

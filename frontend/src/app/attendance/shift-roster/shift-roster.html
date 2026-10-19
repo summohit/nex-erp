@@ -247,7 +247,8 @@
                 </span>
                 <!-- Where the day is worked (19 Oct 2026) -->
                 <span *ngIf="cell.workLocation === 'WFH'" class="chip-where wfh">WFH{{ cell.wfhHalfDay ? ' · half day' : '' }}</span>
-                <span *ngIf="cell.workLocation === 'OFFICE'" class="chip-where">Office</span>
+                <span *ngIf="cell.workLocation === 'OFFICE'" class="chip-where">{{ cell.workLocationLabel || 'Office' }}</span>
+                <span *ngIf="cell.workLocation === 'ON_SITE' && !cell.onSite" class="chip-where">{{ cell.workLocationLabel || 'On site' }}</span>
               </div>
 
               <div *ngIf="cell.type === 'DAY_OFF'" class="chip chip-off" [class.is-default]="cell.isDefault">

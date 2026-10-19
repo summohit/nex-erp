@@ -139,6 +139,7 @@ export interface RosterCell {
   /** Where a working day is worked (19 Oct 2026). */
   workLocation?: 'OFFICE' | 'WFH' | 'ON_SITE' | 'FIELD_VISIT';
   wfhHalfDay?: boolean;
+  workLocationLabel?: string;
 }
 
 export interface RosterRow {
