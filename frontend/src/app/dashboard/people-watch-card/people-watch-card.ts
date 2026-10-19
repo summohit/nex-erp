@@ -12,7 +12,8 @@ type Item = { kind: 'Probation' | 'Notice' | 'PIP'; name: string; avatarUrl: str
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, RouterModule, LucideAlertTriangle, LucideChevronRight, LucideUserCheck],
   template: `
-    <div class="pwc-card pwc-alert" *ngIf="minePip() as p">
+    <!-- Own PIP now shows in app-my-pip-card (19 Oct 2026). -->
+    <div class="pwc-card pwc-alert" *ngIf="false && minePip() as p">
       <div class="pwc-mine">
         <div class="pwc-mine-left">
           <div class="pwc-alert-ico">

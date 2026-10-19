@@ -1,3 +1,4 @@
+import { MyPipCardComponent } from './my-pip-card/my-pip-card';
 import { TaskHoursRequestsTabComponent } from '../projects/task-hours-requests/task-hours-requests-tab';
 import {
   ChangeDetectionStrategy,
@@ -110,6 +111,7 @@ export type TaskSortColumn = 'title' | 'priority' | 'status' | 'dueDate';
     StatCardComponent,
     MyCalendarComponent,
     PeopleWatchCardComponent,
+    MyPipCardComponent,
     TaskHoursRequestsTabComponent,
     ApexChartCardComponent,
     WorkHoursHeatmapWidgetComponent,
