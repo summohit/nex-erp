@@ -1,0 +1,63 @@
+<div class="ap">
+  <div class="ap-head">
+    <div>
+      <h1>Approvals</h1>
+      <p>Everything waiting on your decision, in one place.</p>
+    </div>
+    <button type="button" class="ap-btn" (click)="load()" [disabled]="loading()">↻ Refresh</button>
+  </div>
+
+  <div class="ap-tabs">
+    <button type="button" [class.on]="tab() === 'ALL'" (click)="tab.set('ALL')">All <span>{{ counts()['ALL'] || 0 }}</span></button>
+    <ng-container *ngFor="let t of tabs">
+      <button type="button" *ngIf="available().has(t.kind)" [class.on]="tab() === t.kind" (click)="tab.set(t.kind)">
+        {{ t.label }} <span>{{ counts()[t.kind] || 0 }}</span>
+      </button>
+    </ng-container>
+  </div>
+
+  <div class="ap-tools">
+    <input type="text" placeholder="Search name, type or reason…" [value]="query()" (input)="query.set($any($event.target).value)" />
+    <label class="ap-all"><input type="checkbox" [checked]="allSelected()" (change)="toggleAll()" /> Select all</label>
+    <button type="button" class="ap-btn ok" *ngIf="selected().size" (click)="approveSelected()" [disabled]="busy() === 'bulk'">
+      Approve selected ({{ selected().size }})
+    </button>
+  </div>
+
+  <div class="ap-loading" *ngIf="loading()">Loading…</div>
+  <div class="ap-empty" *ngIf="!loading() && !shown().length">Nothing waiting. 🎉</div>
+
+  <div class="ap-list" *ngIf="!loading()">
+    <div class="ap-row" *ngFor="let r of shown()">
+      <input type="checkbox" [checked]="selected().has(key(r))" (change)="toggle(r)" />
+      <button type="button" class="ap-person" (click)="profile.open(r.employeeId)">
+        <span class="ap-av"><img *ngIf="r.avatarUrl" [src]="r.avatarUrl" alt=""><span *ngIf="!r.avatarUrl">{{ initials(r.name) }}</span></span>
+        <span class="ap-ptext"><b>{{ r.name }}</b><small>{{ r.designation || '—' }}</small></span>
+      </button>
+      <div class="ap-what">
+        <div class="ap-what-top">
+          <span class="ap-kind k-{{ r.kind }}">{{ r.title }}</span>
+          <span class="ap-badge" *ngIf="r.badge">{{ r.badge }}</span>
+        </div>
+        <div class="ap-detail">{{ r.detail }}</div>
+        <div class="ap-reason" *ngIf="r.reason">“{{ r.reason }}”</div>
+      </div>
+      <div class="ap-actions">
+        <button type="button" class="ap-btn no" (click)="openReject(r)" [disabled]="busy() === key(r)">Reject</button>
+        <button type="button" class="ap-btn ok" (click)="approve(r)" [disabled]="busy() === key(r)">Approve</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ap-overlay" *ngIf="rejecting() as r" (click)="rejecting.set(null)">
+  <div class="ap-dialog" (click)="$event.stopPropagation()">
+    <h3>Reject {{ r.title.toLowerCase() }} · {{ r.name }}</h3>
+    <p>{{ r.detail }}</p>
+    <textarea rows="3" [(ngModel)]="rejectNote" placeholder="Why (the employee sees this)"></textarea>
+    <div class="ap-dialog-actions">
+      <button type="button" class="ap-btn" (click)="rejecting.set(null)">Cancel</button>
+      <button type="button" class="ap-btn no solid" (click)="confirmReject()" [disabled]="busy() === key(r)">Reject</button>
+    </div>
+  </div>
+</div>

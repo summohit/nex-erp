@@ -65,6 +65,12 @@ export const routes: Routes = [
         loadComponent: () => import('./settings/master-data/master-data').then(m => m.MasterDataComponent)
       },
       {
+        // One approvals inbox (19 Oct 2026), as in the app. No module gate:
+        // each queue is scoped by the server, empty for people who approve nothing.
+        path: 'approvals',
+        loadComponent: () => import('./approvals/approvals').then(m => m.ApprovalsComponent)
+      },
+      {
         // Its own top-level page. Posting is restricted to administrators and
         // HR on the server; this gate only decides who sees the menu item.
         path: 'notices',
