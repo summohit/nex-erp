@@ -297,13 +297,21 @@ export class PeopleWatchComponent implements OnInit {
       error: (e) => { this.busy.set(false); this.toast.error(e.error?.message || 'Could not save probation'); },
     });
   }
-  confirmProbation(row: { employeeId: number; name: string }) {
-    if (!confirm(`Confirm ${row.name}? Their probation ends and they move to confirmed staff.`)) return;
-    this.api.confirmProbation(row.employeeId).subscribe({
-      next: () => { this.toast.success(`${row.name} confirmed`); this.load(); },
+  /** Confirm, or (19 Oct 2026) confirm and make permanent in one step. Both notify. */
+  confirmProbation(row: { employeeId: number; name: string; employmentCategory?: string }, makePermanent = false) {
+    const msg = makePermanent
+      ? `Confirm ${row.name} and make them PERMANENT? Their probation ends, their category becomes Permanent, and they and their manager are notified.`
+      : `Confirm ${row.name}? Their probation ends (category stays ${this.categoryLabel(row.employmentCategory)}), and they and their manager are notified.`;
+    if (!confirm(msg)) return;
+    this.api.confirmProbation(row.employeeId, makePermanent).subscribe({
+      next: (r: any) => { this.toast.success(r?.madePermanent ? `${row.name} confirmed and made permanent` : `${row.name} confirmed`); this.load(); },
       error: (e) => this.toast.error(e.error?.message || 'Could not confirm'),
     });
   }
+  categoryLabel(c?: string) {
+    return ({ PERMANENT: 'Permanent', TRAINEE: 'Trainee', CONTRACT: 'Contract' } as any)[c || ''] ?? (c || 'as it is');
+  }
+
   clearProbation(row: { employeeId: number; name: string }) {
     if (!confirm(`Take ${row.name} off probation? Use this only if they were added by mistake.`)) return;
     this.api.clearProbation(row.employeeId).subscribe({

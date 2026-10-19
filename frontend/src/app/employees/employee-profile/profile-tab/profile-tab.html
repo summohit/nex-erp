@@ -73,6 +73,21 @@
               </div>
             </div>
 
+            <!-- Employment and probation (19 Oct 2026), set from Performance → Probation -->
+            <div class="form-row-item">
+              <label class="item-label">Employment</label>
+              <div class="item-value">
+                <span class="prob-status">{{ employeeData?.employmentCategory === 'TRAINEE' ? 'Trainee' : employeeData?.employmentCategory === 'CONTRACT' ? 'Contract' : 'Permanent' }}</span>
+              </div>
+            </div>
+            <div class="form-row-item" *ngIf="employeeData?.probationEndDate">
+              <label class="item-label">Probation</label>
+              <div class="item-value">
+                <span class="prob-status ok" *ngIf="employeeData?.probationConfirmedAt">Confirmed on {{ employeeData.probationConfirmedAt | date:'d MMM y' }}</span>
+                <span class="prob-status wait" *ngIf="!employeeData?.probationConfirmedAt">On probation until {{ employeeData.probationEndDate | date:'d MMM y':'UTC' }}</span>
+              </div>
+            </div>
+
           </div>
         </div>
 

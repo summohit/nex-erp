@@ -1562,3 +1562,7 @@
   }
 }
 
+
+/* Make permanent (19 Oct 2026) */
+.pw-btn.perm { background: #1373e5; border-color: #1373e5; color: #fff; }
+.pw-btn.perm:hover { background: #0f62c4; }

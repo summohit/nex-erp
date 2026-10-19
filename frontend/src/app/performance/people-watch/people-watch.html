@@ -210,6 +210,16 @@
               <svg lucideCheck size="13"></svg>
               <span>Confirm</span>
             </button>
+            <!-- Confirm and make permanent in one step (19 Oct 2026) -->
+            <button
+              type="button"
+              class="pw-btn perm btn-sm"
+              *ngIf="r.employmentCategory !== 'PERMANENT'"
+              (click)="confirmProbation(r, true)"
+              title="Confirm and make permanent">
+              <svg lucideCheck size="13"></svg>
+              <span>Make permanent</span>
+            </button>
             <button 
               type="button" 
               class="pw-btn btn-sm" 

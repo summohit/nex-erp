@@ -1520,3 +1520,8 @@ select.form-control:disabled {
     width: 100%;
   }
 }
+
+/* Employment and probation (19 Oct 2026) */
+.prob-status { display: inline-block; font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 10px; background: #f1f5f9; color: #334155; }
+.prob-status.ok { background: #ecfdf5; color: #047857; }
+.prob-status.wait { background: #fffbeb; color: #b45309; }

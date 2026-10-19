@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { isHrAdmin } from '../common/company-roles';
 
 type Viewer = { companyId: number; role: string; employeeId: number | null };
@@ -22,7 +23,10 @@ const OPEN_PIP = ['ACTIVE', 'EXTENDED'];
  */
 @Injectable()
 export class LifecycleService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private todayUtc(): Date {
     const ist = new Date(Date.now() + 330 * 60_000);
@@ -151,14 +155,57 @@ export class LifecycleService {
     return { employeeId: e.id, endDate: end, daysLeft: this.daysLeft(end) };
   }
 
-  /** Probation passed: the person is confirmed. */
-  async confirmProbation(v: Viewer, employeeId: number) {
+  /**
+   * Probation passed: the person is confirmed (19 Oct 2026). Optionally made
+   * permanent at the same time (employment category PERMANENT). The employee
+   * and their reporting manager are told.
+   */
+  async confirmProbation(v: Viewer, employeeId: number, body: { makePermanent?: boolean } = {}) {
     if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can confirm probation');
-    const r = await this.prisma.employee.updateMany({
+    const e = await this.prisma.employee.findFirst({
       where: { id: employeeId, companyId: v.companyId, probationEndDate: { not: null } },
-      data: { probationConfirmedAt: new Date() },
+      select: { id: true, firstName: true, lastName: true, managerId: true, employmentCategory: true },
     });
-    if (!r.count) throw new NotFoundException('This person is not on probation');
+    if (!e) throw new NotFoundException('This person is not on probation');
+    const permanent = !!body?.makePermanent && e.employmentCategory !== 'PERMANENT';
+    await this.prisma.employee.update({
+      where: { id: e.id },
+      data: { probationConfirmedAt: new Date(), ...(permanent ? { employmentCategory: 'PERMANENT' } : {}) },
+    });
+    const name = `${e.firstName} ${e.lastName ?? ''}`.trim();
+    try {
+      await this.notifications.notifyEmployees([e.id], {
+        companyId: v.companyId, title: 'Probation confirmed',
+        message: permanent ? 'Congratulations, your probation is complete and you are now a permanent employee.'
+          : 'Congratulations, your probation is complete and you are confirmed.',
+        type: 'GENERAL', linkUrl: '/employees/me/profile', excludeEmployeeId: v.employeeId,
+      });
+      if (e.managerId) {
+        await this.notifications.notifyEmployees([e.managerId], {
+          companyId: v.companyId, title: 'Probation confirmed',
+          message: `${name}'s probation is confirmed${permanent ? ' and they are now permanent' : ''}.`,
+          type: 'GENERAL', linkUrl: '/performance?tab=people', excludeEmployeeId: v.employeeId,
+        });
+      }
+    } catch { /* the confirmation stands even if a notification fails */ }
+    return { ok: true, madePermanent: permanent };
+  }
+
+  /** Make someone permanent without a probation (Trainee or Contract today). */
+  async makePermanent(v: Viewer, employeeId: number) {
+    if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can change the employment category');
+    const e = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId: v.companyId }, select: { id: true, employmentCategory: true, managerId: true },
+    });
+    if (!e) throw new NotFoundException('Employee not found');
+    if (e.employmentCategory === 'PERMANENT') throw new BadRequestException('Already permanent');
+    await this.prisma.employee.update({ where: { id: e.id }, data: { employmentCategory: 'PERMANENT' } });
+    try {
+      await this.notifications.notifyEmployees([e.id], {
+        companyId: v.companyId, title: 'You are now permanent',
+        message: 'Your employment is now permanent.', type: 'GENERAL', linkUrl: '/employees/me/profile', excludeEmployeeId: v.employeeId,
+      });
+    } catch { /* category change stands */ }
     return { ok: true };
   }
 

@@ -21,8 +21,13 @@ export class LifecycleController {
   }
 
   @Post('probation/:employeeId/confirm')
-  confirmProbation(@Request() req, @Param('employeeId', ParseIntPipe) id: number) {
-    return this.svc.confirmProbation(this.v(req), id);
+  confirmProbation(@Request() req, @Param('employeeId', ParseIntPipe) id: number, @Body() body: { makePermanent?: boolean }) {
+    return this.svc.confirmProbation(this.v(req), id, body ?? {});
+  }
+
+  @Post('employees/:employeeId/make-permanent')
+  makePermanent(@Request() req, @Param('employeeId', ParseIntPipe) id: number) {
+    return this.svc.makePermanent(this.v(req), id);
   }
 
   @Delete('probation/:employeeId')

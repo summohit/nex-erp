@@ -37,7 +37,8 @@ export class LifecycleService {
 
   overview(): Observable<LcOverview> { return this.http.get<LcOverview>(`${this.url}/overview`); }
   setProbation(employeeId: number, body: { months?: number; endDate?: string }) { return this.http.put(`${this.url}/probation/${employeeId}`, body); }
-  confirmProbation(employeeId: number) { return this.http.post(`${this.url}/probation/${employeeId}/confirm`, {}); }
+  confirmProbation(employeeId: number, makePermanent = false) { return this.http.post(`${this.url}/probation/${employeeId}/confirm`, { makePermanent }); }
+  makePermanent(employeeId: number) { return this.http.post(`${this.url}/employees/${employeeId}/make-permanent`, {}); }
   clearProbation(employeeId: number) { return this.http.delete(`${this.url}/probation/${employeeId}`); }
   myPips(): Observable<LcPip[]> { return this.http.get<LcPip[]>(`${this.url}/pips/mine`); }
   pipHistory(): Observable<LcPip[]> { return this.http.get<LcPip[]>(`${this.url}/pips/history`); }
