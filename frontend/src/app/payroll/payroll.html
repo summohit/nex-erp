@@ -673,6 +673,7 @@
                     <span class="status-dot"></span>
                     {{ p.status || 'DRAFT' }}
                   </span>
+                  <div class="paid-on-note" *ngIf="p.status === 'PAID' && p.paidOn">{{ p.paidOn | date:'d MMM y':'+0530' }}</div>
                 </td>
 
                 <!-- 10. Actions Dropdown -->
@@ -746,7 +747,7 @@
         <div class="payslip-card" *ngFor="let p of myPayslips()" (click)="openPayslipDetail(p)">
           <div class="card-header">
             <h4>{{ getMonthName(p.month) }} {{ p.year }}</h4>
-            <span class="badge" [ngClass]="p.status === 'PAID' ? 'badge-success' : 'badge-info'">{{ p.status }}</span>
+            <span class="badge" [ngClass]="p.status === 'PAID' ? 'badge-success' : 'badge-info'">{{ p.status }}<ng-container *ngIf="p.status === 'PAID' && p.paidOn"> · {{ p.paidOn | date:'d MMM y':'+0530' }}</ng-container></span>
           </div>
           <div class="card-body">
             <div class="net-pay">
@@ -1130,6 +1131,7 @@
                     <span class="status-dot"></span>
                     {{ p.status || 'DRAFT' }}
                   </span>
+                  <div class="paid-on-note" *ngIf="p.status === 'PAID' && p.paidOn">{{ p.paidOn | date:'d MMM y':'+0530' }}</div>
                 </td>
 
                 <!-- 10. Actions Dropdown & Quick Actions -->
@@ -2598,7 +2600,7 @@
           <h2>Payslip for {{ getMonthName(selectedPayslipDetail()?.month || 1) }} {{ selectedPayslipDetail()?.year }}</h2>
           <p class="edit-sub" *ngIf="selectedPayslipDetail() as pd">
             {{ pd.employee.firstName }} {{ pd.employee.lastName }} · {{ pd.employee.designation?.name || 'Staff' }}
-            <span class="status-chip" [class.chip-paid]="pd.status === 'PAID'">{{ pd.status }}</span>
+            <span class="status-chip" [class.chip-paid]="pd.status === 'PAID'">{{ pd.status }}<ng-container *ngIf="pd.status === 'PAID' && pd.paidOn"> · Paid on {{ pd.paidOn | date:'d MMM y':'+0530' }}</ng-container></span>
           </p>
         </div>
         <button class="btn-icon" (click)="closePayslipDetail()">✕</button>
