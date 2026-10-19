@@ -387,8 +387,10 @@ export class AttendanceService {
 
     }
 
-    // 2. Office geofence (B3) — see officeCheck.
-    const office = await this.officeCheck(employee, effective, onsite, data);
+    // 2. Office geofence (B3) — see officeCheck. An approved Work From Home
+    // day is not checked against the office either (19 Oct 2026).
+    const wfhToday = !onsite && (await this.hasApprovedWfh(employee.id, new Date()));
+    const office = await this.officeCheck(employee, effective, onsite || wfhToday, data);
     const outsideIn = this.outsideFields('in', office, data);
 
     // Nothing may start while something earlier is still running.
@@ -569,6 +571,23 @@ export class AttendanceService {
    * coordinates for someone with no branch set. A branch without a pin, or no
    * coordinates anywhere, means no check.
    */
+  /**
+   * An approved Work From Home request covering this day (19 Oct 2026). WFH is
+   * a leave type whose name says so (as on the dashboard); such a day is
+   * worked from home by agreement, so the office distance needs no approval.
+   */
+  private async hasApprovedWfh(employeeId: number, day: Date): Promise<boolean> {
+    // Focused unit tests stub only the delegates they use.
+    if (!this.prisma.leaveRequest?.findMany) return false;
+    const ist = new Date(day.getTime() + 330 * 60_000);
+    const d = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()));
+    const leaves = await this.prisma.leaveRequest.findMany({
+      where: { employeeId, status: 'APPROVED', deletedAt: null, startDate: { lte: d }, endDate: { gte: d } },
+      select: { leaveType: { select: { name: true } } },
+    });
+    return leaves.some((l) => /work\s*from\s*home|wfh|remote/i.test(l.leaveType?.name ?? ''));
+  }
+
   private async officeCheck(
     employee: { companyId: number; branch?: any },
     effective: EffectiveShift,
@@ -781,8 +800,9 @@ export class AttendanceService {
     // Office geofence (B3), on the same on-site exemption as clock-in — and
     // skipped entirely for a previous day. Someone closing Monday's session at
     // one in the morning is at home; that case has its own reason flow above.
+    const exemptOut = isPreviousDay || !!effective.onsite || !!options?.fieldVisit;
     const officeOut = await this.officeCheck(
-      employee, effective, isPreviousDay || !!effective.onsite || !!options?.fieldVisit, data,
+      employee, effective, exemptOut || (await this.hasApprovedWfh(employee.id, existing.date)), data,
     );
     const outsideOut = this.outsideFields('out', officeOut, data);
 
@@ -1345,7 +1365,7 @@ export class AttendanceService {
     if (!this.mayApproveGeofence(role)) {
       throw new ForbiddenException('Only an administrator reviews out-of-office clock-ins and clock-outs.');
     }
-    return this.prisma.attendance.findMany({
+    const rows = await this.prisma.attendance.findMany({
       where: { geofenceApproval: 'PENDING', employee: { companyId } },
       include: {
         employee: {
@@ -1359,6 +1379,23 @@ export class AttendanceService {
       },
       orderBy: { date: 'asc' },
     });
+    if (!rows.length || !this.prisma.leaveRequest?.findMany) return rows;
+    // Days covered by an approved Work From Home request (19 Oct 2026), so the
+    // approver sees at a glance that working away from the office was agreed.
+    const days = rows.map((r) => r.date);
+    const leaves = await this.prisma.leaveRequest.findMany({
+      where: {
+        employeeId: { in: [...new Set(rows.map((r) => r.employeeId))] }, status: 'APPROVED', deletedAt: null,
+        startDate: { lte: new Date(Math.max(...days.map((d) => d.getTime()))) },
+        endDate: { gte: new Date(Math.min(...days.map((d) => d.getTime()))) },
+      },
+      select: { employeeId: true, startDate: true, endDate: true, leaveType: { select: { name: true } } },
+    });
+    const wfh = leaves.filter((l) => /work\s*from\s*home|wfh|remote/i.test(l.leaveType?.name ?? ''));
+    return rows.map((r) => ({
+      ...r,
+      approvedWfh: wfh.some((l) => l.employeeId === r.employeeId && l.startDate <= r.date && l.endDate >= r.date),
+    }));
   }
 
   async reviewGeofence(
