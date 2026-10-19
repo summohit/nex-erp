@@ -880,6 +880,9 @@ export class ApplicationsService {
     return this.prisma.interview.findMany({
       where: whereClause,
       include: {
+        interviewer: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true }
+        },
         application: {
           select: {
             id: true,
