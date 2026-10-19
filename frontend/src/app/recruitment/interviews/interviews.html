@@ -208,6 +208,11 @@
           </button>
         </div>
 
+        <select class="iv-select" [ngModel]="interviewerFilter()" (ngModelChange)="interviewerFilter.set($event)" aria-label="Filter by interviewer">
+          <option value="">All interviewers</option>
+          <option *ngFor="let interviewer of availableInterviewers()" [value]="interviewer.id">{{ interviewer.name }}</option>
+        </select>
+
         <!-- Job Role Filter -->
         <select
           class="iv-select"

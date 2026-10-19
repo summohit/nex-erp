@@ -66,6 +66,7 @@ export class InterviewsComponent implements OnInit {
   dateFilter = signal<string>('all');
   customStartDate = signal<string>('');
   customEndDate = signal<string>('');
+  interviewerFilter = signal<string>('');
   jobFilter = signal<string>('');
   roundFilter = signal<string>('');
   sortOrder = signal<'NEWEST' | 'OLDEST'>('NEWEST');
@@ -112,6 +113,16 @@ export class InterviewsComponent implements OnInit {
     return [...set].sort((a, b) => a.localeCompare(b));
   });
 
+  availableInterviewers = computed(() => {
+    const people = new Map<string, string>();
+    for (const interview of this.interviews()) {
+      const person = interview.interviewer;
+      if (!person?.id) continue;
+      people.set(String(person.id), `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'Unnamed interviewer');
+    }
+    return [...people.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+
   hasActiveFilters = computed(() => {
     return !!(
       this.searchText().trim() ||
@@ -119,6 +130,7 @@ export class InterviewsComponent implements OnInit {
       this.dateFilter() !== 'all' ||
       this.customStartDate() ||
       this.customEndDate() ||
+      this.interviewerFilter() ||
       this.jobFilter() ||
       this.roundFilter()
     );
@@ -130,6 +142,7 @@ export class InterviewsComponent implements OnInit {
     const tab = this.activeTab();
     const q = this.searchText().toLowerCase().trim();
     const dateF = this.dateFilter();
+    const interviewerF = this.interviewerFilter();
     const jobF = this.jobFilter();
     const roundF = this.roundFilter();
     const order = this.sortOrder();
@@ -148,6 +161,8 @@ export class InterviewsComponent implements OnInit {
         if (tab === 'completed' && !isCompleted) return false;
         if (tab === 'upcoming' && !isScheduledUpcoming) return false;
         if (tab === 'needs-review' && !isNeedsReview) return false;
+
+        if (interviewerF && String(i.interviewer?.id || '') !== interviewerF) return false;
 
         // Job Role Filter
         if (jobF && (i.application?.job?.title || '').trim() !== jobF) return false;
@@ -290,6 +305,7 @@ export class InterviewsComponent implements OnInit {
     this.dateFilter.set('all');
     this.customStartDate.set('');
     this.customEndDate.set('');
+    this.interviewerFilter.set('');
     this.jobFilter.set('');
     this.roundFilter.set('');
     this.sortOrder.set('NEWEST');
