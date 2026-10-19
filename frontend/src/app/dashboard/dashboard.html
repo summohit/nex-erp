@@ -1179,9 +1179,9 @@
                 >
                   <img
                     *ngIf="a.employee?.avatarUrl"
-                    [src]="a.employee.avatarUrl"
+                    [src]="a.employee?.avatarUrl"
                     [alt]="a.employee?.firstName || 'Employee'"
-                    (error)="a.employee.avatarUrl = null"
+                    (error)="a.employee && (a.employee.avatarUrl = null)"
                   />
                   <svg *ngIf="!a.employee?.avatarUrl" lucideAward size="15"></svg>
                 </span>
