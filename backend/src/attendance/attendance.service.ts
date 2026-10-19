@@ -26,6 +26,19 @@ export interface FieldVisitClockContext {
   projectId: number | null;
 }
 
+/** Leave types and profile locations that mean Work From Home. */
+const WFH_NAME = /work\s*from\s*home|wfh|remote/i;
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+/** The profile's weekday setting (Home), else its Work Location. */
+function profileSaysWfh(emp: { workLocation?: string | null; usualWorkLocation?: any } | null, day: Date): boolean {
+  if (!emp) return false;
+  const usual = emp.usualWorkLocation && typeof emp.usualWorkLocation === 'object'
+    ? String(emp.usualWorkLocation[WEEKDAYS[day.getUTCDay()]] ?? '') : '';
+  if (usual && usual !== 'Unspecified') return /^home$/i.test(usual);
+  return WFH_NAME.test(String(emp.workLocation ?? ''));
+}
+
 @Injectable()
 export class AttendanceService {
   constructor(
@@ -572,20 +585,33 @@ export class AttendanceService {
    * coordinates anywhere, means no check.
    */
   /**
-   * An approved Work From Home request covering this day (19 Oct 2026). WFH is
-   * a leave type whose name says so (as on the dashboard); such a day is
-   * worked from home by agreement, so the office distance needs no approval.
+   * Is this a Work From Home day for the person (19 Oct 2026)? Then the office
+   * distance needs no approval. Same sources, in the same order, as the shift
+   * roster: an approved WFH request for the day; else the profile's usual
+   * location for that weekday (Home); else the profile's Work Location
+   * ("Work from Home"). A weekday set to an office or Other is not WFH.
    */
   private async hasApprovedWfh(employeeId: number, day: Date): Promise<boolean> {
-    // Focused unit tests stub only the delegates they use.
-    if (!this.prisma.leaveRequest?.findMany) return false;
+    return (await this.wfhSource(employeeId, day)) !== null;
+  }
+
+  /** 'REQUEST' | 'PROFILE' when the day is WFH, else null. */
+  private async wfhSource(employeeId: number, day: Date): Promise<'REQUEST' | 'PROFILE' | null> {
     const ist = new Date(day.getTime() + 330 * 60_000);
     const d = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()));
-    const leaves = await this.prisma.leaveRequest.findMany({
-      where: { employeeId, status: 'APPROVED', deletedAt: null, startDate: { lte: d }, endDate: { gte: d } },
-      select: { leaveType: { select: { name: true } } },
+    // Focused unit tests stub only the delegates they use.
+    if (this.prisma.leaveRequest?.findMany) {
+      const leaves = await this.prisma.leaveRequest.findMany({
+        where: { employeeId, status: 'APPROVED', deletedAt: null, startDate: { lte: d }, endDate: { gte: d } },
+        select: { leaveType: { select: { name: true } } },
+      });
+      if (leaves.some((l) => WFH_NAME.test(l.leaveType?.name ?? ''))) return 'REQUEST';
+    }
+    if (!this.prisma.employee?.findUnique) return null;
+    const emp = await this.prisma.employee.findUnique({
+      where: { id: employeeId }, select: { workLocation: true, usualWorkLocation: true },
     });
-    return leaves.some((l) => /work\s*from\s*home|wfh|remote/i.test(l.leaveType?.name ?? ''));
+    return profileSaysWfh(emp, d) ? 'PROFILE' : null;
   }
 
   private async officeCheck(
@@ -1394,11 +1420,17 @@ export class AttendanceService {
       },
       select: { employeeId: true, startDate: true, endDate: true, leaveType: { select: { name: true } } },
     });
-    const wfh = leaves.filter((l) => /work\s*from\s*home|wfh|remote/i.test(l.leaveType?.name ?? ''));
-    return rows.map((r) => ({
-      ...r,
-      approvedWfh: wfh.some((l) => l.employeeId === r.employeeId && l.startDate <= r.date && l.endDate >= r.date),
-    }));
+    const wfh = leaves.filter((l) => WFH_NAME.test(l.leaveType?.name ?? ''));
+    const profiles = await this.prisma.employee.findMany({
+      where: { id: { in: [...new Set(rows.map((r) => r.employeeId))] } },
+      select: { id: true, workLocation: true, usualWorkLocation: true },
+    });
+    const profileBy = new Map(profiles.map((p) => [p.id, p]));
+    return rows.map((r) => {
+      const byRequest = wfh.some((l) => l.employeeId === r.employeeId && l.startDate <= r.date && l.endDate >= r.date);
+      const byProfile = !byRequest && profileSaysWfh(profileBy.get(r.employeeId) ?? null, r.date);
+      return { ...r, approvedWfh: byRequest, profileWfh: byProfile };
+    });
   }
 
   async reviewGeofence(

@@ -164,13 +164,15 @@ export class ClockOutApprovalsComponent implements OnInit {
   geoTo = signal('');
   geoSort = signal<'OLDEST' | 'NEWEST' | 'FARTHEST'>('NEWEST');
   geoPage = signal(1);
-  /** Everyone on one page (19 Oct 2026); the page scrolls, not the table. */
-  readonly GEO_PAGE_SIZE = 100000;
+  geoPageSize = signal(25);
   geoSelected = signal<Set<number>>(new Set());
   geoBulkBusy = signal(false);
 
   geoDepartments = computed(() => [...new Set(this.geoRows()
     .map((r) => r.employee?.department?.name).filter(Boolean))].sort() as string[]);
+
+  lateDepartments = computed(() => [...new Set(this.rows()
+    .map((r) => r.employee?.department?.name || r.employee?.department).filter((d): d is string => typeof d === 'string' && !!d))].sort());
 
   geoInCount = computed(() => this.visibleGeoRows().filter((r) => r.clockInOutside).length);
   geoOutCount = computed(() => this.visibleGeoRows().filter((r) => r.clockOutOutside).length);
@@ -245,17 +247,19 @@ export class ClockOutApprovalsComponent implements OnInit {
       : sort === 'NEWEST' ? String(b.date).localeCompare(String(a.date)) : String(a.date).localeCompare(String(b.date)));
   });
 
-  geoPageCount = computed(() => Math.max(1, Math.ceil(this.geoFiltered().length / this.GEO_PAGE_SIZE)));
+  geoPageCount = computed(() => Math.max(1, Math.ceil(this.geoFiltered().length / this.geoPageSize())));
   geoPageRows = computed(() => {
+    const size = this.geoPageSize();
     const page = Math.min(this.geoPage(), this.geoPageCount());
-    return this.geoFiltered().slice((page - 1) * this.GEO_PAGE_SIZE, page * this.GEO_PAGE_SIZE);
+    return this.geoFiltered().slice((page - 1) * size, page * size);
   });
   geoRangeLabel = computed(() => {
     const total = this.geoFiltered().length;
-    if (!total) return '0';
+    if (!total) return '0 of 0';
+    const size = this.geoPageSize();
     const page = Math.min(this.geoPage(), this.geoPageCount());
-    const start = (page - 1) * this.GEO_PAGE_SIZE + 1;
-    return `${start}–${Math.min(total, page * this.GEO_PAGE_SIZE)} of ${total}`;
+    const start = (page - 1) * size + 1;
+    return `${start}–${Math.min(total, page * size)} of ${total}`;
   });
   geoHasFilters = computed(() => !!(this.geoSearch() || this.geoDept() || this.geoType() !== 'ALL'
     || this.geoDistance() !== 'ALL' || this.geoFrom() || this.geoTo() || this.geoTab() !== 'ALL'));
@@ -290,6 +294,12 @@ export class ClockOutApprovalsComponent implements OnInit {
     this.geoSelected.set(new Set());
   }
 
+  setGeoPageSize(size: number) {
+    this.geoPageSize.set(Number(size) || 25);
+    this.geoPage.set(1);
+    this.geoSelected.set(new Set());
+  }
+
   toggleGeoRow(id: number) {
     const next = new Set(this.geoSelected());
     next.has(id) ? next.delete(id) : next.add(id);
@@ -298,6 +308,10 @@ export class ClockOutApprovalsComponent implements OnInit {
 
   toggleGeoPage() {
     this.geoSelected.set(this.geoAllOnPageSelected() ? new Set() : new Set(this.geoPageRows().map((r) => r.id)));
+  }
+
+  clearGeoSelection() {
+    this.geoSelected.set(new Set());
   }
 
   geoInitials(r: any): string {
