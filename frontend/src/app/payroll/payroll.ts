@@ -1860,15 +1860,46 @@ export class PayrollComponent implements OnInit {
     });
   }
 
+  /**
+   * Mark as Paid asks for the day the money went out (19 Oct 2026), for the
+   * whole period or one payslip; it defaults to today and cannot be later.
+   */
+  paidDialog = signal<{ payslip: any | null } | null>(null);
+  paidOnDate = '';
+  readonly monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  paidBusy = signal(false);
+  todayIso(): string {
+    const d = new Date(Date.now() + 330 * 60_000);
+    return d.toISOString().slice(0, 10);
+  }
+
   markPaid() {
-    if (!confirm('Mark all finalized payslips as PAID for this period?')) return;
-    this.payrollService.markPayslipsPaid(Number(this.selectedMonth()), Number(this.selectedYear())).subscribe({
-      next: () => {
-        this.toast.success('Payslips marked as PAID');
-        this.loadPayslips();
-      },
-      error: (err) => this.toast.error(err.error?.message || 'Failed to update payslips')
-    });
+    this.paidOnDate = this.todayIso();
+    this.paidDialog.set({ payslip: null });
+  }
+
+  closePaidDialog() {
+    if (!this.paidBusy()) this.paidDialog.set(null);
+  }
+
+  confirmPaid() {
+    const d = this.paidDialog();
+    if (!d || !this.paidOnDate) { this.toast.error('Choose the payment date'); return; }
+    if (this.paidOnDate > this.todayIso()) { this.toast.error('Payment date cannot be in the future'); return; }
+    this.paidBusy.set(true);
+    const done = (msg: string) => { this.paidBusy.set(false); this.paidDialog.set(null); this.toast.success(msg); this.loadPayslips(); };
+    const fail = (err: any) => { this.paidBusy.set(false); this.toast.error(err.error?.message || 'Failed to update payslips'); };
+    if (d.payslip) {
+      const p = d.payslip;
+      const empName = p.employee ? `${p.employee.firstName} ${p.employee.lastName}` : 'employee';
+      this.payrollService.updatePayslip(p.id, { status: 'PAID', paidOn: this.paidOnDate }).subscribe({
+        next: () => done(`Payslip for ${empName} marked as PAID`), error: fail,
+      });
+    } else {
+      this.payrollService.markPayslipsPaid(Number(this.selectedMonth()), Number(this.selectedYear()), this.paidOnDate).subscribe({
+        next: () => done('Payslips marked as PAID'), error: fail,
+      });
+    }
   }
 
   sendBulkPayslipEmails() {
@@ -1887,15 +1918,8 @@ export class PayrollComponent implements OnInit {
   }
 
   markIndividualPaid(payslip: any) {
-    const empName = payslip.employee ? `${payslip.employee.firstName} ${payslip.employee.lastName}` : 'employee';
-    if (!confirm(`Mark payslip for ${empName} as PAID?`)) return;
-    this.payrollService.updatePayslip(payslip.id, { status: 'PAID' }).subscribe({
-      next: () => {
-        this.toast.success(`Payslip for ${empName} marked as PAID`);
-        this.loadPayslips();
-      },
-      error: (err) => this.toast.error(err.error?.message || 'Failed to update status')
-    });
+    this.paidOnDate = this.todayIso();
+    this.paidDialog.set({ payslip });
   }
 
   finalizeIndividual(payslip: any) {

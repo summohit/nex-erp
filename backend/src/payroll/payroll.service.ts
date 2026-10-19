@@ -1090,7 +1090,7 @@ export class PayrollService {
     });
   }
 
-  async updatePayslip(companyId: number, id: number, data: { lossOfPay?: number; totalEarnings?: number; totalDeductions?: number; expenseAmount?: number; status?: string }) {
+  async updatePayslip(companyId: number, id: number, data: { lossOfPay?: number; totalEarnings?: number; totalDeductions?: number; expenseAmount?: number; status?: string; paidOn?: string | null }) {
     const payslip = await this.prisma.payslip.findFirst({ where: { id, companyId } });
     if (!payslip) throw new NotFoundException('Payslip not found');
 
@@ -1163,7 +1163,7 @@ export class PayrollService {
         expenseAmount,
         netPay,
         status,
-        ...(status === 'PAID' && payslip.status !== 'PAID' && { paidOn: new Date() })
+        ...(status === 'PAID' && payslip.status !== 'PAID' && { paidOn: this.paidOnDate(data.paidOn) })
       },
       include: { items: true, employee: true }
     });
@@ -1182,11 +1182,25 @@ export class PayrollService {
     });
   }
 
-  async markPayslipsPaid(companyId: number, month: number, year: number) {
+  /**
+   * The day salary was actually paid (19 Oct 2026), chosen by finance, as
+   * midday IST so it reads as that same day everywhere. Not in the future.
+   * Without a date, today.
+   */
+  private paidOnDate(paidOn?: string | null): Date {
+    if (!paidOn) return new Date();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn)) throw new BadRequestException('Payment date must be YYYY-MM-DD');
+    const d = new Date(`${paidOn}T12:00:00+05:30`);
+    if (isNaN(d.getTime())) throw new BadRequestException('Invalid payment date');
+    if (d.getTime() > Date.now() + 12 * 3600 * 1000) throw new BadRequestException('Payment date cannot be in the future');
+    return d;
+  }
+
+  async markPayslipsPaid(companyId: number, month: number, year: number, paidOn?: string | null) {
     const where = { companyId, month: Number(month), year: Number(year), status: 'FINALIZED' };
     return this.prisma.payslip.updateMany({
       where,
-      data: { status: 'PAID', paidOn: new Date() }
+      data: { status: 'PAID', paidOn: this.paidOnDate(paidOn) }
     });
   }
 

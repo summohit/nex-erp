@@ -248,7 +248,7 @@ export class PayrollService {
     return this.http.get<Payslip[]>(`${this.apiUrl}/payslips/me`);
   }
 
-  updatePayslip(id: number, data: { lossOfPay?: number; totalEarnings?: number; totalDeductions?: number; expenseAmount?: number; status?: string }): Observable<Payslip> {
+  updatePayslip(id: number, data: { lossOfPay?: number; totalEarnings?: number; totalDeductions?: number; expenseAmount?: number; status?: string; paidOn?: string }): Observable<Payslip> {
     return this.http.put<Payslip>(`${this.apiUrl}/payslips/${id}`, data);
   }
 
@@ -283,8 +283,8 @@ export class PayrollService {
     return this.http.put(`${this.apiUrl}/payslips/finalize-all`, { month, year });
   }
 
-  markPayslipsPaid(month: number, year: number): Observable<any> {
-    return this.http.put(`${this.apiUrl}/payslips/mark-paid`, { month, year });
+  markPayslipsPaid(month: number, year: number, paidOn?: string): Observable<any> {
+    return this.http.put(`${this.apiUrl}/payslips/mark-paid`, { month, year, paidOn });
   }
 
   // Expense Claims

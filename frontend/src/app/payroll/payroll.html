@@ -3703,3 +3703,22 @@
     </div>
   </div>
 </div>
+
+<!-- Mark as Paid: the day the salary was paid (19 Oct 2026) -->
+<div class="paid-dialog-overlay" *ngIf="paidDialog() as pd" (click)="closePaidDialog()">
+  <div class="paid-dialog" (click)="$event.stopPropagation()" role="dialog" aria-label="Mark as paid">
+    <h3>Mark as paid</h3>
+    <p *ngIf="pd.payslip">Payslip for <b>{{ pd.payslip.employee?.firstName }} {{ pd.payslip.employee?.lastName }}</b></p>
+    <p *ngIf="!pd.payslip">All finalized payslips for <b>{{ monthNames[selectedMonth() - 1] || selectedMonth() }} {{ selectedYear() }}</b></p>
+    <label class="paid-dialog-field">
+      <span>Payment date</span>
+      <input type="date" [(ngModel)]="paidOnDate" [max]="todayIso()" />
+    </label>
+    <div class="paid-dialog-actions">
+      <button type="button" class="btn btn-outline" (click)="closePaidDialog()" [disabled]="paidBusy()">Cancel</button>
+      <button type="button" class="btn btn-success" (click)="confirmPaid()" [disabled]="paidBusy() || !paidOnDate">
+        {{ paidBusy() ? 'Saving…' : 'Mark as Paid' }}
+      </button>
+    </div>
+  </div>
+</div>

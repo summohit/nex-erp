@@ -228,9 +228,9 @@ export class PayrollController {
   }
 
   @Put('payslips/mark-paid')
-  markPayslipsPaid(@Request() req, @Body() body: { month: number; year: number }) {
+  markPayslipsPaid(@Request() req, @Body() body: { month: number; year: number; paidOn?: string }) {
     this.assertPayrollOperator(req, 'mark payslips paid');
-    return this.payrollService.markPayslipsPaid(req.user.companyId, Number(body.month), Number(body.year));
+    return this.payrollService.markPayslipsPaid(req.user.companyId, Number(body.month), Number(body.year), body.paidOn);
   }
 
   @Get('payslips/:id/detail')
@@ -274,7 +274,7 @@ export class PayrollController {
   updatePayslip(
     @Request() req,
     @Param('id', ParseIntPipe) id: number,
-    @Body() data: { lossOfPay?: number; totalEarnings?: number; totalDeductions?: number; expenseAmount?: number; status?: string }
+    @Body() data: { lossOfPay?: number; totalEarnings?: number; totalDeductions?: number; expenseAmount?: number; status?: string; paidOn?: string }
   ) {
     this.assertPayrollOperator(req);
     return this.payrollService.updatePayslip(req.user.companyId, id, data);
