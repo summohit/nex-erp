@@ -2,7 +2,21 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { LucideCalendarDays, LucideChevronLeft, LucideChevronRight, LucideX } from '@lucide/angular';
+import {
+  LucideAward,
+  LucideCake,
+  LucideCalendar,
+  LucideCalendarDays,
+  LucideCheckSquare,
+  LucideChevronLeft,
+  LucideChevronRight,
+  LucideClock,
+  LucideExternalLink,
+  LucideRefreshCw,
+  LucideSparkles,
+  LucideUserCheck,
+  LucideX,
+} from '@lucide/angular';
 import { environment } from '../../../environments/environment';
 
 /**
@@ -12,11 +26,11 @@ import { environment } from '../../../environments/environment';
  * Data: GET /dashboard/calendar?from&to (holidays, birthdays, anniversaries,
  * everyone's approved leave, and my own shifts, days off and tasks due).
  */
-type CalEvent = {
+export type CalEvent = {
   date: string; type: string; title: string; subtitle?: string;
   avatarUrl?: string | null; mine?: boolean; link?: string; priority?: string;
 };
-type Cell = { date: string; day: number; inMonth: boolean; weekend: boolean };
+type Cell = { date: string; day: number; monthShort: string; isFirstOfMonth: boolean; inMonth: boolean; weekend: boolean };
 
 const KINDS: { type: string; label: string }[] = [
   { type: 'HOLIDAY', label: 'Holiday' },
@@ -28,10 +42,27 @@ const KINDS: { type: string; label: string }[] = [
   { type: 'ANNIVERSARY', label: 'Work anniversary' },
 ];
 
+const DEFAULT_HIDDEN = ['SHIFT'];
+
 @Component({
   selector: 'app-my-calendar',
   standalone: true,
-  imports: [CommonModule, LucideCalendarDays, LucideChevronLeft, LucideChevronRight, LucideX],
+  imports: [
+    CommonModule,
+    LucideCalendarDays,
+    LucideChevronLeft,
+    LucideChevronRight,
+    LucideX,
+    LucideCake,
+    LucideAward,
+    LucideSparkles,
+    LucideCheckSquare,
+    LucideClock,
+    LucideCalendar,
+    LucideUserCheck,
+    LucideExternalLink,
+    LucideRefreshCw,
+  ],
   templateUrl: './my-calendar.html',
   styleUrls: ['./my-calendar.css'],
 })
@@ -47,9 +78,18 @@ export class MyCalendarComponent implements OnInit {
   anchor = signal<Date>(this.startOfDay(new Date()));
   events = signal<CalEvent[]>([]);
   loading = signal(false);
-  hidden = signal<Set<string>>(new Set(['SHIFT']));
+  hidden = signal<Set<string>>(new Set(DEFAULT_HIDDEN));
+  onlyMine = signal(false);
   selected = signal<string | null>(null);
   todayKey = this.key(new Date());
+
+  /** True when the user has toggled any filter chip or 'Only Mine' away from defaults. */
+  hasCustomFilters = computed(() => {
+    if (this.onlyMine()) return true;
+    const h = this.hidden();
+    if (h.size !== DEFAULT_HIDDEN.length) return true;
+    return DEFAULT_HIDDEN.some((k) => !h.has(k));
+  });
 
   cells = computed<Cell[]>(() => {
     const a = this.anchor();
@@ -66,7 +106,14 @@ export class MyCalendarComponent implements OnInit {
     }
     return Array.from({ length: count }, (_, i) => {
       const d = this.addDays(first, i);
-      return { date: this.key(d), day: d.getDate(), inMonth: this.view() === 'week' || d.getMonth() === a.getMonth(), weekend: d.getDay() === 0 || d.getDay() === 6 };
+      return {
+        date: this.key(d),
+        day: d.getDate(),
+        monthShort: d.toLocaleDateString('en-IN', { month: 'short' }),
+        isFirstOfMonth: d.getDate() === 1,
+        inMonth: this.view() === 'week' || d.getMonth() === a.getMonth(),
+        weekend: d.getDay() === 0 || d.getDay() === 6,
+      };
     });
   });
 
@@ -79,11 +126,27 @@ export class MyCalendarComponent implements OnInit {
     return `${f.getDate()}${sameMonth ? '' : ' ' + f.toLocaleDateString('en-IN', { month: 'short' })} – ${l.getDate()} ${l.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`;
   });
 
+  /** Events filtered by 'Only Mine' scope (before legend chip toggles). */
+  scopedEvents = computed(() => {
+    const mineOnly = this.onlyMine();
+    return this.events().filter((e) => !mineOnly || e.mine || e.type === 'HOLIDAY');
+  });
+
+  /** Count per event kind in the current range so filter chips show live numbers. */
+  kindCounts = computed(() => {
+    const counts = new Map<string, number>();
+    for (const k of KINDS) counts.set(k.type, 0);
+    for (const e of this.scopedEvents()) {
+      counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
+    }
+    return counts;
+  });
+
   byDate = computed(() => {
     const hide = this.hidden();
     const order = new Map(KINDS.map((k, i) => [k.type, i]));
     const map = new Map<string, CalEvent[]>();
-    for (const e of this.events()) {
+    for (const e of this.scopedEvents()) {
       if (hide.has(e.type)) continue;
       if (!map.has(e.date)) map.set(e.date, []);
       map.get(e.date)!.push(e);
@@ -96,7 +159,11 @@ export class MyCalendarComponent implements OnInit {
 
   selectedEvents = computed(() => {
     const d = this.selected();
-    return d ? this.events().filter((e) => e.date === d) : [];
+    if (!d) return [];
+    const order = new Map(KINDS.map((k, i) => [k.type, i]));
+    return this.scopedEvents()
+      .filter((e) => e.date === d)
+      .sort((x, y) => (order.get(x.type) ?? 99) - (order.get(y.type) ?? 99) || Number(!!y.mine) - Number(!!x.mine));
   });
 
   ngOnInit() { this.load(); }
@@ -138,23 +205,73 @@ export class MyCalendarComponent implements OnInit {
     this.hidden.set(s);
   }
 
+  toggleOnlyMine() {
+    this.onlyMine.set(!this.onlyMine());
+  }
+
+  resetFilters() {
+    this.hidden.set(new Set(DEFAULT_HIDDEN));
+    this.onlyMine.set(false);
+  }
+
+  isPersonEvent(e: CalEvent): boolean {
+    return e.type === 'LEAVE' || e.type === 'BIRTHDAY' || e.type === 'ANNIVERSARY' || !!e.avatarUrl;
+  }
+
   pick(date: string) { this.selected.set(this.selected() === date ? null : date); }
 
-  open(e: CalEvent) { if (e.link) this.router.navigateByUrl(e.link); }
+  open(e: CalEvent, ev?: Event) {
+    if (ev) ev.stopPropagation();
+    if (e.link) this.router.navigateByUrl(e.link);
+  }
 
-  /** Month cells show a few chips and "+N more"; the week view shows all. */
-  shown(date: string): CalEvent[] {
+  /** Whether a cell has a visible DAY_OFF event (shown as a compact header pill in month view). */
+  isDayOff(date: string): boolean {
     const list = this.byDate().get(date) ?? [];
+    return list.some((e) => e.type === 'DAY_OFF');
+  }
+
+  /** Events stacked inside the cell body (in month view, DAY_OFF is elevated to the cell header). */
+  private cellBodyEvents(date: string): CalEvent[] {
+    const list = this.byDate().get(date) ?? [];
+    return this.view() === 'month' ? list.filter((e) => e.type !== 'DAY_OFF') : list;
+  }
+
+  /** Month cells show up to 3 chips and "+N more"; the week view shows all. */
+  shown(date: string): CalEvent[] {
+    const list = this.cellBodyEvents(date);
     return this.view() === 'month' ? list.slice(0, 3) : list;
   }
+
   more(date: string): number {
-    const n = (this.byDate().get(date) ?? []).length;
+    const n = this.cellBodyEvents(date).length;
     return this.view() === 'month' ? Math.max(0, n - 3) : 0;
+  }
+
+  totalForDay(date: string): number {
+    return (this.byDate().get(date) ?? []).length;
+  }
+
+  countForKind(type: string): number {
+    return this.kindCounts().get(type) ?? 0;
   }
 
   longDate(key: string) {
     return new Date(`${key}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   }
+
+  relativeDayLabel(key: string): string {
+    if (key === this.todayKey) return 'Today';
+    const target = new Date(`${key}T00:00:00`).getTime();
+    const today = new Date(`${this.todayKey}T00:00:00`).getTime();
+    const diff = Math.round((target - today) / 86400000);
+    if (diff === 1) return 'Tomorrow';
+    if (diff === -1) return 'Yesterday';
+    if (diff > 1 && diff <= 14) return `In ${diff} days`;
+    if (diff < -1 && diff >= -14) return `${Math.abs(diff)} days ago`;
+    return '';
+  }
+
   kindLabel(type: string) { return KINDS.find((k) => k.type === type)?.label ?? type; }
   initials(t: string) { return t.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(); }
 

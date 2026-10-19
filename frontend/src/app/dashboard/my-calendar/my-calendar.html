@@ -1,69 +1,219 @@
 <div class="dashboard-card mc">
+  <div class="mc-accent-bar"></div>
+
+  <!-- Header Toolbar -->
   <div class="mc-head">
     <div class="mc-title">
-      <div class="card-icon-badge bg-indigo-tint"><svg lucideCalendarDays size="16"></svg></div>
-      <div>
-        <h3>My Calendar</h3>
-        <span class="mc-period">{{ title() }}</span>
+      <div class="mc-icon-badge">
+        <svg lucideCalendarDays size="18"></svg>
+      </div>
+      <div class="mc-title-text">
+        <div class="mc-title-row">
+          <h3>My Calendar</h3>
+          <span class="mc-period-badge">{{ title() }}</span>
+        </div>
+        <p class="mc-subtitle">Holidays, team leaves, celebrations &amp; your personal schedule</p>
       </div>
     </div>
+
     <div class="mc-tools">
-      <button type="button" class="mc-today" (click)="today()">Today</button>
+      <button
+        type="button"
+        class="mc-scope-btn"
+        [class.active]="onlyMine()"
+        (click)="toggleOnlyMine()"
+        title="Show only your events and company holidays"
+      >
+        <svg lucideUserCheck size="13"></svg>
+        <span>Only Mine</span>
+      </button>
+
+      <button type="button" class="mc-today" (click)="today()">
+        <span class="mc-today-dot"></span>
+        <span>Today</span>
+      </button>
+
       <div class="mc-nav">
-        <button type="button" (click)="move(-1)" [attr.aria-label]="view() === 'month' ? 'Previous month' : 'Previous week'"><svg lucideChevronLeft size="16"></svg></button>
-        <button type="button" (click)="move(1)" [attr.aria-label]="view() === 'month' ? 'Next month' : 'Next week'"><svg lucideChevronRight size="16"></svg></button>
+        <button
+          type="button"
+          (click)="move(-1)"
+          [attr.aria-label]="view() === 'month' ? 'Previous month' : 'Previous week'"
+        >
+          <svg lucideChevronLeft size="15"></svg>
+        </button>
+        <button
+          type="button"
+          (click)="move(1)"
+          [attr.aria-label]="view() === 'month' ? 'Next month' : 'Next week'"
+        >
+          <svg lucideChevronRight size="15"></svg>
+        </button>
       </div>
-      <div class="mc-switch" role="tablist">
-        <button type="button" [class.on]="view() === 'month'" (click)="setView('month')">Month</button>
-        <button type="button" [class.on]="view() === 'week'" (click)="setView('week')">Week</button>
+
+      <div class="mc-switch" role="tablist" aria-label="Calendar view mode">
+        <button type="button" role="tab" [attr.aria-selected]="view() === 'month'" [class.on]="view() === 'month'" (click)="setView('month')">Month</button>
+        <button type="button" role="tab" [attr.aria-selected]="view() === 'week'" [class.on]="view() === 'week'" (click)="setView('week')">Week</button>
       </div>
     </div>
   </div>
 
-  <!-- Legend doubles as a filter -->
-  <div class="mc-legend">
-    <button type="button" *ngFor="let k of kinds" class="mc-chip k-{{ k.type }}" [class.off]="hidden().has(k.type)" (click)="toggleKind(k.type)">
-      <span class="mc-dot"></span>{{ k.label }}
-    </button>
+  <!-- Legend / Interactive Filter Bar -->
+  <div class="mc-legend-bar">
+    <div class="mc-legend">
+      <button
+        type="button"
+        *ngFor="let k of kinds"
+        class="mc-chip k-{{ k.type }}"
+        [class.off]="hidden().has(k.type)"
+        [attr.aria-pressed]="!hidden().has(k.type)"
+        (click)="toggleKind(k.type)"
+      >
+        <span class="mc-dot"></span>
+        <span class="mc-chip-label">{{ k.label }}</span>
+        <span class="mc-chip-count" *ngIf="countForKind(k.type) > 0">{{ countForKind(k.type) }}</span>
+      </button>
+
+      <button
+        type="button"
+        class="mc-reset-btn"
+        [class.dirty]="hasCustomFilters()"
+        (click)="resetFilters()"
+        title="Reset all filters to default"
+      >
+        <svg lucideRefreshCw size="12"></svg>
+        <span>Reset</span>
+      </button>
+    </div>
+    <span class="mc-legend-hint">Click a day to view full schedule</span>
   </div>
 
+  <!-- Main Calendar Grid + Inspector -->
   <div class="mc-body" [class.loading]="loading()">
     <div class="mc-grid" [class.week]="view() === 'week'">
-      <div class="mc-wd" *ngFor="let w of weekdays">{{ w }}</div>
-      <div class="mc-cell" *ngFor="let c of cells()"
-           [class.out]="!c.inMonth" [class.weekend]="c.weekend" [class.today]="c.date === todayKey" [class.sel]="c.date === selected()"
-           (click)="pick(c.date)">
-        <div class="mc-num"><span>{{ c.day }}</span></div>
+      <div class="mc-wd" *ngFor="let w of weekdays; let i = index" [class.weekend-hd]="i >= 5">{{ w }}</div>
+
+      <div
+        class="mc-cell"
+        *ngFor="let c of cells()"
+        [class.out]="!c.inMonth"
+        [class.weekend]="c.weekend"
+        [class.day-off]="isDayOff(c.date) && view() === 'month'"
+        [class.today]="c.date === todayKey"
+        [class.sel]="c.date === selected()"
+        (click)="pick(c.date)"
+      >
+        <div class="mc-cell-top">
+          <div class="mc-cell-badges">
+            <span class="mc-today-tag" *ngIf="c.date === todayKey">Today</span>
+            <span class="mc-off-tag" *ngIf="isDayOff(c.date) && view() === 'month'">Day off</span>
+          </div>
+          <div class="mc-num">
+            <span>{{ c.day }}</span>
+          </div>
+        </div>
+
         <div class="mc-events">
-          <div class="mc-ev k-{{ e.type }}" *ngFor="let e of shown(c.date)" [class.mine]="e.mine" [title]="e.title + (e.subtitle ? ' — ' + e.subtitle : '')">
-            <span class="mc-ev-title">{{ e.title }}</span>
+          <div
+            class="mc-ev k-{{ e.type }}"
+            *ngFor="let e of shown(c.date)"
+            [class.mine]="e.mine"
+            [class.clickable]="!!e.link"
+            [title]="e.title + (e.subtitle ? ' — ' + e.subtitle : '')"
+          >
+            <div class="mc-ev-row">
+              <!-- Person avatar (image or initials fallback) for Leave / Birthday / Anniversary -->
+              <span class="mc-ev-av" *ngIf="isPersonEvent(e)" aria-hidden="true">
+                <img
+                  *ngIf="e.avatarUrl"
+                  [src]="e.avatarUrl"
+                  [alt]="e.title"
+                  class="mc-ev-avatar-img"
+                  (error)="e.avatarUrl = null"
+                />
+                <span *ngIf="!e.avatarUrl" class="mc-ev-mini-av">{{ initials(e.title) }}</span>
+              </span>
+
+              <!-- Category icon for Holiday / Task / Shift / Day Off -->
+              <span class="mc-ev-ico" *ngIf="!isPersonEvent(e)" aria-hidden="true">
+                <svg *ngIf="e.type === 'HOLIDAY'" lucideSparkles size="11"></svg>
+                <svg *ngIf="e.type === 'TASK'" lucideCheckSquare size="11"></svg>
+                <svg *ngIf="e.type === 'SHIFT'" lucideClock size="11"></svg>
+                <svg *ngIf="e.type === 'DAY_OFF'" lucideCalendar size="11"></svg>
+              </span>
+
+              <span class="mc-ev-title">{{ e.title }}</span>
+
+              <!-- Right-side semantic indicator -->
+              <svg *ngIf="e.type === 'BIRTHDAY'" lucideCake size="11" class="mc-ev-trail-ico" aria-hidden="true"></svg>
+              <svg *ngIf="e.type === 'ANNIVERSARY'" lucideAward size="11" class="mc-ev-trail-ico" aria-hidden="true"></svg>
+              <span class="mc-ev-you" *ngIf="e.mine && e.type === 'LEAVE'">You</span>
+            </div>
             <span class="mc-ev-sub" *ngIf="view() === 'week' && e.subtitle">{{ e.subtitle }}</span>
           </div>
-          <div class="mc-more" *ngIf="more(c.date) > 0">+{{ more(c.date) }} more</div>
+
+          <div class="mc-more" *ngIf="more(c.date) > 0">
+            <span>+{{ more(c.date) }} more</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- The chosen day, in full -->
+    <!-- Selected Day Agenda Drawer -->
     <aside class="mc-day" *ngIf="selected() as d">
       <div class="mc-day-head">
         <div>
+          <span class="mc-day-rel" *ngIf="relativeDayLabel(d) as rel" [class.is-today]="d === todayKey">{{ rel }}</span>
           <div class="mc-day-title">{{ longDate(d) }}</div>
-          <div class="mc-day-count">{{ selectedEvents().length }} {{ selectedEvents().length === 1 ? 'item' : 'items' }}</div>
+          <div class="mc-day-count">
+            {{ selectedEvents().length }} {{ selectedEvents().length === 1 ? 'scheduled item' : 'scheduled items' }}
+          </div>
         </div>
-        <button type="button" class="mc-x" (click)="selected.set(null)" aria-label="Close"><svg lucideX size="16"></svg></button>
+        <button type="button" class="mc-x" (click)="selected.set(null)" aria-label="Close day details">
+          <svg lucideX size="15"></svg>
+        </button>
       </div>
-      <div class="mc-day-empty" *ngIf="!selectedEvents().length">Nothing on this day.</div>
-      <div class="mc-day-item k-{{ e.type }}" *ngFor="let e of selectedEvents()" [class.link]="!!e.link" (click)="open(e)">
-        <div class="mc-av">
-          <img *ngIf="e.avatarUrl" [src]="e.avatarUrl" alt="">
-          <span *ngIf="!e.avatarUrl">{{ initials(e.title) }}</span>
+
+      <div class="mc-day-empty" *ngIf="!selectedEvents().length">
+        <div class="mc-day-empty-ico">
+          <svg lucideCalendar size="20"></svg>
         </div>
-        <div class="mc-day-text">
-          <div class="mc-day-name">{{ e.title }} <span class="mc-you" *ngIf="e.mine && (e.type === 'LEAVE' || e.type === 'BIRTHDAY' || e.type === 'ANNIVERSARY')">You</span></div>
-          <div class="mc-day-sub">{{ kindLabel(e.type) }}<ng-container *ngIf="e.subtitle"> · {{ e.subtitle }}</ng-container></div>
+        <div class="mc-day-empty-title">No events on this day</div>
+        <div class="mc-day-empty-sub">No holidays, leaves, or tasks scheduled.</div>
+      </div>
+
+      <div class="mc-day-list" *ngIf="selectedEvents().length > 0">
+        <div
+          class="mc-day-item k-{{ e.type }}"
+          *ngFor="let e of selectedEvents()"
+          [class.link]="!!e.link"
+          (click)="open(e, $event)"
+        >
+          <div class="mc-av">
+            <img *ngIf="e.avatarUrl" [src]="e.avatarUrl" alt="" (error)="e.avatarUrl = null">
+            <ng-container *ngIf="!e.avatarUrl">
+              <svg *ngIf="e.type === 'HOLIDAY'" lucideSparkles size="15"></svg>
+              <svg *ngIf="e.type === 'TASK'" lucideCheckSquare size="15"></svg>
+              <svg *ngIf="e.type === 'SHIFT'" lucideClock size="15"></svg>
+              <svg *ngIf="e.type === 'DAY_OFF'" lucideCalendar size="15"></svg>
+              <span *ngIf="e.type === 'LEAVE' || e.type === 'BIRTHDAY' || e.type === 'ANNIVERSARY'">{{ initials(e.title) }}</span>
+            </ng-container>
+          </div>
+
+          <div class="mc-day-text">
+            <div class="mc-day-name">
+              <span>{{ e.title }}</span>
+              <span class="mc-you" *ngIf="e.mine && (e.type === 'LEAVE' || e.type === 'BIRTHDAY' || e.type === 'ANNIVERSARY')">You</span>
+            </div>
+            <div class="mc-day-sub">
+              <span class="mc-day-kind-pill">{{ kindLabel(e.type) }}</span>
+              <span class="mc-day-sub-text" *ngIf="e.subtitle">{{ e.subtitle }}</span>
+            </div>
+          </div>
+
+          <svg *ngIf="e.link" lucideExternalLink size="13" class="mc-day-link-ico"></svg>
         </div>
       </div>
     </aside>
   </div>
 </div>
+
