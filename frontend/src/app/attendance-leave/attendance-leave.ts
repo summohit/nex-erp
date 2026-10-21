@@ -168,7 +168,9 @@ export class AttendanceLeaveComponent implements OnInit {
   attendanceFlagFilter = signal('');
   attendanceSearch = signal('');
 
-  get attendanceFilterGroups() {
+  // Built once per change of its inputs (21 Oct 2026): as a getter it was a
+  // new list on every check, so the filter drawer redrew without end.
+  attendanceFilterGroups = computed(() => {
     const departments = [...new Set(
       this.employees().map((employee) => employee.department?.name).filter((name): name is string => !!name),
     )].sort((a, b) => a.localeCompare(b));
@@ -205,16 +207,18 @@ export class AttendanceLeaveComponent implements OnInit {
         ],
       },
     ];
-  }
+  });
 
-  get attendanceDrawerValues(): Record<string, string> {
+  // Built once per change of its inputs (21 Oct 2026): as a getter it was a
+  // new list on every check, so the filter drawer redrew without end.
+  attendanceDrawerValues = computed(() => {
     return {
       employee: this.selectedAttendanceEmployeeId() === null ? '' : String(this.selectedAttendanceEmployeeId()),
       department: this.attendanceDepartmentFilter(),
       status: this.attendanceStatusFilter(),
       flag: this.attendanceFlagFilter(),
     };
-  }
+  });
 
   filteredMonthlyGrid = computed(() => {
     const date = this.attendanceDateFilter();
@@ -278,7 +282,9 @@ export class AttendanceLeaveComponent implements OnInit {
     return query.split(/\s+/).every((term) => values.some((value) => value.includes(term)));
   }
 
-  get leaveFilterGroups() {
+  // Built once per change of its inputs (21 Oct 2026): as a getter it was a
+  // new list on every check, so the filter drawer redrew without end.
+  leaveFilterGroups = computed(() => {
     const groups = [{
       key: 'leaveType',
       label: 'Leave type',
@@ -299,16 +305,18 @@ export class AttendanceLeaveComponent implements OnInit {
       });
     }
     return groups;
-  }
+  });
 
-  get leaveDrawerValues(): Record<string, string> {
+  // Built once per change of its inputs (21 Oct 2026): as a getter it was a
+  // new list on every check, so the filter drawer redrew without end.
+  leaveDrawerValues = computed(() => {
     return {
       leaveType: this.filterLeaveTypeId(),
       status: this.isAdmin() && this.leaveSection() !== 'balances'
         ? (this.approvalStatusFilter() === 'ALL' ? '' : this.approvalStatusFilter())
         : this.leaveStatusFilter(),
     };
-  }
+  });
 
   private matchesAttendanceFilters(employee: any, startDate?: string | Date, endDate?: string | Date): boolean {
     const query = this.filterEmployeeQuery().trim().toLowerCase();
