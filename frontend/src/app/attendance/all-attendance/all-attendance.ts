@@ -279,11 +279,29 @@ export class AllAttendanceComponent implements OnInit {
 
   /** Today's position (IST), shown above the period KPIs. */
   today = signal<any | null>(null);
+  /** Day strip filters (21 Oct 2026): '' = today; department '' = all. */
+  stripDate = signal<string>('');
+  stripDept = signal<string>('');
+  todayKeyStr = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+  isTodayStrip() { return !this.stripDate() || this.stripDate() === this.todayKeyStr; }
+  setStripDate(v: string) { this.stripDate.set(v && v < this.todayKeyStr ? v : ''); this.loadToday(); }
+  setStripDept(v: string) { this.stripDept.set(v || ''); this.loadToday(); }
+  shiftStripDay(step: number) {
+    const base = new Date(`${this.stripDate() || this.todayKeyStr}T00:00:00Z`);
+    base.setUTCDate(base.getUTCDate() + step);
+    this.setStripDate(base.toISOString().slice(0, 10));
+  }
+
   loadToday() {
-    this.attendanceService.getTodaySummary().subscribe({
+    this.attendanceService.getTodaySummary({ date: this.stripDate() || undefined, departmentId: this.stripDept() || undefined }).subscribe({
       next: (t) => this.today.set(t),
       error: () => this.today.set(null),
     });
+  }
+
+  todayPercent(count: number, total: number): number {
+    if (!total || count <= 0) return 0;
+    return Math.round((count / total) * 100);
   }
 
   ngOnInit() {
@@ -1037,7 +1055,7 @@ export class AllAttendanceComponent implements OnInit {
     const halfDay = byStatus('Half Day');
     const absent = byStatus('Absent');
     const onLeave = byStatus('On Leave');
-    const late = list.filter(r => r.isLate).length;
+    const late = list.filter(r => r.isLate && r.status !== 'HALF_DAY').length;
     const early = list.filter(r => r.isEarlyLeave).length;
     const missedClockOut = list.filter(r => this.isMissedClockOut(r)).length;
 
@@ -1060,7 +1078,7 @@ export class AllAttendanceComponent implements OnInit {
       onTimeRate,
       totalLocations: this.workLocationBreakdown(list),
       presentLocations: this.workLocationBreakdown(list.filter(r => this.recordDayStatus(r) === 'Present')),
-      lateLocations: this.workLocationBreakdown(list.filter(r => r.isLate)),
+      lateLocations: this.workLocationBreakdown(list.filter(r => r.isLate && r.status !== 'HALF_DAY')),
       halfDayLocations: this.workLocationBreakdown(list.filter(r => this.recordDayStatus(r) === 'Half Day')),
       absentLocations: this.workLocationBreakdown(list.filter(r => this.recordDayStatus(r) === 'Absent')),
       leaveLocations: this.workLocationBreakdown(list.filter(r => this.recordDayStatus(r) === 'On Leave')),
@@ -1436,7 +1454,7 @@ export class AllAttendanceComponent implements OnInit {
     const rows = this.today()?.lists?.[key] ?? [];
     this.resetKpiModalFilters();
     this.kpiModal.set({
-      title: `${title} · today`,
+      title: `${title} · ${this.isTodayStrip() ? 'today' : this.stripDate()}`,
       heading: title,
       scope: 'Today',
       tone: this.resolveKpiTone(key),
@@ -1447,7 +1465,7 @@ export class AllAttendanceComponent implements OnInit {
 
   openStatKpi(status: string, title: string) {
     let list = this.baseFilteredRecords();
-    if (status === 'Late') list = list.filter((r) => r.isLate);
+    if (status === 'Late') list = list.filter((r) => r.isLate && r.status !== 'HALF_DAY');
     else if (status !== 'ALL') list = list.filter((r) => this.recordDayStatus(r) === status);
     const rows = list.map((r: any) => ({
       id: r.employeeId,

@@ -108,11 +108,11 @@ export class AttendanceService {
   private apiUrl = `${environment.apiUrl}/attendance`;
 
   /** Today at a glance (IST) for All People Attendance. */
-  getTodaySummary() {
+  getTodaySummary(opts: { date?: string; departmentId?: number | string } = {}) {
     return this.http.get<{
       date: string; totalEmployees: number; clockedIn: number; present: number; late: number; halfDay: number;
       stillWorking: number; onLeave: number; dayOff: number; notClockedIn: number; office: number; onsite: number; remote: number;
-    }>(`${this.apiUrl}/today-summary`);
+    }>(`${this.apiUrl}/today-summary`, { params: { ...(opts.date ? { date: opts.date } : {}), ...(opts.departmentId ? { departmentId: String(opts.departmentId) } : {}) } });
   }
 
   /** People late on `minLate`+ days in the last `days` days, worst first. */

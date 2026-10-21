@@ -94,27 +94,23 @@ describe('clockIn / clockOut on an on-site day', () => {
     // check that has to catch this, so the IP rule cannot mask it.
     await expect(
       service.clockIn(99, { ...SITE, ipAddress: '10.0.0.1' }),
-    ).rejects.toThrow(/office radius/i);
+    ).rejects.toThrow(/office geofence/i);
   });
 
-  it('accepts an outside-office clock-in once a reason is given, and queues it', async () => {
+  it('strictly blocks an outside-office clock-in even if a reason is given', async () => {
     officeDay();
     jest.useFakeTimers().setSystemTime(ist(9, 25));
 
-    await service.clockIn(99, { ...SITE, ipAddress: '10.0.0.1', outsideReason: 'Client meeting' });
-
-    const data = prisma.attendance.create.mock.calls[0][0].data;
-    expect(data.clockInOutside).toBe(true);
-    expect(data.clockInOutsideReason).toBe('Client meeting');
-    expect(data.geofenceApproval).toBe('PENDING');
-    expect(data.clockInDistanceKm).toBeGreaterThan(10);
+    await expect(
+      service.clockIn(99, { ...SITE, ipAddress: '10.0.0.1', outsideReason: 'Client meeting' }),
+    ).rejects.toThrow(/office geofence/i);
   });
 
-  it('asks for a reason when there is no location reading at all', async () => {
+  it('rejects clock-in when there is no location reading at all on an office shift', async () => {
     officeDay();
     jest.useFakeTimers().setSystemTime(ist(9, 25));
 
-    await expect(service.clockIn(99, { ipAddress: '10.0.0.1' })).rejects.toThrow(/could not be read/i);
+    await expect(service.clockIn(99, { ipAddress: '10.0.0.1' })).rejects.toThrow(/location could not be verified/i);
   });
 
   it('does not geofence a shift that is not an office shift (e.g. Night Shift)', async () => {

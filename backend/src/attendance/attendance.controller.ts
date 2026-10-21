@@ -190,8 +190,11 @@ export class AttendanceController {
   /** Today at a glance (IST) for the All People Attendance page. */
   @Get('today-summary')
   @Permissions('attendance/all')
-  getTodaySummary(@Request() req) {
-    return this.attendanceService.getTodaySummary(req.user.companyId);
+  getTodaySummary(@Request() req, @Query('date') date?: string, @Query('departmentId') departmentId?: string) {
+    return this.attendanceService.getTodaySummary(req.user.companyId, {
+      date: date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined,
+      departmentId: departmentId ? Number(departmentId) || undefined : undefined,
+    });
   }
 
   /**

@@ -15,11 +15,14 @@ describe('the ordinary clock on a field visit day', () => {
     name: 'Head Office', latitude: 28.6139, longitude: 77.209,
     geofenceRadius: 200, allowedIps: '10.0.0.1',
   };
-  /** Nowhere near the office — where the bypass would have been used from. */
+  /** Within 20 metres of the approved client site. */
+  const SITE = { lat: 28.6001, lng: 77.2001, ipAddress: '49.36.1.1' };
+  /** Nowhere near the office or site — 23km away on the sofa. */
   const SOFA = { lat: 28.4595, lng: 77.0266, ipAddress: '49.36.1.1' };
 
   const FIELD_VISIT_DAY = {
-    id: 7, request: { latitude: 28.6, longitude: 77.2 },
+    id: 7, clockInTime: null,
+    request: { id: 9, requestNumber: 'FVR-0009', location: 'Client Site – Delhi', latitude: 28.6, longitude: 77.2, geofenceRadiusM: 1000 },
   };
 
   let prisma: any;
@@ -58,14 +61,15 @@ describe('the ordinary clock on a field visit day', () => {
         onsite: { projectId: 3, address: 'Client Site – Delhi' },
       }),
     };
-    service = new AttendanceService(prisma, {} as any, roster as ShiftRosterService, {} as any);
+    const notifications = { createNotification: jest.fn().mockResolvedValue({}) };
+    service = new AttendanceService(prisma, notifications as any, roster as ShiftRosterService, {} as any);
   });
 
   afterEach(() => jest.useRealTimers());
 
-  it('lets the ordinary clock-in through, late against the visit hours, and opens the visit day', async () => {
-    // 10:00 against a 09:00 visit start with a 10 minute buffer.
-    await service.clockIn(99, SOFA);
+  it('lets the ordinary clock-in through when at the site, late against the visit hours, and opens the visit day', async () => {
+    // 10:00 against a 09:00 visit start with a 10 minute buffer, within site geofence.
+    await service.clockIn(99, SITE);
 
     const written = prisma.attendance.create.mock.calls[0][0].data;
     expect(written.isLate).toBe(true);
@@ -75,21 +79,33 @@ describe('the ordinary clock on a field visit day', () => {
     const visit = prisma.fieldVisitAttendance.update.mock.calls[0][0];
     expect(visit.where).toEqual({ id: 7 });
     expect(visit.data.status).toBe('IN_PROGRESS');
-    expect(visit.data.clockInDistanceKm).toBeGreaterThan(10);
+    expect(visit.data.clockInDistanceKm).toBeLessThan(1);
   });
 
-  it('is not late when clocking in within the visit start', async () => {
+  it('blocks the ordinary clock-in when outside the field visit site geofence', async () => {
+    // 23km away from the site.
+    await expect(service.clockIn(99, SOFA)).rejects.toThrow(
+      /outside the approved Field Visit location/i,
+    );
+  });
+
+  it('requires GPS coordinates to clock in on an approved field visit day', async () => {
+    await expect(service.clockIn(99, { ipAddress: '49.36.1.1' })).rejects.toThrow(
+      /GPS location is required/i,
+    );
+  });
+
+  it('is not late when clocking in at the site within the visit start', async () => {
     jest.setSystemTime(ist(9, 5));
-    await service.clockIn(99, SOFA);
+    await service.clockIn(99, SITE);
     expect(prisma.attendance.create.mock.calls[0][0].data.isLate).toBe(false);
   });
 
   it('only looks at the day being clocked that has not been opened yet', async () => {
-    await service.clockIn(99, SOFA);
+    await service.clockIn(99, SITE);
     expect(prisma.fieldVisitAttendance.findFirst.mock.calls[0][0].where).toMatchObject({
       employeeId: 10,
       visitDate: new Date(Date.UTC(2026, 8, 24)),
-      clockInTime: null,
       request: { status: 'APPROVED' },
     });
   });
@@ -133,6 +149,6 @@ describe('the ordinary clock on a field visit day', () => {
 
     // And with the office IP, by the geofence behind it.
     await expect(service.clockIn(99, { ...SOFA, ipAddress: '10.0.0.1' }))
-      .rejects.toThrow(/outside the .* office radius/);
+      .rejects.toThrow(/outside the .* office geofence/);
   });
 });

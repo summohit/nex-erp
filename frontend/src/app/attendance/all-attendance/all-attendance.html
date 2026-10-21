@@ -62,127 +62,219 @@
   <!-- Today at a glance (IST) -->
   <div class="today-strip" *ngIf="today() as t">
     <div class="today-head">
-      <span class="today-label">Today</span>
-      <span class="today-date">{{ t.date + 'T00:00:00' | date:'EEEE, dd-MM-yyyy' }}</span>
-      <span class="today-sub">{{ t.totalEmployees }} active employees</span>
-      <button type="button" class="today-refresh" (click)="loadToday()" title="Refresh today's numbers">↻</button>
+      <div class="today-head-main">
+        <span class="today-label">{{ isTodayStrip() ? 'Today' : 'Day' }}</span>
+        <span class="today-date">{{ t.date + 'T00:00:00' | date:'EEEE, dd-MM-yyyy' }}</span>
+        <span class="today-sub-dot">·</span>
+        <span class="today-sub">{{ t.totalEmployees }} active employees</span>
+      </div>
+      <!-- Filters for this strip (21 Oct 2026): any day, one department -->
+      <div class="today-filters">
+        <button type="button" class="today-nav" (click)="shiftStripDay(-1)" title="Previous day">‹</button>
+        <input type="date" class="today-date-input" [max]="todayKeyStr" [value]="stripDate() || todayKeyStr" (change)="setStripDate($any($event.target).value)" />
+        <button type="button" class="today-nav" (click)="shiftStripDay(1)" [disabled]="isTodayStrip()" title="Next day">›</button>
+        <button type="button" class="today-nav today-now" *ngIf="!isTodayStrip()" (click)="setStripDate('')">Today</button>
+        <select class="today-dept" [value]="stripDept()" (change)="setStripDept($any($event.target).value)">
+          <option value="">All departments</option>
+          <option *ngFor="let d of departments()" [value]="d.id">{{ d.name }}</option>
+        </select>
+      </div>
+      <div class="today-head-actions">
+        <button type="button" class="today-refresh-btn" (click)="loadToday()" title="Refresh today's numbers">
+          <svg lucideRotateCcw [size]="13"></svg>
+          <span>Refresh</span>
+        </button>
+      </div>
     </div>
+
+    <!-- Segmented Attendance Composition Bar -->
+    <div class="composition-wrapper">
+      <div class="composition-bar" role="progressbar" [attr.aria-label]="'Today attendance: ' + t.totalEmployees + ' employees'">
+        <div 
+          class="seg-fill seg-present" 
+          *ngIf="t.present > 0" 
+          [style.width.%]="(t.present / t.totalEmployees) * 100"
+          (click)="openTodayKpi('present', 'On time')"
+          [attr.title]="'On time: ' + t.present + ' (' + todayPercent(t.present, t.totalEmployees) + '%)'">
+        </div>
+        <div 
+          class="seg-fill seg-late" 
+          *ngIf="t.late > 0" 
+          [style.width.%]="(t.late / t.totalEmployees) * 100"
+          (click)="openTodayKpi('late', 'Late')"
+          [attr.title]="'Late: ' + t.late + ' (' + todayPercent(t.late, t.totalEmployees) + '%)'">
+        </div>
+        <div 
+          class="seg-fill seg-half" 
+          *ngIf="t.halfDay > 0" 
+          [style.width.%]="(t.halfDay / t.totalEmployees) * 100"
+          (click)="openTodayKpi('halfDay', 'Half day')"
+          [attr.title]="'Half day: ' + t.halfDay + ' (' + todayPercent(t.halfDay, t.totalEmployees) + '%)'">
+        </div>
+        <div 
+          class="seg-fill seg-leave" 
+          *ngIf="t.onLeave > 0" 
+          [style.width.%]="(t.onLeave / t.totalEmployees) * 100"
+          (click)="openTodayKpi('onLeave', 'On leave')"
+          [attr.title]="'On leave: ' + t.onLeave + ' (' + todayPercent(t.onLeave, t.totalEmployees) + '%)'">
+        </div>
+        <div 
+          class="seg-fill seg-off" 
+          *ngIf="t.dayOff > 0" 
+          [style.width.%]="(t.dayOff / t.totalEmployees) * 100"
+          (click)="openTodayKpi('dayOff', 'Day off')"
+          [attr.title]="'Day off: ' + t.dayOff + ' (' + todayPercent(t.dayOff, t.totalEmployees) + '%)'">
+        </div>
+        <div 
+          class="seg-fill seg-miss" 
+          *ngIf="t.notClockedIn > 0" 
+          [style.width.%]="(t.notClockedIn / t.totalEmployees) * 100"
+          (click)="openTodayKpi('notClockedIn', isTodayStrip() ? 'Not clocked in yet' : 'Did not clock in')"
+          [attr.title]="'Not clocked in: ' + t.notClockedIn + ' (' + todayPercent(t.notClockedIn, t.totalEmployees) + '%)'">
+        </div>
+      </div>
+    </div>
+
+    <!-- Elevated Today KPI Cards -->
     <div class="today-grid">
-      <div class="today-kpi k-in" (click)="openTodayKpi('clockedIn', 'Clocked in')" title="Show who"><b>{{ t.clockedIn }}</b><span>Clocked in</span><small>{{ t.stillWorking }} still working</small></div>
-      <div class="today-kpi k-ok" (click)="openTodayKpi('present', 'On time')" title="Show who"><b>{{ t.present }}</b><span>On time</span></div>
-      <div class="today-kpi k-late" (click)="openTodayKpi('late', 'Late')" title="Show who"><b>{{ t.late }}</b><span>Late</span></div>
-      <div class="today-kpi k-half" (click)="openTodayKpi('halfDay', 'Half day')" title="Show who"><b>{{ t.halfDay }}</b><span>Half day</span></div>
-      <div class="today-kpi k-leave" (click)="openTodayKpi('onLeave', 'On leave')" title="Show who"><b>{{ t.onLeave }}</b><span>On leave</span></div>
-      <div class="today-kpi k-off" (click)="openTodayKpi('dayOff', 'Day off')" title="Show who"><b>{{ t.dayOff }}</b><span>Day off</span></div>
-      <div class="today-kpi k-miss" (click)="openTodayKpi('notClockedIn', 'Not clocked in yet')" title="Show who"><b>{{ t.notClockedIn }}</b><span>Not clocked in yet</span></div>
+      <!-- 1. Clocked in -->
+      <div class="today-kpi k-in" (click)="openTodayKpi('clockedIn', 'Clocked in')" title="Show all who clocked in today">
+        <div class="kpi-header">
+          <span class="kpi-dot"></span>
+          <span class="kpi-label">Clocked in</span>
+          <span class="kpi-percent">{{ todayPercent(t.clockedIn, t.totalEmployees) }}%</span>
+        </div>
+        <div class="kpi-body">
+          <b class="kpi-value">{{ t.clockedIn }}</b>
+          <span class="kpi-total">/ {{ t.totalEmployees }}</span>
+        </div>
+        <div class="kpi-status-sub">
+          <span class="pulse-indicator"></span>
+          <span>{{ t.stillWorking }} still working</span>
+        </div>
+      </div>
+
+      <!-- 2. On time -->
+      <div class="today-kpi k-ok" (click)="openTodayKpi('present', 'On time')" title="Arrived before or at shift start">
+        <div class="kpi-header">
+          <span class="kpi-dot"></span>
+          <span class="kpi-label">On time</span>
+          <span class="kpi-percent">{{ todayPercent(t.present, t.totalEmployees) }}%</span>
+        </div>
+        <div class="kpi-body">
+          <b class="kpi-value">{{ t.present }}</b>
+          <span class="kpi-total">/ {{ t.totalEmployees }}</span>
+        </div>
+        <div class="kpi-status-sub">
+          <span>On schedule</span>
+        </div>
+      </div>
+
+      <!-- 3. Late -->
+      <div class="today-kpi k-late" (click)="openTodayKpi('late', 'Late')" title="Clocked in within grace/late window">
+        <div class="kpi-header">
+          <span class="kpi-dot"></span>
+          <span class="kpi-label">Late</span>
+          <span class="kpi-percent">{{ todayPercent(t.late, t.totalEmployees) }}%</span>
+        </div>
+        <div class="kpi-body">
+          <b class="kpi-value">{{ t.late }}</b>
+          <span class="kpi-total">/ {{ t.totalEmployees }}</span>
+        </div>
+        <div class="kpi-status-sub">
+          <span>Full day pay</span>
+        </div>
+      </div>
+
+      <!-- 4. Half day -->
+      <div class="today-kpi k-half" (click)="openTodayKpi('halfDay', 'Half day')" title="Clocked in after half-day cutoff">
+        <div class="kpi-header">
+          <span class="kpi-dot"></span>
+          <span class="kpi-label">Half day</span>
+          <span class="kpi-percent">{{ todayPercent(t.halfDay, t.totalEmployees) }}%</span>
+        </div>
+        <div class="kpi-body">
+          <b class="kpi-value">{{ t.halfDay }}</b>
+          <span class="kpi-total">/ {{ t.totalEmployees }}</span>
+        </div>
+        <div class="kpi-status-sub">
+          <span>Half day pay</span>
+        </div>
+      </div>
+
+      <!-- 5. On leave -->
+      <div class="today-kpi k-leave" (click)="openTodayKpi('onLeave', 'On leave')" title="Approved leave for today">
+        <div class="kpi-header">
+          <span class="kpi-dot"></span>
+          <span class="kpi-label">On leave</span>
+          <span class="kpi-percent">{{ todayPercent(t.onLeave, t.totalEmployees) }}%</span>
+        </div>
+        <div class="kpi-body">
+          <b class="kpi-value">{{ t.onLeave }}</b>
+          <span class="kpi-total">/ {{ t.totalEmployees }}</span>
+        </div>
+        <div class="kpi-status-sub">
+          <span>Approved leave</span>
+        </div>
+      </div>
+
+      <!-- 6. Day off -->
+      <div class="today-kpi k-off" (click)="openTodayKpi('dayOff', 'Day off')" title="Weekly off or rostered day off">
+        <div class="kpi-header">
+          <span class="kpi-dot"></span>
+          <span class="kpi-label">Day off</span>
+          <span class="kpi-percent">{{ todayPercent(t.dayOff, t.totalEmployees) }}%</span>
+        </div>
+        <div class="kpi-body">
+          <b class="kpi-value">{{ t.dayOff }}</b>
+          <span class="kpi-total">/ {{ t.totalEmployees }}</span>
+        </div>
+        <div class="kpi-status-sub">
+          <span>Rostered / weekly</span>
+        </div>
+      </div>
+
+      <!-- 7. Not clocked in -->
+      <div class="today-kpi k-miss" (click)="openTodayKpi('notClockedIn', isTodayStrip() ? 'Not clocked in yet' : 'Did not clock in')" title="Pending clock-in or unexcused absence">
+        <div class="kpi-header">
+          <span class="kpi-dot"></span>
+          <span class="kpi-label">Not clocked in</span>
+          <span class="kpi-percent">{{ todayPercent(t.notClockedIn, t.totalEmployees) }}%</span>
+        </div>
+        <div class="kpi-body">
+          <b class="kpi-value">{{ t.notClockedIn }}</b>
+          <span class="kpi-total">/ {{ t.totalEmployees }}</span>
+        </div>
+        <div class="kpi-status-sub">
+          <span>Pending clock-in</span>
+        </div>
+      </div>
     </div>
-    <div class="today-where">Where: Office {{ t.office }} · On site {{ t.onsite }} · WFH / outside {{ t.remote }}</div>
+
+    <!-- Active Location Chips Strip -->
+    <div class="today-location-bar">
+      <span class="loc-bar-title">Active Workspaces:</span>
+      <div class="loc-pills">
+        <span class="loc-pill loc-office" title="Clocked in at office branch">
+          <span class="loc-emoji">🏢</span>
+          <span class="loc-text">Office</span>
+          <strong class="loc-num">{{ t.office }}</strong>
+        </span>
+        <span class="loc-pill loc-onsite" title="Clocked in at client site or field visit">
+          <span class="loc-emoji">🚗</span>
+          <span class="loc-text">On site</span>
+          <strong class="loc-num">{{ t.onsite }}</strong>
+        </span>
+        <span class="loc-pill loc-remote" title="Clocked in remotely / WFH">
+          <span class="loc-emoji">🏠</span>
+          <span class="loc-text">WFH / Outside</span>
+          <strong class="loc-num">{{ t.remote }}</strong>
+        </span>
+      </div>
+    </div>
   </div>
 
-  <!-- KPI / Stats Row -->
-  <div class="stats-row">
-    <!-- Total Shifts Tracked -->
-    <div class="stat-card stat-indigo" [class.active-card]="!filterStatus && filterFlag === 'ALL' && !filterDate" (click)="openStatKpi('ALL', 'All shifts')" title="Click to see everyone">
-      <div class="stat-icon-wrapper">
-        <svg lucideCalendarDays [size]="22"></svg>
-      </div>
-      <div class="stat-info">
-        <span class="stat-label">Total Shifts</span>
-        <div class="stat-value">{{ stats().total }}</div>
-        <span class="stat-subtext">{{ statsScopeLabel() }}</span>
-      </div>
-      <div class="stat-location-breakdown">
-        <span>Office {{ stats().totalLocations.office }} ({{ stats().totalLocations.officePercent }}%)</span>
-        <span>On site {{ stats().totalLocations.onsite }} ({{ stats().totalLocations.onsitePercent }}%)</span>
-        <span>WFH {{ stats().totalLocations.remote }} ({{ stats().totalLocations.remotePercent }}%)</span>
-      </div>
-    </div>
-
-    <!-- Present & On-Time -->
-    <div class="stat-card stat-green" [class.active-card]="filterStatus === 'Present' && filterFlag === 'ALL'" (click)="openStatKpi('Present', 'Present')" title="Click to see who">
-      <div class="stat-icon-wrapper">
-        <svg lucideUserCheck [size]="22"></svg>
-      </div>
-      <div class="stat-info">
-        <span class="stat-label">Present</span>
-        <div class="stat-value">{{ stats().present }}</div>
-        <span class="stat-subtext">{{ stats().onTimeRate }}% on-time arrival rate</span>
-      </div>
-      <div class="stat-location-breakdown">
-        <span>Office {{ stats().presentLocations.office }} ({{ stats().presentLocations.officePercent }}%)</span>
-        <span>On site {{ stats().presentLocations.onsite }} ({{ stats().presentLocations.onsitePercent }}%)</span>
-        <span>WFH {{ stats().presentLocations.remote }} ({{ stats().presentLocations.remotePercent }}%)</span>
-      </div>
-    </div>
-
-    <!-- Late Arrivals -->
-    <div class="stat-card stat-amber" [class.active-card]="filterStatus === 'Late'" (click)="openStatKpi('Late', 'Late arrivals')" title="Click to see who">
-      <div class="stat-icon-wrapper">
-        <svg lucideAlertTriangle [size]="22"></svg>
-      </div>
-      <div class="stat-info">
-        <span class="stat-label">Late Arrivals</span>
-        <div class="stat-value">{{ stats().late }}</div>
-        <span class="stat-subtext">Clocked in after shift start</span>
-      </div>
-      <div class="stat-location-breakdown">
-        <span>Office {{ stats().lateLocations.office }} ({{ stats().lateLocations.officePercent }}%)</span>
-        <span>On site {{ stats().lateLocations.onsite }} ({{ stats().lateLocations.onsitePercent }}%)</span>
-        <span>WFH {{ stats().lateLocations.remote }} ({{ stats().lateLocations.remotePercent }}%)</span>
-      </div>
-    </div>
-
-    <!-- Half Day / Early Leave -->
-    <div class="stat-card stat-rose" [class.active-card]="filterStatus === 'Half Day'" (click)="openStatKpi('Half Day', 'Half day')" title="Click to see who">
-      <div class="stat-icon-wrapper">
-        <svg lucideTimer [size]="22"></svg>
-      </div>
-      <div class="stat-info">
-        <span class="stat-label">Half Day</span>
-        <div class="stat-value">{{ stats().halfDay }}</div>
-        <span class="stat-subtext">{{ stats().early }} early departure flags</span>
-      </div>
-      <div class="stat-location-breakdown">
-        <span>Office {{ stats().halfDayLocations.office }} ({{ stats().halfDayLocations.officePercent }}%)</span>
-        <span>On site {{ stats().halfDayLocations.onsite }} ({{ stats().halfDayLocations.onsitePercent }}%)</span>
-        <span>WFH {{ stats().halfDayLocations.remote }} ({{ stats().halfDayLocations.remotePercent }}%)</span>
-      </div>
-    </div>
-
-    <!-- Absent -->
-    <div class="stat-card stat-red" [class.active-card]="filterStatus === 'Absent'" (click)="openStatKpi('Absent', 'Absent')" title="Click to see who">
-      <div class="stat-icon-wrapper">
-        <svg lucideUserX [size]="22"></svg>
-      </div>
-      <div class="stat-info">
-        <span class="stat-label">Absent</span>
-        <div class="stat-value">{{ stats().absent }}</div>
-        <span class="stat-subtext">No clock-in recorded</span>
-      </div>
-      <div class="stat-location-breakdown">
-        <span>Office {{ stats().absentLocations.office }} ({{ stats().absentLocations.officePercent }}%)</span>
-        <span>On site {{ stats().absentLocations.onsite }} ({{ stats().absentLocations.onsitePercent }}%)</span>
-        <span>WFH {{ stats().absentLocations.remote }} ({{ stats().absentLocations.remotePercent }}%)</span>
-      </div>
-    </div>
-
-    <!-- On Leave -->
-    <div class="stat-card stat-violet" [class.active-card]="filterStatus === 'On Leave'" (click)="openStatKpi('On Leave', 'On leave')" title="Click to see who">
-      <div class="stat-icon-wrapper">
-        <svg lucidePlane [size]="22"></svg>
-      </div>
-      <div class="stat-info">
-        <span class="stat-label">On Leave</span>
-        <div class="stat-value">{{ stats().onLeave }}</div>
-        <span class="stat-subtext">Approved leave days</span>
-      </div>
-      <div class="stat-location-breakdown">
-        <span>Office {{ stats().leaveLocations.office }} ({{ stats().leaveLocations.officePercent }}%)</span>
-        <span>On site {{ stats().leaveLocations.onsite }} ({{ stats().leaveLocations.onsitePercent }}%)</span>
-        <span>WFH {{ stats().leaveLocations.remote }} ({{ stats().leaveLocations.remotePercent }}%)</span>
-      </div>
-    </div>
-  </div>
+  <!-- The six period cards were removed (21 Oct 2026); the day strip above has the filters. -->
 
   <!-- §Att6: Top Performers Recognition (Attendance Champions Leaderboard) -->
   <div class="top-performers-card" *ngIf="topPerformers().length > 0 || performersPeriod() === 'year'">
@@ -1301,6 +1393,11 @@
           <!-- Leave Pill -->
           <span *ngIf="r.leaveType" class="kpi-chip leave">
             {{ r.leaveType }}{{ r.halfDayLeave ? ' · Half Day' : '' }}
+          </span>
+
+          <!-- Pending Leave Pill (Applied but not approved) -->
+          <span *ngIf="r.pendingLeave" class="kpi-chip pending-leave" [attr.title]="(r.pendingLeave.reason ? r.pendingLeave.reason + ' — ' : '') + 'Leave approval pending'">
+            ⏳ Pending: {{ r.pendingLeave.leaveType }}{{ r.pendingLeave.isHalfDay ? ' · Half Day' : '' }}
           </span>
 
           <!-- Day Status Pill -->

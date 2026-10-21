@@ -3182,28 +3182,310 @@
 .outside-office-note .note-reason { display: block; }
 
 /* Today at a glance */
-.today-strip { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 18px; margin-bottom: 16px; }
-.today-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
-.today-label { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #fff; background: #2563eb; padding: 3px 10px; border-radius: 999px; }
-.today-date { font-size: 18px; font-weight: 800; color: #0f172a; }
-.today-sub { font-size: 13px; color: #64748b; }
-.today-refresh { margin-left: auto; border: 1px solid #e2e8f0; background: #fff; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; color: #475569; font-size: 16px; }
-.today-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
-.today-kpi { border-radius: 12px; padding: 10px 12px; background: #f8fafc; display: flex; flex-direction: column; gap: 2px; border: 1px solid transparent; }
-.today-kpi b { font-size: 24px; line-height: 1.1; color: #0f172a; }
-.today-kpi span { font-size: 12.5px; font-weight: 600; color: #475569; }
-.today-kpi small { font-size: 11.5px; color: #64748b; }
-.today-kpi.k-in { background: #eff6ff; border-color: #bfdbfe; }
-.today-kpi.k-ok { background: #f0fdf4; border-color: #bbf7d0; }
-.today-kpi.k-late { background: #fffbeb; border-color: #fde68a; }
-.today-kpi.k-half { background: #fff1f2; border-color: #fecdd3; }
-.today-kpi.k-leave { background: #f5f3ff; border-color: #ddd6fe; }
-.today-kpi.k-off { background: #f8fafc; border-color: #e2e8f0; }
-.today-kpi.k-miss { background: #fef2f2; border-color: #fecaca; }
-.today-kpi.k-miss b { color: #b91c1c; }
-.today-where { margin-top: 10px; font-size: 12.5px; color: #64748b; }
-@media (max-width: 1100px) { .today-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .today-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* ==========================================================================
+   ELEVATED TODAY SECTION & COMPOSITION BAR
+   ========================================================================== */
+.today-strip {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 8px 24px -6px rgba(15, 23, 42, 0.04);
+}
+
+.today-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.today-head-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.today-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  padding: 3px 10px;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+}
+
+.today-date {
+  font-size: 19px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.today-sub-dot {
+  color: #cbd5e1;
+  font-weight: bold;
+}
+
+.today-sub {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.today-head-actions {
+  display: flex;
+  align-items: center;
+}
+
+.today-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+.today-refresh-btn:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+/* --- Segmented Attendance Composition Bar --- */
+.composition-wrapper {
+  margin-bottom: 16px;
+}
+
+.composition-bar {
+  height: 9px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  display: flex;
+  gap: 2px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.seg-fill {
+  height: 100%;
+  cursor: pointer;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+  position: relative;
+}
+.seg-fill:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.15);
+}
+
+.seg-present { background: #10b981; }
+.seg-late    { background: #f59e0b; }
+.seg-half    { background: #f43f5e; }
+.seg-leave   { background: #8b5cf6; }
+.seg-off     { background: #94a3b8; }
+.seg-miss    { background: #f87171; }
+
+/* --- Elevated Today KPI Cards Grid --- */
+.today-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.today-kpi {
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.16s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.16s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.today-kpi:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px -8px rgba(15, 23, 42, 0.08), 0 4px 8px -4px rgba(15, 23, 42, 0.04);
+}
+
+.kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.kpi-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.kpi-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  margin-left: 5px;
+}
+
+.kpi-percent {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-body {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.kpi-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.kpi-total {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.kpi-status-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.pulse-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  animation: pulseGreen 1.8s infinite;
+}
+
+@keyframes pulseGreen {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Card Accent Themes */
+.today-kpi.k-in   .kpi-dot { background: #2563eb; }
+.today-kpi.k-in:hover { border-color: #93c5fd; background: #fbfdff; }
+
+.today-kpi.k-ok   .kpi-dot { background: #10b981; }
+.today-kpi.k-ok:hover { border-color: #a7f3d0; background: #fbfffc; }
+
+.today-kpi.k-late .kpi-dot { background: #f59e0b; }
+.today-kpi.k-late:hover { border-color: #fde68a; background: #fffdf8; }
+
+.today-kpi.k-half .kpi-dot { background: #f43f5e; }
+.today-kpi.k-half:hover { border-color: #fecdd3; background: #fffafb; }
+
+.today-kpi.k-leave .kpi-dot { background: #8b5cf6; }
+.today-kpi.k-leave:hover { border-color: #ddd6fe; background: #fdfaff; }
+
+.today-kpi.k-off  .kpi-dot { background: #64748b; }
+.today-kpi.k-off:hover { border-color: #cbd5e1; background: #fbfcfd; }
+
+.today-kpi.k-miss .kpi-dot { background: #ef4444; }
+.today-kpi.k-miss .kpi-value { color: #dc2626; }
+.today-kpi.k-miss:hover { border-color: #fca5a5; background: #fffbfb; }
+
+/* --- Workspace Location Chips --- */
+.today-location-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.loc-bar-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.loc-pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  transition: all 0.15s ease;
+}
+.loc-pill:hover {
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.loc-emoji { font-size: 13px; }
+.loc-text { color: #475569; }
+.loc-num { font-weight: 800; color: #0f172a; margin-left: 2px; }
+
+.loc-pill.loc-office:hover { border-color: #bfdbfe; color: #1d4ed8; }
+.loc-pill.loc-onsite:hover { border-color: #fed7aa; color: #c2410c; }
+.loc-pill.loc-remote:hover { border-color: #ddd6fe; color: #6d28d9; }
+
+@media (max-width: 1200px) {
+  .today-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .today-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 /* ==========================================================================
    ENHANCED KPI DRILLDOWN MODAL (All People Attendance)
@@ -3874,6 +4156,13 @@
   border-color: #ddd6fe;
 }
 
+.kpi-chip.pending-leave {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+  font-weight: 700;
+}
+
 .kpi-chip.status-badge[data-status='Present'] {
   background: #ecfdf5;
   border-color: #a7f3d0;
@@ -3986,3 +4275,11 @@
     justify-content: flex-start;
   }
 }
+
+/* Day strip filters (21 Oct 2026) */
+.today-filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.today-nav { height: 34px; min-width: 34px; padding: 0 10px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; color: #334155; font-weight: 800; cursor: pointer; }
+.today-nav:disabled { opacity: .4; cursor: not-allowed; }
+.today-nav.today-now { color: #1373e5; border-color: #bfdbfe; background: #eff6ff; font-size: 12.5px; }
+.today-date-input, .today-dept { height: 34px; border: 1px solid #e2e8f0; border-radius: 9px; padding: 0 10px; font-size: 13px; color: #0f172a; background: #fff; }
+.today-dept { min-width: 170px; }

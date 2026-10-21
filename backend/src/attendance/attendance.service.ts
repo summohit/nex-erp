@@ -369,17 +369,62 @@ export class AttendanceService {
 
     // A field visit day may also be clocked from here (TKT-029). Late and
     // half-day are still measured against the visit's own hours, because the
-    // roster entry the approval wrote carries them. The visit's day record is
-    // opened alongside, with how far from the site they were.
-    const unopenedVisitDay = options?.fieldVisit ? null : await this.prisma.fieldVisitAttendance.findFirst({
+    // roster entry the approval wrote carries them. When clocking in on a field
+    // visit day, they must be within the approved site's geofence radius.
+    const visitDayToday = options?.fieldVisit ? null : await this.prisma.fieldVisitAttendance.findFirst({
       where: {
         employeeId: employee.id,
         visitDate: todayKey,
-        clockInTime: null,
         request: { status: FIELD_VISIT_STATUS.APPROVED },
       },
-      select: { id: true, request: { select: { latitude: true, longitude: true } } },
+      select: {
+        id: true,
+        clockInTime: true,
+        request: {
+          select: {
+            requestNumber: true,
+            location: true,
+            latitude: true,
+            longitude: true,
+            geofenceRadiusM: true,
+          },
+        },
+      },
     });
+
+    const unopenedVisitDay = visitDayToday && !visitDayToday.clockInTime ? visitDayToday : null;
+
+    // Enforce field visit geofence if clocking in on an approved field visit day
+    if (visitDayToday && !options?.fieldVisit) {
+      if (data.lat == null || data.lng == null || !Number.isFinite(data.lat) || !Number.isFinite(data.lng)) {
+        throw new BadRequestException('Your GPS location is required to clock in on an approved field visit day.');
+      }
+
+      const visitLat = visitDayToday.request.latitude;
+      const visitLng = visitDayToday.request.longitude;
+      const radiusM = visitDayToday.request.geofenceRadiusM ?? 1000;
+      const distanceKm = haversineKm(visitLat, visitLng, data.lat, data.lng);
+      const distanceM = Math.round(distanceKm * 1000);
+      const allowedM = Math.round(distanceAllowingAccuracyM(distanceKm, data.accuracy));
+
+      if (allowedM > radiusM) {
+        const spokenDist = distanceM >= 1000 ? `${(distanceM / 1000).toFixed(1)}km` : `${distanceM}m`;
+        if (employee.userId) {
+          await this.notificationsService?.createNotification(
+            employee.userId,
+            'Clock-in denied: outside field visit location',
+            `${visitDayToday.request.requestNumber} at ${visitDayToday.request.location}: you were ${spokenDist} away, outside the ${radiusM}m radius.`,
+            'WARNING',
+            '/field-visits/my',
+            employee.companyId,
+          );
+        }
+        throw new BadRequestException(
+          `Clock-in denied: You are outside the approved Field Visit location (${visitDayToday.request.requestNumber}). ` +
+          `Please move within ${radiusM} metres of the site to Clock In. You are ${spokenDist} from ${visitDayToday.request.location}.`,
+        );
+      }
+    }
 
     // On-site either because the roster says so, or because this came through
     // the field visit screen — which is on-site by definition, and says so even
@@ -659,6 +704,21 @@ export class AttendanceService {
     data: { outsideReason?: string; outsideProofUrl?: string },
   ): Record<string, any> {
     if (!office?.outside) return {};
+
+    // Strict Office Geofence Enforcement for Clock-In:
+    // Staff on an office geofenced shift must be physically within the branch geofence radius.
+    // They cannot clock in from home or outside the office merely by supplying a text reason.
+    // Remote / WFH clock-ins strictly require an approved WFH request or field visit.
+    if (direction === 'in') {
+      const where = office.distanceKm == null
+        ? 'Your location could not be verified'
+        : `You are ${office.distanceKm.toFixed(2)} km from ${office.branchName}`;
+      throw new BadRequestException(
+        `Clock-in denied: ${where}, outside the ${office.radiusM} m office geofence. ` +
+        `You must be at the office to clock in, or submit an official Work From Home (WFH) request.`,
+      );
+    }
+
     const reason = String(data.outsideReason ?? '').trim();
     if (!reason) {
       throw new OutsideOfficeError(direction, office.branchName, office.distanceKm, office.radiusM);
@@ -666,9 +726,10 @@ export class AttendanceService {
     const proof = String(data.outsideProofUrl ?? '').trim() || null;
     const km = office.distanceKm == null ? null : Math.round(office.distanceKm * 100) / 100;
     return {
-      ...(direction === 'in'
-        ? { clockInOutside: true, clockInDistanceKm: km, clockInOutsideReason: reason, clockInOutsideProofUrl: proof }
-        : { clockOutOutside: true, clockOutDistanceKm: km, clockOutOutsideReason: reason, clockOutOutsideProofUrl: proof }),
+      clockOutOutside: true,
+      clockOutDistanceKm: km,
+      clockOutOutsideReason: reason,
+      clockOutOutsideProofUrl: proof,
       // Every new outside clock needs a decision, even if an earlier one today
       // was already approved.
       geofenceApproval: 'PENDING',
@@ -974,13 +1035,17 @@ export class AttendanceService {
    * fact. Counts only active people (suspended accounts are excluded), and a
    * rostered day off is not counted as missing.
    */
-  async getTodaySummary(companyId: number) {
+  /**
+   * The day at a glance (21 Oct 2026: any day and one department, not only
+   * today). `date` is YYYY-MM-DD; without it, today in IST.
+   */
+  async getTodaySummary(companyId: number, opts: { date?: string; departmentId?: number } = {}) {
     const now = new Date();
-    const today = istDateKey(now);
+    const today = opts.date ? new Date(`${opts.date}T00:00:00.000Z`) : istDateKey(now);
     const tomorrow = new Date(today.getTime() + 86400000);
 
     const people = await this.prisma.employee.findMany({
-      where: { companyId, user: { status: { not: 'SUSPENDED' } } },
+      where: { companyId, user: { status: { not: 'SUSPENDED' } }, ...(opts.departmentId ? { departmentId: opts.departmentId } : {}) },
       select: {
         id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true,
         department: { select: { name: true } }, designation: { select: { name: true } },
@@ -989,7 +1054,7 @@ export class AttendanceService {
     });
     const ids = people.map((p) => p.id);
 
-    const [records, leaves, daysOff] = await Promise.all([
+    const [records, leaves, daysOff, pendingLeaves] = await Promise.all([
       this.prisma.attendance.findMany({
         where: { employeeId: { in: ids }, date: { gte: today, lt: tomorrow } },
         select: { employeeId: true, clockIn: true, clockOut: true, status: true, isLate: true, isOnsite: true, clockInOutside: true },
@@ -1002,6 +1067,10 @@ export class AttendanceService {
         where: { employeeId: { in: ids }, date: today, isDayOff: true },
         select: { employeeId: true },
       }),
+      this.prisma.leaveRequest.findMany({
+        where: { employeeId: { in: ids }, status: 'PENDING', deletedAt: null, startDate: { lt: tomorrow }, endDate: { gte: today } },
+        select: { employeeId: true, isHalfDay: true, reason: true, leaveType: { select: { name: true } } },
+      }),
     ]);
 
     const clocked = records.filter((r) => r.clockIn);
@@ -1013,23 +1082,26 @@ export class AttendanceService {
     const byId = new Map(people.map((p) => [p.id, p]));
     const recById = new Map(clocked.map((r) => [r.employeeId, r]));
     const leaveById = new Map(leaves.map((l) => [l.employeeId, l]));
+    const pendingLeaveById = new Map(pendingLeaves.map((l) => [l.employeeId, l]));
     const person = (id: number) => {
       const p = byId.get(id);
       const r = recById.get(id);
       const l = leaveById.get(id);
+      const pl = pendingLeaveById.get(id);
       return {
         id, name: `${p?.firstName ?? ''} ${p?.lastName ?? ''}`.trim(), employeeCode: p?.employeeCode ?? null,
         avatarUrl: p?.avatarUrl ?? null, department: p?.department?.name ?? null, designation: p?.designation?.name ?? null,
         clockIn: r?.clockIn ?? null, clockOut: r?.clockOut ?? null, isLate: !!r?.isLate, status: r?.status ?? null,
         where: r ? (r.isOnsite ? 'On site' : r.clockInOutside ? 'WFH / outside' : 'Office') : null,
         leaveType: l?.leaveType?.name ?? null, halfDayLeave: !!l?.isHalfDay,
+        pendingLeave: pl ? { leaveType: pl.leaveType?.name ?? 'Leave', reason: pl.reason, isHalfDay: !!pl.isHalfDay } : null,
       };
     };
     const list = (rows: number[]) => rows.map(person);
     const lists = {
       clockedIn: list(clocked.map((r) => r.employeeId)),
       present: list(clocked.filter((r) => r.status !== 'HALF_DAY' && !r.isLate).map((r) => r.employeeId)),
-      late: list(clocked.filter((r) => r.isLate).map((r) => r.employeeId)),
+      late: list(clocked.filter((r) => r.isLate && r.status !== 'HALF_DAY').map((r) => r.employeeId)),
       halfDay: list(clocked.filter((r) => r.status === 'HALF_DAY').map((r) => r.employeeId)),
       onLeave: list([...leaveIds]),
       dayOff: list([...offIds]),
@@ -1042,7 +1114,7 @@ export class AttendanceService {
       totalEmployees: ids.length,
       clockedIn: clocked.length,
       present: clocked.filter((r) => r.status !== 'HALF_DAY' && !r.isLate).length,
-      late: clocked.filter((r) => r.isLate).length,
+      late: clocked.filter((r) => r.isLate && r.status !== 'HALF_DAY').length,
       halfDay: clocked.filter((r) => r.status === 'HALF_DAY').length,
       stillWorking: clocked.filter((r) => !r.clockOut).length,
       onLeave: leaveIds.size,
