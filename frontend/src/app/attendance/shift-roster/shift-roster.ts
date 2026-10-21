@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -22,6 +22,16 @@ import { AttendanceFilterDrawerComponent, AttendanceFilterValue } from '../../sh
 import { firstValueFrom } from 'rxjs';
 
 type ViewMode = 'week' | 'month';
+
+interface RosterCellTooltip {
+  row: RosterRow;
+  cell: RosterCell;
+  top: number;
+  left: number;
+  placement: 'top' | 'bottom';
+  arrowLeft: number;
+  holidayName: string | null;
+}
 
 interface OnSiteCtx {
   source: 'cell' | 'bulk';
@@ -281,6 +291,7 @@ export class ShiftRosterComponent implements OnInit {
   editorOpen = signal(false);
   editorRow = signal<RosterRow | null>(null);
   editorCell = signal<RosterCell | null>(null);
+  hoveredCellTooltip = signal<RosterCellTooltip | null>(null);
 
   // Bulk assign ("Automate Shifts")
   bulkOpen = signal(false);
@@ -733,10 +744,22 @@ export class ShiftRosterComponent implements OnInit {
 
   /** Month view has ~31 columns, so it falls back to the short code. */
   cellLabel(cell: RosterCell): string {
-    if (cell.isFieldVisit) return 'Field Visit';
+    if (cell.isFieldVisit) return this.viewMode() === 'month' ? 'FV' : 'Field Visit';
     const s = cell.shift;
     if (!s) return '';
-    return this.viewMode() === 'month' ? (s.shortCode || s.name) : s.name;
+    return this.viewMode() === 'month' ? (s.shortCode || s.name.slice(0, 3).toUpperCase()) : s.name;
+  }
+
+  cellLeaveCode(cell: RosterCell): string {
+    const l = (cell.label || '').toLowerCase();
+    if (l.includes('casual')) return 'CL';
+    if (l.includes('sick')) return 'SL';
+    if (l.includes('comp')) return 'CO';
+    if (l.includes('earned') || l.includes('privilege')) return 'EL';
+    if (l.includes('maternity')) return 'ML';
+    if (l.includes('paternity')) return 'PL';
+    if (l.includes('unpaid') || l.includes('loss')) return 'LWP';
+    return 'LV';
   }
 
   cellTime(cell: RosterCell): string {
@@ -776,8 +799,72 @@ export class ShiftRosterComponent implements OnInit {
     return `${who}: no shift assigned — click to set one`;
   }
 
+  // ── cell hover tooltip ─────────────────────────────────────────────────
+  onCellMouseEnter(event: MouseEvent, row: RosterRow, cell: RosterCell) {
+    const target = event.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    const tooltipWidth = 290;
+
+    // Flip to bottom if there's not enough room above (e.g. first 2-3 rows)
+    const placeBelow = rect.top < 230;
+    const placement: 'top' | 'bottom' = placeBelow ? 'bottom' : 'top';
+
+    const badgeCenterX = rect.left + rect.width / 2;
+
+    // Clamp horizontally to stay within viewport
+    const minMargin = 12;
+    const maxLeft = Math.max(minMargin, window.innerWidth - tooltipWidth - minMargin);
+    const tooltipLeft = Math.max(minMargin, Math.min(maxLeft, badgeCenterX - tooltipWidth / 2));
+
+    // Vertical coordinate
+    const tooltipTop = placement === 'bottom' ? rect.bottom + 8 : rect.top - 8;
+
+    // Arrow pointer relative to tooltip box
+    const rawArrowLeft = badgeCenterX - tooltipLeft;
+    const arrowLeft = Math.max(16, Math.min(tooltipWidth - 16, rawArrowLeft));
+
+    this.hoveredCellTooltip.set({
+      row,
+      cell,
+      top: tooltipTop,
+      left: tooltipLeft,
+      placement,
+      arrowLeft,
+      holidayName: this.holidayOn(cell.date),
+    });
+  }
+
+  onCellMouseLeave() {
+    this.hoveredCellTooltip.set(null);
+  }
+
+  onRosterScroll() {
+    if (this.hoveredCellTooltip()) {
+      this.hoveredCellTooltip.set(null);
+    }
+  }
+
+  @HostListener('window:scroll')
+  onWindowScroll() {
+    if (this.hoveredCellTooltip()) {
+      this.hoveredCellTooltip.set(null);
+    }
+  }
+
+  formatFullDate(dateStr: string): string {
+    if (!dateStr) return '';
+    const d = new Date(`${dateStr}T00:00:00`);
+    return d.toLocaleDateString('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+
   // ── editing ─────────────────────────────────────────────────────────────
   openCell(row: RosterRow, cell: RosterCell) {
+    this.hoveredCellTooltip.set(null);
     // Leave is owned by the leave module; the roster must not silently override it.
     if (cell.type === 'LEAVE') {
       this.toast.info(`${row.employee.name} is on approved ${cell.label} this day`);
@@ -789,6 +876,7 @@ export class ShiftRosterComponent implements OnInit {
   }
 
   closeEditor() {
+    this.hoveredCellTooltip.set(null);
     this.editorOpen.set(false);
     this.editorRow.set(null);
     this.editorCell.set(null);

@@ -182,7 +182,7 @@
     </div>
   </div>
 
-  <div class="roster-scroll" [class.is-loading]="loading()" [class.monthly-grid]="viewMode() === 'month'">
+  <div class="roster-scroll" (scroll)="onRosterScroll()" [class.is-loading]="loading()" [class.monthly-grid]="viewMode() === 'month'">
     <table class="roster-table" [class.month-view]="viewMode() === 'month'">
       <thead>
         <tr>
@@ -200,7 +200,7 @@
                 <span class="day-month" *ngIf="viewMode() === 'week'">{{ dayLabel(day).month }}</span>
               </span>
             </div>
-            <span class="day-holiday" *ngIf="holidayOn(day)">Holiday</span>
+            <span class="day-holiday" *ngIf="holidayOn(day)">{{ viewMode() === 'month' ? 'HOL' : 'Holiday' }}</span>
           </th>
         </tr>
       </thead>
@@ -219,7 +219,7 @@
             </td>
             <td *ngFor="let day of displayDays()" class="day-cell" [class.is-weekend]="dayLabel(day).isWeekend">
               <div style="padding: 2px;">
-                <app-skeleton width="100%" [height]="viewMode() === 'month' ? '28px' : '46px'" radius="6px"></app-skeleton>
+                <app-skeleton width="100%" [height]="viewMode() === 'month' ? '32px' : '46px'" radius="6px"></app-skeleton>
               </div>
             </td>
           </tr>
@@ -248,15 +248,16 @@
                 [class.is-dimmed]="hasActiveLegendFilter() && !isCellMatchingFilter(cell)"
                 [class.is-weekend]="dayLabel(cell.date).isWeekend"
                 [class.is-today]="dayLabel(cell.date).isToday"
-                [title]="cellTitle(row, cell)"
+                [attr.aria-label]="cellTitle(row, cell)"
+                (mouseenter)="onCellMouseEnter($event, row, cell)"
+                (mouseleave)="onCellMouseLeave()"
                 (click)="openCell(row, cell)">
 
               <!-- A holiday wins over the shift/day-off/empty slot; leave still shows,
                    since that is the person's own record. -->
-              <div *ngIf="holidayOn(cell.date) && cell.type !== 'LEAVE'" class="chip chip-holiday"
-                   [title]="holidayOn(cell.date)">
-                <span class="chip-name">{{ holidayOn(cell.date) }}</span>
-                <span class="chip-time">Holiday</span>
+              <div *ngIf="holidayOn(cell.date) && cell.type !== 'LEAVE'" class="chip chip-holiday">
+                <span class="chip-name">{{ viewMode() === 'month' ? 'HOL' : holidayOn(cell.date) }}</span>
+                <span class="chip-time" *ngIf="viewMode() === 'week'">Holiday</span>
               </div>
 
               <ng-container *ngIf="!holidayOn(cell.date) || cell.type === 'LEAVE'">
@@ -267,24 +268,28 @@
                 <span class="chip-name">
                   <span *ngIf="cell.isFieldVisit" class="fv-tag">📍</span>
                   {{ cellLabel(cell) }}
+                  <span *ngIf="viewMode() === 'month' && cell.workLocation === 'WFH'" class="month-loc-dot wfh">🏠</span>
+                  <span *ngIf="viewMode() === 'month' && cell.onSite && !cell.isFieldVisit" class="month-loc-dot onsite">📍</span>
                 </span>
-                <span class="chip-time">{{ cellTime(cell) }}</span>
-                <span *ngIf="cell.onSite" class="chip-onsite" [class.fv-onsite]="cell.isFieldVisit" [class.pending]="cell.onSite.approvalStatus === 'PENDING'">
+                <span class="chip-time" *ngIf="viewMode() === 'week'">{{ cellTime(cell) }}</span>
+                <span *ngIf="cell.onSite && viewMode() === 'week'" class="chip-onsite" [class.fv-onsite]="cell.isFieldVisit" [class.pending]="cell.onSite.approvalStatus === 'PENDING'">
                   {{ cell.onSite.projectName || (cell.isFieldVisit ? (cell.note || 'On-site') : 'On-site') }}<span *ngIf="cell.onSite.approvalStatus === 'PENDING'"> · pending</span>
                 </span>
                 <!-- Where the day is worked (19 Oct 2026) -->
-                <span *ngIf="cell.workLocation === 'WFH'" class="chip-where wfh">WFH{{ cell.wfhHalfDay ? ' · half day' : '' }}</span>
-                <span *ngIf="cell.workLocation === 'OFFICE'" class="chip-where">{{ cell.workLocationLabel || 'Office' }}</span>
-                <span *ngIf="cell.workLocation === 'ON_SITE' && !cell.onSite" class="chip-where">{{ cell.workLocationLabel || 'On site' }}</span>
+                <ng-container *ngIf="viewMode() === 'week'">
+                  <span *ngIf="cell.workLocation === 'WFH'" class="chip-where wfh">WFH{{ cell.wfhHalfDay ? ' · half day' : '' }}</span>
+                  <span *ngIf="cell.workLocation === 'OFFICE'" class="chip-where">{{ cell.workLocationLabel || 'Office' }}</span>
+                  <span *ngIf="cell.workLocation === 'ON_SITE' && !cell.onSite" class="chip-where">{{ cell.workLocationLabel || 'On site' }}</span>
+                </ng-container>
               </div>
 
               <div *ngIf="cell.type === 'DAY_OFF'" class="chip chip-off" [class.is-default]="cell.isDefault">
-                Day Off
+                {{ viewMode() === 'month' ? 'OFF' : 'Day Off' }}
               </div>
 
               <div *ngIf="cell.type === 'LEAVE'" class="chip chip-leave">
-                <span class="chip-name">{{ cell.label }}</span>
-                <span class="chip-time" *ngIf="cell.isHalfDay">Half day</span>
+                <span class="chip-name">{{ viewMode() === 'month' ? cellLeaveCode(cell) : cell.label }}</span>
+                <span class="chip-time" *ngIf="cell.isHalfDay && viewMode() === 'week'">Half day</span>
               </div>
 
               <div *ngIf="cell.type === 'UNASSIGNED'" class="chip chip-empty">+</div>
@@ -1171,5 +1176,172 @@
         </button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Floating Rich Cell Tooltip (Never clipped by table boundaries or overflow) -->
+<div class="fixed-roster-tooltip"
+     *ngIf="hoveredCellTooltip() as tip"
+     [class.placement-top]="tip.placement === 'top'"
+     [class.placement-bottom]="tip.placement === 'bottom'"
+     [style.top.px]="tip.top"
+     [style.left.px]="tip.left">
+  <div class="roster-tooltip-arrow" [style.left.px]="tip.arrowLeft"></div>
+
+  <!-- Header: Employee info & Date -->
+  <div class="roster-tip-header">
+    <div class="roster-tip-user">
+      <img *ngIf="tip.row.employee.avatarUrl" [src]="tip.row.employee.avatarUrl" class="roster-tip-avatar" alt="">
+      <div *ngIf="!tip.row.employee.avatarUrl" class="roster-tip-avatar roster-tip-initial">
+        {{ tip.row.employee.name.charAt(0) }}
+      </div>
+      <div class="roster-tip-user-meta">
+        <div class="roster-tip-name">{{ tip.row.employee.name }}</div>
+        <div class="roster-tip-role">{{ tip.row.employee.designation || tip.row.employee.department || 'Employee' }}</div>
+      </div>
+    </div>
+    <div class="roster-tip-date">
+      <span>{{ formatFullDate(tip.cell.date) }}</span>
+      <span class="roster-tip-today" *ngIf="dayLabel(tip.cell.date).isToday">Today</span>
+    </div>
+  </div>
+
+  <!-- Body: Status & Shift Details -->
+  <div class="roster-tip-body">
+    <!-- 1. HOLIDAY (When day is holiday and not leave) -->
+    <ng-container *ngIf="tip.holidayName && tip.cell.type !== 'LEAVE'">
+      <div class="roster-tip-badge badge-holiday">
+        <span class="badge-icon">🎉</span>
+        <div class="badge-text">
+          <strong>Public Holiday</strong>
+          <span>{{ tip.holidayName }}</span>
+        </div>
+      </div>
+      <div class="roster-tip-note holiday-note">
+        Official company holiday · Regular shifts are suspended.
+      </div>
+    </ng-container>
+
+    <!-- 2. LEAVE -->
+    <ng-container *ngIf="tip.cell.type === 'LEAVE'">
+      <div class="roster-tip-badge badge-leave">
+        <span class="badge-icon">🌴</span>
+        <div class="badge-text">
+          <strong>On Leave</strong>
+          <span>{{ tip.cell.label }}</span>
+        </div>
+      </div>
+      <div class="roster-tip-row" *ngIf="tip.cell.isHalfDay">
+        <span class="tip-label">Duration:</span>
+        <span class="tip-value">Half Day Leave</span>
+      </div>
+      <div class="roster-tip-note">
+        Approved and recorded in Leave Management.
+      </div>
+    </ng-container>
+
+    <!-- 3. DAY OFF -->
+    <ng-container *ngIf="!tip.holidayName && tip.cell.type === 'DAY_OFF'">
+      <div class="roster-tip-badge badge-day-off">
+        <span class="badge-icon">☕</span>
+        <div class="badge-text">
+          <strong>Day Off</strong>
+          <span>{{ tip.cell.isDefault ? 'Weekly Scheduled Off' : 'Rostered Day Off' }}</span>
+        </div>
+      </div>
+      <div class="roster-tip-note" *ngIf="tip.cell.isDefault">
+        Regular recurring rest day per default schedule.
+      </div>
+    </ng-container>
+
+    <!-- 4. SHIFT -->
+    <ng-container *ngIf="!tip.holidayName && tip.cell.type === 'SHIFT'">
+      <div class="roster-tip-badge badge-shift"
+           [style.border-left-color]="tip.cell.isFieldVisit ? '#4f46e5' : (tip.cell.shift?.colorCode || '#2A97D8')">
+        <span class="shift-dot" [style.background]="tip.cell.isFieldVisit ? '#4f46e5' : (tip.cell.shift?.colorCode || '#2A97D8')"></span>
+        <div class="badge-text">
+          <strong>{{ tip.cell.isFieldVisit ? 'Field Visit' : (tip.cell.shift?.name || 'Shift') }}</strong>
+          <span *ngIf="tip.cell.shift?.shortCode">Code: {{ tip.cell.shift?.shortCode }}</span>
+        </div>
+      </div>
+
+      <!-- Shift Timing -->
+      <div class="roster-tip-row" *ngIf="cellTime(tip.cell)">
+        <span class="tip-icon"><svg lucideClock size="13"></svg></span>
+        <span class="tip-label">Working Hours:</span>
+        <span class="tip-value highlight">{{ cellTime(tip.cell) }}</span>
+      </div>
+
+      <!-- Work Location -->
+      <div class="roster-tip-row" *ngIf="tip.cell.workLocation === 'WFH'">
+        <span class="tip-icon">🏠</span>
+        <span class="tip-label">Location:</span>
+        <span class="tip-value wfh">Work From Home{{ tip.cell.wfhHalfDay ? ' (Half Day)' : ' (Full Day)' }}</span>
+      </div>
+
+      <div class="roster-tip-row" *ngIf="tip.cell.workLocation === 'OFFICE' || (!tip.cell.workLocation && !tip.cell.onSite && !tip.cell.isFieldVisit)">
+        <span class="tip-icon">🏢</span>
+        <span class="tip-label">Location:</span>
+        <span class="tip-value">{{ tip.cell.workLocationLabel || 'Base Office' }}</span>
+      </div>
+
+      <!-- On-Site Assignment details -->
+      <div class="roster-tip-section" *ngIf="tip.cell.onSite">
+        <div class="roster-tip-row">
+          <span class="tip-icon">📍</span>
+          <span class="tip-label">On-Site Project:</span>
+          <span class="tip-value">{{ tip.cell.onSite.projectName || (tip.cell.isFieldVisit ? (tip.cell.note || 'On-site') : 'No Project') }}</span>
+        </div>
+        <div class="roster-tip-row" *ngIf="tip.cell.onSite.address">
+          <span class="tip-icon">🗺</span>
+          <span class="tip-label">Site Address:</span>
+          <span class="tip-value">{{ tip.cell.onSite.address }}</span>
+        </div>
+        <div class="roster-tip-row" *ngIf="tip.cell.onSite.approvalStatus">
+          <span class="tip-icon">📋</span>
+          <span class="tip-label">Approval:</span>
+          <span class="tip-status-pill"
+                [class.status-pending]="tip.cell.onSite.approvalStatus === 'PENDING'"
+                [class.status-approved]="tip.cell.onSite.approvalStatus === 'APPROVED'"
+                [class.status-rejected]="tip.cell.onSite.approvalStatus === 'REJECTED'">
+            {{ tip.cell.onSite.approvalStatus === 'PENDING' ? 'Awaiting Approval' : tip.cell.onSite.approvalStatus }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Field visit notes -->
+      <div class="roster-tip-row" *ngIf="tip.cell.isFieldVisit && tip.cell.note">
+        <span class="tip-icon">📝</span>
+        <span class="tip-label">Note:</span>
+        <span class="tip-value">{{ tip.cell.note }}</span>
+      </div>
+
+      <!-- Source / Schedule Type -->
+      <div class="roster-tip-type">
+        <span *ngIf="tip.cell.isDefault" class="type-standing">
+          🔄 Standing schedule (default shift)
+        </span>
+        <span *ngIf="!tip.cell.isDefault" class="type-rostered">
+          📅 Explicit roster assignment
+        </span>
+      </div>
+    </ng-container>
+
+    <!-- 5. UNASSIGNED -->
+    <ng-container *ngIf="!tip.holidayName && tip.cell.type === 'UNASSIGNED'">
+      <div class="roster-tip-badge badge-unassigned">
+        <span class="badge-icon">⚪</span>
+        <div class="badge-text">
+          <strong>Unassigned</strong>
+          <span>No shift assigned for this day</span>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
+  <!-- Footer: Click hint -->
+  <div class="roster-tip-footer">
+    <span *ngIf="tip.cell.type !== 'LEAVE'">💡 Click cell to edit or reassign shift</span>
+    <span *ngIf="tip.cell.type === 'LEAVE'">🔒 Leave is managed in the Leave module</span>
   </div>
 </div>
