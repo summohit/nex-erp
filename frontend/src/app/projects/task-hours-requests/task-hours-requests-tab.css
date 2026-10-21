@@ -2966,3 +2966,18 @@
 .ta-table td.ta-actions-col .ta-action-menu { justify-content: center; }
 .ta-icon-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; cursor: pointer; }
 .ta-icon-btn:hover { background: #f1f5f9; }
+
+/* Audit trail under a table row (21 Oct 2026) */
+.ta-audit-row td { background: #f8fafc; padding: 0 !important; }
+.ta-audit { padding: 12px 16px 14px 24px; border-left: 3px solid #1373e5; }
+.ta-audit-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; color: #0f172a; }
+.ta-audit-close { border: 1px solid #e2e8f0; background: #fff; border-radius: 8px; padding: 3px 10px; font-size: 12px; font-weight: 700; color: #475569; cursor: pointer; }
+.ta-audit-empty { font-size: 12.5px; color: #94a3b8; }
+.ta-audit-item { display: flex; gap: 10px; padding: 6px 0; }
+.ta-audit-dot { width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; background: #94a3b8; flex: 0 0 9px; }
+.ta-audit-dot.dot-approved { background: #16a34a; }
+.ta-audit-dot.dot-rejected { background: #dc2626; }
+.ta-audit-dot.dot-requested, .ta-audit-dot.dot-created { background: #1373e5; }
+.ta-audit-body { font-size: 12.5px; color: #334155; }
+.ta-audit-time { color: #64748b; font-weight: 500; }
+.ta-audit-detail { color: #475569; margin-top: 2px; }

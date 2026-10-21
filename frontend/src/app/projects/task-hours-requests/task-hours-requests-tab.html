@@ -368,7 +368,8 @@
       <table class="ta-table hours-requests-table">
         <thead><tr><th>Task Code</th><th>Task</th><th>Requested by</th><th>Requested</th><th>Reason</th><th>Stage</th><th class="ta-actions-col">Actions</th></tr></thead>
         <tbody>
-          <tr *ngFor="let r of filteredRequests()">
+          <ng-container *ngFor="let r of filteredRequests()">
+          <tr>
             <td><a class="prq-key clickable" [routerLink]="['/projects', r.issue?.project?.id]" [queryParams]="{ task: r.issue?.id }">{{ r.issue?.key }}</a></td>
             <td class="ta-task"><a class="ta-title clickable" [routerLink]="['/projects', r.issue?.project?.id]" [queryParams]="{ task: r.issue?.id }">{{ r.issue?.title }}</a><a class="ta-project-under clickable" [routerLink]="['/projects', r.issue?.project?.id]">{{ r.issue?.project?.name }}</a></td>
             <td class="ta-raised-by">
@@ -389,6 +390,29 @@
               <div class="ta-action-menu"><button type="button" class="ta-icon-btn" title="Actions" (click)="toggleHoursActionMenu(r.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === r.id"><a *ngIf="canEditApprovalRequest(r.status)" [routerLink]="['/projects', r.issue?.project?.id]" [queryParams]="{ task: r.issue?.id, hoursRequest: r.id, edit: 1 }">Edit</a><button (click)="toggleTimeline(r); toggleHoursActionMenu(r.id)">Audit</button><button *ngIf="canReview(r)" class="approve" (click)="approve(r); toggleHoursActionMenu(r.id)">Approve</button><button *ngIf="canReview(r)" (click)="startApproveWithEdit(r); toggleHoursActionMenu(r.id)">Approve less</button><button *ngIf="canReview(r)" class="reject" (click)="startReject(r); toggleHoursActionMenu(r.id)">Reject</button></div></div>
             </td>
           </tr>
+          <!-- Audit trail under the row (21 Oct 2026): it only had a place in Cards view -->
+          <tr class="ta-audit-row" *ngIf="expanded().has(r.id)">
+            <td colspan="8">
+              <div class="ta-audit">
+                <div class="ta-audit-head">
+                  <b>Audit trail · {{ r.issue?.key }}</b>
+                  <button type="button" class="ta-audit-close" (click)="toggleTimeline(r)">Hide</button>
+                </div>
+                <div class="ta-audit-empty" *ngIf="timelineFor(r.id) === null">Loading…</div>
+                <ng-container *ngIf="timelineFor(r.id) as events">
+                  <div class="ta-audit-empty" *ngIf="events.length === 0">No history yet.</div>
+                  <div class="ta-audit-item" *ngFor="let e of events">
+                    <span class="ta-audit-dot" [class]="'ta-audit-dot dot-' + e.action.toLowerCase()"></span>
+                    <div class="ta-audit-body">
+                      <div><b>{{ actionLabel(e.action) }}</b> <span class="ta-audit-time">{{ e.createdAt | date: 'dd-MM-yyyy, h:mm a' }}</span><ng-container *ngIf="e.actor"> · by {{ fullName(e.actor) }}</ng-container></div>
+                      <div class="ta-audit-detail" *ngIf="e.detail">{{ e.detail }}</div>
+                    </div>
+                  </div>
+                </ng-container>
+              </div>
+            </td>
+          </tr>
+          </ng-container>
         </tbody>
       </table>
     </div>
