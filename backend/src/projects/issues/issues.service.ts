@@ -282,12 +282,9 @@ export class IssuesService {
   }
 
   /**
-   * The technical architect reads the board; they do not run it.
-   *
-   * Their whole point is sight of the plan without a hand on it, so the one
-   * thing their role adds — seeing every task — must not become a licence to
-   * move them. Commenting and logging time go through their own endpoints and
-   * are deliberately untouched here.
+   * Coordinators and technical architects read the whole board; they do not
+   * run it. Their visibility must not become a licence to edit every task.
+   * Moving their own card is handled by the separate movement guard below.
    */
   private async assertMayChange(
     companyId: number, projectId: number, employeeId: number | null, role?: string, data?: any,
@@ -296,32 +293,28 @@ export class IssuesService {
       this.prisma as any, companyId, projectId, employeeId, role,
     );
     const isMove = data?.columnId !== undefined || data?.status !== undefined || data?.position !== undefined;
-    if (viewer.projectRole === PROJECT_ROLE.ARCHITECT && !mayChangeAnyTask(viewer) && !isMove) {
+    const isReadAllDeliveryRole = viewer.projectRole === PROJECT_ROLE.ARCHITECT
+      || viewer.projectRole === PROJECT_ROLE.COORDINATOR;
+    if (isReadAllDeliveryRole && !mayChangeAnyTask(viewer) && !isMove) {
       throw new ForbiddenException(
-        'As technical architect you can see the whole board, but changing a task is the project manager\'s call.',
+        'You can see the whole board, but changing a task is the project manager\'s call.',
       );
     }
   }
 
   /**
-   * Delivery leads may inspect the whole board, but moving a card remains
-   * operational work: it is limited to their own card or a reporting-line
-   * junior's card. The project owner and company administrators keep their
-   * existing unrestricted authority.
+   * Anyone may move their own card through ordinary workflow stages. Project
+   * Managers and Super Admin may move any card; final Done/Cancelled states
+   * are separately guarded below.
    */
   private async assertDeliveryLeadMayMove(
     companyId: number, projectId: number, employeeId: number, issue: any, data: any, role?: string,
   ): Promise<void> {
     if (data.columnId === undefined && data.status === undefined && data.position === undefined) return;
     const viewer = await resolveProjectViewer(this.prisma as any, companyId, projectId, employeeId, role);
-    if (viewer.isOwner || role === 'ADMIN' || role === 'SUPERADMIN') return;
-    if (![PROJECT_ROLE.MANAGER, PROJECT_ROLE.COORDINATOR, PROJECT_ROLE.ARCHITECT].includes(viewer.projectRole as any)) return;
+    if (role === 'SUPERADMIN' || viewer.projectRole === PROJECT_ROLE.MANAGER) return;
     if (issue.assigneeId === employeeId) return;
-    if (issue.assigneeId) {
-      const hierarchy = await this.getAssigneeUpperHierarchy(companyId, issue.assigneeId);
-      if (hierarchy.includes(employeeId)) return;
-    }
-    throw new ForbiddenException('You can move only your own tasks or tasks assigned to employees who report to you.');
+    throw new ForbiddenException('You can move only tasks assigned to you.');
   }
 
   async getIssues(
@@ -466,6 +459,14 @@ export class IssuesService {
     // left was the assignee's manager chain. An administrator with nobody
     // reporting to them could not close a general task at all.
     if (role === 'SUPERADMIN') return;
+    const projectManager = issue.projectId
+      ? await this.prisma.projectMember.findFirst({
+          where: { projectId: issue.projectId, employeeId: actorEmployeeId, role: 'PROJECT_MANAGER' },
+          select: { id: true },
+        })
+      : null;
+    if (projectManager) return;
+    throw new ForbiddenException('Only a Project Manager or Super Admin can move a task to Completed or Cancelled.');
 
     const project = issue.projectId
       ? await this.prisma.project.findUnique({ where: { id: issue.projectId }, select: { leadId: true, isSystem: true, name: true } })
