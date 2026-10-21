@@ -59,6 +59,11 @@ export class ShiftsService {
     return this.http.post<{ written: number; skipped: number }>(`${this.apiUrl}/roster/bulk`, data);
   }
 
+  /** Copy last month's roster into a month, weekday for weekday (21 Oct 2026). */
+  copyPreviousMonth(year: number, month: number) {
+    return this.http.post<{ created: number; people: number }>(`${this.apiUrl}/roster/copy-previous-month`, { year, month });
+  }
+
   clearRoster(data: { employeeIds: number[]; start: string; end: string }) {
     return this.http.post<{ cleared: number }>(`${this.apiUrl}/roster/clear`, data);
   }

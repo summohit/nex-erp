@@ -43,6 +43,13 @@ export class ShiftsController {
     return this.rosterService.bulkAssign(req.user.companyId, data);
   }
 
+  /** Copy last month's roster into a month, weekday for weekday (21 Oct 2026). */
+  @Post('roster/copy-previous-month')
+  @Permissions('attendance/shifts')
+  copyPreviousMonth(@Request() req, @Body() data: any) {
+    return this.rosterService.copyPreviousMonth(req.user.companyId, data);
+  }
+
   @Post('roster/clear')
   @Permissions('attendance/shifts')
   clearRoster(@Request() req, @Body() data: any) {

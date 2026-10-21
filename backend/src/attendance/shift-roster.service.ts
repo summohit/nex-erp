@@ -342,6 +342,55 @@ export class ShiftRosterService {
         return { date: day, type: 'UNASSIGNED' };
   }
 
+  /**
+   * Copy the previous month's roster into a month (21 Oct 2026), weekday for
+   * weekday: each day takes the entry from four weeks earlier (five, for the
+   * last days of the month), so Sundays stay Sundays. Only shift, timings and
+   * day off are copied — not on-site projects, which belong to their dates.
+   * Days that already have an entry are left alone.
+   */
+  async copyPreviousMonth(companyId: number, data: { year: number; month: number; employeeIds?: number[] }) {
+    const y = Number(data?.year), m = Number(data?.month);
+    if (!y || !m || m < 1 || m > 12) throw new BadRequestException('Choose the month');
+    const first = new Date(Date.UTC(y, m - 1, 1));
+    const next = new Date(Date.UTC(y, m, 1));
+    const prevFirst = new Date(Date.UTC(y, m - 2, 1));
+    const people = await this.prisma.employee.findMany({
+      where: { companyId, user: { status: { not: 'SUSPENDED' } }, ...(data?.employeeIds?.length ? { id: { in: data.employeeIds.map(Number) } } : {}) },
+      select: { id: true },
+    });
+    const ids = people.map((p) => p.id);
+    const [source, existing] = await Promise.all([
+      this.prisma.shiftRosterEntry.findMany({
+        where: { employeeId: { in: ids }, date: { gte: prevFirst, lt: first } },
+        select: { employeeId: true, date: true, shiftId: true, isDayOff: true, startTime: true, endTime: true, projectId: true, onsiteApprovalStatus: true },
+      }),
+      this.prisma.shiftRosterEntry.findMany({ where: { employeeId: { in: ids }, date: { gte: first, lt: next } }, select: { employeeId: true, date: true } }),
+    ]);
+    if (!source.length) throw new BadRequestException('The previous month has no roster to copy');
+    const src = new Map(source.map((e) => [`${e.employeeId}|${e.date.toISOString().slice(0, 10)}`, e]));
+    const taken = new Set(existing.map((e) => `${e.employeeId}|${e.date.toISOString().slice(0, 10)}`));
+    const rows: any[] = [];
+    for (const id of ids) {
+      for (let d = new Date(first); d < next; d.setUTCDate(d.getUTCDate() + 1)) {
+        const key = d.toISOString().slice(0, 10);
+        if (taken.has(`${id}|${key}`)) continue;
+        let back = new Date(d.getTime() - 28 * 86400000);
+        if (back >= first) back = new Date(d.getTime() - 35 * 86400000);
+        const e = src.get(`${id}|${back.toISOString().slice(0, 10)}`);
+        if (!e) continue;
+        // On-site project days belong to their own dates: copy as the plain shift.
+        const onsite = !!e.projectId || (e.onsiteApprovalStatus && e.onsiteApprovalStatus !== 'NONE');
+        rows.push({
+          companyId, employeeId: id, date: new Date(d), shiftId: e.shiftId, isDayOff: e.isDayOff,
+          startTime: onsite ? null : e.startTime, endTime: onsite ? null : e.endTime,
+        });
+      }
+    }
+    if (rows.length) await this.prisma.shiftRosterEntry.createMany({ data: rows, skipDuplicates: true });
+    return { created: rows.length, people: new Set(rows.map((r) => r.employeeId)).size };
+  }
+
   private shiftBrief(s: any) {
     return {
       id: s.id, name: s.name, shortCode: s.shortCode, colorCode: s.colorCode,

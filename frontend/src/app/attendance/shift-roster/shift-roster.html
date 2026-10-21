@@ -47,6 +47,10 @@
         </a>
       </div>
 
+      <button type="button" class="btn-action-outline" (click)="copyPreviousMonth()" [disabled]="copyPrevBusy()" title="Copy last month's roster into this month, weekday for weekday">
+        <span>{{ copyPrevBusy() ? 'Copying…' : 'Copy previous month' }}</span>
+      </button>
+
       <span class="actions-divider" *ngIf="canAssignWfh()"></span>
 
       <button type="button" class="btn-action-primary btn-assign-wfh" (click)="openAssignWfh()" *ngIf="canAssignWfh()" title="Assign Work From Home to employees">

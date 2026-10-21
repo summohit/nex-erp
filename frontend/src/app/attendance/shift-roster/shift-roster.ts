@@ -69,6 +69,21 @@ export class ShiftRosterComponent implements OnInit {
   wfhFrom = '';
   wfhTo = '';
   wfhReason = '';
+  /** Copy the previous month's roster into the month on screen (21 Oct 2026). */
+  copyPrevBusy = signal(false);
+  copyPreviousMonth() {
+    const d = new Date(this.rangeStart());
+    const y = d.getFullYear(), m = d.getMonth() + 1;
+    const name = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    const prev = new Date(y, m - 2, 1).toLocaleDateString('en-IN', { month: 'long' });
+    if (!confirm(`Copy ${prev}'s roster into ${name}?\n\nEach person's shift and days off are copied weekday for weekday (Sundays stay Sundays). Days in ${name} that already have an entry are not changed. On-site project days are copied as the plain shift.`)) return;
+    this.copyPrevBusy.set(true);
+    this.shiftsService.copyPreviousMonth(y, m).subscribe({
+      next: (r) => { this.copyPrevBusy.set(false); this.toast.success(`Copied ${r.created} days for ${r.people} people`); this.load(); },
+      error: (e) => { this.copyPrevBusy.set(false); this.toast.error(e.error?.message || 'Could not copy the roster'); },
+    });
+  }
+
   canAssignWfh(): boolean {
     const r = this.currentUser()?.role;
     return r === 'HR' || r === 'ADMIN' || r === 'SUPERADMIN' || r === 'SUPER_ADMIN';
