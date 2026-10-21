@@ -414,6 +414,7 @@
                       <div class="member-share-name">
                         {{ m.firstName }} {{ m.lastName }}
                         <span *ngIf="isSelf(m.id)" class="text-xs text-slate-500 font-normal ml-1">(You)</span>
+                        <span *ngIf="m.isInactive" class="member-inactive-pill">Inactive</span>
                       </div>
                       <div class="member-share-email" *ngIf="m.user?.email">{{ m.user?.email }}</div>
                     </div>

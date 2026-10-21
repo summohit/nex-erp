@@ -6526,7 +6526,15 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   get filteredMembers(): any[] {
     const q = (this.memberSearchQuery || '').toLowerCase().trim();
-    const members = this.companyMembers();
+    // Company members are active people only. A member deactivated since
+    // joining the board (21 Oct 2026) is added from the board itself, marked
+    // inactive, so they can still be seen and removed.
+    const active = this.companyMembers();
+    const known = new Set(active.map((m: any) => m.id));
+    const inactive = (this.project()?.members || [])
+      .filter((pm: any) => pm.employee && !known.has(pm.employeeId))
+      .map((pm: any) => ({ ...pm.employee, id: pm.employeeId, isInactive: true }));
+    const members = [...active, ...inactive];
     if (!q) return members;
     return members.filter(m => 
       `${m.firstName || ''} ${m.lastName || ''}`.toLowerCase().includes(q) ||
