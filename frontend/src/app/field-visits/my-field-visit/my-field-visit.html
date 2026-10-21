@@ -148,6 +148,14 @@
             <svg lucideMapPin [size]="20" class="site-pin-icon"></svg>
             {{ day()!.request.location }}
           </h2>
+          <!-- Early release (21 Oct 2026) -->
+          <div class="er-line">
+            @if (todaysRelease(); as r) {
+              <span class="er-status s-{{ r.status }}">Early release ({{ r.type === 'HOURS' ? 'leave early today' : 'end visit after today' }}): {{ releaseLabel(r.status) }}</span>
+            } @else {
+              <button type="button" class="er-btn" (click)="openRelease()">Work done early? Request early release</button>
+            }
+          </div>
           <p class="hours-line">
             <svg lucideClock [size]="13"></svg>
             Approved hours: <strong>{{ day()!.request.startTime }} – {{ day()!.request.endTime }}</strong>
@@ -374,3 +382,21 @@
     }
   }
 </div>
+
+@if (releaseOpen()) {
+  <div class="er-overlay" (click)="releaseOpen.set(false)">
+    <div class="er-dialog" (click)="$event.stopPropagation()">
+      <h3>Request early release</h3>
+      <p class="er-note">Your project manager approves. Once approved, leaving early still counts as a full day.</p>
+      <label class="er-opt"><input type="radio" name="er" [checked]="releaseType === 'HOURS'" (change)="releaseType = 'HOURS'" />
+        <span><b>Leave the site early today</b><small>The work for today is done before the shift ends.</small></span></label>
+      <label class="er-opt"><input type="radio" name="er" [checked]="releaseType === 'DAYS'" (change)="releaseType = 'DAYS'" />
+        <span><b>End the visit after today</b><small>The whole visit is finished; later visit days are released and you are back to your normal schedule.</small></span></label>
+      <label class="er-field"><span>What was completed</span><textarea rows="3" [value]="releaseReason" (input)="releaseReason = $any($event.target).value" placeholder="e.g. installation and testing finished"></textarea></label>
+      <div class="er-actions">
+        <button type="button" class="er-b" (click)="releaseOpen.set(false)">Cancel</button>
+        <button type="button" class="er-b primary" (click)="sendRelease()" [disabled]="releaseBusy()">{{ releaseBusy() ? 'Sending…' : 'Send to PM' }}</button>
+      </div>
+    </div>
+  </div>
+}

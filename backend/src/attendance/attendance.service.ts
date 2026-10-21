@@ -908,7 +908,14 @@ export class AttendanceService {
       // Same IST-fixed resolution as clockIn — see the comment there.
       const expectedEnd = istTimeInstant(now, effective.endTime);
 
-      if (now < expectedEnd) {
+      // An approved field-visit early release for hours (21 Oct 2026): the
+      // work was done, so leaving early is a full day.
+      const released = this.prisma.fieldVisitEarlyRelease?.findFirst
+        ? await this.prisma.fieldVisitEarlyRelease.findFirst({
+            where: { employeeId: employee.id, date: existing.date, type: 'HOURS', status: 'APPROVED' }, select: { id: true },
+          })
+        : null;
+      if (now < expectedEnd && !released) {
         isEarlyLeave = true;
         status = 'HALF_DAY';
       }
@@ -2010,6 +2017,8 @@ export class AttendanceService {
     const fieldVisitWhere: any = {
       companyId,
       request: { status: { in: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] } },
+      // Days released early (21 Oct 2026) are not on site any more.
+      status: { not: 'RELEASED' },
     };
     if (dateFilter) fieldVisitWhere.visitDate = dateFilter;
     const fieldVisits = await this.prisma.fieldVisitAttendance.findMany({

@@ -163,6 +163,7 @@ export class ShiftRosterService {
           companyId,
           employeeId: { in: empIds },
           visitDate: { gte: start, lte: end },
+          status: { not: 'RELEASED' },
           request: { status: { in: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] } },
         },
         include: {

@@ -4630,3 +4630,30 @@ model WfhRequest {
   @@index([companyId, status])
   @@index([employeeId, date])
 }
+
+/// Field visit early release (21 Oct 2026). The work finished early:
+/// DAYS — a multi-day visit ends after `date` for this person (later visit days
+/// are released); HOURS — on `date` they may leave the site early and the day
+/// still counts in full (no half day, no early-leave flag). Approved by the
+/// project's manager (lead or PROJECT_MANAGER) or the super admin.
+model FieldVisitEarlyRelease {
+  id           Int       @id @default(autoincrement())
+  companyId    Int
+  requestId    Int
+  employeeId   Int
+  /// DAYS or HOURS
+  type         String
+  date         DateTime  @db.Date
+  reason       String    @db.Text
+  /// PENDING, APPROVED, REJECTED, CANCELLED
+  status       String    @default("PENDING")
+  reviewedById Int?
+  reviewedAt   DateTime?
+  reviewNote   String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([companyId, status])
+  @@index([employeeId, date])
+  @@index([requestId])
+}

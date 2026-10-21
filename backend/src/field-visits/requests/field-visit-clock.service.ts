@@ -387,7 +387,7 @@ export class FieldVisitClockService {
    * A day that was simply never clocked does, which the nightly sweep picks up
    * once the end date has passed.
    */
-  private async completeIfNothingLeft(requestId: number): Promise<void> {
+  async completeIfNothingLeft(requestId: number): Promise<void> {
     const open = await this.prisma.fieldVisitAttendance.count({
       where: { requestId, status: { in: OPEN_VISIT_DAYS } },
     });

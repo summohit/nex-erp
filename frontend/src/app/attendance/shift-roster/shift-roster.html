@@ -1,36 +1,57 @@
 <div class="page-container">
-  <div class="page-header">
-    <div class="header-content">
-      <h1>Shift Roster</h1>
-      <p>Who works which shift, day by day. Click any cell to change it.</p>
-      <div class="field-visit-total"
-           [class.is-active]="isStateFilterActive('FIELD_VISIT')"
-           (click)="toggleStateFilter('FIELD_VISIT')"
-           role="button"
-           tabindex="0"
-           (keydown.enter)="toggleStateFilter('FIELD_VISIT')"
-           title="Click to filter by Field Visits in the displayed roster period">
-        <svg lucideMapPin size="15"></svg>
-        <strong>{{ fieldVisitCount() }}</strong>
-        <span>Field Visit{{ fieldVisitCount() === 1 ? '' : 's' }}</span>
+  <div class="page-header roster-header-card">
+    <div class="roster-header-left">
+      <div class="roster-header-icon">
+        <svg lucideCalendarCheck size="22"></svg>
+      </div>
+      <div class="roster-header-text">
+        <div class="roster-title-row">
+          <h1>Shift Roster</h1>
+          <span class="roster-meta-pill" *ngIf="!loading()">
+            <svg lucideUsers size="13"></svg>
+            <strong>{{ visibleRows().length }}</strong>
+            <span>{{ visibleRows().length === 1 ? 'Employee' : 'Employees' }}</span>
+          </span>
+          <button type="button"
+                  class="field-visit-total"
+                  [class.is-active]="isStateFilterActive('FIELD_VISIT')"
+                  (click)="toggleStateFilter('FIELD_VISIT')"
+                  title="Click to filter by Field Visits in the displayed roster period">
+            <svg lucideMapPin size="13"></svg>
+            <strong>{{ fieldVisitCount() }}</strong>
+            <span>Field Visit{{ fieldVisitCount() === 1 ? '' : 's' }}</span>
+          </button>
+        </div>
+        <p class="roster-subtitle">Who works which shift, day by day. Click any cell to change it.</p>
       </div>
     </div>
+
     <div class="header-actions">
-      <input #rosterImport type="file" accept=".csv,text/csv" hidden (change)="importCsv($event)">
-      <button class="btn-outline" (click)="downloadRosterTemplate()" title="Download the roster import template">Template</button>
-      <button class="btn-outline" (click)="rosterImport.click()" title="Import roster assignments from CSV">Import CSV</button>
-      <button class="btn-outline" (click)="exportCsv()" title="Export the visible roster">Export CSV</button>
-      <button class="btn-outline" *ngIf="isApprover && pendingOnsite().length > 0" (click)="openApprovals()" title="On-site (No Project) requests awaiting approval">
-        <svg lucideBadgeCheck size="15"></svg> Approvals
-        <span class="approval-count">{{ pendingOnsite().length }}</span>
-      </button>
-      <button class="btn-outline" (click)="load()" title="Reload">
-        <svg lucideRotateCcw size="15"></svg> Refresh
-      </button>
-      <a class="btn-secondary" routerLink="/wfh-report" *ngIf="canAssignWfh()">WFH report</a>
-      <button class="btn-secondary" (click)="openAssignWfh()" *ngIf="canAssignWfh()">🏠 Assign WFH</button>
-      <button class="btn-primary" (click)="openBulk()">
-        <svg lucideWandSparkles size="16"></svg> Automate Shifts
+      <div class="actions-utility-group">
+        <button type="button" class="btn-action-outline" (click)="exportCsv()" title="Export the visible roster">
+          <svg lucideDownload size="14"></svg>
+          <span>Export CSV</span>
+        </button>
+        <button type="button" class="btn-action-outline" (click)="load()" [disabled]="loading()" title="Reload shift roster">
+          <svg lucideRotateCcw size="14" [class.spinning]="loading()"></svg>
+          <span>Refresh</span>
+        </button>
+        <button type="button" class="btn-action-outline btn-approvals-pill" *ngIf="isApprover && pendingOnsite().length > 0" (click)="openApprovals()" title="On-site (No Project) requests awaiting approval">
+          <svg lucideBadgeCheck size="14"></svg>
+          <span>Approvals</span>
+          <span class="approval-count">{{ pendingOnsite().length }}</span>
+        </button>
+        <a class="btn-action-outline btn-wfh-report" routerLink="/wfh-report" *ngIf="canAssignWfh()" title="View monthly WFH report">
+          <svg lucideFileText size="14"></svg>
+          <span>WFH Report</span>
+        </a>
+      </div>
+
+      <span class="actions-divider" *ngIf="canAssignWfh()"></span>
+
+      <button type="button" class="btn-action-primary btn-assign-wfh" (click)="openAssignWfh()" *ngIf="canAssignWfh()" title="Assign Work From Home to employees">
+        <svg lucideHouse size="15"></svg>
+        <span>Assign WFH</span>
       </button>
     </div>
   </div>
@@ -951,30 +972,197 @@
   </div>
 </div>
 
-<!-- Assign WFH (21 Oct 2026): HR / super admin; approved at once, not in the monthly limit -->
-<div class="awfh-overlay" *ngIf="wfhOpen()" (click)="wfhOpen.set(false)">
-  <div class="awfh-dialog" (click)="$event.stopPropagation()">
-    <h3>Assign WFH</h3>
-    <p class="awfh-note">Approved straight away, no approval steps, and not counted in the person's monthly WFH allowance. They are notified.</p>
-    <label class="awfh-field"><span>Employees</span>
-      <div class="awfh-chips">
-        <span class="awfh-chip" *ngFor="let p of wfhPickedPeople()">{{ p.name }} <button type="button" (click)="wfhPicked.set(wfhPicked().filter(x => x !== p.id))">×</button></span>
+<!-- Assign WFH Modal (Enhanced UI) -->
+<div class="modal-overlay awfh-overlay" *ngIf="wfhOpen()" (click)="wfhOpen.set(false)">
+  <div class="modal-card awfh-modal-card" (click)="$event.stopPropagation()">
+    
+    <!-- Modal Header -->
+    <div class="modal-header">
+      <div class="modal-title-group">
+        <div class="modal-icon-badge awfh-badge">
+          <svg lucideHouse size="20"></svg>
+        </div>
+        <div>
+          <h2>Assign Work From Home</h2>
+          <p class="modal-sub">Direct administrative assignment &bull; No approval steps required</p>
+        </div>
       </div>
-      <input type="text" placeholder="Search name or code…" [value]="wfhQuery()" (input)="wfhQuery.set($any($event.target).value)" />
-      <div class="awfh-results" *ngIf="wfhQuery().trim() && wfhMatches().length">
-        <button type="button" *ngFor="let m of wfhMatches()" (click)="wfhPicked.set([...wfhPicked(), m.id]); wfhQuery.set('')"><b>{{ m.name }}</b><span>{{ m.sub }}</span></button>
-      </div>
-    </label>
-    <div class="awfh-two">
-      <label class="awfh-field"><span>From</span><input type="date" [(ngModel)]="wfhFrom" /></label>
-      <label class="awfh-field"><span>To</span><input type="date" [(ngModel)]="wfhTo" [min]="wfhFrom" /></label>
+      <button type="button" class="icon-btn-close" (click)="wfhOpen.set(false)" title="Close dialog">
+        <svg lucideX size="18"></svg>
+      </button>
     </div>
-    <label class="awfh-check"><input type="checkbox" [(ngModel)]="wfhSkipWeekends" /> Skip Saturdays and Sundays</label>
-    <label class="awfh-field"><span>Reason (optional)</span><input type="text" [(ngModel)]="wfhReason" placeholder="e.g. office closed, client remote day" /></label>
-    <p class="awfh-sum">{{ wfhPicked().length }} {{ wfhPicked().length === 1 ? 'person' : 'people' }} × {{ wfhDates().length }} {{ wfhDates().length === 1 ? 'day' : 'days' }}</p>
-    <div class="awfh-actions">
-      <button type="button" class="btn-secondary" (click)="wfhOpen.set(false)">Cancel</button>
-      <button type="button" class="btn-primary" (click)="saveAssignWfh()" [disabled]="wfhBusy()">{{ wfhBusy() ? 'Saving…' : 'Assign WFH' }}</button>
+
+    <!-- Modal Body -->
+    <div class="modal-body awfh-modal-body">
+      <!-- Notice Callout Banner -->
+      <div class="awfh-info-banner">
+        <div class="info-banner-icon">
+          <svg lucideInfo size="16"></svg>
+        </div>
+        <div class="info-banner-text">
+          <p>
+            <strong>Administrative Bypass:</strong> Approved immediately, exempt from the employee's monthly WFH allowance, and team members are notified directly.
+          </p>
+        </div>
+      </div>
+
+      <!-- Employee Selection Section -->
+      <div class="form-group">
+        <div class="form-label-row">
+          <label class="form-label">
+            <span>Target Employees</span>
+            <span class="req-star">*</span>
+          </label>
+          <div class="label-actions" *ngIf="wfhPicked().length > 0">
+            <span class="label-badge">{{ wfhPicked().length }} selected</span>
+            <button type="button" class="btn-text-action" (click)="wfhPicked.set([])">Clear all</button>
+          </div>
+        </div>
+
+        <!-- Selected Employee Chips -->
+        <div class="awfh-selected-chips" *ngIf="wfhPickedPeople().length > 0">
+          <span class="awfh-person-chip" *ngFor="let p of wfhPickedPeople()">
+            <span class="chip-avatar-circle"><img *ngIf="p.avatarUrl" [src]="p.avatarUrl" alt=""><ng-container *ngIf="!p.avatarUrl">{{ p.name.charAt(0) }}</ng-container></span>
+            <span class="chip-name">{{ p.name }}</span>
+            <button type="button" class="chip-remove-btn" (click)="removeWfhPicked(p.id)" title="Remove employee">
+              <svg lucideX size="12"></svg>
+            </button>
+          </span>
+        </div>
+
+        <!-- Employee Search Input -->
+        <div class="awfh-search-box">
+          <div class="search-input-wrapper">
+            <svg lucideSearch size="15" class="search-icon"></svg>
+            <input 
+              type="text" 
+              class="form-control-enhanced awfh-search-input" 
+              placeholder="Search team members by name, code or department…" 
+              [value]="wfhQuery()" 
+              (input)="wfhQuery.set($any($event.target).value)" 
+            />
+            <button 
+              type="button" 
+              class="clear-search-btn" 
+              *ngIf="wfhQuery().trim()" 
+              (click)="wfhQuery.set('')"
+              title="Clear search">
+              <svg lucideX size="13"></svg>
+            </button>
+          </div>
+
+          <!-- Dropdown Results -->
+          <div class="awfh-results-dropdown" *ngIf="wfhQuery().trim() && wfhMatches().length">
+            <div class="dropdown-header">Matching Employees ({{ wfhMatches().length }})</div>
+            <button 
+              type="button" 
+              class="awfh-result-item" 
+              *ngFor="let m of wfhMatches()" 
+              (click)="wfhPicked.set([...wfhPicked(), m.id]); wfhQuery.set('')">
+              <div class="result-avatar"><img *ngIf="m.avatarUrl" [src]="m.avatarUrl" alt=""><ng-container *ngIf="!m.avatarUrl">{{ m.name.charAt(0) }}</ng-container></div>
+              <div class="result-info">
+                <span class="result-name">{{ m.name }}</span>
+                <span class="result-sub">{{ m.sub }}</span>
+              </div>
+              <span class="result-action-icon">
+                <svg lucidePlus size="14"></svg>
+              </span>
+            </button>
+          </div>
+
+          <div class="awfh-results-empty" *ngIf="wfhQuery().trim() && wfhMatches().length === 0">
+            <span>No employees found matching "{{ wfhQuery() }}"</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Date Range Section with Presets -->
+      <div class="form-group">
+        <div class="form-label-row">
+          <label class="form-label">
+            <span>Date Range</span>
+            <span class="req-star">*</span>
+          </label>
+          <div class="awfh-preset-chips">
+            <button type="button" class="preset-chip-btn" (click)="setWfhPreset('today')">Today</button>
+            <button type="button" class="preset-chip-btn" (click)="setWfhPreset('tomorrow')">Tomorrow</button>
+            <button type="button" class="preset-chip-btn" (click)="setWfhPreset('this_week')">Rest of Week</button>
+            <button type="button" class="preset-chip-btn" (click)="setWfhPreset('next_week')">Next Week</button>
+          </div>
+        </div>
+
+        <div class="date-pickers-grid">
+          <div class="date-picker-field">
+            <span class="field-sublabel">From</span>
+            <div class="input-with-icon">
+              <svg lucideCalendar size="15"></svg>
+              <input type="date" class="form-control-enhanced" [(ngModel)]="wfhFrom" />
+            </div>
+          </div>
+          <div class="date-picker-field">
+            <span class="field-sublabel">To</span>
+            <div class="input-with-icon">
+              <svg lucideCalendar size="15"></svg>
+              <input type="date" class="form-control-enhanced" [(ngModel)]="wfhTo" [min]="wfhFrom" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="awfh-daysoff-note">Each person's own days off (roster, shift or branch weekly off) are skipped automatically.</p>
+
+      <!-- Reason Field -->
+      <div class="form-group">
+        <div class="form-label-row">
+          <label class="form-label">
+            <span>Reason</span>
+            <span class="optional-tag">(Optional)</span>
+          </label>
+        </div>
+        <div class="input-with-icon">
+          <svg lucideFileText size="15"></svg>
+          <input 
+            type="text" 
+            class="form-control-enhanced" 
+            [(ngModel)]="wfhReason" 
+            placeholder="e.g. Office maintenance, client remote day, bad weather" 
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer Actions & Calculation Summary -->
+    <div class="modal-footer awfh-modal-footer">
+      <div class="awfh-summary-badge" [class.active]="wfhPicked().length > 0 && wfhDates().length > 0">
+        <svg lucideCalendarCheck size="14"></svg>
+        <span *ngIf="wfhPicked().length > 0 && wfhDates().length > 0">
+          <strong>{{ wfhPicked().length }}</strong> {{ wfhPicked().length === 1 ? 'person' : 'people' }}
+          &times;
+          <strong>{{ wfhDates().length }}</strong> {{ wfhDates().length === 1 ? 'day' : 'days' }}
+          <span class="sum-total">({{ wfhPicked().length * wfhDates().length }} shifts)</span>
+        </span>
+        <span *ngIf="wfhPicked().length === 0 || wfhDates().length === 0" class="muted-summary">
+          {{ wfhPicked().length === 0 ? 'Select employees to continue' : 'Select date range' }}
+        </span>
+      </div>
+
+      <div class="footer-buttons">
+        <button type="button" class="btn-modal-cancel" (click)="wfhOpen.set(false)">Cancel</button>
+        <button 
+          type="button" 
+          class="btn-modal-submit" 
+          (click)="saveAssignWfh()" 
+          [disabled]="wfhBusy() || wfhPicked().length === 0 || wfhDates().length === 0">
+          <span *ngIf="!wfhBusy()" class="btn-inner-content">
+            <svg lucideHouse size="15"></svg>
+            <span>Assign WFH</span>
+          </span>
+          <span *ngIf="wfhBusy()" class="btn-loader-content">
+            <span class="spinner-ring"></span>
+            <span>Assigning WFH…</span>
+          </span>
+        </button>
+      </div>
     </div>
   </div>
 </div>

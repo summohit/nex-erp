@@ -27,6 +27,8 @@ export const FIELD_VISIT_DAY = {
    * what §11 asks the Delivery view to show.
    */
   ON_LEAVE: 'ON_LEAVE',
+  /** Released early by an approved early release (21 Oct 2026): not expected on site. */
+  RELEASED: 'RELEASED',
 } as const;
 
 /** Days that still expect somebody to turn up. */

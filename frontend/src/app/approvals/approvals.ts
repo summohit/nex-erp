@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { LeavesService } from '../services/leaves';
 import { AttendanceService } from '../services/attendance';
 import { WfhService } from '../services/wfh.service';
+import { EarlyReleaseService } from '../services/early-release.service';
 import { ProfileModalService } from '../shared/profile-modal/profile-modal.service';
 import { DialogService } from '../shared/services/dialog.service';
 
@@ -16,7 +17,7 @@ import { DialogService } from '../shared/services/dialog.service';
  * queue is asked for separately and a tab only appears when the server lets
  * this person act on it (HR / admins the company, a manager their team).
  */
-export type ApprovalKind = 'LEAVE' | 'WFH' | 'REG' | 'CLOCKOUT' | 'OUTSIDE';
+export type ApprovalKind = 'LEAVE' | 'WFH' | 'REG' | 'CLOCKOUT' | 'OUTSIDE' | 'RELEASE';
 
 export interface ApprovalRow {
   kind: ApprovalKind;
@@ -48,6 +49,7 @@ export class ApprovalsComponent implements OnInit {
   private attendance = inject(AttendanceService);
   private wfh = inject(WfhService);
   private toast = inject(HotToastService);
+  private release = inject(EarlyReleaseService);
   private dialog = inject(DialogService);
   profile = inject(ProfileModalService);
 
@@ -57,6 +59,7 @@ export class ApprovalsComponent implements OnInit {
     { kind: 'REG', label: 'Regularization', shortDesc: 'Attendance corrections', tone: 'blue' },
     { kind: 'CLOCKOUT', label: 'Late Clock-out', shortDesc: 'Closed on later day', tone: 'amber' },
     { kind: 'OUTSIDE', label: 'Out of Office', shortDesc: 'Outside geofence radius', tone: 'rose' },
+    { kind: 'RELEASE', label: 'Early Release', shortDesc: 'Field visit done early', tone: 'blue' },
   ];
 
   loading = signal(true);
@@ -358,6 +361,8 @@ export class ApprovalsComponent implements OnInit {
       settle(firstValueFrom(this.attendance.canApproveGeofence())),
     ]);
     const wf = await settle(firstValueFrom(this.wfh.pending()));
+    const er = await settle(firstValueFrom(this.release.pending()));
+    const erCan = await settle(firstValueFrom(this.release.canApprove()));
     const [co, oo] = await Promise.all([
       coCan.ok && coCan.v?.canApprove
         ? settle(firstValueFrom(this.attendance.getPendingClockOuts()))
@@ -389,6 +394,19 @@ export class ApprovalsComponent implements OnInit {
           badge: l.isHalfDay ? 'Half Day' : null,
           proofUrl: (l as any).attachmentUrl ?? (l as any).documentUrl ?? null,
         });
+      }
+    }
+    // Field visit early release (21 Oct 2026): project manager or super admin.
+    if (er.ok && erCan.ok && erCan.v?.canApprove) {
+      avail.add('RELEASE');
+      for (const x of er.v ?? []) {
+        out.push({
+          kind: 'RELEASE', id: x.id, ...this.person(x.employee), date: this.day(x.date), raw: x,
+          title: 'Early release',
+          detail: `${x.visit?.requestNumber ?? 'Visit'}${x.visit?.location ? ' · ' + x.visit.location : ''} · ${x.type === 'HOURS' ? 'leave the site early on ' + this.day(x.date) + ' (full day)' : 'end the visit after ' + this.day(x.date)}`,
+          reason: x.reason ?? null,
+          badge: x.type === 'HOURS' ? 'Hours' : 'Days',
+        } as any);
       }
     }
     if (wf.ok && (wf.v ?? []).length >= 0) {
@@ -481,6 +499,8 @@ export class ApprovalsComponent implements OnInit {
         return firstValueFrom(this.leaves.updateRequestStatus(r.id, approve ? 'APPROVED' : 'REJECTED', note));
       case 'WFH':
         return firstValueFrom(this.wfh.review(r.id, approve ? 'APPROVE' : 'REJECT', note));
+      case 'RELEASE':
+        return firstValueFrom(this.release.review(r.id, approve ? 'APPROVE' : 'REJECT', note));
       case 'REG':
         return firstValueFrom(this.attendance.resolveRegularization(r.id, approve ? 'APPROVED' : 'REJECTED', note));
       case 'CLOCKOUT':

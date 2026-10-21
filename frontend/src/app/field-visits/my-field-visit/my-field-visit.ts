@@ -1,3 +1,5 @@
+import { EarlyReleaseService } from '../../services/early-release.service';
+import { HotToastService } from '@ngneat/hot-toast';
 import { Component, HostBinding, Input, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -74,6 +76,34 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
   /** One trip a day is the ordinary case; more than one is shown as a list. */
   day = computed(() => this.days()[0] ?? null);
 
+  // ---- Early release (21 Oct 2026): work done early; the PM approves
+  private releaseApi = inject(EarlyReleaseService);
+  private toast = inject(HotToastService);
+  releaseOpen = signal(false);
+  releaseBusy = signal(false);
+  releaseType: 'HOURS' | 'DAYS' = 'HOURS';
+  releaseReason = '';
+  myReleases = signal<any[]>([]);
+  todaysRelease = computed(() => {
+    const d = this.day();
+    if (!d) return null;
+    const k = String(d.visitDate).slice(0, 10);
+    return this.myReleases().find((r) => r.requestId === (d.request as any).id && String(r.date).slice(0, 10) === k && r.status !== 'CANCELLED') ?? null;
+  });
+  loadReleases() { this.releaseApi.mine().subscribe({ next: (l) => this.myReleases.set(l || []), error: () => {} }); }
+  openRelease() { this.releaseType = 'HOURS'; this.releaseReason = ''; this.releaseOpen.set(true); }
+  sendRelease() {
+    const d = this.day();
+    if (!d) return;
+    if (!this.releaseReason.trim()) { this.toast.error('Write what was completed'); return; }
+    this.releaseBusy.set(true);
+    this.releaseApi.create({ requestId: (d.request as any).id, type: this.releaseType, date: String(d.visitDate).slice(0, 10), reason: this.releaseReason.trim() }).subscribe({
+      next: () => { this.releaseBusy.set(false); this.releaseOpen.set(false); this.toast.success('Sent to your project manager'); this.loadReleases(); },
+      error: (e) => { this.releaseBusy.set(false); this.toast.error(e.error?.message || 'Could not send the request'); },
+    });
+  }
+  releaseLabel(s: string) { return ({ PENDING: 'Waiting for PM', APPROVED: 'Approved', REJECTED: 'Rejected' } as any)[s] ?? s; }
+
   /**
    * Shown as a panel at the top of the Field Visits page rather than as its
    * own screen: no page header, and nothing at all on a day with no trip.
@@ -87,6 +117,7 @@ export class MyFieldVisitComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.load();
+    this.loadReleases();
     // Embedded, the GPS starts only once there is a trip to clock — otherwise
     // every administrator opening Field Visits gets a location prompt for
     // nothing.

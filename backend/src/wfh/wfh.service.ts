@@ -2,6 +2,9 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { isHrAdmin, isSuperAdmin } from '../common/company-roles';
+import { isBranchWeeklyOff } from '../common/weekly-offs';
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 type Viewer = { companyId: number; role: string; employeeId: number | null };
 
@@ -103,22 +106,42 @@ export class WfhService {
     if (!ids.length) throw new BadRequestException('Choose at least one employee');
     if (!dates.length) throw new BadRequestException('Choose at least one day');
     if (ids.length * dates.length > 500) throw new BadRequestException('Too many days at once (max 500)');
-    const people = await this.prisma.employee.findMany({ where: { id: { in: ids }, companyId: v.companyId }, select: { id: true } });
+    const people = await this.prisma.employee.findMany({
+      where: { id: { in: ids }, companyId: v.companyId },
+      select: { id: true, shift: { select: { workingDays: true } }, branch: { select: { weeklyOffs: true } } },
+    });
     const valid = new Set(people.map((p) => p.id));
+    // Each person's own days off are skipped (21 Oct 2026): the roster's day
+    // off, else the shift's working days, else the branch weekly off — the
+    // same order the roster uses. Not a blanket weekend rule.
+    const roster = await this.prisma.shiftRosterEntry.findMany({
+      where: { employeeId: { in: [...valid] }, date: { in: dates } }, select: { employeeId: true, date: true, isDayOff: true },
+    });
+    const rosterBy = new Map(roster.map((r) => [`${r.employeeId}_${r.date.toISOString().slice(0, 10)}`, r.isDayOff]));
+    const isOff = (p: (typeof people)[number], d: Date) => {
+      const k = `${p.id}_${d.toISOString().slice(0, 10)}`;
+      if (rosterBy.has(k)) return !!rosterBy.get(k);
+      const wd = p.shift?.workingDays?.trim();
+      if (wd) return !wd.split(',').map((x) => x.trim()).includes(DAY_NAMES[d.getUTCDay()]);
+      return isBranchWeeklyOff(d, p.branch?.weeklyOffs);
+    };
     const existing = await this.prisma.wfhRequest.findMany({
       where: { employeeId: { in: [...valid] }, date: { in: dates }, status: { in: COUNTS } }, select: { employeeId: true, date: true },
     });
     const have = new Set(existing.map((e) => `${e.employeeId}_${e.date.toISOString().slice(0, 10)}`));
     const reason = String(body?.reason ?? '').trim() || 'Assigned by HR';
     const rows: any[] = [];
-    for (const id of valid) for (const d of dates) {
+    let daysOff = 0;
+    for (const p of people) for (const d of dates) {
+      const id = p.id;
+      if (isOff(p, d)) { daysOff++; continue; }
       if (have.has(`${id}_${d.toISOString().slice(0, 10)}`)) continue;
       rows.push({ companyId: v.companyId, employeeId: id, date: d, reason, status: WFH_STATUS.APPROVED, source: 'ASSIGNED', reviewedById: v.employeeId, reviewedAt: new Date() });
     }
     if (rows.length) await this.prisma.wfhRequest.createMany({ data: rows });
     const label = dates.length === 1 ? this.label(dates[0]) : `${dates.length} days from ${this.label(dates.sort((a, b) => a.getTime() - b.getTime())[0])}`;
     await this.notify([...valid], v, 'WFH assigned', `You are set to work from home: ${label}. ${reason}`);
-    return { created: rows.length, skipped: valid.size * dates.length - rows.length };
+    return { created: rows.length, skipped: valid.size * dates.length - rows.length - daysOff, daysOff };
   }
 
   /**

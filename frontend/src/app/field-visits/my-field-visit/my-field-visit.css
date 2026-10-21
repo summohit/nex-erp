@@ -1024,3 +1024,20 @@
 }
 
 
+
+/* Early release (21 Oct 2026) */
+.er-line { margin-top: 8px; }
+.er-btn { border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 12.5px; border-radius: 9px; padding: 6px 12px; cursor: pointer; }
+.er-status { font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: #fffbeb; color: #b45309; }
+.er-status.s-APPROVED { background: #ecfdf5; color: #047857; } .er-status.s-REJECTED { background: #fef2f2; color: #b91c1c; }
+.er-overlay { position: fixed; inset: 0; z-index: 1300; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.er-dialog { width: min(460px, 100%); background: #fff; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+.er-dialog h3 { margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; }
+.er-note { margin: 0; font-size: 12.5px; color: #64748b; }
+.er-opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer; }
+.er-opt span { display: flex; flex-direction: column; } .er-opt b { font-size: 13.5px; color: #0f172a; } .er-opt small { font-size: 12px; color: #64748b; }
+.er-field { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 700; color: #334155; }
+.er-field textarea { border: 1px solid #cbd5e1; border-radius: 10px; padding: 9px 12px; font-family: inherit; font-size: 13.5px; }
+.er-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.er-b { height: 38px; padding: 0 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; font-weight: 700; cursor: pointer; }
+.er-b.primary { background: #1373e5; border-color: #1373e5; color: #fff; }

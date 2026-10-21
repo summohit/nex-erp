@@ -7,7 +7,8 @@ import {
   LucideChevronLeft, LucideChevronRight, LucideX, LucideCalendar,
   LucideRotateCcw, LucideWandSparkles, LucideTrash2, LucideBadgeCheck, LucideXCircle,
   LucideBuilding2, LucideMapPin, LucideClock, LucideAlertCircle, LucideCheckCircle2,
-  LucideArrowRight, LucideBriefcase, LucideInfo, LucideUserCheck, LucideUsers, LucideSearch, LucideCheck
+  LucideArrowRight, LucideBriefcase, LucideInfo, LucideUserCheck, LucideUsers, LucideSearch, LucideCheck,
+  LucideHouse, LucideFileSpreadsheet, LucideUpload, LucideDownload, LucideFileText, LucideCalendarCheck, LucidePlus
 } from '@lucide/angular';
 import { ShiftsService, RosterAssignmentPayload, RosterCell, RosterGrid, RosterRow, RosterShift } from '../../services/shifts.service';
 import { MasterDataService } from '../../services/master-data.service';
@@ -44,6 +45,7 @@ interface OnSiteCtx {
     LucideBadgeCheck, LucideXCircle, LucideBuilding2, LucideMapPin,
     LucideClock, LucideAlertCircle, LucideCheckCircle2, LucideArrowRight,
     LucideBriefcase, LucideInfo, LucideUserCheck, LucideUsers, LucideSearch, LucideCheck,
+    LucideHouse, LucideFileSpreadsheet, LucideUpload, LucideDownload, LucideFileText, LucideCalendarCheck, LucidePlus,
     SearchableSelectComponent, SkeletonComponent, AttendanceFilterDrawerComponent
   ],
   templateUrl: './shift-roster.html',
@@ -61,12 +63,11 @@ export class ShiftRosterComponent implements OnInit {
   // ---- Assign WFH (21 Oct 2026): HR / super admin, approved at once, not in the monthly limit
   wfhOpen = signal(false);
   wfhBusy = signal(false);
-  wfhPeople = signal<{ id: number; name: string; sub: string }[]>([]);
+  wfhPeople = signal<{ id: number; name: string; sub: string; avatarUrl: string | null }[]>([]);
   wfhPicked = signal<number[]>([]);
   wfhQuery = signal('');
   wfhFrom = '';
   wfhTo = '';
-  wfhSkipWeekends = true;
   wfhReason = '';
   canAssignWfh(): boolean {
     const r = this.currentUser()?.role;
@@ -81,13 +82,45 @@ export class ShiftRosterComponent implements OnInit {
     const ids = new Set(this.wfhPicked());
     return this.wfhPeople().filter((p) => ids.has(p.id));
   });
+  removeWfhPicked(id: number) {
+    this.wfhPicked.set(this.wfhPicked().filter((x) => x !== id));
+  }
+  setWfhPreset(preset: 'today' | 'tomorrow' | 'this_week' | 'next_week') {
+    const now = new Date(Date.now() + 330 * 60_000);
+    const formatDate = (d: Date) => d.toISOString().slice(0, 10);
+    if (preset === 'today') {
+      this.wfhFrom = formatDate(now);
+      this.wfhTo = formatDate(now);
+    } else if (preset === 'tomorrow') {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      this.wfhFrom = formatDate(tomorrow);
+      this.wfhTo = formatDate(tomorrow);
+    } else if (preset === 'this_week') {
+      this.wfhFrom = formatDate(now);
+      const day = now.getDay();
+      const distToFriday = (5 - day + 7) % 7;
+      const end = new Date(now);
+      end.setDate(end.getDate() + distToFriday);
+      this.wfhTo = formatDate(end);
+    } else if (preset === 'next_week') {
+      const day = now.getDay();
+      const daysUntilNextMon = ((1 - day + 7) % 7) || 7;
+      const nextMon = new Date(now);
+      nextMon.setDate(nextMon.getDate() + daysUntilNextMon);
+      const nextFri = new Date(nextMon);
+      nextFri.setDate(nextFri.getDate() + 4);
+      this.wfhFrom = formatDate(nextMon);
+      this.wfhTo = formatDate(nextFri);
+    }
+  }
   openAssignWfh() {
     const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
     this.wfhFrom = today; this.wfhTo = today; this.wfhReason = ''; this.wfhPicked.set([]); this.wfhQuery.set('');
     if (!this.wfhPeople().length) {
       this.employeesApi.getEmployeesBasicList().subscribe({
         next: (list: any[]) => this.wfhPeople.set((list || []).map((e) => ({
-          id: e.id, name: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim(),
+          id: e.id, name: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim(), avatarUrl: e.avatarUrl ?? null,
           sub: [e.employeeCode, e.designation?.name ?? e.designation, e.department?.name ?? e.department].filter((x) => typeof x === 'string' && x).join(' · '),
         }))),
         error: () => {},
@@ -100,8 +133,6 @@ export class ShiftRosterComponent implements OnInit {
     const out: string[] = [];
     const end = new Date(`${this.wfhTo || this.wfhFrom}T00:00:00Z`);
     for (let d = new Date(`${this.wfhFrom}T00:00:00Z`); d <= end && out.length < 62; d.setUTCDate(d.getUTCDate() + 1)) {
-      const dow = d.getUTCDay();
-      if (this.wfhSkipWeekends && (dow === 0 || dow === 6)) continue;
       out.push(d.toISOString().slice(0, 10));
     }
     return out;
@@ -114,7 +145,7 @@ export class ShiftRosterComponent implements OnInit {
     this.wfhApi.assign(this.wfhPicked(), dates, this.wfhReason.trim() || undefined).subscribe({
       next: (r) => {
         this.wfhBusy.set(false); this.wfhOpen.set(false);
-        this.toast.success(`WFH assigned: ${r.created} day${r.created === 1 ? '' : 's'}${r.skipped ? ` (${r.skipped} already WFH)` : ''}`);
+        this.toast.success(`WFH assigned: ${r.created} day${r.created === 1 ? '' : 's'}${(r as any).daysOff ? ` · ${(r as any).daysOff} days off skipped` : ''}${r.skipped ? ` · ${r.skipped} already WFH` : ''}`);
         this.load();
       },
       error: (e) => { this.wfhBusy.set(false); this.toast.error(e.error?.message || 'Could not assign WFH'); },

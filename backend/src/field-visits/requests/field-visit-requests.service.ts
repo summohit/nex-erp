@@ -1200,8 +1200,9 @@ export class FieldVisitRequestsService {
   ) {
     const request = await this.loadForDecision(companyId, id);
 
-    if (!this.isApprover(role)) {
-      throw new ForbiddenException('Only an administrator can cancel a field visit request');
+    const isRaiser = employeeId !== null && request.raisedById === employeeId;
+    if (!this.isApprover(role) && !isRaiser) {
+      throw new ForbiddenException('Only the requester or an administrator can cancel a field visit request');
     }
     const finished: string[] = [
       FIELD_VISIT_STATUS.CANCELLED, FIELD_VISIT_STATUS.REJECTED, FIELD_VISIT_STATUS.COMPLETED,
