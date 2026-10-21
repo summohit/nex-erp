@@ -2950,7 +2950,7 @@
       <div class="cbm-form-section">
         <div class="cbm-section-title">
           <span class="cbm-section-number">3</span>
-          <span>Project Managers &amp; Assigned Users</span>
+          <span>Project Team &amp; Roles</span>
         </div>
 
         <div class="cbm-field-group">
@@ -3033,6 +3033,25 @@
           <span class="cbm-field-helper">Project managers have permission to review, approve tasks, and control project delivery milestones.</span>
         </div>
 
+        <div class="cbm-field-group">
+          <label class="cbm-field-label">Project Coordinators</label>
+          <div class="cbm-searchable-select" (click)="$event.stopPropagation()">
+            <div class="cbm-select-trigger cbm-multi-trigger" [class.open]="coordinatorDropdownOpen()"
+              (click)="coordinatorDropdownOpen.set(!coordinatorDropdownOpen()); pmDropdownOpen.set(false); architectDropdownOpen.set(false); leadEngineerDropdownOpen.set(false); memberDropdownOpen.set(false)">
+              <div class="cbm-chips-wrap" *ngIf="projectForm.coordinatorIds.length">
+                <span class="cbm-user-chip" *ngFor="let id of projectForm.coordinatorIds"><span class="cbm-chip-avatar-text" [style.background]="getPmColor(id)">{{ getPmInitial(id) }}</span><span class="cbm-chip-name">{{ getPmName(id) }}</span><button type="button" class="cbm-chip-remove" (click)="removeCoordinator(id); $event.stopPropagation()"><svg lucideX size="12"></svg></button></span>
+              </div>
+              <div class="cbm-select-placeholder" *ngIf="!projectForm.coordinatorIds.length"><svg lucideUsers size="16" class="cbm-placeholder-icon"></svg><span>Search &amp; assign project coordinators...</span></div>
+              <svg lucideChevronDown size="16" class="cbm-chevron" [class.rotated]="coordinatorDropdownOpen()"></svg>
+            </div>
+            <div class="cbm-dropdown-panel" *ngIf="coordinatorDropdownOpen()">
+              <div class="cbm-search-header"><svg lucideSearch size="15" class="cbm-search-icon"></svg><input type="text" class="cbm-search-input" placeholder="Search coordinators..." [ngModel]="coordinatorSearchQuery()" (ngModelChange)="coordinatorSearchQuery.set($event)" (click)="$event.stopPropagation()" autofocus></div>
+              <div class="cbm-options-list"><div class="cbm-option-item user-option-item" *ngFor="let emp of filteredCoordinatorEmployees()" [class.selected]="projectForm.coordinatorIds.includes(emp.id)" (click)="toggleCoordinator(emp.id)"><div class="cbm-checkbox" [class.checked]="projectForm.coordinatorIds.includes(emp.id)"><svg lucideCheck size="12" *ngIf="projectForm.coordinatorIds.includes(emp.id)"></svg></div><div class="cbm-user-avatar-text" [style.background]="getPmColor(emp.id)">{{ getPmInitial(emp.id) }}</div><div class="cbm-option-info"><div class="cbm-option-primary-row"><span class="cbm-option-name">{{ emp.firstName }} {{ emp.lastName }}</span><span class="cbm-role-tag" *ngIf="emp.designation?.name">{{ emp.designation.name }}</span></div><div class="cbm-option-meta-row"><span class="cbm-meta-item">{{ emp.user?.email }}</span></div></div></div></div>
+            </div>
+          </div>
+          <span class="cbm-field-helper">Coordinate delivery and keep the project team aligned.</span>
+        </div>
+
         <!-- Technical architect: sees every task on the project without being
              able to change them. Optional — a project can run without one. -->
         <div class="cbm-field-group">
@@ -3111,11 +3130,30 @@
           <span class="cbm-field-helper">Technical architects see every task on the project. They cannot add, edit or move them — that stays with the project manager.</span>
         </div>
 
+        <div class="cbm-field-group">
+          <label class="cbm-field-label">Lead Engineers</label>
+          <div class="cbm-searchable-select" (click)="$event.stopPropagation()">
+            <div class="cbm-select-trigger cbm-multi-trigger" [class.open]="leadEngineerDropdownOpen()"
+              (click)="leadEngineerDropdownOpen.set(!leadEngineerDropdownOpen()); pmDropdownOpen.set(false); coordinatorDropdownOpen.set(false); architectDropdownOpen.set(false); memberDropdownOpen.set(false)">
+              <div class="cbm-chips-wrap" *ngIf="projectForm.leadEngineerIds.length">
+                <span class="cbm-user-chip" *ngFor="let id of projectForm.leadEngineerIds"><span class="cbm-chip-avatar-text" [style.background]="getPmColor(id)">{{ getPmInitial(id) }}</span><span class="cbm-chip-name">{{ getPmName(id) }}</span><button type="button" class="cbm-chip-remove" (click)="removeLeadEngineer(id); $event.stopPropagation()"><svg lucideX size="12"></svg></button></span>
+              </div>
+              <div class="cbm-select-placeholder" *ngIf="!projectForm.leadEngineerIds.length"><svg lucideUsers size="16" class="cbm-placeholder-icon"></svg><span>Search &amp; assign lead engineers...</span></div>
+              <svg lucideChevronDown size="16" class="cbm-chevron" [class.rotated]="leadEngineerDropdownOpen()"></svg>
+            </div>
+            <div class="cbm-dropdown-panel" *ngIf="leadEngineerDropdownOpen()">
+              <div class="cbm-search-header"><svg lucideSearch size="15" class="cbm-search-icon"></svg><input type="text" class="cbm-search-input" placeholder="Search lead engineers..." [ngModel]="leadEngineerSearchQuery()" (ngModelChange)="leadEngineerSearchQuery.set($event)" (click)="$event.stopPropagation()" autofocus></div>
+              <div class="cbm-options-list"><div class="cbm-option-item user-option-item" *ngFor="let emp of filteredLeadEngineerEmployees()" [class.selected]="projectForm.leadEngineerIds.includes(emp.id)" (click)="toggleLeadEngineer(emp.id)"><div class="cbm-checkbox" [class.checked]="projectForm.leadEngineerIds.includes(emp.id)"><svg lucideCheck size="12" *ngIf="projectForm.leadEngineerIds.includes(emp.id)"></svg></div><div class="cbm-user-avatar-text" [style.background]="getPmColor(emp.id)">{{ getPmInitial(emp.id) }}</div><div class="cbm-option-info"><div class="cbm-option-primary-row"><span class="cbm-option-name">{{ emp.firstName }} {{ emp.lastName }}</span><span class="cbm-role-tag" *ngIf="emp.designation?.name">{{ emp.designation.name }}</span></div><div class="cbm-option-meta-row"><span class="cbm-meta-item">{{ emp.user?.email }}</span></div></div></div></div>
+            </div>
+          </div>
+          <span class="cbm-field-helper">Lead engineers guide the technical work for this project.</span>
+        </div>
+
         <!-- Assigned users: the people who do the work, as distinct from the
              managers who own it. Stored as ProjectMember MEMBER rows; anyone
              picked in both lists keeps the higher role. -->
         <div class="cbm-field-group">
-          <label class="cbm-field-label" data-field="memberIds">Assigned Users <span class="cbm-required">*</span></label>
+          <label class="cbm-field-label" data-field="memberIds">Support Engineers <span class="cbm-required">*</span></label>
           <div class="cbm-searchable-select" (click)="$event.stopPropagation()">
             <div
               class="cbm-select-trigger cbm-multi-trigger"
@@ -3134,7 +3172,7 @@
               </div>
               <div class="cbm-select-placeholder" *ngIf="projectForm.memberIds.length === 0">
                 <svg lucideUsers size="16" class="cbm-placeholder-icon"></svg>
-                <span>Search &amp; assign users to this project...</span>
+                <span>Search &amp; assign support engineers to this project...</span>
               </div>
               <svg lucideChevronDown size="16" class="cbm-chevron" [class.rotated]="memberDropdownOpen()"></svg>
             </div>
@@ -3189,7 +3227,7 @@
             </div>
           </div>
           <span class="cbm-error-text" *ngIf="isSubmitted() && projectForm.memberIds.length === 0">
-            Assign at least one user to this project
+            Assign at least one support engineer to this project
           </span>
         </div>
       </div>

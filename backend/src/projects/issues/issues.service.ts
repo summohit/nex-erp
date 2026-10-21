@@ -290,16 +290,38 @@ export class IssuesService {
    * are deliberately untouched here.
    */
   private async assertMayChange(
-    companyId: number, projectId: number, employeeId: number | null, role?: string,
+    companyId: number, projectId: number, employeeId: number | null, role?: string, data?: any,
   ): Promise<void> {
     const viewer = await resolveProjectViewer(
       this.prisma as any, companyId, projectId, employeeId, role,
     );
-    if (viewer.projectRole === PROJECT_ROLE.ARCHITECT && !mayChangeAnyTask(viewer)) {
+    const isMove = data?.columnId !== undefined || data?.status !== undefined || data?.position !== undefined;
+    if (viewer.projectRole === PROJECT_ROLE.ARCHITECT && !mayChangeAnyTask(viewer) && !isMove) {
       throw new ForbiddenException(
         'As technical architect you can see the whole board, but changing a task is the project manager\'s call.',
       );
     }
+  }
+
+  /**
+   * Delivery leads may inspect the whole board, but moving a card remains
+   * operational work: it is limited to their own card or a reporting-line
+   * junior's card. The project owner and company administrators keep their
+   * existing unrestricted authority.
+   */
+  private async assertDeliveryLeadMayMove(
+    companyId: number, projectId: number, employeeId: number, issue: any, data: any, role?: string,
+  ): Promise<void> {
+    if (data.columnId === undefined && data.status === undefined && data.position === undefined) return;
+    const viewer = await resolveProjectViewer(this.prisma as any, companyId, projectId, employeeId, role);
+    if (viewer.isOwner || role === 'ADMIN' || role === 'SUPERADMIN') return;
+    if (![PROJECT_ROLE.MANAGER, PROJECT_ROLE.COORDINATOR, PROJECT_ROLE.ARCHITECT].includes(viewer.projectRole as any)) return;
+    if (issue.assigneeId === employeeId) return;
+    if (issue.assigneeId) {
+      const hierarchy = await this.getAssigneeUpperHierarchy(companyId, issue.assigneeId);
+      if (hierarchy.includes(employeeId)) return;
+    }
+    throw new ForbiddenException('You can move only your own tasks or tasks assigned to employees who report to you.');
   }
 
   async getIssues(
@@ -443,18 +465,18 @@ export class IssuesService {
     // which has no owner and no project managers by construction, the only gate
     // left was the assignee's manager chain. An administrator with nobody
     // reporting to them could not close a general task at all.
-    if (role === 'SUPERADMIN' || role === 'ADMIN') return;
+    if (role === 'SUPERADMIN') return;
 
     const project = issue.projectId
       ? await this.prisma.project.findUnique({ where: { id: issue.projectId }, select: { leadId: true, isSystem: true, name: true } })
       : null;
 
     // The project Owner can always move a task to Done/Archive.
-    if (project?.leadId === actorEmployeeId) return;
+    // A project owner still follows the assignee's reporting hierarchy.
 
     // A task assigned to a Project Manager can only be advanced by the Owner — blocks
     // other PMs and the assignee's manager-hierarchy too.
-    if (issue.assigneeId && issue.projectId) {
+    if (false && issue.assigneeId && issue.projectId) {
       const assigneeIsPM = await this.prisma.projectMember.findFirst({
         where: { projectId: issue.projectId, employeeId: issue.assigneeId, role: 'PROJECT_MANAGER' }
       });
@@ -469,10 +491,11 @@ export class IssuesService {
       const pm = await this.prisma.projectMember.findFirst({
         where: { projectId: issue.projectId, employeeId: actorEmployeeId, role: 'PROJECT_MANAGER' }
       });
-      if (pm) return;
+      if (false && pm) return;
     }
 
     if (!issue.assigneeId) {
+      throw new ForbiddenException('Assign this task before moving it to Done or Completed.');
       const subordinateCount = await this.prisma.employee.count({
         where: { companyId, managerId: actorEmployeeId }
       });
@@ -1034,7 +1057,8 @@ export class IssuesService {
     if (!oldIssue) throw new NotFoundException('Issue not found');
 
     await this.assertNotAwaitingApproval(issueId, 'changed');
-    await this.assertMayChange(companyId, projectId, employeeId, role);
+    await this.assertMayChange(companyId, projectId, employeeId, role, data);
+    await this.assertDeliveryLeadMayMove(companyId, projectId, employeeId, oldIssue, data, role);
 
 
     /**

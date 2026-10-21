@@ -191,7 +191,7 @@ export class ProjectsService {
           // the project is MEMBER — de-duplicated, because ProjectMember is
           // unique on (projectId, employeeId) and somebody picked as both a
           // manager and a user would otherwise fail the insert.
-          create: buildInitialMembers(leadId, data.pmIds, data.memberIds, (data as any).architectIds)
+          create: buildInitialMembers(leadId, data.pmIds, data.memberIds, (data as any).architectIds, (data as any).coordinatorIds, (data as any).leadEngineerIds)
         },
         boards: {
           create: { name: 'Main Board', columns: { create: DEFAULT_BOARD_COLUMNS } }
@@ -2373,6 +2373,9 @@ export class ProjectsService {
     if (data.memberIds !== undefined) {
       await this.syncProjectMembers(id, data.memberIds || []);
     }
+    if (data.coordinatorIds !== undefined) await this.syncProjectRole(id, data.coordinatorIds || [], 'PROJECT_COORDINATOR');
+    if (data.architectIds !== undefined) await this.syncProjectRole(id, data.architectIds || [], 'TECHNICAL_ARCHITECT');
+    if (data.leadEngineerIds !== undefined) await this.syncProjectRole(id, data.leadEngineerIds || [], 'LEAD_ENGINEER');
 
     return updated;
   }
@@ -2442,6 +2445,20 @@ export class ProjectsService {
             data: toAdd.map(employeeId => ({ projectId, employeeId, role: 'MEMBER' }))
           })]
         : [])
+    ]);
+  }
+
+  /** Sync an optional delivery role without touching owners or project managers. */
+  private async syncProjectRole(projectId: number, employeeIds: number[], role: 'PROJECT_COORDINATOR' | 'TECHNICAL_ARCHITECT' | 'LEAD_ENGINEER') {
+    const existing = await this.prisma.projectMember.findMany({ where: { projectId } });
+    const protectedIds = new Set(existing.filter(m => m.role === 'ADMIN' || m.role === 'PROJECT_MANAGER').map(m => m.employeeId));
+    const wanted = employeeIds.map(Number).filter(id => Number.isInteger(id) && id > 0 && !protectedIds.has(id));
+    const current = existing.filter(m => m.role === role).map(m => m.employeeId);
+    const remove = current.filter(id => !wanted.includes(id));
+    const add = wanted.filter(id => !existing.some(m => m.employeeId === id));
+    await this.prisma.$transaction([
+      ...(remove.length ? [this.prisma.projectMember.updateMany({ where: { projectId, employeeId: { in: remove }, role }, data: { role: 'MEMBER' } })] : []),
+      ...(add.length ? [this.prisma.projectMember.createMany({ data: add.map(employeeId => ({ projectId, employeeId, role })) })] : []),
     ]);
   }
 

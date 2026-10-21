@@ -7,7 +7,8 @@
  * rather than failing the insert.
  *
  * Highest role wins: ADMIN (the owner) over PROJECT_MANAGER over
- * TECHNICAL_ARCHITECT over MEMBER. Extracted so the precedence is stated once
+ * PROJECT_COORDINATOR over TECHNICAL_ARCHITECT over LEAD_ENGINEER over MEMBER.
+ * Extracted so the precedence is stated once
  * and can be tested without a database.
  *
  * The architect sits between the two because of what the roles grant: an
@@ -15,13 +16,15 @@
  * can additionally change them. Somebody named as both architect and manager
  * keeps the manager's hand on the board rather than losing it.
  */
-export type ProjectMemberRole = 'ADMIN' | 'PROJECT_MANAGER' | 'TECHNICAL_ARCHITECT' | 'MEMBER';
+export type ProjectMemberRole = 'ADMIN' | 'PROJECT_MANAGER' | 'PROJECT_COORDINATOR' | 'TECHNICAL_ARCHITECT' | 'LEAD_ENGINEER' | 'MEMBER';
 
 export function buildInitialMembers(
   leadId: number,
   pmIds: unknown,
   memberIds: unknown,
   architectIds: unknown = [],
+  coordinatorIds: unknown = [],
+  leadEngineerIds: unknown = [],
 ): { employeeId: number; role: ProjectMemberRole }[] {
   // `> 0` matters: Number(null) is 0, which passes an integer check and would
   // insert a member with employeeId 0 — a row pointing at nobody.
@@ -34,7 +37,9 @@ export function buildInitialMembers(
 
   // Lowest precedence first, so a later assignment overwrites it.
   for (const id of ids(memberIds)) byEmployee.set(id, 'MEMBER');
+  for (const id of ids(leadEngineerIds)) byEmployee.set(id, 'LEAD_ENGINEER');
   for (const id of ids(architectIds)) byEmployee.set(id, 'TECHNICAL_ARCHITECT');
+  for (const id of ids(coordinatorIds)) byEmployee.set(id, 'PROJECT_COORDINATOR');
   for (const id of ids(pmIds)) byEmployee.set(id, 'PROJECT_MANAGER');
   byEmployee.set(leadId, 'ADMIN');
 

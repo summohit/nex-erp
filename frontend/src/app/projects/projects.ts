@@ -282,6 +282,25 @@ export class ProjectsComponent implements OnInit {
    */
   architectDropdownOpen = signal(false);
   architectSearchQuery = signal<string>('');
+  coordinatorDropdownOpen = signal(false);
+  coordinatorSearchQuery = signal<string>('');
+  leadEngineerDropdownOpen = signal(false);
+  leadEngineerSearchQuery = signal<string>('');
+
+  private filterEmployees(query: string) {
+    const q = query.toLowerCase().trim();
+    const all = this.employees() || [];
+    if (!q) return all;
+    return all.filter((e: any) =>
+      `${e.firstName || ''} ${e.lastName || ''}`.toLowerCase().includes(q) ||
+      (e.user?.email || '').toLowerCase().includes(q) ||
+      (e.designation?.name || '').toLowerCase().includes(q) ||
+      (e.department?.name || '').toLowerCase().includes(q)
+    );
+  }
+
+  filteredCoordinatorEmployees = computed(() => this.filterEmployees(this.coordinatorSearchQuery()));
+  filteredLeadEngineerEmployees = computed(() => this.filterEmployees(this.leadEngineerSearchQuery()));
 
   filteredArchitectEmployees = computed(() => {
     const q = this.architectSearchQuery().toLowerCase().trim();
@@ -492,6 +511,28 @@ export class ProjectsComponent implements OnInit {
   removeArchitect(id: number) {
     const idx = this.projectForm.architectIds.indexOf(id);
     if (idx >= 0) this.projectForm.architectIds.splice(idx, 1);
+  }
+
+  toggleCoordinator(id: number) {
+    const idx = this.projectForm.coordinatorIds.indexOf(id);
+    if (idx >= 0) this.projectForm.coordinatorIds.splice(idx, 1);
+    else this.projectForm.coordinatorIds.push(id);
+  }
+
+  removeCoordinator(id: number) {
+    const idx = this.projectForm.coordinatorIds.indexOf(id);
+    if (idx >= 0) this.projectForm.coordinatorIds.splice(idx, 1);
+  }
+
+  toggleLeadEngineer(id: number) {
+    const idx = this.projectForm.leadEngineerIds.indexOf(id);
+    if (idx >= 0) this.projectForm.leadEngineerIds.splice(idx, 1);
+    else this.projectForm.leadEngineerIds.push(id);
+  }
+
+  removeLeadEngineer(id: number) {
+    const idx = this.projectForm.leadEngineerIds.indexOf(id);
+    if (idx >= 0) this.projectForm.leadEngineerIds.splice(idx, 1);
   }
   
   // Local persistence for Starred & Recently Viewed
@@ -1166,7 +1207,9 @@ export class ProjectsComponent implements OnInit {
       clientId: null as number | null,
       leadContactId: null as number | null,
       pmIds: [] as number[],
+      coordinatorIds: [] as number[],
       architectIds: [] as number[],
+      leadEngineerIds: [] as number[],
       memberIds: [] as number[],
       address: '',
       onsiteRepresentation: '',
@@ -1817,7 +1860,7 @@ export class ProjectsComponent implements OnInit {
     { anchor: 'startDate',    label: 'Start date',      isMissing: () => !this.projectForm.startDate },
     { anchor: 'endDate',      label: 'Deadline',        isMissing: () => !this.projectForm.endDate },
     { anchor: 'pmIds',        label: 'Project manager', isMissing: () => this.projectForm.pmIds.length === 0 },
-    { anchor: 'memberIds',    label: 'Assigned user',   isMissing: () => this.projectForm.memberIds.length === 0 },
+    { anchor: 'memberIds',    label: 'Support engineer', isMissing: () => this.projectForm.memberIds.length === 0 },
   ];
 
   missingRequiredFields(): string[] {
@@ -4359,7 +4402,9 @@ export class ProjectsComponent implements OnInit {
       clientId: project.clientId,
       leadContactId: project.leadContactId ?? project.leadContact?.id ?? null,
       pmIds: project.members?.filter((m: any) => m.role === 'PROJECT_MANAGER').map((m: any) => m.employeeId) || [],
+      coordinatorIds: project.members?.filter((m: any) => m.role === 'PROJECT_COORDINATOR').map((m: any) => m.employeeId) || [],
       architectIds: project.members?.filter((m: any) => m.role === 'TECHNICAL_ARCHITECT').map((m: any) => m.employeeId) || [],
+      leadEngineerIds: project.members?.filter((m: any) => m.role === 'LEAD_ENGINEER').map((m: any) => m.employeeId) || [],
       memberIds: project.members?.filter((m: any) => m.role === 'MEMBER').map((m: any) => m.employeeId) || [],
       address: project.address || '',
       onsiteRepresentation: project.onsiteRepresentation || '',
@@ -4514,6 +4559,9 @@ export class ProjectsComponent implements OnInit {
       startDate: this.projectForm.startDate || null,
       endDate: this.projectForm.endDate || null,
       pmIds: this.projectForm.pmIds,
+      coordinatorIds: this.projectForm.coordinatorIds,
+      architectIds: this.projectForm.architectIds,
+      leadEngineerIds: this.projectForm.leadEngineerIds,
       memberIds: this.projectForm.memberIds,
       overrides: {
         summary: this.projectForm.summary || null,

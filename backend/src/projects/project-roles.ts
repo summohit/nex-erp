@@ -20,6 +20,7 @@ export const PROJECT_ROLE = {
    * but the plan is the manager's to change.
    */
   ARCHITECT: 'TECHNICAL_ARCHITECT',
+  COORDINATOR: 'PROJECT_COORDINATOR',
   ADMIN: 'ADMIN',
   MEMBER: 'MEMBER',
   VIEWER: 'VIEWER',
@@ -117,6 +118,7 @@ export function seesEveryTask(viewer: ProjectViewer): boolean {
   if (viewer.canViewAllProjects || canViewOrganisationProjects(viewer.companyRole)) return true;
   if (viewer.isOwner) return true;
   return viewer.projectRole === PROJECT_ROLE.MANAGER
+    || viewer.projectRole === PROJECT_ROLE.COORDINATOR
     || viewer.projectRole === PROJECT_ROLE.ARCHITECT;
 }
 
