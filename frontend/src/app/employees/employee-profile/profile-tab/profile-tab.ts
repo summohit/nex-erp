@@ -335,6 +335,7 @@ export class ProfileTabComponent implements OnInit {
         // nested `shifts` key so records saved before this existed still load.
         usualWorkLocation: this.normaliseWorkLocation(this.employeeData.usualWorkLocation),
         workLocation: this.employeeData.workLocation || null,
+        weeklyOffs: this.employeeData.weeklyOffs || '',
         workNotes: this.employeeData.workNotes || '',
         
         pfNumber: this.employeeData.pfNumber || '',

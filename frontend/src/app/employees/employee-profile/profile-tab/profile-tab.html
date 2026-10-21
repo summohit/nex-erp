@@ -112,6 +112,26 @@
               </div>
             </div>
 
+            <!-- Personal weekly off (21 Oct 2026): wins over the shift and branch -->
+            <div class="form-row-item">
+              <label class="item-label">Weekly off</label>
+              <div class="item-value">
+                <select class="form-control" [(ngModel)]="formData.weeklyOffs" [disabled]="!canEditWorkDetails">
+                  <option value="">From shift / branch</option>
+                  <option value="0,6:even">Sunday + 2nd &amp; 4th Saturday</option>
+                  <option value="0">Sunday</option>
+                  <option value="0,6">Sunday + every Saturday</option>
+                  <option value="1">Monday</option>
+                  <option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option>
+                  <option value="4">Thursday</option>
+                  <option value="5">Friday</option>
+                  <option value="6">Saturday</option>
+                  <option value="NONE">No weekly off</option>
+                </select>
+              </div>
+            </div>
+
             <div class="form-row-item">
               <label class="item-label">Work Location</label>
               <div class="item-value">

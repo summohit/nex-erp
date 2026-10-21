@@ -682,7 +682,9 @@ export class AllAttendanceComponent implements OnInit {
         // The payroll rule (15 Oct 2026): the roster row, else a shift that
         // really leaves days out, else the branch. An all-week shift used to
         // win here, so Sundays nobody worked showed as absences.
-        const isDayOff = isRestDay(day.date, roster.get(key), emp.shift?.workingDays, weeklyOffs);
+        // The person's own weekly off wins over shift and branch (21 Oct 2026).
+        const ownOff = ((emp as any).weeklyOffs ?? '').trim();
+        const isDayOff = isRestDay(day.date, roster.get(key), ownOff ? null : emp.shift?.workingDays, ownOff || weeklyOffs);
         // Historic WEEKLY_OFF rows were generated using the branch default.
         // They must not keep Saturday/Sunday off after a person is moved to a
         // permanent weekend shift. An explicit roster entry still wins.

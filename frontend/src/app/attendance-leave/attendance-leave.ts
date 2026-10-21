@@ -3446,8 +3446,10 @@ export class AttendanceLeaveComponent implements OnInit {
     }
     this.employeeService.getMyProfile().subscribe({
       next: (p: any) => {
-        this.myWeeklyOffs.set(p?.branch ? (p.branch.weeklyOffs ?? '') : null);
-        this.myShiftDays.set(p?.shift?.workingDays ?? null);
+        // My own weekly off wins over the shift and branch (21 Oct 2026).
+        const own = (p?.weeklyOffs ?? '').trim();
+        this.myWeeklyOffs.set(own ? own : (p?.branch ? (p.branch.weeklyOffs ?? '') : null));
+        this.myShiftDays.set(own ? null : (p?.shift?.workingDays ?? null));
         this.generateGrid();
         this.loadMyRoster();
       },

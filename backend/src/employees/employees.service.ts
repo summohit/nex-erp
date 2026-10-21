@@ -98,6 +98,7 @@ export class EmployeesService {
         // as a working day invents one.
         branch: { select: { id: true, name: true, weeklyOffs: true } },
         shift: { select: { id: true, name: true, workingDays: true } },
+        weeklyOffs: true,
       },
       orderBy: { firstName: 'asc' }
     });
