@@ -401,11 +401,44 @@ export class EmployeesService {
       const sourceTraineeId = (() => { try { return JSON.parse(application?.answers || '{}')?.__traineeConversion?.sourceTraineeId; } catch { return null; } })();
       if (!trainee || !application || sourceTraineeId !== traineeId) throw new NotFoundException('Trainee conversion record was not found');
 
+      // Older job records may have been created without a designation even
+      // though their title maps exactly to one in master data.  Resolve that
+      // here so the promoted profile reflects the hired role, rather than
+      // retaining "Trainee" indefinitely.
+      const matchingDesignation = application.job.designationId
+        ? null
+        : await tx.designation.findFirst({
+            where: {
+              companyId,
+              name: { equals: application.job.title, mode: 'insensitive' },
+              ...(application.job.departmentId ? { departmentId: application.job.departmentId } : {}),
+            },
+            select: { id: true },
+          });
+      const designationId = application.job.designationId || matchingDesignation?.id || trainee.designationId;
+      const profileUpdates = {
+        onboardingStatus: 'COMPLETED',
+        joiningDate: application.joiningDate || trainee.joiningDate,
+        departmentId: application.job.departmentId || trainee.departmentId,
+        designationId,
+        branchId: application.job.branchId || trainee.branchId,
+      };
+
       // The signing endpoint can be retried by browsers/webhooks. Once this
-      // trainee is permanent, return the existing profile without issuing a
-      // second employee code or changing their account again.
+      // trainee is permanent, keep the existing profile and code, but still
+      // repair the ATS stage and job details. A converted trainee belongs in
+      // the ATS Onboarded lane and starts directly in the onboarding board's
+      // Completed column — their existing profile is already complete.
       if (trainee.employmentCategory !== 'TRAINEE') {
-        return { employee: trainee, offeredSalary: application.offeredSalary };
+        const employee = await tx.employee.update({ where: { id: trainee.id }, data: profileUpdates });
+        await tx.jobApplication.update({
+          where: { id: application.id },
+          data: {
+            status: 'ONBOARDED',
+            completedStages: Array.from(new Set([...(application.completedStages || []), 'HIRED', 'ONBOARDED'])),
+          },
+        });
+        return { employee, offeredSalary: application.offeredSalary };
       }
 
       const employeeCode = await this.generateEmployeeCode(tx, companyId, 'PERMANENT');
@@ -414,18 +447,14 @@ export class EmployeesService {
         data: {
           employeeCode,
           employmentCategory: 'PERMANENT',
-          onboardingStatus: 'COMPLETED',
-          joiningDate: application.joiningDate || trainee.joiningDate,
-          departmentId: application.job.departmentId || trainee.departmentId,
-          designationId: application.job.designationId || trainee.designationId,
-          branchId: application.job.branchId || trainee.branchId,
+          ...profileUpdates,
         },
       });
       await tx.jobApplication.update({
         where: { id: application.id },
         data: {
-          status: 'HIRED',
-          completedStages: Array.from(new Set([...(application.completedStages || []), 'HIRED'])),
+          status: 'ONBOARDED',
+          completedStages: Array.from(new Set([...(application.completedStages || []), 'HIRED', 'ONBOARDED'])),
         },
       });
       return { employee, offeredSalary: application.offeredSalary };
