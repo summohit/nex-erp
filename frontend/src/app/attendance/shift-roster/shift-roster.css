@@ -3214,4 +3214,5 @@ textarea.form-control-enhanced:focus {
 /* Assign WFH: photos and days-off note (21 Oct 2026) */
 .chip-avatar-circle img, .result-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 .chip-avatar-circle, .result-avatar { overflow: hidden; }
-.awfh-daysoff-note { margin: 4px 0 0; font-size: 12.5px; color: #64748b; }
+.awfh-daysoff-note { margin: 6px 0 0; padding: 10px 12px; border-radius: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; font-size: 12.5px; color: #166534; line-height: 1.45; }
+.awfh-daysoff-note b { color: #14532d; }
