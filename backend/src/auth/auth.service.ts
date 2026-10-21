@@ -315,7 +315,14 @@ export class AuthService {
       throw new UnauthorizedException('Verification token has expired.');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { email: verificationToken.identifier } });
+    // Verification links may be requested with different email casing from
+    // the originally imported account. Email addresses are case-insensitive
+    // for this product, so never let that difference strand an account in
+    // PENDING_VERIFICATION.
+    const identifier = verificationToken.identifier.trim().toLowerCase();
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: identifier, mode: 'insensitive' } },
+    });
     if (!user) {
       throw new UnauthorizedException('User not found.');
     }
@@ -487,9 +494,10 @@ export class AuthService {
   }
 
   async resendVerificationEmail(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
       where: {
-        email: { equals: email, mode: 'insensitive' }
+        email: { equals: normalizedEmail, mode: 'insensitive' }
       }
     });
     if (!user) {
@@ -502,19 +510,19 @@ export class AuthService {
 
     // Delete any existing tokens for this user
     await this.prisma.verificationToken.deleteMany({
-      where: { identifier: email }
+      where: { identifier: { equals: normalizedEmail, mode: 'insensitive' } }
     });
 
     const token = crypto.randomBytes(32).toString('hex');
     await this.prisma.verificationToken.create({
       data: {
-        identifier: email,
+        identifier: normalizedEmail,
         token: token,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
       }
     });
 
-    this.mailService.sendVerificationEmail(email, token).catch(e => console.error(e));
+    this.mailService.sendVerificationEmail(user.email, token).catch(e => console.error(e));
 
     return { message: 'Verification email resent successfully.' };
   }
