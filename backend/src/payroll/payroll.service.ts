@@ -1,3 +1,4 @@
+import { personalDaysOff } from '../common/weekly-offs';
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from './pdf.service';
@@ -460,7 +461,7 @@ export class PayrollService {
    * branch, so someone rostered Sat–Sun with Monday off lost pay every Monday.
    */
   private async restDayCheck(
-    emp: { id: number; shift?: { workingDays?: string | null } | null; branch?: { weeklyOffs?: string | null } | null },
+    emp: { id: number; weeklyOffs?: string | null; shift?: { workingDays?: string | null } | null; branch?: { weeklyOffs?: string | null } | null },
     start: Date, end: Date,
   ): Promise<(date: Date) => boolean> {
     // Tests that stub prisma without a roster still get the branch rule.
@@ -472,7 +473,7 @@ export class PayrollService {
       : [];
     const byDay = new Map(rows.map((r) => [this.payrollDateKey(r.date), r]));
     return (date: Date) => isRestDay(
-      date, byDay.get(this.payrollDateKey(date)), emp.shift?.workingDays, emp.branch?.weeklyOffs || '0',
+      date, byDay.get(this.payrollDateKey(date)), personalDaysOff(emp as any).shiftWorkingDays, personalDaysOff(emp as any).weeklyOffs || '0',
     );
   }
 

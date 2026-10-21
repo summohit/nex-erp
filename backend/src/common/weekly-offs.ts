@@ -25,3 +25,29 @@ export function isBranchWeeklyOff(date: Date, weeklyOffs?: string | null): boole
   }
   return false;
 }
+
+/**
+ * The days-off rule that applies to one person (21 Oct 2026). Their own
+ * weekly off, when set, replaces both the shift's working days and the branch
+ * weekly off; otherwise those apply as before. Returns the values to hand to
+ * isRestDay / resolveEffectiveShift unchanged, so every caller keeps its shape.
+ */
+export function personalDaysOff<S extends { workingDays?: string | null }>(emp: {
+  weeklyOffs?: string | null;
+  shift?: S | null;
+  branch?: { weeklyOffs?: string | null } | null;
+}): { shift: S | null; shiftWorkingDays: string | null; weeklyOffs: string | null } {
+  const own = (emp?.weeklyOffs ?? '').trim();
+  if (own) {
+    return {
+      shift: emp.shift ? ({ ...emp.shift, workingDays: null } as S) : null,
+      shiftWorkingDays: null,
+      weeklyOffs: own,
+    };
+  }
+  return {
+    shift: emp?.shift ?? null,
+    shiftWorkingDays: emp?.shift?.workingDays ?? null,
+    weeklyOffs: emp?.branch ? emp.branch.weeklyOffs ?? '' : null,
+  };
+}

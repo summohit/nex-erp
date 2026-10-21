@@ -797,6 +797,8 @@ export class EmployeesService {
       updateData.usualWorkLocation = data.usualWorkLocation ? data.usualWorkLocation : null;
     }
     setText('workLocation');
+    // Personal weekly off (21 Oct 2026): "0,6:even", "1", "NONE"; empty = shift / branch.
+    setText('weeklyOffs');
     setText('workNotes');
     setText('pfNumber');
     setText('esiNumber');

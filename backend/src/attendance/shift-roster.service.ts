@@ -85,7 +85,7 @@ function toKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-import { isBranchWeeklyOff } from '../common/weekly-offs';
+import { isBranchWeeklyOff, personalDaysOff } from '../common/weekly-offs';
 /** Leave types that are really Work From Home (same test as the dashboard). */
 const WFH_PATTERN = /work\s*from\s*home|wfh|remote/i;
 
@@ -127,7 +127,7 @@ export class ShiftRosterService {
         shift: true,
         branch: { select: { weeklyOffs: true, name: true } },
         user: { select: { status: true } },
-        workLocation: true, usualWorkLocation: true,
+        workLocation: true, usualWorkLocation: true, weeklyOffs: true,
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
@@ -329,10 +329,12 @@ export class ShiftRosterService {
         // run that weekday, in which case the day is off by definition.
         if (emp.shift) {
           const dayName = DAY_NAMES[new Date(`${day}T00:00:00Z`).getUTCDay()];
-          const hasPermanentDays = !!emp.shift.workingDays?.trim();
+          // The person's own weekly off wins over the shift and branch (21 Oct 2026).
+          const own = personalDaysOff(emp);
+          const hasPermanentDays = !!own.shiftWorkingDays?.trim();
           const works = hasPermanentDays
-            ? emp.shift.workingDays!.split(',').map((value) => value.trim()).includes(dayName)
-            : !isBranchWeeklyOff(new Date(`${day}T00:00:00Z`), emp.branch?.weeklyOffs);
+            ? own.shiftWorkingDays!.split(',').map((value) => value.trim()).includes(dayName)
+            : !isBranchWeeklyOff(new Date(`${day}T00:00:00Z`), own.weeklyOffs);
           // The branch's weekly offs too, e.g. 2nd and 4th Saturday. A shift
           // rostered on such a day (above) still wins — that is how someone
           // is put to work on an off Saturday.
@@ -424,10 +426,11 @@ export class ShiftRosterService {
     if (standing === undefined || weeklyOffs === undefined) {
       const emp = await this.prisma.employee.findUnique({
         where: { id: employeeId },
-        select: { shift: true, branch: { select: { weeklyOffs: true } } },
+        select: { shift: true, weeklyOffs: true, branch: { select: { weeklyOffs: true } } },
       });
-      if (standing === undefined) standing = emp?.shift ?? null;
-      if (weeklyOffs === undefined) weeklyOffs = emp?.branch ? emp.branch.weeklyOffs ?? '' : null;
+      const own = emp ? personalDaysOff(emp) : null;
+      if (standing === undefined) standing = (own?.shift as any) ?? null;
+      if (weeklyOffs === undefined) weeklyOffs = own ? own.weeklyOffs : null;
     }
 
     const entry = await this.prisma.shiftRosterEntry.findUnique({
@@ -458,7 +461,7 @@ export class ShiftRosterService {
     const [employees, entries] = await Promise.all([
       this.prisma.employee.findMany({
         where: { id: { in: employeeIds } },
-        select: { id: true, shift: true, branch: { select: { weeklyOffs: true } } },
+        select: { id: true, shift: true, weeklyOffs: true, branch: { select: { weeklyOffs: true } } },
       }),
       this.prisma.shiftRosterEntry.findMany({
         where: { employeeId: { in: employeeIds }, date },
@@ -466,9 +469,9 @@ export class ShiftRosterService {
       }),
     ]);
 
-    const standingByEmployee = new Map(employees.map(e => [e.id, e.shift ?? null]));
+    const standingByEmployee = new Map(employees.map(e => [e.id, (personalDaysOff(e).shift as any) ?? null]));
     const offsByEmployee = new Map(
-      employees.map(e => [e.id, e.branch ? e.branch.weeklyOffs ?? '' : null] as const),
+      employees.map(e => [e.id, personalDaysOff(e).weeklyOffs] as const),
     );
     const entryByEmployee = new Map(entries.map(e => [e.employeeId, e]));
 

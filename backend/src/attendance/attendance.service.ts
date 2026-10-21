@@ -12,7 +12,7 @@ import { isHalfDayStart } from './half-day-rule';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
 import { isCompanyAdmin, isHrAdmin } from '../common/company-roles';
-import { isBranchWeeklyOff } from '../common/weekly-offs';
+import { isBranchWeeklyOff, personalDaysOff } from '../common/weekly-offs';
 import { isRestDay } from '../common/rest-day';
 
 /**
@@ -112,7 +112,8 @@ export class AttendanceService {
     // The same rest-day rule payroll uses: the roster row, else a shift that
     // actually has days off, else the branch weekly off. Before 15 Oct 2026
     // every Sunday counted, so rostered Sunday shifts earned comp-off.
-    const dayOff = isRestDay(date, entry, attendance.employee.shift?.workingDays, attendance.employee.branch?.weeklyOffs);
+    const own = personalDaysOff(attendance.employee as any);
+    const dayOff = isRestDay(date, entry, own.shiftWorkingDays, own.weeklyOffs);
     if (!dayOff && !holiday) return;
 
     // Comp-off is earned only for an approved field visit that day (decided
@@ -364,7 +365,7 @@ export class AttendanceService {
     // shift, or (the usual case) nothing, in which case the standing shift
     // still applies exactly as before.
     const effective = this.workingWindow(await this.roster.getEffectiveShift(
-      employee.id, todayKey, employee.shift, employee.branch ? employee.branch.weeklyOffs ?? '' : null,
+      employee.id, todayKey, personalDaysOff(employee as any).shift as any, personalDaysOff(employee as any).weeklyOffs,
     ));
 
     // A field visit day may also be clocked from here (TKT-029). Late and
@@ -794,7 +795,7 @@ export class AttendanceService {
   private async isOvernightContinuation(employee: any, session: { date: Date }, todayKey: Date, now: Date) {
     if (todayKey.getTime() - session.date.getTime() !== 86400000) return false;
     const effective = await this.roster.getEffectiveShift(
-      employee.id, session.date, employee.shift, employee.branch ? employee.branch.weeklyOffs ?? '' : null,
+      employee.id, session.date, personalDaysOff(employee as any).shift as any, personalDaysOff(employee as any).weeklyOffs,
     );
     if (!effective?.startTime || !effective?.endTime || effective.endTime > effective.startTime) return false;
     const end = istTimeInstant(now, effective.endTime);
@@ -886,7 +887,7 @@ export class AttendanceService {
     }
 
     const effective = this.workingWindow(await this.roster.getEffectiveShift(
-      employee.id, existing.date, employee.shift, employee.branch ? employee.branch.weeklyOffs ?? '' : null,
+      employee.id, existing.date, personalDaysOff(employee as any).shift as any, personalDaysOff(employee as any).weeklyOffs,
     ));
 
     // Office geofence (B3), on the same on-site exemption as clock-in — and
@@ -1935,6 +1936,7 @@ export class AttendanceService {
             user: { select: { email: true, role: true } },
             shift: { select: { id: true, name: true, workingDays: true } },
             branch: { select: { weeklyOffs: true } },
+            weeklyOffs: true,
           },
         },
         project: {
@@ -1967,6 +1969,7 @@ export class AttendanceService {
         user: { select: { email: true, role: true } },
         shift: { select: { id: true, name: true, workingDays: true } },
         branch: { select: { weeklyOffs: true } },
+        weeklyOffs: true,
       } as const;
       const rangeStart = dateFilter.gte ?? new Date('1970-01-01T00:00:00.000Z');
       const rangeEnd = dateFilter.lte ?? new Date('9999-12-31T23:59:59.999Z');
@@ -2042,6 +2045,7 @@ export class AttendanceService {
             user: { select: { email: true, role: true } },
             shift: { select: { id: true, name: true, workingDays: true } },
             branch: { select: { weeklyOffs: true } },
+            weeklyOffs: true,
           },
         },
       },

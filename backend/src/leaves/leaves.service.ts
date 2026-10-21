@@ -1,3 +1,4 @@
+import { personalDaysOff } from '../common/weekly-offs';
 import { isRestDay } from '../common/rest-day';
 import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -1032,7 +1033,7 @@ export class LeavesService {
    */
   private async calculateWorkingDays(
     start: Date, end: Date,
-    employee: { id: number; shift?: { workingDays?: string | null } | null; branch?: { weeklyOffs?: string | null } | null },
+    employee: { id: number; weeklyOffs?: string | null; shift?: { workingDays?: string | null } | null; branch?: { weeklyOffs?: string | null } | null },
     isHalfDay: boolean, holidayDates?: Set<string>,
   ): Promise<number> {
     const dayOf = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -1054,7 +1055,9 @@ export class LeavesService {
     let count = 0;
     while (current <= last) {
       const dateStr = current.toISOString().split('T')[0];
-      const rest = isRestDay(current, roster.get(dateStr), employee.shift?.workingDays, employee.branch?.weeklyOffs || '0');
+      // The person's own weekly off wins over shift and branch (21 Oct 2026).
+      const own = personalDaysOff(employee as any);
+      const rest = isRestDay(current, roster.get(dateStr), own.shiftWorkingDays, own.weeklyOffs || '0');
       if (!rest && !(holidayDates && holidayDates.has(dateStr))) {
         count++;
       }

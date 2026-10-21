@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { isHrAdmin, isSuperAdmin } from '../common/company-roles';
-import { isBranchWeeklyOff } from '../common/weekly-offs';
+import { isBranchWeeklyOff, personalDaysOff } from '../common/weekly-offs';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -108,7 +108,7 @@ export class WfhService {
     if (ids.length * dates.length > 500) throw new BadRequestException('Too many days at once (max 500)');
     const people = await this.prisma.employee.findMany({
       where: { id: { in: ids }, companyId: v.companyId },
-      select: { id: true, shift: { select: { workingDays: true } }, branch: { select: { weeklyOffs: true } } },
+      select: { id: true, weeklyOffs: true, shift: { select: { workingDays: true } }, branch: { select: { weeklyOffs: true } } },
     });
     const valid = new Set(people.map((p) => p.id));
     // Each person's own days off are skipped (21 Oct 2026): the roster's day
@@ -121,9 +121,10 @@ export class WfhService {
     const isOff = (p: (typeof people)[number], d: Date) => {
       const k = `${p.id}_${d.toISOString().slice(0, 10)}`;
       if (rosterBy.has(k)) return !!rosterBy.get(k);
-      const wd = p.shift?.workingDays?.trim();
+      const own = personalDaysOff(p);
+      const wd = own.shiftWorkingDays?.trim();
       if (wd) return !wd.split(',').map((x) => x.trim()).includes(DAY_NAMES[d.getUTCDay()]);
-      return isBranchWeeklyOff(d, p.branch?.weeklyOffs);
+      return isBranchWeeklyOff(d, own.weeklyOffs);
     };
     const existing = await this.prisma.wfhRequest.findMany({
       where: { employeeId: { in: [...valid] }, date: { in: dates }, status: { in: COUNTS } }, select: { employeeId: true, date: true },

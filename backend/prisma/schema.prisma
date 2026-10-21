@@ -504,6 +504,11 @@ model Employee {
 
   /// Probation (19 Oct 2026): HR puts someone on probation until this day,
   /// by months or a date; confirmed when HR closes it.
+  /// The person's own weekly off (21 Oct 2026), same format as Branch.weeklyOffs
+  /// ("0,6:even" = Sunday + 2nd/4th Saturday; "1" = Monday; "NONE" = works
+  /// every day). When set it wins over the shift's working days and the branch
+  /// weekly off; a rostered day still wins over it.
+  weeklyOffs           String?
   probationEndDate     DateTime?
   probationConfirmedAt DateTime?
   pips                 Pip[]        @relation("PipEmployee")
