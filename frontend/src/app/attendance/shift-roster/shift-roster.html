@@ -27,6 +27,8 @@
       <button class="btn-outline" (click)="load()" title="Reload">
         <svg lucideRotateCcw size="15"></svg> Refresh
       </button>
+      <a class="btn-secondary" routerLink="/wfh-report" *ngIf="canAssignWfh()">WFH report</a>
+      <button class="btn-secondary" (click)="openAssignWfh()" *ngIf="canAssignWfh()">🏠 Assign WFH</button>
       <button class="btn-primary" (click)="openBulk()">
         <svg lucideWandSparkles size="16"></svg> Automate Shifts
       </button>
@@ -945,6 +947,34 @@
     <div class="modal-footer">
       <span class="spacer"></span>
       <button class="btn-outline" (click)="closeApprovals()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign WFH (21 Oct 2026): HR / super admin; approved at once, not in the monthly limit -->
+<div class="awfh-overlay" *ngIf="wfhOpen()" (click)="wfhOpen.set(false)">
+  <div class="awfh-dialog" (click)="$event.stopPropagation()">
+    <h3>Assign WFH</h3>
+    <p class="awfh-note">Approved straight away, no approval steps, and not counted in the person's monthly WFH allowance. They are notified.</p>
+    <label class="awfh-field"><span>Employees</span>
+      <div class="awfh-chips">
+        <span class="awfh-chip" *ngFor="let p of wfhPickedPeople()">{{ p.name }} <button type="button" (click)="wfhPicked.set(wfhPicked().filter(x => x !== p.id))">×</button></span>
+      </div>
+      <input type="text" placeholder="Search name or code…" [value]="wfhQuery()" (input)="wfhQuery.set($any($event.target).value)" />
+      <div class="awfh-results" *ngIf="wfhQuery().trim() && wfhMatches().length">
+        <button type="button" *ngFor="let m of wfhMatches()" (click)="wfhPicked.set([...wfhPicked(), m.id]); wfhQuery.set('')"><b>{{ m.name }}</b><span>{{ m.sub }}</span></button>
+      </div>
+    </label>
+    <div class="awfh-two">
+      <label class="awfh-field"><span>From</span><input type="date" [(ngModel)]="wfhFrom" /></label>
+      <label class="awfh-field"><span>To</span><input type="date" [(ngModel)]="wfhTo" [min]="wfhFrom" /></label>
+    </div>
+    <label class="awfh-check"><input type="checkbox" [(ngModel)]="wfhSkipWeekends" /> Skip Saturdays and Sundays</label>
+    <label class="awfh-field"><span>Reason (optional)</span><input type="text" [(ngModel)]="wfhReason" placeholder="e.g. office closed, client remote day" /></label>
+    <p class="awfh-sum">{{ wfhPicked().length }} {{ wfhPicked().length === 1 ? 'person' : 'people' }} × {{ wfhDates().length }} {{ wfhDates().length === 1 ? 'day' : 'days' }}</p>
+    <div class="awfh-actions">
+      <button type="button" class="btn-secondary" (click)="wfhOpen.set(false)">Cancel</button>
+      <button type="button" class="btn-primary" (click)="saveAssignWfh()" [disabled]="wfhBusy()">{{ wfhBusy() ? 'Saving…' : 'Assign WFH' }}</button>
     </div>
   </div>
 </div>

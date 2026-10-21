@@ -203,6 +203,14 @@ import { DialogService } from '../services/dialog.service';
               <span class="wfh-history-title">My WFH Requests</span>
               <span class="wfh-history-count">{{ requests().length }}</span>
             </div>
+            <!-- This month at a glance (21 Oct 2026) -->
+            <div class="wfh-month-counts" *ngIf="counts() as c">
+              <span class="ok">{{ c.approved }} approved</span>
+              <span class="pend">{{ c.pending }} pending</span>
+              <span class="rej" *ngIf="c.rejected">{{ c.rejected }} rejected</span>
+              <span class="asg" *ngIf="c.assigned">{{ c.assigned }} assigned by HR</span>
+              <small>this month</small>
+            </div>
 
             <!-- Empty State -->
             <div class="wfh-empty-state" *ngIf="!requests().length">
@@ -851,6 +859,11 @@ import { DialogService } from '../services/dialog.service';
       box-shadow: none;
     }
 
+    .wfh-month-counts { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0 10px; }
+    .wfh-month-counts span { font-size: 11.5px; font-weight: 800; padding: 3px 9px; border-radius: 999px; }
+    .wfh-month-counts .ok { background: #ecfdf5; color: #047857; } .wfh-month-counts .pend { background: #fffbeb; color: #b45309; }
+    .wfh-month-counts .rej { background: #fef2f2; color: #b91c1c; } .wfh-month-counts .asg { background: #eff6ff; color: #1d4ed8; }
+    .wfh-month-counts small { font-size: 11.5px; color: #94a3b8; }
     /* ── 5. My WFH Requests History Section ── */
     .wfh-history-section {
       display: flex;
@@ -1104,6 +1117,7 @@ export class WfhRequestComponent implements OnInit {
   busy = signal(false);
   limit = signal(1);
   used = signal(0);
+  counts = signal<{ approved: number; pending: number; rejected: number; assigned: number } | null>(null);
   requests = signal<WfhRequest[]>([]);
 
   today = this.offsetDateStr(0);
@@ -1165,6 +1179,7 @@ export class WfhRequestComponent implements OnInit {
         this.limitInput = r.limit;
         this.used.set(r.usedThisMonth);
         this.requests.set(r.requests || []);
+        this.counts.set((r as any).counts ?? null);
       },
       error: () => {},
     });

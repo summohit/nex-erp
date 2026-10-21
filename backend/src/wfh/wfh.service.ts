@@ -81,14 +81,108 @@ export class WfhService {
       }),
       this.usedInMonth(v.employeeId, t),
     ]);
-    return { limit, usedThisMonth: used, requests };
+    const thisMonth = requests.filter((r) => r.date.getUTCFullYear() === t.getUTCFullYear() && r.date.getUTCMonth() === t.getUTCMonth());
+    const counts = {
+      approved: thisMonth.filter((r) => r.status === WFH_STATUS.APPROVED).length,
+      pending: thisMonth.filter((r) => OPEN.includes(r.status as any)).length,
+      rejected: thisMonth.filter((r) => r.status === WFH_STATUS.REJECTED).length,
+      assigned: thisMonth.filter((r) => r.source === 'ASSIGNED' && r.status === WFH_STATUS.APPROVED).length,
+    };
+    return { limit, usedThisMonth: used, requests, counts };
+  }
+
+  /**
+   * HR / super admin assign WFH from the roster (21 Oct 2026): approved at
+   * once, no approval steps, and outside the employee's monthly allowance.
+   * Days the person already has WFH for are skipped. Each person is told.
+   */
+  async assign(v: Viewer, body: { employeeIds: number[]; dates: string[]; reason?: string }) {
+    if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can assign WFH');
+    const ids = [...new Set((body?.employeeIds ?? []).map(Number).filter(Boolean))];
+    const dates = [...new Set((body?.dates ?? []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)))].map((d) => this.parseDay(d));
+    if (!ids.length) throw new BadRequestException('Choose at least one employee');
+    if (!dates.length) throw new BadRequestException('Choose at least one day');
+    if (ids.length * dates.length > 500) throw new BadRequestException('Too many days at once (max 500)');
+    const people = await this.prisma.employee.findMany({ where: { id: { in: ids }, companyId: v.companyId }, select: { id: true } });
+    const valid = new Set(people.map((p) => p.id));
+    const existing = await this.prisma.wfhRequest.findMany({
+      where: { employeeId: { in: [...valid] }, date: { in: dates }, status: { in: COUNTS } }, select: { employeeId: true, date: true },
+    });
+    const have = new Set(existing.map((e) => `${e.employeeId}_${e.date.toISOString().slice(0, 10)}`));
+    const reason = String(body?.reason ?? '').trim() || 'Assigned by HR';
+    const rows: any[] = [];
+    for (const id of valid) for (const d of dates) {
+      if (have.has(`${id}_${d.toISOString().slice(0, 10)}`)) continue;
+      rows.push({ companyId: v.companyId, employeeId: id, date: d, reason, status: WFH_STATUS.APPROVED, source: 'ASSIGNED', reviewedById: v.employeeId, reviewedAt: new Date() });
+    }
+    if (rows.length) await this.prisma.wfhRequest.createMany({ data: rows });
+    const label = dates.length === 1 ? this.label(dates[0]) : `${dates.length} days from ${this.label(dates.sort((a, b) => a.getTime() - b.getTime())[0])}`;
+    await this.notify([...valid], v, 'WFH assigned', `You are set to work from home: ${label}. ${reason}`);
+    return { created: rows.length, skipped: valid.size * dates.length - rows.length };
+  }
+
+  /**
+   * WFH report for HR (21 Oct 2026): everyone's WFH in a month, per person
+   * (approved, pending, rejected, assigned) and every day, optionally one department.
+   */
+  async report(v: Viewer, q: { month?: number; year?: number; departmentId?: number }) {
+    if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can see the WFH report');
+    const now = new Date(Date.now() + 330 * 60_000);
+    const y = Number(q.year) || now.getUTCFullYear();
+    const m = Number(q.month) || now.getUTCMonth() + 1;
+    const from = new Date(Date.UTC(y, m - 1, 1));
+    const to = new Date(Date.UTC(y, m, 1));
+    const rows = await this.prisma.wfhRequest.findMany({
+      where: {
+        companyId: v.companyId, date: { gte: from, lt: to }, status: { not: WFH_STATUS.CANCELLED },
+        ...(q.departmentId ? { employee: { departmentId: Number(q.departmentId) } } : {}),
+      },
+      include: { employee: { select: PERSON }, reviewedBy: { select: { firstName: true, lastName: true } } },
+      orderBy: { date: 'asc' },
+    });
+    const byPerson = new Map<number, any>();
+    for (const r of rows) {
+      const p = byPerson.get(r.employeeId) ?? {
+        employee: r.employee, approved: 0, pending: 0, rejected: 0, assigned: 0, days: [] as any[],
+      };
+      if (r.status === WFH_STATUS.APPROVED) p.approved++;
+      else if (OPEN.includes(r.status as any)) p.pending++;
+      else if (r.status === WFH_STATUS.REJECTED) p.rejected++;
+      if (r.source === 'ASSIGNED' && r.status === WFH_STATUS.APPROVED) p.assigned++;
+      p.days.push({ id: r.id, date: r.date, status: r.status, source: r.source, reason: r.reason, reviewNote: r.reviewNote });
+      byPerson.set(r.employeeId, p);
+    }
+    const people = [...byPerson.values()].sort((a, b) => b.approved + b.pending - (a.approved + a.pending));
+    return {
+      month: m, year: y, limit: await this.getLimit(v.companyId),
+      totals: {
+        approved: people.reduce((n, p) => n + p.approved, 0),
+        pending: people.reduce((n, p) => n + p.pending, 0),
+        rejected: people.reduce((n, p) => n + p.rejected, 0),
+        assigned: people.reduce((n, p) => n + p.assigned, 0),
+        people: people.length,
+      },
+      people,
+    };
+  }
+
+  /** HR / super admin cancel any WFH day, e.g. one assigned by mistake. */
+  async adminCancel(v: Viewer, id: number) {
+    if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can cancel this');
+    const r = await this.prisma.wfhRequest.findFirst({ where: { id, companyId: v.companyId } });
+    if (!r) throw new NotFoundException('Request not found');
+    if (![...OPEN, WFH_STATUS.APPROVED].includes(r.status as any)) throw new BadRequestException('This request is already closed');
+    const done = await this.prisma.wfhRequest.update({ where: { id }, data: { status: WFH_STATUS.CANCELLED } });
+    await this.notify([r.employeeId], v, 'WFH cancelled', `Your WFH day on ${this.label(r.date)} was cancelled by HR.`);
+    return done;
   }
 
   private async usedInMonth(employeeId: number, day: Date, exceptId?: number) {
     const from = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), 1));
     const to = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth() + 1, 1));
     return this.prisma.wfhRequest.count({
-      where: { employeeId, status: { in: COUNTS }, date: { gte: from, lt: to }, ...(exceptId ? { id: { not: exceptId } } : {}) },
+      // Days HR assigned from the roster are not the employee's allowance.
+      where: { employeeId, source: 'REQUEST', status: { in: COUNTS }, date: { gte: from, lt: to }, ...(exceptId ? { id: { not: exceptId } } : {}) },
     });
   }
 

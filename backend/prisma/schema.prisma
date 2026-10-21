@@ -683,7 +683,7 @@ model Branch {
   isActive       Boolean    @default(true)
   companyId      Int
   company        Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  geofenceRadius Int?       @default(100) // meters
+  geofenceRadius Int?       @default(200) // meters
   allowedIps     String? // Comma-separated list of allowed IPs
   employees      Employee[]
   jobs           Job[]
@@ -4616,6 +4616,9 @@ model WfhRequest {
   reason       String    @db.Text
   /// PENDING_MANAGER, PENDING_HR, APPROVED, REJECTED, CANCELLED
   status       String    @default("PENDING_MANAGER")
+  /// REQUEST (asked by the employee) or ASSIGNED (set by HR / super admin
+  /// from the roster, 21 Oct 2026: approved at once, not in the monthly limit).
+  source       String    @default("REQUEST")
   managerApprovedAt DateTime?
   reviewedById Int?
   reviewedBy   Employee? @relation("WfhReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)

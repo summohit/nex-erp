@@ -67,6 +67,10 @@ export const routes: Routes = [
       {
         // One approvals inbox (19 Oct 2026), as in the app. No module gate:
         // each queue is scoped by the server, empty for people who approve nothing.
+        path: 'wfh-report',
+        loadComponent: () => import('./attendance/wfh-report/wfh-report').then(m => m.WfhReportComponent)
+      },
+      {
         path: 'approvals',
         loadComponent: () => import('./approvals/approvals').then(m => m.ApprovalsComponent)
       },

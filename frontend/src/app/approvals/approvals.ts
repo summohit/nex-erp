@@ -1,4 +1,5 @@
 import { Component, computed, HostListener, inject, OnInit, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -38,7 +39,7 @@ export interface ApprovalRow {
 @Component({
   selector: 'app-approvals',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './approvals.html',
   styleUrls: ['./approvals.css'],
 })
@@ -61,6 +62,22 @@ export class ApprovalsComponent implements OnInit {
   loading = signal(true);
   available = signal<Set<ApprovalKind>>(new Set());
   rows = signal<ApprovalRow[]>([]);
+  /** WFH at a glance (21 Oct 2026): waiting by stage; approved this month for HR. */
+  wfhApprovedThisMonth = signal<number | null>(null);
+  wfhStageCounts = computed(() => {
+    const w = this.rows().filter((r: any) => r.kind === 'WFH');
+    return {
+      manager: w.filter((r: any) => r.raw?.status === 'PENDING_MANAGER').length,
+      hr: w.filter((r: any) => r.raw?.status === 'PENDING_HR').length,
+    };
+  });
+  loadWfhMonth() {
+    const n = new Date(Date.now() + 330 * 60_000);
+    this.wfh.report(n.getUTCMonth() + 1, n.getUTCFullYear()).subscribe({
+      next: (d: any) => this.wfhApprovedThisMonth.set(d?.totals?.approved ?? null),
+      error: () => this.wfhApprovedThisMonth.set(null),
+    });
+  }
   tab = signal<ApprovalKind | 'ALL'>('ALL');
   query = signal('');
   departmentFilter = signal('');
@@ -168,6 +185,7 @@ export class ApprovalsComponent implements OnInit {
   });
 
   ngOnInit() {
+    this.loadWfhMonth();
     this.load();
   }
 

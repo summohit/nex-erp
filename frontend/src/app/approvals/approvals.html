@@ -165,6 +165,14 @@
       </div>
     </div>
 
+    <!-- WFH at a glance (21 Oct 2026) -->
+    <div class="ap-wfh-strip" *ngIf="tab() === 'WFH'">
+      <span class="pend">{{ wfhStageCounts().manager }} waiting for manager</span>
+      <span class="pend">{{ wfhStageCounts().hr }} waiting for HR</span>
+      <span class="ok" *ngIf="wfhApprovedThisMonth() !== null">{{ wfhApprovedThisMonth() }} approved this month</span>
+      <a routerLink="/wfh-report" *ngIf="wfhApprovedThisMonth() !== null">WFH report →</a>
+    </div>
+
     <div class="ap-toolbar-bottom">
       <div class="ap-filters-left">
         <!-- Department Select -->

@@ -1518,3 +1518,9 @@ th.sticky-actions-col {
     width: 100%;
   }
 }
+
+/* WFH at a glance (21 Oct 2026) */
+.ap-wfh-strip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+.ap-wfh-strip span { font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; }
+.ap-wfh-strip .pend { background: #fffbeb; color: #b45309; } .ap-wfh-strip .ok { background: #ecfdf5; color: #047857; }
+.ap-wfh-strip a { font-size: 12.5px; font-weight: 700; color: #1373e5; text-decoration: none; margin-left: 4px; }

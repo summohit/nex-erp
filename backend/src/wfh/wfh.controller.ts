@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { WfhService } from './wfh.service';
 
@@ -26,6 +26,17 @@ export class WfhController {
 
   @Post(':id/cancel')
   cancel(@Request() req, @Param('id', ParseIntPipe) id: number) { return this.svc.cancel(this.v(req), id); }
+
+  @Post('assign')
+  assign(@Request() req, @Body() body: { employeeIds: number[]; dates: string[]; reason?: string }) { return this.svc.assign(this.v(req), body); }
+
+  @Get('report')
+  report(@Request() req, @Query('month') month?: string, @Query('year') year?: string, @Query('departmentId') departmentId?: string) {
+    return this.svc.report(this.v(req), { month: Number(month) || undefined, year: Number(year) || undefined, departmentId: Number(departmentId) || undefined });
+  }
+
+  @Post(':id/admin-cancel')
+  adminCancel(@Request() req, @Param('id', ParseIntPipe) id: number) { return this.svc.adminCancel(this.v(req), id); }
 
   @Get('pending')
   pending(@Request() req) { return this.svc.pending(this.v(req)); }

@@ -2502,3 +2502,22 @@ textarea.form-control-enhanced:focus {
 /* Where the day is worked (19 Oct 2026) */
 .chip-where { display: inline-block; margin-top: 3px; font-size: 10px; font-weight: 800; letter-spacing: .02em; padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,.25); color: #fff; }
 .chip-where.wfh { background: #fff; color: #047857; }
+
+/* Assign WFH (21 Oct 2026) */
+.awfh-overlay { position: fixed; inset: 0; z-index: 1300; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.awfh-dialog { width: min(520px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: #fff; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+.awfh-dialog h3 { margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; }
+.awfh-note { margin: 0; font-size: 12.5px; color: #64748b; background: #f8fafc; border-radius: 10px; padding: 8px 10px; }
+.awfh-field { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 700; color: #334155; position: relative; }
+.awfh-field input { height: 40px; border: 1px solid #cbd5e1; border-radius: 10px; padding: 0 12px; font-size: 13.5px; }
+.awfh-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.awfh-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border-radius: 999px; background: #ecfdf5; color: #047857; font-size: 12.5px; font-weight: 700; }
+.awfh-chip button { border: 0; background: #fff; border-radius: 50%; width: 18px; height: 18px; cursor: pointer; color: #64748b; }
+.awfh-results { position: absolute; z-index: 5; top: 100%; left: 0; right: 0; max-height: 240px; overflow-y: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 12px 24px rgba(15,23,42,.12); }
+.awfh-results button { display: flex; flex-direction: column; align-items: flex-start; width: 100%; padding: 8px 12px; border: 0; background: #fff; text-align: left; cursor: pointer; font-size: 13px; }
+.awfh-results button:hover { background: #f8fafc; }
+.awfh-results span { font-size: 11.5px; color: #64748b; font-weight: 500; }
+.awfh-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.awfh-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #334155; }
+.awfh-sum { margin: 0; font-size: 13px; font-weight: 700; color: #047857; }
+.awfh-actions { display: flex; justify-content: flex-end; gap: 8px; }
