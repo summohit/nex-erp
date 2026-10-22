@@ -355,8 +355,70 @@
                 <input type="text" class="ci-input" [(ngModel)]="editingWidget.botName" placeholder="e.g. CES Assistant" />
               </div>
               <div class="ci-field-group">
-                <label class="ci-label">Bot Avatar Image URL <small class="ci-opt-tag">(Optional)</small></label>
-                <input type="text" class="ci-input" [(ngModel)]="editingWidget.botAvatarUrl" placeholder="https://.../avatar.png" />
+                <label class="ci-label">Bot Avatar <small class="ci-opt-tag">(Optional)</small></label>
+                <div class="ci-avatar-upload-card">
+                  <!-- Avatar Circle with hover overlay and click-to-upload -->
+                  <div 
+                    class="ci-avatar-preview-box" 
+                    (click)="avatarFile.click()" 
+                    [title]="editingWidget.botAvatarUrl ? 'Click to change photo' : 'Click to upload photo'"
+                    [style.background]="!editingWidget.botAvatarUrl ? (editingWidget.primaryColor || '#0284c7') : '#f8fafc'">
+                    
+                    <img 
+                      *ngIf="editingWidget.botAvatarUrl" 
+                      [src]="editingWidget.botAvatarUrl" 
+                      alt="Bot avatar" 
+                      (error)="editingWidget.botAvatarUrl = ''" 
+                    />
+                    
+                    <span *ngIf="!editingWidget.botAvatarUrl" class="ci-avatar-initial">
+                      {{ (editingWidget.botName || 'B')[0] }}
+                    </span>
+
+                    <!-- Hover Camera Overlay -->
+                    <div class="ci-avatar-hover-overlay">
+                      <svg lucideCamera size="16"></svg>
+                    </div>
+
+                    <!-- Uploading Overlay Spinner -->
+                    <div class="ci-avatar-loading-overlay" *ngIf="avatarUploading">
+                      <div class="spinner-small"></div>
+                    </div>
+                  </div>
+
+                  <!-- Upload & Action Controls -->
+                  <div class="ci-avatar-controls">
+                    <input #avatarFile type="file" accept="image/png,image/jpeg,image/webp" hidden (change)="uploadAvatar($event)" />
+                    
+                    <div class="ci-avatar-buttons">
+                      <button 
+                        type="button" 
+                        class="ci-btn-avatar-upload" 
+                        (click)="avatarFile.click()" 
+                        [disabled]="avatarUploading">
+                        <svg lucideUpload size="13" *ngIf="!avatarUploading"></svg>
+                        <span>{{ avatarUploading ? 'Uploading…' : (editingWidget.botAvatarUrl ? 'Change Photo' : 'Upload Photo') }}</span>
+                      </button>
+
+                      <button 
+                        type="button" 
+                        class="ci-btn-avatar-remove" 
+                        *ngIf="editingWidget.botAvatarUrl && !avatarUploading" 
+                        (click)="editingWidget.botAvatarUrl = ''"
+                        title="Remove avatar photo">
+                        <svg lucideTrash2 size="13"></svg>
+                        <span>Remove</span>
+                      </button>
+                    </div>
+
+                    <div class="ci-avatar-specs">
+                      <span class="ci-avatar-spec-pill">PNG, JPG, WebP</span>
+                      <span class="ci-avatar-spec-pill">Max 2 MB</span>
+                      <span class="ci-avatar-spec-pill">Square 1:1</span>
+                    </div>
+                  </div>
+                </div>
+                <span class="ci-field-hint">Used in the header and message bubbles. If not provided, your company logo is used.</span>
               </div>
             </div>
 
@@ -479,7 +541,8 @@
                 <div class="ci-wm-body">
                   <div class="ci-wm-bot-bubble-wrap">
                     <div class="ci-wm-bot-avatar-mini" [style.background]="editingWidget.primaryColor || '#0284c7'">
-                      {{ (editingWidget.botName || 'C')[0] }}
+                      <img *ngIf="editingWidget.botAvatarUrl" [src]="editingWidget.botAvatarUrl" alt="Bot" (error)="editingWidget.botAvatarUrl = ''" />
+                      <span *ngIf="!editingWidget.botAvatarUrl">{{ (editingWidget.botName || 'C')[0] }}</span>
                     </div>
                     <div class="ci-wm-bubble">
                       {{ editingWidget.greetingMessage || 'Hi there! How can we help you today?' }}

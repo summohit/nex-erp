@@ -9,7 +9,7 @@ import { PermissionsService } from '../../services/permissions.service';
 import {
   LucideMessageCircle, LucideSearch, LucidePlus, LucideTrash2, LucideSave, LucideCopy,
   LucideEdit2, LucideFileText, LucideChevronLeft, LucideExternalLink,
-  LucideSparkles, LucideGlobe, LucideCode, LucideCheck,
+  LucideSparkles, LucideGlobe, LucideCode, LucideCheck, LucideUpload, LucideCamera,
 } from '@lucide/angular';
 
 type Tab = 'inbox' | 'kb' | 'widgets';
@@ -21,7 +21,7 @@ type Tab = 'inbox' | 'kb' | 'widgets';
     CommonModule, FormsModule, RouterModule,
     LucideMessageCircle, LucideSearch, LucidePlus, LucideTrash2, LucideSave, LucideCopy,
     LucideEdit2, LucideFileText, LucideChevronLeft, LucideExternalLink,
-    LucideSparkles, LucideGlobe, LucideCode, LucideCheck,
+    LucideSparkles, LucideGlobe, LucideCode, LucideCheck, LucideUpload, LucideCamera,
   ],
   templateUrl: './chat-inbox.html',
   styleUrls: ['./chat-inbox.css'],
@@ -345,6 +345,31 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     req.subscribe({
       next: () => { this.widgetSaving = false; this.editingWidget = null; this.loadWidgets(); this.toast.success('Widget saved.'); },
       error: (e) => { this.widgetSaving = false; this.toast.error(e?.error?.message || 'Failed to save widget.'); },
+    });
+  }
+
+  avatarUploading = false;
+
+  /** Upload the bot's photo through the shared /upload endpoint; the returned URL is public, so it works on ces-pl.com too. */
+  uploadAvatar(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !this.editingWidget) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      this.toast.error('Please choose a PNG, JPG or WebP image.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      this.toast.error('Image must be 2 MB or smaller.');
+      return;
+    }
+    const form = new FormData();
+    form.append('file', file);
+    this.avatarUploading = true;
+    this.http.post<{ url: string }>(`${environment.apiUrl}/upload`, form).subscribe({
+      next: (r) => { this.editingWidget.botAvatarUrl = r.url; this.avatarUploading = false; this.toast.success('Photo uploaded — save the widget to apply it.'); },
+      error: (e) => { this.avatarUploading = false; this.toast.error(e?.error?.message || 'Upload failed.'); },
     });
   }
 
