@@ -134,8 +134,6 @@ export class CareersComponent implements OnInit, OnDestroy {
     script.src = `${environment.apiUrl}/public/chat-widget/embed.js`;
     script.dataset['widgetKey'] = key;
     script.dataset['source'] = 'CAREERS';
-    // Bottom-left: the job listing keeps its apply actions on the right.
-    script.dataset['position'] = 'bl';
     document.body.appendChild(script);
     return true;
   }
@@ -146,6 +144,7 @@ export class CareersComponent implements OnInit, OnDestroy {
     } catch {
       /* never finished loading */
     }
+    (window as any).__nexChatLoaded = false;
     document.getElementById(CareersComponent.NEX_CHAT_SCRIPT_ID)?.remove();
   }
 

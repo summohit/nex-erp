@@ -11,7 +11,7 @@ export const environment = {
   // localhost would push test conversations into the live support inbox.
   // Nex's own chat & help widget (ERP → CRM → Website Chat → Widgets). When a
   // key is set it replaces Tawk on the careers page; empty keeps Tawk.
-  chatWidgetKey: '',
+  chatWidgetKey: '4b69ce80-3612-4a56-88db-ea1fb5410af6',
   tawkPropertyId: '',
   tawkWidgetId: '',
   production: false,

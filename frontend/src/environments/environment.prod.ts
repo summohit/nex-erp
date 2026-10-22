@@ -10,7 +10,7 @@ export const environment = {
   // widget stays off, which is what every non-production build wants.
   // Nex's own chat & help widget (ERP → CRM → Website Chat → Widgets). When a
   // key is set it replaces Tawk on the careers page; empty keeps Tawk.
-  chatWidgetKey: '',
+  chatWidgetKey: '4b69ce80-3612-4a56-88db-ea1fb5410af6',
   tawkPropertyId: '69c3bd8135e8d61c3a87568a',
   tawkWidgetId: '1jki9ogko',
   production: true,
