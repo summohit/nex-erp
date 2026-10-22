@@ -1583,8 +1583,14 @@
               </div>
 
               <!-- Floating Launcher Bubble Mockup -->
-              <div class="ci-wm-launcher" [class.pos-left]="editingWidget.position === 'bl'" [style.background]="editingWidget.primaryColor || '#0284c7'">
-                <svg lucideMessageCircle size="22"></svg>
+              <div class="ci-wm-launcher-wrap" [class.pos-left]="editingWidget.position === 'bl'">
+                <div class="ci-wm-teaser-pill">
+                  <span class="ci-wm-teaser-av">🤖</span>
+                  <span>{{ editingWidget.greetingMessage || 'Ask a question…' }}</span>
+                </div>
+                <div class="ci-wm-launcher" [style.background]="editingWidget.primaryColor || '#0284c7'">
+                  <svg lucideMessageCircle size="22"></svg>
+                </div>
               </div>
             </div>
 

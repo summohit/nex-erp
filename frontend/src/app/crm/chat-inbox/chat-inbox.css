@@ -4174,6 +4174,43 @@
 }
 
 /* Floating Launcher Bubble Mockup */
+.ci-wm-launcher-wrap {
+  align-self: flex-end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  position: relative;
+  z-index: 10;
+}
+
+.ci-wm-launcher-wrap.pos-left {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.ci-wm-teaser-pill {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 6px 11px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  font-size: 11px;
+  font-weight: 500;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: teaserPopPreview 0.4s ease both;
+}
+
+.ci-wm-teaser-av {
+  font-size: 12px;
+}
+
 .ci-wm-launcher {
   width: 48px;
   height: 48px;
@@ -4183,13 +4220,40 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-  z-index: 10;
-  align-self: flex-end;
-  transition: background 0.15s ease;
+  position: relative;
+  transition: transform 0.2s ease;
+  animation: nexAttentionWigglePreview 7s ease-in-out infinite;
 }
 
-.ci-wm-launcher.pos-left {
-  align-self: flex-start;
+.ci-wm-launcher::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0.35;
+  z-index: -1;
+  animation: nexPulsePreview 2.6s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+
+@keyframes nexPulsePreview {
+  0% { transform: scale(0.92); opacity: 0.45; }
+  50% { transform: scale(1.22); opacity: 0; }
+  100% { transform: scale(0.92); opacity: 0; }
+}
+
+@keyframes nexAttentionWigglePreview {
+  0%, 82%, 100% { transform: scale(1) rotate(0deg); }
+  85% { transform: scale(1.12) translateY(-4px) rotate(-8deg); }
+  88% { transform: scale(1.12) translateY(-4px) rotate(8deg); }
+  91% { transform: scale(1.06) translateY(-2px) rotate(-4deg); }
+  94% { transform: scale(1.02) rotate(2deg); }
+  97% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes teaserPopPreview {
+  from { opacity: 0; transform: translateY(10px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .ci-preview-footer-note {
