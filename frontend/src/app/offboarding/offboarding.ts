@@ -11,7 +11,12 @@ import {
   LucideClock, 
   LucideXCircle, 
   LucideClipboardCheck,
-  LucideX
+  LucideX,
+  LucideEye,
+  LucideMail,
+  LucideCalendarDays,
+  LucideMessageSquare,
+  LucideUserRound
 } from '@lucide/angular';
 
 @Component({
@@ -23,7 +28,12 @@ import {
     LucideDoorOpen,
     LucideCheckCircle2,
     LucideClipboardCheck,
-    LucideX
+    LucideX,
+    LucideEye,
+    LucideMail,
+    LucideCalendarDays,
+    LucideMessageSquare,
+    LucideUserRound
   ],
   templateUrl: './offboarding.html',
   styleUrls: ['./offboarding.css']
@@ -49,6 +59,43 @@ export class OffboardingComponent implements OnInit {
 
   showApproveModal = signal(false);
   approveForm = { id: 0, status: 'APPROVED', approvedLastWorkingDay: '', remarks: '' };
+
+  showResignationDetails = signal(false);
+  selectedResignation = signal<Resignation | null>(null);
+  inlineStatusBusy = signal<number | null>(null);
+  openStatusDropdownId = signal<number | null>(null);
+  openActionMenuId = signal<number | null>(null);
+  resignationPage = signal(1);
+  resignationPageSize = signal(10);
+  readonly resignationPageSizeOptions = [10, 25, 50, 100];
+  resignationSearch = signal('');
+  resignationStatusFilter = signal('ALL');
+  pendingResignationCount = computed(() => this.resignations().filter((item) => item.status === 'PENDING').length);
+  approvedResignationCount = computed(() => this.resignations().filter((item) => item.status === 'APPROVED').length);
+  pendingTaskCount = computed(() => this.tasks().filter((item) => item.status === 'PENDING').length);
+  clearedTaskCount = computed(() => this.tasks().filter((item) => item.status === 'CLEARED').length);
+  filteredResignations = computed(() => {
+    const query = this.resignationSearch().trim().toLowerCase();
+    const status = this.resignationStatusFilter();
+    return this.resignations().filter((item) => {
+      const matchesStatus = status === 'ALL' || item.status === status;
+      const matchesSearch = !query || [
+        item.employee?.user?.email,
+        item.reason,
+        item.approver?.email,
+        item.status,
+      ].some((value) => value?.toLowerCase().includes(query));
+      return matchesStatus && matchesSearch;
+    });
+  });
+  resignationPageCount = computed(() => Math.max(1, Math.ceil(this.filteredResignations().length / this.resignationPageSize())));
+  pagedResignations = computed(() => {
+    const page = Math.min(this.resignationPage(), this.resignationPageCount());
+    const start = (page - 1) * this.resignationPageSize();
+    return this.filteredResignations().slice(start, start + this.resignationPageSize());
+  });
+  resignationRangeStart = computed(() => this.filteredResignations().length ? (Math.min(this.resignationPage(), this.resignationPageCount()) - 1) * this.resignationPageSize() + 1 : 0);
+  resignationRangeEnd = computed(() => Math.min(this.resignationRangeStart() + this.resignationPageSize() - 1, this.filteredResignations().length));
 
   showTaskModal = signal(false);
   taskForm = { id: 0, remarks: '' };
@@ -91,9 +138,84 @@ export class OffboardingComponent implements OnInit {
     this.loadData();
   }
 
+  setResignationPage(page: number) {
+    this.resignationPage.set(Math.max(1, Math.min(page, this.resignationPageCount())));
+  }
+
+  setResignationPageSize(size: string | number) {
+    this.resignationPageSize.set(Number(size) || 10);
+    this.resignationPage.set(1);
+  }
+
+  updateResignationSearch(value: string) {
+    this.resignationSearch.set(value);
+    this.resignationPage.set(1);
+  }
+
+  updateResignationStatusFilter(value: string) {
+    this.resignationStatusFilter.set(value);
+    this.resignationPage.set(1);
+  }
+
+  clearResignationFilters() {
+    this.resignationSearch.set('');
+    this.resignationStatusFilter.set('ALL');
+    this.resignationPage.set(1);
+  }
+
+  /** The directory is the canonical employee-photo source. This keeps the
+   * resignation register compatible with older API responses that omit it. */
+  private hydrateResignationAvatars() {
+    this.employeeService.getEmployees().subscribe({
+      next: (employees) => {
+        const avatarByEmployeeId = new Map(
+          employees
+            .map((employee) => [employee.id, employee.avatarUrl || employee.user?.avatarUrl] as const)
+            .filter(([, avatarUrl]) => !!avatarUrl),
+        );
+        this.resignations.update((items) => items.map((item) => {
+          const avatarUrl = item.employee?.avatarUrl || avatarByEmployeeId.get(item.employeeId);
+          const directoryEmployee = employees.find((employee) => employee.id === item.employeeId);
+          return item.employee && directoryEmployee ? {
+            ...item,
+            employee: {
+              ...item.employee,
+              avatarUrl,
+              firstName: item.employee.firstName || directoryEmployee.firstName,
+              lastName: item.employee.lastName || directoryEmployee.lastName,
+              employeeCode: item.employee.employeeCode || directoryEmployee.employeeCode,
+            },
+          } : item;
+        }));
+      },
+      // The table remains usable for roles that cannot load the directory.
+      error: () => undefined,
+    });
+  }
+
+  handleAvatarError(resignation: Resignation) {
+    if (resignation.employee) {
+      resignation.employee.avatarUrl = null;
+    }
+  }
+
+  employeeName(resignation: Resignation): string {
+    const employee = resignation.employee;
+    const name = [employee?.firstName, employee?.lastName].filter(Boolean).join(' ').trim();
+    return name || 'Employee record unavailable';
+  }
+
+  employeeIdentifier(resignation: Resignation): string {
+    return resignation.employee?.employeeCode || `ID ${resignation.employeeId}`;
+  }
+
   loadData() {
     if (this.activeTab() === 'resignations') {
-      this.offboardingService.getResignations().subscribe(res => this.resignations.set(res));
+      this.offboardingService.getResignations().subscribe(res => {
+        this.resignations.set(res);
+        this.setResignationPage(this.resignationPage());
+        this.hydrateResignationAvatars();
+      });
     } else if (this.activeTab() === 'tasks') {
       if (this.canClearTasks()) {
         this.offboardingService.getTasks().subscribe(res => this.tasks.set(res));
@@ -140,6 +262,58 @@ export class OffboardingComponent implements OnInit {
       remarks: '' 
     };
     this.showApproveModal.set(true);
+  }
+
+  openResignationDetails(resignation: Resignation) {
+    this.openActionMenuId.set(null);
+    this.selectedResignation.set(resignation);
+    this.showResignationDetails.set(true);
+  }
+
+  toggleActionMenu(resignationId: number, event: Event) {
+    event.stopPropagation();
+    this.openActionMenuId.update((openId) => openId === resignationId ? null : resignationId);
+  }
+
+  closeResignationDetails() {
+    this.showResignationDetails.set(false);
+    this.selectedResignation.set(null);
+  }
+
+  reviewFromDetails() {
+    const resignation = this.selectedResignation();
+    if (!resignation) return;
+    this.closeResignationDetails();
+    this.openApproveModal(resignation);
+  }
+
+  toggleStatusDropdown(resignationId: number, event: Event) {
+    event.stopPropagation();
+    this.openStatusDropdownId.update((openId) => openId === resignationId ? null : resignationId);
+  }
+
+  selectInlineStatus(resignation: Resignation, nextStatus: string, event: Event) {
+    event.stopPropagation();
+    this.openStatusDropdownId.set(null);
+    if (!nextStatus || nextStatus === resignation.status) return;
+
+    this.inlineStatusBusy.set(resignation.id);
+    const approvedLastWorkingDay = nextStatus === 'APPROVED'
+      ? (resignation.approvedLastWorkingDay || resignation.intendedLastWorkingDay).split('T')[0]
+      : undefined;
+
+    this.offboardingService.updateResignationStatus(resignation.id, nextStatus, approvedLastWorkingDay).subscribe({
+      next: (updated) => {
+        this.resignations.update((items) => items.map((item) => item.id === updated.id ? { ...item, ...updated } : item));
+        if (this.selectedResignation()?.id === updated.id) this.selectedResignation.update((item) => item ? { ...item, ...updated } : item);
+        this.inlineStatusBusy.set(null);
+        this.toast.success(`Status changed to ${nextStatus.toLowerCase()}`);
+      },
+      error: (err) => {
+        this.inlineStatusBusy.set(null);
+        this.toast.error(err.error?.message || 'Could not update the resignation status');
+      },
+    });
   }
 
   closeApproveModal() {

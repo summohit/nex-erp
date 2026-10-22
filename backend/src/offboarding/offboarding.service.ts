@@ -33,7 +33,7 @@ export class OffboardingService {
     return this.prisma.resignation.findMany({
       where: whereClause,
       include: {
-        employee: { select: { id: true, user: { select: { email: true } }, salutation: true } },
+        employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true, user: { select: { email: true } }, salutation: true } },
         approver: { select: { id: true, email: true } }
       },
       orderBy: { createdAt: 'desc' }
@@ -125,7 +125,9 @@ export class OffboardingService {
       }
     });
 
-    if (status === 'APPROVED') {
+    // Approval may be changed inline in the register. Only the first transition
+    // into APPROVED creates clearance tasks; later edits must not duplicate them.
+    if (status === 'APPROVED' && resignation.status !== 'APPROVED') {
       // Update Employee Status
       await this.prisma.employee.update({
         where: { id: resignation.employeeId },
