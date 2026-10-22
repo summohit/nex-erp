@@ -5,6 +5,7 @@ import { CrmModule } from '../crm/crm.module';
 import { TicketsModule } from '../tickets/tickets.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AiModule } from '../ai/ai.module';
+import { MailModule } from '../mail/mail.module';
 import { ChatWidgetController } from './chat-widget.controller';
 import { PublicChatWidgetController } from './public-chat-widget.controller';
 import { ChatWidgetService } from './chat-widget.service';
@@ -13,7 +14,7 @@ import { KnowledgeBaseService } from './knowledge-base.service';
 import { WebsiteChatAccessGuard } from './website-chat-access.guard';
 
 @Module({
-  imports: [PrismaModule, PermissionsModule, CrmModule, TicketsModule, NotificationsModule, AiModule],
+  imports: [PrismaModule, PermissionsModule, CrmModule, TicketsModule, NotificationsModule, AiModule, MailModule],
   controllers: [ChatWidgetController, PublicChatWidgetController],
   providers: [ChatWidgetService, ChatBotService, KnowledgeBaseService, WebsiteChatAccessGuard],
 })

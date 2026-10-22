@@ -4,6 +4,7 @@ import { CrmService } from '../crm/crm.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import { MailService } from '../mail/mail.service';
 import { ChatBotService } from './chat-bot.service';
 
 const MAX_MESSAGE = 4000;
@@ -47,7 +48,16 @@ export class ChatWidgetService {
     private tickets: TicketsService,
     private notifications: NotificationsService,
     private permissions: PermissionsService,
+    private mail: MailService,
   ) {}
+
+  // In-memory, so per backend process — fine while one instance serves the API.
+  /** companyId → when an agent's inbox last polled (it polls every 5s while the tab is visible). */
+  private inboxSeenAt = new Map<number, number>();
+  /** conversationId → when its last offline email went out. */
+  private emailedAt = new Map<number, number>();
+  private static readonly INBOX_ONLINE_MS = 45_000;
+  private static readonly EMAIL_GAP_MS = 15 * 60_000;
 
   // ═══ Widget configuration (admin) ═══════════════════════════════════════════
 
@@ -224,6 +234,7 @@ export class ChatWidgetService {
             linkUrl: `/website-chat/inbox?c=${conversationId}`,
           })
           .catch(() => {});
+        this.emailAssigneeIfInboxClosed(widget.companyId, conversationId, conversation.assignedToId, `New chat message from ${conversation.visitorName || 'a visitor'}`, text);
       } else {
         // Nobody owns it yet: alert the team, but once per burst rather than per line.
         const previous = await this.prisma.chatMessage.findFirst({
@@ -310,6 +321,7 @@ export class ChatWidgetService {
           linkUrl: `/website-chat/inbox?c=${conversationId}`,
         })
         .catch(() => {});
+      this.emailAssigneeIfInboxClosed(widget.companyId, conversationId, conversation.assignedToId, `${who} left their details`, [email, phone].filter(Boolean).join(' · '));
     } else {
       this.notifyTeam(widget.companyId, conversationId, `${who} wants to talk to the team`, [email, phone].filter(Boolean).join(' · '));
     }
@@ -390,6 +402,7 @@ export class ChatWidgetService {
   // ═══ Agent inbox ════════════════════════════════════════════════════════════
 
   async inbox(companyId: number, status?: string, mine?: { employeeId: number | null }) {
+    this.inboxSeenAt.set(companyId, Date.now());
     // Someone who opened the widget and left has nothing for an agent to read.
     const where: any = { widgetConfig: { companyId }, messages: { some: { senderType: 'VISITOR' } } };
     if (status === 'ACTIVE') where.status = { in: OPEN_STATUSES };
@@ -548,20 +561,47 @@ export class ChatWidgetService {
     return contact.id;
   }
 
-  /** Fire-and-forget alert to everyone with Website Chat inbox access. */
+  /**
+   * Fire-and-forget alert to everyone with Website Chat inbox access (in-app + push).
+   * If no one has the inbox open, it also goes by email — push is not on every phone.
+   */
   private notifyTeam(companyId: number, conversationId: number, title: string, message: string) {
     this.permissions
-      .websiteChatInboxEmployeeIds(companyId)
-      .then((ids) =>
-        this.notifications.notifyEmployees(ids, {
+      .websiteChatInboxTeam(companyId)
+      .then(async (team) => {
+        await this.notifications.notifyEmployees(team.map((m) => m.employeeId), {
           companyId,
           title,
           message: message.slice(0, 140),
           type: 'CHAT',
           linkUrl: `/website-chat/inbox?c=${conversationId}`,
-        }),
-      )
+        });
+        this.emailIfInboxClosed(companyId, conversationId, team.map((m) => m.email), title, message);
+      })
       .catch(() => {});
+  }
+
+  /** The assigned agent's email, when nobody has the inbox open. */
+  private emailAssigneeIfInboxClosed(companyId: number, conversationId: number, employeeId: number, title: string, message: string) {
+    this.prisma.employee
+      .findUnique({ where: { id: employeeId }, select: { user: { select: { email: true, status: true } } } })
+      .then((e) => {
+        if (e?.user?.email && e.user.status !== 'SUSPENDED') {
+          this.emailIfInboxClosed(companyId, conversationId, [e.user.email], title, message);
+        }
+      })
+      .catch(() => {});
+  }
+
+  private emailIfInboxClosed(companyId: number, conversationId: number, emails: string[], title: string, message: string) {
+    const now = Date.now();
+    if (now - (this.inboxSeenAt.get(companyId) ?? 0) < ChatWidgetService.INBOX_ONLINE_MS) return;
+    if (now - (this.emailedAt.get(conversationId) ?? 0) < ChatWidgetService.EMAIL_GAP_MS) return;
+    this.emailedAt.set(conversationId, now);
+    const link = `/website-chat/inbox?c=${conversationId}`;
+    for (const email of new Set(emails)) {
+      void this.mail.sendWebsiteChatAlertEmail(email, title, message.slice(0, 500), link);
+    }
   }
 
   /** True while the latest SYSTEM message is the visitor's own End Chat — a visitor writing again reopens it. */

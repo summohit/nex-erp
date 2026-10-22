@@ -119,8 +119,8 @@ export class PermissionsService implements OnModuleInit {
     return override?.granted ? [...WEBSITE_CHAT_TABS] : [];
   }
 
-  /** Employee ids of active users who can open the Website Chat inbox — who to alert when a visitor needs a person. */
-  async websiteChatInboxEmployeeIds(companyId: number): Promise<number[]> {
+  /** Active users who can open the Website Chat inbox — who to alert when a visitor needs a person. */
+  async websiteChatInboxTeam(companyId: number): Promise<{ employeeId: number; email: string }[]> {
     const users = await this.prisma.user.findMany({
       where: {
         companyId,
@@ -131,9 +131,9 @@ export class PermissionsService implements OnModuleInit {
           { moduleAccess: { some: { module: WEBSITE_CHAT_MODULE, granted: true } } },
         ],
       },
-      select: { employee: { select: { id: true } } },
+      select: { email: true, employee: { select: { id: true } } },
     });
-    return users.map((u) => u.employee?.id).filter((id): id is number => !!id);
+    return users.filter((u) => u.employee).map((u) => ({ employeeId: u.employee!.id, email: u.email }));
   }
 
   /** Everyone in the company with their Website Chat access, for the super admin's per-user panel. */
