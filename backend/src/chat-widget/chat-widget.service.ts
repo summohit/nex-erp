@@ -7,6 +7,8 @@ import { ChatBotService } from './chat-bot.service';
 
 const MAX_MESSAGE = 4000;
 const OPEN_STATUSES = ['BOT', 'OPEN'];
+/** The widget stops polling once the visitor ends a chat, so nothing an agent sends after that would reach them. */
+export const VISITOR_ENDED_MESSAGE = 'The visitor ended the conversation.';
 
 /** Fields a visitor's browser is allowed to see — never assignee internals. */
 const PUBLIC_MESSAGE_SELECT = {
@@ -301,7 +303,7 @@ export class ChatWidgetService {
           conversationId,
           senderType: 'SYSTEM',
           senderName: 'System',
-          message: 'The visitor ended the conversation.',
+          message: VISITOR_ENDED_MESSAGE,
           isRead: true,
         },
       });
@@ -377,6 +379,12 @@ export class ChatWidgetService {
 
   async agentReply(companyId: number, id: number, employeeId: number | null, body: any) {
     const conversation = await this.agentConversation(companyId, id);
+    if (!OPEN_STATUSES.includes(conversation.status)) {
+      throw new BadRequestException('This conversation has ended. Reopen it before replying.');
+    }
+    if (await this.endedByVisitor(id)) {
+      throw new BadRequestException('The visitor ended this conversation, so they will not see new replies.');
+    }
     const text = clean(body.message, MAX_MESSAGE);
     if (!text) throw new BadRequestException('Message is empty.');
     const agent = employeeId
@@ -403,6 +411,9 @@ export class ChatWidgetService {
     const data: any = {};
     if (body.status) {
       if (!['BOT', 'OPEN', 'RESOLVED', 'CLOSED'].includes(body.status)) throw new BadRequestException('Unknown status.');
+      if (OPEN_STATUSES.includes(body.status) && !OPEN_STATUSES.includes(conversation.status) && (await this.endedByVisitor(id))) {
+        throw new BadRequestException('The visitor ended this conversation. It reopens when they write again.');
+      }
       data.status = body.status;
     }
     if (body.assignedToId !== undefined) {
@@ -492,6 +503,20 @@ export class ChatWidgetService {
       .catch(() => {});
     await this.prisma.chatConversation.update({ where: { id: conversationId }, data: { leadContactId: contact.id } });
     return contact.id;
+  }
+
+  /** True while the latest SYSTEM message is the visitor's own End Chat — a visitor writing again reopens it. */
+  private async endedByVisitor(conversationId: number) {
+    const lastSystem = await this.prisma.chatMessage.findFirst({
+      where: { conversationId, senderType: 'SYSTEM' },
+      orderBy: { id: 'desc' },
+      select: { id: true, message: true },
+    });
+    if (lastSystem?.message !== VISITOR_ENDED_MESSAGE) return false;
+    const visitorSince = await this.prisma.chatMessage.count({
+      where: { conversationId, senderType: 'VISITOR', id: { gt: lastSystem.id } },
+    });
+    return visitorSince === 0;
   }
 
   private async transcript(conversationId: number) {

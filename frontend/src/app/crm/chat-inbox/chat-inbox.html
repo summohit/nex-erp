@@ -113,13 +113,86 @@
       </div>
 
       <!-- Empty State -->
-      <div class="ci-inbox-empty" *ngIf="!inboxLoading && !filteredConversations.length">
-        <div class="ci-empty-icon-wrap">
-          <svg lucideMessageCircle size="30"></svg>
+      <div class="ci-inbox-empty-wrap" *ngIf="!inboxLoading && !filteredConversations.length">
+        <div class="ci-inbox-empty-card">
+          <div class="ci-empty-glow"></div>
+          <div class="ci-empty-icon-wrap">
+            <svg lucideMessageCircle size="28"></svg>
+          </div>
+
+          <h4 class="ci-empty-title" *ngIf="searchTerm">No matching chats</h4>
+          <h4 class="ci-empty-title" *ngIf="!searchTerm && mineOnly">No assigned chats</h4>
+          <h4 class="ci-empty-title" *ngIf="!searchTerm && !mineOnly && activeQuickFilter === 'ACTIVE' && resolvedCount > 0">All caught up! 🎉</h4>
+          <h4 class="ci-empty-title" *ngIf="!searchTerm && !mineOnly && activeQuickFilter === 'OPEN'">No waiting chats</h4>
+          <h4 class="ci-empty-title" *ngIf="!searchTerm && !mineOnly && activeQuickFilter === 'BOT'">No bot chats</h4>
+          <h4 class="ci-empty-title" *ngIf="!searchTerm && !mineOnly && activeQuickFilter === 'RESOLVED'">No resolved chats</h4>
+          <h4 class="ci-empty-title" *ngIf="!searchTerm && !mineOnly && activeQuickFilter === 'ALL'">No conversations yet</h4>
+
+          <p class="ci-empty-desc" *ngIf="searchTerm">
+            No chats match “{{ searchTerm }}”. Check for typos or clear your search query.
+          </p>
+          <p class="ci-empty-desc" *ngIf="!searchTerm && mineOnly">
+            You don't have any conversations assigned to your account right now.
+          </p>
+          <p class="ci-empty-desc" *ngIf="!searchTerm && !mineOnly && activeQuickFilter === 'ACTIVE' && resolvedCount > 0">
+            There are no active or waiting chats right now. You have {{ resolvedCount }} resolved conversation{{ resolvedCount > 1 ? 's' : '' }}.
+          </p>
+          <p class="ci-empty-desc" *ngIf="!searchTerm && !mineOnly && activeQuickFilter === 'OPEN'">
+            No visitors are currently waiting for team response.
+          </p>
+          <p class="ci-empty-desc" *ngIf="!searchTerm && !mineOnly && activeQuickFilter === 'BOT'">
+            No visitors are currently in automated bot conversation.
+          </p>
+          <p class="ci-empty-desc" *ngIf="!searchTerm && !mineOnly && activeQuickFilter === 'RESOLVED'">
+            No conversations have been closed or resolved yet.
+          </p>
+          <p class="ci-empty-desc" *ngIf="!searchTerm && !mineOnly && activeQuickFilter === 'ALL' && !conversations.length">
+            Chats from visitors on your website or careers portal will appear here in real time.
+          </p>
+
+          <!-- Interactive Actions -->
+          <div class="ci-empty-actions">
+            <button
+              type="button"
+              class="ci-btn-empty-action"
+              *ngIf="searchTerm"
+              (click)="searchTerm = ''"
+            >
+              <svg lucideX size="13"></svg>
+              <span>Clear search</span>
+            </button>
+
+            <button
+              type="button"
+              class="ci-btn-empty-action"
+              *ngIf="mineOnly"
+              (click)="toggleMineOnly()"
+            >
+              <svg lucideUser size="13"></svg>
+              <span>View all team chats</span>
+            </button>
+
+            <button
+              type="button"
+              class="ci-btn-empty-action primary"
+              *ngIf="!searchTerm && !mineOnly && activeQuickFilter === 'ACTIVE' && resolvedCount > 0"
+              (click)="setQuickFilter('RESOLVED')"
+            >
+              <svg lucideCheckCheck size="13"></svg>
+              <span>View Resolved ({{ resolvedCount }})</span>
+            </button>
+
+            <button
+              type="button"
+              class="ci-btn-empty-action"
+              *ngIf="!searchTerm && !mineOnly && activeQuickFilter !== 'ALL' && (activeQuickFilter === 'OPEN' || activeQuickFilter === 'BOT' || (activeQuickFilter === 'ACTIVE' && resolvedCount === 0))"
+              (click)="setQuickFilter('ALL')"
+            >
+              <svg lucideList size="13"></svg>
+              <span>View all conversations</span>
+            </button>
+          </div>
         </div>
-        <b>No conversations found</b>
-        <p *ngIf="searchTerm">No chats match “{{ searchTerm }}”. Try clearing filters.</p>
-        <p *ngIf="!searchTerm">Chats from visitors on your website or careers portal will appear here.</p>
       </div>
 
       <!-- Conversations Stream -->
@@ -270,16 +343,18 @@
             <span>Take chat</span>
           </button>
 
+          <!-- Convert to lead: hidden for now (convertToLead() and the API stay in place). -->
+
           <button
             type="button"
-            class="ci-btn-action"
-            [class.completed]="selected.leadContactId"
-            (click)="convertToLead()"
-            [disabled]="selected.leadContactId"
-            title="Save visitor details as CRM Lead Contact"
+            class="ci-btn-action ci-sound-toggle"
+            [class.on]="soundEnabled"
+            (click)="toggleSound()"
+            [title]="soundEnabled ? 'Mute new-message sound' : 'Play a sound on new visitor messages'"
           >
-            <svg lucideSparkles size="14"></svg>
-            <span>{{ selected.leadContactId ? 'Lead saved' : 'Convert to lead' }}</span>
+            <svg lucideVolume2 size="14" *ngIf="soundEnabled"></svg>
+            <svg lucideVolumeX size="14" *ngIf="!soundEnabled"></svg>
+            <span>Sound: {{ soundEnabled ? 'On' : 'Off' }}</span>
           </button>
 
           <button
@@ -321,7 +396,7 @@
           <button
             type="button"
             class="ci-btn-action reopen-btn"
-            *ngIf="selected.status === 'RESOLVED'"
+            *ngIf="selected.status === 'RESOLVED' && !visitorEnded"
             (click)="setStatus('OPEN')"
             title="Reopen conversation for team response"
           >
@@ -431,8 +506,15 @@
         </div>
       </div>
 
+      <!-- Ended chats take no replies: the visitor's widget has stopped listening -->
+      <div class="ci-ended-banner" *ngIf="chatEnded">
+        <svg lucideCheckCircle2 size="16"></svg>
+        <span *ngIf="visitorEnded">The visitor ended this chat. It reopens here if they write again.</span>
+        <span *ngIf="!visitorEnded">This chat is {{ statusLabel(selected.status).toLowerCase() }}. Reopen it to reply.</span>
+      </div>
+
       <!-- Quick Canned Replies Bar -->
-      <div class="ci-canned-bar">
+      <div class="ci-canned-bar" *ngIf="!chatEnded">
         <div class="ci-canned-label">
           <svg lucideZap size="13"></svg>
           <span>Quick:</span>
@@ -451,7 +533,7 @@
       </div>
 
       <!-- Composer Card -->
-      <div class="ci-composer-card">
+      <div class="ci-composer-card" *ngIf="!chatEnded">
         <div class="ci-composer-box">
           <textarea
             [(ngModel)]="reply"
@@ -506,7 +588,7 @@
           </div>
           <h3 class="ci-pick-title">Select a Conversation</h3>
           <p class="ci-pick-subtitle">
-            Choose a visitor chat from the left panel to review messages, reply with real-time typing effect, or convert into an ERP lead or ticket.
+            Choose a visitor chat from the left panel to review messages, reply with real-time typing effect, or raise an ERP ticket.
           </p>
 
           <div class="ci-pick-quick-stats" *ngIf="conversations.length">

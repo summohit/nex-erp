@@ -15,7 +15,7 @@ import {
   LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
   LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
   LucideSend, LucideUser, LucideMail, LucidePhone, LucideBriefcase, LucideRotateCcw,
-  LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter
+  LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX
 } from '@lucide/angular';
 
 type Tab = 'inbox' | 'kb' | 'widgets';
@@ -32,7 +32,7 @@ type Tab = 'inbox' | 'kb' | 'widgets';
     LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
     LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
     LucideSend, LucideUser, LucideMail, LucidePhone, LucideBriefcase, LucideRotateCcw,
-    LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter
+    LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX
   ],
   templateUrl: './chat-inbox.html',
   styleUrls: ['./chat-inbox.css'],
@@ -71,6 +71,10 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   private typewriterTimer: any = null;
   private pollTimer: any = null;
   private typingSimTimer: any = null;
+  soundEnabled = true;
+  private audioCtx: AudioContext | null = null;
+  /** Newest visitor message time seen — null until the first inbox load seeds it. */
+  private latestVisitorAt: number | null = null;
 
   cannedReplies = [
     'Thanks for reaching out! Let me check that for you.',
@@ -106,8 +110,65 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     this.permissions.getWebsiteChatTabs().subscribe(tabs => {
       this.allowedTabs = new Set(tabs.map(t => (t === 'website-chat/knowledge-base' ? 'kb' : t.replace('website-chat/', '')) as Tab));
     });
+    try { this.soundEnabled = localStorage.getItem('chatInboxSound') !== 'off'; } catch { /* storage blocked */ }
     this.load(this.tab);
     this.schedulePoll();
+  }
+
+  toggleSound() {
+    this.soundEnabled = !this.soundEnabled;
+    try { localStorage.setItem('chatInboxSound', this.soundEnabled ? 'on' : 'off'); } catch { /* storage blocked */ }
+    if (this.soundEnabled) this.playChime();
+  }
+
+  /** Two-note chime from Web Audio — no asset to ship. Browsers allow it after the first click on the page. */
+  private playChime() {
+    if (!this.soundEnabled) return;
+    try {
+      this.audioCtx ??= new AudioContext();
+      const ctx = this.audioCtx;
+      if (ctx.state === 'suspended') ctx.resume();
+      [880, 1320].forEach((freq, i) => {
+        const t = ctx.currentTime + i * 0.12;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.26);
+      });
+    } catch { /* no audio support */ }
+  }
+
+  /** Chime when a visitor message is newer than anything seen so far (filter switches don't re-chime old chats). */
+  private checkNewVisitorMessages(rows: any[]) {
+    let latest = 0;
+    for (const c of rows) {
+      if (c.lastMessage?.senderType !== 'VISITOR') continue;
+      latest = Math.max(latest, new Date(c.lastMessage.createdAt).getTime());
+    }
+    if (this.latestVisitorAt !== null && latest > this.latestVisitorAt) this.playChime();
+    this.latestVisitorAt = Math.max(this.latestVisitorAt ?? 0, latest);
+  }
+
+  /** Resolved/closed chats can't be replied to — the visitor's widget has stopped listening. */
+  get chatEnded(): boolean {
+    return !!this.selected && (this.selected.status === 'RESOLVED' || this.selected.status === 'CLOSED');
+  }
+
+  /** The visitor pressed End Chat (and hasn't written since) — only they can restart it. */
+  get visitorEnded(): boolean {
+    if (!this.chatEnded) return false;
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      const m = this.messages[i];
+      if (m.senderType === 'VISITOR') return false;
+      if (m.senderType === 'SYSTEM') return m.message === 'The visitor ended the conversation.';
+    }
+    return false;
   }
 
   ngOnDestroy() {
@@ -176,6 +237,7 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
       next: (rows) => {
         this.conversations = rows;
         this.inboxLoading = false;
+        this.checkNewVisitorMessages(rows);
         // Auto-select first conversation on initial load on desktop screens
         if (!this.selectedId && rows.length && window.innerWidth > 860) {
           this.open(rows[0].id);
@@ -283,7 +345,7 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   sendReply() {
     const message = this.reply.trim();
-    if (!message || !this.selectedId || this.sending) return;
+    if (!message || !this.selectedId || this.sending || this.chatEnded) return;
     this.sending = true;
     this.http.post<any>(`${this.api}/inbox/${this.selectedId}/reply`, { message }).subscribe({
       next: (r) => { this.reply = ''; this.sending = false; this.applyConversation(r); this.loadInbox(true); },
