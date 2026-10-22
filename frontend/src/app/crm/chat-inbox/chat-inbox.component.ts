@@ -15,7 +15,8 @@ import {
   LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
   LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
   LucideSend, LucideUser, LucideMail, LucidePhone, LucideBriefcase, LucideRotateCcw,
-  LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX
+  LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX,
+  LucidePalette, LucidePipette
 } from '@lucide/angular';
 
 type Tab = 'inbox' | 'kb' | 'widgets';
@@ -32,7 +33,8 @@ type Tab = 'inbox' | 'kb' | 'widgets';
     LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
     LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
     LucideSend, LucideUser, LucideMail, LucidePhone, LucideBriefcase, LucideRotateCcw,
-    LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX
+    LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX,
+  LucidePalette, LucidePipette
   ],
   templateUrl: './chat-inbox.html',
   styleUrls: ['./chat-inbox.css'],
@@ -656,12 +658,62 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   // ═══ Widgets ═══
 
-  brandColorPresets = ['#0284C7', '#2563EB', '#4F46E5', '#7C3AED', '#059669', '#0D9488', '#DB2777', '#0F172A'];
+  brandColorPresets = [
+    '#0284C7', // Sky Blue (Primary Default)
+    '#2563EB', // Royal Blue
+    '#4F46E5', // Indigo
+    '#7C3AED', // Violet
+    '#9333EA', // Purple
+    '#DB2777', // Pink
+    '#E11D48', // Rose Red
+    '#EA580C', // Orange
+    '#D97706', // Amber Gold
+    '#059669', // Emerald Green
+    '#0D9488', // Teal
+    '#0F172A', // Midnight Slate
+  ];
+
+  hasEyeDropper = typeof window !== 'undefined' && 'EyeDropper' in (window as any);
 
   selectColor(color: string) {
-    if (this.editingWidget) {
-      this.editingWidget.primaryColor = color;
+    if (!this.editingWidget) return;
+    let c = (color || '#0284C7').trim();
+    if (!c.startsWith('#')) c = '#' + c;
+    this.editingWidget.primaryColor = c.toUpperCase();
+  }
+
+  onHexInput(value: string) {
+    if (!this.editingWidget) return;
+    const clean = (value || '').trim().replace(/[^0-9A-Fa-f]/g, '').slice(0, 6);
+    this.editingWidget.primaryColor = '#' + clean.toUpperCase();
+  }
+
+  async openEyeDropper() {
+    if (typeof window !== 'undefined' && (window as any).EyeDropper) {
+      try {
+        const eyeDropper = new (window as any).EyeDropper();
+        const res = await eyeDropper.open();
+        if (res?.sRGBHex) {
+          this.selectColor(res.sRGBHex);
+        }
+      } catch {
+        // Dropper cancelled by user
+      }
     }
+  }
+
+  isDarkColor(hex?: string): boolean {
+    if (!hex) return true;
+    let c = hex.replace('#', '');
+    if (c.length === 3) {
+      c = c.split('').map(x => x + x).join('');
+    }
+    if (c.length < 6) return true;
+    const r = parseInt(c.substring(0, 2), 16) || 0;
+    const g = parseInt(c.substring(2, 4), 16) || 0;
+    const b = parseInt(c.substring(4, 6), 16) || 0;
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    return yiq < 150;
   }
 
   copiedSnippetId: string | null = null;

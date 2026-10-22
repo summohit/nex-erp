@@ -3472,18 +3472,53 @@
   border-radius: 4px;
 }
 
-/* Color Picker Row */
-.ci-color-picker-row {
+/* Brand Color Picker Card & Controls */
+.ci-brand-color-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.ci-field-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ci-field-hint {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.ci-color-presets-section {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
+}
+
+.ci-color-sublabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
 }
 
 .ci-color-presets {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .ci-color-preset-dot {
@@ -3491,41 +3526,181 @@
   height: 26px;
   border-radius: 50%;
   border: 2px solid #ffffff;
-  box-shadow: 0 0 0 1px #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.08);
   cursor: pointer;
-  transition: transform 0.12s ease;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s ease;
+  padding: 0;
 }
 
 .ci-color-preset-dot:hover {
-  transform: scale(1.15);
+  transform: scale(1.18);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.12);
+  z-index: 2;
 }
 
 .ci-color-preset-dot.selected {
-  box-shadow: 0 0 0 2px #0f172a;
-  transform: scale(1.1);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #0284c7;
+  transform: scale(1.12);
 }
 
-.ci-color-custom-input {
+.ci-preset-check {
+  color: #ffffff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.75));
+}
+
+.ci-color-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0 -2px;
+}
+
+.ci-color-custom-section {
   display: flex;
   align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Custom Color Picker Trigger Pill */
+.ci-color-trigger-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
-}
-
-.ci-color-input {
-  width: 38px;
-  height: 38px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 2px;
+  padding: 4px 12px 4px 5px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 999px;
   cursor: pointer;
-  background: #fff;
+  transition: all 0.15s ease;
+  user-select: none;
 }
 
-.ci-hex-input {
-  width: 95px !important;
+.ci-color-trigger-pill:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.ci-native-color-picker {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.ci-color-swatch-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease;
+}
+
+.ci-color-trigger-pill:hover .ci-color-swatch-badge {
+  transform: scale(1.08);
+}
+
+.ci-color-trigger-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+/* Eyedropper Button */
+.ci-dropper-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ci-dropper-action-btn:hover {
+  border-color: #0284c7;
+  color: #0284c7;
+  background: #f0f9ff;
+  box-shadow: 0 2px 4px rgba(2, 132, 199, 0.08);
+}
+
+/* Hex Input Pill */
+.ci-hex-input-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 9px 5px 9px;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ci-hex-input-pill:focus-within {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+}
+
+.ci-hex-prefix {
   font-family: monospace;
-  font-size: 12.5px !important;
+  font-size: 13px;
+  font-weight: 700;
+  color: #94a3b8;
+  user-select: none;
+}
+
+.ci-hex-clean-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 62px;
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
   text-transform: uppercase;
+  color: #0f172a;
+  padding: 0;
+}
+
+.ci-hex-preview-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  margin-left: 2px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.ci-color-reset-link {
+  background: none;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 4px 6px;
+  transition: color 0.15s ease;
+}
+
+.ci-color-reset-link:hover {
+  color: #ef4444;
 }
 
 /* Position Selector */

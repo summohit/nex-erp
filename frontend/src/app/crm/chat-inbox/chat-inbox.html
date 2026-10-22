@@ -1259,22 +1259,79 @@
             </div>
 
             <div class="ci-field-group">
-              <label class="ci-label">Brand Color</label>
-              <div class="ci-color-picker-row">
-                <div class="ci-color-presets">
-                  <button 
-                    type="button" 
-                    class="ci-color-preset-dot" 
-                    *ngFor="let col of brandColorPresets"
-                    [style.background]="col"
-                    [class.selected]="editingWidget.primaryColor?.toLowerCase() === col.toLowerCase()"
-                    (click)="selectColor(col)"
-                    [title]="col">
-                  </button>
+              <div class="ci-field-label-row">
+                <label class="ci-label">Brand Color</label>
+                <span class="ci-field-hint">Launcher bubble, headers, accents &amp; buttons</span>
+              </div>
+              <div class="ci-brand-color-card">
+                <!-- Preset color swatches -->
+                <div class="ci-color-presets-section">
+                  <span class="ci-color-sublabel">Presets</span>
+                  <div class="ci-color-presets">
+                    <button 
+                      type="button" 
+                      class="ci-color-preset-dot" 
+                      *ngFor="let col of brandColorPresets"
+                      [style.background]="col"
+                      [class.selected]="editingWidget.primaryColor?.toLowerCase() === col.toLowerCase()"
+                      (click)="selectColor(col)"
+                      [title]="col">
+                      <svg *ngIf="editingWidget.primaryColor?.toLowerCase() === col.toLowerCase()" lucideCheck size="13" class="ci-preset-check"></svg>
+                    </button>
+                  </div>
                 </div>
-                <div class="ci-color-custom-input">
-                  <input type="color" class="ci-color-input" [(ngModel)]="editingWidget.primaryColor" />
-                  <input type="text" class="ci-input ci-hex-input" [(ngModel)]="editingWidget.primaryColor" placeholder="#0284C7" />
+
+                <div class="ci-color-divider"></div>
+
+                <!-- Custom Picker & Hex Controls -->
+                <div class="ci-color-custom-section">
+                  <!-- Custom Color Picker Trigger Pill -->
+                  <label class="ci-color-trigger-pill" title="Click to open color palette picker">
+                    <input 
+                      type="color" 
+                      class="ci-native-color-picker" 
+                      [value]="editingWidget.primaryColor || '#0284C7'" 
+                      (input)="selectColor($any($event.target).value)" />
+                    <span class="ci-color-swatch-badge" [style.background]="editingWidget.primaryColor || '#0284C7'">
+                      <svg lucidePalette size="15" [style.color]="isDarkColor(editingWidget.primaryColor) ? '#ffffff' : '#0f172a'"></svg>
+                    </span>
+                    <span class="ci-color-trigger-label">Color Picker</span>
+                  </label>
+
+                  <!-- EyeDropper Screen Picker Button (if browser supports it) -->
+                  <button 
+                    *ngIf="hasEyeDropper" 
+                    type="button" 
+                    class="ci-dropper-action-btn" 
+                    (click)="openEyeDropper()"
+                    title="Sample any color on your screen">
+                    <svg lucidePipette size="14"></svg>
+                    <span>EyeDropper</span>
+                  </button>
+
+                  <!-- Hex Input with # Tag and Live Preview Dot -->
+                  <div class="ci-hex-input-pill" title="Edit Hex code directly">
+                    <span class="ci-hex-prefix">#</span>
+                    <input 
+                      type="text" 
+                      class="ci-hex-clean-input" 
+                      [ngModel]="(editingWidget.primaryColor || '#0284C7').replace('#', '')" 
+                      (ngModelChange)="onHexInput($event)" 
+                      placeholder="0284C7"
+                      maxlength="6"
+                      spellcheck="false" />
+                    <span class="ci-hex-preview-dot" [style.background]="editingWidget.primaryColor || '#0284C7'"></span>
+                  </div>
+
+                  <!-- Reset to Default Button -->
+                  <button 
+                    *ngIf="(editingWidget.primaryColor || '#0284C7').toLowerCase() !== '#0284c7'"
+                    type="button" 
+                    class="ci-color-reset-link" 
+                    (click)="selectColor('#0284C7')" 
+                    title="Reset to default #0284C7">
+                    Reset
+                  </button>
                 </div>
               </div>
             </div>
