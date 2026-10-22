@@ -1,4 +1,3 @@
-import { WfhRequestComponent } from '../shared/wfh-request/wfh-request';
 import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener } from '@angular/core';
 import { CompOffHistoryComponent } from '../shared/components/comp-off-history/comp-off-history';
 import { CommonModule, DatePipe } from '@angular/common';
@@ -84,7 +83,6 @@ import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDateP
   selector: 'app-attendance-leave',
   standalone: true,
   imports: [
-    WfhRequestComponent,
     CompOffHistoryComponent,
     CommonModule, RouterLink,
     FormsModule, 

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CrmService } from '../crm/crm.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { PermissionsService } from '../permissions/permissions.service';
 import { MailService } from '../mail/mail.service';
 import { storeUploadedFile } from '../upload/store-uploaded-file';
@@ -17,7 +18,7 @@ export const VISITOR_ENDED_MESSAGE = 'The visitor ended the conversation.';
 
 /** Fields a visitor's browser is allowed to see — never assignee internals. */
 const PUBLIC_MESSAGE_SELECT = {
-  id: true, senderType: true, senderName: true, message: true, metadata: true, createdAt: true,
+  id: true, senderType: true, senderName: true, message: true, metadata: true, isRead: true, createdAt: true,
 } as const;
 
 /** What visitors and agents may share in a chat. No SVG/HTML: those can carry script when opened. */
@@ -86,7 +87,11 @@ export class ChatWidgetService {
     private notifications: NotificationsService,
     private permissions: PermissionsService,
     private mail: MailService,
+    private gateway: NotificationsGateway,
   ) {}
+
+  /** conversationId → until when an agent counts as typing (they ping every few seconds while typing). */
+  private agentTypingUntil = new Map<number, number>();
 
   // In-memory, so per backend process — fine while one instance serves the API.
   /** companyId → when an agent's inbox last polled (it polls every 5s while the tab is visible). */
@@ -242,15 +247,41 @@ export class ChatWidgetService {
     return { conversation: this.publicConversation(conversation), messages };
   }
 
-  async pollMessages(widgetKey: string, originHost: string | null, conversationId: number, visitorId: string, afterId: number) {
+  /**
+   * New messages since `afterId`. `seen` = the widget is open and visible, so the
+   * visitor has now read the agents' replies (their double ticks turn blue).
+   */
+  async pollMessages(widgetKey: string, originHost: string | null, conversationId: number, visitorId: string, afterId: number, seen = false) {
     const { conversation } = await this.visitorConversation(widgetKey, originHost, conversationId, visitorId);
-    const messages = await this.prisma.chatMessage.findMany({
-      where: { conversationId, id: { gt: afterId || 0 } },
-      orderBy: { id: 'asc' },
-      select: PUBLIC_MESSAGE_SELECT,
-      take: 100,
-    });
-    return { conversation: this.publicConversation(conversation), messages };
+    if (seen) {
+      const read = await this.prisma.chatMessage.updateMany({
+        where: { conversationId, senderType: 'AGENT', isRead: false },
+        data: { isRead: true },
+      });
+      if (read.count) this.emitChange(conversationId, 'read').catch(() => {});
+    }
+    const [messages, lastSeen] = await Promise.all([
+      this.prisma.chatMessage.findMany({
+        where: { conversationId, id: { gt: afterId || 0 } },
+        orderBy: { id: 'asc' },
+        select: PUBLIC_MESSAGE_SELECT,
+        take: 100,
+      }),
+      // Newest visitor message an agent has opened — the widget shows "Seen" up to it.
+      this.prisma.chatMessage.findFirst({
+        where: { conversationId, senderType: 'VISITOR', isRead: true },
+        orderBy: { id: 'desc' },
+        select: { id: true },
+      }),
+    ]);
+    return {
+      conversation: {
+        ...this.publicConversation(conversation),
+        agentTyping: (this.agentTypingUntil.get(conversationId) ?? 0) > Date.now(),
+        seenUpTo: lastSeen?.id ?? 0,
+      },
+      messages,
+    };
   }
 
   /** A file from the visitor: checked against the conversation before anything is stored. */
@@ -428,6 +459,7 @@ export class ChatWidgetService {
         isRead: true,
       },
     });
+    this.emitChange(conversationId).catch(() => {});
     return this.pollMessages(widgetKey, originHost, conversationId, conversation.visitorId, 0);
   }
 
@@ -452,6 +484,7 @@ export class ChatWidgetService {
         },
       });
     }
+    this.emitChange(conversationId).catch(() => {});
     return this.pollMessages(widgetKey, originHost, conversationId, conversation.visitorId, 0);
   }
 
@@ -484,8 +517,38 @@ export class ChatWidgetService {
     };
   }
 
-  private touch(conversationId: number) {
-    return this.prisma.chatConversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } });
+  private async touch(conversationId: number) {
+    const c = await this.prisma.chatConversation.update({
+      where: { id: conversationId },
+      data: { lastMessageAt: new Date() },
+      select: { widgetConfig: { select: { companyId: true } } },
+    });
+    this.gateway.sendWebsiteChat(c.widgetConfig.companyId, { conversationId, kind: 'message' });
+  }
+
+  /** Something changed in a conversation that agents should see right away. */
+  private async emitChange(conversationId: number, kind: 'message' | 'typing' | 'read' = 'message') {
+    const c = await this.prisma.chatConversation.findUnique({
+      where: { id: conversationId },
+      select: { widgetConfig: { select: { companyId: true } } },
+    });
+    if (c) this.gateway.sendWebsiteChat(c.widgetConfig.companyId, { conversationId, kind });
+  }
+
+  /** The visitor is typing — agents' inboxes show it live. */
+  async visitorTyping(widgetKey: string, originHost: string | null, conversationId: number, body: any) {
+    const { widget, conversation } = await this.visitorConversation(widgetKey, originHost, conversationId, this.visitorId(body));
+    if (OPEN_STATUSES.includes(conversation.status)) {
+      this.gateway.sendWebsiteChat(widget.companyId, { conversationId, kind: 'typing' });
+    }
+    return { ok: true };
+  }
+
+  /** An agent is typing — the visitor's widget picks this up on its next poll. */
+  async agentTyping(companyId: number, id: number) {
+    await this.agentConversation(companyId, id);
+    this.agentTypingUntil.set(id, Date.now() + 6000);
+    return { ok: true };
   }
 
   // ═══ Agent inbox ════════════════════════════════════════════════════════════
@@ -649,9 +712,11 @@ export class ChatWidgetService {
         senderName: agent?.firstName || 'Support',
         message: text,
         metadata: attachment ? { attachment } as any : undefined,
-        isRead: true,
+        isRead: false, // flips when the visitor's widget shows it
       },
     });
+    this.agentTypingUntil.delete(id);
+    this.emitChange(id).catch(() => {});
     // Once a person has spoken the bot steps aside; first responder owns the chat.
     await this.prisma.chatConversation.update({
       where: { id },

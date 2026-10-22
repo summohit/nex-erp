@@ -38,7 +38,12 @@ export class ChatWidgetController {
     return this.chat.agentAttachment(req.user.companyId, id, req.user.employeeId ?? null, body ?? {}, file, req);
   }
 
-  @Post('inbox/:id/reply')
+  @Post('inbox/:id/typing')
+  typing(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.chat.agentTyping(req.user.companyId, id);
+  }
+
+    @Post('inbox/:id/reply')
   reply(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: any) {
     return this.chat.agentReply(req.user.companyId, id, req.user.employeeId ?? null, body ?? {});
   }

@@ -110,10 +110,25 @@ export class PublicChatWidgetController {
     @Param('id', ParseIntPipe) id: number,
     @Query('visitorId') visitorId: string,
     @Query('after') after: string,
+    @Query('seen') seen?: string,
     @Headers('origin') origin?: string,
     @Headers('referer') referer?: string,
   ) {
-    return this.chat.pollMessages(key, originHost(origin, referer), id, String(visitorId || ''), Number(after) || 0);
+    return this.chat.pollMessages(key, originHost(origin, referer), id, String(visitorId || ''), Number(after) || 0, seen === '1');
+  }
+
+  // Fired every few seconds while the visitor types, so agents see it live.
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: seconds(60), limit: 30 } })
+  @Post(':key/conversations/:id/typing')
+  typing(
+    @Param('key') key: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+    @Headers('origin') origin?: string,
+    @Headers('referer') referer?: string,
+  ) {
+    return this.chat.visitorTyping(key, originHost(origin, referer), id, body ?? {});
   }
 
   // Each visitor message can cost a Groq call — keep a lid on it.

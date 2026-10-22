@@ -98,6 +98,19 @@ export class ShiftRosterComponent implements OnInit {
     const r = this.currentUser()?.role;
     return r === 'HR' || r === 'ADMIN' || r === 'SUPERADMIN' || r === 'SUPER_ADMIN';
   }
+
+  myEmployeeId = computed<number | null>(() => {
+    const u = this.currentUser();
+    return u?.employeeId ?? u?.employee?.id ?? null;
+  });
+
+  addMyselfToWfh() {
+    const myId = this.myEmployeeId();
+    if (!myId) return;
+    if (!this.wfhPicked().includes(myId)) {
+      this.wfhPicked.set([...this.wfhPicked(), myId]);
+    }
+  }
   wfhMatches = computed(() => {
     const q = this.wfhQuery().trim().toLowerCase();
     const picked = new Set(this.wfhPicked());

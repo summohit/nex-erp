@@ -396,7 +396,6 @@
           <svg lucidePlus [size]="16"></svg>
           New Leave
         </button>
-        <app-wfh-request [canSetLimit]="isAdmin()"></app-wfh-request>
         <input *ngIf="isAdmin()" id="leave-request-import" type="file" accept=".csv,text/csv" hidden (change)="importLeaveRequestsCsv($event)">
         <label *ngIf="isAdmin()" for="leave-request-import" class="btn btn-outline leave-export-button">
           <svg lucideUploadCloud [size]="15"></svg>

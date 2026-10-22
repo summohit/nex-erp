@@ -538,8 +538,9 @@
               <div class="ci-bubble agent">
                 <ng-container *ngTemplateOutlet="attachmentTpl; context: { $implicit: m }"></ng-container>
                 <div *ngIf="!isAttachmentOnly(m)" [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
-                <div class="ci-bubble-meta">
-                  <svg lucideCheckCheck size="13" class="ci-check-double"></svg>
+                <div class="ci-bubble-meta" [title]="m.isRead ? 'Seen by the visitor' : 'Sent'">
+                  <svg *ngIf="m.isRead" lucideCheckCheck size="13" class="ci-check-double seen"></svg>
+                  <svg *ngIf="!m.isRead" lucideCheck size="13" class="ci-check-double"></svg>
                 </div>
               </div>
             </div>
@@ -580,6 +581,21 @@
             </div>
           </div>
         </ng-container>
+
+        <!-- Real typing: the visitor's widget pings while they type -->
+        <div class="ci-msg-row visitor ci-typing-indicator-row" *ngIf="visitorTypingId === selected.id && !chatEnded">
+          <div class="ci-msg-avatar" [style.background]="getAvatarGradient(selected.visitorName)">
+            {{ getInitials(selected.visitorName || 'V') }}
+          </div>
+          <div class="ci-bubble-wrapper">
+            <div class="ci-typing-bubble">
+              <span class="ci-typing-dot"></span>
+              <span class="ci-typing-dot"></span>
+              <span class="ci-typing-dot"></span>
+            </div>
+            <span class="ci-typing-status-text">{{ selected.visitorName || 'Visitor' }} is typing…</span>
+          </div>
+        </div>
       </div>
 
       <!-- Ended chats take no replies: the visitor's widget has stopped listening -->
@@ -614,6 +630,7 @@
           <textarea
             [(ngModel)]="reply"
             (keydown)="onReplyKey($event)"
+            (input)="pingTyping()"
             rows="2"
             placeholder="Reply to the visitor… (Press Enter to send, Shift+Enter for new line)"
             class="ci-composer-textarea"

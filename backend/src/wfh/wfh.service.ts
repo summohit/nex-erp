@@ -211,50 +211,9 @@ export class WfhService {
   }
 
   async create(v: Viewer, body: { date: string; reason: string }) {
-    if (!v.employeeId) throw new BadRequestException('No employee profile');
-    const date = this.parseDay(body?.date);
-    if (date < this.todayUtc()) throw new BadRequestException('WFH can be requested for today or a later day');
-    const reason = String(body?.reason ?? '').trim();
-    if (!reason) throw new BadRequestException('Write the reason');
-
-    // Already clocked in today: the day has started where it started, so WFH
-    // for it can no longer be asked for (19 Oct 2026).
-    if (date.getTime() === this.todayUtc().getTime() && this.prisma.attendance?.findFirst) {
-      const clocked = await this.prisma.attendance.findFirst({
-        where: { employeeId: v.employeeId, date, clockIn: { not: null } }, select: { id: true },
-      });
-      if (clocked) throw new BadRequestException('You have already clocked in today, so WFH cannot be requested for today');
-    }
-
-    const clash = await this.prisma.wfhRequest.findFirst({
-      where: { employeeId: v.employeeId, date, status: { in: COUNTS } }, select: { id: true },
-    });
-    if (clash) throw new BadRequestException('You already have a WFH request for this day');
-
-    const limit = await this.getLimit(v.companyId);
-    const used = await this.usedInMonth(v.employeeId, date);
-    if (used >= limit) {
-      const month = date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-      throw new BadRequestException(
-        limit === 0 ? 'WFH requests are switched off'
-          : `You have used your ${limit} WFH day${limit === 1 ? '' : 's'} for ${month}`,
-      );
-    }
-
-    const me = await this.prisma.employee.findUnique({ where: { id: v.employeeId }, select: { managerId: true, firstName: true, lastName: true } });
-    // The super admin's own request needs nobody; no manager goes straight to HR.
-    const status = isSuperAdmin(v.role) ? WFH_STATUS.APPROVED : me?.managerId ? WFH_STATUS.PENDING_MANAGER : WFH_STATUS.PENDING_HR;
-    const req = await this.prisma.wfhRequest.create({
-      data: { companyId: v.companyId, employeeId: v.employeeId, date, reason, status,
-        ...(status === WFH_STATUS.APPROVED ? { reviewedById: v.employeeId, reviewedAt: new Date() } : {}) },
-    });
-    const who = `${me?.firstName ?? ''} ${me?.lastName ?? ''}`.trim();
-    if (status === WFH_STATUS.PENDING_MANAGER) {
-      await this.notify([me!.managerId], v, 'WFH request', `${who} asked to work from home on ${this.label(date)}: ${reason}`);
-    } else if (status === WFH_STATUS.PENDING_HR) {
-      await this.notify(await this.hrIds(v.companyId), v, 'WFH request', `${who} asked to work from home on ${this.label(date)}: ${reason}`);
-    }
-    return req;
+    throw new ForbiddenException(
+      'Work From Home self-requests have been disabled. Work From Home can only be assigned directly by HR and Superadmin via the Shift Roster.'
+    );
   }
 
   async cancel(v: Viewer, id: number) {

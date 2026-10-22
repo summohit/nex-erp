@@ -166,6 +166,7 @@
     '.ht b{display:block;font-size:14.5px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '.ht-status-line{display:flex;align-items:center;gap:6px;font-size:11.5px;opacity:.92;margin-top:2px}',
     '.ht-live-dot{width:6px;height:6px;border-radius:50%;background:#34d399;animation:liveBlink 1.8s infinite ease-in-out}',
+    '.seen{font-size:10.5px;color:#94a3b8;text-align:right;margin-top:2px;animation:nexMsgSlide .2s ease-out both}',
     '.offline-note{align-self:stretch;margin:0 4px 10px;padding:10px 12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:12.5px;line-height:1.45;text-align:center}',
     '.ht-offline-dot{width:6px;height:6px;border-radius:50%;background:#cbd5e1;opacity:.8}',
     '@keyframes liveBlink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.85)}}',
@@ -553,6 +554,7 @@
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
     inputEl.addEventListener('input', function () {
+      pingTyping();
       inputEl.style.height = 'auto';
       inputEl.style.height = Math.min(110, inputEl.scrollHeight) + 'px';
     });
@@ -827,6 +829,8 @@
     if (cfg.online === false && cfg.offlineMessage && !isEnded) {
       list.appendChild(el('div', 'offline-note', esc(cfg.offlineMessage)));
     }
+    var lastVisitorId = 0;
+    msgs.forEach(function (m) { if (m.senderType === 'VISITOR' && m.id % 1 === 0) lastVisitorId = m.id; });
     msgs.forEach(function (m, idx) {
       var label = dayLabel(m.createdAt, lastDay);
       if (label) {
@@ -883,6 +887,10 @@
         mCol.appendChild(pills);
       }
       mCol.appendChild(el('div', 'ts', time(m.createdAt)));
+      // "Seen" under the visitor's latest message once an agent has opened it.
+      if (mine && m.id === lastVisitorId && conv && conv.status === 'OPEN' && (conv.seenUpTo || 0) >= m.id) {
+        mCol.appendChild(el('div', 'seen', 'Seen'));
+      }
       row.appendChild(mCol);
       list.appendChild(row);
 
@@ -891,7 +899,7 @@
       }
     });
 
-    if (sending && conv && conv.status === 'BOT') {
+    if ((sending && conv && conv.status === 'BOT') || (!sending && conv && conv.status === 'OPEN' && conv.agentTyping)) {
       var tyRow = el('div', 'row new-anim');
       var av1 = el('div', 'msg-avatar');
       av1.innerHTML = avatarHtml(cfg);
@@ -991,8 +999,10 @@
 
   function merge(r) {
     var prevStatus = conv ? conv.status : null;
+    var prevTyping = conv ? !!conv.agentTyping : false;
+    var prevSeen = conv ? conv.seenUpTo || 0 : 0;
     if (r.conversation) conv = r.conversation;
-    var statusChanged = conv && conv.status !== prevStatus;
+    var statusChanged = conv && (conv.status !== prevStatus || !!conv.agentTyping !== prevTyping || (conv.seenUpTo || 0) !== prevSeen);
 
     var fresh = 0;
     (r.messages || []).forEach(function (m) {
@@ -1018,6 +1028,16 @@
       return '<span class="ht-offline-dot"></span><span>' + esc(cfg.backAt ? 'Offline · back ' + cfg.backAt : 'Offline right now') + '</span>';
     }
     return '<span class="ht-live-dot"></span><span>' + esc((cfg && cfg.headerSubtitle) || 'Online • Instant Answers') + '</span>';
+  }
+
+  // Let agents see the visitor typing — only once a person is on the chat, at most every 3s.
+  var lastTypingPing = 0;
+  function pingTyping() {
+    if (!conv || conv.status !== 'OPEN' || !inputEl.value.trim()) return;
+    var now = Date.now();
+    if (now - lastTypingPing < 3000) return;
+    lastTypingPing = now;
+    api('/conversations/' + conv.id + '/typing', { method: 'POST', body: { visitorId: visitorId } }).catch(function () {});
   }
 
   function fileSize(n) {
@@ -1104,10 +1124,11 @@
     if (conv && (conv.status === 'RESOLVED' || conv.status === 'CLOSED')) {
       return; // Stop polling while conversation is ended
     }
-    var delay = !open ? 20000 : conv && conv.status === 'OPEN' ? 3000 : 8000;
+    var delay = !open ? 20000 : conv && conv.agentTyping ? 1500 : conv && conv.status === 'OPEN' ? 3000 : 8000;
     pollTimer = setTimeout(function () {
       if (conv && !sending && document.visibilityState !== 'hidden') {
-        api('/conversations/' + conv.id + '/messages?visitorId=' + encodeURIComponent(visitorId) + '&after=' + Math.floor(lastId))
+        api('/conversations/' + conv.id + '/messages?visitorId=' + encodeURIComponent(visitorId) + '&after=' + Math.floor(lastId) +
+          (open && tab === 'chat' ? '&seen=1' : ''))
           .then(merge)
           .catch(function () { /* transient — try again next tick */ })
           .then(schedulePoll);

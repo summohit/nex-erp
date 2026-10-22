@@ -7,6 +7,8 @@ import { DomSanitizer, SafeHtml, Title } from '@angular/platform-browser';
 import { HotToastService } from '@ngneat/hot-toast';
 import { environment } from '../../../environments/environment';
 import { PermissionsService } from '../../services/permissions.service';
+import { NotificationsService } from '../../services/notifications.service';
+import { Subscription } from 'rxjs';
 import {
   LucideMessageCircle, LucideSearch, LucidePlus, LucideTrash2, LucideSave, LucideCopy,
   LucideEdit2, LucideFileText, LucideChevronLeft, LucideExternalLink,
@@ -47,6 +49,13 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   private permissions = inject(PermissionsService);
   private sanitizer = inject(DomSanitizer);
   private titleService = inject(Title);
+  private notificationsService = inject(NotificationsService);
+  private liveSub?: Subscription;
+  /** Conversation whose visitor is typing right now (cleared a few seconds after the last ping). */
+  visitorTypingId: number | null = null;
+  private visitorTypingTimer: any = null;
+  private lastTypingPing = 0;
+  private liveRefreshTimer: any = null;
   private baseTitle = '';
   private api = `${environment.apiUrl}/chat`;
 
@@ -148,6 +157,37 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     try { this.soundEnabled = localStorage.getItem('chatInboxSound') !== 'off'; } catch { /* storage blocked */ }
     this.load(this.tab);
     this.schedulePoll();
+    this.liveSub = this.notificationsService.websiteChat.subscribe((e) => this.onLiveEvent(e));
+  }
+
+  /** Socket push from the backend: refetch now instead of waiting for the next poll. */
+  private onLiveEvent(e: { conversationId: number; kind: 'message' | 'typing' | 'read' }) {
+    if (this.tab !== 'inbox') return;
+    if (e.kind === 'typing') {
+      this.visitorTypingId = e.conversationId;
+      clearTimeout(this.visitorTypingTimer);
+      this.visitorTypingTimer = setTimeout(() => (this.visitorTypingId = null), 5000);
+      if (e.conversationId === this.selectedId) setTimeout(() => this.scrollThreadToBottom(), 30);
+      return;
+    }
+    if (e.kind === 'message' && e.conversationId === this.visitorTypingId) this.visitorTypingId = null;
+    // Events arrive in bursts (message + bot reply): coalesce into one refetch.
+    clearTimeout(this.liveRefreshTimer);
+    this.liveRefreshTimer = setTimeout(() => {
+      this.loadInbox(true);
+      if (this.selectedId === e.conversationId && !this.sending) {
+        this.http.get<any>(`${this.api}/inbox/${e.conversationId}`).subscribe({ next: (r) => this.applyConversation(r) });
+      }
+    }, 150);
+  }
+
+  /** Tell the visitor's widget an agent is typing — at most every 3 seconds. */
+  pingTyping() {
+    if (!this.selectedId || this.chatEnded || !this.reply.trim()) return;
+    const now = Date.now();
+    if (now - this.lastTypingPing < 3000) return;
+    this.lastTypingPing = now;
+    this.http.post(`${this.api}/inbox/${this.selectedId}/typing`, {}).subscribe({ error: () => {} });
   }
 
   toggleSound() {
@@ -227,6 +267,9 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearTimeout(this.pollTimer);
+    clearTimeout(this.liveRefreshTimer);
+    clearTimeout(this.visitorTypingTimer);
+    this.liveSub?.unsubscribe();
     if (this.baseTitle) this.titleService.setTitle(this.baseTitle);
   }
 
@@ -410,7 +453,7 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     return m.message;
   }
 
-  /** Agents get fresh visitor messages without a socket — a short poll is plenty for chat volume. */
+  /** Fallback poll; the socket (onLiveEvent) delivers changes instantly when connected. */
   private schedulePoll() {
     clearTimeout(this.pollTimer);
     this.pollTimer = setTimeout(() => {
@@ -421,7 +464,7 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
         }
       }
       this.schedulePoll();
-    }, 5000);
+    }, 10000); // safety net — live updates arrive over the socket
   }
 
   sendReply() {

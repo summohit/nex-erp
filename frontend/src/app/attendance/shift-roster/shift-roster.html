@@ -1022,9 +1022,17 @@
             <span>Target Employees</span>
             <span class="req-star">*</span>
           </label>
-          <div class="label-actions" *ngIf="wfhPicked().length > 0">
-            <span class="label-badge">{{ wfhPicked().length }} selected</span>
-            <button type="button" class="btn-text-action" (click)="wfhPicked.set([])">Clear all</button>
+          <div class="label-actions">
+            <button 
+              type="button" 
+              class="btn-text-action btn-assign-self" 
+              *ngIf="myEmployeeId() && !wfhPicked().includes(myEmployeeId()!)" 
+              (click)="addMyselfToWfh()"
+              title="Assign Work From Home to yourself">
+              + Assign to Myself
+            </button>
+            <span class="label-badge" *ngIf="wfhPicked().length > 0">{{ wfhPicked().length }} selected</span>
+            <button type="button" class="btn-text-action" *ngIf="wfhPicked().length > 0" (click)="wfhPicked.set([])">Clear all</button>
           </div>
         </div>
 

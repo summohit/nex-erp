@@ -65,6 +65,16 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
   }
 
   /**
+   * Website Chat activity for the company's agents: a message, typing, or a read.
+   * Only ids go out; the inbox refetches through its access-checked routes.
+   */
+  sendWebsiteChat(companyId: number, payload: { conversationId: number; kind: 'message' | 'typing' | 'read' }) {
+    if (this.server) {
+      this.server.to(`company_${companyId}`).emit('website-chat', payload);
+    }
+  }
+
+  /**
    * Tell these people a notice has just been posted to them. Only the id goes
    * out; the client fetches it through the normal, access-checked route.
    */

@@ -53,6 +53,8 @@ export class NotificationsService {
   notifications = signal<NotificationItem[]>([]);
   /** A notice has just been posted to this person. Its popup decides what to show. */
   readonly noticePosted = new Subject<{ id: number }>();
+  /** Website Chat activity in this company (ids only) — the inbox refetches on it. */
+  readonly websiteChat = new Subject<{ conversationId: number; kind: 'message' | 'typing' | 'read' }>();
   unreadCount = signal<number>(0);
 
   constructor() {
@@ -94,6 +96,7 @@ export class NotificationsService {
     });
 
     this.socket.on('notice', (n: { id: number }) => this.noticePosted.next(n));
+    this.socket.on('website-chat', (e: { conversationId: number; kind: 'message' | 'typing' | 'read' }) => this.websiteChat.next(e));
 
     this.socket.on('notification', (newNotif: NotificationItem) => {
       this.notifications.update(list => [newNotif, ...list]);
