@@ -9,6 +9,7 @@ import { PermissionsService } from '../../services/permissions.service';
 import {
   LucideMessageCircle, LucideSearch, LucidePlus, LucideTrash2, LucideSave, LucideCopy,
   LucideEdit2, LucideFileText, LucideChevronLeft, LucideExternalLink,
+  LucideSparkles, LucideGlobe, LucideCode, LucideCheck,
 } from '@lucide/angular';
 
 type Tab = 'inbox' | 'kb' | 'widgets';
@@ -20,6 +21,7 @@ type Tab = 'inbox' | 'kb' | 'widgets';
     CommonModule, FormsModule, RouterModule,
     LucideMessageCircle, LucideSearch, LucidePlus, LucideTrash2, LucideSave, LucideCopy,
     LucideEdit2, LucideFileText, LucideChevronLeft, LucideExternalLink,
+    LucideSparkles, LucideGlobe, LucideCode, LucideCheck,
   ],
   templateUrl: './chat-inbox.html',
   styleUrls: ['./chat-inbox.css'],
@@ -285,6 +287,34 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   // ═══ Widgets ═══
 
+  brandColorPresets = ['#0284C7', '#2563EB', '#4F46E5', '#7C3AED', '#059669', '#0D9488', '#DB2777', '#0F172A'];
+
+  selectColor(color: string) {
+    if (this.editingWidget) {
+      this.editingWidget.primaryColor = color;
+    }
+  }
+
+  copiedSnippetId: string | null = null;
+  copiedKeyId: string | null = null;
+
+  copySnippet(w: any) {
+    const s = this.snippet(w);
+    navigator.clipboard.writeText(s).then(() => {
+      this.copiedSnippetId = w.id || w.widgetKey;
+      setTimeout(() => (this.copiedSnippetId = null), 2000);
+      this.toast.success('Embed snippet copied to clipboard');
+    });
+  }
+
+  copyKey(w: any) {
+    navigator.clipboard.writeText(w.widgetKey).then(() => {
+      this.copiedKeyId = w.id || w.widgetKey;
+      setTimeout(() => (this.copiedKeyId = null), 2000);
+      this.toast.success('Widget key copied');
+    });
+  }
+
   loadWidgets() {
     this.http.get<any[]>(`${this.api}/widgets`).subscribe({
       next: (r) => (this.widgets = r),
@@ -294,9 +324,17 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   newWidget() {
     this.editingWidget = {
-      name: 'Website', primaryColor: '#2563EB', headerTitle: 'CES Support & Careers', headerSubtitle: 'We are here to help you!',
-      greetingMessage: 'Hi there! How can we help you today?', botName: 'CES Assistant', position: 'br',
-      enableAi: true, isEnabled: true, allowedDomains: 'ces-pl.com, *.ces-pl.com',
+      name: 'Website Widget',
+      primaryColor: '#0284C7',
+      headerTitle: 'CES Support & Careers',
+      headerSubtitle: 'We are here to help you!',
+      greetingMessage: 'Hi there! How can we help you today?',
+      botName: 'CES Assistant',
+      botAvatarUrl: '',
+      position: 'br',
+      enableAi: true,
+      isEnabled: true,
+      allowedDomains: 'ces-pl.com, *.ces-pl.com',
     };
   }
 

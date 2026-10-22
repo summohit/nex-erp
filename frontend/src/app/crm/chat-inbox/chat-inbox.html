@@ -159,50 +159,361 @@
 
   <!-- ══════════════ WIDGETS ══════════════ -->
   <div class="ci-widgets" *ngIf="tab === 'widgets'">
-    <div class="ci-articles-tools" *ngIf="!editingWidget">
-      <span class="ci-muted">Each widget gets its own embed snippet. Use one for ces-pl.com and set its key as <code>chatWidgetKey</code> for the careers page.</span>
-      <button type="button" class="ci-btn primary" (click)="newWidget()"><svg lucidePlus size="15"></svg> New widget</button>
-    </div>
-    <div class="ci-empty" *ngIf="!editingWidget && !widgets.length">No widget yet.</div>
-
-    <div class="ci-widget-card" *ngFor="let w of (editingWidget ? [] : widgets)">
-      <div class="ci-widget-top">
-        <span class="ci-swatch" [style.background]="w.primaryColor"></span>
-        <b>{{ w.name }}</b>
-        <span class="ci-status" [attr.data-s]="w.isEnabled ? 'OPEN' : 'CLOSED'">{{ w.isEnabled ? 'Live' : 'Off' }}</span>
-        <span class="ci-muted">{{ w._count?.conversations }} chats · AI {{ w.enableAi ? 'on' : 'off' }} · {{ w.allowedDomains || 'any site' }}</span>
-        <button type="button" class="ci-btn" (click)="editingWidget = { ...w }"><svg lucideEdit2 size="14"></svg> Edit</button>
-      </div>
-      <div class="ci-snippet">
-        <code>{{ snippet(w) }}</code>
-        <button type="button" class="ci-icon" (click)="copy(snippet(w))" title="Copy snippet"><svg lucideCopy size="15"></svg></button>
-      </div>
-      <div class="ci-muted">Widget key: <code>{{ w.widgetKey }}</code> <button type="button" class="ci-icon" (click)="copy(w.widgetKey)" title="Copy key"><svg lucideCopy size="13"></svg></button></div>
-    </div>
-
-    <div class="ci-editor" *ngIf="editingWidget">
-      <div class="ci-editor-head">
-        <button type="button" class="ci-btn" (click)="editingWidget = null"><svg lucideChevronLeft size="15"></svg> Back</button>
-        <b>{{ editingWidget.id ? 'Edit widget' : 'New widget' }}</b>
-        <button type="button" class="ci-btn primary" (click)="saveWidget()" [disabled]="widgetSaving"><svg lucideSave size="15"></svg> {{ widgetSaving ? 'Saving…' : 'Save' }}</button>
-      </div>
-      <div class="ci-editor-grid">
-        <label>Name<input [(ngModel)]="editingWidget.name"></label>
-        <label>Brand colour<span class="ci-color"><input type="color" [(ngModel)]="editingWidget.primaryColor"><input [(ngModel)]="editingWidget.primaryColor"></span></label>
-        <label>Header title<input [(ngModel)]="editingWidget.headerTitle"></label>
-        <label>Header subtitle<input [(ngModel)]="editingWidget.headerSubtitle"></label>
-        <label>Bot name<input [(ngModel)]="editingWidget.botName"></label>
-        <label>Bot avatar URL <small>(defaults to company logo)</small><input [(ngModel)]="editingWidget.botAvatarUrl"></label>
-        <label class="wide">Greeting<textarea rows="2" [(ngModel)]="editingWidget.greetingMessage"></textarea></label>
-        <label class="wide">Allowed sites <small>(comma-separated, e.g. ces-pl.com, *.ces-pl.com; empty = any site)</small><input [(ngModel)]="editingWidget.allowedDomains"></label>
-        <label>Launcher position
-          <select [(ngModel)]="editingWidget.position"><option value="br">Bottom right</option><option value="bl">Bottom left</option></select>
-        </label>
-        <div class="ci-checks">
-          <label class="ci-check"><input type="checkbox" [(ngModel)]="editingWidget.enableAi"> AI answers</label>
-          <label class="ci-check"><input type="checkbox" [(ngModel)]="editingWidget.isEnabled"> Widget live</label>
+    
+    <!-- Top Bar when NOT editing -->
+    <div class="ci-widgets-top-bar" *ngIf="!editingWidget">
+      <div class="ci-widgets-intro">
+        <div class="ci-widgets-intro-icon">
+          <svg lucideCode size="20"></svg>
+        </div>
+        <div class="ci-widgets-intro-text">
+          <h3>Embeddable Chat Widgets</h3>
+          <p>Each widget provides its own isolated embed snippet. Use one for <strong>ces-pl.com</strong> and set its key as <code>chatWidgetKey</code> for the careers page.</p>
         </div>
       </div>
+      <button type="button" class="ci-btn primary ci-btn-lg" (click)="newWidget()">
+        <svg lucidePlus size="16"></svg>
+        <span>Create Widget</span>
+      </button>
+    </div>
+
+    <!-- Empty State (Screenshot 1) -->
+    <div class="ci-widgets-empty-card" *ngIf="!editingWidget && !widgets.length">
+      <div class="ci-widgets-empty-icon">
+        <svg lucideSparkles size="36"></svg>
+      </div>
+      <h3>No Chat Widgets Configured</h3>
+      <p>Create and configure an embeddable chat widget for <strong>ces-pl.com</strong>, the Careers portal, or other web apps with AI bot responses, custom branding, and knowledge base search.</p>
+      <button type="button" class="ci-btn primary ci-btn-lg" (click)="newWidget()">
+        <svg lucidePlus size="16"></svg>
+        <span>Create Your First Widget</span>
+      </button>
+    </div>
+
+    <!-- Widget Cards List (Screenshot 2) -->
+    <div class="ci-widgets-grid" *ngIf="!editingWidget && widgets.length">
+      <div class="ci-widget-card-enhanced" *ngFor="let w of widgets">
+        
+        <!-- Header Row -->
+        <div class="ci-wc-header">
+          <div class="ci-wc-header-left">
+            <div class="ci-wc-swatch" [style.background]="w.primaryColor || '#0284c7'">
+              <svg lucideMessageCircle size="20"></svg>
+            </div>
+            <div class="ci-wc-title-box">
+              <div class="ci-wc-title-row">
+                <h4 class="ci-wc-name">{{ w.name }}</h4>
+                <span class="ci-wc-status-pill" [class.live]="w.isEnabled" [class.off]="!w.isEnabled">
+                  <span class="ci-wc-status-dot"></span>
+                  <span>{{ w.isEnabled ? 'Live & Active' : 'Disabled' }}</span>
+                </span>
+                <span class="ci-wc-ai-pill" [class.ai-on]="w.enableAi">
+                  <svg lucideSparkles size="11"></svg>
+                  <span>{{ w.enableAi ? 'AI Assisted' : 'AI Off' }}</span>
+                </span>
+              </div>
+              <div class="ci-wc-meta-row">
+                <span class="ci-wc-meta-item">
+                  <svg lucideGlobe size="12"></svg>
+                  <span>{{ w.allowedDomains || 'All domains allowed' }}</span>
+                </span>
+                <span class="ci-wc-meta-sep">•</span>
+                <span class="ci-wc-meta-item">
+                  <span>{{ w._count?.conversations || 0 }} chats</span>
+                </span>
+                <span class="ci-wc-meta-sep">•</span>
+                <span class="ci-wc-meta-item">
+                  <span>{{ w.position === 'bl' ? 'Bottom Left' : 'Bottom Right' }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ci-wc-header-actions">
+            <button type="button" class="ci-btn ci-btn-edit" (click)="editingWidget = { ...w }">
+              <svg lucideEdit2 size="14"></svg>
+              <span>Edit Widget</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Snippet Container -->
+        <div class="ci-wc-snippet-box">
+          <div class="ci-wc-snippet-head">
+            <div class="ci-wc-snippet-label">
+              <svg lucideCode size="13"></svg>
+              <span>EMBED SCRIPT</span>
+            </div>
+            <button type="button" class="ci-wc-copy-btn" (click)="copySnippet(w)">
+              <svg lucideCheck size="13" *ngIf="copiedSnippetId === (w.id || w.widgetKey)"></svg>
+              <svg lucideCopy size="13" *ngIf="copiedSnippetId !== (w.id || w.widgetKey)"></svg>
+              <span>{{ copiedSnippetId === (w.id || w.widgetKey) ? 'Copied!' : 'Copy Script' }}</span>
+            </button>
+          </div>
+          <div class="ci-wc-snippet-code">
+            <code>{{ snippet(w) }}</code>
+          </div>
+        </div>
+
+        <!-- Footer Bar with Key -->
+        <div class="ci-wc-footer">
+          <div class="ci-wc-key-group">
+            <span class="ci-wc-key-label">Widget Key:</span>
+            <code class="ci-wc-key-code">{{ w.widgetKey }}</code>
+            <button type="button" class="ci-wc-icon-copy" (click)="copyKey(w)" title="Copy Key">
+              <svg lucideCheck size="13" *ngIf="copiedKeyId === (w.id || w.widgetKey)"></svg>
+              <svg lucideCopy size="13" *ngIf="copiedKeyId !== (w.id || w.widgetKey)"></svg>
+            </button>
+          </div>
+          <span class="ci-wc-embed-hint">Paste before <code>&lt;/body&gt;</code> on your site</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ WIDGET CONFIGURATION & REAL-TIME PREVIEW (Screenshot 3) ═══ -->
+    <div class="ci-widget-editor-split" *ngIf="editingWidget">
+      
+      <!-- Editor Form (Left Side) -->
+      <div class="ci-editor-form-col">
+        <div class="ci-editor-top-nav">
+          <button type="button" class="ci-btn ci-btn-back" (click)="editingWidget = null">
+            <svg lucideChevronLeft size="16"></svg>
+            <span>Back to Widgets</span>
+          </button>
+          <div class="ci-editor-nav-title">
+            <h3>{{ editingWidget.id ? 'Edit Widget: ' + editingWidget.name : 'Create New Widget' }}</h3>
+          </div>
+          <button type="button" class="ci-btn primary ci-btn-save" (click)="saveWidget()" [disabled]="widgetSaving">
+            <svg lucideSave size="15"></svg>
+            <span>{{ widgetSaving ? 'Saving…' : 'Save Changes' }}</span>
+          </button>
+        </div>
+
+        <div class="ci-editor-cards">
+          <!-- Card 1: Branding & Appearance -->
+          <div class="ci-card-panel">
+            <div class="ci-card-panel-head">
+              <div class="ci-panel-icon"><svg lucideEdit2 size="16"></svg></div>
+              <div>
+                <h4>General &amp; Branding</h4>
+                <p>Customize widget naming, primary brand color, and placement.</p>
+              </div>
+            </div>
+
+            <div class="ci-field-group">
+              <label class="ci-label">Widget Name</label>
+              <input type="text" class="ci-input" [(ngModel)]="editingWidget.name" placeholder="e.g. CES Website Main" />
+            </div>
+
+            <div class="ci-field-group">
+              <label class="ci-label">Brand Color</label>
+              <div class="ci-color-picker-row">
+                <div class="ci-color-presets">
+                  <button 
+                    type="button" 
+                    class="ci-color-preset-dot" 
+                    *ngFor="let col of brandColorPresets"
+                    [style.background]="col"
+                    [class.selected]="editingWidget.primaryColor?.toLowerCase() === col.toLowerCase()"
+                    (click)="selectColor(col)"
+                    [title]="col">
+                  </button>
+                </div>
+                <div class="ci-color-custom-input">
+                  <input type="color" class="ci-color-input" [(ngModel)]="editingWidget.primaryColor" />
+                  <input type="text" class="ci-input ci-hex-input" [(ngModel)]="editingWidget.primaryColor" placeholder="#0284C7" />
+                </div>
+              </div>
+            </div>
+
+            <div class="ci-field-grid-2">
+              <div class="ci-field-group">
+                <label class="ci-label">Header Title</label>
+                <input type="text" class="ci-input" [(ngModel)]="editingWidget.headerTitle" placeholder="e.g. CES Support &amp; Careers" />
+              </div>
+              <div class="ci-field-group">
+                <label class="ci-label">Header Subtitle</label>
+                <input type="text" class="ci-input" [(ngModel)]="editingWidget.headerSubtitle" placeholder="e.g. We are here to help you!" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Assistant & Greetings -->
+          <div class="ci-card-panel">
+            <div class="ci-card-panel-head">
+              <div class="ci-panel-icon"><svg lucideMessageCircle size="16"></svg></div>
+              <div>
+                <h4>Assistant Persona &amp; Greeting</h4>
+                <p>Define what visitors see as soon as the chat launcher opens.</p>
+              </div>
+            </div>
+
+            <div class="ci-field-grid-2">
+              <div class="ci-field-group">
+                <label class="ci-label">Bot / Assistant Name</label>
+                <input type="text" class="ci-input" [(ngModel)]="editingWidget.botName" placeholder="e.g. CES Assistant" />
+              </div>
+              <div class="ci-field-group">
+                <label class="ci-label">Bot Avatar Image URL <small class="ci-opt-tag">(Optional)</small></label>
+                <input type="text" class="ci-input" [(ngModel)]="editingWidget.botAvatarUrl" placeholder="https://.../avatar.png" />
+              </div>
+            </div>
+
+            <div class="ci-field-group">
+              <label class="ci-label">Greeting Message</label>
+              <textarea class="ci-textarea" rows="3" [(ngModel)]="editingWidget.greetingMessage" placeholder="Hi there! How can we help you today?"></textarea>
+              <span class="ci-field-hint">This welcome message is shown automatically to new website visitors.</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Placement, Security & AI -->
+          <div class="ci-card-panel">
+            <div class="ci-card-panel-head">
+              <div class="ci-panel-icon"><svg lucideGlobe size="16"></svg></div>
+              <div>
+                <h4>Placement, AI &amp; Domain Security</h4>
+                <p>Control where and how the widget behaves on the client site.</p>
+              </div>
+            </div>
+
+            <div class="ci-field-group">
+              <label class="ci-label">Allowed Sites / Domains</label>
+              <input type="text" class="ci-input" [(ngModel)]="editingWidget.allowedDomains" placeholder="ces-pl.com, *.ces-pl.com" />
+              <span class="ci-field-hint">Comma-separated domains (e.g. <code>ces-pl.com, *.ces-pl.com</code>). Leave empty to allow any website.</span>
+            </div>
+
+            <div class="ci-field-group">
+              <label class="ci-label">Launcher Position</label>
+              <div class="ci-position-selector">
+                <label class="ci-pos-option" [class.selected]="editingWidget.position !== 'bl'">
+                  <input type="radio" name="pos" value="br" [(ngModel)]="editingWidget.position" />
+                  <div class="ci-pos-card">
+                    <span class="ci-pos-name">Bottom Right</span>
+                    <span class="ci-pos-desc">Standard placement for website chat widgets</span>
+                  </div>
+                </label>
+                <label class="ci-pos-option" [class.selected]="editingWidget.position === 'bl'">
+                  <input type="radio" name="pos" value="bl" [(ngModel)]="editingWidget.position" />
+                  <div class="ci-pos-card">
+                    <span class="ci-pos-name">Bottom Left</span>
+                    <span class="ci-pos-desc">Ideal for Careers to avoid covering right-side action buttons</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div class="ci-toggles-row">
+              <label class="ci-toggle-card">
+                <input type="checkbox" [(ngModel)]="editingWidget.enableAi" />
+                <div class="ci-toggle-content">
+                  <div class="ci-toggle-title">
+                    <svg lucideSparkles size="14"></svg>
+                    <strong>Enable AI Auto-Answers</strong>
+                  </div>
+                  <span class="ci-toggle-desc">Automatically answers visitor questions using your Knowledge Base articles.</span>
+                </div>
+              </label>
+
+              <label class="ci-toggle-card">
+                <input type="checkbox" [(ngModel)]="editingWidget.isEnabled" />
+                <div class="ci-toggle-content">
+                  <div class="ci-toggle-title">
+                    <span class="ci-dot-indicator" [class.on]="editingWidget.isEnabled"></span>
+                    <strong>Widget Active &amp; Live</strong>
+                  </div>
+                  <span class="ci-toggle-desc">Controls whether this widget script displays on allowed websites.</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Interactive Preview (Right Side) -->
+      <div class="ci-preview-col">
+        <div class="ci-preview-sticky">
+          <div class="ci-preview-card">
+            <div class="ci-preview-card-head">
+              <div class="ci-preview-tag">
+                <span class="ci-preview-live-dot"></span>
+                <span>REAL-TIME LIVE PREVIEW</span>
+              </div>
+              <span class="ci-preview-pos-pill">{{ editingWidget.position === 'bl' ? 'Bottom Left' : 'Bottom Right' }}</span>
+            </div>
+
+            <!-- Simulated Browser / Website Surface -->
+            <div class="ci-preview-canvas">
+              <div class="ci-preview-site-mock">
+                <div class="ci-mock-nav">
+                  <div class="ci-mock-logo">CES Tech</div>
+                  <div class="ci-mock-links"><span>Services</span><span>Careers</span><span>About</span></div>
+                </div>
+                <div class="ci-mock-hero">
+                  <div class="ci-mock-line-1"></div>
+                  <div class="ci-mock-line-2"></div>
+                </div>
+              </div>
+
+              <!-- Open Widget Window Preview -->
+              <div class="ci-widget-mock-window" [class.pos-left]="editingWidget.position === 'bl'">
+                <!-- Header -->
+                <div class="ci-wm-header" [style.background]="editingWidget.primaryColor || '#0284c7'">
+                  <div class="ci-wm-header-top">
+                    <div class="ci-wm-avatar">
+                      <img *ngIf="editingWidget.botAvatarUrl" [src]="editingWidget.botAvatarUrl" alt="Bot" (error)="editingWidget.botAvatarUrl = ''" />
+                      <span *ngIf="!editingWidget.botAvatarUrl">{{ (editingWidget.botName || 'B')[0] }}</span>
+                    </div>
+                    <div class="ci-wm-header-text">
+                      <span class="ci-wm-title">{{ editingWidget.headerTitle || 'CES Support & Careers' }}</span>
+                      <span class="ci-wm-subtitle">{{ editingWidget.headerSubtitle || 'We are here to help you!' }}</span>
+                    </div>
+                  </div>
+                  <div class="ci-wm-status">
+                    <span class="ci-wm-dot"></span>
+                    <span>Online • Instant AI Answers</span>
+                  </div>
+                </div>
+
+                <!-- Body -->
+                <div class="ci-wm-body">
+                  <div class="ci-wm-bot-bubble-wrap">
+                    <div class="ci-wm-bot-avatar-mini" [style.background]="editingWidget.primaryColor || '#0284c7'">
+                      {{ (editingWidget.botName || 'C')[0] }}
+                    </div>
+                    <div class="ci-wm-bubble">
+                      {{ editingWidget.greetingMessage || 'Hi there! How can we help you today?' }}
+                    </div>
+                  </div>
+
+                  <div class="ci-wm-quick-actions">
+                    <span class="ci-wm-chip">💼 Open Job Positions</span>
+                    <span class="ci-wm-chip">💡 IT Services</span>
+                    <span class="ci-wm-chip">📞 Talk to Team</span>
+                  </div>
+                </div>
+
+                <!-- Input Footer -->
+                <div class="ci-wm-footer">
+                  <div class="ci-wm-input-box">
+                    <span>Ask a question or search help...</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Floating Launcher Bubble Mockup -->
+              <div class="ci-wm-launcher" [class.pos-left]="editingWidget.position === 'bl'" [style.background]="editingWidget.primaryColor || '#0284c7'">
+                <svg lucideMessageCircle size="22"></svg>
+              </div>
+            </div>
+
+            <div class="ci-preview-footer-note">
+              <span>This preview reflects real-time styling for <strong>ces-pl.com</strong> and the Careers portal.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
