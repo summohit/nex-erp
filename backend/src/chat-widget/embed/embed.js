@@ -273,11 +273,9 @@
     '.btn-new-chat{margin-top:4px;background:var(--c);color:#fff;border:0;border-radius:9px;padding:9px 15px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;box-shadow:0 2px 6px color-mix(in srgb,var(--c) 25%,transparent)}',
     '.btn-new-chat svg{width:14px;height:14px}',
     '.btn-new-chat:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 4px 10px color-mix(in srgb,var(--c) 35%,transparent)}',
-    '.compose-ended{padding:12px 16px;background:#fff;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12.5px;color:#64748b;animation:composeUp .28s cubic-bezier(.16,1,.3,1) both}',
+    '.compose-ended{padding:14px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:#64748b;animation:composeUp .28s cubic-bezier(.16,1,.3,1) both}',
     '@keyframes composeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}',
-    '@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}',
-    '.compose-ended button{background:var(--c);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}',
-    '.compose-ended button:hover{filter:brightness(1.08)}'
+    '@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}'
   ].join('\n');
 
   // ─── Sound System (Synthesized via Web Audio API) ───
@@ -502,9 +500,6 @@
     composeEndedEl = el('div', 'compose-ended');
     composeEndedEl.style.display = 'none';
     composeEndedEl.innerHTML = '<span>Conversation ended</span>';
-    var freshBtn = el('button', null, ICONS.refresh + '<span>Start new chat</span>');
-    freshBtn.onclick = startNewConversation;
-    composeEndedEl.appendChild(freshBtn);
 
     panel.appendChild(head); panel.appendChild(tabsEl); panel.appendChild(bodyEl);
     panel.appendChild(composeEl);
@@ -852,9 +847,6 @@
           '<strong>Conversation Ended</strong>' +
           '<p>Thank you for reaching out! Let us know if you need anything else.</p>' +
         '</div>';
-      var newChatBtn = el('button', 'btn-new-chat', ICONS.refresh + '<span>Start new conversation</span>');
-      newChatBtn.onclick = startNewConversation;
-      endedBox.appendChild(newChatBtn);
       list.appendChild(endedBox);
     }
 
