@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { isHrAdmin, isSuperAdmin } from '../common/company-roles';
+import { isHrAdmin, isSuperAdmin, normaliseRole } from '../common/company-roles';
 import { isBranchWeeklyOff, personalDaysOff } from '../common/weekly-offs';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -292,6 +292,102 @@ export class WfhService {
       await this.notify(await this.hrIds(v.companyId), v, 'WFH request', `A WFH request for ${this.label(r.date)} is approved by the manager and needs HR.`);
     }
     return done;
+  }
+
+  /** Permanent WFH is HR's and the super admin's alone (22 Oct 2026). */
+  private assertPermanentRole(v: Viewer) {
+    if (!(isSuperAdmin(v.role) || normaliseRole(v.role) === 'HR')) {
+      throw new ForbiddenException('Only HR and the super admin can set permanent WFH');
+    }
+  }
+
+  private todayIst(): Date {
+    const ist = new Date(Date.now() + 330 * 60_000);
+    return new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()));
+  }
+
+  /** Everyone on permanent WFH now or from a later start date. */
+  async permanentList(v: Viewer) {
+    this.assertPermanentRole(v);
+    const rules = await this.prisma.wfhPermanent.findMany({
+      where: { companyId: v.companyId, OR: [{ endDate: null }, { endDate: { gt: this.todayIst() } }] },
+      orderBy: { startDate: 'asc' },
+    });
+    const ids = [...new Set(rules.flatMap((r) => [r.employeeId, r.setById].filter((x): x is number => !!x)))];
+    const people = await this.prisma.employee.findMany({ where: { id: { in: ids } }, select: PERSON });
+    const by = new Map(people.map((p) => [p.id, p]));
+    return rules.map((r) => ({ ...r, employee: by.get(r.employeeId) ?? null, setBy: r.setById ? by.get(r.setById) ?? null : null }));
+  }
+
+  /**
+   * Put people on permanent WFH from `startDate`, every working day or only
+   * `weekdays` (0=Sun..6=Sat). No end date: it runs until ended. Someone
+   * already on it has their rule replaced (the old one ends the day before).
+   */
+  async setPermanent(v: Viewer, body: { employeeIds: number[]; startDate?: string; weekdays?: number[]; reason?: string }) {
+    this.assertPermanentRole(v);
+    const ids = [...new Set((body?.employeeIds ?? []).map(Number).filter(Boolean))];
+    if (!ids.length) throw new BadRequestException('Choose at least one employee');
+    const start = body?.startDate && /^\d{4}-\d{2}-\d{2}$/.test(body.startDate) ? this.parseDay(body.startDate) : this.todayIst();
+    const days = [...new Set((body?.weekdays ?? []).map(Number).filter((d) => d >= 0 && d <= 6))].sort();
+    const weekdays = days.length && days.length < 7 ? days.join(',') : null;
+    const people = await this.prisma.employee.findMany({ where: { id: { in: ids }, companyId: v.companyId }, select: { id: true } });
+    const valid = people.map((p) => p.id);
+    if (!valid.length) throw new BadRequestException('No such employees');
+    const reason = String(body?.reason ?? '').trim() || null;
+    await this.prisma.$transaction([
+      // A replaced rule ends where the new one starts; one not yet begun is simply superseded.
+      this.prisma.wfhPermanent.updateMany({
+        where: { companyId: v.companyId, employeeId: { in: valid }, OR: [{ endDate: null }, { endDate: { gt: start } }] },
+        data: { endDate: start, endedById: v.employeeId, endedAt: new Date() },
+      }),
+      this.prisma.wfhPermanent.createMany({
+        data: valid.map((employeeId) => ({ companyId: v.companyId, employeeId, startDate: start, weekdays, reason, setById: v.employeeId })),
+      }),
+    ]);
+    const which = weekdays ? days.map((d) => DAY_NAMES[d].slice(0, 3)).join(', ') : 'every working day';
+    await this.notify(valid, v, 'Permanent WFH', `You work from home ${which} from ${this.label(start)} until HR changes it.${reason ? ` ${reason}` : ''}`);
+    return { updated: valid.length };
+  }
+
+  /** End permanent WFH: from `fromDate` (default today) they are back at the office. */
+  async endPermanent(v: Viewer, body: { employeeIds: number[]; fromDate?: string }) {
+    this.assertPermanentRole(v);
+    const ids = [...new Set((body?.employeeIds ?? []).map(Number).filter(Boolean))];
+    if (!ids.length) throw new BadRequestException('Choose at least one employee');
+    const from = body?.fromDate && /^\d{4}-\d{2}-\d{2}$/.test(body.fromDate) ? this.parseDay(body.fromDate) : this.todayIst();
+    const open = await this.prisma.wfhPermanent.findMany({
+      where: { companyId: v.companyId, employeeId: { in: ids }, OR: [{ endDate: null }, { endDate: { gt: from } }] },
+      select: { id: true, employeeId: true },
+    });
+    if (!open.length) return { ended: 0 };
+    await this.prisma.wfhPermanent.updateMany({
+      where: { id: { in: open.map((r) => r.id) } }, data: { endDate: from, endedById: v.employeeId, endedAt: new Date() },
+    });
+    const who = [...new Set(open.map((r) => r.employeeId))];
+    await this.notify(who, v, 'Permanent WFH ended', `Your permanent work from home ends. From ${this.label(from)} you work at the office as rostered.`);
+    return { ended: who.length };
+  }
+
+  /** Call a permanent-WFH person to the office for one day, or undo that. */
+  async setOfficeDay(v: Viewer, body: { employeeId: number; date: string; atOffice: boolean }) {
+    this.assertPermanentRole(v);
+    const employeeId = Number(body?.employeeId);
+    if (!body?.date || !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) throw new BadRequestException('Choose a day');
+    const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId: v.companyId }, select: { id: true } });
+    if (!emp) throw new NotFoundException('Employee not found');
+    const date = this.parseDay(body.date);
+    if (body.atOffice) {
+      await this.prisma.wfhOfficeDay.upsert({
+        where: { employeeId_date: { employeeId, date } }, update: { setById: v.employeeId },
+        create: { companyId: v.companyId, employeeId, date, setById: v.employeeId },
+      });
+      await this.notify([employeeId], v, 'Office day', `Please work at the office on ${this.label(date)}.`);
+    } else {
+      await this.prisma.wfhOfficeDay.deleteMany({ where: { employeeId, date } });
+      await this.notify([employeeId], v, 'Office day cancelled', `You work from home on ${this.label(date)} as usual.`);
+    }
+    return { ok: true };
   }
 
   /** An approved WFH request covers this day (used by attendance and the roster). */

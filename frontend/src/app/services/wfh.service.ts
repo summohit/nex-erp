@@ -23,6 +23,13 @@ export class WfhService {
   mine(): Observable<{ limit: number; usedThisMonth: number; requests: WfhRequest[]; counts?: { approved: number; pending: number; rejected: number; assigned: number } }> { return this.http.get<any>(`${this.url}/mine`); }
   /** HR / super admin (21 Oct 2026): approved at once, outside the monthly limit. */
   assign(employeeIds: number[], dates: string[], reason?: string) { return this.http.post<{ created: number; skipped: number }>(`${this.url}/assign`, { employeeIds, dates, reason }); }
+  /** Permanent WFH (22 Oct 2026): HR and the super admin only. */
+  permanentList() { return this.http.get<any[]>(`${this.url}/permanent`); }
+  setPermanent(employeeIds: number[], startDate: string, weekdays: number[], reason?: string) {
+    return this.http.post<{ updated: number }>(`${this.url}/permanent`, { employeeIds, startDate, weekdays, reason });
+  }
+  endPermanent(employeeIds: number[], fromDate?: string) { return this.http.post<{ ended: number }>(`${this.url}/permanent/end`, { employeeIds, fromDate }); }
+  officeDay(employeeId: number, date: string, atOffice: boolean) { return this.http.post(`${this.url}/permanent/office-day`, { employeeId, date, atOffice }); }
   report(month: number, year: number, departmentId?: number | string) {
     return this.http.get<any>(`${this.url}/report`, { params: { month, year, ...(departmentId ? { departmentId: String(departmentId) } : {}) } });
   }

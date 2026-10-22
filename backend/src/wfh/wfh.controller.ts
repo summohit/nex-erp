@@ -30,6 +30,21 @@ export class WfhController {
   @Post('assign')
   assign(@Request() req, @Body() body: { employeeIds: number[]; dates: string[]; reason?: string }) { return this.svc.assign(this.v(req), body); }
 
+  /** Permanent WFH (22 Oct 2026): HR and the super admin, from the roster. */
+  @Get('permanent')
+  permanentList(@Request() req) { return this.svc.permanentList(this.v(req)); }
+
+  @Post('permanent')
+  setPermanent(@Request() req, @Body() body: { employeeIds: number[]; startDate?: string; weekdays?: number[]; reason?: string }) {
+    return this.svc.setPermanent(this.v(req), body);
+  }
+
+  @Post('permanent/end')
+  endPermanent(@Request() req, @Body() body: { employeeIds: number[]; fromDate?: string }) { return this.svc.endPermanent(this.v(req), body); }
+
+  @Post('permanent/office-day')
+  officeDay(@Request() req, @Body() body: { employeeId: number; date: string; atOffice: boolean }) { return this.svc.setOfficeDay(this.v(req), body); }
+
   @Get('report')
   report(@Request() req, @Query('month') month?: string, @Query('year') year?: string, @Query('departmentId') departmentId?: string) {
     return this.svc.report(this.v(req), { month: Number(month) || undefined, year: Number(year) || undefined, departmentId: Number(departmentId) || undefined });

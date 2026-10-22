@@ -144,6 +144,9 @@ export interface RosterCell {
   /** Where a working day is worked (19 Oct 2026). */
   workLocation?: 'OFFICE' | 'WFH' | 'ON_SITE' | 'FIELD_VISIT';
   wfhHalfDay?: boolean;
+  /** Permanent WFH set by HR (22 Oct 2026); officeDay = called in this day. */
+  wfhPermanent?: boolean;
+  officeDay?: boolean;
   workLocationLabel?: string;
 }
 

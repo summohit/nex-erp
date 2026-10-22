@@ -4655,6 +4655,40 @@ model WfhRequest {
   @@index([employeeId, date])
 }
 
+/// Permanent WFH (22 Oct 2026), set by HR or the super admin from the roster.
+/// From `startDate` every working day (or only `weekdays`, 0=Sun..6=Sat,
+/// comma separated) is WFH, until someone ends it: `endDate` is then the first
+/// day back at the office. Ended rules are kept as history. Leave, holidays and
+/// roster days off still win; a WfhOfficeDay calls the person in for one day.
+model WfhPermanent {
+  id          Int       @id @default(autoincrement())
+  companyId   Int
+  employeeId  Int
+  startDate   DateTime  @db.Date
+  endDate     DateTime? @db.Date
+  weekdays    String?
+  reason      String?   @db.Text
+  setById     Int?
+  endedById   Int?
+  endedAt     DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([companyId, endDate])
+  @@index([employeeId])
+}
+
+/// One day a permanent-WFH person works at the office instead (22 Oct 2026).
+model WfhOfficeDay {
+  id         Int      @id @default(autoincrement())
+  companyId  Int
+  employeeId Int
+  date       DateTime @db.Date
+  setById    Int?
+  createdAt  DateTime @default(now())
+
+  @@unique([employeeId, date])
+}
+
 /// Field visit early release (21 Oct 2026). The work finished early:
 /// DAYS — a multi-day visit ends after `date` for this person (later visit days
 /// are released); HOURS — on `date` they may leave the site early and the day

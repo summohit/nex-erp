@@ -14,6 +14,7 @@ import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
 import { isCompanyAdmin, isHrAdmin } from '../common/company-roles';
 import { isBranchWeeklyOff, personalDaysOff } from '../common/weekly-offs';
 import { isRestDay } from '../common/rest-day';
+import { permanentWfhCovers, permanentWfhWhere } from '../common/permanent-wfh';
 
 /**
  * What the field visit clock tells attendance about the day it is clocking.
@@ -649,6 +650,14 @@ export class AttendanceService {
     if (this.prisma.wfhRequest?.findFirst) {
       const req = await this.prisma.wfhRequest.findFirst({ where: { employeeId, date: d, status: 'APPROVED' }, select: { id: true } });
       if (req) return 'REQUEST';
+    }
+    // Permanent WFH set by HR (22 Oct 2026), unless called to the office that day.
+    if (this.prisma.wfhPermanent?.findMany) {
+      const rules = await this.prisma.wfhPermanent.findMany({ where: permanentWfhWhere([employeeId], d, d) });
+      if (rules.some((r) => permanentWfhCovers(r, d))
+        && !(await this.prisma.wfhOfficeDay.findUnique({ where: { employeeId_date: { employeeId, date: d } }, select: { id: true } }))) {
+        return 'REQUEST';
+      }
     }
     // Older WFH taken as a leave type. Focused unit tests stub only the delegates they use.
     if (this.prisma.leaveRequest?.findMany) {
@@ -1511,6 +1520,19 @@ export class AttendanceService {
       select: { employeeId: true, date: true },
     }) : [];
     const reqKey = new Set(wfhReqs.map((w) => `${w.employeeId}_${w.date.toISOString().slice(0, 10)}`));
+    // Permanent WFH (22 Oct 2026) counts as approved, except office call-in days.
+    if (this.prisma.wfhPermanent?.findMany && rows.length) {
+      const empIds = [...new Set(rows.map((r) => r.employeeId))];
+      const lo = new Date(Math.min(...rows.map((r) => r.date.getTime()))), hi = new Date(Math.max(...rows.map((r) => r.date.getTime())));
+      const rules = await this.prisma.wfhPermanent.findMany({ where: permanentWfhWhere(empIds, lo, hi) });
+      const office = new Set((await this.prisma.wfhOfficeDay.findMany({
+        where: { employeeId: { in: empIds }, date: { gte: lo, lte: hi } }, select: { employeeId: true, date: true },
+      })).map((o) => `${o.employeeId}_${o.date.toISOString().slice(0, 10)}`));
+      for (const r of rows) {
+        const k = `${r.employeeId}_${r.date.toISOString().slice(0, 10)}`;
+        if (!office.has(k) && rules.some((x) => x.employeeId === r.employeeId && permanentWfhCovers(x, r.date))) reqKey.add(k);
+      }
+    }
     const profiles = await this.prisma.employee.findMany({
       where: { id: { in: [...new Set(rows.map((r) => r.employeeId))] } },
       select: { id: true, workLocation: true, usualWorkLocation: true },

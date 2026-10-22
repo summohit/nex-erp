@@ -3666,3 +3666,13 @@ textarea.form-control-enhanced:focus {
   align-items: center;
   gap: 5px;
 }
+
+/* Permanent WFH (22 Oct 2026) */
+.awfh-mode-tabs { display: flex; gap: 6px; margin-bottom: 12px; padding: 4px; background: #f1f5f9; border-radius: 10px; }
+.awfh-mode-tabs button { flex: 1; border: 0; background: transparent; padding: 8px; border-radius: 8px; font-weight: 600; font-size: 13px; color: #475569; cursor: pointer; }
+.awfh-mode-tabs button.active { background: #fff; color: #0f172a; box-shadow: 0 1px 2px rgba(15, 23, 42, .08); }
+.preset-chip-btn.active { background: #dcfce7; border-color: #22c55e; color: #166534; }
+.awfh-perm-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+.awfh-perm-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; }
+.awfh-perm-row .perm-name { font-weight: 600; }
+.awfh-perm-row .perm-meta { flex: 1; color: #64748b; font-size: 12px; }

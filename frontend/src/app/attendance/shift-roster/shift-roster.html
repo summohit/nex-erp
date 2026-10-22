@@ -277,7 +277,8 @@
                 </span>
                 <!-- Where the day is worked (19 Oct 2026) -->
                 <ng-container *ngIf="viewMode() === 'week'">
-                  <span *ngIf="cell.workLocation === 'WFH'" class="chip-where wfh">WFH{{ cell.wfhHalfDay ? ' · half day' : '' }}</span>
+                  <span *ngIf="cell.workLocation === 'WFH'" class="chip-where wfh">WFH{{ cell.wfhPermanent ? ' · permanent' : '' }}{{ cell.wfhHalfDay ? ' · half day' : '' }}</span>
+                  <span *ngIf="cell.officeDay" class="chip-where">Office (called in)</span>
                   <span *ngIf="cell.workLocation === 'OFFICE'" class="chip-where">{{ cell.workLocationLabel || 'Office' }}</span>
                   <span *ngIf="cell.workLocation === 'ON_SITE' && !cell.onSite" class="chip-where">{{ cell.workLocationLabel || 'On site' }}</span>
                 </ng-container>
@@ -351,6 +352,14 @@
             {{ s.shiftType === 'FLEXIBLE' ? (s.totalHours ? s.totalHours + ' hrs' : 'Flexible') : (s.startTime + ' - ' + s.endTime) }}
           </span>
         </span>
+      </button>
+
+      <!-- Permanent WFH: call in for one day (22 Oct 2026) -->
+      <button *ngIf="canPermanentWfh() && editorCell()?.wfhPermanent" class="shift-option" (click)="setOfficeDay(true)">
+        <span class="option-text"><span class="option-name">Work at office this day</span><span class="option-time">Permanent WFH stays on for other days</span></span>
+      </button>
+      <button *ngIf="canPermanentWfh() && editorCell()?.officeDay" class="shift-option" (click)="setOfficeDay(false)">
+        <span class="option-text"><span class="option-name">Back to WFH this day</span><span class="option-time">Undo the office call-in</span></span>
       </button>
 
       <button class="shift-option" [class.selected]="editorCell()?.type === 'DAY_OFF' && !editorCell()?.isDefault"
@@ -1003,8 +1012,13 @@
 
     <!-- Modal Body -->
     <div class="modal-body awfh-modal-body">
+      <!-- Specific days or permanent WFH (22 Oct 2026) -->
+      <div class="awfh-mode-tabs" *ngIf="canPermanentWfh()">
+        <button type="button" [class.active]="wfhMode() === 'DAYS'" (click)="wfhMode.set('DAYS')">Specific days</button>
+        <button type="button" [class.active]="wfhMode() === 'PERMANENT'" (click)="wfhMode.set('PERMANENT')">Permanent WFH</button>
+      </div>
       <!-- Notice Callout Banner -->
-      <div class="awfh-info-banner">
+      <div class="awfh-info-banner" *ngIf="wfhMode() === 'DAYS'">
         <div class="info-banner-icon">
           <svg lucideInfo size="16"></svg>
         </div>
@@ -1093,8 +1107,40 @@
         </div>
       </div>
 
+      <!-- Permanent WFH: start date, weekdays, who is on it now -->
+      <ng-container *ngIf="wfhMode() === 'PERMANENT'">
+        <div class="form-group">
+          <label class="form-label"><span>Starts on</span></label>
+          <div class="input-with-icon">
+            <svg lucideCalendar size="15"></svg>
+            <input type="date" class="form-control-enhanced" [(ngModel)]="wfhStart" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label"><span>Weekdays</span><span class="optional-tag">(none ticked = every working day)</span></label>
+          <div class="awfh-preset-chips">
+            <button type="button" class="preset-chip-btn" *ngFor="let w of weekdayChips"
+                    [class.active]="wfhWeekdays().includes(w.d)" (click)="toggleWfhWeekday(w.d)">{{ w.l }}</button>
+          </div>
+        </div>
+        <div class="awfh-daysoff-note">
+          <b>No end date.</b>
+          It runs until HR or the super admin ends it. Leave, holidays and roster days off still apply. To call someone in for one day, open their roster cell and choose "Work at office this day".
+        </div>
+        <div class="form-group" *ngIf="permanentRules().length">
+          <label class="form-label"><span>On permanent WFH now</span><span class="label-badge">{{ permanentRules().length }}</span></label>
+          <div class="awfh-perm-list">
+            <div class="awfh-perm-row" *ngFor="let r of permanentRules()">
+              <span class="perm-name">{{ r.employee?.firstName }} {{ r.employee?.lastName }}</span>
+              <span class="perm-meta">{{ ruleDays(r) }} · from {{ r.startDate | date:'d MMM y' }}<span *ngIf="r.setBy"> · by {{ r.setBy.firstName }}</span></span>
+              <button type="button" class="btn-text-action" [disabled]="wfhBusy()" (click)="endPermanentWfh([r.employeeId])">End</button>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
       <!-- Date Range Section with Presets -->
-      <div class="form-group">
+      <div class="form-group" *ngIf="wfhMode() === 'DAYS'">
         <div class="form-label-row">
           <label class="form-label">
             <span>Date Range</span>
@@ -1126,7 +1172,7 @@
         </div>
       </div>
 
-      <div class="awfh-daysoff-note">
+      <div class="awfh-daysoff-note" *ngIf="wfhMode() === 'DAYS'">
         <b>Days off are not affected.</b>
         Each person's own days off in this range (roster day off, shift's off days or branch weekly off) stay as Day Off; WFH is only set on their working days.
       </div>
@@ -1153,7 +1199,7 @@
 
     <!-- Modal Footer Actions & Calculation Summary -->
     <div class="modal-footer awfh-modal-footer">
-      <div class="awfh-summary-badge" [class.active]="wfhPicked().length > 0 && wfhDates().length > 0">
+      <div class="awfh-summary-badge" *ngIf="wfhMode() === 'DAYS'" [class.active]="wfhPicked().length > 0 && wfhDates().length > 0">
         <svg lucideCalendarCheck size="14"></svg>
         <span *ngIf="wfhPicked().length > 0 && wfhDates().length > 0">
           <strong>{{ wfhPicked().length }}</strong> {{ wfhPicked().length === 1 ? 'person' : 'people' }}
@@ -1166,7 +1212,14 @@
         </span>
       </div>
 
-      <div class="footer-buttons">
+      <div class="footer-buttons" *ngIf="wfhMode() === 'PERMANENT'">
+        <button type="button" class="btn-modal-cancel" (click)="wfhOpen.set(false)">Close</button>
+        <button type="button" class="btn-modal-cancel" [disabled]="wfhBusy() || wfhPicked().length === 0" (click)="endPermanentWfh(wfhPicked())">End for selected</button>
+        <button type="button" class="btn-modal-submit" [disabled]="wfhBusy() || wfhPicked().length === 0" (click)="savePermanentWfh()">
+          <span class="btn-inner-content"><svg lucideHouse size="15"></svg><span>Set permanent WFH</span></span>
+        </button>
+      </div>
+      <div class="footer-buttons" *ngIf="wfhMode() === 'DAYS'">
         <button type="button" class="btn-modal-cancel" (click)="wfhOpen.set(false)">Cancel</button>
         <button 
           type="button" 

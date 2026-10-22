@@ -86,6 +86,7 @@ function toKey(d: Date): string {
 }
 
 import { isBranchWeeklyOff, personalDaysOff } from '../common/weekly-offs';
+import { permanentWfhCovers, permanentWfhWhere } from '../common/permanent-wfh';
 /** Leave types that are really Work From Home (same test as the dashboard). */
 const WFH_PATTERN = /work\s*from\s*home|wfh|remote/i;
 
@@ -184,6 +185,18 @@ export class ShiftRosterService {
         select: { employeeId: true, date: true },
       })).map((w) => `${w.employeeId}|${toKey(w.date)}`),
     );
+    // Permanent WFH (22 Oct 2026), less the days someone was called to the office.
+    const permanentRules = await this.prisma.wfhPermanent.findMany({ where: permanentWfhWhere(empIds, start, end) });
+    const officeDays = new Set(
+      (await this.prisma.wfhOfficeDay.findMany({
+        where: { employeeId: { in: empIds }, date: { gte: start, lte: end } }, select: { employeeId: true, date: true },
+      })).map((o) => `${o.employeeId}|${toKey(o.date)}`),
+    );
+    const permanentBy = new Map<number, typeof permanentRules>();
+    for (const r of permanentRules) permanentBy.set(r.employeeId, [...(permanentBy.get(r.employeeId) ?? []), r]);
+    const permanentWfh = (empId: number, day: string) =>
+      !officeDays.has(`${empId}|${day}`)
+      && (permanentBy.get(empId) ?? []).some((r) => permanentWfhCovers(r, new Date(`${day}T00:00:00Z`)));
 
     const entryBy = new Map<string, typeof entries[number]>();
     for (const e of entries) entryBy.set(`${e.employeeId}|${toKey(e.date)}`, e);
@@ -225,7 +238,8 @@ export class ShiftRosterService {
         // cell shows the shift, with WFH as where it is worked.
         // Real leave on the same day wins over a WFH request.
         const wfhLeave = !!leave && WFH_PATTERN.test(leave.name);
-        const wfh = wfhLeave || (wfhDays.has(key) && !leave);
+        const permanent = !leave && permanentWfh(emp.id, day);
+        const wfh = wfhLeave || (wfhDays.has(key) && !leave) || permanent;
         const cell: any = this.rosterCell(day, key, wfh ? undefined : leave, entryBy, fieldVisitBy, emp);
         if (cell.type === 'SHIFT') {
           if (wfh) cell.workLocation = 'WFH';
@@ -233,6 +247,10 @@ export class ShiftRosterService {
           else if (cell.onSite) cell.workLocation = 'ON_SITE';
           else Object.assign(cell, this.usualLocation(emp, day));
           if (wfh && leave?.isHalfDay) cell.wfhHalfDay = true;
+          if (permanent) cell.wfhPermanent = true;
+        }
+        if (cell.type === 'SHIFT' && officeDays.has(key)) {
+          cell.officeDay = true;
         }
         return cell;
       }),
