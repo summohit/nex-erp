@@ -26,6 +26,23 @@ export const permissionGuard: CanActivateFn = (route: ActivatedRouteSnapshot) =>
 
     const userRole = user?.role || 'EMPLOYEE';
 
+    // Website Chat: super admin decides per role and per person, with no
+    // ADMIN fallback — the server works out the answer.
+    if (targetModule.startsWith('website-chat')) {
+      return permissionsService.getWebsiteChatTabs().pipe(
+        map(tabs => {
+          if (tabs.includes(targetModule)) return true;
+          if (tabs.length) {
+            router.navigate(['/', ...tabs[0].split('/')]);
+            return false;
+          }
+          toast.error('Access Denied: You do not have permission to view this page.');
+          router.navigate(['/dashboard']);
+          return false;
+        }),
+      );
+    }
+
     // Universal access: every logged-in user can view their own profile and basic self-service routes
     // Self-service routes every role reaches regardless of RolePermission rows.
     // 'settings/security' is each user's own two-factor setup — gating it on a

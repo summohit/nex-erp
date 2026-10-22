@@ -10,6 +10,7 @@ export class MenusController {
   @Get('sidebar')
   async getSidebar(@Request() req: any) {
     const user = req.user;
-    return this.menusService.getSidebarMenus(user.companyId, user.id, user.role);
+    // Access tokens carry the user id as `sub`; there is no `id` on them.
+    return this.menusService.getSidebarMenus(user.companyId, user.sub ?? user.id, user.role);
   }
 }

@@ -1,14 +1,13 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
-import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { Permissions } from '../common/decorators/permissions.decorator';
+import { WebsiteChatAccessGuard } from './website-chat-access.guard';
 import { ChatWidgetService } from './chat-widget.service';
 import { KnowledgeBaseService } from './knowledge-base.service';
 
-// Website chat lives with CRM: the people who work leads answer the chats.
+// Who may use this is decided by the super admin (Roles & Permissions →
+// Website Chat), per role or per person.
 @Controller('chat')
-@UseGuards(AuthGuard, PermissionsGuard)
-@Permissions('crm/leads')
+@UseGuards(AuthGuard, WebsiteChatAccessGuard)
 export class ChatWidgetController {
   constructor(
     private readonly chat: ChatWidgetService,

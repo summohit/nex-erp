@@ -10,10 +10,11 @@ import { PublicChatWidgetController } from './public-chat-widget.controller';
 import { ChatWidgetService } from './chat-widget.service';
 import { ChatBotService } from './chat-bot.service';
 import { KnowledgeBaseService } from './knowledge-base.service';
+import { WebsiteChatAccessGuard } from './website-chat-access.guard';
 
 @Module({
   imports: [PrismaModule, PermissionsModule, CrmModule, TicketsModule, NotificationsModule, AiModule],
   controllers: [ChatWidgetController, PublicChatWidgetController],
-  providers: [ChatWidgetService, ChatBotService, KnowledgeBaseService],
+  providers: [ChatWidgetService, ChatBotService, KnowledgeBaseService, WebsiteChatAccessGuard],
 })
 export class ChatWidgetModule {}

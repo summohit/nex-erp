@@ -1,11 +1,15 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PermissionsService } from '../permissions/permissions.service';
 
 @Injectable()
 export class MenusService implements OnModuleInit {
   private readonly logger = new Logger(MenusService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private permissionsService: PermissionsService,
+  ) {}
 
   async onModuleInit() {
     try {
@@ -501,6 +505,11 @@ export class MenusService implements OnModuleInit {
         ['assets', 'assets/requests', 'careers'].forEach(m => allowedModules.add(m));
       }
     }
+
+    // Website Chat is never granted by the role alone here: the super admin's
+    // per-person overrides win over the role (PermissionsService.websiteChatTabs).
+    for (const m of [...allowedModules]) if (m.startsWith('website-chat')) allowedModules.delete(m);
+    (await this.permissionsService.websiteChatTabs(companyId, userId, roleName)).forEach((t) => allowedModules.add(t));
 
     // 5. Filter the formatted menus
     const filteredMenus = formattedMenus.map(section => {

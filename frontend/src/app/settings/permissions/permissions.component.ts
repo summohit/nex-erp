@@ -1,7 +1,8 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { PermissionsService, RolePermission } from '../../services/permissions.service';
+import { PermissionsService, RolePermission, WebsiteChatUserAccess } from '../../services/permissions.service';
+import { AuthService } from '../../services/auth.service';
 import { MasterDataService, Department } from '../../services/master-data.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { LucideShield, LucideChevronDown, LucideChevronRight } from '@lucide/angular';
@@ -18,6 +19,8 @@ interface PermissionCategory extends PermissionNode {
   viewAllEnabled?: boolean;
   viewAllLabel?: string;
   viewAllHint?: string;
+  /** Only the super admin may switch this on or off. */
+  superadminOnly?: boolean;
 }
 
 @Component({
@@ -31,8 +34,13 @@ export class PermissionsComponent implements OnInit {
   private permissionsService = inject(PermissionsService);
   private masterDataService = inject(MasterDataService);
   private toast = inject(HotToastService);
+  private auth = inject(AuthService);
 
-  activeTab: 'departments' | 'matrix' = 'departments';
+  activeTab: 'departments' | 'matrix' | 'chat-access' = 'departments';
+
+  get isSuperadmin(): boolean {
+    return this.auth.currentUser()?.role === 'SUPERADMIN';
+  }
 
   // Tab 1: Departments -> Roles
   departments: Department[] = [];
@@ -124,6 +132,14 @@ export class PermissionsComponent implements OnInit {
       subItems: [], viewAllEnabled: false
     },
     {
+      id: 'website-chat', title: 'Website Chat', isExpanded: true, enabled: false, superadminOnly: true,
+      subItems: [
+        { id: 'website-chat/inbox', title: 'Inbox', enabled: false },
+        { id: 'website-chat/knowledge-base', title: 'Knowledge Base', enabled: false },
+        { id: 'website-chat/widgets', title: 'Widgets', enabled: false }
+      ]
+    },
+    {
       id: 'sales', title: 'Sales', isExpanded: true, enabled: false,
       subItems: [
         { id: 'sales/quotations', title: 'Quotations', enabled: false },
@@ -149,8 +165,48 @@ export class PermissionsComponent implements OnInit {
     this.loadPermissions();
   }
 
-  setTab(tab: 'departments' | 'matrix') {
+  setTab(tab: 'departments' | 'matrix' | 'chat-access') {
     this.activeTab = tab;
+    if (tab === 'chat-access') this.loadChatAccess();
+  }
+
+  // --- Website Chat per-user access (super admin only) ---
+  chatUsers: WebsiteChatUserAccess[] = [];
+  chatUserSearch = '';
+  isLoadingChatUsers = false;
+  savingChatUserId: number | null = null;
+
+  get filteredChatUsers(): WebsiteChatUserAccess[] {
+    const q = this.chatUserSearch.trim().toLowerCase();
+    if (!q) return this.chatUsers;
+    return this.chatUsers.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.role.toLowerCase().includes(q));
+  }
+
+  loadChatAccess() {
+    this.isLoadingChatUsers = true;
+    this.permissionsService.getWebsiteChatUsers().subscribe({
+      next: (users) => { this.chatUsers = users; this.isLoadingChatUsers = false; },
+      error: () => { this.toast.error('Failed to load users'); this.isLoadingChatUsers = false; }
+    });
+  }
+
+  /** value: 'role' = follow the role, 'show' / 'hide' = override for this person. */
+  setChatAccess(u: WebsiteChatUserAccess, value: string) {
+    const granted = value === 'show' ? true : value === 'hide' ? false : null;
+    this.savingChatUserId = u.userId;
+    this.permissionsService.setWebsiteChatUser(u.userId, granted).subscribe({
+      next: () => {
+        u.override = granted;
+        u.hasAccess = granted ?? u.fromRole;
+        this.savingChatUserId = null;
+        this.toast.success(`Website Chat ${u.hasAccess ? 'shown to' : 'hidden from'} ${u.name}`);
+      },
+      error: (e) => { this.savingChatUserId = null; this.toast.error(e?.error?.message || 'Failed to update access'); }
+    });
+  }
+
+  chatAccessValue(u: WebsiteChatUserAccess): string {
+    return u.override === true ? 'show' : u.override === false ? 'hide' : 'role';
   }
 
   // --- Department Roles Tab ---

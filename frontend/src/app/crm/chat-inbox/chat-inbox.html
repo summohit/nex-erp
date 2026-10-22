@@ -5,9 +5,9 @@
       <p>Chats from the careers page and ces-pl.com, the help articles the bot answers from, and the widget itself.</p>
     </div>
     <div class="ci-tabs">
-      <button type="button" [class.on]="tab === 'inbox'" (click)="setTab('inbox')"><svg lucideMessageCircle size="15"></svg> Inbox</button>
-      <button type="button" [class.on]="tab === 'kb'" (click)="setTab('kb')"><svg lucideFileText size="15"></svg> Knowledge Base</button>
-      <button type="button" [class.on]="tab === 'widgets'" (click)="setTab('widgets')"><svg lucideEdit2 size="15"></svg> Widgets</button>
+      <button type="button" *ngIf="allowedTabs.has('inbox')" [class.on]="tab === 'inbox'" (click)="setTab('inbox')"><svg lucideMessageCircle size="15"></svg> Inbox</button>
+      <button type="button" *ngIf="allowedTabs.has('kb')" [class.on]="tab === 'kb'" (click)="setTab('kb')"><svg lucideFileText size="15"></svg> Knowledge Base</button>
+      <button type="button" *ngIf="allowedTabs.has('widgets')" [class.on]="tab === 'widgets'" (click)="setTab('widgets')"><svg lucideEdit2 size="15"></svg> Widgets</button>
     </div>
   </div>
 

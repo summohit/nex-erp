@@ -13,6 +13,9 @@
     <button class="tab-btn" [class.active]="activeTab === 'matrix'" (click)="setTab('matrix')">
       Permissions Matrix
     </button>
+    <button class="tab-btn" *ngIf="isSuperadmin" [class.active]="activeTab === 'chat-access'" (click)="setTab('chat-access')">
+      Website Chat Access
+    </button>
   </div>
 
   <!-- TAB 1: Department Mapping -->
@@ -107,10 +110,12 @@
               </ng-container>
               <div *ngIf="!(cat.subItems && cat.subItems.length > 0) && cat.viewAllEnabled === undefined" style="width: 20px;"></div>
               <h3>{{ cat.title }}</h3>
+              <span class="superadmin-only-hint" *ngIf="cat.superadminOnly">Super admin only</span>
             </div>
             <label class="toggle-switch">
               <input
                 type="checkbox"
+                [disabled]="cat.superadminOnly && !isSuperadmin"
                 [ngModel]="cat.enabled"
                 (ngModelChange)="toggleCategory(cat, $event)">
               <span class="slider"></span>
@@ -126,6 +131,7 @@
               <label class="toggle-switch">
                 <input
                   type="checkbox"
+                  [disabled]="cat.superadminOnly && !isSuperadmin"
                   [ngModel]="sub.enabled"
                   (ngModelChange)="toggleSubItem(sub, cat, $event)">
                 <span class="slider"></span>
@@ -150,6 +156,58 @@
         </div>
       </div>
 
+    </div>
+  </div>
+  <!-- TAB 3: Website Chat per-person access (super admin only) -->
+  <div class="tab-content" *ngIf="activeTab === 'chat-access' && isSuperadmin">
+    <div class="content-header">
+      <h2>Website Chat Access</h2>
+      <p>Website Chat is visible only to the super admin until you allow it. Switch it on for a whole role in the Permissions Matrix, or show or hide it for one person here — a person's setting wins over their role.</p>
+    </div>
+
+    <input class="form-control chat-access-search" [(ngModel)]="chatUserSearch" placeholder="Search by name, email or role…">
+
+    <div class="loading-state" *ngIf="isLoadingChatUsers">
+      <div class="spinner"></div> Loading users...
+    </div>
+
+    <div class="table-container" *ngIf="!isLoadingChatUsers">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+            <th>From role</th>
+            <th>Website Chat</th>
+            <th>Access</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let u of filteredChatUsers">
+            <td><strong>{{ u.name }}</strong><div class="chat-access-email">{{ u.email }}</div></td>
+            <td>{{ u.role }}</td>
+            <td>{{ u.fromRole ? 'Allowed' : 'Not allowed' }}</td>
+            <td>
+              <span *ngIf="u.role === 'SUPERADMIN'" class="chat-access-fixed">Always (super admin)</span>
+              <select *ngIf="u.role !== 'SUPERADMIN'" class="form-control"
+                [ngModel]="chatAccessValue(u)" (ngModelChange)="setChatAccess(u, $event)"
+                [disabled]="savingChatUserId === u.userId">
+                <option value="role">Follow role</option>
+                <option value="show">Show</option>
+                <option value="hide">Hide</option>
+              </select>
+            </td>
+            <td>
+              <span class="badge" [class.badge-success]="u.hasAccess" [class.badge-error]="!u.hasAccess">
+                {{ u.hasAccess ? 'Visible' : 'Hidden' }}
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="filteredChatUsers.length === 0">
+            <td colspan="5" class="text-center">No users found.</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>

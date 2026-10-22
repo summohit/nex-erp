@@ -415,7 +415,7 @@ export const routes: Routes = [
       ...(['inbox', 'knowledge-base', 'widgets'] as const).map(tab => ({
         path: `website-chat/${tab}`,
         canActivate: [permissionGuard],
-        data: { module: 'crm/leads', tab },
+        data: { module: `website-chat/${tab}`, tab },
         loadComponent: () => import('./crm/chat-inbox/chat-inbox.component').then(m => m.ChatInboxComponent)
       })),
       {

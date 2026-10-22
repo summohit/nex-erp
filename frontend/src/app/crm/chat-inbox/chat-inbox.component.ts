@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { HotToastService } from '@ngneat/hot-toast';
 import { environment } from '../../../environments/environment';
+import { PermissionsService } from '../../services/permissions.service';
 import {
   LucideMessageCircle, LucideSearch, LucidePlus, LucideTrash2, LucideSave, LucideCopy,
   LucideEdit2, LucideFileText, LucideChevronLeft, LucideExternalLink,
@@ -28,11 +29,14 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private toast = inject(HotToastService);
+  private permissions = inject(PermissionsService);
   private api = `${environment.apiUrl}/chat`;
 
   @ViewChild('thread') threadEl?: ElementRef<HTMLDivElement>;
 
   tab: Tab = 'inbox';
+  /** Tabs this user was granted; the others are hidden. */
+  allowedTabs = new Set<Tab>();
 
   // ─── Inbox ───
   statusFilter = 'ACTIVE';
@@ -77,6 +81,9 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
       this.statusFilter = '';
       this.open(c);
     }
+    this.permissions.getWebsiteChatTabs().subscribe(tabs => {
+      this.allowedTabs = new Set(tabs.map(t => (t === 'website-chat/knowledge-base' ? 'kb' : t.replace('website-chat/', '')) as Tab));
+    });
     this.load(this.tab);
     this.schedulePoll();
   }

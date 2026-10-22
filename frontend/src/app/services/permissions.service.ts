@@ -52,4 +52,31 @@ export class PermissionsService {
   clearCache() {
     this.permissionsCache.clear();
   }
+
+  /** Website Chat tabs the signed-in user may open (decided server-side: role + per-user override). */
+  getWebsiteChatTabs(): Observable<string[]> {
+    return this.http.get<{ tabs: string[] }>(`${this.apiUrl}/website-chat/me`).pipe(
+      map(r => r.tabs || []),
+      catchError(() => of([]))
+    );
+  }
+
+  getWebsiteChatUsers(): Observable<WebsiteChatUserAccess[]> {
+    return this.http.get<WebsiteChatUserAccess[]>(`${this.apiUrl}/website-chat/users`);
+  }
+
+  /** granted: true = show, false = hide, null = follow the role. */
+  setWebsiteChatUser(userId: number, granted: boolean | null): Observable<any> {
+    return this.http.put(`${this.apiUrl}/website-chat/users/${userId}`, { granted });
+  }
+}
+
+export interface WebsiteChatUserAccess {
+  userId: number;
+  name: string;
+  email: string;
+  role: string;
+  fromRole: boolean;
+  override: boolean | null;
+  hasAccess: boolean;
 }

@@ -160,6 +160,7 @@ model User {
   notificationPrefs        NotificationPreference[]
   userRoles                UserRole[]
   userMenuBookmarks        UserMenuBookmark[]
+  moduleAccess             UserModuleAccess[]
   approvedResignations     Resignation[]              @relation("ResignationApprover")
   conductedExitInterviews  ExitInterview[]            @relation("ExitInterviewer")
   clearedOffboardingTasks  OffboardingTask[]          @relation("TaskClearer")
@@ -2740,6 +2741,21 @@ model Menu {
   requiredPermId Int?
   requiredPerm   PermissionDefinition? @relation(fields: [requiredPermId], references: [id])
   bookmarks      UserMenuBookmark[]
+}
+
+/// Per-user override of a role permission for one sidebar module, set by the
+/// super admin. granted=true shows the module even if the role lacks it;
+/// granted=false hides it even if the role has it. No row = follow the role.
+model UserModuleAccess {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module    String // e.g. 'website-chat'
+  granted   Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, module])
 }
 
 model UserMenuBookmark {

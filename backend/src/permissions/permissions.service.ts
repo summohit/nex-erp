@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 // Default sidebar access granted to the OFFICE_STAFF role the first time it's used.
@@ -11,6 +11,17 @@ const OFFICE_STAFF_DEFAULT_MODULES = [
   'payroll', 'payroll/processing', 'payroll/payslips', 'payroll/expenses',
   'assets', 'assets/inventory', 'assets/assignments', 'assets/requests'
 ];
+
+/**
+ * Website Chat is off for everyone but the super admin until granted — per
+ * role in the Permissions Matrix, or per person (UserModuleAccess). Unlike
+ * other modules there is no ADMIN fallback: chats hold visitors' contact
+ * details and the super admin decides who reads them.
+ */
+export const WEBSITE_CHAT_MODULE = 'website-chat';
+export const WEBSITE_CHAT_TABS = ['website-chat/inbox', 'website-chat/knowledge-base', 'website-chat/widgets'];
+/** Modules only the super admin may grant, by role or by person. */
+const SUPERADMIN_ONLY_MODULES = [WEBSITE_CHAT_MODULE, ...WEBSITE_CHAT_TABS];
 
 @Injectable()
 export class PermissionsService implements OnModuleInit {
@@ -88,5 +99,78 @@ export class PermissionsService implements OnModuleInit {
       }
     });
     return !!perm;
+  }
+
+  isSuperadminOnlyModule(module: string) {
+    return SUPERADMIN_ONLY_MODULES.includes(module);
+  }
+
+  /** Which Website Chat tabs this user may open (empty = no access). */
+  async websiteChatTabs(companyId: number, userId: number, role: string): Promise<string[]> {
+    if (role === 'SUPERADMIN') return [...WEBSITE_CHAT_TABS];
+
+    const override = await this.prisma.userModuleAccess.findUnique({
+      where: { userId_module: { userId, module: WEBSITE_CHAT_MODULE } },
+    });
+    if (override) return override.granted ? [...WEBSITE_CHAT_TABS] : [];
+
+    const rows = await this.prisma.rolePermission.findMany({
+      where: { companyId, role, action: 'VIEW', module: { in: SUPERADMIN_ONLY_MODULES } },
+      select: { module: true },
+    });
+    const modules = new Set(rows.map((r) => r.module));
+    if (!modules.has(WEBSITE_CHAT_MODULE)) return [];
+    const tabs = WEBSITE_CHAT_TABS.filter((t) => modules.has(t));
+    // Module switched on with no tab picked: treat as the whole module.
+    return tabs.length ? tabs : [...WEBSITE_CHAT_TABS];
+  }
+
+  /** Everyone in the company with their Website Chat access, for the super admin's per-user panel. */
+  async websiteChatUserAccess(companyId: number) {
+    const users = await this.prisma.user.findMany({
+      where: { companyId },
+      select: {
+        id: true, email: true, role: true,
+        employee: { select: { firstName: true, lastName: true } },
+        moduleAccess: { where: { module: WEBSITE_CHAT_MODULE }, select: { granted: true } },
+      },
+      orderBy: { email: 'asc' },
+    });
+    const roleRows = await this.prisma.rolePermission.findMany({
+      where: { companyId, module: WEBSITE_CHAT_MODULE, action: 'VIEW' },
+      select: { role: true },
+    });
+    const rolesWithAccess = new Set(roleRows.map((r) => r.role));
+    return users.map((u) => {
+      const override = u.moduleAccess[0]?.granted;
+      const fromRole = u.role === 'SUPERADMIN' || rolesWithAccess.has(u.role);
+      return {
+        userId: u.id,
+        name: u.employee ? `${u.employee.firstName} ${u.employee.lastName}`.trim() : u.email,
+        email: u.email,
+        role: u.role,
+        fromRole,
+        override: override === undefined ? null : override,
+        hasAccess: u.role === 'SUPERADMIN' ? true : override ?? fromRole,
+      };
+    });
+  }
+
+  /** granted: true = show, false = hide, null = follow the role again. */
+  async setUserModuleAccess(companyId: number, userId: number, module: string, granted: boolean | null) {
+    if (module !== WEBSITE_CHAT_MODULE) throw new BadRequestException('Per-user access is only available for Website Chat.');
+    const user = await this.prisma.user.findFirst({ where: { id: userId, companyId }, select: { id: true, role: true } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.role === 'SUPERADMIN') throw new BadRequestException('Super admins always have access.');
+    if (granted === null) {
+      await this.prisma.userModuleAccess.deleteMany({ where: { userId, module } });
+    } else {
+      await this.prisma.userModuleAccess.upsert({
+        where: { userId_module: { userId, module } },
+        update: { granted },
+        create: { userId, module, granted },
+      });
+    }
+    return { success: true };
   }
 }
