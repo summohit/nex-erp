@@ -2441,6 +2441,19 @@
   color: #94a3b8;
 }
 
+.ci-wm-brand-foot {
+  text-align: center;
+  font-size: 10px;
+  color: #94a3b8;
+  margin-top: 6px;
+  user-select: none;
+}
+
+.ci-wm-brand-foot b {
+  color: #0284c7;
+  font-weight: 700;
+}
+
 /* Floating Launcher Bubble Mockup */
 .ci-wm-launcher {
   width: 48px;
