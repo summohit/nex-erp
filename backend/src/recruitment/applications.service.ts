@@ -8,6 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcrypt';
 import { MailService } from '../mail/mail.service';
 import { EmployeesService } from '../employees/employees.service';
+import { parseIstDateTime } from '../common/timezone.util';
 
 /**
  * Where a salary component sits in the annexure.
@@ -914,12 +915,15 @@ export class ApplicationsService {
       throw new BadRequestException('Meeting link is required');
     }
 
+    const scheduledAt = parseIstDateTime(data?.scheduledAt);
+    if (!scheduledAt) throw new BadRequestException('A valid interview date and time is required');
+
     const app = await this.findOne(applicationId, companyId);
     const interview = await this.prisma.interview.create({
       data: {
         applicationId: app.id,
         title: data.title,
-        scheduledAt: new Date(data.scheduledAt),
+        scheduledAt,
         durationMins: data.durationMins ? parseInt(data.durationMins, 10) : 30,
         interviewerId: data.interviewerId || null,
         locationUrl: this.normalizeUrl(data.locationUrl),
@@ -976,7 +980,11 @@ export class ApplicationsService {
     if (data.rating !== undefined) updateData.rating = data.rating;
     if (data.feedback !== undefined) updateData.feedback = data.feedback;
     if (data.title) updateData.title = data.title;
-    if (data.scheduledAt) updateData.scheduledAt = new Date(data.scheduledAt);
+    if (data.scheduledAt) {
+      const scheduledAt = parseIstDateTime(data.scheduledAt);
+      if (!scheduledAt) throw new BadRequestException('A valid interview date and time is required');
+      updateData.scheduledAt = scheduledAt;
+    }
     if (data.durationMins) updateData.durationMins = parseInt(data.durationMins, 10);
     if (data.locationUrl !== undefined) updateData.locationUrl = this.normalizeUrl(data.locationUrl);
     if (data.interviewerId !== undefined) updateData.interviewerId = data.interviewerId;

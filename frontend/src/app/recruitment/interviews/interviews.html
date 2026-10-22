@@ -282,7 +282,7 @@
 
           <div class="schedule-date-tag">
             <svg lucideCalendar size="13"></svg>
-            <span>{{ interview.scheduledAt | date:'dd-MM-yyyy' }}</span>
+            <span>{{ interview.scheduledAt | date:'dd-MM-yyyy':'Asia/Kolkata' }}</span>
           </div>
         </div>
 
@@ -323,7 +323,7 @@
           <div class="detail-row">
             <div class="detail-meta">
               <svg lucideClock size="14" class="meta-icon"></svg>
-              <span class="meta-title">{{ interview.scheduledAt | date:'shortTime' }}</span>
+              <span class="meta-title">{{ interview.scheduledAt | date:'shortTime':'Asia/Kolkata' }} IST</span>
               <span class="meta-duration">({{ interview.durationMins || 30 }} mins)</span>
             </div>
           </div>
@@ -465,7 +465,7 @@
       </div>
       <div class="cand-modal-date">
         <svg lucideCalendar size="13"></svg>
-        <span>{{ selectedInterview()?.scheduledAt | date:'dd-MM-yyyy' }}</span>
+        <span>{{ selectedInterview()?.scheduledAt | date:'dd-MM-yyyy':'Asia/Kolkata' }}</span>
       </div>
     </div>
 
