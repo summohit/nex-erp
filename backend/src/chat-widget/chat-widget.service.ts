@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CrmService } from '../crm/crm.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PermissionsService } from '../permissions/permissions.service';
 import { ChatBotService } from './chat-bot.service';
 
 const MAX_MESSAGE = 4000;
@@ -45,6 +46,7 @@ export class ChatWidgetService {
     private crm: CrmService,
     private tickets: TicketsService,
     private notifications: NotificationsService,
+    private permissions: PermissionsService,
   ) {}
 
   // ═══ Widget configuration (admin) ═══════════════════════════════════════════
@@ -206,6 +208,16 @@ export class ChatWidgetService {
             linkUrl: `/website-chat/inbox?c=${conversationId}`,
           })
           .catch(() => {});
+      } else {
+        // Nobody owns it yet: alert the team, but once per burst rather than per line.
+        const previous = await this.prisma.chatMessage.findFirst({
+          where: { conversationId, id: { lt: visitorMsg.id } },
+          orderBy: { id: 'desc' },
+          select: { senderType: true },
+        });
+        if (previous?.senderType !== 'VISITOR') {
+          this.notifyTeam(widget.companyId, conversationId, `${conversation.visitorName || 'A visitor'} is waiting for a reply`, text);
+        }
       }
       return this.pollMessages(widgetKey, originHost, conversationId, conversation.visitorId, visitorMsg.id - 1);
     }
@@ -269,6 +281,21 @@ export class ChatWidgetService {
 
     if (intent === 'sales' && !conversation.leadContactId) {
       await this.createLeadContact(widget.companyId, conversationId, null).catch(() => {});
+    }
+
+    const who = `${name}${intent === 'sales' ? ' (sales enquiry)' : intent === 'job' ? ' (careers)' : intent === 'support' ? ' (support)' : ''}`;
+    if (conversation.assignedToId) {
+      this.notifications
+        .notifyEmployees([conversation.assignedToId], {
+          companyId: widget.companyId,
+          title: `${who} left their details`,
+          message: [email, phone].filter(Boolean).join(' · '),
+          type: 'CHAT',
+          linkUrl: `/website-chat/inbox?c=${conversationId}`,
+        })
+        .catch(() => {});
+    } else {
+      this.notifyTeam(widget.companyId, conversationId, `${who} wants to talk to the team`, [email, phone].filter(Boolean).join(' · '));
     }
 
     const firstName = name.split(' ')[0];
@@ -503,6 +530,22 @@ export class ChatWidgetService {
       .catch(() => {});
     await this.prisma.chatConversation.update({ where: { id: conversationId }, data: { leadContactId: contact.id } });
     return contact.id;
+  }
+
+  /** Fire-and-forget alert to everyone with Website Chat inbox access. */
+  private notifyTeam(companyId: number, conversationId: number, title: string, message: string) {
+    this.permissions
+      .websiteChatInboxEmployeeIds(companyId)
+      .then((ids) =>
+        this.notifications.notifyEmployees(ids, {
+          companyId,
+          title,
+          message: message.slice(0, 140),
+          type: 'CHAT',
+          linkUrl: `/website-chat/inbox?c=${conversationId}`,
+        }),
+      )
+      .catch(() => {});
   }
 
   /** True while the latest SYSTEM message is the visitor's own End Chat — a visitor writing again reopens it. */

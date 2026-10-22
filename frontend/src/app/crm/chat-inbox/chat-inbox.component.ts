@@ -66,13 +66,11 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   messages: any[] = [];
   reply = '';
   sending = false;
-  isVisitorTyping = false;
   typewriterEnabled = true;
   typewriterActiveMessageId: number | null = null;
   typewriterRenderedText: { [id: number]: string } = {};
   private typewriterTimer: any = null;
   private pollTimer: any = null;
-  private typingSimTimer: any = null;
   soundEnabled = true;
   private audioCtx: AudioContext | null = null;
   /** Newest visitor message time seen — null until the first inbox load seeds it. */
@@ -270,10 +268,11 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     const isNew = this.messages.length > 0 && r.messages.length > this.messages.length;
     this.selected = r.conversation;
 
-    // Trigger typewriter effect on new incoming message from visitor or bot
-    if (isNew && this.typewriterEnabled) {
+    // Animate only a fresh bot reply in the thread already open — visitor messages
+    // must be readable the moment the poll brings them in.
+    if (isNew && this.typewriterEnabled && r.conversation.id === this.selectedId) {
       const latest = r.messages[r.messages.length - 1];
-      if (latest && latest.senderType !== 'AGENT') {
+      if (latest && latest.senderType === 'BOT') {
         this.runTypewriter(latest.id, latest.message);
       }
     }
@@ -297,11 +296,13 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     if (this.typewriterTimer) clearInterval(this.typewriterTimer);
     this.typewriterActiveMessageId = messageId;
     this.typewriterRenderedText[messageId] = '';
+    // Long replies type in bigger steps so none takes more than about a second.
+    const step = Math.max(1, Math.ceil(fullText.length / (1000 / speedMs)));
     let i = 0;
     this.typewriterTimer = setInterval(() => {
       if (i < fullText.length && this.typewriterActiveMessageId === messageId) {
-        this.typewriterRenderedText[messageId] += fullText[i];
-        i++;
+        i = Math.min(fullText.length, i + step);
+        this.typewriterRenderedText[messageId] = fullText.slice(0, i);
         this.scrollThreadToBottom();
       } else {
         clearInterval(this.typewriterTimer);
@@ -317,18 +318,6 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
       return this.typewriterRenderedText[m.id] !== undefined ? this.typewriterRenderedText[m.id] : m.message;
     }
     return m.message;
-  }
-
-  /**
-   * Simulate or toggle visitor typing presence indicator.
-   */
-  simulateTyping() {
-    clearTimeout(this.typingSimTimer);
-    this.isVisitorTyping = true;
-    this.scrollThreadToBottom();
-    this.typingSimTimer = setTimeout(() => {
-      this.isVisitorTyping = false;
-    }, 4000);
   }
 
   /** Agents get fresh visitor messages without a socket — a short poll is plenty for chat volume. */

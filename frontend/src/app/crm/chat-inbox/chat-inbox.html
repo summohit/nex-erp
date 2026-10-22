@@ -375,7 +375,7 @@
             class="ci-btn-action ci-typewriter-toggle"
             [class.on]="typewriterEnabled"
             (click)="typewriterEnabled = !typewriterEnabled"
-            title="Toggle animated typewriter effect for messages"
+            title="Animate new bot replies as they arrive"
           >
             <svg lucideZap size="14"></svg>
             <span>Typing fx: {{ typewriterEnabled ? 'On' : 'Off' }}</span>
@@ -489,21 +489,6 @@
             </div>
           </div>
         </ng-container>
-
-        <!-- Live Typing Indicator in Thread -->
-        <div class="ci-msg-row visitor ci-typing-indicator-row" *ngIf="isVisitorTyping || sending">
-          <div class="ci-msg-avatar" [style.background]="getAvatarGradient(selected.visitorName)">
-            {{ getInitials(selected.visitorName || 'V') }}
-          </div>
-          <div class="ci-bubble-wrapper">
-            <div class="ci-typing-bubble">
-              <span class="ci-typing-dot"></span>
-              <span class="ci-typing-dot"></span>
-              <span class="ci-typing-dot"></span>
-            </div>
-            <span class="ci-typing-status-text">{{ selected.visitorName || 'Visitor' }} is typing…</span>
-          </div>
-        </div>
       </div>
 
       <!-- Ended chats take no replies: the visitor's widget has stopped listening -->
@@ -550,16 +535,6 @@
             </div>
 
             <div class="ci-composer-actions">
-              <button
-                type="button"
-                class="ci-btn-simulate-typing"
-                (click)="simulateTyping()"
-                title="Preview typing animation in thread"
-              >
-                <svg lucideZap size="13"></svg>
-                <span>Simulate typing</span>
-              </button>
-
               <button
                 type="button"
                 class="ci-send-btn"

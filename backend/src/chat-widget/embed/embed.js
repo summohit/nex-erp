@@ -705,7 +705,7 @@
       }
     });
 
-    if (sending) {
+    if (sending && conv && conv.status === 'BOT') {
       var tyRow = el('div', 'row new-anim');
       var av1 = el('div', 'msg-avatar');
       av1.innerHTML = avatarHtml(cfg);
@@ -837,7 +837,14 @@
     animatedIds[tempId] = true;
     playSound('send');
     sending = true; sendBtn.disabled = true; render();
+    // The bot often answers in a few ms — hold its typing dots long enough to be seen.
+    var minTyping = conv.status === 'BOT' ? 900 + Math.min(900, msg.length * 15) : 0;
+    var started = Date.now();
     api('/conversations/' + conv.id + '/messages', { method: 'POST', body: { visitorId: visitorId, message: msg } })
+      .then(function (r) {
+        var wait = minTyping - (Date.now() - started);
+        return wait > 0 ? new Promise(function (res) { setTimeout(function () { res(r); }, wait); }) : r;
+      })
       .then(function (r) {
         msgs = msgs.filter(function (m) { return m.id % 1 === 0; });
         merge(r);
