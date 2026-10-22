@@ -182,7 +182,7 @@
     '.tab{flex:1;border:0;background:none;padding:12px 8px;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;border-bottom:2px solid transparent;transition:all .15s ease}',
     '.tab svg{width:16px;height:16px;transition:color .15s}.tab:hover{color:#0f172a}',
     '.tab.on{color:var(--c);border-bottom-color:var(--c)}',
-    '.body{flex:1;overflow-y:auto;background:#ffffff;scroll-behavior:smooth}',
+    '.body{flex:1;overflow-y:auto;overscroll-behavior:contain;background:#ffffff;scroll-behavior:smooth}',
     '.date-divider{display:flex;align-items:center;justify-content:center;margin:8px 0 16px;user-select:none}',
     '.date-pill{background:#eae8f0;color:#475569;font-size:12px;font-weight:500;padding:4px 16px;border-radius:999px;letter-spacing:-.01em;box-shadow:0 1px 2px rgba(0,0,0,.02)}',
     '.msgs{padding:14px 16px;display:flex;flex-direction:column;gap:16px}',
@@ -400,6 +400,11 @@
   // ─── mount ───
   var host = document.createElement('div');
   host.id = 'nex-chat-widget';
+  // Smooth-scroll libraries (Lenis on ces-pl.com, Locomotive) take over the
+  // wheel for the whole page; these attributes tell them to leave the chat
+  // panel's own scrolling alone.
+  host.setAttribute('data-lenis-prevent', '');
+  host.setAttribute('data-scroll-ignore', '');
   var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
   var style = document.createElement('style');
   style.textContent = CSS + '\n' + DARK_CSS;
