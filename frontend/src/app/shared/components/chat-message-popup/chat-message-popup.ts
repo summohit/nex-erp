@@ -2,7 +2,8 @@ import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HotToastService } from '@ngneat/hot-toast';
 import { LucideMessageCircle, LucideSend, LucideX, LucideExternalLink } from '@lucide/angular';
@@ -21,7 +22,7 @@ const FRESH_MS = 2 * 60 * 1000;
  * Website Chat new-message popup (22 Oct 2026), on every page for people with
  * Website Chat Inbox access. Each visitor message brings up a card for its
  * conversation, where the agent can reply on the spot or open the chat in the
- * Inbox. Hidden for the conversation already open in the Inbox.
+ * Inbox. Not shown on the Website Chat screens themselves.
  */
 @Component({
   selector: 'app-chat-message-popup',
@@ -44,6 +45,10 @@ export class ChatMessagePopupComponent {
   readonly max = MAX_CARDS;
 
   constructor() {
+    // Opening Website Chat clears the cards: the Inbox shows these chats itself.
+    this.router.events.pipe(filter((e) => e instanceof NavigationEnd), takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      if (this.onChatScreen()) this.cards.set([]);
+    });
     inject(PermissionsService).getWebsiteChatTabs().subscribe((tabs) => {
       if (!tabs.includes('website-chat/inbox')) return;
       this.notifications.websiteChat.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((e) => {
@@ -52,14 +57,13 @@ export class ChatMessagePopupComponent {
     });
   }
 
-  /** Viewing this conversation in the Inbox right now. */
-  private viewing(id: number): boolean {
-    const t = this.router.parseUrl(this.router.url);
-    return this.router.url.startsWith('/website-chat/inbox') && Number(t.queryParams['c']) === id;
+  /** On a Website Chat screen, where the Inbox already shows new messages. */
+  private onChatScreen(): boolean {
+    return this.router.url.startsWith('/website-chat');
   }
 
   private check(id: number) {
-    if (this.viewing(id)) return;
+    if (this.onChatScreen()) return;
     this.http.get<any>(`${this.api}/inbox/${id}/latest`).subscribe({
       next: (r) => {
         const m = r?.message;
