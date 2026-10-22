@@ -512,6 +512,102 @@ export class ChatWidgetService {
     return rows.map(({ messages, _count, ...c }) => ({ ...c, lastMessage: messages[0] ?? null, unread: _count.messages }));
   }
 
+  // ═══ Reports ════════════════════════════════════════════════════════════════
+
+  /**
+   * How the chat is doing over the last `days`: volume, how much the bot handled
+   * alone, how fast people answered, and per-agent load. Chat volume is small,
+   * so it's computed in memory from the conversations and their message times.
+   */
+  async reports(companyId: number, days: number) {
+    const span = [7, 30, 90].includes(days) ? days : 30;
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - (span - 1));
+
+    const conversations = await this.prisma.chatConversation.findMany({
+      where: { widgetConfig: { companyId }, createdAt: { gte: since }, messages: { some: { senderType: 'VISITOR' } } },
+      select: {
+        id: true, status: true, source: true, createdAt: true, leadContactId: true, ticketId: true,
+        visitorEmail: true, visitorPhone: true,
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
+        messages: { select: { senderType: true, createdAt: true }, orderBy: { id: 'asc' } },
+      },
+      take: 5000,
+    });
+
+    const median = (xs: number[]) => {
+      if (!xs.length) return null;
+      const s = [...xs].sort((a, b) => a - b);
+      const m = Math.floor(s.length / 2);
+      return Math.round(s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2);
+    };
+
+    // Server-local calendar days, matching how `since` was cut.
+    const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const daily = new Map<string, number>();
+    for (let i = 0; i < span; i++) {
+      const d = new Date(since);
+      d.setDate(since.getDate() + i);
+      daily.set(dayKey(d), 0);
+    }
+
+    let botOnly = 0, handedOff = 0, answered = 0, leads = 0, tickets = 0, careers = 0;
+    const firstResponse: number[] = [];
+    const agents = new Map<number, { name: string; chats: number; replies: number; firstResponse: number[] }>();
+
+    for (const c of conversations) {
+      const day = dayKey(c.createdAt);
+      daily.set(day, (daily.get(day) ?? 0) + 1);
+      if (c.source === 'CAREERS') careers++;
+      if (c.leadContactId) leads++;
+      if (c.ticketId) tickets++;
+
+      const agentMsgs = c.messages.filter((m) => m.senderType === 'AGENT');
+      const wantedPerson = c.status === 'OPEN' || !!(c.visitorEmail || c.visitorPhone) || agentMsgs.length > 0;
+      if (!wantedPerson) botOnly++;
+      else handedOff++;
+
+      if (agentMsgs.length) {
+        answered++;
+        // From the visitor's first message to the first human reply.
+        const firstVisitor = c.messages.find((m) => m.senderType === 'VISITOR')!;
+        const wait = (agentMsgs[0].createdAt.getTime() - firstVisitor.createdAt.getTime()) / 1000;
+        if (wait >= 0) firstResponse.push(wait);
+        if (c.assignedTo) {
+          const a = agents.get(c.assignedTo.id) ?? {
+            name: `${c.assignedTo.firstName} ${c.assignedTo.lastName ?? ''}`.trim(),
+            chats: 0, replies: 0, firstResponse: [],
+          };
+          a.chats++;
+          a.replies += agentMsgs.length;
+          if (wait >= 0) a.firstResponse.push(wait);
+          agents.set(c.assignedTo.id, a);
+        }
+      }
+    }
+
+    const total = conversations.length;
+    return {
+      days: span,
+      total,
+      careers,
+      website: total - careers,
+      botOnly,
+      handedOff,
+      answered,
+      unanswered: handedOff - answered,
+      botResolvedRate: total ? Math.round((botOnly / total) * 100) : 0,
+      medianFirstResponseSec: median(firstResponse),
+      leads,
+      tickets,
+      daily: [...daily.entries()].map(([date, count]) => ({ date, count })),
+      agents: [...agents.values()]
+        .map((a) => ({ name: a.name, chats: a.chats, replies: a.replies, medianFirstResponseSec: median(a.firstResponse) }))
+        .sort((a, b) => b.chats - a.chats),
+    };
+  }
+
   async inboxConversation(companyId: number, id: number) {
     const conversation = await this.agentConversation(companyId, id);
     await this.prisma.chatMessage.updateMany({

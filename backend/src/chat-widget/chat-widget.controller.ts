@@ -22,6 +22,11 @@ export class ChatWidgetController {
     return this.chat.inbox(req.user.companyId, status, mine === '1' ? { employeeId: req.user.employeeId ?? null } : undefined);
   }
 
+  @Get('reports')
+  reports(@Request() req, @Query('days') days?: string) {
+    return this.chat.reports(req.user.companyId, Number(days) || 30);
+  }
+
   @Get('inbox/:id')
   conversation(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.chat.inboxConversation(req.user.companyId, id);

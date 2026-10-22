@@ -6,9 +6,84 @@
     </div>
     <div class="ci-tabs">
       <button type="button" *ngIf="allowedTabs.has('inbox')" [class.on]="tab === 'inbox'" (click)="setTab('inbox')"><svg lucideMessageCircle size="15"></svg> Inbox</button>
+      <button type="button" *ngIf="allowedTabs.has('inbox')" [class.on]="tab === 'reports'" (click)="setTab('reports')"><svg lucideLayers size="15"></svg> Reports</button>
       <button type="button" *ngIf="allowedTabs.has('kb')" [class.on]="tab === 'kb'" (click)="setTab('kb')"><svg lucideBookOpen size="15"></svg> Knowledge Base</button>
       <button type="button" *ngIf="allowedTabs.has('widgets')" [class.on]="tab === 'widgets'" (click)="setTab('widgets')"><svg lucideEdit2 size="15"></svg> Widgets</button>
     </div>
+  </div>
+
+  <!-- ══════════════ REPORTS ══════════════ -->
+  <div class="ci-reports" *ngIf="tab === 'reports'">
+    <div class="ci-rep-head">
+      <h3>How the chat is doing</h3>
+      <div class="ci-rep-range">
+        <button type="button" *ngFor="let d of [7, 30, 90]" [class.on]="reportDays === d" (click)="loadReports(d)">Last {{ d }} days</button>
+      </div>
+    </div>
+
+    <div class="ci-rep-loading" *ngIf="reportLoading && !report">
+      <div class="ci-skel ci-skel-line w90"></div>
+      <div class="ci-skel ci-skel-line w60"></div>
+    </div>
+
+    <ng-container *ngIf="report">
+      <div class="ci-rep-kpis" [class.dim]="reportLoading">
+        <div class="ci-kpi">
+          <span class="ci-kpi-label">Conversations</span>
+          <strong>{{ report.total }}</strong>
+          <small>{{ report.website }} website · {{ report.careers }} careers</small>
+        </div>
+        <div class="ci-kpi">
+          <span class="ci-kpi-label">Handled by the bot alone</span>
+          <strong>{{ report.botResolvedRate }}%</strong>
+          <small>{{ report.botOnly }} of {{ report.total }} never needed a person</small>
+        </div>
+        <div class="ci-kpi">
+          <span class="ci-kpi-label">Median first reply</span>
+          <strong>{{ formatDuration(report.medianFirstResponseSec) }}</strong>
+          <small>from the visitor's first message to a person's reply</small>
+        </div>
+        <div class="ci-kpi" [class.warn]="report.unanswered > 0">
+          <span class="ci-kpi-label">Wanted a person, got no reply</span>
+          <strong>{{ report.unanswered }}</strong>
+          <small>{{ report.answered }} of {{ report.handedOff }} handed-off chats answered</small>
+        </div>
+        <div class="ci-kpi">
+          <span class="ci-kpi-label">Leads · Tickets</span>
+          <strong>{{ report.leads }} · {{ report.tickets }}</strong>
+          <small>created from chats</small>
+        </div>
+      </div>
+
+      <div class="ci-rep-card">
+        <h4>Conversations per day</h4>
+        <div class="ci-rep-bars">
+          <div class="ci-rep-bar" *ngFor="let d of report.daily" [title]="(d.date | date: 'EEE d MMM') + ': ' + d.count">
+            <span class="ci-rep-bar-fill" [style.height.%]="(d.count / reportMaxDaily) * 100"></span>
+          </div>
+        </div>
+        <div class="ci-rep-axis">
+          <span>{{ report.daily[0]?.date | date: 'd MMM' }}</span>
+          <span>{{ report.daily[report.daily.length - 1]?.date | date: 'd MMM' }}</span>
+        </div>
+      </div>
+
+      <div class="ci-rep-card">
+        <h4>By agent</h4>
+        <table class="ci-rep-table" *ngIf="report.agents.length; else noAgents">
+          <thead><tr><th>Agent</th><th>Chats</th><th>Replies</th><th>Median first reply</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let a of report.agents">
+              <td>{{ a.name }}</td>
+              <td>{{ a.chats }}</td>
+              <td>{{ a.replies }}</td>
+              <td>{{ formatDuration(a.medianFirstResponseSec) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <ng-template #noAgents><p class="ci-rep-empty">No agent has replied to a chat in this period.</p></ng-template>
+      </div>
+    </ng-container>
   </div>
 
   <!-- ══════════════ INBOX ══════════════ -->

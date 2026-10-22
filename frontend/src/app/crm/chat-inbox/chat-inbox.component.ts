@@ -19,7 +19,7 @@ import {
   LucidePalette, LucidePipette
 } from '@lucide/angular';
 
-type Tab = 'inbox' | 'kb' | 'widgets';
+type Tab = 'inbox' | 'kb' | 'widgets' | 'reports';
 
 @Component({
   selector: 'app-chat-inbox',
@@ -90,6 +90,33 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     'You can apply directly to any open role on our careers page.',
     'Our team will get back to you within one business day.',
   ];
+
+  // ─── Reports ───
+  reportDays = 30;
+  report: any = null;
+  reportLoading = false;
+
+  loadReports(days = this.reportDays) {
+    this.reportDays = days;
+    this.reportLoading = true;
+    this.http.get<any>(`${this.api}/reports`, { params: { days: String(days) } }).subscribe({
+      next: (r) => { this.report = r; this.reportLoading = false; },
+      error: () => { this.reportLoading = false; this.toast.error('Failed to load chat reports.'); },
+    });
+  }
+
+  get reportMaxDaily(): number {
+    return Math.max(1, ...(this.report?.daily || []).map((d: any) => d.count));
+  }
+
+  /** 95 → "1m 35s", 7200 → "2h", null → "—". */
+  formatDuration(sec: number | null | undefined): string {
+    if (sec === null || sec === undefined) return '—';
+    if (sec < 60) return `${sec}s`;
+    if (sec < 3600) return `${Math.floor(sec / 60)}m${sec % 60 ? ` ${sec % 60}s` : ''}`;
+    const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+    return `${h}h${m ? ` ${m}m` : ''}`;
+  }
 
   // ─── Knowledge base ───
   categories: any[] = [];
@@ -212,6 +239,13 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   setTab(t: Tab) {
     if (t === this.tab) return;
+    // Reports live on the inbox route (same permission), so switch in place.
+    if (t === 'reports' || (t === 'inbox' && this.tab === 'reports')) {
+      this.tab = t;
+      if (t === 'reports') this.loadReports();
+      else this.loadInbox();
+      return;
+    }
     this.router.navigate(['/website-chat', t === 'kb' ? 'knowledge-base' : t]);
   }
 

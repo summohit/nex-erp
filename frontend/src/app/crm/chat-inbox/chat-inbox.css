@@ -4708,3 +4708,30 @@
   font-size: 12.5px;
   color: #94a3b8;
 }
+
+/* ─── Reports ─── */
+.ci-reports { display: flex; flex-direction: column; gap: 16px; }
+.ci-rep-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ci-rep-head h3 { margin: 0; font-size: 17px; color: #0f172a; }
+.ci-rep-range { display: inline-flex; background: #f1f5f9; border-radius: 10px; padding: 3px; gap: 2px; }
+.ci-rep-range button { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: #64748b; cursor: pointer; }
+.ci-rep-range button.on { background: #ffffff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08); }
+.ci-rep-loading { display: flex; flex-direction: column; gap: 10px; padding: 20px; }
+.ci-rep-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; transition: opacity 0.15s ease; }
+.ci-rep-kpis.dim { opacity: 0.55; }
+.ci-kpi { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.ci-kpi.warn { border-color: #fdba74; background: #fff7ed; }
+.ci-kpi-label { font-size: 12px; color: #64748b; font-weight: 600; }
+.ci-kpi strong { font-size: 26px; color: #0f172a; line-height: 1.15; }
+.ci-kpi small { font-size: 11.5px; color: #94a3b8; }
+.ci-rep-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; }
+.ci-rep-card h4 { margin: 0 0 12px; font-size: 14px; color: #0f172a; }
+.ci-rep-bars { display: flex; align-items: flex-end; gap: 3px; height: 140px; }
+.ci-rep-bar { flex: 1; height: 100%; display: flex; align-items: flex-end; min-width: 3px; }
+.ci-rep-bar-fill { width: 100%; min-height: 2px; background: #3b82f6; border-radius: 4px 4px 0 0; }
+.ci-rep-bar:hover .ci-rep-bar-fill { background: #1d4ed8; }
+.ci-rep-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: #94a3b8; }
+.ci-rep-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ci-rep-table th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+.ci-rep-table td { padding: 10px; border-bottom: 1px solid #f1f5f9; color: #0f172a; }
+.ci-rep-empty { margin: 0; color: #94a3b8; font-size: 13px; }
