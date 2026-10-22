@@ -5,7 +5,7 @@ import { PermissionsService, RolePermission, WebsiteChatUserAccess } from '../..
 import { AuthService } from '../../services/auth.service';
 import { MasterDataService, Department } from '../../services/master-data.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucideShield, LucideChevronDown, LucideChevronRight } from '@lucide/angular';
+import { LucideShield, LucideChevronDown, LucideChevronRight, LucideSearch, LucideX, LucideTrash2, LucideUsers, LucideMessageSquare } from '@lucide/angular';
 
 interface PermissionNode {
   id: string;
@@ -26,7 +26,18 @@ interface PermissionCategory extends PermissionNode {
 @Component({
   selector: 'app-permissions',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideShield, LucideChevronDown, LucideChevronRight],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucideShield,
+    LucideChevronDown,
+    LucideChevronRight,
+    LucideSearch,
+    LucideX,
+    LucideTrash2,
+    LucideUsers,
+    LucideMessageSquare,
+  ],
   templateUrl: './permissions.component.html',
   styleUrls: ['./permissions.component.css']
 })
@@ -132,14 +143,6 @@ export class PermissionsComponent implements OnInit {
       subItems: [], viewAllEnabled: false
     },
     {
-      id: 'website-chat', title: 'Website Chat', isExpanded: true, enabled: false, superadminOnly: true,
-      subItems: [
-        { id: 'website-chat/inbox', title: 'Inbox', enabled: false },
-        { id: 'website-chat/knowledge-base', title: 'Knowledge Base', enabled: false },
-        { id: 'website-chat/widgets', title: 'Widgets', enabled: false }
-      ]
-    },
-    {
       id: 'sales', title: 'Sales', isExpanded: true, enabled: false,
       subItems: [
         { id: 'sales/quotations', title: 'Quotations', enabled: false },
@@ -176,10 +179,61 @@ export class PermissionsComponent implements OnInit {
   isLoadingChatUsers = false;
   savingChatUserId: number | null = null;
 
-  get filteredChatUsers(): WebsiteChatUserAccess[] {
+  /** People the super admin has given Website Chat to — the only rows in the table. */
+  get shownChatUsers(): WebsiteChatUserAccess[] {
+    return this.chatUsers.filter(u => u.override === true);
+  }
+
+  /** Search results for "Add person": active people not already shown (super admins always have it). */
+  get chatAddCandidates(): WebsiteChatUserAccess[] {
     const q = this.chatUserSearch.trim().toLowerCase();
-    if (!q) return this.chatUsers;
-    return this.chatUsers.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.role.toLowerCase().includes(q));
+    if (!q) return [];
+    return this.chatUsers
+      .filter(u => u.override !== true && u.role !== 'SUPERADMIN' && u.isActive)
+      .filter(u =>
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.designation && u.designation.toLowerCase().includes(q)) ||
+        (u.department && u.department.toLowerCase().includes(q))
+      )
+      .slice(0, 8);
+  }
+
+  clearChatSearch() {
+    this.chatUserSearch = '';
+  }
+
+  getAvatarBg(nameOrEmail: string): string {
+    const colors = [
+      '#4f46e5', '#2563eb', '#0284c7', '#0d9488',
+      '#059669', '#7c3aed', '#9333ea', '#c026d3',
+      '#db2777', '#e11d48', '#d97706', '#475569'
+    ];
+    let hash = 0;
+    const str = nameOrEmail || '';
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  getInitials(nameOrEmail: string): string {
+    if (!nameOrEmail) return '?';
+    const parts = nameOrEmail.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  getRoleBadgeClass(role: string): string {
+    switch (role?.toUpperCase()) {
+      case 'SUPERADMIN': return 'badge-role-superadmin';
+      case 'ADMIN': return 'badge-role-admin';
+      case 'HR': return 'badge-role-hr';
+      case 'FINANCE': return 'badge-role-finance';
+      case 'SALES': return 'badge-role-sales';
+      case 'OPERATIONS_MANAGER': return 'badge-role-ops';
+      default: return 'badge-role-employee';
+    }
   }
 
   loadChatAccess() {
@@ -190,23 +244,26 @@ export class PermissionsComponent implements OnInit {
     });
   }
 
-  /** value: 'role' = follow the role, 'show' / 'hide' = override for this person. */
-  setChatAccess(u: WebsiteChatUserAccess, value: string) {
-    const granted = value === 'show' ? true : value === 'hide' ? false : null;
+  showChatTo(u: WebsiteChatUserAccess) {
+    this.saveChatAccess(u, true, `Website Chat shown to ${u.name}`);
+    this.chatUserSearch = '';
+  }
+
+  removeChatFrom(u: WebsiteChatUserAccess) {
+    this.saveChatAccess(u, null, `Website Chat hidden from ${u.name}`);
+  }
+
+  private saveChatAccess(u: WebsiteChatUserAccess, granted: boolean | null, ok: string) {
     this.savingChatUserId = u.userId;
     this.permissionsService.setWebsiteChatUser(u.userId, granted).subscribe({
       next: () => {
         u.override = granted;
         u.hasAccess = granted ?? u.fromRole;
         this.savingChatUserId = null;
-        this.toast.success(`Website Chat ${u.hasAccess ? 'shown to' : 'hidden from'} ${u.name}`);
+        this.toast.success(ok);
       },
       error: (e) => { this.savingChatUserId = null; this.toast.error(e?.error?.message || 'Failed to update access'); }
     });
-  }
-
-  chatAccessValue(u: WebsiteChatUserAccess): string {
-    return u.override === true ? 'show' : u.override === false ? 'hide' : 'role';
   }
 
   // --- Department Roles Tab ---

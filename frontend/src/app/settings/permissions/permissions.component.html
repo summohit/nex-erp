@@ -160,51 +160,192 @@
   </div>
   <!-- TAB 3: Website Chat per-person access (super admin only) -->
   <div class="tab-content" *ngIf="activeTab === 'chat-access' && isSuperadmin">
-    <div class="content-header">
-      <h2>Website Chat Access</h2>
-      <p>Website Chat is visible only to the super admin until you allow it. Switch it on for a whole role in the Permissions Matrix, or show or hide it for one person here — a person's setting wins over their role.</p>
+    <div class="content-header chat-access-header">
+      <div class="chat-access-title-row">
+        <div>
+          <h2>Website Chat Access</h2>
+          <p>Website Chat is private to Super Admins by default. Add team members below to unlock the live chat inbox in their sidebar.</p>
+        </div>
+        <div class="chat-access-stats" *ngIf="!isLoadingChatUsers && shownChatUsers.length > 0">
+          <span class="chat-stat-pill">
+            <svg lucideUsers size="14"></svg>
+            <strong>{{ shownChatUsers.length }}</strong> Authorized Member{{ shownChatUsers.length === 1 ? '' : 's' }}
+          </span>
+        </div>
+      </div>
     </div>
 
-    <input class="form-control chat-access-search" [(ngModel)]="chatUserSearch" placeholder="Search by name, email or role…">
+    <!-- Search & Add Bar -->
+    <div class="chat-add-box">
+      <div class="chat-search-input-wrap">
+        <svg lucideSearch size="16" class="chat-search-icon"></svg>
+        <input 
+          type="text"
+          class="form-control chat-search-input" 
+          [(ngModel)]="chatUserSearch" 
+          placeholder="Search by name, email, or designation to grant access…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button 
+          type="button" 
+          class="chat-search-clear" 
+          *ngIf="chatUserSearch.trim()" 
+          (click)="clearChatSearch()"
+          title="Clear search">
+          <svg lucideX size="14"></svg>
+        </button>
+      </div>
 
+      <!-- Dropdown Results -->
+      <div class="chat-add-results" *ngIf="chatAddCandidates.length">
+        <div class="chat-results-header">Matching Team Members ({{ chatAddCandidates.length }})</div>
+        <div class="chat-results-list">
+          <div 
+            class="chat-add-row" 
+            *ngFor="let u of chatAddCandidates" 
+            (click)="showChatTo(u)"
+            [class.saving]="savingChatUserId === u.userId">
+            
+            <div class="chat-candidate-left">
+              <div class="chat-avatar-wrap">
+                <img 
+                  *ngIf="u.avatarUrl" 
+                  [src]="u.avatarUrl" 
+                  (error)="u.avatarUrl = null" 
+                  class="chat-avatar-img" 
+                  [alt]="u.name || u.email" 
+                />
+                <div 
+                  *ngIf="!u.avatarUrl" 
+                  class="chat-avatar-fallback" 
+                  [style.background-color]="getAvatarBg(u.name || u.email)">
+                  {{ getInitials(u.name || u.email) }}
+                </div>
+              </div>
+
+              <div class="chat-candidate-info">
+                <div class="chat-candidate-name-row">
+                  <span class="chat-candidate-name">{{ u.name }}</span>
+                  <span class="chat-role-badge" [ngClass]="getRoleBadgeClass(u.role)">{{ u.role }}</span>
+                </div>
+                <div class="chat-candidate-meta">
+                  <span class="chat-candidate-email">{{ u.email }}</span>
+                  <span *ngIf="u.designation" class="chat-candidate-desig">• {{ u.designation }}</span>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              type="button" 
+              class="chat-add-cta-btn" 
+              [disabled]="savingChatUserId === u.userId"
+              (click)="showChatTo(u); $event.stopPropagation()">
+              <span *ngIf="savingChatUserId !== u.userId">+ Grant Access</span>
+              <span *ngIf="savingChatUserId === u.userId">Adding...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty Search Dropdown -->
+      <div class="chat-add-results chat-add-empty" *ngIf="chatUserSearch.trim() && !chatAddCandidates.length">
+        <svg lucideSearch size="18" class="chat-empty-icon"></svg>
+        <span>No active team members found matching "<strong>{{ chatUserSearch }}</strong>"</span>
+      </div>
+    </div>
+
+    <!-- Loading State -->
     <div class="loading-state" *ngIf="isLoadingChatUsers">
-      <div class="spinner"></div> Loading users...
+      <div class="spinner"></div> Loading access list...
     </div>
 
-    <div class="table-container" *ngIf="!isLoadingChatUsers">
-      <table class="data-table">
+    <!-- Authorized Users Table -->
+    <div class="table-container chat-access-table-card" *ngIf="!isLoadingChatUsers">
+      <table class="data-table chat-access-table">
         <thead>
           <tr>
-            <th>Name</th>
+            <th>Team Member</th>
             <th>Role</th>
-            <th>From role</th>
-            <th>Website Chat</th>
-            <th>Access</th>
+            <th>Designation &amp; Department</th>
+            <th>Sidebar Status</th>
+            <th class="text-right">Action</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let u of filteredChatUsers">
-            <td><strong>{{ u.name }}</strong><div class="chat-access-email">{{ u.email }}</div></td>
-            <td>{{ u.role }}</td>
-            <td>{{ u.fromRole ? 'Allowed' : 'Not allowed' }}</td>
+          <tr *ngFor="let u of shownChatUsers" class="chat-user-row">
+            <!-- Team Member with Avatar -->
             <td>
-              <span *ngIf="u.role === 'SUPERADMIN'" class="chat-access-fixed">Always (super admin)</span>
-              <select *ngIf="u.role !== 'SUPERADMIN'" class="form-control"
-                [ngModel]="chatAccessValue(u)" (ngModelChange)="setChatAccess(u, $event)"
-                [disabled]="savingChatUserId === u.userId">
-                <option value="role">Follow role</option>
-                <option value="show">Show</option>
-                <option value="hide">Hide</option>
-              </select>
+              <div class="chat-member-cell">
+                <div class="chat-avatar-wrap">
+                  <img 
+                    *ngIf="u.avatarUrl" 
+                    [src]="u.avatarUrl" 
+                    (error)="u.avatarUrl = null" 
+                    class="chat-avatar-img" 
+                    [alt]="u.name || u.email" 
+                  />
+                  <div 
+                    *ngIf="!u.avatarUrl" 
+                    class="chat-avatar-fallback" 
+                    [style.background-color]="getAvatarBg(u.name || u.email)">
+                    {{ getInitials(u.name || u.email) }}
+                  </div>
+                </div>
+                <div class="chat-member-details">
+                  <strong class="chat-member-name">{{ u.name }}</strong>
+                  <span class="chat-member-email">{{ u.email }}</span>
+                </div>
+              </div>
             </td>
+
+            <!-- Role Badge -->
             <td>
-              <span class="badge" [class.badge-success]="u.hasAccess" [class.badge-error]="!u.hasAccess">
-                {{ u.hasAccess ? 'Visible' : 'Hidden' }}
+              <span class="chat-role-badge" [ngClass]="getRoleBadgeClass(u.role)">{{ u.role }}</span>
+            </td>
+
+            <!-- Designation & Dept -->
+            <td>
+              <div class="chat-dept-cell">
+                <span class="chat-desig-text" *ngIf="u.designation">{{ u.designation }}</span>
+                <span class="chat-dept-text" *ngIf="u.department">{{ u.department }}</span>
+                <span class="chat-meta-na" *ngIf="!u.designation && !u.department">—</span>
+              </div>
+            </td>
+
+            <!-- Sidebar Status -->
+            <td>
+              <span class="chat-status-pill">
+                <span class="chat-status-dot"></span>
+                <span>Visible</span>
               </span>
             </td>
+
+            <!-- Action: Remove -->
+            <td class="text-right">
+              <button 
+                type="button" 
+                class="chat-remove-btn" 
+                (click)="removeChatFrom(u)" 
+                [disabled]="savingChatUserId === u.userId"
+                title="Remove Website Chat from this user's sidebar">
+                <svg lucideTrash2 size="13"></svg>
+                <span>Remove</span>
+              </button>
+            </td>
           </tr>
-          <tr *ngIf="filteredChatUsers.length === 0">
-            <td colspan="5" class="text-center">No users found.</td>
+
+          <!-- Empty State -->
+          <tr *ngIf="shownChatUsers.length === 0">
+            <td colspan="5" class="chat-empty-state-cell">
+              <div class="chat-empty-state">
+                <div class="chat-empty-icon-box">
+                  <svg lucideMessageSquare size="28"></svg>
+                </div>
+                <h3>No Team Members Added Yet</h3>
+                <p>Website Chat is currently restricted to Super Admins. Search above to grant access to employees, HR, or support staff.</p>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>

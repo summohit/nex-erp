@@ -76,6 +76,10 @@ export interface WebsiteChatUserAccess {
   name: string;
   email: string;
   role: string;
+  avatarUrl?: string | null;
+  designation?: string | null;
+  department?: string | null;
+  isActive: boolean;
   fromRole: boolean;
   override: boolean | null;
   hasAccess: boolean;
