@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Request, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '../auth/auth.guard';
 import { WebsiteChatAccessGuard } from './website-chat-access.guard';
-import { ChatWidgetService } from './chat-widget.service';
+import { ChatWidgetService, chatAttachmentUpload } from './chat-widget.service';
 import { KnowledgeBaseService } from './knowledge-base.service';
 
 // Who may use this is decided by the super admin (Roles & Permissions →
@@ -24,6 +25,12 @@ export class ChatWidgetController {
   @Get('inbox/:id')
   conversation(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.chat.inboxConversation(req.user.companyId, id);
+  }
+
+  @Post('inbox/:id/attachments')
+  @UseInterceptors(FileInterceptor('file', chatAttachmentUpload))
+  attach(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: any, @UploadedFile() file: Express.Multer.File) {
+    return this.chat.agentAttachment(req.user.companyId, id, req.user.employeeId ?? null, body ?? {}, file, req);
   }
 
   @Post('inbox/:id/reply')

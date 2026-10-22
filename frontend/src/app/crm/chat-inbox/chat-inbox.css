@@ -4592,3 +4592,77 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ─── Attachments ─── */
+.ci-attach-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.ci-attach-btn:hover:not(:disabled) {
+  color: #2563eb;
+  border-color: #93c5fd;
+}
+
+.ci-attach-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ci-att-img-link {
+  display: block;
+}
+
+.ci-att-img {
+  display: block;
+  max-width: 260px;
+  max-height: 240px;
+  border-radius: 10px;
+  object-fit: cover;
+  cursor: zoom-in;
+}
+
+.ci-att-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.ci-att-ico {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.ci-att-meta b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ci-att-meta small {
+  display: block;
+  font-size: 11px;
+  opacity: 0.7;
+}

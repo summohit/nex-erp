@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Header, Headers, Param, ParseIntPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, Headers, Param, ParseIntPipe, Post, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle, ThrottlerGuard, seconds } from '@nestjs/throttler';
 import type { Response } from 'express';
 import * as fs from 'fs';
 import { join } from 'path';
-import { ChatWidgetService } from './chat-widget.service';
+import { ChatWidgetService, chatAttachmentUpload } from './chat-widget.service';
 import { KnowledgeBaseService } from './knowledge-base.service';
 
 /** The site embedding the widget: Origin for cross-site calls, Referer otherwise. */
@@ -127,6 +128,22 @@ export class PublicChatWidgetController {
     @Headers('referer') referer?: string,
   ) {
     return this.chat.visitorMessage(key, originHost(origin, referer), id, body ?? {});
+  }
+
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: seconds(60), limit: 6 } })
+  @Post(':key/conversations/:id/attachments')
+  @UseInterceptors(FileInterceptor('file', chatAttachmentUpload))
+  attach(
+    @Param('key') key: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+    @Headers('origin') origin?: string,
+    @Headers('referer') referer?: string,
+  ) {
+    return this.chat.visitorAttachment(key, originHost(origin, referer), id, body ?? {}, file, req);
   }
 
   @UseGuards(ThrottlerGuard)

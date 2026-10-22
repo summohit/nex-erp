@@ -4,7 +4,8 @@
  *   <script src="https://<api>/public/chat-widget/embed.js" data-widget-key="<key>" async></script>
  *
  * Optional attributes: data-source="CAREERS" (tells the bot it's on the careers
- * page), data-api="https://<api>" (defaults to the script's own origin+path).
+ * page), data-api="https://<api>" (defaults to the script's own origin+path),
+ * data-theme="light" | "dark" | "auto" (auto follows the visitor's system setting; default light).
  * Everything renders inside a shadow root so the host site's CSS can't touch
  * it and ours can't leak out. No dependencies.
  */
@@ -17,6 +18,7 @@
   var WIDGET_KEY = script.getAttribute('data-widget-key');
   var SOURCE = (script.getAttribute('data-source') || 'WEBSITE').toUpperCase();
   var POSITION = script.getAttribute('data-position');
+  var THEME = (script.getAttribute('data-theme') || 'light').toLowerCase();
   var API = (script.getAttribute('data-api') || script.src.replace(/\/public\/chat-widget\/embed\.js.*$/, '')).replace(/\/$/, '');
   var BASE = API + '/public/chat-widget/' + encodeURIComponent(WIDGET_KEY);
   if (!WIDGET_KEY) return;
@@ -36,8 +38,9 @@
     opts = opts || {};
     return fetch(BASE + path, {
       method: opts.method || 'GET',
+      // FormData (file uploads) sets its own multipart header.
       headers: opts.body ? { 'Content-Type': 'application/json' } : undefined,
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      body: opts.form || (opts.body ? JSON.stringify(opts.body) : undefined),
       credentials: 'omit',
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
@@ -117,6 +120,7 @@
     endChat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>',
     more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>',
     refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+    clip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>',
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
   };
 
@@ -221,6 +225,15 @@
     '.err{color:#dc2626;font-size:12px}',
     '.compose{display:flex;gap:8px;padding:12px 14px;border-top:1px solid #e2e8f0;background:#fff;align-items:flex-end}',
     '.compose textarea{flex:1;resize:none;border:1px solid #cbd5e1;border-radius:12px;padding:9px 12px;font-size:13.5px;line-height:1.45;max-height:110px;min-height:42px;outline:none;color:#0f172a;background:#f8fafc;transition:all .15s ease}',
+    '.attach{width:38px;height:42px;border-radius:12px;border:0;background:transparent;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;transition:color .15s,background .15s}',
+    '.attach svg{width:19px;height:19px}.attach:hover{color:var(--c);background:color-mix(in srgb,var(--c) 8%,transparent)}.attach:disabled{opacity:.4;cursor:default}',
+    '.att-img{display:block;max-width:220px;max-height:220px;border-radius:12px;object-fit:cover;cursor:zoom-in}',
+    '.att-file{display:flex;align-items:center;gap:10px;padding:2px 0;color:inherit;text-decoration:none;min-width:0}',
+    '.att-file .att-ico{width:34px;height:34px;border-radius:9px;background:rgba(15,23,42,.08);display:flex;align-items:center;justify-content:center;flex:none}',
+    '.att-file .att-ico svg{width:17px;height:17px}',
+    '.att-file b{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}',
+    '.att-file small{display:block;font-size:11px;opacity:.7}',
+    '.att-uploading{font-size:12.5px;opacity:.8}',
     '.compose textarea:focus{border-color:var(--c);background:#fff;box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 15%,transparent)}',
     '.send{width:42px;height:42px;border-radius:12px;border:0;background:linear-gradient(135deg,var(--c),color-mix(in srgb,var(--c) 82%,#0f172a));color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;transition:all .15s;box-shadow:0 2px 6px color-mix(in srgb,var(--c) 30%,transparent)}',
     '.send:hover:not(:disabled){transform:scale(1.05);box-shadow:0 4px 10px color-mix(in srgb,var(--c) 40%,transparent)}',
@@ -276,6 +289,41 @@
     '.compose-ended{padding:14px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:#64748b;animation:composeUp .28s cubic-bezier(.16,1,.3,1) both}',
     '@keyframes composeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}',
     '@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}'
+  ].join('\n');
+
+  // Dark theme: the same layout with surfaces, text and borders swapped. Applied
+  // by the .dk class on the wrapper (see applyTheme). Brand colour stays as set.
+  var DARK_CSS = [
+    '.dk .panel{background:#0f172a;color:#e2e8f0;box-shadow:0 24px 60px -12px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08)}',
+    '.dk .teaser,.dk .teaser::after{background:#1e293b}.dk .teaser-msg{color:#e2e8f0}',
+    '.dk .tabs{background:#0f172a;border-bottom-color:#1e293b}.dk .tab:hover{color:#f8fafc}',
+    '.dk .body{background:#0f172a}',
+    '.dk .date-pill{background:#1e293b;color:#94a3b8}',
+    '.dk .row:not(.me) .bubble{background:#1e293b;color:#e2e8f0}',
+    '.dk .row:not(.me) .bubble a{color:#93c5fd}',
+    '.dk .sys{background:#1e293b;color:#94a3b8}',
+    '.dk .pill{background:#1e293b;border-color:#334155;color:#e2e8f0}',
+    '.dk .pill:hover{background:color-mix(in srgb,var(--c) 18%,#1e293b)}',
+    '.dk .typing-bubble{background:#1e293b}.dk .typing-bubble span{background:#94a3b8}',
+    '.dk .form{background:#1e293b;border-color:#334155}.dk .form b{color:#f1f5f9}',
+    '.dk .form input{background:#0f172a;border-color:#334155;color:#e2e8f0}',
+    '.dk .compose{background:#0f172a;border-top-color:#1e293b}',
+    '.dk .compose textarea{background:#1e293b;border-color:#334155;color:#e2e8f0}.dk .compose textarea::placeholder{color:#64748b}',
+    '.dk .compose textarea:focus{background:#1e293b}',
+    '.dk .attach{color:#94a3b8}',
+    '.dk .att-file .att-ico{background:rgba(255,255,255,.08)}',
+    '.dk .foot{background:#0f172a;border-top-color:#1e293b;color:#64748b}',
+    '.dk .search{background:#1e293b;border-color:#334155}.dk .search input{color:#e2e8f0}',
+    '.dk .art{background:#1e293b;border-color:#334155;color:#e2e8f0}',
+    '.dk .reader h3{color:#f8fafc}.dk .vote{border-top-color:#1e293b;color:#94a3b8}',
+    '.dk .menu-popover{background:#1e293b;border-color:#334155}',
+    '.dk .menu-item{color:#cbd5e1}.dk .menu-item:hover{background:#334155}',
+    '.dk .confirm-box{background:#1e293b}.dk .confirm-title{color:#f8fafc}',
+    '.dk .btn-cancel{background:#334155;color:#e2e8f0}.dk .btn-cancel:hover{background:#475569}',
+    '.dk .ended-card{background:#1e293b;border-color:#334155}.dk .ended-icon{background:#334155}',
+    '.dk .ended-text strong{color:#f1f5f9}.dk .ended-text p{color:#94a3b8}',
+    '.dk .compose-ended{background:#111827;border-top-color:#1e293b;color:#94a3b8}',
+    '.dk .badge{border-color:#0f172a}',
   ].join('\n');
 
   // ─── Sound System (Synthesized via Web Audio API) ───
@@ -347,10 +395,22 @@
   host.id = 'nex-chat-widget';
   var root = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
   var style = document.createElement('style');
-  style.textContent = CSS;
+  style.textContent = CSS + '\n' + DARK_CSS;
   root.appendChild(style);
   var wrap = document.createElement('div');
   root.appendChild(wrap);
+
+  /** light | dark | auto (follows the visitor's system and updates when it changes). */
+  function applyTheme() {
+    var dark = THEME === 'dark' ||
+      (THEME === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    wrap.classList.toggle('dk', !!dark);
+  }
+  applyTheme();
+  if (THEME === 'auto' && window.matchMedia) {
+    var themeMq = window.matchMedia('(prefers-color-scheme: dark)');
+    if (themeMq.addEventListener) themeMq.addEventListener('change', applyTheme);
+  }
 
   function el(tag, cls, html) {
     var e = document.createElement(tag);
@@ -359,7 +419,9 @@
     return e;
   }
 
-  var panel, bodyEl, launcher, badgeEl, composeEl, composeEndedEl, inputEl, sendBtn, tabsEl;
+  var panel, bodyEl, launcher, badgeEl, composeEl, composeEndedEl, inputEl, sendBtn, attachBtn, tabsEl;
+  var ATTACH_ACCEPT = '.jpg,.jpeg,.png,.gif,.webp,.heic,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt';
+  var MAX_ATTACH = 10 * 1024 * 1024;
   var endBtn, moreBtn, soundBtn, menuPopover, confirmModal, teaserEl;
 
   function build() {
@@ -495,6 +557,20 @@
     sendBtn = el('button', 'send', ICONS.send);
     sendBtn.setAttribute('aria-label', 'Send');
     sendBtn.onclick = send;
+    var fileInput = el('input');
+    fileInput.type = 'file';
+    fileInput.accept = ATTACH_ACCEPT;
+    fileInput.style.display = 'none';
+    fileInput.onchange = function () {
+      var f = fileInput.files && fileInput.files[0];
+      fileInput.value = '';
+      if (f) sendFile(f);
+    };
+    attachBtn = el('button', 'attach', ICONS.clip);
+    attachBtn.setAttribute('aria-label', 'Attach a file');
+    attachBtn.title = 'Attach an image or document (max 10 MB)';
+    attachBtn.onclick = function () { fileInput.click(); };
+    composeEl.appendChild(fileInput); composeEl.appendChild(attachBtn);
     composeEl.appendChild(inputEl); composeEl.appendChild(sendBtn);
 
     composeEndedEl = el('div', 'compose-ended');
@@ -775,7 +851,10 @@
         mCol.appendChild(el('div', 'who', esc(m.senderName) + (m.senderType === 'AGENT' ? ' · Team' : '')));
       }
 
-      var b = el('div', 'bubble', md(m.message));
+      var att = m.metadata && m.metadata.attachment;
+      var b = el('div', 'bubble', att
+        ? attachmentHtml(att) + (m.message && m.message !== att.name ? md(m.message) : '')
+        : m.uploading ? '<span class="att-uploading">Uploading ' + esc(m.message) + '…</span>' : md(m.message));
       var tip = el('div', 'bubble-tooltip', time(m.createdAt));
       b.appendChild(tip);
       mCol.appendChild(b);
@@ -926,6 +1005,52 @@
     if (fresh > 0 || statusChanged) {
       if (tab === 'chat') render();
     }
+  }
+
+  function fileSize(n) {
+    return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  }
+
+  /** Image preview or a file card; only http(s) URLs are ever linked. */
+  function attachmentHtml(a) {
+    var url = /^https?:\/\//.test(a.url || '') ? esc(a.url) : '';
+    if (!url) return esc(a.name || 'File');
+    if (a.isImage) {
+      return '<a href="' + url + '" target="_blank" rel="noopener noreferrer"><img class="att-img" src="' + url + '" alt="' + esc(a.name) + '" loading="lazy"></a>';
+    }
+    return '<a class="att-file" href="' + url + '" target="_blank" rel="noopener noreferrer">' +
+      '<span class="att-ico">' + ICONS.doc + '</span>' +
+      '<span><b>' + esc(a.name) + '</b><small>' + fileSize(a.size || 0) + ' · Open</small></span></a>';
+  }
+
+  function sendFile(file) {
+    if (sending || !conv) return;
+    var tempId = lastId + 0.5;
+    if (file.size > MAX_ATTACH) {
+      msgs.push({ id: lastId + 0.25, senderType: 'SYSTEM', message: 'That file is over 10 MB — please send a smaller one.' });
+      animatedIds[lastId + 0.25] = true;
+      render();
+      return;
+    }
+    msgs.push({ id: tempId, senderType: 'VISITOR', senderName: 'You', message: file.name, uploading: true, createdAt: new Date().toISOString() });
+    animatedIds[tempId] = true;
+    playSound('send');
+    sending = true; sendBtn.disabled = true; attachBtn.disabled = true; render();
+    var form = new FormData();
+    form.append('visitorId', visitorId);
+    form.append('file', file);
+    api('/conversations/' + conv.id + '/attachments', { method: 'POST', form: form })
+      .then(function (r) {
+        msgs = msgs.filter(function (m) { return m.id % 1 === 0; });
+        merge(r);
+      })
+      .catch(function (e) {
+        msgs = msgs.filter(function (m) { return m.id % 1 === 0; });
+        var errId = lastId + 0.25;
+        msgs.push({ id: errId, senderType: 'SYSTEM', message: e.message });
+        animatedIds[errId] = true;
+      })
+      .then(function () { sending = false; sendBtn.disabled = false; attachBtn.disabled = false; render(); schedulePoll(); });
   }
 
   function send(text) {

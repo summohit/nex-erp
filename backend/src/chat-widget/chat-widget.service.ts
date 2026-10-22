@@ -5,6 +5,7 @@ import { TicketsService } from '../tickets/tickets.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
 import { MailService } from '../mail/mail.service';
+import { storeUploadedFile } from '../upload/store-uploaded-file';
 import { ChatBotService } from './chat-bot.service';
 
 const MAX_MESSAGE = 4000;
@@ -16,6 +17,40 @@ export const VISITOR_ENDED_MESSAGE = 'The visitor ended the conversation.';
 const PUBLIC_MESSAGE_SELECT = {
   id: true, senderType: true, senderName: true, message: true, metadata: true, createdAt: true,
 } as const;
+
+/** What visitors and agents may share in a chat. No SVG/HTML: those can carry script when opened. */
+export const CHAT_ATTACHMENT_EXTENSIONS = [
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.txt',
+];
+export const MAX_CHAT_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+
+export interface ChatAttachment {
+  url: string;
+  name: string;
+  size: number;
+  isImage: boolean;
+}
+
+/** Shape a stored upload into message metadata. */
+export function chatAttachment(file: Express.Multer.File, url: string): ChatAttachment {
+  const name = (file.originalname || 'file').replace(/[\\/\r\n]/g, '_').slice(0, 160);
+  const ext = (name.match(/\.[^.]+$/)?.[0] || '').toLowerCase();
+  return { url, name, size: file.size, isImage: IMAGE_EXTENSIONS.includes(ext) };
+}
+
+/** Multer options for chat uploads: allowlisted extensions, 10 MB. */
+export const chatAttachmentUpload = {
+  limits: { fileSize: MAX_CHAT_ATTACHMENT_BYTES, files: 1 },
+  fileFilter: (_req: any, file: Express.Multer.File, cb: (error: Error | null, accept: boolean) => void) => {
+    const ext = (file.originalname.match(/\.[^.]+$/)?.[0] || '').toLowerCase();
+    if (!CHAT_ATTACHMENT_EXTENSIONS.includes(ext)) {
+      return cb(new BadRequestException('Send an image, PDF, Word, Excel, CSV or text file.'), false);
+    }
+    cb(null, true);
+  },
+};
 
 function clean(value: any, max = 200): string | null {
   const s = typeof value === 'string' ? value.trim() : '';
@@ -201,9 +236,18 @@ export class ChatWidgetService {
     return { conversation: this.publicConversation(conversation), messages };
   }
 
-  async visitorMessage(widgetKey: string, originHost: string | null, conversationId: number, body: any) {
+  /** A file from the visitor: checked against the conversation before anything is stored. */
+  async visitorAttachment(widgetKey: string, originHost: string | null, conversationId: number, body: any, file: Express.Multer.File, req: any) {
+    if (!file) throw new BadRequestException('No file received.');
+    const { conversation } = await this.visitorConversation(widgetKey, originHost, conversationId, this.visitorId(body));
+    if (!OPEN_STATUSES.includes(conversation.status)) throw new BadRequestException('This chat has ended — start a new one to send files.');
+    const { url } = await storeUploadedFile(file, '/chat_attachments', req);
+    return this.visitorMessage(widgetKey, originHost, conversationId, body, chatAttachment(file, url));
+  }
+
+  async visitorMessage(widgetKey: string, originHost: string | null, conversationId: number, body: any, attachment?: ChatAttachment) {
     const { widget, conversation } = await this.visitorConversation(widgetKey, originHost, conversationId, this.visitorId(body));
-    const text = clean(body.message, MAX_MESSAGE);
+    const text = clean(body.message, MAX_MESSAGE) || (attachment ? attachment.name : null);
     if (!text) throw new BadRequestException('Message is empty.');
     if (!OPEN_STATUSES.includes(conversation.status)) {
       // A visitor writing into a resolved chat reopens it. The bot picks it back up
@@ -219,9 +263,34 @@ export class ChatWidgetService {
         senderType: 'VISITOR',
         senderName: conversation.visitorName || 'Visitor',
         message: text,
+        metadata: attachment ? { attachment } as any : undefined,
       },
     });
     await this.touch(conversationId);
+
+    // The bot can't read files — pass them on rather than guessing at an answer.
+    if (attachment && conversation.status === 'BOT') {
+      const hasContact = !!(conversation.visitorEmail || conversation.visitorPhone);
+      await this.prisma.chatMessage.create({
+        data: {
+          conversationId,
+          senderType: 'BOT',
+          senderName: widget.botName,
+          message: hasContact
+            ? "Thanks for the file! I can't open attachments myself, so I'll pass it to our team."
+            : "Thanks for the file! I can't open attachments myself — leave your details and our team will take a look.",
+          metadata: hasContact ? undefined : { intent: 'support', action: 'collect_contact' },
+          isRead: true,
+        },
+      });
+      if (hasContact) {
+        // We already know who they are: hand the chat to the team now.
+        await this.prisma.chatConversation.update({ where: { id: conversationId }, data: { status: 'OPEN' } });
+        this.notifyTeam(widget.companyId, conversationId, `${conversation.visitorName || 'A visitor'} sent a file`, attachment.name);
+      }
+      await this.touch(conversationId);
+      return this.pollMessages(widgetKey, originHost, conversationId, conversation.visitorId, visitorMsg.id - 1);
+    }
 
     if (conversation.status !== 'BOT') {
       if (conversation.assignedToId) {
@@ -433,7 +502,17 @@ export class ChatWidgetService {
     return { conversation, messages };
   }
 
-  async agentReply(companyId: number, id: number, employeeId: number | null, body: any) {
+  async agentAttachment(companyId: number, id: number, employeeId: number | null, body: any, file: Express.Multer.File, req: any) {
+    if (!file) throw new BadRequestException('No file received.');
+    const conversation = await this.agentConversation(companyId, id);
+    if (!OPEN_STATUSES.includes(conversation.status) || (await this.endedByVisitor(id))) {
+      throw new BadRequestException('This conversation has ended. Reopen it before sending files.');
+    }
+    const { url } = await storeUploadedFile(file, '/chat_attachments', req);
+    return this.agentReply(companyId, id, employeeId, body, chatAttachment(file, url));
+  }
+
+  async agentReply(companyId: number, id: number, employeeId: number | null, body: any, attachment?: ChatAttachment) {
     const conversation = await this.agentConversation(companyId, id);
     if (!OPEN_STATUSES.includes(conversation.status)) {
       throw new BadRequestException('This conversation has ended. Reopen it before replying.');
@@ -441,14 +520,21 @@ export class ChatWidgetService {
     if (await this.endedByVisitor(id)) {
       throw new BadRequestException('The visitor ended this conversation, so they will not see new replies.');
     }
-    const text = clean(body.message, MAX_MESSAGE);
+    const text = clean(body.message, MAX_MESSAGE) || (attachment ? attachment.name : null);
     if (!text) throw new BadRequestException('Message is empty.');
     const agent = employeeId
       ? await this.prisma.employee.findUnique({ where: { id: employeeId }, select: { firstName: true } })
       : null;
 
     await this.prisma.chatMessage.create({
-      data: { conversationId: id, senderType: 'AGENT', senderName: agent?.firstName || 'Support', message: text, isRead: true },
+      data: {
+        conversationId: id,
+        senderType: 'AGENT',
+        senderName: agent?.firstName || 'Support',
+        message: text,
+        metadata: attachment ? { attachment } as any : undefined,
+        isRead: true,
+      },
     });
     // Once a person has spoken the bot steps aside; first responder owns the chat.
     await this.prisma.chatConversation.update({

@@ -446,7 +446,8 @@
                 <span class="ci-msg-time">{{ m.createdAt | date: 'EEE hh:mm a' }}</span>
               </div>
               <div class="ci-bubble visitor">
-                <div [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
+                <ng-container *ngTemplateOutlet="attachmentTpl; context: { $implicit: m }"></ng-container>
+                <div *ngIf="!isAttachmentOnly(m)" [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
                 <span class="ci-typewriter-cursor" *ngIf="typewriterActiveMessageId === m.id"></span>
               </div>
             </div>
@@ -460,7 +461,8 @@
                 <span class="ci-msg-sender-name">{{ m.senderName || 'You' }}</span>
               </div>
               <div class="ci-bubble agent">
-                <div [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
+                <ng-container *ngTemplateOutlet="attachmentTpl; context: { $implicit: m }"></ng-container>
+                <div *ngIf="!isAttachmentOnly(m)" [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
                 <div class="ci-bubble-meta">
                   <svg lucideCheckCheck size="13" class="ci-check-double"></svg>
                 </div>
@@ -485,7 +487,8 @@
                 <span class="ci-msg-time">{{ m.createdAt | date: 'EEE hh:mm a' }}</span>
               </div>
               <div class="ci-bubble bot">
-                <div [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
+                <ng-container *ngTemplateOutlet="attachmentTpl; context: { $implicit: m }"></ng-container>
+                <div *ngIf="!isAttachmentOnly(m)" [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
                 <span class="ci-typewriter-cursor" *ngIf="typewriterActiveMessageId === m.id"></span>
 
                 <!-- Article Citations -->
@@ -548,6 +551,17 @@
             </div>
 
             <div class="ci-composer-actions">
+              <input #fileInput type="file" hidden [accept]="attachAccept" (change)="sendAttachment(fileInput)" />
+              <button
+                type="button"
+                class="ci-attach-btn"
+                (click)="fileInput.click()"
+                [disabled]="sending"
+                title="Attach an image or document (max 10 MB)"
+              >
+                <svg lucidePaperclip size="15"></svg>
+              </button>
+
               <button
                 type="button"
                 class="ci-send-btn"
@@ -565,6 +579,22 @@
         </div>
       </div>
     </section>
+
+    <!-- Attachment preview inside any bubble -->
+    <ng-template #attachmentTpl let-m>
+      <ng-container *ngIf="m.metadata?.attachment as a">
+        <a *ngIf="a.isImage && safeUrl(a.url)" class="ci-att-img-link" [href]="safeUrl(a.url)" target="_blank" rel="noopener noreferrer">
+          <img class="ci-att-img" [src]="safeUrl(a.url)" [alt]="a.name" loading="lazy" />
+        </a>
+        <a *ngIf="!a.isImage && safeUrl(a.url)" class="ci-att-file" [href]="safeUrl(a.url)" target="_blank" rel="noopener noreferrer">
+          <span class="ci-att-ico"><svg lucideFileText size="16"></svg></span>
+          <span class="ci-att-meta">
+            <b>{{ a.name }}</b>
+            <small>{{ fileSize(a.size) }} · Open</small>
+          </span>
+        </a>
+      </ng-container>
+    </ng-template>
 
     <!-- Empty Pick State -->
     <ng-template #pick>

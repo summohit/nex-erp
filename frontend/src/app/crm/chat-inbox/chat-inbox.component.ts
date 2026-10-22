@@ -15,7 +15,7 @@ import {
   LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
   LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
   LucideSend, LucideUser, LucideMail, LucidePhone, LucideBriefcase, LucideRotateCcw,
-  LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX,
+  LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX, LucidePaperclip,
   LucidePalette, LucidePipette
 } from '@lucide/angular';
 
@@ -33,7 +33,7 @@ type Tab = 'inbox' | 'kb' | 'widgets';
     LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
     LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
     LucideSend, LucideUser, LucideMail, LucidePhone, LucideBriefcase, LucideRotateCcw,
-    LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX,
+    LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX, LucidePaperclip,
   LucidePalette, LucidePipette
   ],
   templateUrl: './chat-inbox.html',
@@ -398,6 +398,42 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
       next: (r) => { this.reply = ''; this.sending = false; this.applyConversation(r); this.loadInbox(true); },
       error: (e) => { this.sending = false; this.toast.error(e?.error?.message || 'Failed to send.'); },
     });
+  }
+
+  readonly attachAccept = '.jpg,.jpeg,.png,.gif,.webp,.heic,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt';
+
+  sendAttachment(input: HTMLInputElement) {
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !this.selectedId || this.sending || this.chatEnded) return;
+    if (file.size > 10 * 1024 * 1024) {
+      this.toast.error('That file is over 10 MB.');
+      return;
+    }
+    const form = new FormData();
+    form.append('file', file);
+    const caption = this.reply.trim();
+    if (caption) form.append('message', caption);
+    this.sending = true;
+    this.http.post<any>(`${this.api}/inbox/${this.selectedId}/attachments`, form).subscribe({
+      next: (r) => { this.reply = ''; this.sending = false; this.applyConversation(r); this.loadInbox(true); },
+      error: (e) => { this.sending = false; this.toast.error(e?.error?.message || 'Failed to send the file.'); },
+    });
+  }
+
+  /** A file message whose text is just the file name — the preview says it all. */
+  isAttachmentOnly(m: any): boolean {
+    const a = m.metadata?.attachment;
+    return !!a && (!m.message || m.message === a.name);
+  }
+
+  /** Only http(s) links are rendered as file links or images. */
+  safeUrl(url: string): string | null {
+    return /^https?:\/\//.test(url || '') ? url : null;
+  }
+
+  fileSize(n: number): string {
+    return n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round((n || 0) / 1024))} KB`;
   }
 
   onReplyKey(e: KeyboardEvent) {
@@ -855,7 +891,7 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   }
 
   snippet(w: any) {
-    return `<script src="${environment.apiUrl}/public/chat-widget/embed.js" data-widget-key="${w.widgetKey}" async></script>`;
+    return `<script src="${environment.apiUrl}/public/chat-widget/embed.js" data-widget-key="${w.widgetKey}" data-theme="light" async></script>`;
   }
 
   copy(text: string) {
