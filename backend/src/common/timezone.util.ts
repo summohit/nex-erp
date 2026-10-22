@@ -79,3 +79,42 @@ export function istTimeInstant(reference: Date, hhmm: string): Date {
   const { year, month, day } = toISTFields(reference);
   return new Date(Date.UTC(year, month, day, hh, mm, 0, 0) - IST_OFFSET_MS);
 }
+
+/**
+ * Turns a date/time entered in an India-only form into the corresponding UTC
+ * instant. `datetime-local` deliberately has no zone, so `new Date(value)`
+ * would otherwise depend on the server's configured timezone.
+ *
+ * Values which already carry an offset are retained as explicit instants for
+ * backwards-compatible API callers; values without one are always IST.
+ */
+export function parseIstDateTime(value: unknown): Date | null {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (!text) return null;
+
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(text)) {
+    const explicit = new Date(text);
+    return Number.isNaN(explicit.getTime()) ? null : explicit;
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(text);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second = '0', milliseconds = '0'] = match;
+  const utcWallClock = new Date(Date.UTC(
+    Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute),
+    Number(second), Number(milliseconds.padEnd(3, '0')),
+  ));
+  // Reject values JavaScript would otherwise roll into the following month.
+  if (
+    utcWallClock.getUTCFullYear() !== Number(year)
+    || utcWallClock.getUTCMonth() !== Number(month) - 1
+    || utcWallClock.getUTCDate() !== Number(day)
+    || utcWallClock.getUTCHours() !== Number(hour)
+    || utcWallClock.getUTCMinutes() !== Number(minute)
+    || utcWallClock.getUTCSeconds() !== Number(second)
+  ) return null;
+
+  return new Date(utcWallClock.getTime() - IST_OFFSET_MS);
+}

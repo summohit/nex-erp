@@ -1516,12 +1516,22 @@ export class CandidatesComponent implements OnInit {
     this.editInterviewMode.set(interview.id);
     this.newInterview.set({
       title: interview.title,
-      scheduledAt: new Date(new Date(interview.scheduledAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
+      scheduledAt: this.toIstDateTimeInput(interview.scheduledAt),
       durationMins: interview.durationMins,
       interviewerId: interview.interviewerId,
       locationUrl: interview.locationUrl
     });
     this.showInterviewForm.set(true);
+  }
+
+  /** A datetime-local input has no timezone; populate it with the IST clock. */
+  private toIstDateTimeInput(value: string | Date): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(value));
+    const get = (type: string) => parts.find(part => part.type === type)?.value ?? '';
+    return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
   }
 
   cancelInterviewForm() {

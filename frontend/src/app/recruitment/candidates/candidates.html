@@ -958,7 +958,7 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Date & Time <span style="color: #ef4444;">*</span></label>
+            <label>Date & Time (IST) <span style="color: #ef4444;">*</span></label>
             <input type="datetime-local" class="form-control" [style.border]="attemptedInterviewSubmit() && !newInterview().scheduledAt ? '1px solid #ef4444' : ''" [min]="minDate" [ngModel]="newInterview().scheduledAt" (ngModelChange)="newInterview.update(v => ({...v, scheduledAt: $event}))">
           </div>
           <div class="form-group">
@@ -1073,7 +1073,7 @@
           </div>
           <div class="i-details">
             <div class="i-row">
-              <svg lucideClock size="14"></svg> {{interview.scheduledAt | date:'dd-MM-yyyy, h:mm a'}} ({{interview.durationMins}}m)
+              <svg lucideClock size="14"></svg> {{interview.scheduledAt | date:'dd-MM-yyyy, h:mm a':'Asia/Kolkata'}} IST ({{interview.durationMins}}m)
             </div>
             <div class="i-row" *ngIf="interview.interviewer">
               <svg lucideUsers size="14"></svg> Interviewer: {{interview.interviewer.firstName}} {{interview.interviewer.lastName}}
