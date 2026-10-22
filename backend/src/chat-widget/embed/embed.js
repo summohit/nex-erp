@@ -88,7 +88,11 @@
     doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
     volumeOn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>',
     volumeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>',
-    sparkle: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>'
+    sparkle: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>',
+    endChat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>',
+    more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
   };
 
   var CSS = [
@@ -107,25 +111,31 @@
     '.panel.bl{transform-origin:bottom left}',
     '.panel.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}',
     '@media (max-width:480px){.panel{left:0!important;right:0!important;bottom:0;width:100%!important;height:100%!important;border-radius:0!important;max-height:100%}.panel.open~.launcher{display:none}}',
-    '.head{background:linear-gradient(135deg,var(--c) 0%,color-mix(in srgb,var(--c) 80%,#0f172a) 100%);color:#fff;padding:16px 18px 14px;display:flex;align-items:center;gap:12px;position:relative;box-shadow:0 4px 12px rgba(0,0,0,.06)}',
-    '.avatar{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.24);display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none;font-weight:700;position:relative;box-shadow:0 0 0 2px rgba(255,255,255,.35),0 3px 8px rgba(0,0,0,.15)}',
+    '.head{background:linear-gradient(135deg,var(--c) 0%,color-mix(in srgb,var(--c) 80%,#0f172a) 100%);color:#fff;padding:14px 16px 12px;display:flex;align-items:center;gap:10px;position:relative;box-shadow:0 4px 12px rgba(0,0,0,.06);user-select:none}',
+    '.avatar{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.24);display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none;font-weight:700;position:relative;box-shadow:0 0 0 2px rgba(255,255,255,.35),0 3px 8px rgba(0,0,0,.15)}',
     '.avatar img{width:100%;height:100%;object-fit:cover}.avatar svg{width:22px;height:22px}',
     '.avatar-online-dot{position:absolute;bottom:0;right:0;width:11px;height:11px;border-radius:50%;background:#10b981;border:2px solid #fff;box-shadow:0 0 6px #10b981}',
     '.ht{flex:1;min-width:0}',
-    '.ht b{display:block;font-size:15px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.ht b{display:block;font-size:14.5px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '.ht-status-line{display:flex;align-items:center;gap:6px;font-size:11.5px;opacity:.92;margin-top:2px}',
     '.ht-live-dot{width:6px;height:6px;border-radius:50%;background:#34d399;animation:liveBlink 1.8s infinite ease-in-out}',
+    '.ht-offline-dot{width:6px;height:6px;border-radius:50%;background:#cbd5e1;opacity:.8}',
     '@keyframes liveBlink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.85)}}',
-    '.icon-btn{background:transparent;border:0;color:inherit;cursor:pointer;padding:7px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:background-color .15s}',
-    '.icon-btn:hover{background:rgba(255,255,255,.2)}.icon-btn svg{width:18px;height:18px}',
+    '.head-actions{display:flex;align-items:center;gap:3px;flex:none}',
+    '.icon-btn{background:transparent;border:0;color:inherit;cursor:pointer;padding:6px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:background-color .15s,transform .1s}',
+    '.icon-btn:hover{background:rgba(255,255,255,.2);transform:scale(1.05)}',
+    '.icon-btn:active{transform:scale(.95)}',
+    '.icon-btn svg{width:18px;height:18px}',
     '.sound-btn svg{width:17px;height:17px}',
+    '.end-btn:hover{background:rgba(239,68,68,.35)!important}',
     '.tabs{display:flex;border-bottom:1px solid #e2e8f0;background:#fff;padding:0 8px}',
     '.tab{flex:1;border:0;background:none;padding:12px 8px;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;border-bottom:2px solid transparent;transition:all .15s ease}',
     '.tab svg{width:16px;height:16px;transition:color .15s}.tab:hover{color:#0f172a}',
     '.tab.on{color:var(--c);border-bottom-color:var(--c)}',
     '.body{flex:1;overflow-y:auto;background:#f8fafc;scroll-behavior:smooth}',
     '.msgs{padding:18px 16px;display:flex;flex-direction:column;gap:12px}',
-    '.row{display:flex;flex-direction:column;max-width:86%;animation:nexMsgSlide .22s cubic-bezier(.16,1,.3,1) both}',
+    '.row{display:flex;flex-direction:column;max-width:86%}',
+    '.row.new-anim{animation:nexMsgSlide .22s cubic-bezier(.16,1,.3,1) both}',
     '@keyframes nexMsgSlide{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}',
     '.row.me{align-self:flex-end;align-items:flex-end}',
     '.who{font-size:11px;font-weight:600;color:#64748b;margin:0 4px 4px}',
@@ -176,6 +186,37 @@
     '.back{display:inline-flex;align-items:center;gap:5px;border:0;background:none;color:var(--c);cursor:pointer;font-size:13px;padding:0;font-weight:600;margin-bottom:6px}.back svg{width:16px;height:16px}',
     '.vote{margin-top:22px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:13px;color:#475569;display:flex;gap:8px;align-items:center;flex-wrap:wrap}',
     '.empty{text-align:center;color:#64748b;font-size:13px;padding:28px 12px}',
+    /* End Chat & Session Management Styles */
+    '.menu-popover{position:absolute;top:56px;right:14px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 12px 28px -4px rgba(15,23,42,.2),0 0 0 1px rgba(0,0,0,.05);padding:6px;min-width:186px;z-index:30;display:flex;flex-direction:column;gap:2px;animation:menuPop .15s cubic-bezier(.16,1,.3,1)}',
+    '@keyframes menuPop{from{transform:scale(.92) translateY(-6px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}',
+    '.menu-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border:0;background:none;width:100%;text-align:left;font-size:13px;font-weight:500;color:#334155;border-radius:8px;cursor:pointer;transition:all .12s}',
+    '.menu-item svg{width:16px;height:16px;flex:none;color:#64748b}',
+    '.menu-item:hover{background:#f1f5f9;color:#0f172a}',
+    '.menu-item.danger{color:#dc2626}',
+    '.menu-item.danger svg{color:#dc2626}',
+    '.menu-item.danger:hover{background:#fef2f2}',
+    '.confirm-modal{position:absolute;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:40;padding:20px;animation:modalFadeIn .18s ease-out}',
+    '@keyframes modalFadeIn{from{opacity:0}to{opacity:1}}',
+    '.confirm-box{background:#fff;border-radius:16px;padding:22px;max-width:320px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,.22);text-align:center;animation:modalPop .2s cubic-bezier(.16,1,.3,1)}',
+    '@keyframes modalPop{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}',
+    '.confirm-title{font-size:16px;font-weight:700;color:#0f172a;margin-bottom:6px}',
+    '.confirm-desc{font-size:13px;color:#64748b;line-height:1.45;margin-bottom:18px}',
+    '.confirm-actions{display:flex;gap:10px;justify-content:center}',
+    '.btn-cancel{flex:1;background:#f1f5f9;color:#475569;border:0;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;transition:background-color .15s}',
+    '.btn-cancel:hover{background:#e2e8f0}',
+    '.btn-danger{flex:1;background:#ef4444;color:#fff;border:0;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;box-shadow:0 2px 6px rgba(239,68,68,.3)}',
+    '.btn-danger:hover{filter:brightness(.92);transform:translateY(-1px)}',
+    '.ended-card{margin:14px auto 6px;padding:16px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:14px;text-align:center;max-width:92%;display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(15,23,42,.04);animation:nexMsgSlide .22s cubic-bezier(.16,1,.3,1) both}',
+    '.ended-icon{width:32px;height:32px;border-radius:50%;background:#e2e8f0;color:#10b981;display:flex;align-items:center;justify-content:center}',
+    '.ended-icon svg{width:18px;height:18px}',
+    '.ended-text strong{font-size:13.5px;color:#1e293b;display:block}',
+    '.ended-text p{margin:3px 0 0;font-size:12px;color:#64748b}',
+    '.btn-new-chat{margin-top:4px;background:var(--c);color:#fff;border:0;border-radius:9px;padding:9px 15px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;box-shadow:0 2px 6px color-mix(in srgb,var(--c) 25%,transparent)}',
+    '.btn-new-chat svg{width:14px;height:14px}',
+    '.btn-new-chat:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 4px 10px color-mix(in srgb,var(--c) 35%,transparent)}',
+    '.compose-ended{padding:12px 16px;background:#fff;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12.5px;color:#64748b}',
+    '.compose-ended button{background:var(--c);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}',
+    '.compose-ended button:hover{filter:brightness(1.08)}'
   ].join('\n');
 
   // ─── Sound System (Synthesized via Web Audio API) ───
@@ -238,6 +279,7 @@
   // ─── state ───
   var cfg = null, conv = null, msgs = [], lastId = 0, open = false, tab = 'chat', unread = 0;
   var sending = false, pollTimer = null, formFor = null, kbCache = null, article = null;
+  var animatedIds = {};
   var openKey = 'nexchat_open';
 
   // ─── mount ───
@@ -257,7 +299,8 @@
     return e;
   }
 
-  var panel, bodyEl, launcher, badgeEl, composeEl, inputEl, sendBtn, tabsEl;
+  var panel, bodyEl, launcher, badgeEl, composeEl, composeEndedEl, inputEl, sendBtn, tabsEl;
+  var endBtn, moreBtn, soundBtn, menuPopover, confirmModal;
 
   function build() {
     wrap.style.setProperty('--c', cfg.primaryColor || '#2563EB');
@@ -273,7 +316,10 @@
     var dot = el('span', 'avatar-online-dot');
     av.appendChild(dot);
     var ht = el('div', 'ht', '<b>' + esc(cfg.headerTitle) + '</b><div class="ht-status-line"><span class="ht-live-dot"></span><span>' + esc(cfg.headerSubtitle || 'Online • Instant Answers') + '</span></div>');
-    var soundBtn = el('button', 'icon-btn sound-btn', soundEnabled ? ICONS.volumeOn : ICONS.volumeOff);
+    
+    var headActions = el('div', 'head-actions');
+
+    soundBtn = el('button', 'icon-btn sound-btn', soundEnabled ? ICONS.volumeOn : ICONS.volumeOff);
     soundBtn.setAttribute('aria-label', soundEnabled ? 'Mute sounds' : 'Unmute sounds');
     soundBtn.title = soundEnabled ? 'Mute sounds' : 'Unmute sounds';
     soundBtn.onclick = function (e) {
@@ -284,10 +330,87 @@
       soundBtn.title = soundEnabled ? 'Mute sounds' : 'Unmute sounds';
       if (soundEnabled) playSound('send');
     };
-    var closeBtn = el('button', 'icon-btn', ICONS.close);
+
+    endBtn = el('button', 'icon-btn end-btn', ICONS.endChat);
+    endBtn.setAttribute('aria-label', 'End chat conversation');
+    endBtn.title = 'End chat';
+    endBtn.onclick = function (e) {
+      e.stopPropagation();
+      closeMenu();
+      confirmEndChat();
+    };
+
+    moreBtn = el('button', 'icon-btn more-btn', ICONS.more);
+    moreBtn.setAttribute('aria-label', 'Chat options');
+    moreBtn.title = 'More options';
+    moreBtn.onclick = function (e) {
+      e.stopPropagation();
+      toggleMenu();
+    };
+
+    var closeBtn = el('button', 'icon-btn close-btn', ICONS.close);
     closeBtn.setAttribute('aria-label', 'Close chat');
-    closeBtn.onclick = function () { toggle(false); };
-    head.appendChild(av); head.appendChild(ht); head.appendChild(soundBtn); head.appendChild(closeBtn);
+    closeBtn.title = 'Minimize chat';
+    closeBtn.onclick = function () { closeMenu(); toggle(false); };
+
+    headActions.appendChild(soundBtn);
+    headActions.appendChild(endBtn);
+    headActions.appendChild(moreBtn);
+    headActions.appendChild(closeBtn);
+
+    head.appendChild(av);
+    head.appendChild(ht);
+    head.appendChild(headActions);
+
+    // Options dropdown menu
+    menuPopover = el('div', 'menu-popover');
+    menuPopover.style.display = 'none';
+
+    var miNew = el('button', 'menu-item', ICONS.refresh + '<span>New conversation</span>');
+    miNew.onclick = function (e) {
+      e.stopPropagation();
+      closeMenu();
+      startNewConversation();
+    };
+    var miEnd = el('button', 'menu-item danger', ICONS.endChat + '<span>End conversation</span>');
+    miEnd.onclick = function (e) {
+      e.stopPropagation();
+      closeMenu();
+      confirmEndChat();
+    };
+    var miSound = el('button', 'menu-item', (soundEnabled ? ICONS.volumeOff : ICONS.volumeOn) + '<span>' + (soundEnabled ? 'Mute sounds' : 'Enable sounds') + '</span>');
+    miSound.onclick = function (e) {
+      e.stopPropagation();
+      soundBtn.click();
+      miSound.innerHTML = (soundEnabled ? ICONS.volumeOff : ICONS.volumeOn) + '<span>' + (soundEnabled ? 'Mute sounds' : 'Enable sounds') + '</span>';
+      closeMenu();
+    };
+
+    menuPopover.appendChild(miNew);
+    menuPopover.appendChild(miEnd);
+    menuPopover.appendChild(miSound);
+    panel.appendChild(menuPopover);
+
+    // Confirmation Modal for Ending Chat
+    confirmModal = el('div', 'confirm-modal');
+    confirmModal.style.display = 'none';
+    confirmModal.innerHTML = 
+      '<div class="confirm-box">' +
+        '<div class="confirm-title">End conversation?</div>' +
+        '<div class="confirm-desc">Are you sure you want to end this chat? You can start a fresh conversation whenever you like.</div>' +
+        '<div class="confirm-actions">' +
+          '<button class="btn-cancel" type="button">Cancel</button>' +
+          '<button class="btn-danger" type="button">End Chat</button>' +
+        '</div>' +
+      '</div>';
+    var cancelBtn = confirmModal.querySelector('.btn-cancel');
+    var okEndBtn = confirmModal.querySelector('.btn-danger');
+    cancelBtn.onclick = function () { confirmModal.style.display = 'none'; };
+    okEndBtn.onclick = function () {
+      confirmModal.style.display = 'none';
+      endConversation();
+    };
+    panel.appendChild(confirmModal);
 
     tabsEl = el('div', 'tabs');
     [['chat', ICONS.chat + 'Chat'], ['help', ICONS.book + 'Help articles']].forEach(function (t) {
@@ -315,8 +438,16 @@
     sendBtn.onclick = send;
     composeEl.appendChild(inputEl); composeEl.appendChild(sendBtn);
 
+    composeEndedEl = el('div', 'compose-ended');
+    composeEndedEl.style.display = 'none';
+    composeEndedEl.innerHTML = '<span>Conversation ended</span>';
+    var freshBtn = el('button', null, ICONS.refresh + '<span>Start new chat</span>');
+    freshBtn.onclick = startNewConversation;
+    composeEndedEl.appendChild(freshBtn);
+
     panel.appendChild(head); panel.appendChild(tabsEl); panel.appendChild(bodyEl);
     panel.appendChild(composeEl);
+    panel.appendChild(composeEndedEl);
     var footHtml = '<span class="foot-sparkle">' + ICONS.sparkle + '</span><span>Powered by <strong>MIRA</strong></span>';
     panel.appendChild(el('div', 'foot', footHtml));
 
@@ -329,7 +460,84 @@
 
     wrap.appendChild(panel); wrap.appendChild(launcher);
     document.body.appendChild(host);
+
+    // Global click listener to close popover menu
+    document.addEventListener('click', function (e) {
+      if (menuPopover && menuPopover.style.display === 'flex' && !menuPopover.contains(e.target)) {
+        closeMenu();
+      }
+    });
+
+    // Escape key listener to close popover or minimize chat
+    window.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && open) {
+        if (confirmModal && confirmModal.style.display === 'flex') {
+          confirmModal.style.display = 'none';
+        } else if (menuPopover && menuPopover.style.display === 'flex') {
+          closeMenu();
+        } else {
+          toggle(false);
+        }
+      }
+    });
+
     if (store(openKey) === '1' && window.innerWidth > 480) toggle(true);
+  }
+
+  function toggleMenu() {
+    if (!menuPopover) return;
+    var isShown = menuPopover.style.display === 'flex';
+    menuPopover.style.display = isShown ? 'none' : 'flex';
+  }
+
+  function closeMenu() {
+    if (menuPopover) menuPopover.style.display = 'none';
+  }
+
+  function confirmEndChat() {
+    if (!conv || conv.status === 'RESOLVED' || conv.status === 'CLOSED') return;
+    if (confirmModal) confirmModal.style.display = 'flex';
+  }
+
+  function endConversation() {
+    if (!conv) return;
+    api('/conversations/' + conv.id + '/close', { method: 'POST', body: { visitorId: visitorId } })
+      .then(function (r) {
+        if (r.conversation) conv = r.conversation;
+        else conv.status = 'RESOLVED';
+        var sysMsg = {
+          id: lastId + 0.1,
+          senderType: 'SYSTEM',
+          senderName: 'System',
+          message: 'The visitor ended the conversation.',
+          createdAt: new Date().toISOString()
+        };
+        msgs.push(sysMsg);
+        lastId = sysMsg.id;
+        render();
+      })
+      .catch(function () {
+        conv.status = 'RESOLVED';
+        render();
+      });
+  }
+
+  function startNewConversation() {
+    conv = null;
+    msgs = [];
+    lastId = 0;
+    formFor = null;
+    animatedIds = {};
+    render();
+    api('/conversations', {
+      method: 'POST',
+      body: { visitorId: visitorId, source: SOURCE, pageUrl: location.href, referrer: document.referrer || null, forceNew: true },
+    }).then(function (r) {
+      merge(r);
+      schedulePoll();
+    }).catch(function (e) {
+      if (bodyEl) bodyEl.innerHTML = '<div class="empty">' + esc(e.message) + '</div>';
+    });
   }
 
   function toggle(v) {
@@ -350,9 +558,24 @@
   function setTab(t) {
     tab = t;
     Array.prototype.forEach.call(tabsEl.children, function (b) { b.classList.toggle('on', b.dataset.t === t); });
-    composeEl.style.display = t === 'chat' ? 'flex' : 'none';
+    updateComposeVisibility();
     render();
     if (t === 'chat' && open) setTimeout(function () { inputEl.focus(); }, 50);
+  }
+
+  function updateComposeVisibility() {
+    if (!composeEl || !composeEndedEl) return;
+    var isEnded = conv && (conv.status === 'RESOLVED' || conv.status === 'CLOSED');
+    if (tab === 'help') {
+      composeEl.style.display = 'none';
+      composeEndedEl.style.display = 'none';
+    } else if (isEnded) {
+      composeEl.style.display = 'none';
+      composeEndedEl.style.display = 'flex';
+    } else {
+      composeEl.style.display = 'flex';
+      composeEndedEl.style.display = 'none';
+    }
   }
 
   function renderBadge() {
@@ -363,19 +586,42 @@
   function render() {
     if (!bodyEl) return;
     if (tab === 'help') return renderHelp();
+
+    var isEnded = conv && (conv.status === 'RESOLVED' || conv.status === 'CLOSED');
+    updateComposeVisibility();
+
+    // Update header actions according to conversation status
+    if (endBtn) {
+      endBtn.style.display = isEnded ? 'none' : 'flex';
+    }
+    var htStatus = panel ? panel.querySelector('.ht-status-line') : null;
+    if (htStatus) {
+      if (isEnded) {
+        htStatus.innerHTML = '<span class="ht-offline-dot"></span><span>Conversation ended</span>';
+      } else {
+        htStatus.innerHTML = '<span class="ht-live-dot"></span><span>' + esc(cfg.headerSubtitle || 'Online • Instant Answers') + '</span>';
+      }
+    }
+
+    var wasNearBottom = (bodyEl.scrollHeight - bodyEl.scrollTop - bodyEl.clientHeight) < 60;
     bodyEl.innerHTML = '';
     var list = el('div', 'msgs');
     if (!conv) {
-      var tyRow0 = el('div', 'row');
+      var tyRow0 = el('div', 'row new-anim');
       var tb0 = el('div', 'typing-bubble');
       tb0.appendChild(el('span')); tb0.appendChild(el('span')); tb0.appendChild(el('span'));
       tyRow0.appendChild(tb0);
       list.appendChild(tyRow0);
     }
     msgs.forEach(function (m, idx) {
-      if (m.senderType === 'SYSTEM') { list.appendChild(el('div', 'sys', esc(m.message))); return; }
+      if (m.senderType === 'SYSTEM') {
+        list.appendChild(el('div', 'sys', esc(m.message)));
+        return;
+      }
       var mine = m.senderType === 'VISITOR';
-      var row = el('div', 'row' + (mine ? ' me' : ''));
+      var isNew = !animatedIds[m.id];
+      if (isNew) animatedIds[m.id] = true;
+      var row = el('div', 'row' + (mine ? ' me' : '') + (isNew ? ' new-anim' : ''));
       var prev = msgs[idx - 1];
       if (!mine && (!prev || prev.senderName !== m.senderName || prev.senderType !== m.senderType)) {
         row.appendChild(el('div', 'who', esc(m.senderName) + (m.senderType === 'AGENT' ? ' · Team' : '')));
@@ -402,18 +648,21 @@
       row.appendChild(el('div', 'ts', time(m.createdAt)));
       list.appendChild(row);
 
-      if (isLast && meta.action === 'collect_contact' && conv && !conv.hasContact && !formFor) formFor = meta.intent || 'human';
+      if (isLast && meta.action === 'collect_contact' && conv && !conv.hasContact && !formFor && !isEnded) {
+        formFor = meta.intent || 'human';
+      }
     });
 
     if (sending) {
-      var tyRow = el('div', 'row');
+      var tyRow = el('div', 'row new-anim');
       var tb = el('div', 'typing-bubble');
       tb.appendChild(el('span')); tb.appendChild(el('span')); tb.appendChild(el('span'));
       tyRow.appendChild(tb);
       list.appendChild(tyRow);
     }
-    if (formFor && conv && !conv.hasContact) list.appendChild(contactForm());
-    else if (conv && conv.status === 'BOT' && msgs.length <= 1) {
+    if (formFor && conv && !conv.hasContact && !isEnded) {
+      list.appendChild(contactForm());
+    } else if (conv && conv.status === 'BOT' && msgs.length <= 1) {
       var starters = el('div', 'pills');
       starters.style.alignSelf = 'flex-end';
       var opts = SOURCE === 'CAREERS'
@@ -426,8 +675,26 @@
       });
       list.appendChild(starters);
     }
+
+    // Display "Ended" status card when conversation is closed or resolved
+    if (isEnded) {
+      var endedBox = el('div', 'ended-card');
+      endedBox.innerHTML =
+        '<div class="ended-icon">' + ICONS.check + '</div>' +
+        '<div class="ended-text">' +
+          '<strong>Conversation Ended</strong>' +
+          '<p>Thank you for reaching out! Let us know if you need anything else.</p>' +
+        '</div>';
+      var newChatBtn = el('button', 'btn-new-chat', ICONS.refresh + '<span>Start new conversation</span>');
+      newChatBtn.onclick = startNewConversation;
+      endedBox.appendChild(newChatBtn);
+      list.appendChild(endedBox);
+    }
+
     bodyEl.appendChild(list);
-    bodyEl.scrollTop = bodyEl.scrollHeight;
+    if (wasNearBottom || sending || msgs.length <= 2) {
+      bodyEl.scrollTop = bodyEl.scrollHeight;
+    }
   }
 
   function contactForm() {
@@ -472,15 +739,18 @@
       method: 'POST',
       body: { visitorId: visitorId, source: SOURCE, pageUrl: location.href, referrer: document.referrer || null },
     }).then(function (r) {
-      msgs = []; lastId = 0; merge(r);
+      msgs = []; lastId = 0; animatedIds = {}; merge(r);
     }).catch(function (e) {
-      bodyEl.innerHTML = '<div class="empty">' + esc(e.message) + '</div>';
+      if (bodyEl) bodyEl.innerHTML = '<div class="empty">' + esc(e.message) + '</div>';
     }).then(function () { starting = null; });
     return starting;
   }
 
   function merge(r) {
+    var prevStatus = conv ? conv.status : null;
     if (r.conversation) conv = r.conversation;
+    var statusChanged = conv && conv.status !== prevStatus;
+
     var fresh = 0;
     (r.messages || []).forEach(function (m) {
       if (m.id > lastId) {
@@ -488,9 +758,15 @@
         if (m.senderType !== 'VISITOR') fresh++;
       }
     });
+
     if (fresh && !open) { unread += fresh; renderBadge(); }
     if (fresh) playSound('receive');
-    if (tab === 'chat' || !open) render();
+
+    // CRITICAL: Only trigger DOM render if genuinely new messages arrived or conversation status changed.
+    // This eliminates the bug where the chat was refreshing / flickering every 3 seconds!
+    if (fresh > 0 || statusChanged) {
+      if (tab === 'chat') render();
+    }
   }
 
   function send(text) {
@@ -498,7 +774,9 @@
     if (!msg || sending || !conv) return;
     if (typeof text !== 'string') { inputEl.value = ''; inputEl.style.height = 'auto'; }
     // optimistic echo
-    msgs.push({ id: lastId + 0.5, senderType: 'VISITOR', senderName: 'You', message: msg, createdAt: new Date().toISOString() });
+    var tempId = lastId + 0.5;
+    msgs.push({ id: tempId, senderType: 'VISITOR', senderName: 'You', message: msg, createdAt: new Date().toISOString() });
+    animatedIds[tempId] = true;
     playSound('send');
     sending = true; sendBtn.disabled = true; render();
     api('/conversations/' + conv.id + '/messages', { method: 'POST', body: { visitorId: visitorId, message: msg } })
@@ -508,15 +786,20 @@
       })
       .catch(function (e) {
         msgs = msgs.filter(function (m) { return m.id % 1 === 0; });
-        msgs.push({ id: lastId + 0.25, senderType: 'SYSTEM', message: e.message });
+        var errId = lastId + 0.25;
+        msgs.push({ id: errId, senderType: 'SYSTEM', message: e.message });
+        animatedIds[errId] = true;
       })
-      .then(function () { sending = false; sendBtn.disabled = false; render(); });
+      .then(function () { sending = false; sendBtn.disabled = false; render(); schedulePoll(); });
   }
 
   // Poll faster while open and a person is on the other end; slowly in the
   // background so a closed launcher can still show an unread badge.
   function schedulePoll() {
     clearTimeout(pollTimer);
+    if (conv && (conv.status === 'RESOLVED' || conv.status === 'CLOSED')) {
+      return; // Stop polling while conversation is ended
+    }
     var delay = !open ? 20000 : conv && conv.status === 'OPEN' ? 3000 : 8000;
     pollTimer = setTimeout(function () {
       if (conv && !sending && document.visibilityState !== 'hidden') {
@@ -637,7 +920,7 @@
       // Resume a chat from a previous page so replies show on the badge.
       if (store('nexchat_conv') === WIDGET_KEY && !conv) {
         api('/conversations', { method: 'POST', body: { visitorId: visitorId, source: SOURCE, resumeOnly: true } })
-          .then(function (r) { if (r.conversation && !conv) { msgs = []; lastId = 0; unread = 0; merge(r); unread = 0; renderBadge(); } })
+          .then(function (r) { if (r.conversation && !conv) { msgs = []; lastId = 0; unread = 0; animatedIds = {}; merge(r); unread = 0; renderBadge(); } })
           .catch(function () { });
       }
       schedulePoll();
@@ -651,6 +934,8 @@
   window.NexChat = {
     open: function () { if (panel) toggle(true); },
     close: function () { if (panel) toggle(false); },
+    end: function () { endConversation(); },
+    newChat: function () { startNewConversation(); },
     destroy: function () {
       clearTimeout(pollTimer);
       if (host.parentNode) host.parentNode.removeChild(host);

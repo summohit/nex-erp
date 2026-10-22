@@ -125,7 +125,14 @@ export class ChatWidgetService {
     const widget = await this.resolveWidget(widgetKey, originHost);
     const visitorId = this.visitorId(body);
 
-    let conversation = await this.prisma.chatConversation.findFirst({
+    if (body.forceNew) {
+      await this.prisma.chatConversation.updateMany({
+        where: { widgetConfigId: widget.id, visitorId, status: { in: OPEN_STATUSES } },
+        data: { status: 'RESOLVED' },
+      });
+    }
+
+    let conversation = body.forceNew ? null : await this.prisma.chatConversation.findFirst({
       where: { widgetConfigId: widget.id, visitorId, status: { in: OPEN_STATUSES } },
       orderBy: { createdAt: 'desc' },
     });
@@ -275,6 +282,30 @@ export class ChatWidgetService {
         isRead: true,
       },
     });
+    return this.pollMessages(widgetKey, originHost, conversationId, conversation.visitorId, 0);
+  }
+
+  /**
+   * Visitor ended/closed the conversation from the embedded widget.
+   * Sets status to RESOLVED and adds an audit system message.
+   */
+  async visitorCloseConversation(widgetKey: string, originHost: string | null, conversationId: number, body: any) {
+    const { conversation } = await this.visitorConversation(widgetKey, originHost, conversationId, this.visitorId(body));
+    if (conversation.status !== 'RESOLVED' && conversation.status !== 'CLOSED') {
+      await this.prisma.chatConversation.update({
+        where: { id: conversationId },
+        data: { status: 'RESOLVED', lastMessageAt: new Date() },
+      });
+      await this.prisma.chatMessage.create({
+        data: {
+          conversationId,
+          senderType: 'SYSTEM',
+          senderName: 'System',
+          message: 'The visitor ended the conversation.',
+          isRead: true,
+        },
+      });
+    }
     return this.pollMessages(widgetKey, originHost, conversationId, conversation.visitorId, 0);
   }
 

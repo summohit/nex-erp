@@ -141,4 +141,17 @@ export class PublicChatWidgetController {
   ) {
     return this.chat.submitContact(key, originHost(origin, referer), id, body ?? {});
   }
+
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: seconds(60), limit: 12 } })
+  @Post(':key/conversations/:id/close')
+  close(
+    @Param('key') key: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+    @Headers('origin') origin?: string,
+    @Headers('referer') referer?: string,
+  ) {
+    return this.chat.visitorCloseConversation(key, originHost(origin, referer), id, body ?? {});
+  }
 }
