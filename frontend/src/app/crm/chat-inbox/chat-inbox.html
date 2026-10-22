@@ -409,11 +409,10 @@
       <!-- Messages Thread Scroll Area -->
       <div class="ci-thread-messages" #thread>
         <!-- Date Divider -->
-        <div class="ci-thread-date-divider">
-          <span>Today</span>
-        </div>
-
-        <ng-container *ngFor="let m of messages">
+<ng-container *ngFor="let m of messages; let i = index">
+          <div class="ci-thread-date-divider" *ngIf="dayLabel(i) as label">
+            <span>{{ label }}</span>
+          </div>
           <!-- System Event Bubble -->
           <div class="ci-sys-row" *ngIf="m.senderType === 'SYSTEM'">
             <div class="ci-sys-pill">

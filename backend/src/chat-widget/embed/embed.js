@@ -74,6 +74,15 @@
     if (list) out.push('<ul>' + list.join('') + '</ul>');
     return out.join('');
   }
+  /** "Today" / "Yesterday" / "12 Oct" when iso falls on a new day, else null. */
+  function dayLabel(iso, lastDay) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime()) || d.toDateString() === lastDay) return null;
+    var now = new Date(), y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    if (d.toDateString() === now.toDateString()) return 'Today';
+    if (d.toDateString() === y.toDateString()) return 'Yesterday';
+    try { return d.toLocaleDateString([], { day: 'numeric', month: 'short' }); } catch (e) { return d.toDateString(); }
+  }
   function time(iso) {
     try {
       var d = new Date(iso);
@@ -633,10 +642,12 @@
     bodyEl.innerHTML = '';
     var list = el('div', 'msgs');
 
-    // Date Divider ("Today")
-    var dateDiv = el('div', 'date-divider');
-    dateDiv.innerHTML = '<span class="date-pill">Today</span>';
-    list.appendChild(dateDiv);
+    // Before the first message there's nothing to date — show "Today".
+    if (!msgs.length) {
+      var dateDiv = el('div', 'date-divider');
+      dateDiv.innerHTML = '<span class="date-pill">Today</span>';
+      list.appendChild(dateDiv);
+    }
 
     if (!conv) {
       var tyRow0 = el('div', 'row new-anim');
@@ -651,7 +662,15 @@
       tyRow0.appendChild(mCol0);
       list.appendChild(tyRow0);
     }
+    var lastDay = null;
     msgs.forEach(function (m, idx) {
+      var label = dayLabel(m.createdAt, lastDay);
+      if (label) {
+        lastDay = new Date(m.createdAt).toDateString();
+        var dd = el('div', 'date-divider');
+        dd.innerHTML = '<span class="date-pill">' + esc(label) + '</span>';
+        list.appendChild(dd);
+      }
       if (m.senderType === 'SYSTEM') {
         list.appendChild(el('div', 'sys', esc(m.message)));
         return;

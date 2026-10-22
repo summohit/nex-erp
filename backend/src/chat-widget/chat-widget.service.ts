@@ -130,10 +130,24 @@ export class ChatWidgetService {
     const visitorId = this.visitorId(body);
 
     if (body.forceNew) {
-      await this.prisma.chatConversation.updateMany({
+      // Leave a trail in the chats being replaced so an agent mid-reply knows why it closed.
+      const previous = await this.prisma.chatConversation.findMany({
         where: { widgetConfigId: widget.id, visitorId, status: { in: OPEN_STATUSES } },
-        data: { status: 'RESOLVED' },
+        select: { id: true },
       });
+      if (previous.length) {
+        const ids = previous.map((c) => c.id);
+        await this.prisma.chatConversation.updateMany({ where: { id: { in: ids } }, data: { status: 'RESOLVED' } });
+        await this.prisma.chatMessage.createMany({
+          data: ids.map((conversationId) => ({
+            conversationId,
+            senderType: 'SYSTEM',
+            senderName: 'System',
+            message: 'The visitor started a new conversation, so this one was closed.',
+            isRead: true,
+          })),
+        });
+      }
     }
 
     let conversation = body.forceNew ? null : await this.prisma.chatConversation.findFirst({
@@ -182,9 +196,11 @@ export class ChatWidgetService {
     const text = clean(body.message, MAX_MESSAGE);
     if (!text) throw new BadRequestException('Message is empty.');
     if (!OPEN_STATUSES.includes(conversation.status)) {
-      // A visitor writing into a resolved chat reopens it for the team.
-      await this.prisma.chatConversation.update({ where: { id: conversationId }, data: { status: 'OPEN' } });
-      conversation.status = 'OPEN';
+      // A visitor writing into a resolved chat reopens it. The bot picks it back up
+      // unless an agent still owns it — then it goes straight to them.
+      const status = conversation.assignedToId ? 'OPEN' : 'BOT';
+      await this.prisma.chatConversation.update({ where: { id: conversationId }, data: { status } });
+      conversation.status = status;
     }
 
     const visitorMsg = await this.prisma.chatMessage.create({

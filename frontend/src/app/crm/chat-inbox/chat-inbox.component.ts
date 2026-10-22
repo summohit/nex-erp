@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer, SafeHtml, Title } from '@angular/platform-browser';
 import { HotToastService } from '@ngneat/hot-toast';
 import { environment } from '../../../environments/environment';
 import { PermissionsService } from '../../services/permissions.service';
@@ -46,6 +46,8 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   private toast = inject(HotToastService);
   private permissions = inject(PermissionsService);
   private sanitizer = inject(DomSanitizer);
+  private titleService = inject(Title);
+  private baseTitle = '';
   private api = `${environment.apiUrl}/chat`;
 
   @ViewChild('thread') threadEl?: ElementRef<HTMLDivElement>;
@@ -173,6 +175,14 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearTimeout(this.pollTimer);
+    if (this.baseTitle) this.titleService.setTitle(this.baseTitle);
+  }
+
+  /** "(3) New chat · MIRA" while visitor messages wait unread, so a background tab still shows them. */
+  private updateTabTitle() {
+    if (!this.baseTitle) this.baseTitle = this.titleService.getTitle();
+    const unread = this.conversations.reduce((n, c) => n + (c.unread || 0), 0);
+    this.titleService.setTitle(unread ? `(${unread}) New chat · ${this.baseTitle}` : this.baseTitle);
   }
 
   setTab(t: Tab) {
@@ -238,6 +248,7 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
         this.conversations = rows;
         this.inboxLoading = false;
         this.checkNewVisitorMessages(rows);
+        this.updateTabTitle();
         // Auto-select first conversation on initial load on desktop screens
         if (!this.selectedId && rows.length && window.innerWidth > 860) {
           this.open(rows[0].id);
@@ -280,7 +291,21 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     this.messages = r.messages;
     const row = this.conversations.find((c) => c.id === r.conversation.id);
     if (row) { row.unread = 0; row.status = r.conversation.status; row.assignedTo = r.conversation.assignedTo; }
+    this.updateTabTitle();
     if (scroll && grew) setTimeout(() => this.scrollThreadToBottom(), 30);
+  }
+
+  /** "Today" / "Yesterday" / "12 Oct" above the first message of each day; null when the day hasn't changed. */
+  dayLabel(i: number): string | null {
+    const at = new Date(this.messages[i]?.createdAt);
+    if (isNaN(at.getTime())) return null;
+    const day = at.toDateString();
+    if (i > 0 && new Date(this.messages[i - 1].createdAt).toDateString() === day) return null;
+    const today = new Date();
+    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    if (day === today.toDateString()) return 'Today';
+    if (day === yesterday.toDateString()) return 'Yesterday';
+    return at.toLocaleDateString([], { day: 'numeric', month: 'short', ...(at.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) });
   }
 
   scrollThreadToBottom() {
