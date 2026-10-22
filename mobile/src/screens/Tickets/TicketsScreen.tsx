@@ -60,7 +60,7 @@ const THUMB_STYLE: ImageStyle = {
 
 // Mirrors the server allowlist in upload.controller.ts.
 const ALLOWED_EXTS = [
-  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic',
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic',
   '.pdf', '.doc', '.docx', '.odt', '.rtf',
   '.xls', '.xlsx', '.ods', '.csv',
   '.ppt', '.pptx', '.odp',

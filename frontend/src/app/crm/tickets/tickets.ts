@@ -172,7 +172,7 @@ export class TicketsComponent implements OnInit {
 
   /** Mirrors the server allowlist in upload.controller.ts. */
   readonly allowedAttachmentExtensions = [
-    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic',
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic',
     '.pdf', '.doc', '.docx', '.odt', '.rtf',
     '.xls', '.xlsx', '.ods', '.csv',
     '.ppt', '.pptx', '.odp',
