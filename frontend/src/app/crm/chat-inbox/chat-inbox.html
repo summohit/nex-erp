@@ -499,12 +499,34 @@
     <!-- Empty Pick State -->
     <ng-template #pick>
       <section class="ci-thread-wrap ci-pick">
-        <div class="ci-pick-empty-box">
+        <div class="ci-pick-empty-card">
+          <div class="ci-pick-glow-aura"></div>
           <div class="ci-pick-icon-wrap">
-            <svg lucideMessageCircle size="36"></svg>
+            <svg lucideMessageCircle size="38"></svg>
           </div>
-          <h3>Select a conversation</h3>
-          <p>Choose a visitor chat from the left panel to review messages, reply with real-time typing effect, or convert into an ERP lead or ticket.</p>
+          <h3 class="ci-pick-title">Select a Conversation</h3>
+          <p class="ci-pick-subtitle">
+            Choose a visitor chat from the left panel to review messages, reply with real-time typing effect, or convert into an ERP lead or ticket.
+          </p>
+
+          <div class="ci-pick-quick-stats" *ngIf="conversations.length">
+            <div class="ci-pick-stat-pill">
+              <span class="ci-live-dot"></span>
+              <strong>{{ activeCount }}</strong> Active Chats
+            </div>
+            <div class="ci-pick-stat-pill waiting" *ngIf="waitingCount">
+              <strong>{{ waitingCount }}</strong> Awaiting Reply
+            </div>
+            <button type="button" class="ci-pick-btn-select-first" (click)="openFirstConversation()">
+              <svg lucideZap size="13"></svg>
+              <span>Open Latest Chat</span>
+            </button>
+          </div>
+
+          <div class="ci-pick-keyboard-guide">
+            <span><kbd>↑</kbd> <kbd>↓</kbd> Select chats</span>
+            <span><kbd>Enter</kbd> Send reply</span>
+          </div>
         </div>
       </section>
     </ng-template>

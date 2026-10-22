@@ -173,9 +173,24 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     if (this.statusFilter) params.status = this.statusFilter;
     if (this.mineOnly) params.mine = '1';
     this.http.get<any[]>(`${this.api}/inbox`, { params }).subscribe({
-      next: (rows) => { this.conversations = rows; this.inboxLoading = false; },
+      next: (rows) => {
+        this.conversations = rows;
+        this.inboxLoading = false;
+        // Auto-select first conversation on initial load on desktop screens
+        if (!this.selectedId && rows.length && window.innerWidth > 860) {
+          this.open(rows[0].id);
+        }
+      },
       error: () => { this.inboxLoading = false; if (!silent) this.toast.error('Failed to load chats.'); },
     });
+  }
+
+  openFirstConversation() {
+    if (this.filteredConversations.length) {
+      this.open(this.filteredConversations[0].id);
+    } else if (this.conversations.length) {
+      this.open(this.conversations[0].id);
+    }
   }
 
   open(id: number) {
