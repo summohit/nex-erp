@@ -408,8 +408,8 @@
 
       <!-- Messages Thread Scroll Area -->
       <div class="ci-thread-messages" #thread>
-        <!-- Date Divider -->
-<ng-container *ngFor="let m of messages; let i = index">
+        <!-- Messages, with a date divider at each new day -->
+        <ng-container *ngFor="let m of messages; let i = index">
           <div class="ci-thread-date-divider" *ngIf="dayLabel(i) as label">
             <span>{{ label }}</span>
           </div>
