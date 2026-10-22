@@ -63,6 +63,11 @@ export class ChatWidgetController {
     return this.chat.updateWidget(req.user.companyId, id, body ?? {});
   }
 
+  @Delete('widgets/:id')
+  deleteWidget(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.chat.deleteWidget(req.user.companyId, id);
+  }
+
   // ─── Knowledge base ───
 
   @Get('kb/categories')

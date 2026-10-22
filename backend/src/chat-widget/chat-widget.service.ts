@@ -65,6 +65,14 @@ export class ChatWidgetService {
     return this.prisma.chatWidgetConfig.update({ where: { id }, data: this.widgetFields(data) });
   }
 
+  /** Removes the widget and, by cascade, its conversations and messages. Lead contacts and tickets made from them stay. */
+  async deleteWidget(companyId: number, id: number) {
+    const widget = await this.prisma.chatWidgetConfig.findFirst({ where: { id, companyId } });
+    if (!widget) throw new NotFoundException('Widget not found');
+    await this.prisma.chatWidgetConfig.delete({ where: { id } });
+    return { success: true };
+  }
+
   private widgetFields(data: any) {
     const color = clean(data.primaryColor, 9);
     if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) throw new BadRequestException('Primary colour must be a hex value like #2563EB.');

@@ -6,7 +6,7 @@
     </div>
     <div class="ci-tabs">
       <button type="button" *ngIf="allowedTabs.has('inbox')" [class.on]="tab === 'inbox'" (click)="setTab('inbox')"><svg lucideMessageCircle size="15"></svg> Inbox</button>
-      <button type="button" *ngIf="allowedTabs.has('kb')" [class.on]="tab === 'kb'" (click)="setTab('kb')"><svg lucideFileText size="15"></svg> Knowledge Base</button>
+      <button type="button" *ngIf="allowedTabs.has('kb')" [class.on]="tab === 'kb'" (click)="setTab('kb')"><svg lucideBookOpen size="15"></svg> Knowledge Base</button>
       <button type="button" *ngIf="allowedTabs.has('widgets')" [class.on]="tab === 'widgets'" (click)="setTab('widgets')"><svg lucideEdit2 size="15"></svg> Widgets</button>
     </div>
   </div>
@@ -24,8 +24,15 @@
         </select>
         <label class="ci-check"><input type="checkbox" [(ngModel)]="mineOnly" (change)="loadInbox()"> Mine</label>
       </div>
-      <div class="ci-empty" *ngIf="inboxLoading">Loading…</div>
-      <div class="ci-empty" *ngIf="!inboxLoading && !conversations.length">No chats here yet.</div>
+      <div class="ci-inbox-loading" *ngIf="inboxLoading">
+        <div class="spinner-small"></div>
+        <span>Loading conversations…</span>
+      </div>
+      <div class="ci-inbox-empty" *ngIf="!inboxLoading && !conversations.length">
+        <svg lucideMessageCircle size="28"></svg>
+        <b>No conversations</b>
+        <p>Chats from visitors on your website or careers portal will appear here.</p>
+      </div>
       <button type="button" class="ci-row" *ngFor="let c of conversations" [class.active]="c.id === selectedId" (click)="open(c.id)">
         <div class="ci-row-top">
           <b>{{ c.visitorName || 'Visitor #' + c.id }}</b>
@@ -43,6 +50,9 @@
     <section class="ci-thread-wrap" *ngIf="selected; else pick">
       <div class="ci-thread-head">
         <button type="button" class="ci-back" (click)="selected = null; selectedId = null"><svg lucideChevronLeft size="16"></svg></button>
+        <div class="ci-visitor-avatar-badge">
+          {{ (selected.visitorName || 'V')[0] }}
+        </div>
         <div class="ci-visitor">
           <b>{{ selected.visitorName || 'Visitor #' + selected.id }}</b>
           <span>
@@ -83,78 +93,508 @@
         <button type="button" class="ci-btn primary" (click)="sendReply()" [disabled]="sending || !reply.trim()">{{ sending ? 'Sending…' : 'Send' }}</button>
       </div>
     </section>
-    <ng-template #pick><section class="ci-thread-wrap ci-pick">Select a chat to read and reply.</section></ng-template>
+    <ng-template #pick>
+      <section class="ci-thread-wrap ci-pick">
+        <div class="ci-pick-empty-box">
+          <div class="ci-pick-icon-wrap">
+            <svg lucideMessageCircle size="34"></svg>
+          </div>
+          <h3>Select a conversation</h3>
+          <p>Choose a visitor chat from the left panel to review messages, reply directly, or convert into an ERP lead or ticket.</p>
+        </div>
+      </section>
+    </ng-template>
   </div>
 
   <!-- ══════════════ KNOWLEDGE BASE ══════════════ -->
-  <div class="ci-kb" *ngIf="tab === 'kb' && !editingArticle">
-    <aside class="ci-cats">
-      <div class="ci-cats-head"><b>Categories</b><button type="button" class="ci-icon" (click)="newCategory()" title="New category"><svg lucidePlus size="15"></svg></button></div>
-      <button type="button" class="ci-cat" [class.on]="!kbCategoryFilter" (click)="kbCategoryFilter = null; loadArticles()">All articles</button>
-      <div class="ci-cat-row" *ngFor="let c of categories">
-        <button type="button" class="ci-cat" [class.on]="kbCategoryFilter === c.id" (click)="kbCategoryFilter = c.id; loadArticles()">
-          {{ c.name }} <small>{{ c._count?.articles }}</small><em *ngIf="!c.isPublic"> · hidden</em>
-        </button>
-        <button type="button" class="ci-icon" (click)="editingCategory = { ...c }" title="Edit"><svg lucideEdit2 size="13"></svg></button>
-        <button type="button" class="ci-icon" (click)="deleteCategory(c)" title="Delete"><svg lucideTrash2 size="13"></svg></button>
-      </div>
-
-      <form class="ci-form" *ngIf="editingCategory" (ngSubmit)="saveCategory()">
-        <input name="cn" [(ngModel)]="editingCategory.name" placeholder="Category name" required>
-        <input name="cd" [(ngModel)]="editingCategory.description" placeholder="Description (optional)">
-        <label class="ci-check"><input type="checkbox" name="cp" [(ngModel)]="editingCategory.isPublic"> Shown in the widget</label>
-        <div class="ci-form-actions">
-          <button type="button" class="ci-btn" (click)="editingCategory = null">Cancel</button>
-          <button type="submit" class="ci-btn primary">Save</button>
+  <div class="ci-kb-container" *ngIf="tab === 'kb' && !editingArticle">
+    
+    <!-- Left Sidebar: Categories Management -->
+    <aside class="ci-kb-sidebar">
+      <div class="ci-kb-card ci-cats-card">
+        <div class="ci-cats-header">
+          <div class="ci-cats-title-wrap">
+            <div class="ci-cats-icon-badge">
+              <svg lucideFolder size="15"></svg>
+            </div>
+            <span class="ci-cats-title">Categories</span>
+            <span class="ci-badge-counter">{{ categories.length }}</span>
+          </div>
+          <button type="button" class="ci-btn-add-cat" (click)="newCategory()" title="Create new category">
+            <svg lucidePlus size="14"></svg>
+            <span>Add</span>
+          </button>
         </div>
-      </form>
+
+        <!-- Inline Category Creator / Editor Card -->
+        <div class="ci-cat-inline-form-box" *ngIf="editingCategory">
+          <div class="ci-cat-form-title">
+            <svg lucideFolderPlus size="14"></svg>
+            <span>{{ editingCategory.id ? 'Edit Category' : 'New Category' }}</span>
+          </div>
+          <form class="ci-cat-form" (ngSubmit)="saveCategory()">
+            <div class="ci-cat-field">
+              <label>Name <span class="text-danger">*</span></label>
+              <input name="cn" [(ngModel)]="editingCategory.name" placeholder="e.g. Careers & Hiring" required autofocus />
+            </div>
+            <div class="ci-cat-field">
+              <label>Description <small class="text-muted">(Optional)</small></label>
+              <input name="cd" [(ngModel)]="editingCategory.description" placeholder="Short description" />
+            </div>
+            <label class="ci-cat-toggle">
+              <input type="checkbox" name="cp" [(ngModel)]="editingCategory.isPublic" />
+              <div class="ci-cat-toggle-text">
+                <span class="ci-toggle-title">Show in chat widget</span>
+                <span class="ci-toggle-desc">Visitors can browse articles in this category</span>
+              </div>
+            </label>
+            <div class="ci-cat-form-actions">
+              <button type="button" class="ci-btn-cancel-cat" (click)="editingCategory = null">Cancel</button>
+              <button type="submit" class="ci-btn-save-cat" [disabled]="!editingCategory.name?.trim()">Save</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Category Items Nav -->
+        <nav class="ci-cats-nav">
+          <!-- All Articles Item -->
+          <button 
+            type="button" 
+            class="ci-cat-nav-item" 
+            [class.active]="!kbCategoryFilter" 
+            (click)="kbCategoryFilter = null; loadArticles()">
+            <div class="ci-cat-nav-left">
+              <svg lucideBookOpen size="15" class="ci-cat-item-icon"></svg>
+              <span class="ci-cat-nav-name">All articles</span>
+            </div>
+            <span class="ci-cat-nav-count">{{ totalArticlesCount }}</span>
+          </button>
+
+          <!-- Individual Category Items -->
+          <div class="ci-cat-row-item" *ngFor="let c of categories" [class.active]="kbCategoryFilter === c.id">
+            <button 
+              type="button" 
+              class="ci-cat-nav-item-btn" 
+              (click)="kbCategoryFilter = c.id; loadArticles()">
+              <div class="ci-cat-nav-left">
+                <svg lucideFolder size="15" class="ci-cat-item-icon"></svg>
+                <span class="ci-cat-nav-name">{{ c.name }}</span>
+                <span class="ci-cat-hidden-pill" *ngIf="!c.isPublic" title="Hidden from widget">
+                  <svg lucideEyeOff size="11"></svg> Hidden
+                </span>
+              </div>
+              <span class="ci-cat-nav-count">{{ c._count?.articles || 0 }}</span>
+            </button>
+
+            <!-- Actions -->
+            <div class="ci-cat-item-actions">
+              <button type="button" class="ci-cat-action-btn" (click)="editingCategory = { ...c }" title="Edit category">
+                <svg lucideEdit2 size="12"></svg>
+              </button>
+              <button type="button" class="ci-cat-action-btn danger" (click)="deleteCategory(c)" title="Delete category">
+                <svg lucideTrash2 size="12"></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty Categories micro-state -->
+          <div class="ci-cats-empty" *ngIf="!categories.length && !editingCategory">
+            <svg lucideFolder size="22"></svg>
+            <p>No categories yet</p>
+            <button type="button" class="ci-btn-create-first-cat" (click)="newCategory()">
+              <svg lucidePlus size="13"></svg> Create Category
+            </button>
+          </div>
+        </nav>
+
+        <!-- AI Bot Knowledge sync note -->
+        <div class="ci-kb-sidebar-tip">
+          <svg lucideSparkles size="14"></svg>
+          <p>Published articles automatically empower the AI chatbot with instant knowledge.</p>
+        </div>
+      </div>
     </aside>
 
-    <section class="ci-articles">
-      <div class="ci-articles-tools">
-        <div class="ci-search"><svg lucideSearch size="15"></svg><input [(ngModel)]="kbSearch" placeholder="Search articles…"></div>
-        <button type="button" class="ci-btn primary" (click)="newArticle()"><svg lucidePlus size="15"></svg> New article</button>
+    <!-- Right Main Section: Articles Table / Empty State -->
+    <main class="ci-kb-main">
+      <div class="ci-kb-card ci-articles-card">
+        
+        <!-- Header Toolbar -->
+        <div class="ci-kb-toolbar">
+          <div class="ci-kb-toolbar-left">
+            <div class="ci-kb-view-title">
+              <h2>{{ activeCategoryName }}</h2>
+              <span class="ci-kb-count-pill">{{ filteredArticles.length }} {{ filteredArticles.length === 1 ? 'article' : 'articles' }}</span>
+            </div>
+            
+            <!-- Search bar -->
+            <div class="ci-kb-search-box">
+              <svg lucideSearch size="15" class="ci-kb-search-icon"></svg>
+              <input 
+                type="text" 
+                [(ngModel)]="kbSearch" 
+                placeholder="Search articles by title, tags or content…" 
+              />
+              <button 
+                type="button" 
+                class="ci-kb-search-clear" 
+                *ngIf="kbSearch" 
+                (click)="clearKbSearch()" 
+                title="Clear search">
+                <svg lucideX size="13"></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="ci-kb-toolbar-right">
+            <button type="button" class="ci-btn-primary-action" (click)="newArticle()">
+              <svg lucidePlus size="15"></svg>
+              <span>New Article</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Empty State (No articles) -->
+        <div class="ci-kb-empty-hero" *ngIf="!filteredArticles.length && !kbSearch">
+          <div class="ci-kb-empty-icon-wrap">
+            <svg lucideBookOpen size="32"></svg>
+          </div>
+          <h3>No Knowledge Base Articles Yet</h3>
+          <p>Write answers to common questions about services, career opportunities, and support. The AI bot references published articles to answer visitors in the chat.</p>
+          <button type="button" class="ci-btn-empty-create" (click)="newArticle()">
+            <svg lucidePlus size="15"></svg>
+            <span>Create First Article</span>
+          </button>
+        </div>
+
+        <!-- Search yielded 0 results -->
+        <div class="ci-kb-empty-hero search-empty" *ngIf="!filteredArticles.length && kbSearch">
+          <div class="ci-kb-empty-icon-wrap neutral">
+            <svg lucideSearch size="28"></svg>
+          </div>
+          <h3>No articles matched "{{ kbSearch }}"</h3>
+          <p>Try searching with different keywords or check spelling.</p>
+          <button type="button" class="ci-btn-clear-search" (click)="clearKbSearch()">
+            <svg lucideX size="14"></svg>
+            <span>Clear Search</span>
+          </button>
+        </div>
+
+        <!-- Articles Data Table -->
+        <div class="ci-kb-table-wrap" *ngIf="filteredArticles.length">
+          <table class="ci-kb-table">
+            <thead>
+              <tr>
+                <th style="width: 44%;">Article</th>
+                <th style="width: 16%;">Category</th>
+                <th style="width: 10%;">Views</th>
+                <th style="width: 14%;">Feedback</th>
+                <th style="width: 10%;">Status</th>
+                <th style="width: 6%; text-align: right;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let a of filteredArticles" class="ci-kb-tr">
+                <!-- Article Title & Excerpt -->
+                <td class="ci-td-article">
+                  <div class="ci-art-title-row">
+                    <a class="ci-art-title-link" (click)="editArticle(a)">{{ a.title }}</a>
+                  </div>
+                  <div class="ci-art-excerpt" *ngIf="a.excerpt">{{ a.excerpt }}</div>
+                  <div class="ci-art-tags" *ngIf="a.tags?.length">
+                    <span class="ci-art-tag-pill" *ngFor="let t of a.tags">
+                      #{{ t }}
+                    </span>
+                  </div>
+                </td>
+
+                <!-- Category -->
+                <td class="ci-td-cat">
+                  <span class="ci-cat-badge">
+                    <svg lucideFolder size="12"></svg>
+                    <span>{{ a.category?.name || 'General' }}</span>
+                  </span>
+                </td>
+
+                <!-- Views -->
+                <td class="ci-td-views">
+                  <span class="ci-views-badge" title="Total page/widget views">
+                    <svg lucideEye size="13"></svg>
+                    <span>{{ a.views || 0 }}</span>
+                  </span>
+                </td>
+
+                <!-- Helpful Feedback -->
+                <td class="ci-td-feedback">
+                  <div class="ci-feedback-badges">
+                    <span class="ci-feed-pill up" title="Helpful votes">
+                      <svg lucideThumbsUp size="12"></svg>
+                      <span>{{ a.helpfulCount || 0 }}</span>
+                    </span>
+                    <span class="ci-feed-pill down" title="Unhelpful votes">
+                      <svg lucideThumbsDown size="12"></svg>
+                      <span>{{ a.notHelpful || 0 }}</span>
+                    </span>
+                  </div>
+                </td>
+
+                <!-- Status Pill -->
+                <td class="ci-td-status">
+                  <span class="ci-status-indicator" [class.published]="a.isPublished" [class.draft]="!a.isPublished">
+                    <span class="ci-status-dot"></span>
+                    <span>{{ a.isPublished ? 'Published' : 'Draft' }}</span>
+                  </span>
+                </td>
+
+                <!-- Actions -->
+                <td class="ci-td-actions">
+                  <div class="ci-actions-cluster">
+                    <button type="button" class="ci-action-circle" (click)="editArticle(a)" title="Edit article">
+                      <svg lucideEdit2 size="14"></svg>
+                    </button>
+                    <button type="button" class="ci-action-circle danger" (click)="deleteArticle(a)" title="Delete article">
+                      <svg lucideTrash2 size="14"></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
       </div>
-      <div class="ci-empty" *ngIf="!filteredArticles.length">No articles yet. The bot answers only from published articles (and open jobs on the careers page), so start with your most common questions.</div>
-      <table class="ci-table" *ngIf="filteredArticles.length">
-        <thead><tr><th>Title</th><th>Category</th><th>Views</th><th>Helpful</th><th>Status</th><th></th></tr></thead>
-        <tbody>
-          <tr *ngFor="let a of filteredArticles">
-            <td><a (click)="editArticle(a)">{{ a.title }}</a><div class="ci-tags"><span *ngFor="let t of a.tags">{{ t }}</span></div></td>
-            <td>{{ a.category?.name }}</td>
-            <td>{{ a.views }}</td>
-            <td>👍 {{ a.helpfulCount }} · 👎 {{ a.notHelpful }}</td>
-            <td><span class="ci-status" [attr.data-s]="a.isPublished ? 'OPEN' : 'CLOSED'">{{ a.isPublished ? 'Published' : 'Draft' }}</span></td>
-            <td class="ci-row-actions">
-              <button type="button" class="ci-icon" (click)="editArticle(a)" title="Edit"><svg lucideEdit2 size="14"></svg></button>
-              <button type="button" class="ci-icon" (click)="deleteArticle(a)" title="Delete"><svg lucideTrash2 size="14"></svg></button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+    </main>
+
   </div>
 
-  <div class="ci-editor" *ngIf="tab === 'kb' && editingArticle">
-    <div class="ci-editor-head">
-      <button type="button" class="ci-btn" (click)="editingArticle = null"><svg lucideChevronLeft size="15"></svg> Back</button>
-      <b>{{ editingArticle.id ? 'Edit article' : 'New article' }}</b>
-      <button type="button" class="ci-btn primary" (click)="saveArticle()" [disabled]="kbSaving"><svg lucideSave size="15"></svg> {{ kbSaving ? 'Saving…' : 'Save' }}</button>
+  <!-- ══════════════ ARTICLE STUDIO EDITOR ══════════════ -->
+  <div class="ci-article-studio" *ngIf="tab === 'kb' && editingArticle">
+    
+    <!-- Top Action Nav -->
+    <div class="ci-studio-top-nav">
+      <div class="ci-studio-top-left">
+        <button type="button" class="ci-btn-back-link" (click)="editingArticle = null">
+          <svg lucideChevronLeft size="16"></svg>
+          <span>Back to Articles</span>
+        </button>
+        <div class="ci-studio-divider"></div>
+        <div class="ci-studio-title-badge">
+          <b>{{ editingArticle.id ? 'Edit Article' : 'New Article' }}</b>
+          <span class="ci-status-indicator-mini" [class.published]="editingArticle.isPublished">
+            {{ editingArticle.isPublished ? 'Live in Widget' : 'Draft' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="ci-studio-top-right">
+        <button type="button" class="ci-btn-studio-cancel" (click)="editingArticle = null">
+          Cancel
+        </button>
+        <button 
+          type="button" 
+          class="ci-btn-studio-save" 
+          (click)="saveArticle()" 
+          [disabled]="kbSaving || !editingArticle.title?.trim()">
+          <svg lucideSave size="15" *ngIf="!kbSaving"></svg>
+          <div class="spinner-small" *ngIf="kbSaving"></div>
+          <span>{{ kbSaving ? 'Saving…' : (editingArticle.isPublished ? 'Save & Publish' : 'Save as Draft') }}</span>
+        </button>
+      </div>
     </div>
-    <div class="ci-editor-grid">
-      <label>Title<input [(ngModel)]="editingArticle.title" placeholder="e.g. How do I apply for a job?"></label>
-      <label>Category
-        <select [(ngModel)]="editingArticle.categoryId">
-          <option *ngFor="let c of categories" [ngValue]="c.id">{{ c.name }}</option>
-        </select>
-      </label>
-      <label class="wide">Short summary <small>(shown in the article list)</small><input [(ngModel)]="editingArticle.excerpt"></label>
-      <label class="wide">Content <small>(Markdown: **bold**, - bullet lists, [link](https://…))</small>
-        <textarea [(ngModel)]="editingArticle.content" rows="16"></textarea>
-      </label>
-      <label>Tags <small>(comma-separated; help search)</small><input [(ngModel)]="editingArticle.tagsText" placeholder="apply, resume, careers"></label>
-      <label class="ci-check inline"><input type="checkbox" [(ngModel)]="editingArticle.isPublished"> Published</label>
+
+    <!-- 2-Column Studio Grid -->
+    <div class="ci-studio-grid">
+      
+      <!-- Left Column: Main Article Composition (Title, Summary, Rich Content) -->
+      <div class="ci-studio-main-col">
+        
+        <!-- Title Input Card -->
+        <div class="ci-studio-card ci-title-card">
+          <label class="ci-studio-label">
+            <span>Article Title</span>
+            <span class="text-danger">*</span>
+          </label>
+          <input 
+            type="text" 
+            class="ci-studio-title-input" 
+            [(ngModel)]="editingArticle.title" 
+            placeholder="e.g. How does the hiring process work at CES?" 
+            autofocus 
+          />
+        </div>
+
+        <!-- Short Summary Excerpt Card -->
+        <div class="ci-studio-card">
+          <div class="ci-studio-label-row">
+            <label class="ci-studio-label">Short Summary</label>
+            <span class="ci-label-hint">Shown in search suggestions and AI citation cards</span>
+          </div>
+          <input 
+            type="text" 
+            class="ci-studio-input" 
+            [(ngModel)]="editingArticle.excerpt" 
+            placeholder="Brief 1-2 sentence overview of the answer or policy..." 
+          />
+        </div>
+
+        <!-- Rich Markdown Content Editor Card -->
+        <div class="ci-studio-card ci-content-card">
+          <!-- Editor Sub-Header: Mode Tabs & Toolbar -->
+          <div class="ci-editor-subhead">
+            <!-- Mode Switch Tabs -->
+            <div class="ci-mode-tabs">
+              <button 
+                type="button" 
+                class="ci-mode-tab" 
+                [class.active]="articleEditorTab === 'write'" 
+                (click)="articleEditorTab = 'write'">
+                <svg lucideEdit2 size="13"></svg>
+                <span>Write</span>
+              </button>
+              <button 
+                type="button" 
+                class="ci-mode-tab" 
+                [class.active]="articleEditorTab === 'preview'" 
+                (click)="articleEditorTab = 'preview'">
+                <svg lucideEye size="13"></svg>
+                <span>Live Preview</span>
+              </button>
+            </div>
+
+            <!-- Markdown Quick Toolbar (Visible in Write Mode) -->
+            <div class="ci-markdown-toolbar" *ngIf="articleEditorTab === 'write'">
+              <button type="button" class="ci-md-tool-btn" (click)="insertMarkdown('**', '**')" title="Bold (Ctrl+B)">
+                <svg lucideBold size="13"></svg>
+              </button>
+              <button type="button" class="ci-md-tool-btn" (click)="insertMarkdown('*', '*')" title="Italic (Ctrl+I)">
+                <svg lucideItalic size="13"></svg>
+              </button>
+              <button type="button" class="ci-md-tool-btn text-tool" (click)="insertMarkdown('## ')" title="Heading 2">
+                H2
+              </button>
+              <button type="button" class="ci-md-tool-btn text-tool" (click)="insertMarkdown('### ')" title="Heading 3">
+                H3
+              </button>
+              <div class="ci-md-divider"></div>
+              <button type="button" class="ci-md-tool-btn" (click)="insertMarkdown('- ')" title="Bullet List">
+                <svg lucideList size="14"></svg>
+              </button>
+              <button type="button" class="ci-md-tool-btn" (click)="insertMarkdown('[Link text](', ')')" title="Insert Link">
+                <svg lucideLink size="13"></svg>
+              </button>
+              <button type="button" class="ci-md-tool-btn" (click)="insertMarkdown('`', '`')" title="Code">
+                <svg lucideCode size="13"></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Write Mode: Crisp Monospaced Textarea -->
+          <div class="ci-write-container" *ngIf="articleEditorTab === 'write'">
+            <textarea 
+              id="kb-article-content-area"
+              class="ci-studio-textarea" 
+              [(ngModel)]="editingArticle.content" 
+              rows="16" 
+              placeholder="Write your article in Markdown...&#10;&#10;## Overview&#10;Explain the topic clearly.&#10;&#10;### Key Steps&#10;- Step 1: Submit your resume&#10;- Step 2: Technical review&#10;&#10;For more info, visit [our careers portal](https://www.ces-pl.com/careers).">
+            </textarea>
+            
+            <!-- Quick Markdown Cheatsheet Footer -->
+            <div class="ci-md-footer-hints">
+              <span class="ci-hint-title">Formatting tips:</span>
+              <code>**bold**</code>
+              <code>*italic*</code>
+              <code>## Heading</code>
+              <code>- list</code>
+              <code>[title](url)</code>
+              <code>`code`</code>
+            </div>
+          </div>
+
+          <!-- Live Preview Mode -->
+          <div class="ci-preview-container" *ngIf="articleEditorTab === 'preview'">
+            <div class="ci-preview-rendered" [innerHTML]="renderMarkdown(editingArticle.content)"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Settings & AI Optimization Sidebar -->
+      <div class="ci-studio-side-col">
+        
+        <!-- Card 1: Publishing & Status -->
+        <div class="ci-studio-card">
+          <div class="ci-side-card-title">
+            <svg lucideCheckCircle2 size="16"></svg>
+            <span>Publishing & Status</span>
+          </div>
+
+          <div class="ci-publish-switch-box">
+            <label class="ci-switch-label">
+              <input type="checkbox" [(ngModel)]="editingArticle.isPublished" />
+              <span class="ci-switch-slider"></span>
+              <span class="ci-switch-text">
+                <b>{{ editingArticle.isPublished ? 'Published & Active' : 'Draft Only' }}</b>
+                <small>{{ editingArticle.isPublished ? 'Visible to visitors and indexed for AI bot' : 'Hidden from chatbot and website visitors' }}</small>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Card 2: Category Assignment -->
+        <div class="ci-studio-card">
+          <div class="ci-side-card-title">
+            <svg lucideFolder size="16"></svg>
+            <span>Category</span>
+          </div>
+          <p class="ci-side-card-desc">Group this article to help visitors browse related topics.</p>
+          
+          <div class="ci-select-wrapper">
+            <select class="ci-studio-select" [(ngModel)]="editingArticle.categoryId">
+              <option *ngFor="let c of categories" [ngValue]="c.id">
+                {{ c.name }} ({{ c._count?.articles || 0 }} articles)
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Card 3: Search Tags & Keywords -->
+        <div class="ci-studio-card">
+          <div class="ci-side-card-title">
+            <svg lucideTag size="16"></svg>
+            <span>Search Tags</span>
+          </div>
+          <p class="ci-side-card-desc">Comma-separated keywords help the search bar and AI semantic engine match queries.</p>
+          
+          <input 
+            type="text" 
+            class="ci-studio-input" 
+            [(ngModel)]="editingArticle.tagsText" 
+            placeholder="e.g. interview, resume, notice, salary" 
+          />
+
+          <!-- Live Tag Chips Preview -->
+          <div class="ci-studio-tags-preview" *ngIf="getParsedTags().length">
+            <span class="ci-preview-tag-pill" *ngFor="let t of getParsedTags()">
+              #{{ t }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Card 4: AI Training / Grounding Tip -->
+        <div class="ci-ai-assistant-tip-card">
+          <div class="ci-ai-tip-header">
+            <div class="ci-ai-tip-icon">
+              <svg lucideSparkles size="16"></svg>
+            </div>
+            <b>AI Chatbot Citation</b>
+          </div>
+          <p>The CES AI assistant quotes from this article when website visitors ask questions matching these topics. Use clear headers and concise answers for best results.</p>
+        </div>
+
+      </div>
+
     </div>
+
   </div>
 
   <!-- ══════════════ WIDGETS ══════════════ -->
@@ -233,6 +673,10 @@
             <button type="button" class="ci-btn ci-btn-edit" (click)="editingWidget = { ...w }">
               <svg lucideEdit2 size="14"></svg>
               <span>Edit Widget</span>
+            </button>
+            <button type="button" class="ci-btn ci-btn-delete" (click)="deleteWidget(w)" [disabled]="deletingWidgetId === w.id">
+              <svg lucideTrash2 size="14"></svg>
+              <span>{{ deletingWidgetId === w.id ? 'Deleting…' : 'Delete' }}</span>
             </button>
           </div>
         </div>

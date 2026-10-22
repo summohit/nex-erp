@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { HotToastService } from '@ngneat/hot-toast';
 import { environment } from '../../../environments/environment';
 import { PermissionsService } from '../../services/permissions.service';
@@ -10,6 +11,9 @@ import {
   LucideMessageCircle, LucideSearch, LucidePlus, LucideTrash2, LucideSave, LucideCopy,
   LucideEdit2, LucideFileText, LucideChevronLeft, LucideExternalLink,
   LucideSparkles, LucideGlobe, LucideCode, LucideCheck, LucideUpload, LucideCamera,
+  LucideFolder, LucideFolderPlus, LucideBookOpen, LucideEye, LucideEyeOff,
+  LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
+  LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
 } from '@lucide/angular';
 
 type Tab = 'inbox' | 'kb' | 'widgets';
@@ -22,6 +26,9 @@ type Tab = 'inbox' | 'kb' | 'widgets';
     LucideMessageCircle, LucideSearch, LucidePlus, LucideTrash2, LucideSave, LucideCopy,
     LucideEdit2, LucideFileText, LucideChevronLeft, LucideExternalLink,
     LucideSparkles, LucideGlobe, LucideCode, LucideCheck, LucideUpload, LucideCamera,
+    LucideFolder, LucideFolderPlus, LucideBookOpen, LucideEye, LucideEyeOff,
+    LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
+    LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
   ],
   templateUrl: './chat-inbox.html',
   styleUrls: ['./chat-inbox.css'],
@@ -32,6 +39,7 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private toast = inject(HotToastService);
   private permissions = inject(PermissionsService);
+  private sanitizer = inject(DomSanitizer);
   private api = `${environment.apiUrl}/chat`;
 
   @ViewChild('thread') threadEl?: ElementRef<HTMLDivElement>;
@@ -213,6 +221,21 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   // ═══ Knowledge base ═══
 
+  articleEditorTab: 'write' | 'preview' = 'write';
+
+  get totalArticlesCount(): number {
+    if (this.categories.length) {
+      return this.categories.reduce((acc, c) => acc + (c._count?.articles || 0), 0);
+    }
+    return this.articles.length;
+  }
+
+  get activeCategoryName(): string {
+    if (!this.kbCategoryFilter) return 'All Articles';
+    const c = this.categories.find(cat => cat.id === this.kbCategoryFilter);
+    return c ? c.name : 'Articles';
+  }
+
   loadCategories() {
     this.http.get<any[]>(`${this.api}/kb/categories`).subscribe({
       next: (r) => (this.categories = r),
@@ -230,7 +253,15 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   get filteredArticles() {
     const q = this.kbSearch.trim().toLowerCase();
-    return q ? this.articles.filter((a) => a.title.toLowerCase().includes(q) || a.tags?.some((t: string) => t.includes(q))) : this.articles;
+    return q ? this.articles.filter((a) =>
+      a.title?.toLowerCase().includes(q) ||
+      a.excerpt?.toLowerCase().includes(q) ||
+      a.tags?.some((t: string) => t.toLowerCase().includes(q))
+    ) : this.articles;
+  }
+
+  clearKbSearch() {
+    this.kbSearch = '';
   }
 
   newCategory() {
@@ -258,12 +289,80 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   }
 
   newArticle() {
-    if (!this.categories.length) { this.toast.error('Create a category first.'); return; }
-    this.editingArticle = { title: '', content: '', excerpt: '', tagsText: '', isPublished: true, categoryId: this.kbCategoryFilter || this.categories[0].id };
+    if (!this.categories.length) {
+      this.toast.info('Please create a category first to organize your articles.');
+      this.newCategory();
+      return;
+    }
+    this.articleEditorTab = 'write';
+    this.editingArticle = {
+      title: '',
+      content: '',
+      excerpt: '',
+      tagsText: '',
+      isPublished: true,
+      categoryId: this.kbCategoryFilter || this.categories[0].id
+    };
   }
 
   editArticle(a: any) {
+    this.articleEditorTab = 'write';
     this.editingArticle = { ...a, tagsText: (a.tags || []).join(', ') };
+  }
+
+  getParsedTags(): string[] {
+    if (!this.editingArticle?.tagsText) return [];
+    return this.editingArticle.tagsText
+      .split(',')
+      .map((t: string) => t.trim())
+      .filter((t: string) => !!t);
+  }
+
+  insertMarkdown(prefix: string, suffix: string = '') {
+    const el = document.getElementById('kb-article-content-area') as HTMLTextAreaElement | null;
+    if (!el || !this.editingArticle) return;
+    const start = el.selectionStart || 0;
+    const end = el.selectionEnd || 0;
+    const text = this.editingArticle.content || '';
+    const selected = text.substring(start, end);
+    const replacement = prefix + (selected || 'text') + suffix;
+    this.editingArticle.content = text.substring(0, start) + replacement + text.substring(end);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + prefix.length, start + prefix.length + (selected ? selected.length : 4));
+    }, 10);
+  }
+
+  renderMarkdown(md: string): SafeHtml {
+    if (!md || !md.trim()) {
+      return this.sanitizer.bypassSecurityTrustHtml('<div class="ci-preview-placeholder">Nothing to preview yet. Start typing in the Write tab...</div>');
+    }
+    let html = md
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    // Headings
+    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+    // Bold & italic
+    html = html.replace(/\*\*\*(.*?)\*\*\*/gim, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
+    html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>');
+    // Inline code
+    html = html.replace(/`([^`]+)`/gim, '<code>$1</code>');
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    // Bullet list items
+    html = html.replace(/^\s*[-*]\s+(.*$)/gim, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>)/gims, '<ul>$1</ul>');
+    // Blockquotes
+    html = html.replace(/^\>\s+(.*$)/gim, '<blockquote>$1</blockquote>');
+    // Paragraphs
+    html = html.replace(/\n\n+/g, '</p><p>');
+    html = '<p>' + html.replace(/\n/g, '<br>') + '</p>';
+    html = html.replace(/<p><\/p>/g, '').replace(/<p><br><\/p>/g, '');
+    return this.sanitizer.bypassSecurityTrustHtml(html);
   }
 
   saveArticle() {
@@ -345,6 +444,21 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     req.subscribe({
       next: () => { this.widgetSaving = false; this.editingWidget = null; this.loadWidgets(); this.toast.success('Widget saved.'); },
       error: (e) => { this.widgetSaving = false; this.toast.error(e?.error?.message || 'Failed to save widget.'); },
+    });
+  }
+
+  deletingWidgetId: number | null = null;
+
+  deleteWidget(w: any) {
+    const chats = w._count?.conversations || 0;
+    const warning = chats
+      ? `Delete "${w.name}"? Its ${chats} chat${chats === 1 ? '' : 's'} will be deleted too, and any site using its embed script will stop showing the chat. This cannot be undone.`
+      : `Delete "${w.name}"? Any site using its embed script will stop showing the chat. This cannot be undone.`;
+    if (!confirm(warning)) return;
+    this.deletingWidgetId = w.id;
+    this.http.delete(`${this.api}/widgets/${w.id}`).subscribe({
+      next: () => { this.deletingWidgetId = null; this.loadWidgets(); this.toast.success('Widget deleted.'); },
+      error: (e) => { this.deletingWidgetId = null; this.toast.error(e?.error?.message || 'Failed to delete widget.'); },
     });
   }
 
