@@ -115,7 +115,7 @@
             <label class="toggle-switch">
               <input
                 type="checkbox"
-                [disabled]="cat.superadminOnly && !isSuperadmin"
+                [disabled]="!!cat.superadminOnly && !isSuperadmin"
                 [ngModel]="cat.enabled"
                 (ngModelChange)="toggleCategory(cat, $event)">
               <span class="slider"></span>
@@ -131,7 +131,7 @@
               <label class="toggle-switch">
                 <input
                   type="checkbox"
-                  [disabled]="cat.superadminOnly && !isSuperadmin"
+                  [disabled]="!!cat.superadminOnly && !isSuperadmin"
                   [ngModel]="sub.enabled"
                   (ngModelChange)="toggleSubItem(sub, cat, $event)">
                 <span class="slider"></span>
