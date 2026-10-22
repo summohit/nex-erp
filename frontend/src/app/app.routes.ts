@@ -408,12 +408,16 @@ export const routes: Routes = [
         data: { module: 'crm/leads' },
         loadComponent: () => import('./crm/leads-dashboard/leads-dashboard').then(m => m.LeadsDashboardComponent)
       },
-      {
-        path: 'crm/chat-inbox',
+      // Website Chat has its own sidebar group; each tab is its own route so
+      // the sidebar can highlight it. Old /crm/chat-inbox links still land.
+      { path: 'crm/chat-inbox', redirectTo: 'website-chat/inbox' },
+      { path: 'website-chat', pathMatch: 'full', redirectTo: 'website-chat/inbox' },
+      ...(['inbox', 'knowledge-base', 'widgets'] as const).map(tab => ({
+        path: `website-chat/${tab}`,
         canActivate: [permissionGuard],
-        data: { module: 'crm/leads' },
+        data: { module: 'crm/leads', tab },
         loadComponent: () => import('./crm/chat-inbox/chat-inbox.component').then(m => m.ChatInboxComponent)
-      },
+      })),
       {
         path: 'crm/lead-forms',
         canActivate: [permissionGuard],

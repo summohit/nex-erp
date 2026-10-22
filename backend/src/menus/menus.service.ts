@@ -340,10 +340,33 @@ export class MenusService implements OnModuleInit {
           });
           this.logger.log('Lead Forms menu auto-seeded successfully.');
         }
-        const chatMenu = await this.prisma.menu.findFirst({ where: { title: 'Website Chat', parentId: crmSection.id } });
-        if (!chatMenu) {
-          await this.prisma.menu.create({
-            data: { title: 'Website Chat', route: '/crm/chat-inbox', displayOrder: 21, parentId: crmSection.id, isActive: true },
+        // Website Chat moved out of CRM into its own sidebar group (22 Oct 2026).
+        await this.prisma.menu.updateMany({
+          where: { route: '/crm/chat-inbox', isActive: true },
+          data: { isActive: false },
+        });
+        let chatGroup = await this.prisma.menu.findFirst({
+          where: { title: 'Website Chat', parentId: crmSection.parentId },
+        });
+        if (!chatGroup) {
+          chatGroup = await this.prisma.menu.create({
+            data: {
+              title: 'Website Chat',
+              icon: 'message-circle',
+              displayOrder: crmSection.displayOrder,
+              parentId: crmSection.parentId,
+              isActive: true,
+            },
+          });
+          const tabs = [
+            ['Inbox', '/website-chat/inbox'],
+            ['Knowledge Base', '/website-chat/knowledge-base'],
+            ['Widgets', '/website-chat/widgets'],
+          ];
+          await this.prisma.menu.createMany({
+            data: tabs.map(([title, route], i) => ({
+              title, route, displayOrder: i + 1, parentId: chatGroup!.id, isActive: true,
+            })),
           });
           this.logger.log('Website Chat menu auto-seeded successfully.');
         }

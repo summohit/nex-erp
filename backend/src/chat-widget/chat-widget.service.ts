@@ -186,7 +186,7 @@ export class ChatWidgetService {
             title: `New chat message from ${conversation.visitorName || 'a visitor'}`,
             message: text.slice(0, 140),
             type: 'CHAT',
-            linkUrl: `/crm/chat-inbox?c=${conversationId}`,
+            linkUrl: `/website-chat/inbox?c=${conversationId}`,
           })
           .catch(() => {});
       }
@@ -391,7 +391,7 @@ export class ChatWidgetService {
           title: 'Website chat assigned to you',
           message: `${conversation.visitorName || 'A visitor'} is waiting for a reply.`,
           type: 'CHAT',
-          linkUrl: `/crm/chat-inbox?c=${id}`,
+          linkUrl: `/website-chat/inbox?c=${id}`,
           excludeEmployeeId: employeeId,
         })
         .catch(() => {});

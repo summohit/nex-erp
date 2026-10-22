@@ -80,6 +80,7 @@
                   <ng-container *ngSwitchCase="'map-pin'"><svg lucideMapPin class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'megaphone'"><svg lucideMegaphone class="nav-icon" size="20"></svg></ng-container>
                   <ng-container *ngSwitchCase="'check-circle'"><svg lucideCheckCircle2 class="nav-icon" size="20"></svg></ng-container>
+                  <ng-container *ngSwitchCase="'message-circle'"><svg lucideMessageCircle class="nav-icon" size="20"></svg></ng-container>
                 </ng-container>
                 <span class="nav-label">{{ item.title }}</span>
                 <span class="module-status-badge badge-wip" *ngIf="getModuleStatus(item.title) === 'WIP'">WIP</span>

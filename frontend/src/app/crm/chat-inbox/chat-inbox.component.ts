@@ -68,15 +68,16 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   widgetSaving = false;
 
   ngOnInit() {
-    const qp = this.route.snapshot.queryParamMap;
-    const t = qp.get('tab') as Tab | null;
-    if (t === 'kb' || t === 'widgets') this.tab = t;
-    const c = Number(qp.get('c'));
+    // Each tab is its own route (sidebar: Website Chat → Inbox / Knowledge
+    // Base / Widgets), so switching tabs creates a fresh component.
+    const routeTab = this.route.snapshot.data['tab'];
+    this.tab = routeTab === 'knowledge-base' ? 'kb' : routeTab === 'widgets' ? 'widgets' : 'inbox';
+    const c = Number(this.route.snapshot.queryParamMap.get('c'));
     if (c) {
       this.statusFilter = '';
       this.open(c);
     }
-    this.setTab(this.tab);
+    this.load(this.tab);
     this.schedulePoll();
   }
 
@@ -85,8 +86,11 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   }
 
   setTab(t: Tab) {
-    this.tab = t;
-    this.router.navigate([], { queryParams: { tab: t === 'inbox' ? null : t }, queryParamsHandling: 'merge', replaceUrl: true });
+    if (t === this.tab) return;
+    this.router.navigate(['/website-chat', t === 'kb' ? 'knowledge-base' : t]);
+  }
+
+  private load(t: Tab) {
     if (t === 'inbox') this.loadInbox();
     if (t === 'kb') { this.loadCategories(); this.loadArticles(); }
     if (t === 'widgets') this.loadWidgets();
