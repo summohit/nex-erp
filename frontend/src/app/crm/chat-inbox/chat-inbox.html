@@ -430,7 +430,7 @@
             <div class="ci-bubble-wrapper">
               <div class="ci-msg-header">
                 <span class="ci-msg-sender-name">{{ m.senderName || selected.visitorName || 'Visitor' }}</span>
-                <span class="ci-msg-time">{{ m.createdAt | date: 'HH:mm' }}</span>
+                <span class="ci-msg-time">{{ m.createdAt | date: 'EEE hh:mm a' }}</span>
               </div>
               <div class="ci-bubble visitor">
                 <div [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
@@ -443,7 +443,7 @@
           <div class="ci-msg-row agent" *ngIf="m.senderType === 'AGENT'">
             <div class="ci-bubble-wrapper">
               <div class="ci-msg-header">
-                <span class="ci-msg-time">{{ m.createdAt | date: 'HH:mm' }}</span>
+                <span class="ci-msg-time">{{ m.createdAt | date: 'EEE hh:mm a' }}</span>
                 <span class="ci-msg-sender-name">{{ m.senderName || 'You' }}</span>
               </div>
               <div class="ci-bubble agent">
@@ -469,7 +469,7 @@
                   <svg lucideSparkles size="12"></svg>
                   <span>{{ m.senderName || 'MIRA Bot' }}</span>
                 </span>
-                <span class="ci-msg-time">{{ m.createdAt | date: 'HH:mm' }}</span>
+                <span class="ci-msg-time">{{ m.createdAt | date: 'EEE hh:mm a' }}</span>
               </div>
               <div class="ci-bubble bot">
                 <div [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
@@ -1548,13 +1548,45 @@
 
                 <!-- Body -->
                 <div class="ci-wm-body">
-                  <div class="ci-wm-bot-bubble-wrap">
-                    <div class="ci-wm-bot-avatar-mini" [style.background]="editingWidget.primaryColor || '#0284c7'">
+                  <div class="ci-wm-date-divider">
+                    <span class="ci-wm-date-pill">Today</span>
+                  </div>
+
+                  <!-- Bot Greeting Bubble with Avatar & Time -->
+                  <div class="ci-wm-bot-row">
+                    <div class="ci-wm-bot-avatar-mini" [style.background]="'#f2cb67'">
                       <img *ngIf="editingWidget.botAvatarUrl" [src]="editingWidget.botAvatarUrl" alt="Bot" (error)="editingWidget.botAvatarUrl = ''" />
-                      <span *ngIf="!editingWidget.botAvatarUrl">{{ (editingWidget.botName || 'C')[0] }}</span>
+                      <span *ngIf="!editingWidget.botAvatarUrl" style="color: #5c42fd; font-size: 12px; font-weight: 700;">🤖</span>
                     </div>
-                    <div class="ci-wm-bubble">
-                      {{ editingWidget.greetingMessage || 'Hi there! How can we help you today?' }}
+                    <div class="ci-wm-msg-col">
+                      <div class="ci-wm-bubble bot">
+                        {{ editingWidget.greetingMessage || 'Hey I\'m Mia. Share one goal (e.g., \'reduce ticket volumes\'), and I\'ll get you a demo + a success plan.' }}
+                      </div>
+                      <span class="ci-wm-ts">Thu 12:12 PM</span>
+                    </div>
+                  </div>
+
+                  <!-- Visitor Sample Bubble -->
+                  <div class="ci-wm-visitor-row">
+                    <div class="ci-wm-msg-col right">
+                      <div class="ci-wm-bubble visitor">
+                        hello
+                      </div>
+                      <span class="ci-wm-ts right">Thu 12:18 PM</span>
+                    </div>
+                  </div>
+
+                  <!-- Bot Follow-up Bubble -->
+                  <div class="ci-wm-bot-row">
+                    <div class="ci-wm-bot-avatar-mini" [style.background]="'#f2cb67'">
+                      <img *ngIf="editingWidget.botAvatarUrl" [src]="editingWidget.botAvatarUrl" alt="Bot" (error)="editingWidget.botAvatarUrl = ''" />
+                      <span *ngIf="!editingWidget.botAvatarUrl" style="color: #5c42fd; font-size: 12px; font-weight: 700;">🤖</span>
+                    </div>
+                    <div class="ci-wm-msg-col">
+                      <div class="ci-wm-bubble bot">
+                        Hey there! I'd greet you by name, but you're a mystery. What's your name, Sherlock?
+                      </div>
+                      <span class="ci-wm-ts">Thu 12:18 PM</span>
                     </div>
                   </div>
 
