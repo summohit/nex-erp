@@ -168,6 +168,8 @@ export class PermissionsService implements OnModuleInit {
         department: u.employee?.department?.name || null,
         // Inactive in this app means a SUSPENDED account (see timesheets.service).
         isActive: u.status !== 'SUSPENDED',
+        // Chat alerts go to employees, so a login without a profile gets none.
+        hasEmployee: !!u.employee,
         fromRole,
         override: override === undefined ? null : override,
         hasAccess: u.role === 'SUPERADMIN' ? true : override ?? fromRole,

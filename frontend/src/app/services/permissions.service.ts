@@ -80,6 +80,7 @@ export interface WebsiteChatUserAccess {
   designation?: string | null;
   department?: string | null;
   isActive: boolean;
+  hasEmployee: boolean;
   fromRole: boolean;
   override: boolean | null;
   hasAccess: boolean;

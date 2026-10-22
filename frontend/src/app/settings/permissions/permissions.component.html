@@ -166,10 +166,10 @@
           <h2>Website Chat Access</h2>
           <p>Website Chat is private to Super Admins by default. Add team members below to unlock the live chat inbox in their sidebar.</p>
         </div>
-        <div class="chat-access-stats" *ngIf="!isLoadingChatUsers && shownChatUsers.length > 0">
+        <div class="chat-access-stats" *ngIf="!isLoadingChatUsers && (shownChatUsers.length + defaultChatAdmins.length) > 0">
           <span class="chat-stat-pill">
             <svg lucideUsers size="14"></svg>
-            <strong>{{ shownChatUsers.length }}</strong> Authorized Member{{ shownChatUsers.length === 1 ? '' : 's' }}
+            <strong>{{ shownChatUsers.length + defaultChatAdmins.length }}</strong> Authorized Member{{ (shownChatUsers.length + defaultChatAdmins.length) === 1 ? '' : 's' }}
           </span>
         </div>
       </div>
@@ -295,6 +295,7 @@
                 <div class="chat-member-details">
                   <strong class="chat-member-name">{{ u.name }}</strong>
                   <span class="chat-member-email">{{ u.email }}</span>
+                  <span class="chat-no-alerts" *ngIf="!u.hasEmployee">No employee profile — gets no chat alerts</span>
                 </div>
               </div>
             </td>
@@ -335,8 +336,46 @@
             </td>
           </tr>
 
+          <!-- Super admins: access by default, can't be removed here -->
+          <tr *ngFor="let u of defaultChatAdmins" class="chat-user-row chat-default-row">
+            <td>
+              <div class="chat-member-cell">
+                <div class="chat-avatar-wrap">
+                  <img *ngIf="u.avatarUrl" [src]="u.avatarUrl" (error)="u.avatarUrl = null" class="chat-avatar-img" [alt]="u.name || u.email" />
+                  <div *ngIf="!u.avatarUrl" class="chat-avatar-fallback" [style.background-color]="getAvatarBg(u.name || u.email)">
+                    {{ getInitials(u.name || u.email) }}
+                  </div>
+                </div>
+                <div class="chat-member-details">
+                  <strong class="chat-member-name">{{ u.name }}</strong>
+                  <span class="chat-member-email">{{ u.email }}</span>
+                  <span class="chat-no-alerts" *ngIf="!u.hasEmployee">No employee profile — gets no chat alerts</span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="chat-role-badge" [ngClass]="getRoleBadgeClass(u.role)">{{ u.role }}</span>
+            </td>
+            <td>
+              <div class="chat-dept-cell">
+                <span class="chat-desig-text" *ngIf="u.designation">{{ u.designation }}</span>
+                <span class="chat-dept-text" *ngIf="u.department">{{ u.department }}</span>
+                <span class="chat-meta-na" *ngIf="!u.designation && !u.department">—</span>
+              </div>
+            </td>
+            <td>
+              <span class="chat-status-pill">
+                <span class="chat-status-dot"></span>
+                <span>Visible</span>
+              </span>
+            </td>
+            <td class="text-right">
+              <span class="chat-default-tag" title="Super Admins always have Website Chat">Default access</span>
+            </td>
+          </tr>
+
           <!-- Empty State -->
-          <tr *ngIf="shownChatUsers.length === 0">
+          <tr *ngIf="shownChatUsers.length === 0 && defaultChatAdmins.length === 0">
             <td colspan="5" class="chat-empty-state-cell">
               <div class="chat-empty-state">
                 <div class="chat-empty-icon-box">

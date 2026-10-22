@@ -184,6 +184,11 @@ export class PermissionsComponent implements OnInit {
     return this.chatUsers.filter(u => u.override === true);
   }
 
+  /** Super admins always have Website Chat — listed so it's clear who else gets chat alerts. */
+  get defaultChatAdmins(): WebsiteChatUserAccess[] {
+    return this.chatUsers.filter(u => u.role === 'SUPERADMIN' && u.isActive);
+  }
+
   /** Search results for "Add person": active people not already shown (super admins always have it). */
   get chatAddCandidates(): WebsiteChatUserAccess[] {
     const q = this.chatUserSearch.trim().toLowerCase();
