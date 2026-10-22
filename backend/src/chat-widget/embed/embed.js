@@ -120,6 +120,7 @@
     endChat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>',
     more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>',
     refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+    smile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>',
     clip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>',
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
   };
@@ -225,7 +226,10 @@
     '.btn:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.05);box-shadow:0 3px 8px rgba(15,23,42,.15)}',
     '.btn:disabled{opacity:.6;cursor:default}',
     '.err{color:#dc2626;font-size:12px}',
-    '.compose{display:flex;gap:8px;padding:12px 14px;border-top:1px solid #e2e8f0;background:#fff;align-items:flex-end}',
+    '.emoji-pop{position:absolute;bottom:64px;left:12px;right:12px;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;padding:8px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 12px 28px -6px rgba(15,23,42,.22);z-index:20;animation:menuPop .16s cubic-bezier(.16,1,.3,1) both}',
+    '.emoji{border:0;background:none;font-size:20px;line-height:1;padding:6px 0;border-radius:8px;cursor:pointer}.emoji:hover{background:#f1f5f9}',
+    '.dk .emoji-pop{background:#1e293b;border-color:#334155}.dk .emoji:hover{background:#334155}',
+    '.compose{position:relative;display:flex;gap:8px;padding:12px 14px;border-top:1px solid #e2e8f0;background:#fff;align-items:flex-end}',
     '.compose textarea{flex:1;resize:none;border:1px solid #cbd5e1;border-radius:12px;padding:9px 12px;font-size:13.5px;line-height:1.45;max-height:110px;min-height:42px;outline:none;color:#0f172a;background:#f8fafc;transition:all .15s ease}',
     '.attach{width:38px;height:42px;border-radius:12px;border:0;background:transparent;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;transition:color .15s,background .15s}',
     '.attach svg{width:19px;height:19px}.attach:hover{color:var(--c);background:color-mix(in srgb,var(--c) 8%,transparent)}.attach:disabled{opacity:.4;cursor:default}',
@@ -425,6 +429,17 @@
   var panel, bodyEl, launcher, badgeEl, composeEl, composeEndedEl, inputEl, sendBtn, attachBtn, tabsEl;
   var ATTACH_ACCEPT = '.jpg,.jpeg,.png,.gif,.webp,.heic,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt';
   var MAX_ATTACH = 10 * 1024 * 1024;
+  var EMOJIS = '😀 😊 😂 🙂 😉 😍 🤔 😅 😢 😮 😎 🙏 👍 👎 👏 🙌 👋 🤝 💪 👀 ❤️ 🎉 ✅ ❌ ⭐ 🔥 💡 📎 📄 📞 📧 📅 ⏰ 💼 🚀'.split(' ');
+
+  /** Put text where the caret is (or at the end) and keep typing from there. */
+  function insertAtCursor(input, text) {
+    var start = input.selectionStart == null ? input.value.length : input.selectionStart;
+    var end = input.selectionEnd == null ? start : input.selectionEnd;
+    input.value = input.value.slice(0, start) + text + input.value.slice(end);
+    input.focus();
+    input.selectionStart = input.selectionEnd = start + text.length;
+    input.dispatchEvent(new Event('input'));
+  }
   var endBtn, moreBtn, soundBtn, menuPopover, confirmModal, teaserEl;
 
   function build() {
@@ -574,7 +589,26 @@
     attachBtn.setAttribute('aria-label', 'Attach a file');
     attachBtn.title = 'Attach an image or document (max 10 MB)';
     attachBtn.onclick = function () { fileInput.click(); };
-    composeEl.appendChild(fileInput); composeEl.appendChild(attachBtn);
+    var emojiBtn = el('button', 'attach', ICONS.smile);
+    emojiBtn.setAttribute('aria-label', 'Insert emoji');
+    emojiBtn.title = 'Emoji';
+    var emojiPop = el('div', 'emoji-pop');
+    emojiPop.style.display = 'none';
+    EMOJIS.forEach(function (e) {
+      var b = el('button', 'emoji', e);
+      b.type = 'button';
+      b.onclick = function () { insertAtCursor(inputEl, e); emojiPop.style.display = 'none'; };
+      emojiPop.appendChild(b);
+    });
+    emojiBtn.onclick = function (ev) {
+      ev.stopPropagation();
+      emojiPop.style.display = emojiPop.style.display === 'none' ? 'grid' : 'none';
+    };
+    panel.addEventListener('click', function (ev) {
+      if (emojiPop.style.display !== 'none' && !emojiPop.contains(ev.target)) emojiPop.style.display = 'none';
+    });
+    composeEl.appendChild(emojiPop);
+    composeEl.appendChild(fileInput); composeEl.appendChild(attachBtn); composeEl.appendChild(emojiBtn);
     composeEl.appendChild(inputEl); composeEl.appendChild(sendBtn);
 
     composeEndedEl = el('div', 'compose-ended');

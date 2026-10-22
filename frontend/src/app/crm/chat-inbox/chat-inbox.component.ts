@@ -17,7 +17,7 @@ import {
   LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
   LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
   LucideSend, LucideUser, LucideMail, LucidePhone, LucideBriefcase, LucideRotateCcw,
-  LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX, LucidePaperclip,
+  LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX, LucidePaperclip, LucideSmile,
   LucidePalette, LucidePipette
 } from '@lucide/angular';
 
@@ -35,7 +35,7 @@ type Tab = 'inbox' | 'kb' | 'widgets' | 'reports';
     LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
     LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
     LucideSend, LucideUser, LucideMail, LucidePhone, LucideBriefcase, LucideRotateCcw,
-    LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX, LucidePaperclip,
+    LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter, LucideVolume2, LucideVolumeX, LucidePaperclip, LucideSmile,
   LucidePalette, LucidePipette
   ],
   templateUrl: './chat-inbox.html',
@@ -474,6 +474,21 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     this.http.post<any>(`${this.api}/inbox/${this.selectedId}/reply`, { message }).subscribe({
       next: (r) => { this.reply = ''; this.sending = false; this.applyConversation(r); this.loadInbox(true); },
       error: (e) => { this.sending = false; this.toast.error(e?.error?.message || 'Failed to send.'); },
+    });
+  }
+
+  readonly emojis = '😀 😊 😂 🙂 😉 😍 🤔 😅 😢 😮 😎 🙏 👍 👎 👏 🙌 👋 🤝 💪 👀 ❤️ 🎉 ✅ ❌ ⭐ 🔥 💡 📎 📄 📞 📧 📅 ⏰ 💼 🚀'.split(' ');
+  emojiOpen = false;
+
+  /** Insert at the caret in the reply box, then keep focus there. */
+  insertEmoji(textarea: HTMLTextAreaElement, emoji: string) {
+    const start = textarea.selectionStart ?? this.reply.length;
+    const end = textarea.selectionEnd ?? start;
+    this.reply = this.reply.slice(0, start) + emoji + this.reply.slice(end);
+    this.emojiOpen = false;
+    setTimeout(() => {
+      textarea.focus();
+      textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
     });
   }
 

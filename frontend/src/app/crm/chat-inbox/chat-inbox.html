@@ -628,6 +628,7 @@
       <div class="ci-composer-card" *ngIf="!chatEnded">
         <div class="ci-composer-box">
           <textarea
+            #replyBox
             [(ngModel)]="reply"
             (keydown)="onReplyKey($event)"
             (input)="pingTyping()"
@@ -643,6 +644,14 @@
             </div>
 
             <div class="ci-composer-actions">
+              <div class="ci-emoji-wrap">
+                <button type="button" class="ci-attach-btn" (click)="emojiOpen = !emojiOpen" title="Emoji">
+                  <svg lucideSmile size="15"></svg>
+                </button>
+                <div class="ci-emoji-pop" *ngIf="emojiOpen">
+                  <button type="button" *ngFor="let e of emojis" (click)="insertEmoji(replyBox, e)">{{ e }}</button>
+                </div>
+              </div>
               <input #fileInput type="file" hidden [accept]="attachAccept" (change)="sendAttachment(fileInput)" />
               <button
                 type="button"
