@@ -340,6 +340,13 @@ export class MenusService implements OnModuleInit {
           });
           this.logger.log('Lead Forms menu auto-seeded successfully.');
         }
+        const chatMenu = await this.prisma.menu.findFirst({ where: { title: 'Website Chat', parentId: crmSection.id } });
+        if (!chatMenu) {
+          await this.prisma.menu.create({
+            data: { title: 'Website Chat', route: '/crm/chat-inbox', displayOrder: 21, parentId: crmSection.id, isActive: true },
+          });
+          this.logger.log('Website Chat menu auto-seeded successfully.');
+        }
       }
     } catch (err) {
       this.logger.error('Failed to auto-seed menus:', err);

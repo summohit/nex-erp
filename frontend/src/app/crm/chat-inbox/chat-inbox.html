@@ -1,0 +1,208 @@
+<div class="ci-page">
+  <div class="ci-header">
+    <div>
+      <h1>Website Chat</h1>
+      <p>Chats from the careers page and ces-pl.com, the help articles the bot answers from, and the widget itself.</p>
+    </div>
+    <div class="ci-tabs">
+      <button type="button" [class.on]="tab === 'inbox'" (click)="setTab('inbox')"><svg lucideMessageCircle size="15"></svg> Inbox</button>
+      <button type="button" [class.on]="tab === 'kb'" (click)="setTab('kb')"><svg lucideFileText size="15"></svg> Knowledge Base</button>
+      <button type="button" [class.on]="tab === 'widgets'" (click)="setTab('widgets')"><svg lucideEdit2 size="15"></svg> Widgets</button>
+    </div>
+  </div>
+
+  <!-- ══════════════ INBOX ══════════════ -->
+  <div class="ci-inbox" *ngIf="tab === 'inbox'">
+    <aside class="ci-list" [class.hide-mobile]="selected">
+      <div class="ci-list-tools">
+        <select [(ngModel)]="statusFilter" (change)="loadInbox()">
+          <option value="ACTIVE">Active</option>
+          <option value="OPEN">Waiting for team</option>
+          <option value="BOT">With bot</option>
+          <option value="RESOLVED">Resolved</option>
+          <option value="">All</option>
+        </select>
+        <label class="ci-check"><input type="checkbox" [(ngModel)]="mineOnly" (change)="loadInbox()"> Mine</label>
+      </div>
+      <div class="ci-empty" *ngIf="inboxLoading">Loading…</div>
+      <div class="ci-empty" *ngIf="!inboxLoading && !conversations.length">No chats here yet.</div>
+      <button type="button" class="ci-row" *ngFor="let c of conversations" [class.active]="c.id === selectedId" (click)="open(c.id)">
+        <div class="ci-row-top">
+          <b>{{ c.visitorName || 'Visitor #' + c.id }}</b>
+          <span class="ci-time">{{ c.lastMessageAt | date: 'dd MMM, HH:mm' }}</span>
+        </div>
+        <div class="ci-row-mid">{{ c.lastMessage?.senderType === 'VISITOR' ? '' : (c.lastMessage?.senderType === 'AGENT' ? 'You: ' : 'Bot: ') }}{{ c.lastMessage?.message }}</div>
+        <div class="ci-row-bot">
+          <span class="ci-status" [attr.data-s]="c.status">{{ statusLabel(c.status) }}</span>
+          <span class="ci-src">{{ c.source === 'CAREERS' ? 'Careers' : c.widgetConfig?.name }}</span>
+          <span class="ci-unread" *ngIf="c.unread">{{ c.unread }}</span>
+        </div>
+      </button>
+    </aside>
+
+    <section class="ci-thread-wrap" *ngIf="selected; else pick">
+      <div class="ci-thread-head">
+        <button type="button" class="ci-back" (click)="selected = null; selectedId = null"><svg lucideChevronLeft size="16"></svg></button>
+        <div class="ci-visitor">
+          <b>{{ selected.visitorName || 'Visitor #' + selected.id }}</b>
+          <span>
+            <ng-container *ngIf="selected.visitorEmail">{{ selected.visitorEmail }} · </ng-container>
+            <ng-container *ngIf="selected.visitorPhone">{{ selected.visitorPhone }} · </ng-container>
+            {{ statusLabel(selected.status) }}
+            <ng-container *ngIf="selected.assignedTo"> · {{ selected.assignedTo.firstName }} {{ selected.assignedTo.lastName }}</ng-container>
+          </span>
+          <a *ngIf="selected.pageUrl" [href]="selected.pageUrl" target="_blank" rel="noopener" class="ci-page-link">{{ selected.pageUrl }}</a>
+        </div>
+        <div class="ci-actions">
+          <button type="button" class="ci-btn" *ngIf="!selected.assignedTo" (click)="assignToMe()">Take chat</button>
+          <button type="button" class="ci-btn" (click)="convertToLead()" [disabled]="selected.leadContactId">{{ selected.leadContactId ? 'Lead saved' : 'Convert to lead' }}</button>
+          <button type="button" class="ci-btn" (click)="convertToTicket()" [disabled]="selected.ticketId">{{ selected.ticketId ? 'Ticket raised' : 'Create ticket' }}</button>
+          <button type="button" class="ci-btn primary" *ngIf="selected.status !== 'RESOLVED'" (click)="setStatus('RESOLVED')">Resolve</button>
+          <button type="button" class="ci-btn" *ngIf="selected.status === 'RESOLVED'" (click)="setStatus('OPEN')">Reopen</button>
+        </div>
+      </div>
+
+      <div class="ci-thread" #thread>
+        <ng-container *ngFor="let m of messages">
+          <div class="ci-sys" *ngIf="m.senderType === 'SYSTEM'">{{ m.message }}</div>
+          <div class="ci-msg" *ngIf="m.senderType !== 'SYSTEM'" [class.me]="m.senderType === 'AGENT'" [class.bot]="m.senderType === 'BOT'">
+            <div class="ci-who">{{ m.senderName }}<ng-container *ngIf="m.senderType === 'BOT'"> · Bot</ng-container> · {{ m.createdAt | date: 'HH:mm' }}</div>
+            <div class="ci-bubble">{{ m.message }}</div>
+            <div class="ci-cites" *ngIf="m.metadata?.articles?.length">
+              Cited: <span *ngFor="let a of m.metadata.articles; let last = last">{{ a.title }}{{ last ? '' : ', ' }}</span>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+
+      <div class="ci-canned">
+        <button type="button" *ngFor="let c of cannedReplies" (click)="useCanned(c)">{{ c }}</button>
+      </div>
+      <div class="ci-compose">
+        <textarea [(ngModel)]="reply" (keydown)="onReplyKey($event)" rows="2" placeholder="Reply to the visitor… (Enter to send, Shift+Enter for a new line)"></textarea>
+        <button type="button" class="ci-btn primary" (click)="sendReply()" [disabled]="sending || !reply.trim()">{{ sending ? 'Sending…' : 'Send' }}</button>
+      </div>
+    </section>
+    <ng-template #pick><section class="ci-thread-wrap ci-pick">Select a chat to read and reply.</section></ng-template>
+  </div>
+
+  <!-- ══════════════ KNOWLEDGE BASE ══════════════ -->
+  <div class="ci-kb" *ngIf="tab === 'kb' && !editingArticle">
+    <aside class="ci-cats">
+      <div class="ci-cats-head"><b>Categories</b><button type="button" class="ci-icon" (click)="newCategory()" title="New category"><svg lucidePlus size="15"></svg></button></div>
+      <button type="button" class="ci-cat" [class.on]="!kbCategoryFilter" (click)="kbCategoryFilter = null; loadArticles()">All articles</button>
+      <div class="ci-cat-row" *ngFor="let c of categories">
+        <button type="button" class="ci-cat" [class.on]="kbCategoryFilter === c.id" (click)="kbCategoryFilter = c.id; loadArticles()">
+          {{ c.name }} <small>{{ c._count?.articles }}</small><em *ngIf="!c.isPublic"> · hidden</em>
+        </button>
+        <button type="button" class="ci-icon" (click)="editingCategory = { ...c }" title="Edit"><svg lucideEdit2 size="13"></svg></button>
+        <button type="button" class="ci-icon" (click)="deleteCategory(c)" title="Delete"><svg lucideTrash2 size="13"></svg></button>
+      </div>
+
+      <form class="ci-form" *ngIf="editingCategory" (ngSubmit)="saveCategory()">
+        <input name="cn" [(ngModel)]="editingCategory.name" placeholder="Category name" required>
+        <input name="cd" [(ngModel)]="editingCategory.description" placeholder="Description (optional)">
+        <label class="ci-check"><input type="checkbox" name="cp" [(ngModel)]="editingCategory.isPublic"> Shown in the widget</label>
+        <div class="ci-form-actions">
+          <button type="button" class="ci-btn" (click)="editingCategory = null">Cancel</button>
+          <button type="submit" class="ci-btn primary">Save</button>
+        </div>
+      </form>
+    </aside>
+
+    <section class="ci-articles">
+      <div class="ci-articles-tools">
+        <div class="ci-search"><svg lucideSearch size="15"></svg><input [(ngModel)]="kbSearch" placeholder="Search articles…"></div>
+        <button type="button" class="ci-btn primary" (click)="newArticle()"><svg lucidePlus size="15"></svg> New article</button>
+      </div>
+      <div class="ci-empty" *ngIf="!filteredArticles.length">No articles yet. The bot answers only from published articles (and open jobs on the careers page), so start with your most common questions.</div>
+      <table class="ci-table" *ngIf="filteredArticles.length">
+        <thead><tr><th>Title</th><th>Category</th><th>Views</th><th>Helpful</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          <tr *ngFor="let a of filteredArticles">
+            <td><a (click)="editArticle(a)">{{ a.title }}</a><div class="ci-tags"><span *ngFor="let t of a.tags">{{ t }}</span></div></td>
+            <td>{{ a.category?.name }}</td>
+            <td>{{ a.views }}</td>
+            <td>👍 {{ a.helpfulCount }} · 👎 {{ a.notHelpful }}</td>
+            <td><span class="ci-status" [attr.data-s]="a.isPublished ? 'OPEN' : 'CLOSED'">{{ a.isPublished ? 'Published' : 'Draft' }}</span></td>
+            <td class="ci-row-actions">
+              <button type="button" class="ci-icon" (click)="editArticle(a)" title="Edit"><svg lucideEdit2 size="14"></svg></button>
+              <button type="button" class="ci-icon" (click)="deleteArticle(a)" title="Delete"><svg lucideTrash2 size="14"></svg></button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <div class="ci-editor" *ngIf="tab === 'kb' && editingArticle">
+    <div class="ci-editor-head">
+      <button type="button" class="ci-btn" (click)="editingArticle = null"><svg lucideChevronLeft size="15"></svg> Back</button>
+      <b>{{ editingArticle.id ? 'Edit article' : 'New article' }}</b>
+      <button type="button" class="ci-btn primary" (click)="saveArticle()" [disabled]="kbSaving"><svg lucideSave size="15"></svg> {{ kbSaving ? 'Saving…' : 'Save' }}</button>
+    </div>
+    <div class="ci-editor-grid">
+      <label>Title<input [(ngModel)]="editingArticle.title" placeholder="e.g. How do I apply for a job?"></label>
+      <label>Category
+        <select [(ngModel)]="editingArticle.categoryId">
+          <option *ngFor="let c of categories" [ngValue]="c.id">{{ c.name }}</option>
+        </select>
+      </label>
+      <label class="wide">Short summary <small>(shown in the article list)</small><input [(ngModel)]="editingArticle.excerpt"></label>
+      <label class="wide">Content <small>(Markdown: **bold**, - bullet lists, [link](https://…))</small>
+        <textarea [(ngModel)]="editingArticle.content" rows="16"></textarea>
+      </label>
+      <label>Tags <small>(comma-separated; help search)</small><input [(ngModel)]="editingArticle.tagsText" placeholder="apply, resume, careers"></label>
+      <label class="ci-check inline"><input type="checkbox" [(ngModel)]="editingArticle.isPublished"> Published</label>
+    </div>
+  </div>
+
+  <!-- ══════════════ WIDGETS ══════════════ -->
+  <div class="ci-widgets" *ngIf="tab === 'widgets'">
+    <div class="ci-articles-tools" *ngIf="!editingWidget">
+      <span class="ci-muted">Each widget gets its own embed snippet. Use one for ces-pl.com and set its key as <code>chatWidgetKey</code> for the careers page.</span>
+      <button type="button" class="ci-btn primary" (click)="newWidget()"><svg lucidePlus size="15"></svg> New widget</button>
+    </div>
+    <div class="ci-empty" *ngIf="!editingWidget && !widgets.length">No widget yet.</div>
+
+    <div class="ci-widget-card" *ngFor="let w of (editingWidget ? [] : widgets)">
+      <div class="ci-widget-top">
+        <span class="ci-swatch" [style.background]="w.primaryColor"></span>
+        <b>{{ w.name }}</b>
+        <span class="ci-status" [attr.data-s]="w.isEnabled ? 'OPEN' : 'CLOSED'">{{ w.isEnabled ? 'Live' : 'Off' }}</span>
+        <span class="ci-muted">{{ w._count?.conversations }} chats · AI {{ w.enableAi ? 'on' : 'off' }} · {{ w.allowedDomains || 'any site' }}</span>
+        <button type="button" class="ci-btn" (click)="editingWidget = { ...w }"><svg lucideEdit2 size="14"></svg> Edit</button>
+      </div>
+      <div class="ci-snippet">
+        <code>{{ snippet(w) }}</code>
+        <button type="button" class="ci-icon" (click)="copy(snippet(w))" title="Copy snippet"><svg lucideCopy size="15"></svg></button>
+      </div>
+      <div class="ci-muted">Widget key: <code>{{ w.widgetKey }}</code> <button type="button" class="ci-icon" (click)="copy(w.widgetKey)" title="Copy key"><svg lucideCopy size="13"></svg></button></div>
+    </div>
+
+    <div class="ci-editor" *ngIf="editingWidget">
+      <div class="ci-editor-head">
+        <button type="button" class="ci-btn" (click)="editingWidget = null"><svg lucideChevronLeft size="15"></svg> Back</button>
+        <b>{{ editingWidget.id ? 'Edit widget' : 'New widget' }}</b>
+        <button type="button" class="ci-btn primary" (click)="saveWidget()" [disabled]="widgetSaving"><svg lucideSave size="15"></svg> {{ widgetSaving ? 'Saving…' : 'Save' }}</button>
+      </div>
+      <div class="ci-editor-grid">
+        <label>Name<input [(ngModel)]="editingWidget.name"></label>
+        <label>Brand colour<span class="ci-color"><input type="color" [(ngModel)]="editingWidget.primaryColor"><input [(ngModel)]="editingWidget.primaryColor"></span></label>
+        <label>Header title<input [(ngModel)]="editingWidget.headerTitle"></label>
+        <label>Header subtitle<input [(ngModel)]="editingWidget.headerSubtitle"></label>
+        <label>Bot name<input [(ngModel)]="editingWidget.botName"></label>
+        <label>Bot avatar URL <small>(defaults to company logo)</small><input [(ngModel)]="editingWidget.botAvatarUrl"></label>
+        <label class="wide">Greeting<textarea rows="2" [(ngModel)]="editingWidget.greetingMessage"></textarea></label>
+        <label class="wide">Allowed sites <small>(comma-separated, e.g. ces-pl.com, *.ces-pl.com; empty = any site)</small><input [(ngModel)]="editingWidget.allowedDomains"></label>
+        <label>Launcher position
+          <select [(ngModel)]="editingWidget.position"><option value="br">Bottom right</option><option value="bl">Bottom left</option></select>
+        </label>
+        <div class="ci-checks">
+          <label class="ci-check"><input type="checkbox" [(ngModel)]="editingWidget.enableAi"> AI answers</label>
+          <label class="ci-check"><input type="checkbox" [(ngModel)]="editingWidget.isEnabled"> Widget live</label>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

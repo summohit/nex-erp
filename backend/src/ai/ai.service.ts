@@ -22,6 +22,41 @@ export class AiService {
     return '';
   }
 
+  /**
+   * Plain chat completion for the website chat bot. Returns null instead of
+   * throwing when there is no key or Groq fails, so the caller can fall back to
+   * a keyword answer — a visitor must never see a 500 from the chat bubble.
+   */
+  async chatCompletion(
+    messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
+    opts: { temperature?: number; maxTokens?: number; json?: boolean } = {},
+  ): Promise<string | null> {
+    const key = this.apiKey;
+    if (!key) return null;
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model: 'openai/gpt-oss-120b',
+          messages,
+          temperature: opts.temperature ?? 0.3,
+          max_tokens: opts.maxTokens ?? 700,
+          ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
+        }),
+      });
+      if (!response.ok) {
+        console.error('Groq chat error:', response.status, await response.text());
+        return null;
+      }
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content ?? null;
+    } catch (err: any) {
+      console.error('Groq chat error:', err.message || err);
+      return null;
+    }
+  }
+
   async generateJobDescription(prompt: { title: string; department?: string; location?: string; instructions?: string }): Promise<string> {
     const key = this.apiKey;
     if (!key) {

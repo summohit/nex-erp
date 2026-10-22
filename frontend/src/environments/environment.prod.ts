@@ -8,6 +8,9 @@ export const environment = {
   // dashboard (Administration → Chat Widget); the embed URL is
   // https://embed.tawk.to/<propertyId>/<widgetId>. Leave either empty and the
   // widget stays off, which is what every non-production build wants.
+  // Nex's own chat & help widget (ERP → CRM → Website Chat → Widgets). When a
+  // key is set it replaces Tawk on the careers page; empty keeps Tawk.
+  chatWidgetKey: '',
   tawkPropertyId: '69c3bd8135e8d61c3a87568a',
   tawkWidgetId: '1jki9ogko',
   production: true,

@@ -39,6 +39,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { FieldVisitsModule } from './field-visits/field-visits.module';
 import { SystemSettingsModule } from './system-settings/system-settings.module';
 import { LeadFormsModule } from './lead-forms/lead-forms.module';
+import { ChatWidgetModule } from './chat-widget/chat-widget.module';
 import { AppDownloadModule } from './app-download/app-download.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { NoticesModule } from './notices/notices.module';
@@ -55,7 +56,7 @@ import { CommonModule } from './common/common.module';
     ThrottlerModule.forRoot({
       throttlers: [{ name: 'default', ttl: seconds(60), limit: 60 }],
     }),
-    CommonModule, AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LettersModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule, FieldVisitsModule, SystemSettingsModule, LeadFormsModule, AppDownloadModule, TicketsModule, TasksModule, TimesheetsModule, NoticesModule, ApprovalsModule, LifecycleModule, WfhModule],
+    CommonModule, AuthModule, UsersModule, PrismaModule, UploadModule, MasterDataModule, CompanyModule, PermissionsModule, EmployeesModule, OnboardingModule, AttendanceModule, LettersModule, LeavesModule, PayrollModule, AppreciationModule, AssetsModule, AiModule, PublicJobsModule, RecruitmentModule, ProjectsModule, MailModule, CompanySeederModule, NotificationsModule, EventsModule, MenusModule, PerformanceModule, OffboardingModule, KioskModule, ClientsModule, CrmModule, SalesModule, DashboardModule, FieldVisitsModule, SystemSettingsModule, LeadFormsModule, AppDownloadModule, TicketsModule, TasksModule, TimesheetsModule, NoticesModule, ApprovalsModule, LifecycleModule, WfhModule, ChatWidgetModule],
   controllers: [AppController],
   providers: [AppService],
 })

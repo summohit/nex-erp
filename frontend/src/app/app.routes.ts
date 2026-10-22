@@ -409,6 +409,12 @@ export const routes: Routes = [
         loadComponent: () => import('./crm/leads-dashboard/leads-dashboard').then(m => m.LeadsDashboardComponent)
       },
       {
+        path: 'crm/chat-inbox',
+        canActivate: [permissionGuard],
+        data: { module: 'crm/leads' },
+        loadComponent: () => import('./crm/chat-inbox/chat-inbox.component').then(m => m.ChatInboxComponent)
+      },
+      {
         path: 'crm/lead-forms',
         canActivate: [permissionGuard],
         data: { module: 'crm/leads' },

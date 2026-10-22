@@ -34,9 +34,17 @@ async function bootstrap() {
   // mira.ces-pl.com is the address; nex.ces-pl.com redirects to it but its
   // /api stays live for installed mobile apps, and a tab still open on nex
   // during the switch calls mira's API cross-origin.
-  app.enableCors({
-    origin: ['http://localhost:4200', 'https://mira.ces-pl.com', 'https://nex.ces-pl.com'],
-    credentials: true,
+  //
+  // The chat widget's public API is the exception: embed.js runs on other
+  // sites (ces-pl.com), so any origin may call it — without cookies. Which
+  // sites a widget actually answers is checked per widget (allowedDomains).
+  const appOrigins = ['http://localhost:4200', 'https://mira.ces-pl.com', 'https://nex.ces-pl.com'];
+  app.enableCors((req: any, cb: (err: Error | null, options?: any) => void) => {
+    if ((req.url || '').includes('/public/chat-widget/')) {
+      cb(null, { origin: true, credentials: false });
+    } else {
+      cb(null, { origin: appOrigins, credentials: true });
+    }
   });
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));

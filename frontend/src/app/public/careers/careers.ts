@@ -44,6 +44,7 @@ export interface PublicJob {
 })
 export class CareersComponent implements OnInit, OnDestroy {
   private static readonly TAWK_SCRIPT_ID = 'tawk-to-careers';
+  private static readonly NEX_CHAT_SCRIPT_ID = 'nex-chat-careers';
 
   private http = inject(HttpClient);
   private route = inject(ActivatedRoute);
@@ -109,11 +110,43 @@ export class CareersComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.fetchPublicJobs();
-    this.loadTawkWidget();
+    if (!this.loadNexChatWidget()) this.loadTawkWidget();
   }
 
   ngOnDestroy() {
+    this.unloadNexChatWidget();
     this.unloadTawkWidget();
+  }
+
+  /**
+   * Nex's own chat widget — the same embed.js ces-pl.com uses, told it is on
+   * the careers page so the bot answers from open jobs. Same SPA caveat as
+   * Tawk below: injected on enter, destroyed on leave. Returns false when no
+   * widget key is configured, so Tawk stays as the fallback.
+   */
+  private loadNexChatWidget(): boolean {
+    const key = (environment as any).chatWidgetKey;
+    if (!key) return false;
+    if (document.getElementById(CareersComponent.NEX_CHAT_SCRIPT_ID)) return true;
+    const script = document.createElement('script');
+    script.id = CareersComponent.NEX_CHAT_SCRIPT_ID;
+    script.async = true;
+    script.src = `${environment.apiUrl}/public/chat-widget/embed.js`;
+    script.dataset['widgetKey'] = key;
+    script.dataset['source'] = 'CAREERS';
+    // Bottom-left: the job listing keeps its apply actions on the right.
+    script.dataset['position'] = 'bl';
+    document.body.appendChild(script);
+    return true;
+  }
+
+  private unloadNexChatWidget() {
+    try {
+      (window as any).NexChat?.destroy?.();
+    } catch {
+      /* never finished loading */
+    }
+    document.getElementById(CareersComponent.NEX_CHAT_SCRIPT_ID)?.remove();
   }
 
   /**

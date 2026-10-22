@@ -9,6 +9,9 @@ export const environment = {
   // https://embed.tawk.to/<propertyId>/<widgetId>. Deliberately empty here and
   // set only in environment.prod.ts: with them filled in, every developer's
   // localhost would push test conversations into the live support inbox.
+  // Nex's own chat & help widget (ERP → CRM → Website Chat → Widgets). When a
+  // key is set it replaces Tawk on the careers page; empty keeps Tawk.
+  chatWidgetKey: '',
   tawkPropertyId: '',
   tawkWidgetId: '',
   production: false,

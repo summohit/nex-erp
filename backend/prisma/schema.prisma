@@ -118,6 +118,8 @@ model Company {
   preSalesTaskFiles     PreSalesTaskAttachment[]
   preSalesRequestItems  PreSalesRequestItem[]
   tickets               Ticket[]
+  kbCategories          KnowledgeBaseCategory[]
+  chatWidgets           ChatWidgetConfig[]
   taskTypes             TaskType[]
   projectMilestones     ProjectMilestone[]
   timesheetDays         TimesheetDay[]
@@ -583,6 +585,7 @@ model Employee {
   generatedLetters             GeneratedLetter[]
   uploadedProjectDocuments     ProjectDocument[]
   assignedLeads                Lead[]                        @relation("LeadAssignee")
+  assignedChats                ChatConversation[]            @relation("ChatAssignee")
   createdLeads                 Lead[]                        @relation("LeadCreator")
   peerReviewsGiven             PeerFeedback[]                @relation("PeerReviewer")
   peerReviewsReceived          PeerFeedback[]                @relation("PeerReviewee")
@@ -4661,4 +4664,111 @@ model FieldVisitEarlyRelease {
   @@index([companyId, status])
   @@index([employeeId, date])
   @@index([requestId])
+}
+
+// ─── Chat widget & knowledge base ────────────────────────────────────────────
+// Self-hosted replacement for Tawk.to: an embeddable widget (embed.js) on the
+// careers page and ces-pl.com, answered first by a bot grounded in published
+// articles, then by agents from the ERP inbox.
+
+model KnowledgeBaseCategory {
+  id          Int                    @id @default(autoincrement())
+  companyId   Int
+  company     Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String
+  description String?
+  icon        String?                @default("help-circle")
+  sortOrder   Int                    @default(0)
+  isPublic    Boolean                @default(true)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  articles    KnowledgeBaseArticle[]
+
+  @@unique([companyId, slug])
+  @@index([companyId])
+}
+
+model KnowledgeBaseArticle {
+  id           Int                   @id @default(autoincrement())
+  categoryId   Int
+  category     KnowledgeBaseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  title        String
+  slug         String
+  content      String                @db.Text // Markdown
+  excerpt      String?               @db.Text
+  tags         String[]              @default([])
+  views        Int                   @default(0)
+  helpfulCount Int                   @default(0)
+  notHelpful   Int                   @default(0)
+  isPublished  Boolean               @default(true)
+  sortOrder    Int                   @default(0)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([categoryId, slug])
+  @@index([categoryId, isPublished])
+}
+
+model ChatWidgetConfig {
+  id              Int                @id @default(autoincrement())
+  companyId       Int
+  company         Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  widgetKey       String             @unique @default(uuid())
+  name            String             @default("Default Widget")
+  primaryColor    String             @default("#2563EB")
+  headerTitle     String             @default("CES Support & Careers")
+  headerSubtitle  String?            @default("We are here to help you!")
+  greetingMessage String             @default("Hi there! How can we help you today?")
+  botName         String             @default("CES Assistant")
+  botAvatarUrl    String?
+  position        String             @default("br") // br | bl
+  enableAi        Boolean            @default(true)
+  allowedDomains  String? // comma-separated hostnames, "*.example.com" allowed; empty = any
+  isEnabled       Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  conversations   ChatConversation[]
+
+  @@index([companyId])
+}
+
+model ChatConversation {
+  id             Int              @id @default(autoincrement())
+  widgetConfigId Int
+  widgetConfig   ChatWidgetConfig @relation(fields: [widgetConfigId], references: [id], onDelete: Cascade)
+  visitorId      String // client-generated, kept in the visitor's localStorage
+  visitorName    String?
+  visitorEmail   String?
+  visitorPhone   String?
+  status         String           @default("BOT") // BOT, OPEN, RESOLVED, CLOSED
+  source         String           @default("WEBSITE") // WEBSITE, CAREERS
+  pageUrl        String?
+  referrer       String?
+  userAgent      String?
+  assignedToId   Int?
+  assignedTo     Employee?        @relation("ChatAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  ticketId       Int?
+  leadContactId  Int?
+  lastMessageAt  DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  messages       ChatMessage[]
+
+  @@index([widgetConfigId, status])
+  @@index([visitorId])
+}
+
+model ChatMessage {
+  id             Int              @id @default(autoincrement())
+  conversationId Int
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderType     String // VISITOR, BOT, AGENT, SYSTEM
+  senderName     String
+  message        String           @db.Text
+  metadata       Json? // { articles: [{id,title}], quickReplies: [] }
+  isRead         Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId, id])
 }
