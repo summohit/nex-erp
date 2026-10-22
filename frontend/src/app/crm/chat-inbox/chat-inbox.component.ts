@@ -77,6 +77,12 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   private audioCtx: AudioContext | null = null;
   /** Newest visitor message time seen — null until the first inbox load seeds it. */
   private latestVisitorAt: number | null = null;
+  /** Rows that just got a visitor message — briefly highlighted. */
+  flashIds = new Set<number>();
+  private rowLastAt = new Map<number, number>();
+  threadLoading = false;
+  readonly skeletonRows = [1, 2, 3, 4, 5];
+  private readonly reducedMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   cannedReplies = [
     'Thanks for reaching out! Let me check that for you.',
@@ -155,6 +161,25 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     }
     if (this.latestVisitorAt !== null && latest > this.latestVisitorAt) this.playChime();
     this.latestVisitorAt = Math.max(this.latestVisitorAt ?? 0, latest);
+    this.flashUpdatedRows(rows);
+  }
+
+  /** Highlight rows whose newest message is a visitor's and newer than the last poll showed. */
+  private flashUpdatedRows(rows: any[]) {
+    const firstLoad = this.rowLastAt.size === 0;
+    for (const c of rows) {
+      const at = c.lastMessage ? new Date(c.lastMessage.createdAt).getTime() : 0;
+      const before = this.rowLastAt.get(c.id);
+      this.rowLastAt.set(c.id, at);
+      if (firstLoad || c.lastMessage?.senderType !== 'VISITOR' || (before !== undefined && at <= before)) continue;
+      if (before === undefined && at < Date.now() - 60_000) continue; // an old chat just entering the filter
+      this.flashIds.add(c.id);
+      setTimeout(() => this.flashIds.delete(c.id), 2600);
+    }
+  }
+
+  trackById(_: number, c: any) {
+    return c.id;
   }
 
   /** Resolved/closed chats can't be replied to — the visitor's widget has stopped listening. */
@@ -267,10 +292,15 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   }
 
   open(id: number) {
+    if (id !== this.selected?.id) {
+      // Skeleton instead of the previous chat's messages while this one loads.
+      this.threadLoading = true;
+      this.messages = [];
+    }
     this.selectedId = id;
     this.http.get<any>(`${this.api}/inbox/${id}`).subscribe({
       next: (r) => this.applyConversation(r),
-      error: () => this.toast.error('Failed to open conversation.'),
+      error: () => { this.threadLoading = false; this.toast.error('Failed to open conversation.'); },
     });
   }
 
@@ -278,10 +308,11 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     const grew = r.messages.length !== this.messages.length || r.conversation.id !== this.selected?.id;
     const isNew = this.messages.length > 0 && r.messages.length > this.messages.length;
     this.selected = r.conversation;
+    this.threadLoading = false;
 
     // Animate only a fresh bot reply in the thread already open — visitor messages
     // must be readable the moment the poll brings them in.
-    if (isNew && this.typewriterEnabled && r.conversation.id === this.selectedId) {
+    if (isNew && this.typewriterEnabled && !this.reducedMotion && r.conversation.id === this.selectedId) {
       const latest = r.messages[r.messages.length - 1];
       if (latest && latest.senderType === 'BOT') {
         this.runTypewriter(latest.id, latest.message);
@@ -310,7 +341,7 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   scrollThreadToBottom() {
     if (this.threadEl?.nativeElement) {
-      this.threadEl.nativeElement.scrollTo({ top: this.threadEl.nativeElement.scrollHeight, behavior: 'smooth' });
+      this.threadEl.nativeElement.scrollTo({ top: this.threadEl.nativeElement.scrollHeight, behavior: this.reducedMotion ? 'auto' : 'smooth' });
     }
   }
 

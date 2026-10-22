@@ -200,8 +200,9 @@
     '.ts{font-size:11px;color:#64748b;margin:5px 2px 0;letter-spacing:-.01em;font-weight:400}',
     '.row.me .ts{text-align:right;margin:5px 4px 0 0}',
     '.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}',
-    '.pill{border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;max-width:100%;transition:all .16s cubic-bezier(.16,1,.3,1);box-shadow:0 1px 2px rgba(15,23,42,.04);animation:pillPopIn .3s cubic-bezier(.34,1.56,.64,1) both}',
-    '.pill:nth-child(1){animation-delay:.06s}.pill:nth-child(2){animation-delay:.12s}.pill:nth-child(3){animation-delay:.18s}.pill:nth-child(4){animation-delay:.24s}',
+    '.pill{border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;max-width:100%;transition:all .16s cubic-bezier(.16,1,.3,1);box-shadow:0 1px 2px rgba(15,23,42,.04)}',
+    '.pills.anim .pill{animation:pillPopIn .3s cubic-bezier(.34,1.56,.64,1) both}',
+    '.pills.anim .pill:nth-child(1){animation-delay:.06s}.pills.anim .pill:nth-child(2){animation-delay:.12s}.pills.anim .pill:nth-child(3){animation-delay:.18s}.pills.anim .pill:nth-child(4){animation-delay:.24s}',
     '@keyframes pillPopIn{from{opacity:0;transform:translateY(8px) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}',
     '.pill svg{width:13px;height:13px;flex:none;color:var(--c)}.pill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.pill:hover{border-color:var(--c);color:var(--c);background:color-mix(in srgb,var(--c) 6%,#fff);transform:translateY(-1px);box-shadow:0 4px 10px rgba(15,23,42,.08)}',
@@ -236,7 +237,8 @@
     '.search svg{width:16px;height:16px;color:#94a3b8;flex:none}',
     '.search input{border:0;outline:none;padding:10px 0;font-size:13.5px;flex:1;background:transparent;color:#0f172a}',
     '.cat{margin-bottom:18px}.cat h4{margin:0 0 8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:700}',
-    '.art{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:11px 13px;margin-bottom:7px;cursor:pointer;color:#0f172a;font-size:13.5px;transition:all .15s ease;box-shadow:0 1px 2px rgba(15,23,42,.03)}',
+    '.art{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:11px 13px;margin-bottom:7px;cursor:pointer;color:#0f172a;font-size:13.5px;transition:all .15s ease;box-shadow:0 1px 2px rgba(15,23,42,.03);animation:nexMsgSlide .26s cubic-bezier(.16,1,.3,1) both}',
+    '.art:nth-child(2){animation-delay:.04s}.art:nth-child(3){animation-delay:.08s}.art:nth-child(4){animation-delay:.12s}.art:nth-child(5){animation-delay:.16s}.art:nth-child(n+6){animation-delay:.2s}',
     '.art:hover{border-color:var(--c);transform:translateY(-1px);box-shadow:0 3px 8px rgba(15,23,42,.07)}.art svg{width:16px;height:16px;color:var(--c);flex:none;margin-top:2px}.art small{display:block;color:#64748b;font-size:12px;margin-top:2px}',
     '.reader{padding:18px;animation:nexMsgSlide .2s ease-out}.reader h3{margin:8px 0 14px;font-size:18px;font-weight:700;color:#0f172a}.reader .bubble{border:0;background:none;padding:0;box-shadow:none}',
     '.back{display:inline-flex;align-items:center;gap:5px;border:0;background:none;color:var(--c);cursor:pointer;font-size:13px;padding:0;font-weight:600;margin-bottom:6px}.back svg{width:16px;height:16px}',
@@ -262,7 +264,8 @@
     '.btn-cancel:hover{background:#e2e8f0}',
     '.btn-danger{flex:1;background:#ef4444;color:#fff;border:0;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;box-shadow:0 2px 6px rgba(239,68,68,.3)}',
     '.btn-danger:hover{filter:brightness(.92);transform:translateY(-1px)}',
-    '.ended-card{margin:14px auto 6px;padding:16px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:14px;text-align:center;max-width:92%;display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(15,23,42,.04);animation:nexMsgSlide .22s cubic-bezier(.16,1,.3,1) both}',
+    '.ended-card{margin:14px auto 6px;padding:16px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:14px;text-align:center;max-width:92%;display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(15,23,42,.04)}',
+    '.ended-card.anim{animation:nexMsgSlide .3s cubic-bezier(.16,1,.3,1) both}.ended-card.anim .ended-icon{animation:badgePop .35s .12s cubic-bezier(.34,1.56,.64,1) both}',
     '.ended-icon{width:32px;height:32px;border-radius:50%;background:#e2e8f0;color:#10b981;display:flex;align-items:center;justify-content:center}',
     '.ended-icon svg{width:18px;height:18px}',
     '.ended-text strong{font-size:13.5px;color:#1e293b;display:block}',
@@ -270,7 +273,9 @@
     '.btn-new-chat{margin-top:4px;background:var(--c);color:#fff;border:0;border-radius:9px;padding:9px 15px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;box-shadow:0 2px 6px color-mix(in srgb,var(--c) 25%,transparent)}',
     '.btn-new-chat svg{width:14px;height:14px}',
     '.btn-new-chat:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 4px 10px color-mix(in srgb,var(--c) 35%,transparent)}',
-    '.compose-ended{padding:12px 16px;background:#fff;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12.5px;color:#64748b}',
+    '.compose-ended{padding:12px 16px;background:#fff;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12.5px;color:#64748b;animation:composeUp .28s cubic-bezier(.16,1,.3,1) both}',
+    '@keyframes composeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}',
+    '@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}',
     '.compose-ended button{background:var(--c);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}',
     '.compose-ended button:hover{filter:brightness(1.08)}'
   ].join('\n');
@@ -334,6 +339,7 @@
 
   // ─── state ───
   var cfg = null, conv = null, msgs = [], lastId = 0, open = false, tab = 'chat', unread = 0;
+  var startersAnimatedFor = null, endedAnimatedFor = null; // conversations whose starter pills / ended card already animated in
   var sending = false, pollTimer = null, formFor = null, kbCache = null, article = null;
   var animatedIds = {};
   var openKey = 'nexchat_open';
@@ -782,7 +788,7 @@
       var meta = m.metadata || {};
       var isLast = idx === msgs.length - 1;
       if ((meta.articles && meta.articles.length) || (isLast && meta.quickReplies && conv && conv.status === 'BOT')) {
-        var pills = el('div', 'pills');
+        var pills = el('div', 'pills' + (isNew ? ' anim' : ''));
         (meta.articles || []).forEach(function (a) {
           var p = el('button', 'pill', ICONS.doc + '<span>' + esc(a.title) + '</span>');
           p.onclick = function () { openArticle(a.id, 'chat'); };
@@ -822,7 +828,8 @@
     if (formFor && conv && !conv.hasContact && !isEnded) {
       list.appendChild(contactForm());
     } else if (conv && conv.status === 'BOT' && msgs.length <= 1) {
-      var starters = el('div', 'pills');
+      var starters = el('div', 'pills' + (startersAnimatedFor === conv.id ? '' : ' anim'));
+      startersAnimatedFor = conv.id;
       starters.style.alignSelf = 'flex-end';
       var opts = SOURCE === 'CAREERS'
         ? ['What roles are open?', 'How do I apply?', 'Talk to HR']
@@ -837,7 +844,8 @@
 
     // Display "Ended" status card when conversation is closed or resolved
     if (isEnded) {
-      var endedBox = el('div', 'ended-card');
+      var endedBox = el('div', 'ended-card' + (endedAnimatedFor === conv.id ? '' : ' anim'));
+      endedAnimatedFor = conv.id;
       endedBox.innerHTML =
         '<div class="ended-icon">' + ICONS.check + '</div>' +
         '<div class="ended-text">' +

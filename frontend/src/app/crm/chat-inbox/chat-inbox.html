@@ -107,9 +107,14 @@
       </div>
 
       <!-- Loading State -->
-      <div class="ci-inbox-loading" *ngIf="inboxLoading && !conversations.length">
-        <div class="spinner-small"></div>
-        <span>Loading conversations…</span>
+      <div class="ci-inbox-loading ci-skeleton-list" *ngIf="inboxLoading && !conversations.length" aria-label="Loading conversations">
+        <div class="ci-skel-row" *ngFor="let s of skeletonRows">
+          <div class="ci-skel ci-skel-avatar"></div>
+          <div class="ci-skel-lines">
+            <div class="ci-skel ci-skel-line w60"></div>
+            <div class="ci-skel ci-skel-line w90"></div>
+          </div>
+        </div>
       </div>
 
       <!-- Empty State -->
@@ -200,8 +205,9 @@
         <button
           type="button"
           class="ci-row-card"
-          *ngFor="let c of filteredConversations"
+          *ngFor="let c of filteredConversations; trackBy: trackById"
           [class.active]="c.id === selectedId"
+          [class.ci-row-flash]="flashIds.has(c.id)"
           (click)="open(c.id)"
         >
           <!-- Left Status Indicator Bar -->
@@ -408,6 +414,14 @@
 
       <!-- Messages Thread Scroll Area -->
       <div class="ci-thread-messages" #thread>
+        <!-- Skeleton while a newly picked chat loads -->
+        <div class="ci-thread-skeleton" *ngIf="threadLoading" aria-label="Loading messages">
+          <div class="ci-skel ci-skel-bubble left w55"></div>
+          <div class="ci-skel ci-skel-bubble right w40"></div>
+          <div class="ci-skel ci-skel-bubble left w70"></div>
+          <div class="ci-skel ci-skel-bubble right w50"></div>
+        </div>
+
         <!-- Messages, with a date divider at each new day -->
         <ng-container *ngFor="let m of messages; let i = index">
           <div class="ci-thread-date-divider" *ngIf="dayLabel(i) as label">
