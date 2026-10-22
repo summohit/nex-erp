@@ -4741,6 +4741,9 @@ model ChatWidgetConfig {
   position        String             @default("br") // br | bl
   enableAi        Boolean            @default(true)
   allowedDomains  String? // comma-separated hostnames, "*.example.com" allowed; empty = any
+  /// { enabled, timezone, days: { mon: { open: "09:30", close: "18:30" } | null, … } } — null = always online
+  officeHours     Json?
+  offlineMessage  String? // shown to visitors outside office hours
   isEnabled       Boolean            @default(true)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt

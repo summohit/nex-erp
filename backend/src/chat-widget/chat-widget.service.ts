@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CrmService } from '../crm/crm.service';
 import { TicketsService } from '../tickets/tickets.service';
@@ -7,6 +8,7 @@ import { PermissionsService } from '../permissions/permissions.service';
 import { MailService } from '../mail/mail.service';
 import { storeUploadedFile } from '../upload/store-uploaded-file';
 import { ChatBotService } from './chat-bot.service';
+import { cleanOfficeHours, officeStatus } from './office-hours';
 
 const MAX_MESSAGE = 4000;
 const OPEN_STATUSES = ['BOT', 'OPEN'];
@@ -137,6 +139,8 @@ export class ChatWidgetService {
       enableAi: typeof data.enableAi === 'boolean' ? data.enableAi : undefined,
       allowedDomains: data.allowedDomains !== undefined ? clean(data.allowedDomains, 500) : undefined,
       isEnabled: typeof data.isEnabled === 'boolean' ? data.isEnabled : undefined,
+      officeHours: data.officeHours !== undefined ? (cleanOfficeHours(data.officeHours) as any) ?? Prisma.DbNull : undefined,
+      offlineMessage: data.offlineMessage !== undefined ? clean(data.offlineMessage, 300) : undefined,
     };
   }
 
@@ -166,6 +170,19 @@ export class ChatWidgetService {
       botName: w.botName,
       botAvatarUrl: w.botAvatarUrl || w.company.logoUrl,
       position: w.position,
+      ...this.offlineInfo(w),
+    };
+  }
+
+  /** online flag plus what to tell visitors when the team is out of office. */
+  private offlineInfo(w: { officeHours: any; offlineMessage: string | null }) {
+    const { online, backAt } = officeStatus(cleanOfficeHours(w.officeHours));
+    return {
+      online,
+      backAt,
+      offlineMessage: online
+        ? null
+        : w.offlineMessage || `We're offline right now${backAt ? ` and back ${backAt}` : ''}. Leave a message and we'll get back to you.`,
     };
   }
 
@@ -396,6 +413,7 @@ export class ChatWidgetService {
     }
 
     const firstName = name.split(' ')[0];
+    const { online, backAt } = this.offlineInfo(widget);
     await this.prisma.chatMessage.create({
       data: {
         conversationId,
@@ -404,7 +422,9 @@ export class ChatWidgetService {
         message:
           intent === 'job'
             ? `Thanks ${firstName}! Our HR team will reply here${email ? ' and by email' : ''}. You can also apply directly to any open role on our careers page.`
-            : `Thanks ${firstName}! I've passed this to our team — they'll reply right here${email ? ` and at ${email}` : ''}.`,
+            : online
+              ? `Thanks ${firstName}! I've passed this to our team — they'll reply right here${email ? ` and at ${email}` : ''}.`
+              : `Thanks ${firstName}! Our team is offline right now${backAt ? ` and back ${backAt}` : ''} — they'll reply ${email ? `at ${email}` : 'here'} as soon as they're in.`,
         isRead: true,
       },
     });

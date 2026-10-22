@@ -166,6 +166,7 @@
     '.ht b{display:block;font-size:14.5px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '.ht-status-line{display:flex;align-items:center;gap:6px;font-size:11.5px;opacity:.92;margin-top:2px}',
     '.ht-live-dot{width:6px;height:6px;border-radius:50%;background:#34d399;animation:liveBlink 1.8s infinite ease-in-out}',
+    '.offline-note{align-self:stretch;margin:0 4px 10px;padding:10px 12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:12.5px;line-height:1.45;text-align:center}',
     '.ht-offline-dot{width:6px;height:6px;border-radius:50%;background:#cbd5e1;opacity:.8}',
     '@keyframes liveBlink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.85)}}',
     '.head-actions{display:flex;align-items:center;gap:3px;flex:none}',
@@ -324,6 +325,7 @@
     '.dk .ended-text strong{color:#f1f5f9}.dk .ended-text p{color:#94a3b8}',
     '.dk .compose-ended{background:#111827;border-top-color:#1e293b;color:#94a3b8}',
     '.dk .badge{border-color:#0f172a}',
+    '.dk .offline-note{background:#2a1a0e;border-color:#7c2d12;color:#fdba74}',
   ].join('\n');
 
   // ─── Sound System (Synthesized via Web Audio API) ───
@@ -436,7 +438,7 @@
     av.innerHTML = avatarHtml(cfg);
     var dot = el('span', 'avatar-online-dot');
     av.appendChild(dot);
-    var ht = el('div', 'ht', '<b>' + esc(cfg.headerTitle) + '</b><div class="ht-status-line"><span class="ht-live-dot"></span><span>' + esc(cfg.headerSubtitle || 'Online • Instant Answers') + '</span></div>');
+    var ht = el('div', 'ht', '<b>' + esc(cfg.headerTitle) + '</b><div class="ht-status-line">' + statusLineHtml() + '</div>');
     
     var headActions = el('div', 'head-actions');
 
@@ -793,7 +795,7 @@
       if (isEnded) {
         htStatus.innerHTML = '<span class="ht-offline-dot"></span><span>Conversation ended</span>';
       } else {
-        htStatus.innerHTML = '<span class="ht-live-dot"></span><span>' + esc(cfg.headerSubtitle || 'Online • Instant Answers') + '</span>';
+        htStatus.innerHTML = statusLineHtml();
       }
     }
 
@@ -822,6 +824,9 @@
       list.appendChild(tyRow0);
     }
     var lastDay = null;
+    if (cfg.online === false && cfg.offlineMessage && !isEnded) {
+      list.appendChild(el('div', 'offline-note', esc(cfg.offlineMessage)));
+    }
     msgs.forEach(function (m, idx) {
       var label = dayLabel(m.createdAt, lastDay);
       if (label) {
@@ -1005,6 +1010,14 @@
     if (fresh > 0 || statusChanged) {
       if (tab === 'chat') render();
     }
+  }
+
+  /** Header line: the widget subtitle while the team is in, "Offline · back …" outside office hours. */
+  function statusLineHtml() {
+    if (cfg && cfg.online === false) {
+      return '<span class="ht-offline-dot"></span><span>' + esc(cfg.backAt ? 'Offline · back ' + cfg.backAt : 'Offline right now') + '</span>';
+    }
+    return '<span class="ht-live-dot"></span><span>' + esc((cfg && cfg.headerSubtitle) || 'Online • Instant Answers') + '</span>';
   }
 
   function fileSize(n) {

@@ -1196,7 +1196,7 @@
           </div>
 
           <div class="ci-wc-header-actions">
-            <button type="button" class="ci-btn ci-btn-edit" (click)="editingWidget = { ...w }">
+            <button type="button" class="ci-btn ci-btn-edit" (click)="editWidget(w)">
               <svg lucideEdit2 size="14"></svg>
               <span>Edit Widget</span>
             </button>
@@ -1514,6 +1514,45 @@
                   <span class="ci-toggle-desc">Controls whether this widget script displays on allowed websites.</span>
                 </div>
               </label>
+            </div>
+
+            <!-- Office hours -->
+            <div class="ci-field-group ci-office-hours">
+              <label class="ci-toggle-card">
+                <input type="checkbox" [(ngModel)]="editingWidget.officeHours.enabled" />
+                <div class="ci-toggle-content">
+                  <div class="ci-toggle-title">
+                    <svg lucideClock size="14"></svg>
+                    <strong>Office Hours</strong>
+                  </div>
+                  <span class="ci-toggle-desc">Outside these hours the widget shows "Offline · back …" and your offline message. The bot keeps answering.</span>
+                </div>
+              </label>
+
+              <ng-container *ngIf="editingWidget.officeHours.enabled">
+                <div class="ci-oh-grid">
+                  <div class="ci-oh-row" *ngFor="let d of weekDays">
+                    <label class="ci-oh-day">
+                      <input type="checkbox" [checked]="!!editingWidget.officeHours.days[d.key]" (change)="toggleOfficeDay(d.key)" />
+                      <span>{{ d.label }}</span>
+                    </label>
+                    <ng-container *ngIf="editingWidget.officeHours.days[d.key] as slot; else closedDay">
+                      <input type="time" class="ci-input ci-oh-time" [(ngModel)]="slot.open" />
+                      <span class="ci-oh-sep">to</span>
+                      <input type="time" class="ci-input ci-oh-time" [(ngModel)]="slot.close" />
+                    </ng-container>
+                    <ng-template #closedDay><span class="ci-oh-closed">Closed</span></ng-template>
+                  </div>
+                </div>
+
+                <label class="ci-label">Time zone</label>
+                <input type="text" class="ci-input" [(ngModel)]="editingWidget.officeHours.timezone" placeholder="Asia/Kolkata" />
+
+                <label class="ci-label">Offline message</label>
+                <textarea class="ci-textarea" rows="2" [(ngModel)]="editingWidget.offlineMessage"
+                  placeholder="We're offline right now. Leave a message and we'll get back to you when we're back."></textarea>
+                <span class="ci-field-hint">Leave empty to use a default that includes when you're back.</span>
+              </ng-container>
             </div>
           </div>
         </div>

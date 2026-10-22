@@ -824,8 +824,36 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     });
   }
 
+  readonly weekDays = [
+    { key: 'mon', label: 'Mon' }, { key: 'tue', label: 'Tue' }, { key: 'wed', label: 'Wed' },
+    { key: 'thu', label: 'Thu' }, { key: 'fri', label: 'Fri' }, { key: 'sat', label: 'Sat' }, { key: 'sun', label: 'Sun' },
+  ];
+
+  editWidget(w: any) {
+    this.editingWidget = { ...w, officeHours: this.officeHoursFor(w.officeHours) };
+  }
+
+  /** A schedule the editor can bind to: saved one, or Mon–Fri 9:30–18:30 IST switched off. */
+  private officeHoursFor(saved: any) {
+    const weekday = () => ({ open: '09:30', close: '18:30' });
+    const base = {
+      enabled: false,
+      timezone: 'Asia/Kolkata',
+      days: { mon: weekday(), tue: weekday(), wed: weekday(), thu: weekday(), fri: weekday(), sat: null, sun: null } as any,
+    };
+    if (!saved) return base;
+    return { enabled: !!saved.enabled, timezone: saved.timezone || base.timezone, days: { ...base.days, ...(saved.days || {}) } };
+  }
+
+  toggleOfficeDay(key: string) {
+    const days = this.editingWidget.officeHours.days;
+    days[key] = days[key] ? null : { open: '09:30', close: '18:30' };
+  }
+
   newWidget() {
     this.editingWidget = {
+      officeHours: this.officeHoursFor(null),
+      offlineMessage: '',
       name: 'Website Widget',
       primaryColor: '#0284C7',
       headerTitle: 'CES Support & Careers',
