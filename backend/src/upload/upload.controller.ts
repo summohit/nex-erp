@@ -14,7 +14,8 @@ const MAX_UPLOAD_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_TICKET_FILE_SIZE = 20 * 1024 * 1024;
 const TICKET_FILE_EXTENSIONS = [
   // Images
-  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic',
+  // No .svg: served from our own origin it can run script when opened.
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic',
   // Documents
   '.pdf', '.doc', '.docx', '.odt', '.rtf',
   // Spreadsheets
@@ -38,7 +39,7 @@ const ATTENDANCE_PROOF_MIME_TYPES = [
 ];
 
 const TICKET_FILE_MIME_TYPES = [
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml', 'image/heic',
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/heic',
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
