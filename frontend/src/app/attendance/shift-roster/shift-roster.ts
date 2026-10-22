@@ -82,16 +82,10 @@ export class ShiftRosterComponent implements OnInit {
   // ---- Permanent WFH (22 Oct 2026): HR / super admin only
   wfhMode = signal<'DAYS' | 'PERMANENT'>('DAYS');
   wfhStart = '';
-  wfhWeekdays = signal<number[]>([]);
-  readonly weekdayChips = [{ d: 1, l: 'Mon' }, { d: 2, l: 'Tue' }, { d: 3, l: 'Wed' }, { d: 4, l: 'Thu' }, { d: 5, l: 'Fri' }, { d: 6, l: 'Sat' }, { d: 0, l: 'Sun' }];
   permanentRules = signal<any[]>([]);
   canPermanentWfh(): boolean {
     const r = this.currentUser()?.role;
     return r === 'HR' || r === 'SUPERADMIN' || r === 'SUPER_ADMIN';
-  }
-  toggleWfhWeekday(d: number) {
-    const cur = this.wfhWeekdays();
-    this.wfhWeekdays.set(cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]);
   }
   ruleDays(r: any): string {
     if (!r.weekdays) return 'Every working day';
@@ -105,7 +99,7 @@ export class ShiftRosterComponent implements OnInit {
   savePermanentWfh() {
     if (!this.wfhPicked().length) { this.toast.error('Choose at least one employee'); return; }
     this.wfhBusy.set(true);
-    this.wfhApi.setPermanent(this.wfhPicked(), this.wfhStart, this.wfhWeekdays(), this.wfhReason.trim() || undefined).subscribe({
+    this.wfhApi.setPermanent(this.wfhPicked(), this.wfhStart, [], this.wfhReason.trim() || undefined).subscribe({
       next: (r) => {
         this.wfhBusy.set(false); this.wfhPicked.set([]);
         this.toast.success(`Permanent WFH set for ${r.updated} ${r.updated === 1 ? 'person' : 'people'}`);
@@ -212,7 +206,7 @@ export class ShiftRosterComponent implements OnInit {
   openAssignWfh() {
     const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
     this.wfhFrom = today; this.wfhTo = today; this.wfhReason = ''; this.wfhPicked.set([]); this.wfhQuery.set('');
-    this.wfhStart = today; this.wfhWeekdays.set([]); this.wfhMode.set('DAYS'); this.loadPermanent();
+    this.wfhStart = today; this.wfhMode.set('DAYS'); this.loadPermanent();
     if (!this.wfhPeople().length) {
       this.employeesApi.getEmployeesBasicList().subscribe({
         next: (list: any[]) => this.wfhPeople.set((list || []).map((e) => ({

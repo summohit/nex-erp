@@ -1116,16 +1116,9 @@
             <input type="date" class="form-control-enhanced" [(ngModel)]="wfhStart" />
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label"><span>Weekdays</span><span class="optional-tag">(none ticked = every working day)</span></label>
-          <div class="awfh-preset-chips">
-            <button type="button" class="preset-chip-btn" *ngFor="let w of weekdayChips"
-                    [class.active]="wfhWeekdays().includes(w.d)" (click)="toggleWfhWeekday(w.d)">{{ w.l }}</button>
-          </div>
-        </div>
         <div class="awfh-daysoff-note">
           <b>No end date.</b>
-          It runs until HR or the super admin ends it. Leave, holidays and roster days off still apply. To call someone in for one day, open their roster cell and choose "Work at office this day".
+          WFH on every working day until HR or the super admin ends it. Each person's own days off (roster, shift, branch weekly off), leave and holidays still apply. To call someone in for one day, open their roster cell and choose "Work at office this day".
         </div>
         <div class="form-group" *ngIf="permanentRules().length">
           <label class="form-label"><span>On permanent WFH now</span><span class="label-badge">{{ permanentRules().length }}</span></label>
