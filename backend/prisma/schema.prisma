@@ -4799,6 +4799,19 @@ model ChatConversation {
   pageUrl        String?
   referrer       String?
   userAgent      String?
+  // Visitor details (22 Oct 2026): location from the IP (offline GeoLite2
+  // lookup) and what the widget reports about the visit.
+  ipAddress       String?
+  city            String?
+  region          String?
+  country         String? // ISO code, e.g. IN
+  visitorTimezone String?
+  language        String?
+  screen          String? // e.g. 1440x900
+  utm             Json?   // { source, medium, campaign, term, content }
+  visitCount      Int?    // this visitor's visits to the site, this one included
+  secondsOnSite   Int?    // on the site this visit, as of the last update
+  pages           Json?   // pages this visit: [{ url, title, at }], last 30
   assignedToId   Int?
   assignedTo     Employee?        @relation("ChatAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   ticketId       Int?

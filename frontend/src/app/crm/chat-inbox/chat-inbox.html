@@ -320,6 +320,7 @@
                 <svg lucideGlobe size="10" *ngIf="c.source !== 'CAREERS'"></svg>
                 <span>{{ c.source === 'CAREERS' ? 'Careers' : (c.widgetConfig?.name || 'Website') }}</span>
               </span>
+              <span class="ci-src-chip" *ngIf="c.city || c.country" [title]="visitorLocation(c)">{{ flag(c.country) }} {{ c.city || countryName(c.country) }}</span>
               <span class="ci-unread-badge" *ngIf="c.unread">{{ c.unread }}</span>
             </div>
           </div>
@@ -408,6 +409,36 @@
               <svg lucideExternalLink size="11"></svg>
               <span>{{ formatPageUrl(selected.pageUrl).display }}</span>
             </a>
+            <span class="ci-meta-item" *ngIf="selected.city || selected.country" [title]="selected.ipAddress ? 'IP ' + selected.ipAddress : ''">
+              {{ flag(selected.country) }} {{ visitorLocation(selected) }}
+            </span>
+            <button type="button" class="ci-meta-item ci-visitor-toggle" (click)="visitorInfoOpen = !visitorInfoOpen">
+              {{ visitorInfoOpen ? 'Hide visitor info' : 'Visitor info' }}
+            </button>
+          </div>
+
+          <!-- Visitor details (22 Oct 2026), like Tawk.to's visitor panel -->
+          <div class="ci-visitor-panel" *ngIf="visitorInfoOpen">
+            <div class="ci-vi-grid">
+              <div><span>Location</span><b>{{ (selected.city || selected.country) ? flag(selected.country) + ' ' + visitorLocation(selected) : '—' }}</b></div>
+              <div><span>IP address</span><b>{{ selected.ipAddress || '—' }}</b></div>
+              <div><span>Device</span><b>{{ deviceInfo(selected.userAgent) }}</b></div>
+              <div><span>Screen</span><b>{{ selected.screen || '—' }}</b></div>
+              <div><span>Local time</span><b>{{ localTime(selected.visitorTimezone) }}</b></div>
+              <div><span>Language</span><b>{{ selected.language || '—' }}</b></div>
+              <div><span>Source</span><b>{{ trafficSource(selected) }}</b></div>
+              <div><span>Visits</span><b>{{ selected.visitCount ? (selected.visitCount === 1 ? 'First visit' : 'Visit ' + selected.visitCount) : '—' }}{{ selected.previousChats ? ' · ' + selected.previousChats + ' earlier chat' + (selected.previousChats === 1 ? '' : 's') : '' }}</b></div>
+              <div><span>Time on site</span><b>{{ duration(selected.secondsOnSite) }}</b></div>
+            </div>
+            <div class="ci-vi-pages" *ngIf="selected.pages?.length">
+              <span>Pages this visit</span>
+              <ol>
+                <li *ngFor="let p of selected.pages">
+                  <a [href]="p.url" target="_blank" rel="noopener" [title]="p.url">{{ p.title || formatPageUrl(p.url).display }}</a>
+                  <small>{{ p.at | date:'shortTime' }}</small>
+                </li>
+              </ol>
+            </div>
           </div>
         </div>
 

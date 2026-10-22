@@ -10,6 +10,7 @@ import { MailService } from '../mail/mail.service';
 import { storeUploadedFile } from '../upload/store-uploaded-file';
 import { ChatBotService } from './chat-bot.service';
 import { cleanOfficeHours, officeStatus } from './office-hours';
+import { geoFromIp, visitorContext } from './visitor-info';
 
 const MAX_MESSAGE = 4000;
 const OPEN_STATUSES = ['BOT', 'OPEN'];
@@ -192,7 +193,7 @@ export class ChatWidgetService {
   }
 
   /** Resume the visitor's open conversation, or start one with the greeting. */
-  async startConversation(widgetKey: string, originHost: string | null, body: any, userAgent?: string) {
+  async startConversation(widgetKey: string, originHost: string | null, body: any, userAgent?: string, ip?: string | null) {
     const widget = await this.resolveWidget(widgetKey, originHost);
     const visitorId = this.visitorId(body);
 
@@ -232,11 +233,16 @@ export class ChatWidgetService {
           pageUrl: clean(body.pageUrl, 1000),
           referrer: clean(body.referrer, 1000),
           userAgent: clean(userAgent, 500),
+          ipAddress: ip ?? null,
+          ...geoFromIp(ip ?? null),
+          ...visitorContext(body.context),
           messages: {
             create: { senderType: 'BOT', senderName: widget.botName, message: widget.greetingMessage, isRead: true },
           },
         },
       });
+    } else {
+      await this.refreshVisitor(conversation.id, body.context);
     }
     const messages = await this.prisma.chatMessage.findMany({
       where: { conversationId: conversation.id },
@@ -297,6 +303,7 @@ export class ChatWidgetService {
     const { widget, conversation } = await this.visitorConversation(widgetKey, originHost, conversationId, this.visitorId(body));
     const text = clean(body.message, MAX_MESSAGE) || (attachment ? attachment.name : null);
     if (!text) throw new BadRequestException('Message is empty.');
+    await this.refreshVisitor(conversationId, body.context);
     if (!OPEN_STATUSES.includes(conversation.status)) {
       // A visitor writing into a resolved chat reopens it. The bot picks it back up
       // unless an agent still owns it — then it goes straight to them.
@@ -526,6 +533,12 @@ export class ChatWidgetService {
     this.gateway.sendWebsiteChat(c.widgetConfig.companyId, { conversationId, kind: 'message' });
   }
 
+  /** Pages visited and time on site move on as the visitor browses; keep them current. */
+  private async refreshVisitor(conversationId: number, context: any) {
+    const data = visitorContext(context);
+    if (Object.keys(data).length) await this.prisma.chatConversation.update({ where: { id: conversationId }, data }).catch(() => {});
+  }
+
   /** Something changed in a conversation that agents should see right away. */
   private async emitChange(conversationId: number, kind: 'message' | 'typing' | 'read' = 'message') {
     const c = await this.prisma.chatConversation.findUnique({
@@ -691,7 +704,11 @@ export class ChatWidgetService {
       data: { isRead: true },
     });
     const messages = await this.prisma.chatMessage.findMany({ where: { conversationId: id }, orderBy: { id: 'asc' }, take: 500 });
-    return { conversation, messages };
+    // Returning visitor: their earlier chats on any of this company's widgets.
+    const previousChats = await this.prisma.chatConversation.count({
+      where: { visitorId: conversation.visitorId, id: { lt: id }, widgetConfig: { companyId } },
+    });
+    return { conversation: { ...conversation, previousChats }, messages };
   }
 
   async agentAttachment(companyId: number, id: number, employeeId: number | null, body: any, file: Express.Multer.File, req: any) {

@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import { join } from 'path';
 import { ChatWidgetService, chatAttachmentUpload } from './chat-widget.service';
 import { KnowledgeBaseService } from './knowledge-base.service';
+import { clientIp } from './visitor-info';
 
 /** The site embedding the widget: Origin for cross-site calls, Referer otherwise. */
 function originHost(origin?: string, referer?: string): string | null {
@@ -100,8 +101,9 @@ export class PublicChatWidgetController {
     @Headers('origin') origin?: string,
     @Headers('referer') referer?: string,
     @Headers('user-agent') ua?: string,
+    @Req() req?: any,
   ) {
-    return this.chat.startConversation(key, originHost(origin, referer), body ?? {}, ua);
+    return this.chat.startConversation(key, originHost(origin, referer), body ?? {}, ua, clientIp(req));
   }
 
   @Get(':key/conversations/:id/messages')

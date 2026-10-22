@@ -74,6 +74,50 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   inboxLoading = false;
   selectedId: number | null = null;
   selected: any = null;
+  visitorInfoOpen = false;
+
+  // ─── Visitor details (22 Oct 2026) ───
+  flag(code?: string | null): string {
+    if (!code || !/^[A-Za-z]{2}$/.test(code)) return '';
+    return String.fromCodePoint(...code.toUpperCase().split('').map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+  }
+  countryName(code?: string | null): string {
+    if (!code) return '';
+    try { return new Intl.DisplayNames(['en'], { type: 'region' }).of(code.toUpperCase()) || code; } catch { return code; }
+  }
+  visitorLocation(c: any): string {
+    return [c?.city, c?.region, this.countryName(c?.country)].filter(Boolean).join(', ');
+  }
+  deviceInfo(ua?: string | null): string {
+    if (!ua) return '—';
+    const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /SamsungBrowser/.test(ua) ? 'Samsung Internet'
+      : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+    const os = /Windows/.test(ua) ? 'Windows' : /iPhone|iPad|iPod/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android'
+      : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : '';
+    const kind = /iPad|Tablet/.test(ua) ? 'tablet' : /Mobi|iPhone|Android/.test(ua) ? 'mobile' : 'desktop';
+    return `${browser}${os ? ' on ' + os : ''} · ${kind}`;
+  }
+  localTime(tz?: string | null): string {
+    if (!tz) return '—';
+    try { return `${new Date().toLocaleTimeString('en-IN', { timeZone: tz, hour: 'numeric', minute: '2-digit' })} (${tz})`; } catch { return tz; }
+  }
+  duration(secs?: number | null): string {
+    if (secs == null) return '—';
+    if (secs < 60) return `${secs} sec`;
+    const m = Math.round(secs / 60);
+    return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+  }
+  trafficSource(c: any): string {
+    const u = c?.utm;
+    if (u?.source) return [u.source, u.medium, u.campaign && `"${u.campaign}"`].filter(Boolean).join(' · ');
+    if (!c?.referrer) return 'Direct';
+    try {
+      const host = new URL(c.referrer).hostname.replace(/^www\./, '');
+      if (c.pageUrl && host === new URL(c.pageUrl).hostname.replace(/^www\./, '')) return 'Direct';
+      return /google\./.test(host) ? 'Google search' : /bing\./.test(host) ? 'Bing search' : /linkedin\./.test(host) ? 'LinkedIn'
+        : /facebook\.|fb\./.test(host) ? 'Facebook' : /instagram\./.test(host) ? 'Instagram' : host;
+    } catch { return c.referrer; }
+  }
   messages: any[] = [];
   reply = '';
   sending = false;

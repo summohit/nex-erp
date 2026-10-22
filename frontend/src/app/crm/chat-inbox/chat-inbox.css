@@ -4767,3 +4767,16 @@
   cursor: pointer;
 }
 .ci-emoji-pop button:hover { background: #f1f5f9; }
+
+/* Visitor details (22 Oct 2026) */
+.ci-visitor-toggle { border: 1px dashed #cbd5e1; background: #fff; cursor: pointer; color: #2563eb; font-weight: 600; }
+.ci-visitor-panel { margin-top: 10px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
+.ci-vi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 16px; }
+.ci-vi-grid div { display: flex; flex-direction: column; min-width: 0; }
+.ci-vi-grid span, .ci-vi-pages > span { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #64748b; font-weight: 600; }
+.ci-vi-grid b { font-size: 13px; color: #0f172a; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ci-vi-pages { margin-top: 12px; }
+.ci-vi-pages ol { margin: 6px 0 0; padding-left: 18px; max-height: 140px; overflow-y: auto; }
+.ci-vi-pages li { font-size: 12.5px; margin-bottom: 3px; }
+.ci-vi-pages a { color: #2563eb; text-decoration: none; }
+.ci-vi-pages small { color: #94a3b8; margin-left: 6px; }

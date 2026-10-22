@@ -34,6 +34,52 @@
     store('nexchat_vid', visitorId);
   }
 
+  // ─── visit details for the agent (22 Oct 2026) ───
+  // Per visit (sessionStorage): when it began, campaign tags from the landing
+  // URL, and the pages seen. Per visitor (localStorage): how many visits.
+  function sess(k, v) {
+    try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) { return null; }
+  }
+  function sessJson(k, v) {
+    if (v === undefined) { try { return JSON.parse(sess(k) || 'null'); } catch (e) { return null; } }
+    sess(k, JSON.stringify(v));
+  }
+  if (!sess('nexchat_visit_start')) {
+    sess('nexchat_visit_start', String(Date.now()));
+    store('nexchat_visits', String((Number(store('nexchat_visits')) || 0) + 1));
+    var q = new URLSearchParams(location.search), utm = {};
+    ['source', 'medium', 'campaign', 'term', 'content'].forEach(function (k) { var v = q.get('utm_' + k); if (v) utm[k] = v; });
+    sessJson('nexchat_utm', utm);
+  }
+  function notePage() {
+    var pages = sessJson('nexchat_pages') || [];
+    var last = pages[pages.length - 1];
+    if (last && last.url === location.href) return;
+    pages.push({ url: location.href, title: document.title || '', at: new Date().toISOString() });
+    sessJson('nexchat_pages', pages.slice(-30));
+  }
+  notePage();
+  // Single-page sites change the URL without reloading; catch that too.
+  ['pushState', 'replaceState'].forEach(function (m) {
+    var orig = history[m];
+    if (typeof orig !== 'function') return;
+    history[m] = function () { var r = orig.apply(this, arguments); setTimeout(notePage, 300); return r; };
+  });
+  window.addEventListener('popstate', function () { setTimeout(notePage, 300); });
+  function visitContext() {
+    var tz = null;
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { /* old browser */ }
+    return {
+      timezone: tz,
+      language: navigator.language || null,
+      screen: (window.screen ? screen.width + 'x' + screen.height : null),
+      utm: sessJson('nexchat_utm') || {},
+      visitCount: Number(store('nexchat_visits')) || 1,
+      secondsOnSite: Math.round((Date.now() - (Number(sess('nexchat_visit_start')) || Date.now())) / 1000),
+      pages: sessJson('nexchat_pages') || [],
+    };
+  }
+
   function api(path, opts) {
     opts = opts || {};
     return fetch(BASE + path, {
@@ -760,7 +806,7 @@
     render();
     api('/conversations', {
       method: 'POST',
-      body: { visitorId: visitorId, source: SOURCE, pageUrl: location.href, referrer: document.referrer || null, forceNew: true },
+      body: { visitorId: visitorId, source: SOURCE, pageUrl: location.href, referrer: document.referrer || null, forceNew: true, context: visitContext() },
     }).then(function (r) {
       merge(r);
       schedulePoll();
@@ -1027,7 +1073,7 @@
     if (conv || starting) return starting;
     starting = api('/conversations', {
       method: 'POST',
-      body: { visitorId: visitorId, source: SOURCE, pageUrl: location.href, referrer: document.referrer || null },
+      body: { visitorId: visitorId, source: SOURCE, pageUrl: location.href, referrer: document.referrer || null, context: visitContext() },
     }).then(function (r) {
       msgs = []; lastId = 0; animatedIds = {}; merge(r);
     }).catch(function (e) {
@@ -1138,7 +1184,7 @@
     // The bot often answers in a few ms — hold its typing dots long enough to be seen.
     var minTyping = conv.status === 'BOT' ? 900 + Math.min(900, msg.length * 15) : 0;
     var started = Date.now();
-    api('/conversations/' + conv.id + '/messages', { method: 'POST', body: { visitorId: visitorId, message: msg } })
+    api('/conversations/' + conv.id + '/messages', { method: 'POST', body: { visitorId: visitorId, message: msg, context: visitContext() } })
       .then(function (r) {
         var wait = minTyping - (Date.now() - started);
         return wait > 0 ? new Promise(function (res) { setTimeout(function () { res(r); }, wait); }) : r;
