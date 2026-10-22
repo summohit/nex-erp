@@ -90,7 +90,7 @@ export class SidebarComponent implements OnInit {
       'Dashboard', 'Employees', 'Recruitment', 'Delivery', 'Attendance & Leave',
       'Performance', 'CRM', 'Sales', 'Settings',
       'Appreciation', 'Offboarding', 'Payroll & Expenses', 'Clients', 'Assets & IT',
-      'Notice Board',
+      'Notice Board', 'Website Chat',
     ];
     if (doneModules.includes(title)) return 'DONE';
     return 'WIP';
