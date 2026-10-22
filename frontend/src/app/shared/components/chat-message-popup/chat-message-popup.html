@@ -1,0 +1,21 @@
+<div class="cmp-stack" *ngIf="cards().length">
+  <div class="cmp-card" *ngFor="let c of cards().slice(0, max)">
+    <div class="cmp-head">
+      <span class="cmp-icon"><svg lucideMessageCircle size="16"></svg></span>
+      <div class="cmp-who">
+        <b>{{ c.visitorName }}</b>
+        <span>{{ c.source }} chat · {{ c.at | date:'shortTime' }}</span>
+      </div>
+      <button type="button" class="cmp-icon-btn" title="Open this chat" (click)="open(c.id)"><svg lucideExternalLink size="15"></svg></button>
+      <button type="button" class="cmp-icon-btn" title="Dismiss" (click)="dismiss(c.id)"><svg lucideX size="15"></svg></button>
+    </div>
+    <p class="cmp-text">{{ c.text }}</p>
+    <form class="cmp-reply" (ngSubmit)="send(c)">
+      <input type="text" name="reply" [(ngModel)]="c.reply" placeholder="Type a reply…" [disabled]="c.sending" autocomplete="off" />
+      <button type="submit" [disabled]="c.sending || !c.reply.trim()" title="Send"><svg lucideSend size="15"></svg></button>
+    </form>
+  </div>
+  <button type="button" class="cmp-more" *ngIf="cards().length > max" (click)="openInbox()">
+    +{{ cards().length - max }} more {{ cards().length - max === 1 ? 'chat' : 'chats' }} · open Inbox
+  </button>
+</div>

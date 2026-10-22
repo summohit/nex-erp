@@ -671,6 +671,19 @@ export class ChatWidgetService {
     };
   }
 
+  /**
+   * The newest visitor message, for the new-message popup (22 Oct 2026).
+   * Unlike opening the conversation, this does not mark anything read.
+   */
+  async latestVisitorMessage(companyId: number, id: number) {
+    const c = await this.agentConversation(companyId, id);
+    const message = await this.prisma.chatMessage.findFirst({
+      where: { conversationId: id, senderType: 'VISITOR' }, orderBy: { id: 'desc' },
+      select: { id: true, message: true, createdAt: true },
+    });
+    return { id: c.id, visitorName: c.visitorName, status: c.status, source: c.source, message };
+  }
+
   async inboxConversation(companyId: number, id: number) {
     const conversation = await this.agentConversation(companyId, id);
     await this.prisma.chatMessage.updateMany({

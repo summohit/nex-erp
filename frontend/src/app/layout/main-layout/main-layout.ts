@@ -7,11 +7,12 @@ import { SidebarComponent } from '../sidebar/sidebar';
 import { HeaderComponent } from '../header/header';
 import { DialogHostComponent } from '../../shared/components/dialog-host/dialog-host.component';
 import { NoticePopupComponent } from '../../shared/components/notice-popup/notice-popup';
+import { ChatMessagePopupComponent } from '../../shared/components/chat-message-popup/chat-message-popup';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule, SidebarComponent, HeaderComponent, DialogHostComponent, NoticePopupComponent, ProfileReminderComponent, ProfileModalComponent],
+  imports: [CommonModule, RouterModule, SidebarComponent, HeaderComponent, DialogHostComponent, NoticePopupComponent, ProfileReminderComponent, ProfileModalComponent, ChatMessagePopupComponent],
   templateUrl: './main-layout.html',
   styleUrls: ['./main-layout.css']
 })

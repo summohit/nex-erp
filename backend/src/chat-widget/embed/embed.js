@@ -597,7 +597,7 @@
     EMOJIS.forEach(function (e) {
       var b = el('button', 'emoji', e);
       b.type = 'button';
-      b.onclick = function () { insertAtCursor(inputEl, e); emojiPop.style.display = 'none'; };
+      b.onclick = function () { insertAtCursor(inputEl, e); };
       emojiPop.appendChild(b);
     });
     emojiBtn.onclick = function (ev) {

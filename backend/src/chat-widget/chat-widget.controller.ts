@@ -27,6 +27,11 @@ export class ChatWidgetController {
     return this.chat.reports(req.user.companyId, Number(days) || 30);
   }
 
+  @Get('inbox/:id/latest')
+  latest(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.chat.latestVisitorMessage(req.user.companyId, id);
+  }
+
   @Get('inbox/:id')
   conversation(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.chat.inboxConversation(req.user.companyId, id);

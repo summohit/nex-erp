@@ -146,11 +146,14 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     // Base / Widgets), so switching tabs creates a fresh component.
     const routeTab = this.route.snapshot.data['tab'];
     this.tab = routeTab === 'knowledge-base' ? 'kb' : routeTab === 'widgets' ? 'widgets' : 'inbox';
-    const c = Number(this.route.snapshot.queryParamMap.get('c'));
-    if (c) {
-      this.statusFilter = '';
-      this.open(c);
-    }
+    // ?c= opens a conversation, also when it changes on this page (the new-message popup).
+    this.route.queryParamMap.subscribe((q) => {
+      const c = Number(q.get('c'));
+      if (c && c !== this.selectedId) {
+        this.statusFilter = '';
+        this.open(c);
+      }
+    });
     this.permissions.getWebsiteChatTabs().subscribe(tabs => {
       this.allowedTabs = new Set(tabs.map(t => (t === 'website-chat/knowledge-base' ? 'kb' : t.replace('website-chat/', '')) as Tab));
     });
@@ -471,6 +474,7 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     const message = this.reply.trim();
     if (!message || !this.selectedId || this.sending || this.chatEnded) return;
     this.sending = true;
+    this.emojiOpen = false;
     this.http.post<any>(`${this.api}/inbox/${this.selectedId}/reply`, { message }).subscribe({
       next: (r) => { this.reply = ''; this.sending = false; this.applyConversation(r); this.loadInbox(true); },
       error: (e) => { this.sending = false; this.toast.error(e?.error?.message || 'Failed to send.'); },
@@ -485,7 +489,6 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     const start = textarea.selectionStart ?? this.reply.length;
     const end = textarea.selectionEnd ?? start;
     this.reply = this.reply.slice(0, start) + emoji + this.reply.slice(end);
-    this.emojiOpen = false;
     setTimeout(() => {
       textarea.focus();
       textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
