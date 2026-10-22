@@ -14,6 +14,8 @@ import {
   LucideFolder, LucideFolderPlus, LucideBookOpen, LucideEye, LucideEyeOff,
   LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
   LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
+  LucideSend, LucideUser, LucideMail, LucidePhone, LucideBriefcase, LucideRotateCcw,
+  LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter
 } from '@lucide/angular';
 
 type Tab = 'inbox' | 'kb' | 'widgets';
@@ -29,6 +31,8 @@ type Tab = 'inbox' | 'kb' | 'widgets';
     LucideFolder, LucideFolderPlus, LucideBookOpen, LucideEye, LucideEyeOff,
     LucideThumbsUp, LucideThumbsDown, LucideTag, LucideBold, LucideItalic,
     LucideList, LucideLink, LucideX, LucideLayers, LucideCheckCircle2, LucideClock,
+    LucideSend, LucideUser, LucideMail, LucidePhone, LucideBriefcase, LucideRotateCcw,
+    LucideZap, LucideCheckCheck, LucideBot, LucideRefreshCw, LucideFilter
   ],
   templateUrl: './chat-inbox.html',
   styleUrls: ['./chat-inbox.css'],
@@ -50,7 +54,9 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   // ─── Inbox ───
   statusFilter = 'ACTIVE';
+  activeQuickFilter: 'ALL' | 'ACTIVE' | 'OPEN' | 'BOT' | 'RESOLVED' = 'ACTIVE';
   mineOnly = false;
+  searchTerm = '';
   conversations: any[] = [];
   inboxLoading = false;
   selectedId: number | null = null;
@@ -58,7 +64,13 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
   messages: any[] = [];
   reply = '';
   sending = false;
+  isVisitorTyping = false;
+  typewriterEnabled = true;
+  typewriterActiveMessageId: number | null = null;
+  typewriterRenderedText: { [id: number]: string } = {};
+  private typewriterTimer: any = null;
   private pollTimer: any = null;
+  private typingSimTimer: any = null;
 
   cannedReplies = [
     'Thanks for reaching out! Let me check that for you.',
@@ -115,6 +127,46 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   // ═══ Inbox ═══
 
+  get filteredConversations(): any[] {
+    const q = this.searchTerm.trim().toLowerCase();
+    if (!q) return this.conversations;
+    return this.conversations.filter(c =>
+      (c.visitorName && c.visitorName.toLowerCase().includes(q)) ||
+      (c.visitorEmail && c.visitorEmail.toLowerCase().includes(q)) ||
+      (c.visitorPhone && c.visitorPhone.includes(q)) ||
+      (c.lastMessage?.message && c.lastMessage.message.toLowerCase().includes(q)) ||
+      (c.source && c.source.toLowerCase().includes(q)) ||
+      (c.widgetConfig?.name && c.widgetConfig.name.toLowerCase().includes(q))
+    );
+  }
+
+  get activeCount(): number {
+    return this.conversations.filter(c => c.status === 'BOT' || c.status === 'OPEN').length;
+  }
+
+  get waitingCount(): number {
+    return this.conversations.filter(c => c.status === 'OPEN').length;
+  }
+
+  get botCount(): number {
+    return this.conversations.filter(c => c.status === 'BOT').length;
+  }
+
+  get resolvedCount(): number {
+    return this.conversations.filter(c => c.status === 'RESOLVED' || c.status === 'CLOSED').length;
+  }
+
+  setQuickFilter(f: 'ALL' | 'ACTIVE' | 'OPEN' | 'BOT' | 'RESOLVED') {
+    this.activeQuickFilter = f;
+    this.statusFilter = f === 'ALL' ? '' : f;
+    this.loadInbox();
+  }
+
+  toggleMineOnly() {
+    this.mineOnly = !this.mineOnly;
+    this.loadInbox();
+  }
+
   loadInbox(silent = false) {
     if (!silent) this.inboxLoading = true;
     const params: any = {};
@@ -136,11 +188,68 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
 
   private applyConversation(r: any, scroll = true) {
     const grew = r.messages.length !== this.messages.length || r.conversation.id !== this.selected?.id;
+    const isNew = this.messages.length > 0 && r.messages.length > this.messages.length;
     this.selected = r.conversation;
+
+    // Trigger typewriter effect on new incoming message from visitor or bot
+    if (isNew && this.typewriterEnabled) {
+      const latest = r.messages[r.messages.length - 1];
+      if (latest && latest.senderType !== 'AGENT') {
+        this.runTypewriter(latest.id, latest.message);
+      }
+    }
+
     this.messages = r.messages;
     const row = this.conversations.find((c) => c.id === r.conversation.id);
     if (row) { row.unread = 0; row.status = r.conversation.status; row.assignedTo = r.conversation.assignedTo; }
-    if (scroll && grew) setTimeout(() => this.threadEl?.nativeElement.scrollTo({ top: 1e9 }), 30);
+    if (scroll && grew) setTimeout(() => this.scrollThreadToBottom(), 30);
+  }
+
+  scrollThreadToBottom() {
+    if (this.threadEl?.nativeElement) {
+      this.threadEl.nativeElement.scrollTo({ top: this.threadEl.nativeElement.scrollHeight, behavior: 'smooth' });
+    }
+  }
+
+  /**
+   * Typewriter streaming effect for message bubbles.
+   */
+  runTypewriter(messageId: number, fullText: string, speedMs = 18) {
+    if (this.typewriterTimer) clearInterval(this.typewriterTimer);
+    this.typewriterActiveMessageId = messageId;
+    this.typewriterRenderedText[messageId] = '';
+    let i = 0;
+    this.typewriterTimer = setInterval(() => {
+      if (i < fullText.length && this.typewriterActiveMessageId === messageId) {
+        this.typewriterRenderedText[messageId] += fullText[i];
+        i++;
+        this.scrollThreadToBottom();
+      } else {
+        clearInterval(this.typewriterTimer);
+        this.typewriterTimer = null;
+        this.typewriterActiveMessageId = null;
+        this.typewriterRenderedText[messageId] = fullText;
+      }
+    }, speedMs);
+  }
+
+  getMessageDisplayText(m: any): string {
+    if (this.typewriterActiveMessageId === m.id) {
+      return this.typewriterRenderedText[m.id] !== undefined ? this.typewriterRenderedText[m.id] : m.message;
+    }
+    return m.message;
+  }
+
+  /**
+   * Simulate or toggle visitor typing presence indicator.
+   */
+  simulateTyping() {
+    clearTimeout(this.typingSimTimer);
+    this.isVisitorTyping = true;
+    this.scrollThreadToBottom();
+    this.typingSimTimer = setTimeout(() => {
+      this.isVisitorTyping = false;
+    }, 4000);
   }
 
   /** Agents get fresh visitor messages without a socket — a short poll is plenty for chat volume. */
@@ -171,8 +280,92 @@ export class ChatInboxComponent implements OnInit, OnDestroy {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendReply(); }
   }
 
-  useCanned(text: string) {
-    this.reply = this.reply ? `${this.reply} ${text}` : text;
+  /**
+   * Canned reply with high-speed typewriter effect into textarea.
+   */
+  useCanned(text: string, typeIt = true) {
+    if (!typeIt) {
+      this.reply = this.reply ? `${this.reply} ${text}` : text;
+      return;
+    }
+    let i = 0;
+    const startText = this.reply ? `${this.reply} ` : '';
+    this.reply = startText;
+    const timer = setInterval(() => {
+      if (i < text.length) {
+        this.reply += text[i];
+        i++;
+      } else {
+        clearInterval(timer);
+      }
+    }, 12);
+  }
+
+  formatMessage(text: string): SafeHtml {
+    if (!text) return '';
+    let s = String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    s = s
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+      .replace(/`([^`]+)`/g, '<code class="ci-inline-code">$1</code>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+    return this.sanitizer.bypassSecurityTrustHtml(s);
+  }
+
+  getAvatarGradient(name?: string): string {
+    const palettes = [
+      'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+      'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+      'linear-gradient(135deg, #059669, #047857)',
+      'linear-gradient(135deg, #ec4899, #be185d)',
+      'linear-gradient(135deg, #d97706, #b45309)',
+      'linear-gradient(135deg, #0891b2, #0e7490)',
+      'linear-gradient(135deg, #4f46e5, #3730a3)',
+    ];
+    if (!name) return palettes[0];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return palettes[Math.abs(hash) % palettes.length];
+  }
+
+  getInitials(name?: string): string {
+    if (!name) return 'V';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  }
+
+  formatPageUrl(url?: string): { display: string; fullUrl: string } {
+    if (!url) return { display: 'Website', fullUrl: '' };
+    try {
+      const u = new URL(url);
+      if (u.pathname.includes('/careers')) {
+        const parts = u.pathname.split('/').filter(Boolean);
+        if (parts.length > 1) {
+          try {
+            const decoded = decodeURIComponent(parts[1]);
+            const atobVal = atob(decoded);
+            return { display: `Careers: Job #${atobVal}`, fullUrl: url };
+          } catch {
+            return { display: 'Careers Portal', fullUrl: url };
+          }
+        }
+        return { display: 'Careers Portal', fullUrl: url };
+      }
+      return { display: `${u.hostname}${u.pathname !== '/' ? u.pathname : ''}`, fullUrl: url };
+    } catch {
+      return { display: url.length > 32 ? url.slice(0, 32) + '…' : url, fullUrl: url };
+    }
+  }
+
+  copyContact(text: string, label: string) {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    this.toast.success(`Copied ${label} to clipboard!`);
   }
 
   setStatus(status: string) {

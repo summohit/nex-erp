@@ -13,94 +13,498 @@
 
   <!-- ══════════════ INBOX ══════════════ -->
   <div class="ci-inbox" *ngIf="tab === 'inbox'">
+    <!-- Left Sidebar: Conversations List -->
     <aside class="ci-list" [class.hide-mobile]="selected">
-      <div class="ci-list-tools">
-        <select [(ngModel)]="statusFilter" (change)="loadInbox()">
-          <option value="ACTIVE">Active</option>
-          <option value="OPEN">Waiting for team</option>
-          <option value="BOT">With bot</option>
-          <option value="RESOLVED">Resolved</option>
-          <option value="">All</option>
-        </select>
-        <label class="ci-check"><input type="checkbox" [(ngModel)]="mineOnly" (change)="loadInbox()"> Mine</label>
+      <!-- Search & Filters Header -->
+      <div class="ci-list-header">
+        <div class="ci-search-box">
+          <svg lucideSearch size="15" class="ci-search-icon"></svg>
+          <input
+            type="text"
+            [(ngModel)]="searchTerm"
+            placeholder="Search visitor, email, message…"
+            class="ci-search-input"
+          />
+          <button
+            type="button"
+            class="ci-search-clear"
+            *ngIf="searchTerm"
+            (click)="searchTerm = ''"
+            title="Clear search"
+          >
+            <svg lucideX size="13"></svg>
+          </button>
+        </div>
+
+        <!-- Filter Chips Row -->
+        <div class="ci-filter-chips">
+          <button
+            type="button"
+            class="ci-chip"
+            [class.on]="activeQuickFilter === 'ACTIVE'"
+            (click)="setQuickFilter('ACTIVE')"
+          >
+            <span class="ci-live-dot"></span>
+            Active
+            <span class="ci-chip-count" *ngIf="activeCount">{{ activeCount }}</span>
+          </button>
+          <button
+            type="button"
+            class="ci-chip"
+            [class.on]="activeQuickFilter === 'OPEN'"
+            (click)="setQuickFilter('OPEN')"
+          >
+            Waiting
+            <span class="ci-chip-count ci-chip-waiting" *ngIf="waitingCount">{{ waitingCount }}</span>
+          </button>
+          <button
+            type="button"
+            class="ci-chip"
+            [class.on]="activeQuickFilter === 'BOT'"
+            (click)="setQuickFilter('BOT')"
+          >
+            With Bot
+          </button>
+          <button
+            type="button"
+            class="ci-chip"
+            [class.on]="activeQuickFilter === 'RESOLVED'"
+            (click)="setQuickFilter('RESOLVED')"
+          >
+            Resolved
+          </button>
+          <button
+            type="button"
+            class="ci-chip"
+            [class.on]="activeQuickFilter === 'ALL'"
+            (click)="setQuickFilter('ALL')"
+          >
+            All
+          </button>
+        </div>
+
+        <!-- Secondary Toolbar: Mine Only & Refresh -->
+        <div class="ci-subtools">
+          <button
+            type="button"
+            class="ci-btn-pill-toggle"
+            [class.active]="mineOnly"
+            (click)="toggleMineOnly()"
+          >
+            <svg lucideUser size="12"></svg>
+            <span>Assigned to me</span>
+          </button>
+          <button
+            type="button"
+            class="ci-btn-icon-subtle"
+            (click)="loadInbox()"
+            [disabled]="inboxLoading"
+            title="Refresh conversations"
+          >
+            <svg lucideRefreshCw size="13" [class.ci-spin]="inboxLoading"></svg>
+          </button>
+        </div>
       </div>
-      <div class="ci-inbox-loading" *ngIf="inboxLoading">
+
+      <!-- Loading State -->
+      <div class="ci-inbox-loading" *ngIf="inboxLoading && !conversations.length">
         <div class="spinner-small"></div>
         <span>Loading conversations…</span>
       </div>
-      <div class="ci-inbox-empty" *ngIf="!inboxLoading && !conversations.length">
-        <svg lucideMessageCircle size="28"></svg>
-        <b>No conversations</b>
-        <p>Chats from visitors on your website or careers portal will appear here.</p>
+
+      <!-- Empty State -->
+      <div class="ci-inbox-empty" *ngIf="!inboxLoading && !filteredConversations.length">
+        <div class="ci-empty-icon-wrap">
+          <svg lucideMessageCircle size="30"></svg>
+        </div>
+        <b>No conversations found</b>
+        <p *ngIf="searchTerm">No chats match “{{ searchTerm }}”. Try clearing filters.</p>
+        <p *ngIf="!searchTerm">Chats from visitors on your website or careers portal will appear here.</p>
       </div>
-      <button type="button" class="ci-row" *ngFor="let c of conversations" [class.active]="c.id === selectedId" (click)="open(c.id)">
-        <div class="ci-row-top">
-          <b>{{ c.visitorName || 'Visitor #' + c.id }}</b>
-          <span class="ci-time">{{ c.lastMessageAt | date: 'dd MMM, HH:mm' }}</span>
-        </div>
-        <div class="ci-row-mid">{{ c.lastMessage?.senderType === 'VISITOR' ? '' : (c.lastMessage?.senderType === 'AGENT' ? 'You: ' : 'Bot: ') }}{{ c.lastMessage?.message }}</div>
-        <div class="ci-row-bot">
-          <span class="ci-status" [attr.data-s]="c.status">{{ statusLabel(c.status) }}</span>
-          <span class="ci-src">{{ c.source === 'CAREERS' ? 'Careers' : c.widgetConfig?.name }}</span>
-          <span class="ci-unread" *ngIf="c.unread">{{ c.unread }}</span>
-        </div>
-      </button>
+
+      <!-- Conversations Stream -->
+      <div class="ci-rows-scroll">
+        <button
+          type="button"
+          class="ci-row-card"
+          *ngFor="let c of filteredConversations"
+          [class.active]="c.id === selectedId"
+          (click)="open(c.id)"
+        >
+          <!-- Left Status Indicator Bar -->
+          <div class="ci-row-accent" [attr.data-s]="c.status"></div>
+
+          <!-- Avatar -->
+          <div class="ci-row-avatar" [style.background]="getAvatarGradient(c.visitorName)">
+            {{ getInitials(c.visitorName || 'V') }}
+            <span class="ci-avatar-dot" [attr.data-s]="c.status"></span>
+          </div>
+
+          <!-- Main Info -->
+          <div class="ci-row-content">
+            <div class="ci-row-top">
+              <span class="ci-row-name" [title]="c.visitorName || 'Visitor #' + c.id">
+                {{ c.visitorName || 'Visitor #' + c.id }}
+              </span>
+              <span class="ci-time">{{ c.lastMessageAt | date: 'HH:mm' }}</span>
+            </div>
+
+            <div class="ci-row-mid" [title]="c.lastMessage?.message || ''">
+              <span class="ci-msg-sender-prefix">
+                {{ c.lastMessage?.senderType === 'VISITOR' ? '' : (c.lastMessage?.senderType === 'AGENT' ? 'You: ' : 'Bot: ') }}
+              </span>
+              {{ c.lastMessage?.message || 'New conversation started' }}
+            </div>
+
+            <div class="ci-row-bot">
+              <span class="ci-status-badge" [attr.data-s]="c.status">
+                <span class="ci-status-dot-mini" *ngIf="c.status === 'OPEN'"></span>
+                {{ statusLabel(c.status) }}
+              </span>
+              <span class="ci-src-chip">
+                <svg lucideBriefcase size="10" *ngIf="c.source === 'CAREERS'"></svg>
+                <svg lucideGlobe size="10" *ngIf="c.source !== 'CAREERS'"></svg>
+                <span>{{ c.source === 'CAREERS' ? 'Careers' : (c.widgetConfig?.name || 'Website') }}</span>
+              </span>
+              <span class="ci-unread-badge" *ngIf="c.unread">{{ c.unread }}</span>
+            </div>
+          </div>
+        </button>
+      </div>
     </aside>
 
+    <!-- Right Panel: Conversation Thread & Actions -->
     <section class="ci-thread-wrap" *ngIf="selected; else pick">
+      <!-- Conversation Header -->
       <div class="ci-thread-head">
-        <button type="button" class="ci-back" (click)="selected = null; selectedId = null"><svg lucideChevronLeft size="16"></svg></button>
-        <div class="ci-visitor-avatar-badge">
-          {{ (selected.visitorName || 'V')[0] }}
+        <button type="button" class="ci-back-btn" (click)="selected = null; selectedId = null" title="Back to inbox">
+          <svg lucideChevronLeft size="18"></svg>
+        </button>
+
+        <!-- Big Customer Profile Avatar -->
+        <div class="ci-visitor-avatar-large" [style.background]="getAvatarGradient(selected.visitorName)">
+          {{ getInitials(selected.visitorName || 'V') }}
+          <span class="ci-visitor-status-dot" [attr.data-s]="selected.status"></span>
         </div>
-        <div class="ci-visitor">
-          <b>{{ selected.visitorName || 'Visitor #' + selected.id }}</b>
-          <span>
-            <ng-container *ngIf="selected.visitorEmail">{{ selected.visitorEmail }} · </ng-container>
-            <ng-container *ngIf="selected.visitorPhone">{{ selected.visitorPhone }} · </ng-container>
-            {{ statusLabel(selected.status) }}
-            <ng-container *ngIf="selected.assignedTo"> · {{ selected.assignedTo.firstName }} {{ selected.assignedTo.lastName }}</ng-container>
-          </span>
-          <a *ngIf="selected.pageUrl" [href]="selected.pageUrl" target="_blank" rel="noopener" class="ci-page-link">{{ selected.pageUrl }}</a>
+
+        <!-- Customer Identity & Metadata -->
+        <div class="ci-visitor-info">
+          <div class="ci-visitor-name-row">
+            <h2 class="ci-visitor-name">{{ selected.visitorName || 'Visitor #' + selected.id }}</h2>
+            <span class="ci-status-pill" [attr.data-s]="selected.status">
+              <span class="ci-pulse-dot" *ngIf="selected.status === 'OPEN'"></span>
+              {{ statusLabel(selected.status) }}
+            </span>
+          </div>
+
+          <div class="ci-visitor-meta-row">
+            <a
+              class="ci-meta-item ci-copyable"
+              *ngIf="selected.visitorEmail"
+              [href]="'mailto:' + selected.visitorEmail"
+              (click)="$event.stopPropagation()"
+              title="Click to email"
+            >
+              <svg lucideMail size="12"></svg>
+              <span>{{ selected.visitorEmail }}</span>
+            </a>
+            <span
+              class="ci-copy-btn"
+              *ngIf="selected.visitorEmail"
+              (click)="copyContact(selected.visitorEmail, 'email')"
+              title="Copy email"
+            >
+              <svg lucideCopy size="11"></svg>
+            </span>
+
+            <a
+              class="ci-meta-item ci-copyable"
+              *ngIf="selected.visitorPhone"
+              [href]="'tel:' + selected.visitorPhone"
+              (click)="$event.stopPropagation()"
+              title="Click to call"
+            >
+              <svg lucidePhone size="12"></svg>
+              <span>{{ selected.visitorPhone }}</span>
+            </a>
+            <span
+              class="ci-copy-btn"
+              *ngIf="selected.visitorPhone"
+              (click)="copyContact(selected.visitorPhone, 'phone')"
+              title="Copy phone"
+            >
+              <svg lucideCopy size="11"></svg>
+            </span>
+
+            <!-- Assignee Tag -->
+            <span class="ci-meta-item ci-assignee-pill" *ngIf="selected.assignedTo">
+              <svg lucideUser size="12"></svg>
+              <span>{{ selected.assignedTo.firstName }} {{ selected.assignedTo.lastName }}</span>
+            </span>
+
+            <!-- Clean Source Page Link -->
+            <a
+              *ngIf="selected.pageUrl"
+              [href]="formatPageUrl(selected.pageUrl).fullUrl"
+              target="_blank"
+              rel="noopener"
+              class="ci-meta-item ci-page-link-clean"
+              title="Open visitor origin page"
+            >
+              <svg lucideExternalLink size="11"></svg>
+              <span>{{ formatPageUrl(selected.pageUrl).display }}</span>
+            </a>
+          </div>
         </div>
-        <div class="ci-actions">
-          <button type="button" class="ci-btn" *ngIf="!selected.assignedTo" (click)="assignToMe()">Take chat</button>
-          <button type="button" class="ci-btn" (click)="convertToLead()" [disabled]="selected.leadContactId">{{ selected.leadContactId ? 'Lead saved' : 'Convert to lead' }}</button>
-          <button type="button" class="ci-btn" (click)="convertToTicket()" [disabled]="selected.ticketId">{{ selected.ticketId ? 'Ticket raised' : 'Create ticket' }}</button>
-          <button type="button" class="ci-btn primary" *ngIf="selected.status !== 'RESOLVED'" (click)="setStatus('RESOLVED')">Resolve</button>
-          <button type="button" class="ci-btn" *ngIf="selected.status === 'RESOLVED'" (click)="setStatus('OPEN')">Reopen</button>
+
+        <!-- Action Buttons Toolbar -->
+        <div class="ci-actions-bar">
+          <button
+            type="button"
+            class="ci-btn-action take-btn"
+            *ngIf="!selected.assignedTo"
+            (click)="assignToMe()"
+            title="Assign this conversation to yourself"
+          >
+            <svg lucideUser size="14"></svg>
+            <span>Take chat</span>
+          </button>
+
+          <button
+            type="button"
+            class="ci-btn-action"
+            [class.completed]="selected.leadContactId"
+            (click)="convertToLead()"
+            [disabled]="selected.leadContactId"
+            title="Save visitor details as CRM Lead Contact"
+          >
+            <svg lucideSparkles size="14"></svg>
+            <span>{{ selected.leadContactId ? 'Lead saved' : 'Convert to lead' }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="ci-btn-action"
+            [class.completed]="selected.ticketId"
+            (click)="convertToTicket()"
+            [disabled]="selected.ticketId"
+            title="Create an ERP support ticket"
+          >
+            <svg lucideFileText size="14"></svg>
+            <span>{{ selected.ticketId ? 'Ticket raised' : 'Create ticket' }}</span>
+          </button>
+
+          <!-- Typewriter Effect Toggle -->
+          <button
+            type="button"
+            class="ci-btn-action ci-typewriter-toggle"
+            [class.on]="typewriterEnabled"
+            (click)="typewriterEnabled = !typewriterEnabled"
+            title="Toggle animated typewriter effect for messages"
+          >
+            <svg lucideZap size="14"></svg>
+            <span>Typing fx: {{ typewriterEnabled ? 'On' : 'Off' }}</span>
+          </button>
+
+          <!-- Resolve / Reopen -->
+          <button
+            type="button"
+            class="ci-btn-action resolve-btn"
+            *ngIf="selected.status !== 'RESOLVED'"
+            (click)="setStatus('RESOLVED')"
+            title="Mark conversation as resolved"
+          >
+            <svg lucideCheck size="14"></svg>
+            <span>Resolve</span>
+          </button>
+
+          <button
+            type="button"
+            class="ci-btn-action reopen-btn"
+            *ngIf="selected.status === 'RESOLVED'"
+            (click)="setStatus('OPEN')"
+            title="Reopen conversation for team response"
+          >
+            <svg lucideRotateCcw size="14"></svg>
+            <span>Reopen</span>
+          </button>
         </div>
       </div>
 
-      <div class="ci-thread" #thread>
+      <!-- Messages Thread Scroll Area -->
+      <div class="ci-thread-messages" #thread>
+        <!-- Date Divider -->
+        <div class="ci-thread-date-divider">
+          <span>Today</span>
+        </div>
+
         <ng-container *ngFor="let m of messages">
-          <div class="ci-sys" *ngIf="m.senderType === 'SYSTEM'">{{ m.message }}</div>
-          <div class="ci-msg" *ngIf="m.senderType !== 'SYSTEM'" [class.me]="m.senderType === 'AGENT'" [class.bot]="m.senderType === 'BOT'">
-            <div class="ci-who">{{ m.senderName }}<ng-container *ngIf="m.senderType === 'BOT'"> · Bot</ng-container> · {{ m.createdAt | date: 'HH:mm' }}</div>
-            <div class="ci-bubble">{{ m.message }}</div>
-            <div class="ci-cites" *ngIf="m.metadata?.articles?.length">
-              Cited: <span *ngFor="let a of m.metadata.articles; let last = last">{{ a.title }}{{ last ? '' : ', ' }}</span>
+          <!-- System Event Bubble -->
+          <div class="ci-sys-row" *ngIf="m.senderType === 'SYSTEM'">
+            <div class="ci-sys-pill">
+              <svg lucideClock size="12" class="ci-sys-icon"></svg>
+              <span>{{ m.message }}</span>
+            </div>
+          </div>
+
+          <!-- Message Row: Visitor (Left) -->
+          <div class="ci-msg-row visitor" *ngIf="m.senderType === 'VISITOR'">
+            <div class="ci-msg-avatar" [style.background]="getAvatarGradient(m.senderName)">
+              {{ getInitials(m.senderName || selected.visitorName || 'V') }}
+            </div>
+            <div class="ci-bubble-wrapper">
+              <div class="ci-msg-header">
+                <span class="ci-msg-sender-name">{{ m.senderName || selected.visitorName || 'Visitor' }}</span>
+                <span class="ci-msg-time">{{ m.createdAt | date: 'HH:mm' }}</span>
+              </div>
+              <div class="ci-bubble visitor">
+                <div [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
+                <span class="ci-typewriter-cursor" *ngIf="typewriterActiveMessageId === m.id"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Message Row: Agent / You (Right) -->
+          <div class="ci-msg-row agent" *ngIf="m.senderType === 'AGENT'">
+            <div class="ci-bubble-wrapper">
+              <div class="ci-msg-header">
+                <span class="ci-msg-time">{{ m.createdAt | date: 'HH:mm' }}</span>
+                <span class="ci-msg-sender-name">{{ m.senderName || 'You' }}</span>
+              </div>
+              <div class="ci-bubble agent">
+                <div [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
+                <div class="ci-bubble-meta">
+                  <svg lucideCheckCheck size="13" class="ci-check-double"></svg>
+                </div>
+              </div>
+            </div>
+            <div class="ci-msg-avatar agent">
+              {{ getInitials(m.senderName || 'Support') }}
+            </div>
+          </div>
+
+          <!-- Message Row: Bot (Left) -->
+          <div class="ci-msg-row bot" *ngIf="m.senderType === 'BOT'">
+            <div class="ci-msg-avatar bot">
+              <svg lucideBot size="15"></svg>
+            </div>
+            <div class="ci-bubble-wrapper">
+              <div class="ci-msg-header">
+                <span class="ci-msg-sender-name bot-label">
+                  <svg lucideSparkles size="12"></svg>
+                  <span>{{ m.senderName || 'MIRA Bot' }}</span>
+                </span>
+                <span class="ci-msg-time">{{ m.createdAt | date: 'HH:mm' }}</span>
+              </div>
+              <div class="ci-bubble bot">
+                <div [innerHTML]="formatMessage(getMessageDisplayText(m))"></div>
+                <span class="ci-typewriter-cursor" *ngIf="typewriterActiveMessageId === m.id"></span>
+
+                <!-- Article Citations -->
+                <div class="ci-cites-box" *ngIf="m.metadata?.articles?.length">
+                  <span class="ci-cites-label">Help Articles Cited:</span>
+                  <div class="ci-cites-pills">
+                    <span class="ci-cite-pill" *ngFor="let a of m.metadata.articles">
+                      <svg lucideBookOpen size="12"></svg>
+                      <span>{{ a.title }}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </ng-container>
+
+        <!-- Live Typing Indicator in Thread -->
+        <div class="ci-msg-row visitor ci-typing-indicator-row" *ngIf="isVisitorTyping || sending">
+          <div class="ci-msg-avatar" [style.background]="getAvatarGradient(selected.visitorName)">
+            {{ getInitials(selected.visitorName || 'V') }}
+          </div>
+          <div class="ci-bubble-wrapper">
+            <div class="ci-typing-bubble">
+              <span class="ci-typing-dot"></span>
+              <span class="ci-typing-dot"></span>
+              <span class="ci-typing-dot"></span>
+            </div>
+            <span class="ci-typing-status-text">{{ selected.visitorName || 'Visitor' }} is typing…</span>
+          </div>
+        </div>
       </div>
 
-      <div class="ci-canned">
-        <button type="button" *ngFor="let c of cannedReplies" (click)="useCanned(c)">{{ c }}</button>
+      <!-- Quick Canned Replies Bar -->
+      <div class="ci-canned-bar">
+        <div class="ci-canned-label">
+          <svg lucideZap size="13"></svg>
+          <span>Quick:</span>
+        </div>
+        <div class="ci-canned-scroll">
+          <button
+            type="button"
+            class="ci-canned-chip"
+            *ngFor="let c of cannedReplies"
+            (click)="useCanned(c, true)"
+            title="Click to type this response into composer"
+          >
+            <span>{{ c }}</span>
+          </button>
+        </div>
       </div>
-      <div class="ci-compose">
-        <textarea [(ngModel)]="reply" (keydown)="onReplyKey($event)" rows="2" placeholder="Reply to the visitor… (Enter to send, Shift+Enter for a new line)"></textarea>
-        <button type="button" class="ci-btn primary" (click)="sendReply()" [disabled]="sending || !reply.trim()">{{ sending ? 'Sending…' : 'Send' }}</button>
+
+      <!-- Composer Card -->
+      <div class="ci-composer-card">
+        <div class="ci-composer-box">
+          <textarea
+            [(ngModel)]="reply"
+            (keydown)="onReplyKey($event)"
+            rows="2"
+            placeholder="Reply to the visitor… (Press Enter to send, Shift+Enter for new line)"
+            class="ci-composer-textarea"
+          ></textarea>
+
+          <div class="ci-composer-footer">
+            <div class="ci-composer-hints">
+              <span class="ci-kbd-hint"><kbd>Enter</kbd> to send</span>
+              <span class="ci-kbd-hint"><kbd>Shift</kbd> + <kbd>Enter</kbd> for new line</span>
+            </div>
+
+            <div class="ci-composer-actions">
+              <button
+                type="button"
+                class="ci-btn-simulate-typing"
+                (click)="simulateTyping()"
+                title="Preview typing animation in thread"
+              >
+                <svg lucideZap size="13"></svg>
+                <span>Simulate typing</span>
+              </button>
+
+              <button
+                type="button"
+                class="ci-send-btn"
+                (click)="sendReply()"
+                [disabled]="sending || !reply.trim()"
+                title="Send reply"
+              >
+                <span *ngIf="!sending">Send</span>
+                <span *ngIf="sending">Sending…</span>
+                <svg lucideSend size="14" *ngIf="!sending"></svg>
+                <div class="spinner-tiny" *ngIf="sending"></div>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
+
+    <!-- Empty Pick State -->
     <ng-template #pick>
       <section class="ci-thread-wrap ci-pick">
         <div class="ci-pick-empty-box">
           <div class="ci-pick-icon-wrap">
-            <svg lucideMessageCircle size="34"></svg>
+            <svg lucideMessageCircle size="36"></svg>
           </div>
           <h3>Select a conversation</h3>
-          <p>Choose a visitor chat from the left panel to review messages, reply directly, or convert into an ERP lead or ticket.</p>
+          <p>Choose a visitor chat from the left panel to review messages, reply with real-time typing effect, or convert into an ERP lead or ticket.</p>
         </div>
       </section>
     </ng-template>
