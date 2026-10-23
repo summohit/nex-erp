@@ -6,11 +6,11 @@ import {
   LucidePlus, LucideX, LucideSearch, LucideGlobe, LucideBuilding, LucideBuilding2,
   LucideMapPin, LucideChevronDown, LucideChevronRight, LucidePencil, LucideTrash2,
   LucideLayers, LucideRotateCcw, LucideCheck, LucideUpload, LucideSliders,
-  LucideChevronsUpDown, LucideFolderPlus, LucideAlertCircle, LucideInfo, LucideListChecks
+  LucideChevronsUpDown, LucideFolderPlus, LucideAlertCircle, LucideInfo
 } from '@lucide/angular';
 import { DialogService } from '../../services/dialog.service';
 import { TaskLocationsService, TaskLocation } from '../../../services/task-locations.service';
-import { INDIA_LOCATIONS, INDIA_UNION_TERRITORIES, suggestedCities } from './india-locations';
+import { INDIA_LOCATIONS, suggestedCities } from './india-locations';
 
 interface ChildStats {
   cities: number;
@@ -36,7 +36,7 @@ interface TreeRow {
     LucidePlus, LucideX, LucideSearch, LucideGlobe, LucideBuilding, LucideBuilding2,
     LucideMapPin, LucideChevronDown, LucideChevronRight, LucidePencil, LucideTrash2,
     LucideLayers, LucideRotateCcw, LucideCheck, LucideUpload, LucideSliders,
-    LucideChevronsUpDown, LucideFolderPlus, LucideAlertCircle, LucideInfo, LucideListChecks
+    LucideChevronsUpDown, LucideFolderPlus, LucideAlertCircle, LucideInfo
   ],
   template: `
     <div class="tla-wrapper">
@@ -182,11 +182,6 @@ interface TreeRow {
             <svg lucideRotateCcw size="15" [class.spin]="loading()"></svg>
           </button>
 
-          <button type="button" class="btn-secondary" (click)="openBulkModal()">
-            <svg lucideListChecks size="15"></svg>
-            <span>Add from List</span>
-          </button>
-
           <button type="button" class="btn-primary" (click)="openCreateModal()">
             <svg lucidePlus size="16"></svg>
             <span>Add Location</span>
@@ -209,13 +204,15 @@ interface TreeRow {
           </thead>
           <tbody>
             @for (r of rows(); track r.loc.id) {
-              <tr class="tla-row" [class.row-inactive]="!r.loc.isActive" [class.is-state]="r.loc.level === 'STATE'">
+              <tr class="tla-row" [class.row-inactive]="!r.loc.isActive" [class.is-state]="r.loc.level === 'STATE'"
+                  [class.row-expandable]="canToggle(r)" (click)="onRowClick(r, $event)">
                 <!-- Name Column with Hierarchy Indent & Connectors -->
                 <td class="td-name">
                   <div class="name-cell-inner" [style.padding-left.px]="r.depth * 28">
                     <!-- Tree guide line -->
                     @if (r.depth > 0) {
-                      <span class="tree-connector" aria-hidden="true"></span>
+                      <!-- Hangs from the centre of the parent's icon: its indent, the 20px chevron, the 8px gap, half the 26px badge. -->
+                      <span class="tree-connector" aria-hidden="true" [style.left.px]="(r.depth - 1) * 28 + 41"></span>
                     }
 
                     <!-- Expand/Collapse Chevron -->
@@ -381,10 +378,6 @@ interface TreeRow {
                           <svg lucidePlus size="16"></svg>
                           <span>Add First State</span>
                         </button>
-                        <button type="button" class="btn-secondary" (click)="openBulkModal('STATE')">
-                          <svg lucideListChecks size="15"></svg>
-                          <span>Choose States from List</span>
-                        </button>
                       </div>
                     </div>
                   } @else {
@@ -413,8 +406,6 @@ interface TreeRow {
                 <div class="modal-badge-icon" [ngClass]="modalMode() === 'edit' ? 'edit' : 'create'">
                   @if (modalMode() === 'edit') {
                     <svg lucidePencil size="18"></svg>
-                  } @else if (activeModalTab() === 'bulk') {
-                    <svg lucideListChecks size="18"></svg>
                   } @else {
                     <svg lucidePlus size="18"></svg>
                   }
@@ -423,8 +414,6 @@ interface TreeRow {
                   <h2>
                     @if (modalMode() === 'edit') {
                       Edit Location: {{ editTargetLoc()?.name }}
-                    } @else if (activeModalTab() === 'bulk') {
-                      Add States &amp; Cities from List
                     } @else {
                       Add New Location
                     }
@@ -432,8 +421,6 @@ interface TreeRow {
                   <p class="modal-subtitle">
                     @if (modalMode() === 'edit') {
                       Update the name, hierarchy level, or parent of this location.
-                    } @else if (activeModalTab() === 'bulk') {
-                      Tick India's states and union territories, or the cities of a state you have added.
                     } @else {
                       Add a state, city, or operational site into your task hierarchy.
                     }
@@ -445,138 +432,8 @@ interface TreeRow {
               </button>
             </div>
 
-            <!-- Tab Switcher (Create Mode Only) -->
-            @if (modalMode() === 'create') {
-              <div class="modal-tabs">
-                <button
-                  type="button"
-                  class="modal-tab-btn"
-                  [class.active]="activeModalTab() === 'single'"
-                  (click)="activeModalTab.set('single')">
-                  Single Location
-                </button>
-                <button
-                  type="button"
-                  class="modal-tab-btn"
-                  [class.active]="activeModalTab() === 'bulk'"
-                  (click)="activeModalTab.set('bulk')">
-                  Choose from List
-                </button>
-              </div>
-            }
-
             <!-- Modal Body -->
             <div class="modal-body">
-              @if (modalMode() === 'create' && activeModalTab() === 'bulk') {
-                <!-- BULK IMPORT FORM -->
-                <div class="form-flow">
-                  <!-- Level Selection -->
-                  <div class="form-group">
-                    <label class="form-label">Hierarchy Level</label>
-                    <div class="level-selector-cards">
-                      <label class="level-card" [class.selected]="bulkLevel() === 'STATE'">
-                        <input
-                          type="radio"
-                          name="bulkLevel"
-                          value="STATE"
-                          [checked]="bulkLevel() === 'STATE'"
-                          (change)="setBulkLevel('STATE')"
-                        />
-                        <div class="card-icon state"><svg lucideGlobe size="16"></svg></div>
-                        <div class="card-text">
-                          <strong>State</strong>
-                          <span>Top-level region</span>
-                        </div>
-                      </label>
-
-                      <label class="level-card" [class.selected]="bulkLevel() === 'CITY'">
-                        <input
-                          type="radio"
-                          name="bulkLevel"
-                          value="CITY"
-                          [checked]="bulkLevel() === 'CITY'"
-                          (change)="setBulkLevel('CITY')"
-                        />
-                        <div class="card-icon city"><svg lucideBuilding2 size="16"></svg></div>
-                        <div class="card-text">
-                          <strong>City</strong>
-                          <span>Inside a state</span>
-                        </div>
-                      </label>
-
-                    </div>
-                  </div>
-
-                  <!-- Parent Location Dropdown -->
-                  @if (bulkLevel() !== 'STATE') {
-                    <div class="form-group">
-                      <label class="form-label" for="bulkParent">
-                        Parent Location (Inside) <span class="required">*</span>
-                      </label>
-                      <select
-                        id="bulkParent"
-                        class="form-select"
-                        [value]="bulkParentId() ?? ''"
-                        (change)="bulkParentId.set(+$any($event.target).value || null); bulkPicked.set([])">
-                        <option value="">Choose a state…</option>
-                        @for (p of bulkParentOptions(); track p.id) {
-                          <option [value]="p.id">{{ pathOf(p) }}</option>
-                        }
-                      </select>
-                    </div>
-                  }
-
-                  <!-- Suggested names to tick -->
-                  <div class="form-group">
-                    <div class="label-with-count">
-                      <label class="form-label">
-                        {{ bulkLevel() === 'STATE' ? 'States & union territories' : 'Cities' }} <span class="required">*</span>
-                      </label>
-                      <span class="count-hint">{{ bulkCount() }} selected</span>
-                    </div>
-                    @if (bulkLevel() === 'CITY' && !bulkParentId()) {
-                      <p class="form-hint"><svg lucideInfo size="13"></svg> Choose a state to see its cities.</p>
-                    } @else if (!bulkSuggestions().length && !bulkAdded().length) {
-                      <p class="form-hint">
-                        <svg lucideInfo size="13"></svg>
-                        No suggested cities for this state. Add them one at a time under Single Location.
-                      </p>
-                    } @else {
-                      <div class="pick-tools">
-                        <div class="pick-search">
-                          <svg lucideSearch size="14"></svg>
-                          <input type="search" placeholder="Search…" [value]="bulkSearch()" (input)="bulkSearch.set($any($event.target).value)" />
-                        </div>
-                        <button type="button" class="pick-link" (click)="pickAllShown()" [disabled]="!bulkShown().length">Select all</button>
-                        <button type="button" class="pick-link" (click)="bulkPicked.set([])" [disabled]="!bulkCount()">Clear</button>
-                      </div>
-                      <div class="pick-grid">
-                        @for (name of bulkShown(); track name) {
-                          <label class="pick-item" [class.on]="isPicked(name)">
-                            <input type="checkbox" [checked]="isPicked(name)" (change)="togglePick(name)" />
-                            <span>{{ name }}</span>
-                            @if (bulkLevel() === 'STATE' && isUnionTerritory(name)) { <em>UT</em> }
-                          </label>
-                        }
-                        @for (name of bulkAddedShown(); track name) {
-                          <label class="pick-item added" title="Already added">
-                            <input type="checkbox" checked disabled />
-                            <span>{{ name }}</span>
-                            <em>Added</em>
-                          </label>
-                        }
-                        @if (!bulkShown().length && !bulkAddedShown().length) {
-                          <p class="form-hint">Nothing matches "{{ bulkSearch() }}".</p>
-                        }
-                      </div>
-                      <p class="form-hint">
-                        <svg lucideInfo size="13"></svg>
-                        Not in the list? Add it under Single Location. Sites are always added there.
-                      </p>
-                    }
-                  </div>
-                </div>
-              } @else {
                 <!-- SINGLE CREATE / EDIT FORM -->
                 <div class="form-flow">
                   <!-- Level Selection -->
@@ -712,26 +569,12 @@ interface TreeRow {
                     </label>
                   </div>
                 </div>
-              }
             </div>
 
             <!-- Modal Footer -->
             <div class="modal-footer">
               <button type="button" class="btn-cancel" (click)="closeModal()">Cancel</button>
 
-              @if (modalMode() === 'create' && activeModalTab() === 'bulk') {
-                <button
-                  type="button"
-                  class="btn-primary"
-                  [disabled]="busy() || !bulkCount() || (bulkLevel() !== 'STATE' && !bulkParentId())"
-                  (click)="submitBulk()">
-                  @if (busy()) {
-                    <span>Adding…</span>
-                  } @else {
-                    <span>Add {{ bulkCount() }} {{ bulkLevel() === 'STATE' ? (bulkCount() === 1 ? 'State' : 'States') : (bulkCount() === 1 ? 'City' : 'Cities') }}</span>
-                  }
-                </button>
-              } @else {
                 <button
                   type="button"
                   class="btn-primary"
@@ -743,7 +586,6 @@ interface TreeRow {
                     <span>{{ modalMode() === 'edit' ? 'Update Location' : 'Create Location' }}</span>
                   }
                 </button>
-              }
             </div>
           </div>
         </div>
@@ -1154,6 +996,10 @@ interface TreeRow {
       transition: background-color 0.15s ease;
     }
 
+    .tla-row.row-expandable {
+      cursor: pointer;
+    }
+
     .tla-row:last-child {
       border-bottom: none;
     }
@@ -1190,7 +1036,6 @@ interface TreeRow {
 
     .tree-connector {
       position: absolute;
-      left: -14px;
       width: 12px;
       height: 16px;
       border-left: 1.5px solid #CBD5E1;
@@ -1857,19 +1702,6 @@ interface TreeRow {
       color: #0F172A;
     }
 
-    /* Choose-from-list picker */
-    .pick-tools { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-    .pick-search { flex: 1; display: flex; align-items: center; gap: 6px; border: 1px solid #E2E8F0; border-radius: 10px; padding: 0 10px; color: #94A3B8; }
-    .pick-search input { border: none; outline: none; padding: 8px 0; font: inherit; font-size: 13px; width: 100%; background: transparent; }
-    .pick-link { background: none; border: none; color: var(--color-primary, #1373E5); font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 6px; white-space: nowrap; }
-    .pick-link:disabled { color: #94A3B8; cursor: default; }
-    .pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; max-height: 300px; overflow-y: auto; padding: 2px; }
-    .pick-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid #E2E8F0; border-radius: 10px; font-size: 13px; color: #334155; cursor: pointer; transition: background .15s, border-color .15s; }
-    .pick-item:hover { background: #F8FAFC; }
-    .pick-item.on { background: #EFF6FF; border-color: #BFDBFE; color: #1E3A8A; }
-    .pick-item.added { opacity: .55; cursor: default; }
-    .pick-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .pick-item em { font-style: normal; font-size: 10px; font-weight: 700; color: #64748B; background: #F1F5F9; border-radius: 6px; padding: 1px 6px; }
   `]
 })
 export class TaskLocationsAdminComponent implements OnInit {
@@ -1893,7 +1725,6 @@ export class TaskLocationsAdminComponent implements OnInit {
 
   // Modal dialog states
   modalMode = signal<'create' | 'edit' | null>(null);
-  activeModalTab = signal<'single' | 'bulk'>('single');
   editTargetLoc = signal<TaskLocation | null>(null);
 
   // Single Form fields
@@ -1902,12 +1733,6 @@ export class TaskLocationsAdminComponent implements OnInit {
   formLevel = signal<'STATE' | 'CITY' | 'SITE'>('STATE');
   formParentId = signal<number | null>(null);
   formIsActive = signal(true);
-
-  // Choose-from-list fields
-  bulkLevel = signal<'STATE' | 'CITY' | 'SITE'>('STATE');
-  bulkParentId = signal<number | null>(null);
-  bulkPicked = signal<string[]>([]);
-  bulkSearch = signal('');
 
   ngOnInit() {
     this.load();
@@ -1919,6 +1744,12 @@ export class TaskLocationsAdminComponent implements OnInit {
       next: (list) => {
         this.loading.set(false);
         this.all.set(list);
+        // Open on states only — 36 states with 400 cities is too long a page
+        // to scroll. Later reloads keep whatever the admin has opened.
+        if (!this.loadedOnce) {
+          this.loadedOnce = true;
+          this.collapseAll();
+        }
       },
       error: () => {
         this.loading.set(false);
@@ -1950,38 +1781,6 @@ export class TaskLocationsAdminComponent implements OnInit {
 
     return { total: list.length, states, cities, sites, active, disabled };
   });
-
-  bulkCount = computed(() => this.bulkPicked().length);
-
-  /** Names already used at the chosen level and parent, lower-cased. */
-  private takenNames = computed(() => {
-    const level = this.bulkLevel();
-    const parentId = level === 'STATE' ? null : this.bulkParentId();
-    return new Set(this.all()
-      .filter((l) => (level === 'STATE' ? l.parentId == null : l.parentId === parentId))
-      .map((l) => l.name.toLowerCase()));
-  });
-
-  /** Everything the built-in list offers for the chosen level and state. */
-  private bulkCatalogue = computed(() => {
-    if (this.bulkLevel() === 'STATE') return Object.keys(INDIA_LOCATIONS);
-    const parent = this.all().find((l) => l.id === this.bulkParentId());
-    return parent ? suggestedCities(parent.name) : [];
-  });
-
-  bulkSuggestions = computed(() => this.bulkCatalogue().filter((n) => !this.takenNames().has(n.toLowerCase())));
-  bulkAdded = computed(() => this.bulkCatalogue().filter((n) => this.takenNames().has(n.toLowerCase())));
-
-  private matchesSearch = (n: string) => n.toLowerCase().includes(this.bulkSearch().trim().toLowerCase());
-  bulkShown = computed(() => this.bulkSuggestions().filter(this.matchesSearch));
-  bulkAddedShown = computed(() => this.bulkAdded().filter(this.matchesSearch));
-
-  isPicked(name: string) { return this.bulkPicked().includes(name); }
-  togglePick(name: string) {
-    this.bulkPicked.update((p) => (p.includes(name) ? p.filter((x) => x !== name) : [...p, name]));
-  }
-  pickAllShown() { this.bulkPicked.update((p) => [...new Set([...p, ...this.bulkShown()])]); }
-  isUnionTerritory(name: string) { return INDIA_UNION_TERRITORIES.has(name); }
 
   /** Typing suggestions for the single-location name field. */
   formSuggestions = computed(() => {
@@ -2065,14 +1864,6 @@ export class TaskLocationsAdminComponent implements OnInit {
       l.isActive &&
       !excludeIds.has(l.id) &&
       (lvl === 'CITY' ? l.level === 'STATE' : l.level !== 'SITE')
-    );
-  });
-
-  bulkParentOptions = computed(() => {
-    const lvl = this.bulkLevel();
-    if (lvl === 'STATE') return [];
-    return this.all().filter((l) =>
-      l.isActive && (lvl === 'CITY' ? l.level === 'STATE' : l.level !== 'SITE')
     );
   });
 
@@ -2165,6 +1956,20 @@ export class TaskLocationsAdminComponent implements OnInit {
     this.collapsedIds.set(s);
   }
 
+  private loadedOnce = false;
+
+  /** A row expands from anywhere on it, as long as the tree is showing. */
+  canToggle(r: TreeRow): boolean {
+    return r.hasChildren && !this.query() && this.levelFilter() === 'ALL';
+  }
+
+  onRowClick(r: TreeRow, event: MouseEvent) {
+    if (!this.canToggle(r)) return;
+    // Buttons, inputs and toggles in the row do their own thing.
+    if ((event.target as HTMLElement).closest('button, input, select, textarea, a, label')) return;
+    this.toggleCollapse(r.loc.id);
+  }
+
   collapseAll() {
     const s = new Set<number>();
     const statsMap = this.statsMap();
@@ -2186,24 +1991,12 @@ export class TaskLocationsAdminComponent implements OnInit {
 
   openCreateModal(defaultLevel: 'STATE' | 'CITY' | 'SITE' = 'STATE', parentId: number | null = null) {
     this.modalMode.set('create');
-    this.activeModalTab.set('single');
     this.editTargetLoc.set(null);
     this.formName.set('');
     this.formCode.set('');
     this.formLevel.set(defaultLevel);
     this.formParentId.set(parentId);
     this.formIsActive.set(true);
-
-    // Sites have no built-in list, so the list tab starts on cities instead.
-    this.bulkLevel.set(defaultLevel === 'SITE' ? 'CITY' : defaultLevel);
-    this.bulkParentId.set(defaultLevel === 'SITE' ? null : parentId);
-    this.bulkPicked.set([]);
-    this.bulkSearch.set('');
-  }
-
-  openBulkModal(defaultLevel: 'STATE' | 'CITY' | 'SITE' = 'STATE', parentId: number | null = null) {
-    this.openCreateModal(defaultLevel, parentId);
-    this.activeModalTab.set('bulk');
   }
 
   openAddChild(parentLoc: TaskLocation, event?: Event) {
@@ -2237,20 +2030,6 @@ export class TaskLocationsAdminComponent implements OnInit {
       const opts = this.singleParentOptions();
       if (!opts.some((p) => p.id === this.formParentId())) {
         this.formParentId.set(opts.length ? opts[0].id : null);
-      }
-    }
-  }
-
-  setBulkLevel(level: 'STATE' | 'CITY' | 'SITE') {
-    this.bulkLevel.set(level);
-    this.bulkPicked.set([]);
-    this.bulkSearch.set('');
-    if (level === 'STATE') {
-      this.bulkParentId.set(null);
-    } else {
-      const opts = this.bulkParentOptions();
-      if (!opts.some((p) => p.id === this.bulkParentId())) {
-        this.bulkParentId.set(opts.length ? opts[0].id : null);
       }
     }
   }
@@ -2314,39 +2093,6 @@ export class TaskLocationsAdminComponent implements OnInit {
         },
       });
     }
-  }
-
-  submitBulk() {
-    const names = this.bulkPicked();
-
-    if (!names.length) {
-      this.toast.error('Tick at least one location');
-      return;
-    }
-
-    const level = this.bulkLevel();
-    const parentId = level === 'STATE' ? null : this.bulkParentId();
-    if (level !== 'STATE' && !parentId) {
-      this.toast.error(`Please select a parent for the ${level.toLowerCase()}s`);
-      return;
-    }
-
-    this.busy.set(true);
-    this.api.bulkCreate({ names, level, parentId }).subscribe({
-      next: (r) => {
-        this.busy.set(false);
-        this.bulkPicked.set([]);
-        this.toast.success(
-          `${r.created} location${r.created === 1 ? '' : 's'} added${r.skipped ? `, ${r.skipped} duplicate(s) skipped` : ''}`
-        );
-        this.closeModal();
-        this.load();
-      },
-      error: (e) => {
-        this.busy.set(false);
-        this.toast.error(e?.error?.message || 'Could not add locations');
-      },
-    });
   }
 
   saveCode(loc: TaskLocation, newCode: string) {

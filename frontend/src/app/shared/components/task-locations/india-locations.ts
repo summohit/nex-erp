@@ -1,7 +1,7 @@
 /**
- * Suggested task locations: India's states and union territories, each with
- * its principal cities. Only suggestions — the admin picks which to add, and
- * anything missing can still be added by hand as a single location.
+ * Name suggestions for the Add Location form: India's states and union
+ * territories, each with its principal cities. Only suggestions — any name
+ * can still be typed.
  */
 export const INDIA_LOCATIONS: Record<string, string[]> = {
   // States
@@ -43,12 +43,6 @@ export const INDIA_LOCATIONS: Record<string, string[]> = {
   'Lakshadweep': ['Kavaratti', 'Agatti', 'Minicoy', 'Amini', 'Andrott'],
   'Puducherry': ['Puducherry', 'Karaikal', 'Mahe', 'Yanam'],
 };
-
-/** Union territories, so the picker can label them. */
-export const INDIA_UNION_TERRITORIES = new Set([
-  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
-  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
-]);
 
 /** The suggested cities for a state, matched on its name regardless of case. */
 export function suggestedCities(stateName: string): string[] {
