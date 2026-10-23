@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, HttpException, HttpStatus, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, HttpException, HttpStatus, ForbiddenException, BadRequestException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ProjectTicketsService } from '../tickets/project-tickets.service';
 import axios from 'axios';
@@ -48,6 +48,7 @@ function sameValue(next: unknown, current: unknown): boolean {
 }
 import { assertWithinAllowedHours, remainingHours, HoursExceeded } from '../../tasks/task-hours';
 import { locationProgress } from '../task-locations/location-rules';
+import { TaskLocationsService } from '../task-locations/task-locations.service';
 import { resolveProjectViewer, taskVisibilityFilter, mayChangeAnyTask, seesEveryTask, PROJECT_ROLE } from '../project-roles';
 import { isSuperAdmin, isCompanyAdmin } from '../../common/company-roles';
 import { describeChanges, diffFields, recordApprovalEdit, requireEditReason } from '../../common/approval-edits';
@@ -64,6 +65,9 @@ export class IssuesService {
     private tasksGateway: TasksGateway,
     private notificationsService: NotificationsService,
     private projectTickets: ProjectTicketsService,
+    // Optional so the unit tests that build this service by hand need not
+    // know about locations; Nest always provides it.
+    @Optional() private taskLocations?: TaskLocationsService,
   ) {}
 
   async createIssue(companyId: number, reporterId: number, projectId: number, data: any, role?: string) {
@@ -228,6 +232,15 @@ export class IssuesService {
           actor: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } }
         }
       });
+
+      // Where the task is carried out, when the board's create form chose any.
+      // Optional here: quick-add, subtasks and imports raise tasks without.
+      const locationIds = Array.isArray(data.locationIds) ? data.locationIds : [];
+      if (locationIds.length && this.taskLocations) {
+        await this.taskLocations.attachLocations(tx, {
+          companyId, issueId: created.id, actorId: reporterId, locationIds,
+        });
+      }
 
       return { issue: created, activity: createdActivity };
     });

@@ -4064,6 +4064,16 @@
         </div>
       </div>
 
+      <!-- Creating: choose where the task is carried out. -->
+      <div class="tp-locations" id="task-field-locations" *ngIf="!selectedIssue() && taskLocations().length">
+        <label>Locations <span class="required-star">*</span></label>
+        <app-location-picker [locations]="taskLocations()" [(selected)]="newLocationIds" />
+        <div class="field-error-message" *ngIf="showValidationErrors() && !newLocationIds().length">
+          <svg lucideAlertCircle size="13"></svg>
+          <span>Choose at least one location</span>
+        </div>
+      </div>
+
       <!-- Location Progress: one execution record per location. -->
       <app-task-location-panel *ngIf="selectedIssue()?.id"
         [projectId]="projectId" [issueId]="selectedIssue().id" [people]="locationPeople()"

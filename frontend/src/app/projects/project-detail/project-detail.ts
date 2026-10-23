@@ -52,11 +52,13 @@ declare var Quill: any;
 
 import { TaskTransferComponent } from '../../shared/components/task-transfer/task-transfer';
 import { TaskLocationPanelComponent, PanelPerson } from '../../shared/components/task-locations/task-location-panel';
+import { LocationPickerComponent } from '../../shared/components/task-locations/location-picker';
+import { TaskLocationsService, TaskLocation } from '../../services/task-locations.service';
 import { JiraDatePickerComponent } from '../../shared/components/jira-date-picker';
 @Component({
   selector: 'app-project-detail',
   standalone: true,
-  imports: [ProjectsComponent, TaskTransferComponent, TaskLocationPanelComponent, JiraDatePickerComponent, RouterLink, 
+  imports: [ProjectsComponent, TaskTransferComponent, TaskLocationPanelComponent, LocationPickerComponent, JiraDatePickerComponent, RouterLink, 
     CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
     TicketsTabComponent, BudgetRequestsTabComponent, DiscussionsTabComponent,
     TaskHoursRequestPanelComponent,
@@ -109,6 +111,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   projectId!: number;
   project = signal<any>(null);
+  private taskLocationsApi = inject(TaskLocationsService);
+  /** Active task locations, for the create form's Locations field. */
+  taskLocations = signal<TaskLocation[]>([]);
+  /** Locations chosen in the create form; once the task exists its panel takes over. */
+  newLocationIds = signal<number[]>([]);
   /** Who can be put on a task location: the project's members. */
   locationPeople = computed<PanelPerson[]>(() => (this.project()?.members ?? []).map((m: any) => {
     const e = m.employee ?? m;
@@ -3235,6 +3242,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   openCreateIssue(columnId?: number, initialTitle?: string, initialHours?: any, initialPhaseId?: number | null) {
     this.selectedIssue.set(null);
+    this.newLocationIds.set([]);
+    // Fetched each time: an admin may have just added some.
+    this.taskLocationsApi.list(true).subscribe({ next: (l) => this.taskLocations.set(l || []), error: () => {} });
     this.draftMembers.set([]);
     this.loadingMemberIds.set(new Set());
     this.comments.set([]);
@@ -6363,6 +6373,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         return this.isFieldInvalid(f.key);
       });
 
+      // Required once the company has set up locations, as on the Tasks page.
+      if (!firstInvalid && this.taskLocations().length && !this.newLocationIds().length) {
+        this.toast.error('Please fill in all required fields: Locations is required');
+        this.scrollToField('task-field-locations');
+        return;
+      }
+
       if (firstInvalid) {
         if (firstInvalid.key === 'dueDate' && this.issueForm.startDate && this.issueForm.dueDate && new Date(this.issueForm.dueDate) < new Date(this.issueForm.startDate)) {
           this.toast.error('Due Date cannot be before Start Date');
@@ -6389,6 +6406,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         smeId: Number(this.issueForm.smeId),
         estimatedHours: Number(this.issueForm.estimatedHours),
         assigneeId: pendingMembers[0]?.id || null,
+        locationIds: this.newLocationIds().length ? this.newLocationIds() : undefined,
       };
 
       this.projectsService.createIssue(this.projectId, payload).subscribe({
