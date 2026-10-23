@@ -1346,7 +1346,10 @@ export class IssuesService {
         await this.startTimerForEmployee(companyId, employeeId, projectId, issueId);
         timerSideEffectApplied = true;
       }
-    } else if (targetStatus === 'IN_REVIEW' && prevStatus !== 'IN_REVIEW') {
+    } else if (targetStatus && targetStatus !== 'IN_PROGRESS' && targetStatus !== prevStatus) {
+      // Any move out of work — back to To Do, on to Review, or cancelled
+      // straight from In Progress — stops a running timer. Only Review did,
+      // so a card dragged back to To Do kept accruing time nobody was spending.
       if (oldIssue.workStartedAt && !oldIssue.workCompletedAt) {
         await this.stopTimerForEmployee(companyId, employeeId, projectId, issueId);
         timerSideEffectApplied = true;
