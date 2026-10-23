@@ -7799,3 +7799,7 @@
 .btn-foot-done:hover {
   background: #0055cc;
 }
+
+/* A subproject row, indented under its parent. Rendered inside the grid, so ::ng-deep. */
+.boards-grid-table ::ng-deep .board-title-sub { padding-left: 18px; color: #334155; }
+.boards-grid-table ::ng-deep .board-title-sub .sub-arrow { color: #94a3b8; margin-right: 6px; }

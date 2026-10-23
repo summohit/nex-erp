@@ -6,7 +6,13 @@
       <button class="top-bar-back-btn" (click)="goBack()" title="Back to Projects">
         <svg lucideArrowLeft size="18"></svg>
       </button>
-      <h1 class="board-name-title">{{ project()?.name || 'Board' }}</h1>
+      <div class="board-title-stack">
+        <!-- A subproject names its parent, one click back up. -->
+        <a *ngIf="project()?.parent as par" class="board-parent-link" [routerLink]="['/projects', par.id]" title="Parent project">
+          ↰ {{ par.key }} — {{ par.name }}
+        </a>
+        <h1 class="board-name-title">{{ project()?.name || 'Board' }}</h1>
+      </div>
     </div>
 
     <div class="top-bar-right">
@@ -548,6 +554,7 @@
     <button class="project-tab-btn" *ngIf="canSeeSummary" [class.active]="activeProjectTab() === 'summary'" (click)="setProjectTab('summary')"><svg lucideGlobe size="14"></svg> Summary</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'board'" (click)="setProjectTab('board')"><svg lucideKanban size="14"></svg> Board</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'list'" (click)="setProjectTab('list')"><svg lucideList size="14"></svg> Tasks</button>
+    <button class="project-tab-btn" *ngIf="showSubprojectsTab()" [class.active]="activeProjectTab() === 'subprojects'" (click)="setProjectTab('subprojects')"><svg lucideLayers size="14"></svg> Subprojects<span class="tab-count" *ngIf="project()?.subprojects?.length">{{ project()?.subprojects?.length }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'milestones'" (click)="setProjectTab('milestones')" *ngIf="canSeeFinancialTabs"><svg lucideFlag size="14"></svg> Milestones<span class="tab-count" *ngIf="projectMilestones().length > 0">{{ projectMilestones().length }}</span></button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'roadmap'" (click)="setProjectTab('roadmap')"><svg lucideGanttChart size="14"></svg> Roadmap</button>
     <button class="project-tab-btn" [class.active]="activeProjectTab() === 'calendar'" (click)="setProjectTab('calendar')"><svg lucideCalendar size="14"></svg> Calendar</button>
@@ -673,6 +680,33 @@
           <span class="budget-kpi-sub" *ngIf="b.hours.percentUsed !== null">{{ b.hours.percentUsed }}% of planned</span>
           <span class="budget-kpi-sub muted" *ngIf="b.hours.percentUsed === null">No hours planned</span>
         </div>
+      </div>
+
+      <!-- Subprojects: a parent's budget with its subprojects counted in. -->
+      <div class="sp-budget" *ngIf="projectSummary()?.hierarchy?.combined as c">
+        <div class="sp-budget-head">
+          <strong>With subprojects</strong>
+          <span>{{ c.mode === 'SHARED' ? 'Shared budget — everyone spends from this project\'s budget' : 'Separate budgets — totals added together' }}</span>
+        </div>
+        <div class="sp-budget-row">
+          <div><span>Budget</span><b>{{ projectSummary()?.budget?.currency }} {{ c.total | number:'1.0-0' }}</b></div>
+          <div><span>Spent</span><b>{{ projectSummary()?.budget?.currency }} {{ c.spent | number:'1.0-0' }}</b><em *ngIf="c.percentUsed !== null">{{ c.percentUsed }}%</em></div>
+          <div [class.over]="c.remaining < 0"><span>{{ c.remaining < 0 ? 'Over by' : 'Remaining' }}</span><b>{{ projectSummary()?.budget?.currency }} {{ (c.remaining < 0 ? -c.remaining : c.remaining) | number:'1.0-0' }}</b></div>
+          <div><span>Hours</span><b>{{ c.loggedHours | number:'1.0-1' }}</b></div>
+        </div>
+        <table class="sp-budget-table">
+          <tr><th>Subproject</th><th *ngIf="c.mode === 'SEPARATE'">Budget</th><th>Spent</th><th>Hours</th></tr>
+          <tr *ngFor="let s of projectSummary()?.hierarchy?.subprojects" (click)="router.navigate(['/projects', s.id])">
+            <td>{{ s.key }} — {{ s.name }}</td>
+            <td *ngIf="c.mode === 'SEPARATE'">{{ s.total | number:'1.0-0' }}</td>
+            <td>{{ s.spent | number:'1.0-0' }}</td>
+            <td>{{ s.loggedHours | number:'1.0-1' }}</td>
+          </tr>
+        </table>
+      </div>
+      <div class="sp-budget-note" *ngIf="projectSummary()?.hierarchy?.parent as par">
+        <svg lucideLayers size="14"></svg>
+        <span>Subproject of <a [routerLink]="['/projects', par.id]">{{ par.key }} — {{ par.name }}</a>{{ projectSummary()?.hierarchy?.sharedBudget ? ', spending from its shared budget.' : '.' }}</span>
       </div>
 
       <!-- The spend above is understated by whatever these hours are worth, so
@@ -1131,6 +1165,17 @@
       <!-- Divider -->
       <div style="width: 1px; height: 24px; background: #e2e8f0; margin: 0 4px;"></div>
 
+      <!-- Parent project: the subprojects' tasks too, on demand. -->
+      <button *ngIf="project()?.subprojects?.length" (click)="toggleSubprojectTasks()"
+              style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap;"
+              [style.background-color]="includeSubprojectTasks() ? '#eef2ff' : '#f1f5f9'"
+              [style.color]="includeSubprojectTasks() ? '#4338ca' : '#475569'"
+              [style.border]="includeSubprojectTasks() ? '1px solid #c7d2fe' : '1px solid #e2e8f0'"
+              title="Show the subprojects' tasks in this list as well">
+        <svg lucideLayers size="14" style="width: 14px; height: 14px; flex-shrink: 0;"></svg>
+        <span>{{ loadingSubprojectIssues() ? 'Loading…' : 'Include subproject tasks' }}</span>
+      </button>
+
       <!-- Only my issues toggle -->
       <button (click)="listFilterMyIssues.set(!listFilterMyIssues())" 
               style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap;"
@@ -1536,6 +1581,10 @@
        of "may this person see money". -->
   <!-- projectId is set from the route, so the guard keeps the required input
        from ever being bound undefined on a direct load of this tab. -->
+  <div class="milestones-panel" *ngIf="activeProjectTab() === 'subprojects' && showSubprojectsTab()">
+    <app-subprojects-tab [project]="project()" [isAdmin]="isAdminUser()" (changed)="loadProjectDetails()" />
+  </div>
+
   <div class="milestones-panel" *ngIf="canSeeFinancialTabs && activeProjectTab() === 'milestones' && projectId">
     <app-milestones-tab [projectId]="projectId" />
   </div>

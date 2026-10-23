@@ -14,6 +14,8 @@ const pdfParse = require('pdf-parse');
 import * as mammoth from 'mammoth';
 import * as xlsx from 'xlsx';
 import { resolveProjectViewer, taskVisibilityFilter, seesProjectFinancials, PROJECT_ROLE, hasCompanyWideProjectAccess } from './project-roles';
+import { isCompanyAdmin } from '../common/company-roles';
+import { normaliseSubCode, subprojectKey, normaliseBudgetMode, rollUpBudget } from './subproject-rules';
 
 /**
  * Working hours in a month for pricing time from salary when an employee has
@@ -147,7 +149,10 @@ export class ProjectsService {
     }
 
     const nextSeq = String(maxSeq + 1).padStart(2, '0');
-    const finalKey = `${baseKey}${nextSeq}`;
+    // A subproject's code is not sequenced: it is its parent's code and its own
+    // sub code, worked out (and checked free) by createSubproject.
+    const sub = data.__subproject as { parentId: number; subCode: string; key: string } | undefined;
+    const finalKey = sub?.key ?? `${baseKey}${nextSeq}`;
 
     // The form sends a lead contact; this is the Client it resolves to.
     const resolvedClientId = await this.resolveClientId(companyId, data);
@@ -183,6 +188,7 @@ export class ProjectsService {
         budgetNotes: data.budgetNotes || null,
         estimatedHours: data.estimatedHours ? parseFloat(data.estimatedHours) : null,
         allowManualTimeLogging: data.allowManualTimeLogging === undefined ? true : !!data.allowManualTimeLogging,
+        ...(sub ? { parentId: sub.parentId, subCode: sub.subCode } : {}),
         companyId,
         leadId,
         members: {
@@ -1852,7 +1858,18 @@ export class ProjectsService {
         },
         client: {
           select: { id: true, name: true }
-        }
+        },
+        parent: { select: { id: true, key: true, name: true, budgetMode: true } },
+        subprojects: {
+          where: { status: 'ACTIVE' },
+          orderBy: { subCode: 'asc' },
+          select: {
+            id: true, key: true, name: true, subCode: true, workStatus: true, progress: true,
+            lead: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+            members: { where: { role: 'PROJECT_MANAGER' }, select: { employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } } } },
+            _count: { select: { issues: { where: { isArchived: false } } } },
+          },
+        },
       }
     });
 
@@ -2061,7 +2078,16 @@ export class ProjectsService {
     const pct = (used: number, total: number) =>
       total > 0 ? Math.round((used / total) * 100) : null;
 
+    // A parent sees its subprojects counted in; a subproject sees which
+    // parent it belongs to and whether it spends from that parent's budget.
+    const hierarchy = seesProjectFinancials(viewer)
+      ? await this.subprojectBudgetRollup(companyId, projectId, {
+          total: budget, spent: rollup.employeeCost, loggedHours: rollup.loggedHours,
+        })
+      : null;
+
     return {
+      hierarchy,
       budget: {
         currency: project?.currency ?? 'INR',
         /** What was agreed originally, before any approved increase. */
@@ -2280,8 +2306,11 @@ export class ProjectsService {
     const taken = await this.prisma.project.findFirst({ where: { companyId, key, id: { not: projectId } }, select: { name: true } });
     if (taken) return `"${key}" is already the code of ${taken.name}`;
     // Task IDs are unique across the company, so the new prefix must be free.
+    // The project's own subprojects are renamed with it, so their tasks
+    // (ABC-A-1) are not a clash for the parent's new code.
+    const children = await this.prisma.project.findMany({ where: { parentId: projectId }, select: { id: true } });
     const clash = await this.prisma.issue.findFirst({
-      where: { companyId, key: { startsWith: `${key}-` }, projectId: { not: projectId } },
+      where: { companyId, key: { startsWith: `${key}-` }, projectId: { notIn: [projectId, ...children.map((c) => c.id)] } },
       select: { key: true },
     });
     if (clash) return `Task ID ${clash.key} already uses "${key}" — pick another code`;
@@ -2296,25 +2325,227 @@ export class ProjectsService {
     if (problem) throw new ConflictException(problem);
 
     const oldKey = project.key;
+    const isSub = await this.prisma.project.findFirst({ where: { id: projectId, parentId: { not: null } }, select: { id: true } });
+    if (isSub) throw new BadRequestException('A subproject\'s code comes from its parent. Change its sub code instead.');
     return this.prisma.$transaction(async (tx) => {
-      const issues = await tx.issue.findMany({
-        where: { projectId, key: { startsWith: `${oldKey}-` } },
-        select: { id: true, key: true },
-      });
-      await tx.project.update({ where: { id: projectId }, data: { key } });
-      for (const i of issues) {
-        await tx.issue.update({ where: { id: i.id }, data: { key: key + i.key.slice(oldKey.length) } });
+      const tasksRenamed = await this.renameProjectKeyTx(tx, companyId, projectId, oldKey, key, actorEmployeeId);
+      // Subprojects follow: ABC-A becomes NEW-A, and their tasks with them.
+      const children = await tx.project.findMany({ where: { parentId: projectId }, select: { id: true, key: true, subCode: true } });
+      for (const c of children) {
+        if (c.subCode) await this.renameProjectKeyTx(tx, companyId, c.id, c.key, subprojectKey(key, c.subCode), actorEmployeeId);
       }
-      await tx.auditLog.create({
-        data: {
-          companyId, actorId: actorEmployeeId, action: 'PROJECT_CODE_CHANGED',
-          entityType: 'Project', entityId: String(projectId),
-          oldValue: { key: oldKey }, newValue: { key, tasksRenamed: issues.length },
-        },
-      });
-      return { oldKey, newKey: key, tasksRenamed: issues.length };
+      return { oldKey, newKey: key, tasksRenamed, subprojectsRenamed: children.length };
     }, { timeout: 60000 });
   }
+
+  /**
+   * Rename one project's code and every task ID that carries it, inside the
+   * caller's transaction, with an audit entry. Returns how many tasks moved.
+   */
+  private async renameProjectKeyTx(
+    tx: any, companyId: number, projectId: number, oldKey: string, key: string, actorEmployeeId: number | null,
+  ): Promise<number> {
+    if (oldKey === key) return 0;
+    const issues = await tx.issue.findMany({
+      where: { projectId, key: { startsWith: `${oldKey}-` } },
+      select: { id: true, key: true },
+    });
+    await tx.project.update({ where: { id: projectId }, data: { key } });
+    for (const i of issues) {
+      await tx.issue.update({ where: { id: i.id }, data: { key: key + i.key.slice(oldKey.length) } });
+    }
+    await tx.auditLog.create({
+      data: {
+        companyId, actorId: actorEmployeeId, action: 'PROJECT_CODE_CHANGED',
+        entityType: 'Project', entityId: String(projectId),
+        oldValue: { key: oldKey }, newValue: { key, tasksRenamed: issues.length },
+      },
+    });
+    return issues.length;
+  }
+
+  // ── Subprojects ──────────────────────────────────────────────────────────
+  //
+  // One level: a parent (ABC) and its subprojects (ABC-A, ABC-B). Each
+  // subproject is a full project — its own board, tasks, people and PM, chosen
+  // by an administrator; nothing is inherited from the parent's team. Only
+  // administrators create, attach or detach them.
+
+  private assertSubprojectAdmin(role?: string) {
+    if (!isCompanyAdmin(role)) throw new ForbiddenException('Only an administrator can manage subprojects.');
+  }
+
+  /** The parent, checked: real, in this company, and not itself a subproject. */
+  private async loadParent(companyId: number, parentId: number) {
+    const parent = await this.prisma.project.findFirst({
+      where: { id: parentId, companyId, isSystem: false },
+      select: {
+        id: true, key: true, name: true, parentId: true, budgetMode: true, departmentId: true, category: true,
+        startDate: true, endDate: true, leadContactId: true, currency: true, billingType: true, leadId: true,
+      },
+    });
+    if (!parent) throw new NotFoundException('Parent project not found');
+    if (parent.parentId) throw new BadRequestException(`${parent.name} is itself a subproject — subprojects go one level deep.`);
+    return parent;
+  }
+
+  /** Whether a code is free for a project, its tasks included. */
+  private async codeProblem(companyId: number, key: string, exceptProjectId?: number): Promise<string | null> {
+    const taken = await this.prisma.project.findFirst({
+      where: { companyId, key, ...(exceptProjectId ? { id: { not: exceptProjectId } } : {}) }, select: { name: true },
+    });
+    if (taken) return `"${key}" is already the code of ${taken.name}`;
+    const clash = await this.prisma.issue.findFirst({
+      where: { companyId, key: { startsWith: `${key}-` }, ...(exceptProjectId ? { projectId: { not: exceptProjectId } } : {}) },
+      select: { key: true },
+    });
+    if (clash) return `Task ID ${clash.key} already uses "${key}"`;
+    return null;
+  }
+
+  /**
+   * A new subproject under `parentId`. Name, sub code and at least one project
+   * manager are needed; dates, department, category, client and currency come
+   * from the parent unless given. Under a SHARED parent it has no budget of its
+   * own — it spends from the parent's.
+   */
+  async createSubproject(companyId: number, actorEmployeeId: number, role: string | undefined, parentId: number, data: any) {
+    this.assertSubprojectAdmin(role);
+    const parent = await this.loadParent(companyId, parentId);
+    const subCode = normaliseSubCode(data?.subCode);
+    const key = subprojectKey(parent.key, subCode);
+    const problem = await this.codeProblem(companyId, key);
+    if (problem) throw new ConflictException(problem);
+    const pmIds: number[] = (Array.isArray(data?.pmIds) ? data.pmIds : []).map(Number).filter(Boolean);
+    if (!pmIds.length) throw new BadRequestException('Assign a project manager to the subproject.');
+    const memberIds: number[] = [...new Set<number>([
+      ...pmIds, ...(Array.isArray(data?.memberIds) ? data.memberIds : []).map(Number),
+    ])].filter(Boolean);
+    const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : undefined);
+    return this.createProject(companyId, parent.leadId ?? actorEmployeeId, {
+      name: String(data?.name ?? '').trim(),
+      description: data?.description,
+      startDate: data?.startDate || day(parent.startDate),
+      endDate: data?.endDate || day(parent.endDate),
+      departmentId: data?.departmentId || parent.departmentId,
+      category: data?.category || parent.category,
+      leadContactId: parent.leadContactId ?? undefined,
+      currency: parent.currency,
+      billingType: parent.billingType,
+      budgetAmount: parent.budgetMode === 'SHARED' ? null : data?.budgetAmount,
+      estimatedHours: data?.estimatedHours,
+      pmIds,
+      memberIds,
+      __subproject: { parentId: parent.id, subCode, key },
+    });
+  }
+
+  /** Put an existing project under a parent. Its code, and its tasks', become PARENT-SUB. */
+  async attachSubproject(companyId: number, actorEmployeeId: number | null, role: string | undefined, parentId: number, data: any) {
+    this.assertSubprojectAdmin(role);
+    const parent = await this.loadParent(companyId, parentId);
+    const childId = Number(data?.projectId);
+    if (!childId || childId === parent.id) throw new BadRequestException('Choose another project to add as a subproject.');
+    const child = await this.prisma.project.findFirst({
+      where: { id: childId, companyId, isSystem: false },
+      select: { id: true, key: true, name: true, parentId: true, _count: { select: { subprojects: true } } },
+    });
+    if (!child) throw new NotFoundException('Project not found');
+    if (child.parentId) throw new BadRequestException(`${child.name} is already a subproject. Detach it first.`);
+    if (child._count.subprojects) {
+      throw new BadRequestException(`${child.name} has subprojects of its own — subprojects go one level deep.`);
+    }
+    const subCode = normaliseSubCode(data?.subCode);
+    const key = subprojectKey(parent.key, subCode);
+    const problem = await this.codeProblem(companyId, key, child.id);
+    if (problem) throw new ConflictException(problem);
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.project.update({ where: { id: child.id }, data: { parentId: parent.id, subCode } });
+      const tasksRenamed = await this.renameProjectKeyTx(tx, companyId, child.id, child.key, key, actorEmployeeId);
+      return { id: child.id, oldKey: child.key, newKey: key, tasksRenamed };
+    }, { timeout: 60000 });
+  }
+
+  /** Take a subproject out from under its parent. It keeps its current code. */
+  async detachSubproject(companyId: number, role: string | undefined, projectId: number) {
+    this.assertSubprojectAdmin(role);
+    const p = await this.prisma.project.findFirst({ where: { id: projectId, companyId }, select: { id: true, parentId: true } });
+    if (!p) throw new NotFoundException('Project not found');
+    if (!p.parentId) throw new BadRequestException('That project is not a subproject.');
+    await this.prisma.project.update({ where: { id: projectId }, data: { parentId: null, subCode: null } });
+    return { detached: true };
+  }
+
+  /** Change a subproject's own part of the code: ABC-A → ABC-NORTH. */
+  async changeSubCode(companyId: number, actorEmployeeId: number | null, role: string | undefined, projectId: number, rawSubCode: any) {
+    this.assertSubprojectAdmin(role);
+    const p = await this.prisma.project.findFirst({
+      where: { id: projectId, companyId }, select: { id: true, key: true, parent: { select: { key: true } } },
+    });
+    if (!p) throw new NotFoundException('Project not found');
+    if (!p.parent) throw new BadRequestException('That project is not a subproject.');
+    const subCode = normaliseSubCode(rawSubCode);
+    const key = subprojectKey(p.parent.key, subCode);
+    if (key === p.key) return { newKey: key, tasksRenamed: 0 };
+    const problem = await this.codeProblem(companyId, key, p.id);
+    if (problem) throw new ConflictException(problem);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.project.update({ where: { id: p.id }, data: { subCode } });
+      const tasksRenamed = await this.renameProjectKeyTx(tx, companyId, p.id, p.key, key, actorEmployeeId);
+      return { newKey: key, tasksRenamed };
+    }, { timeout: 60000 });
+  }
+
+  /** SEPARATE or SHARED budgets for a parent's subprojects. */
+  async setBudgetMode(companyId: number, role: string | undefined, projectId: number, rawMode: any) {
+    this.assertSubprojectAdmin(role);
+    const mode = normaliseBudgetMode(rawMode);
+    const parent = await this.loadParent(companyId, projectId);
+    await this.prisma.project.update({ where: { id: parent.id }, data: { budgetMode: mode } });
+    return { budgetMode: mode };
+  }
+
+  /**
+   * The parent's budget with its subprojects counted, for the Summary tab.
+   * Each subproject's own figures come from the same cost roll-up the project
+   * list uses, so the numbers agree everywhere.
+   */
+  private async subprojectBudgetRollup(companyId: number, projectId: number, own: { total: number; spent: number; loggedHours: number }) {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, companyId },
+      select: {
+        budgetMode: true,
+        parent: { select: { id: true, key: true, name: true, budgetMode: true } },
+        subprojects: { where: { status: 'ACTIVE' }, select: { id: true, key: true, name: true, budgetAmount: true } },
+      },
+    });
+    if (!project) return null;
+    if (project.parent) {
+      return { parent: project.parent, sharedBudget: project.parent.budgetMode === 'SHARED' };
+    }
+    if (!project.subprojects.length) return null;
+    const ids = project.subprojects.map((c) => c.id);
+    const [costs, extras] = await Promise.all([
+      this.getCostRollupByProject(ids, companyId),
+      this.prisma.projectBudgetRequest.groupBy({
+        by: ['projectId'], where: { projectId: { in: ids }, companyId, status: 'APPROVED' }, _sum: { additionalBudget: true },
+      }),
+    ]);
+    const extraBy = new Map(extras.map((e: any) => [e.projectId, e._sum.additionalBudget ?? 0]));
+    const children = project.subprojects.map((c) => {
+      const cost = costs.get(c.id) ?? { loggedHours: 0, employeeCost: 0, unratedHours: 0 };
+      return {
+        id: c.id, key: c.key, name: c.name,
+        total: (c.budgetAmount ?? 0) + (extraBy.get(c.id) ?? 0),
+        spent: Math.round(cost.employeeCost * 100) / 100,
+        loggedHours: Math.round(cost.loggedHours * 100) / 100,
+      };
+    });
+    const mode = project.budgetMode === 'SHARED' ? 'SHARED' : 'SEPARATE';
+    return { combined: rollUpBudget(mode, own, children), subprojects: children };
+  }
+
 
   async updateProject(companyId: number, id: number, data: any) {
     const project = await this.prisma.project.findUnique({

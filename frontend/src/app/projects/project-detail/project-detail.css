@@ -11845,3 +11845,26 @@ input[type=text], input[type=email], input[type=password] {
 .card-location-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 2px; }
 .card-location-chip { background: #EFF6FF; color: #1E40AF; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 600; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-location-more { color: #64748B; font-size: 11px; font-weight: 600; padding: 1px 2px; }
+
+/* Subproject: the parent above the title. */
+.board-title-stack { display: flex; flex-direction: column; min-width: 0; }
+.board-parent-link { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.8); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board-parent-link:hover { color: #fff; text-decoration: underline; }
+
+/* Summary: a parent's budget with its subprojects counted. */
+.sp-budget { background: #fff; border: 1px solid #C7D2FE; border-radius: 14px; padding: 14px 16px; margin: 12px 0; }
+.sp-budget-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-size: 13px; color: #64748B; margin-bottom: 10px; }
+.sp-budget-head strong { color: #3730A3; font-size: 14px; }
+.sp-budget-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.sp-budget-row div { display: flex; flex-direction: column; gap: 2px; background: #F8FAFC; border-radius: 10px; padding: 8px 12px; }
+.sp-budget-row div.over b { color: #DC2626; }
+.sp-budget-row span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748B; }
+.sp-budget-row b { font-size: 16px; color: #0F172A; }
+.sp-budget-row em { font-style: normal; font-size: 12px; color: #64748B; }
+.sp-budget-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sp-budget-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #64748B; padding: 6px 8px; border-bottom: 1px solid #E2E8F0; }
+.sp-budget-table td { padding: 7px 8px; border-bottom: 1px solid #F1F5F9; color: #334155; }
+.sp-budget-table tr:not(:first-child) { cursor: pointer; }
+.sp-budget-table tr:not(:first-child):hover td { background: #F8FAFC; }
+.sp-budget-note { display: flex; gap: 8px; align-items: center; font-size: 13px; color: #475569; margin: 10px 0; }
+.sp-budget-note a { color: var(--color-primary, #1373E5); font-weight: 600; text-decoration: none; }

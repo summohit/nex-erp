@@ -60,7 +60,18 @@ export interface ScopeRequest {
   attachments?: { id: number; url: string; name: string; sizeBytes?: number | null }[];
 }
 
+/** A parent's budget with its subprojects counted, or a subproject's parent. */
+export interface ProjectHierarchySummary {
+  /** On a subproject: its parent, and whether it spends from the parent's budget. */
+  parent?: { id: number; key: string; name: string; budgetMode: string };
+  sharedBudget?: boolean;
+  /** On a parent: everything counted together. */
+  combined?: { mode: 'SEPARATE' | 'SHARED'; total: number; spent: number; remaining: number; loggedHours: number; percentUsed: number | null };
+  subprojects?: { id: number; key: string; name: string; total: number; spent: number; loggedHours: number }[];
+}
+
 export interface ProjectSummary {
+  hierarchy?: ProjectHierarchySummary | null;
   budget?: ProjectBudgetSummary;
   metrics: {
     completedLast7Days: number;
@@ -268,6 +279,23 @@ export class ProjectsService {
    * to override, and the move is retried with the override if they agree.
    * Anyone else gets the server's refusal as usual.
    */
+  // ── Subprojects (administrators) ──────────────────────────────────────
+  createSubproject(parentId: number, data: { name: string; subCode: string; pmIds: number[]; memberIds?: number[]; budgetAmount?: number | null; startDate?: string; endDate?: string }) {
+    return this.http.post<any>(`${this.apiUrl}/${parentId}/subprojects`, data);
+  }
+  attachSubproject(parentId: number, projectId: number, subCode: string) {
+    return this.http.post<{ id: number; oldKey: string; newKey: string; tasksRenamed: number }>(`${this.apiUrl}/${parentId}/subprojects/attach`, { projectId, subCode });
+  }
+  detachSubproject(projectId: number) {
+    return this.http.post<{ detached: boolean }>(`${this.apiUrl}/${projectId}/detach`, {});
+  }
+  changeSubCode(projectId: number, subCode: string) {
+    return this.http.patch<{ newKey: string; tasksRenamed: number }>(`${this.apiUrl}/${projectId}/sub-code`, { subCode });
+  }
+  setBudgetMode(projectId: number, budgetMode: 'SEPARATE' | 'SHARED') {
+    return this.http.patch<{ budgetMode: string }>(`${this.apiUrl}/${projectId}/budget-mode`, { budgetMode });
+  }
+
   updateIssue(projectId: number, issueId: number, data: any): Observable<any> {
     const put = (body: any) => this.http.put<any>(`${this.apiUrl}/${projectId}/issues/${issueId}`, body);
     return put(data).pipe(

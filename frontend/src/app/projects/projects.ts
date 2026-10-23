@@ -1076,7 +1076,10 @@ export class ProjectsComponent implements OnInit {
       field: 'name',
       flex: 1.5,
       minWidth: 150,
-      cellRenderer: (params: any) => `<span class="board-title">${params.value || '—'}</span>`
+      // A subproject sits indented under its parent, marked with an arrow.
+      cellRenderer: (params: any) => params.data?.parentId
+        ? `<span class="board-title board-title-sub"><span class="sub-arrow">↳</span>${params.value || '—'}</span>`
+        : `<span class="board-title">${params.value || '—'}</span>`
     },
     {
       headerName: 'Members',
@@ -2056,14 +2059,40 @@ export class ProjectsComponent implements OnInit {
     list = this.applyQuickFilter(list);
     list = this.applyProjectFilters(list);
 
-    if (!q) return list;
     // §3: name, code and client are all searchable from the one box.
-    return list.filter(p =>
-      p.name.toLowerCase().includes(q)
-      || p.key?.toLowerCase().includes(q)
-      || p.client?.name?.toLowerCase().includes(q)
-    );
+    if (q) {
+      list = list.filter(p =>
+        p.name.toLowerCase().includes(q)
+        || p.key?.toLowerCase().includes(q)
+        || p.client?.name?.toLowerCase().includes(q)
+      );
+    }
+    return this.nestSubprojects(list);
   });
+
+  /**
+   * Subprojects directly under their parent (ABC, then ABC-A, ABC-B), in sub
+   * code order. A subproject whose parent is not in the list — filtered out,
+   * or not visible to this person — stays where it was.
+   */
+  private nestSubprojects(list: any[]): any[] {
+    const ids = new Set(list.map((p) => p.id));
+    const childrenOf = new Map<number, any[]>();
+    for (const p of list) {
+      if (p.parentId && ids.has(p.parentId)) {
+        childrenOf.set(p.parentId, [...(childrenOf.get(p.parentId) ?? []), p]);
+      }
+    }
+    if (!childrenOf.size) return list;
+    const out: any[] = [];
+    for (const p of list) {
+      if (p.parentId && ids.has(p.parentId)) continue;
+      out.push(p);
+      const kids = (childrenOf.get(p.id) ?? []).sort((a, b) => String(a.subCode ?? '').localeCompare(String(b.subCode ?? '')));
+      out.push(...kids);
+    }
+    return out;
+  }
 
   starredProjects = computed(() => {
     if (this.isAdmin) return this.myProjects().filter(p => p.members?.some((m: any) => m.employeeId === this.currentUser()?.employeeId && m.isStarred));

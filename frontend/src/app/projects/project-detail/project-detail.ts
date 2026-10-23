@@ -1,5 +1,6 @@
 import { Component, signal, computed, effect, inject, OnInit, OnDestroy, ViewChild, ElementRef, ViewEncapsulation } from '@angular/core';
 import { forkJoin, of } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -55,12 +56,13 @@ import { TaskLocationPanelComponent, PanelPerson } from '../../shared/components
 import { LocationPickerComponent } from '../../shared/components/task-locations/location-picker';
 import { LocationDraftsComponent, LocationDraft, draftComplete } from '../../shared/components/task-locations/location-drafts';
 import { TaskLocationsSimpleComponent } from '../../shared/components/task-locations/task-locations-simple';
+import { SubprojectsTabComponent } from '../subprojects/subprojects-tab';
 import { TaskLocationsService, TaskLocation, LOCATION_TRACKING_ENABLED } from '../../services/task-locations.service';
 import { JiraDatePickerComponent } from '../../shared/components/jira-date-picker';
 @Component({
   selector: 'app-project-detail',
   standalone: true,
-  imports: [ProjectsComponent, TaskTransferComponent, TaskLocationPanelComponent, LocationPickerComponent, LocationDraftsComponent, TaskLocationsSimpleComponent, JiraDatePickerComponent, RouterLink, 
+  imports: [ProjectsComponent, TaskTransferComponent, TaskLocationPanelComponent, LocationPickerComponent, LocationDraftsComponent, TaskLocationsSimpleComponent, SubprojectsTabComponent, JiraDatePickerComponent, RouterLink, 
     CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
     TicketsTabComponent, BudgetRequestsTabComponent, DiscussionsTabComponent,
     TaskHoursRequestPanelComponent,
@@ -95,7 +97,7 @@ import { JiraDatePickerComponent } from '../../shared/components/jira-date-picke
 export class ProjectDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private roles = inject(RoleService);
-  private router = inject(Router);
+  router = inject(Router);
   private projectsService = inject(ProjectsService);
   private uploadService = inject(UploadService);
   private authService = inject(AuthService);
@@ -118,6 +120,17 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   taskLocations = signal<TaskLocation[]>([]);
   /** Locations chosen in the create form; once the task exists its panel takes over. */
   newLocationIds = signal<number[]>([]);
+  /**
+   * The Subprojects tab: on a project that has subprojects, and for an
+   * administrator on any top-level project (so the first one can be added).
+   * Never on a subproject — they go one level deep.
+   */
+  showSubprojectsTab(): boolean {
+    const p = this.project();
+    if (!p || p.parent || p.isSystem) return false;
+    return (p.subprojects?.length ?? 0) > 0 || this.isAdminUser();
+  }
+
   /** Per-location tracking (details, progress panel, card pill), off for now. */
   readonly locationTracking = LOCATION_TRACKING_ENABLED;
   /** Every location on a card, for the hover text behind its chips. */
@@ -827,8 +840,37 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     { value: 'REJECTED', label: 'Needs Changes (Rejected)', color: '#e11d48' },
   ];
 
+  /**
+   * Parent project only: show the subprojects' tasks in the Tasks list as well.
+   * Off by default so the parent's own list stays uncluttered. Each
+   * subproject's tasks are fetched with that subproject's own visibility, so
+   * nobody sees a task there they could not see on its board.
+   */
+  includeSubprojectTasks = signal(false);
+  subprojectIssues = signal<any[]>([]);
+  loadingSubprojectIssues = signal(false);
+
+  toggleSubprojectTasks() {
+    const on = !this.includeSubprojectTasks();
+    this.includeSubprojectTasks.set(on);
+    if (!on) return;
+    const children = this.project()?.subprojects || [];
+    if (!children.length) { this.subprojectIssues.set([]); return; }
+    this.loadingSubprojectIssues.set(true);
+    forkJoin<any[][]>(children.map((c: any) => this.projectsService.getIssues(c.id).pipe(
+      map((rows: any[]) => (rows || []).map((r) => ({ ...r, _subproject: { id: c.id, key: c.key, name: c.name } }))),
+      catchError(() => of([])),
+    ))).subscribe((lists: any[][]) => {
+      this.subprojectIssues.set(lists.flat());
+      this.loadingSubprojectIssues.set(false);
+    });
+  }
+
   filteredListIssues = computed(() => {
     let issues = this.activeIssues();
+    if (this.includeSubprojectTasks()) {
+      issues = [...issues, ...this.subprojectIssues().filter((i) => !i.isArchived)];
+    }
     
     const search = this.listSearchQuery().toLowerCase();
     if (search) {
@@ -4658,6 +4700,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   ];
 
   onListGridCellClicked(event: CellClickedEvent) {
+    // A subproject's task belongs to that subproject's board: open it there.
+    const sub = (event.data as any)?._subproject;
+    if (sub) {
+      this.router.navigate(['/projects', sub.id], { queryParams: { task: (event.data as any).id } });
+      return;
+    }
+
     // An evidence thumbnail is rendered inside the row, so a click on one
     // arrives here as an ordinary cell click too. Previewing wins; anything
     // else falls through to opening the task.
