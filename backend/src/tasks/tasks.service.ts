@@ -1,11 +1,13 @@
 import {
-  Injectable, BadRequestException, ForbiddenException, NotFoundException,
+  Injectable, BadRequestException, ForbiddenException, NotFoundException, Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { approvedOrRaisedBy } from '../projects/project-roles';
 import { TasksGateway } from '../events/tasks/tasks.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CrmService } from '../crm/crm.service';
+import { TaskLocationsService } from '../projects/task-locations/task-locations.service';
+import { locationProgress } from '../projects/task-locations/location-rules';
 import { MyTaskDto, NormalisedStatus, TaskPerson } from './dto/my-task.dto';
 import { canCreateTask } from './task-permissions';
 import { APPROVAL_STATE, needsApprovalOnCreate } from '../approvals/two-step-approval';
@@ -46,6 +48,9 @@ export class TasksService {
     private tasksGateway: TasksGateway,
     private notificationsService: NotificationsService,
     private crm: CrmService,
+    // Optional so the unit tests that build this service by hand need not
+    // know about locations; Nest always provides it.
+    @Optional() private taskLocations?: TaskLocationsService,
   ) {}
 
   /**
@@ -429,6 +434,8 @@ export class TasksService {
       attachments?: { fileName: string; fileUrl: string; fileSize?: number }[];
       /** Work already completed by the employee raising this task. */
       initialTimeLog?: { startedAt: string; endedAt: string; note?: string };
+      /** Where the task is carried out; one execution record per location. */
+      locationIds?: number[];
     },
   ) {
     if (!data?.title?.trim()) throw new BadRequestException('A task needs a title.');
@@ -533,6 +540,18 @@ export class TasksService {
       });
       if (phasesExist > 0) {
         throw new BadRequestException('Choose the project phase this task belongs to.');
+      }
+    }
+
+    // Where the work happens. Required for project and general tasks once the
+    // company has set up locations at all — the same conditional rule phases
+    // follow, so a company that has not adopted locations is unaffected.
+    // Pre-sales tasks never carry locations.
+    const locationIds = [...new Set((data.locationIds ?? []).map(Number).filter(Boolean))];
+    if (this.taskLocations && data.parentKind !== 'LEAD' && !locationIds.length) {
+      const locationsExist = await this.prisma.taskLocation.count({ where: { companyId, isActive: true } });
+      if (locationsExist > 0) {
+        throw new BadRequestException('Choose at least one location this task is carried out at.');
       }
     }
 
@@ -658,6 +677,12 @@ export class TasksService {
         data: { action: 'CREATED', issueId: created.id, actorId: reporterId },
       });
 
+      if (this.taskLocations && data.parentKind !== 'LEAD' && locationIds.length) {
+        await this.taskLocations.attachLocations(tx, {
+          companyId, issueId: created.id, actorId: reporterId, locationIds,
+        });
+      }
+
       return created;
     });
 
@@ -746,6 +771,7 @@ export class TasksService {
         projectTicket: { select: { id: true, ticketNumber: true } },
         assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         _count: { select: { attachments: true } },
+        locations: { where: { removedAt: null }, select: { status: true, dueDate: true } },
         members: {
           select: {
             employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
@@ -782,6 +808,7 @@ export class TasksService {
         : { kind: 'PROJECT' as const, id: i.project!.id, name: i.project!.name };
 
       return {
+        locations: i.locations.length ? locationProgress(i.locations, now) : null,
         approvalState: i.approvalState ?? null,
         approvalRejectionReason: i.approvalRejectionReason ?? null,
         source: general ? 'GENERAL' : 'PROJECT',

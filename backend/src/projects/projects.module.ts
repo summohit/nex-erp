@@ -32,10 +32,13 @@ import { ScopeRequestsService } from './scope-requests/scope-requests.service';
 import { TaskApprovalsController } from './issues/task-approvals.controller';
 import { VisitLocationRequestsController } from './visit-location-requests/visit-location-requests.controller';
 import { VisitLocationRequestsService } from './visit-location-requests/visit-location-requests.service';
+import { TaskLocationsController, IssueLocationsController } from './task-locations/task-locations.controller';
+import { TaskLocationsService } from './task-locations/task-locations.service';
 
 @Module({
   imports: [PrismaModule, EventsModule, NotificationsModule, CrmModule],
-  controllers: [TaskTransferController, ProjectsController, IssuesController, BoardsController, LabelsController, MilestonesController, ProjectTicketsController, BudgetRequestsController, TaskHoursRequestsController, ProjectDiscussionsController, ScopeRequestsController, TaskApprovalsController, VisitLocationRequestsController],
-  providers: [TaskTransferService, ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, MilestonesService, IssueRemindersCron, ProjectTicketsService, BudgetRequestsService, TaskHoursRequestsService, ProjectDiscussionsService, ScopeRequestsService, VisitLocationRequestsService]
+  controllers: [TaskTransferController, ProjectsController, IssuesController, BoardsController, LabelsController, MilestonesController, ProjectTicketsController, BudgetRequestsController, TaskHoursRequestsController, ProjectDiscussionsController, ScopeRequestsController, TaskApprovalsController, VisitLocationRequestsController, TaskLocationsController, IssueLocationsController],
+  providers: [TaskTransferService, ProjectsService, ProjectAiService, IssuesService, BoardsService, LabelsService, MilestonesService, IssueRemindersCron, ProjectTicketsService, BudgetRequestsService, TaskHoursRequestsService, ProjectDiscussionsService, ScopeRequestsService, VisitLocationRequestsService, TaskLocationsService],
+  exports: [TaskLocationsService]
 })
 export class ProjectsModule {}

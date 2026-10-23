@@ -1141,6 +1141,11 @@
             <span>Filters</span>
             <span class="quick-filter-count" *ngIf="activeTaskFilterCount() > 0">{{ activeTaskFilterCount() }}</span>
           </button>
+          <button type="button" class="toggle-done-pill" (click)="myTasksByLocation.set(!myTasksByLocation())"
+                  [class.active]="myTasksByLocation()" title="Every location of every task, one row each">
+            <svg lucideMapPin size="14"></svg>
+            <span>By location</span>
+          </button>
           <button type="button" class="toggle-done-pill" (click)="toggleMyTasksDone()" [class.active]="myTasksShowDone()" title="Toggle completed tasks visibility">
             <svg lucideCheckCircle2 size="14"></svg>
             <span>{{ myTasksShowDone() ? 'Hide completed' : 'Show completed' }}</span>
@@ -1495,6 +1500,7 @@
       </div>
     </div>
 
+    <ng-container *ngIf="!myTasksByLocation(); else byLocationView">
     <!-- Notices Container (Overdue, Blocked, Truncated) -->
     <div class="notices-container" *ngIf="myTasksOverdueCount() || myTasksBlockedCount() || myTasksTruncated()">
       <div class="quota-notice-card warn" *ngIf="myTasksOverdueCount() && myTasksFilter() !== 'overdue'">
@@ -1655,6 +1661,13 @@
         </button>
       </div>
     </div>
+    </ng-container>
+
+    <!-- By location: every location of every task this person can see, flat,
+         with its own status — and the per-task location report. -->
+    <ng-template #byLocationView>
+      <app-location-executions />
+    </ng-template>
   </div>
 
   <!-- 🗃️ Archived Section -->
@@ -2032,6 +2045,21 @@
         </div>
         <span class="field-error" *ngIf="taskError('phase') as m">{{ m }}</span>
       </div>
+    </div>
+
+    <!-- Where the task is carried out. Each location becomes its own execution
+         record with its own status, people and evidence; the task completes
+         when they all do. Not offered on pre-sales tasks. -->
+    <div class="form-group" *ngIf="taskForm.parentKind !== 'LEAD' && (taskLocations().length || isAdmin)">
+      <label class="form-label">
+        Locations <span class="req" *ngIf="taskLocations().length">*</span>
+        <a *ngIf="isAdmin" routerLink="/settings/master-data" [queryParams]="{ tab: 'task-locations' }"
+           class="form-label-link" (click)="isCreateTaskOpen.set(false)">Manage locations</a>
+      </label>
+      <app-location-picker *ngIf="taskLocations().length" [locations]="taskLocations()"
+        [selected]="taskForm.locationIds" (selectedChange)="taskForm.locationIds = $event; revalidateTask()" />
+      <span class="field-hint" *ngIf="!taskLocations().length">No task locations are set up yet.</span>
+      <span class="field-error" *ngIf="taskError('locations') as m">{{ m }}</span>
     </div>
 
     <!-- Attributes: Task Type & Priority (Searchable Selects) -->

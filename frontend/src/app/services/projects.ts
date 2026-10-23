@@ -1,6 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
+import { Observable, catchError, from, switchMap, throwError } from 'rxjs';
+import { DialogService } from '../shared/services/dialog.service';
 
 /** §PB3: hours logged on a project, per person and per day. */
 export interface TimesheetGraph {
@@ -80,6 +82,7 @@ export interface ProjectSummary {
 })
 export class ProjectsService {
   private http = inject(HttpClient);
+  private dialog = inject(DialogService);
   private apiUrl = `${environment.apiUrl}/projects`;
 
   getProjects() {
@@ -259,8 +262,24 @@ export class ProjectsService {
     return this.http.post<any>(`${this.apiUrl}/${projectId}/issues`, data);
   }
 
-  updateIssue(projectId: number, issueId: number, data: any) {
-    return this.http.put<any>(`${this.apiUrl}/${projectId}/issues/${issueId}`, data);
+  /**
+   * Every board move goes through here, so this is where a move to Done on a
+   * task with open locations is answered: an administrator is asked whether
+   * to override, and the move is retried with the override if they agree.
+   * Anyone else gets the server's refusal as usual.
+   */
+  updateIssue(projectId: number, issueId: number, data: any): Observable<any> {
+    const put = (body: any) => this.http.put<any>(`${this.apiUrl}/${projectId}/issues/${issueId}`, body);
+    return put(data).pipe(
+      catchError((err) => {
+        const e = err?.error;
+        if (e?.code !== 'OPEN_LOCATIONS' || !e.canOverride || data?.overrideOpenLocations) return throwError(() => err);
+        return from(this.dialog.confirm(
+          `${e.open} of ${e.total} locations are still open. Mark the task done anyway? This is recorded in its history.`,
+          'Locations still open', 'Mark done anyway', 'Cancel', 'danger',
+        )).pipe(switchMap((yes) => (yes ? put({ ...data, overrideOpenLocations: true }) : throwError(() => err))));
+      }),
+    );
   }
 
   startTime(projectId: number, issueId: number) {

@@ -2998,6 +2998,17 @@
 
               <div class="card-title">{{ issue.title }}</div>
 
+              <!-- Location-wise execution: "8/17 locations" and how far along. -->
+              <div class="card-locations" *ngIf="issue.locationProgress as lp"
+                   [title]="lp.completed + ' of ' + lp.total + ' locations completed'">
+                <div class="card-locations-row">
+                  <span>{{ lp.completed }}/{{ lp.total }} locations</span>
+                  <span class="card-locations-bad" *ngIf="lp.blocked">{{ lp.blocked }} blocked</span>
+                  <span class="card-locations-bad" *ngIf="lp.overdue">{{ lp.overdue }} overdue</span>
+                </div>
+                <div class="card-locations-bar"><span [style.width.%]="lp.percent"></span></div>
+              </div>
+
               <div class="card-footer-meta flex items-center justify-between" *ngIf="issue.key || getIssueTimeSummary(issue) || (issue.members && issue.members.length > 0)">
                 <div class="card-meta-left-group flex items-center gap-1.5 flex-wrap min-w-0">
                   <span class="card-key" *ngIf="issue.key">{{ issue.key }}</span>
@@ -4052,6 +4063,11 @@
           <span class="tp-extra-hint" *ngIf="!smeOptions().length">Add a PM or Technical Architect to this project to choose an SME.</span>
         </div>
       </div>
+
+      <!-- Location Progress: one execution record per location. -->
+      <app-task-location-panel *ngIf="selectedIssue()?.id"
+        [projectId]="projectId" [issueId]="selectedIssue().id" [people]="locationPeople()"
+        (changed)="loadBoardAndIssues()" />
 
       <!-- Time Tracking Section -->
       <div class="modal-time-tracking-section mb-6" id="task-field-estimated-hours">

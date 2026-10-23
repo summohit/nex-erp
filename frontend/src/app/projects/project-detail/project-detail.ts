@@ -51,11 +51,12 @@ ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
 declare var Quill: any;
 
 import { TaskTransferComponent } from '../../shared/components/task-transfer/task-transfer';
+import { TaskLocationPanelComponent, PanelPerson } from '../../shared/components/task-locations/task-location-panel';
 import { JiraDatePickerComponent } from '../../shared/components/jira-date-picker';
 @Component({
   selector: 'app-project-detail',
   standalone: true,
-  imports: [ProjectsComponent, TaskTransferComponent, JiraDatePickerComponent, RouterLink, 
+  imports: [ProjectsComponent, TaskTransferComponent, TaskLocationPanelComponent, JiraDatePickerComponent, RouterLink, 
     CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
     TicketsTabComponent, BudgetRequestsTabComponent, DiscussionsTabComponent,
     TaskHoursRequestPanelComponent,
@@ -108,6 +109,11 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   projectId!: number;
   project = signal<any>(null);
+  /** Who can be put on a task location: the project's members. */
+  locationPeople = computed<PanelPerson[]>(() => (this.project()?.members ?? []).map((m: any) => {
+    const e = m.employee ?? m;
+    return { id: e.id ?? m.employeeId, firstName: e.firstName ?? '', lastName: e.lastName ?? '' };
+  }));
   board = signal<any>(null);
   
   // Organized by columnId

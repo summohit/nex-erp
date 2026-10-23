@@ -47,6 +47,7 @@ function sameValue(next: unknown, current: unknown): boolean {
   return String(next) === String(current);
 }
 import { assertWithinAllowedHours, remainingHours, HoursExceeded } from '../../tasks/task-hours';
+import { locationProgress } from '../task-locations/location-rules';
 import { resolveProjectViewer, taskVisibilityFilter, mayChangeAnyTask, seesEveryTask, PROJECT_ROLE } from '../project-roles';
 import { isSuperAdmin, isCompanyAdmin } from '../../common/company-roles';
 import { describeChanges, diffFields, recordApprovalEdit, requireEditReason } from '../../common/approval-edits';
@@ -357,6 +358,16 @@ export class IssuesService {
             raisedBy: { select: { id: true, firstName: true, lastName: true } },
           },
         },
+        // Location-wise execution: enough for the card's "8/17" pill and the
+        // board's location filter. The detail comes from the locations route.
+        locations: {
+          where: { removedAt: null },
+          select: {
+            status: true, dueDate: true, locationId: true,
+            location: { select: { name: true, parentId: true } },
+            assignees: { select: { employeeId: true } },
+          },
+        },
         // attachments: the proof files, so cards can show evidence was given.
         _count: { select: { comments: true, attachments: true } }
       },
@@ -384,6 +395,7 @@ export class IssuesService {
 
     return issues.map(issue => ({
       ...issue,
+      locationProgress: issue.locations.length ? locationProgress(issue.locations) : null,
       assigneeApproverIds: chainFor(issue.assigneeId)
     }));
   }
@@ -444,6 +456,44 @@ export class IssuesService {
     if (col.type === 'DONE') return true;
     const n = col.name.toLowerCase();
     return n.includes('done') || n.includes('complete') || n.includes('archive');
+  }
+
+  /**
+   * A task carried out at several locations is done when they all are. Moving
+   * it to Done by hand while some are open is refused, unless an administrator
+   * says so explicitly — and that override is written to the task's history.
+   * Tasks without locations are untouched.
+   */
+  private async assertLocationsAllowDone(
+    companyId: number, actorEmployeeId: number, issue: any, targetStatus: string | undefined, data: any, role?: string,
+  ) {
+    if (targetStatus !== 'DONE' || issue.status === 'DONE') return;
+    const rows = await this.prisma.issueLocation.findMany({
+      where: { issueId: issue.id, companyId, removedAt: null },
+      select: { status: true },
+    });
+    const open = rows.filter((r) => r.status !== 'COMPLETED').length;
+    if (!open) return;
+    if (isCompanyAdmin(role) && data.overrideOpenLocations === true) {
+      await this.prisma.issueActivity.create({
+        data: {
+          action: 'LOCATION_OVERRIDE', issueId: issue.id, actorId: actorEmployeeId,
+          field: 'locations', newValue: `${rows.length - open}/${rows.length} completed`,
+        },
+      });
+      return;
+    }
+    throw new BadRequestException({
+      statusCode: 400,
+      code: 'OPEN_LOCATIONS',
+      open,
+      total: rows.length,
+      canOverride: isCompanyAdmin(role),
+      message: `${open} of ${rows.length} locations are still open. `
+        + (isCompanyAdmin(role)
+          ? 'Confirm to mark the task done anyway.'
+          : 'The task moves to Done by itself once every location is completed.'),
+    });
   }
 
   private async assertCanCompleteOrArchive(
@@ -1186,6 +1236,7 @@ export class IssuesService {
 
     if (isRestrictedTarget) {
       await this.assertCanCompleteOrArchive(companyId, employeeId, oldIssue, role);
+      await this.assertLocationsAllowDone(companyId, employeeId, oldIssue, updateData.status ?? data.status, data, role);
       const isManager = await this.mayManageTask(companyId, projectId, employeeId, role);
       const isAssigned = oldIssue.assigneeId === employeeId
         || !!(await this.prisma.issueMember.findUnique({
@@ -2450,6 +2501,7 @@ export class IssuesService {
     let newStatus = '';
     
     if (data.action === 'APPROVE') {
+      await this.assertLocationsAllowDone(companyId, actorEmployeeId, issue, 'DONE', {});
       targetColumn = this.doneColumn(board.columns);
       newStatus = 'DONE';
     } else {

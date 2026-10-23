@@ -6,6 +6,7 @@ import { EventsModule } from '../events/events.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CrmModule } from '../crm/crm.module';
 import { JwtModule } from '@nestjs/jwt';
+import { ProjectsModule } from '../projects/projects.module';
 
 @Module({
   imports: [
@@ -16,6 +17,8 @@ import { JwtModule } from '@nestjs/jwt';
     // ownership of what a pre-sales viewer may see.
     CrmModule,
     JwtModule.register({}),
+    // For TaskLocationsService: a task raised here can carry its locations.
+    ProjectsModule,
   ],
   controllers: [TasksController],
   providers: [TasksService],

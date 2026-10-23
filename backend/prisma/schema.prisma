@@ -559,6 +559,9 @@ model Employee {
   assignedIssues      Issue[]                    @relation("IssueAssignee")
   reportedIssues      Issue[]                    @relation("IssueReporter")
   cardMemberships     IssueMember[]
+  /// Location-wise execution records this person is on, and what they did there.
+  issueLocationAssignments IssueLocationAssignee[]
+  issueLocationActivities  IssueLocationActivity[]
   issueTimeLogs       IssueTimeLog[]
   issueComments       IssueComment[]
   uploadedAttachments IssueAttachment[]
@@ -2400,6 +2403,11 @@ model Issue {
   /// The field-visit days clocked against this task (§5).
   fieldVisitAttendances FieldVisitAttendance[] @relation("FieldVisitAttendanceIssue")
 
+  /// Where this task has to be carried out, one execution record per location.
+  /// Empty on every task that predates the feature, and on any task raised
+  /// without locations — which then behaves exactly as it always has.
+  locations IssueLocation[]
+
   @@unique([key, companyId])
   /// "What is assigned to me, soonest first" — the My Tasks query.
   @@index([companyId, assigneeId, isArchived])
@@ -2478,14 +2486,21 @@ model IssueTimeLog {
   // TIMER rows are evidence of tracked work and are never rewritten. MANUAL rows
   // are the timesheet grid's own entry — one per employee/issue/day, upserted.
   // Defaults to TIMER so pre-existing rows are never eligible for deletion.
-  source      String    @default("TIMER") // TIMER, MANUAL
+  source      String    @default("TIMER") // TIMER, MANUAL, LOCATION
   /// What the person was actually doing (§19). Nullable and staying that way:
   /// the timer records a span without asking for a sentence, and thousands of
   /// rows predate the field. Migrated Workway logs carry their memo here.
   note        String?   @db.Text
+  /// The location this time was spent at, on a location-tracked task. The row
+  /// still belongs to the parent task, so the task's logged total, its hours
+  /// budget and the timesheet all keep summing one table — a location's hours
+  /// are a filter over these rows, never a second copy of them.
+  issueLocationId Int?
+  issueLocation   IssueLocation? @relation(fields: [issueLocationId], references: [id], onDelete: SetNull)
   createdAt   DateTime  @default(now())
 
   @@index([employeeId, issueId, startedAt])
+  @@index([issueLocationId])
 }
 
 /// One employee's time for one day, as a thing that can be submitted and
@@ -2555,7 +2570,13 @@ model IssueAttachment {
   issue      Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
   uploadedBy Int
   uploader   Employee @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  /// Evidence for one location of a location-tracked task. Still the task's
+  /// own attachment, so it shows in the task's file list as well.
+  issueLocationId Int?
+  issueLocation   IssueLocation? @relation(fields: [issueLocationId], references: [id], onDelete: SetNull)
   createdAt  DateTime @default(now())
+
+  @@index([issueLocationId])
 }
 
 model Label {
@@ -4837,4 +4858,106 @@ model ChatMessage {
   createdAt      DateTime         @default(now())
 
   @@index([conversationId, id])
+}
+
+/// Where work can be carried out — a state, a city within it, a site within
+/// that — managed by administrators under Master Data rather than hardcoded,
+/// so a new state or site never needs a deploy. One table with a parent link
+/// rather than three, because the depth differs between companies.
+model TaskLocation {
+  id        Int            @id @default(autoincrement())
+  name      String
+  code      String?
+  level     String         @default("STATE") // STATE, CITY, SITE
+  parentId  Int?
+  parent    TaskLocation?  @relation("TaskLocationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children  TaskLocation[] @relation("TaskLocationHierarchy")
+  /// Soft-disable once used: a location tasks were carried out at is the
+  /// truth about those tasks, so it is hidden from new ones instead.
+  isActive  Boolean        @default(true)
+  position  Int            @default(0)
+  companyId Int
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  executions IssueLocation[]
+
+  @@index([companyId, isActive])
+  @@index([parentId])
+}
+
+/// One location of a parent task, tracked on its own.
+///
+/// The parent Issue keeps everything common — title, description, priority,
+/// phase, prerequisites, estimate and overall deadline. This row keeps what
+/// differs per place: its status, its people, its dates and its evidence.
+/// Completing it says nothing about any other location.
+model IssueLocation {
+  id         Int          @id @default(autoincrement())
+  issueId    Int
+  issue      Issue        @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  locationId Int
+  location   TaskLocation @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  status     String       @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, IN_REVIEW, COMPLETED, BLOCKED
+  startDate  DateTime?
+  dueDate    DateTime?
+  /// When work here actually started and finished, as opposed to the plan above.
+  startedAt     DateTime?
+  completedAt   DateTime?
+  completedById Int?
+  remarks       String?   @db.Text
+  blockedReason String?   @db.Text
+  /// Set once the overdue notice has gone out, so it goes out once.
+  overdueNotifiedAt DateTime?
+  /// Removed from the task after work had been recorded against it. Kept, not
+  /// deleted, so its time, evidence and history survive; it simply stops
+  /// counting toward progress. Re-adding the location restores this row.
+  removedAt   DateTime?
+  removedById Int?
+  companyId   Int
+  createdById Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  assignees   IssueLocationAssignee[]
+  activities  IssueLocationActivity[]
+  timeLogs    IssueTimeLog[]
+  attachments IssueAttachment[]
+
+  /// One execution record per location per task.
+  @@unique([issueId, locationId])
+  @@index([companyId, status])
+  @@index([companyId, dueDate])
+  @@index([locationId])
+}
+
+model IssueLocationAssignee {
+  issueLocationId Int
+  issueLocation   IssueLocation @relation(fields: [issueLocationId], references: [id], onDelete: Cascade)
+  employeeId      Int
+  employee        Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  assignedAt      DateTime      @default(now())
+
+  @@id([issueLocationId, employeeId])
+  @@index([employeeId])
+}
+
+/// The audit trail of one location: every assignment, status change, comment,
+/// time entry and piece of evidence, with who and when. Separate from
+/// IssueActivity so a task with seventeen locations keeps a readable history
+/// of its own.
+model IssueLocationActivity {
+  id              Int           @id @default(autoincrement())
+  issueLocationId Int
+  issueLocation   IssueLocation @relation(fields: [issueLocationId], references: [id], onDelete: Cascade)
+  action          String // ADDED, REMOVED, RESTORED, STATUS_CHANGED, ASSIGNED, UNASSIGNED, UPDATED, COMMENT, TIME_LOGGED, EVIDENCE_ADDED
+  field           String?
+  oldValue        String?
+  newValue        String?
+  body            String?       @db.Text
+  actorId         Int
+  actor           Employee      @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@index([issueLocationId, createdAt])
 }

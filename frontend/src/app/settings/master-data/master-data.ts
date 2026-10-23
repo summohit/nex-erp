@@ -20,12 +20,13 @@ import { StatusToggleRendererComponent } from '../../shared/components/status-to
 import { ProjectsService, LeadContactOption } from '../../services/projects';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { VisitLocationFormModalComponent } from '../../shared/components/visit-location-form-modal/visit-location-form-modal';
+import { TaskLocationsAdminComponent } from '../../shared/components/task-locations/task-locations-admin';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 declare const L: any;
 
-type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'task-types' | 'project-phases' | 'default-project-tasks' | 'visit-locations' | 'holidays' | 'blackout-dates' | 'shifts';
+type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'task-types' | 'project-phases' | 'default-project-tasks' | 'visit-locations' | 'task-locations' | 'holidays' | 'blackout-dates' | 'shifts';
 
 /**
  * The tabs a `?tab=` in the URL is allowed to name.
@@ -38,7 +39,7 @@ type Tab = 'departments' | 'designations' | 'branches' | 'leave-types' | 'task-t
  */
 const TABS: readonly Tab[] = [
   'departments', 'designations', 'branches', 'leave-types', 'task-types',
-  'project-phases', 'default-project-tasks', 'visit-locations', 'holidays',
+  'project-phases', 'default-project-tasks', 'visit-locations', 'task-locations', 'holidays',
   'blackout-dates', 'shifts',
 ];
 
@@ -58,7 +59,7 @@ export interface BlackoutDate {
     LucideUsers, LucideCheck, LucideTag, LucideRotateCcw, 
     LucideTimer, LucideMoon, AgGridAngular,
     LucideMapPin, LucideBuilding2, LucideCrosshair, LucideExternalLink, LucideAlertCircle, LucideNavigation,
-    LucideInfo, LucideLoader2,
+    LucideInfo, LucideLoader2, TaskLocationsAdminComponent,
     SearchableSelectComponent, VisitLocationFormModalComponent
   ],
   templateUrl: './master-data.html',

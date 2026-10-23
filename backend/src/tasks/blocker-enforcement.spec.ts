@@ -25,6 +25,8 @@ describe('IssuesService — blockers on the Review/Done transition', () => {
         update: jest.fn(async () => ({ id: 1 })),
       },
       issueDependency: { findMany: jest.fn(async () => openBlockers) },
+      // A task without locations: the location guard has nothing to say.
+      issueLocation: { findMany: jest.fn(async () => []) },
       boardColumn: {
         findUnique: jest.fn(async () => ({ id: 200, name: 'Done', type: 'DONE', position: 3 })),
         findMany: jest.fn(async () => []),

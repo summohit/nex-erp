@@ -43,6 +43,8 @@ export interface MyTaskDto {
   estimatedHours: number | null;
   /** Number of files attached to this task as evidence. */
   evidenceCount?: number;
+  /** Location-wise progress, on a task carried out at several locations. */
+  locations?: import('../../projects/task-locations/location-rules').LocationProgress | null;
   /** When the work was raised — My Tasks sorts newest-first on this. */
   createdAt: Date | null;
   /**

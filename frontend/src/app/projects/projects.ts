@@ -12,7 +12,7 @@ import {
   LucideX, LucideUser, LucideChevronLeft, LucideCheck, LucideMoreHorizontal,
   LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw, LucideBrainCircuit,
   LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
-  LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
+  LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideMapPin, LucideExternalLink, LucideLayers, LucideCheckCircle2,
   LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
   LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity, LucideInfo,
   LucideCopy
@@ -89,15 +89,18 @@ function getStatusColors(status: string): { bg: string; color: string } {
 }
 
 import { TaskTransferComponent } from '../shared/components/task-transfer/task-transfer';
+import { LocationPickerComponent } from '../shared/components/task-locations/location-picker';
+import { LocationExecutionsComponent } from '../shared/components/task-locations/location-executions';
+import { TaskLocationsService, TaskLocation } from '../services/task-locations.service';
 @Component({
   selector: 'app-projects',
   standalone: true,
-  imports: [TaskTransferComponent, 
+  imports: [TaskTransferComponent, LocationPickerComponent, LocationExecutionsComponent, 
     CommonModule, FormsModule, RouterModule, LucidePlus, LucideKanban,
     LucideX, LucideUser, LucideChevronLeft, LucideBrainCircuit,
     LucideCheck, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw,
     LucideLayoutGrid, LucideList, LucideListChecks, LucideChevronDown, LucideAlertTriangle, LucideUsers,
-    LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideExternalLink, LucideLayers, LucideCheckCircle2,
+    LucideBriefcase, LucideFolder, LucideCheckSquare, LucideCalendar, LucideFilter, LucideMapPin, LucideExternalLink, LucideLayers, LucideCheckCircle2,
     LucidePaperclip, LucideUploadCloud, LucideFileText, LucideFile, LucideTrash2, LucideLoader2,
     LucidePencil, LucideTag, LucideBuilding, LucideMail, LucidePhone, LucideFlag, LucideActivity, LucideInfo,
     LucideCopy,
@@ -2367,6 +2370,11 @@ export class ProjectsComponent implements OnInit {
   taskTypes = signal<TaskType[]>([]);
   /** §8: the company's active delivery phases, for the task form. */
   projectPhases = signal<any[]>([]);
+  /** Active task locations, for the Create Task modal's Locations section. */
+  taskLocations = signal<TaskLocation[]>([]);
+  /** Tasks page: the flat, location-wise execution view instead of the task list. */
+  myTasksByLocation = signal(false);
+  private taskLocationsApi = inject(TaskLocationsService);
   phaseDropdownOpen = signal(false);
   phaseSearch = '';
   leadOptions = signal<LeadOption[]>([]);
@@ -2504,6 +2512,8 @@ export class ProjectsComponent implements OnInit {
       estimatedHours: null as number | null,
       assigneeIds: [] as number[],
       attachments: [] as { fileName: string; fileUrl: string; fileSize?: number }[],
+      /** Where the task is carried out — one execution record per location. */
+      locationIds: [] as number[],
     };
   }
 
@@ -2542,6 +2552,11 @@ export class ProjectsComponent implements OnInit {
         error: () => {},
       });
     }
+    // Fetched every time the modal opens: an admin may have just added some.
+    this.taskLocationsApi.list(true).subscribe({
+      next: (l) => this.taskLocations.set(l || []),
+      error: () => {},
+    });
     // §8: the phase list, fetched alongside the task types it sits beside.
     if (!this.projectPhases().length) {
       this.masterDataService.getProjectPhases().subscribe({
@@ -2844,6 +2859,12 @@ export class ProjectsComponent implements OnInit {
       e['phase'] = 'Choose the project phase.';
     }
 
+    // Locations, for project and general work, once the company has any — the
+    // same conditional rule as phases, and the server's.
+    if (!preSales && this.taskLocations().length && !(f.locationIds as number[]).length) {
+      e['locations'] = 'Choose at least one location.';
+    }
+
     // Both dates for ordinary work. A pre-sales task has a single scheduled
     // moment and no start, so only its range check applies.
     if (!preSales) {
@@ -2942,6 +2963,8 @@ export class ProjectsComponent implements OnInit {
         ? Number(this.taskForm.estimatedHours) : undefined,
       assigneeIds: this.taskForm.assigneeIds,
       attachments: this.taskForm.attachments?.length ? this.taskForm.attachments : undefined,
+      locationIds: this.taskForm.parentKind !== 'LEAD' && this.taskForm.locationIds.length
+        ? this.taskForm.locationIds : undefined,
       initialTimeLog,
     }).subscribe({
       next: (created: any) => {

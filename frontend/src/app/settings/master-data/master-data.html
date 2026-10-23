@@ -4,7 +4,7 @@
       <h1>Master Data</h1>
       <p>Manage your company's departments and designations</p>
     </div>
-    <button class="btn-primary" (click)="openModal('create')">
+    <button class="btn-primary" *ngIf="activeTab() !== 'task-locations'" (click)="openModal('create')">
       <svg lucidePlus size="18"></svg>
       Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'default-project-tasks' ? 'Default Task' : activeTab() === 'visit-locations' ? 'Visit Location' : activeTab() === 'shifts' ? 'Shift' : 'Holiday' }}
     </button>
@@ -91,6 +91,15 @@
       [attr.aria-selected]="activeTab() === 'visit-locations'"
       (click)="switchTab('visit-locations')">
       Visit Locations
+    </button>
+    <button 
+      type="button"
+      role="tab"
+      class="tab-btn" 
+      [class.active]="activeTab() === 'task-locations'" 
+      [attr.aria-selected]="activeTab() === 'task-locations'"
+      (click)="switchTab('task-locations')">
+      Task Locations
     </button>
     <button 
       type="button"
@@ -245,6 +254,8 @@
     </ag-grid-angular>
 
     <!-- §PB10: the sites a client visit can be raised against. -->
+    <app-task-locations-admin *ngIf="activeTab() === 'task-locations'"></app-task-locations-admin>
+
     <div *ngIf="activeTab() === 'visit-locations'" class="visit-locations-tab-wrapper">
       <div class="visit-locations-toolbar">
         <div class="visit-locations-search-box">
