@@ -11,7 +11,15 @@ export interface Resignation {
   status: string;
   remarks?: string;
   createdAt: string;
-  employee?: { id: number, salutation: string, user: { email: string } };
+  employee?: {
+    id: number;
+    salutation: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    employeeCode?: string | null;
+    avatarUrl?: string | null;
+    user: { email: string };
+  };
   approver?: { id: number, email: string };
 }
 
