@@ -3,6 +3,18 @@
  * so they can be tested without one (docs/location-task-tracking.md).
  */
 
+/**
+ * Per-location execution tracking — each location's own status, people,
+ * time and evidence, and the parent task moving with them.
+ *
+ * Off for now (decided 23 Oct 2026): a task simply names the locations it
+ * covers, and moves across the board as any other task does. Turning this on
+ * restores the location-driven status moves, the open-locations Done guard and
+ * employees seeing only their own locations. The frontend has the same switch
+ * in services/task-locations.service.ts; flip both together.
+ */
+export const LOCATION_TRACKING_ENABLED = false;
+
 export const LOCATION_STATUS = {
   NOT_STARTED: 'NOT_STARTED',
   IN_PROGRESS: 'IN_PROGRESS',
@@ -78,8 +90,9 @@ export function locationHasHistory(loc: {
  * Where the parent task should move after its locations changed, or null to
  * leave it where it is.
  *
- * - every active location completed → DONE;
- * - parent DONE but a location is open again (reopened or newly added) → IN_PROGRESS;
+ * - every active location completed → IN_REVIEW, for the project manager to
+ *   check and close (employees never move a task to Done themselves);
+ * - parent in review or done but a location is open again → IN_PROGRESS;
  * - parent TODO and any location has started → IN_PROGRESS.
  *
  * A cancelled parent is never moved: cancelling is a decision about the whole
@@ -88,16 +101,36 @@ export function locationHasHistory(loc: {
 export function parentStatusFor(
   parentStatus: string,
   locations: { status: string; removedAt?: Date | string | null }[],
-): 'DONE' | 'IN_PROGRESS' | null {
+): 'IN_REVIEW' | 'IN_PROGRESS' | null {
   if (parentStatus === 'CANCELLED') return null;
   const active = locations.filter((l) => !l.removedAt);
   if (!active.length) return null;
 
   const allDone = active.every((l) => l.status === LOCATION_STATUS.COMPLETED);
-  if (allDone) return parentStatus === 'DONE' ? null : 'DONE';
-  if (parentStatus === 'DONE') return 'IN_PROGRESS';
+  if (allDone) return parentStatus === 'IN_REVIEW' || parentStatus === 'DONE' ? null : 'IN_REVIEW';
+  if (parentStatus === 'IN_REVIEW' || parentStatus === 'DONE') return 'IN_PROGRESS';
 
   const started = active.some((l) => l.status !== LOCATION_STATUS.NOT_STARTED);
   if (parentStatus === 'TODO' && started) return 'IN_PROGRESS';
   return null;
+}
+
+/** The statuses an employee may set on their own location; managers have them all. */
+export const EMPLOYEE_LOCATION_STATUSES: string[] = [
+  LOCATION_STATUS.NOT_STARTED, LOCATION_STATUS.IN_PROGRESS, LOCATION_STATUS.COMPLETED,
+];
+
+/**
+ * Whether a location is this employee's own: they are assigned to it, or
+ * nobody is and they are on the task itself. Employees see and work only
+ * their own locations; managers see every one.
+ */
+export function isOwnLocation(
+  row: { assignees: { employeeId: number }[] },
+  issue: { assigneeId?: number | null; members?: { employeeId: number }[] },
+  employeeId: number | null | undefined,
+): boolean {
+  if (employeeId == null) return false;
+  if (row.assignees.length) return row.assignees.some((a) => a.employeeId === employeeId);
+  return issue.assigneeId === employeeId || !!issue.members?.some((m) => m.employeeId === employeeId);
 }

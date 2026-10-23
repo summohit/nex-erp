@@ -1107,7 +1107,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.loadAttendance();
         this.loadDashboard();
       },
-      error: () => {
+      error: (err) => {
+        // Only a rejected session signs out. No answer at all — the API
+        // restarting — leaves the session alone; the dashboard just stays
+        // empty until the next load.
+        if (err?.status !== 401 && err?.status !== 403) return;
         this.authService.logout();
         this.router.navigate(['/']);
       },

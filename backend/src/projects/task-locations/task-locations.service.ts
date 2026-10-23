@@ -9,11 +9,12 @@ import { canManageTask } from '../../tasks/task-permissions';
 import { assertWithinAllowedHours, HoursExceeded } from '../../tasks/task-hours';
 import { isCompanyAdmin } from '../../common/company-roles';
 import {
-  resolveProjectViewer, taskVisibilityFilter, hasCompanyWideProjectAccess, PROJECT_ROLE,
+  resolveProjectViewer, taskVisibilityFilter, hasCompanyWideProjectAccess, PROJECT_ROLE, seesEveryTask,
 } from '../project-roles';
 import {
   LOCATION_STATUS, LOCATION_STATUSES, LOCATION_LEVELS,
   locationHasHistory, locationProgress, parentStatusFor, isLocationOverdue,
+  EMPLOYEE_LOCATION_STATUSES, isOwnLocation, LOCATION_TRACKING_ENABLED,
 } from './location-rules';
 
 const PERSON = { id: true, firstName: true, lastName: true, avatarUrl: true } as const;
@@ -30,6 +31,15 @@ const LOCATION_INCLUDE = {
 } as const;
 
 const HOUR_MS = 60 * 60 * 1000;
+
+export interface LocationDraft {
+  status: string;
+  startDate: string;
+  dueDate: string;
+  assigneeIds: number[];
+  remarks?: string | null;
+  blockedReason?: string | null;
+}
 
 /**
  * Location-wise execution of one parent task (docs/location-task-tracking.md).
@@ -259,7 +269,13 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
       },
     });
     if (!issue) throw new NotFoundException('Task not found');
-    return issue;
+    // The PM, owner, architect, coordinator, admins and whoever raised the
+    // task see every location; everyone else only their own.
+    const seesAll = !LOCATION_TRACKING_ENABLED
+      || seesEveryTask(viewer)
+      || (employeeId != null && issue.reporterId === employeeId)
+      || await this.manages(companyId, projectId, employeeId, role);
+    return { ...issue, seesAll };
   }
 
   private async loadRow(issueId: number, rowId: number) {
@@ -302,11 +318,12 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
 
   async getForIssue(companyId: number, projectId: number, issueId: number, employeeId: number | null, role?: string) {
     const issue = await this.loadIssue(companyId, projectId, issueId, employeeId, role);
-    const rows = await this.prisma.issueLocation.findMany({
+    const all = await this.prisma.issueLocation.findMany({
       where: { issueId },
       include: LOCATION_INCLUDE,
       orderBy: [{ removedAt: { sort: 'asc', nulls: 'first' } }, { location: { name: 'asc' } }],
     });
+    const rows = issue.seesAll ? all : all.filter((r) => isOwnLocation(r, issue, employeeId));
     const minutes = await this.prisma.issueTimeLog.groupBy({
       by: ['issueLocationId'],
       where: { issueId, issueLocationId: { not: null } },
@@ -317,6 +334,8 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
     const now = new Date();
     return {
       canManage: manage,
+      /** The parent task's status, so the panel can lock a closed task for employees. */
+      taskStatus: issue.status,
       progress: locationProgress(rows, now),
       locations: rows.map((r) => ({
         ...r,
@@ -343,12 +362,25 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
     if (!(await this.manages(companyId, projectId, employeeId, role))) {
       throw new ForbiddenException('Only the project manager can change where a task is carried out.');
     }
+    let locationIds = data?.locationIds;
+    let details: Record<number, LocationDraft> | undefined = undefined;
+    if (Array.isArray(data?.locations) && data.locations.length) {
+      const parsed = await this.parseDrafts(this.prisma, companyId, data.locations);
+      details = parsed.details;
+      locationIds = parsed.locationIds;
+    } else {
+      if (data?.startDate && data?.dueDate && new Date(data.dueDate) < new Date(data.startDate)) {
+        throw new BadRequestException('Due date cannot be before start date.');
+      }
+    }
     const result = await this.attachLocations(this.prisma, {
       companyId, issueId, actorId: actor,
-      locationIds: data?.locationIds,
+      locationIds,
       assigneeIds: data?.assigneeIds,
       startDate: data?.startDate,
       dueDate: data?.dueDate,
+      status: data?.status,
+      details,
     });
     await this.notifyAssigned(issue, result.assigned, actor);
     await this.syncParent(issueId, actor);
@@ -364,12 +396,18 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
     tx: any,
     opts: {
       companyId: number; issueId: number; actorId: number;
-      locationIds: any; assigneeIds?: any; startDate?: any; dueDate?: any;
+      locationIds: any; assigneeIds?: any; startDate?: any; dueDate?: any; status?: any;
+      /** Per-location values chosen while creating the task, keyed by location id. */
+      details?: Record<number, LocationDraft>;
     },
   ): Promise<{ added: number; restored: number; assigned: { employeeId: number; locationName: string }[] }> {
     const ids = [...new Set<number>((Array.isArray(opts.locationIds) ? opts.locationIds : [])
       .map(Number).filter((n: number) => Number.isInteger(n) && n > 0))];
     if (!ids.length) throw new BadRequestException('Choose at least one location.');
+    // While per-location tracking is off, a task is carried out at one place.
+    if (!LOCATION_TRACKING_ENABLED && ids.length > 1) {
+      throw new BadRequestException('A task has one location. Choose a single location.');
+    }
 
     const locations = await tx.taskLocation.findMany({
       where: { id: { in: ids }, companyId: opts.companyId },
@@ -406,11 +444,21 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
         rowId = prior.id;
         restored++;
       } else {
+        const d = opts.details?.[loc.id];
+        const status = d?.status ?? opts.status ?? LOCATION_STATUS.NOT_STARTED;
+        const startDate = d?.startDate ?? opts.startDate;
+        const dueDate = d?.dueDate ?? opts.dueDate;
         const row = await tx.issueLocation.create({
           data: {
             issueId: opts.issueId, locationId: loc.id, companyId: opts.companyId, createdById: opts.actorId,
-            startDate: opts.startDate ? new Date(opts.startDate) : null,
-            dueDate: opts.dueDate ? new Date(opts.dueDate) : null,
+            startDate: startDate ? new Date(startDate) : null,
+            dueDate: dueDate ? new Date(dueDate) : null,
+            status,
+            startedAt: status !== LOCATION_STATUS.NOT_STARTED ? new Date() : null,
+            completedAt: status === LOCATION_STATUS.COMPLETED ? new Date() : null,
+            completedById: status === LOCATION_STATUS.COMPLETED ? opts.actorId : null,
+            blockedReason: status === LOCATION_STATUS.BLOCKED ? (d?.blockedReason ?? null) : null,
+            remarks: d?.remarks ?? null,
           },
         });
         await tx.issueLocationActivity.create({
@@ -420,7 +468,8 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
         added++;
       }
 
-      for (const employeeId of assigneeIds) {
+      const people = opts.details?.[loc.id]?.assigneeIds ?? assigneeIds;
+      for (const employeeId of people) {
         const made = await tx.issueLocationAssignee.createMany({
           data: [{ issueLocationId: rowId, employeeId }], skipDuplicates: true,
         });
@@ -433,6 +482,43 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
       }
     }
     return { added, restored, assigned };
+  }
+
+  /**
+   * The per-location values the create form sends, checked and normalised.
+   * Status, start date, due date and at least one assignee are required for
+   * every location; remarks are optional.
+   */
+  async parseDrafts(tx: any, companyId: number, raw: any): Promise<{ locationIds: number[]; details: Record<number, LocationDraft> }> {
+    if (!Array.isArray(raw) || !raw.length) throw new BadRequestException('No location details were sent. Pick the locations again and retry.');
+    const details: Record<number, LocationDraft> = {};
+    const names = new Map<number, string>(
+      (await tx.taskLocation.findMany({
+        where: { companyId, id: { in: raw.map((r: any) => Number(r?.locationId)).filter(Boolean) } },
+        select: { id: true, name: true },
+      })).map((l: any) => [l.id, l.name]),
+    );
+    for (const r of raw) {
+      const locationId = Number(r?.locationId);
+      const name = names.get(locationId);
+      if (!name) throw new BadRequestException('One of those locations does not exist.');
+      const status = String(r.status ?? '');
+      if (!LOCATION_STATUSES.includes(status)) throw new BadRequestException(`Choose a status for ${name}.`);
+      if (!r.startDate) throw new BadRequestException(`Choose a start date for ${name}.`);
+      if (!r.dueDate) throw new BadRequestException(`Choose a due date for ${name}.`);
+      if (String(r.dueDate).slice(0, 10) < String(r.startDate).slice(0, 10)) {
+        throw new BadRequestException(`The due date for ${name} cannot be before its start date.`);
+      }
+      const assigneeIds = await this.validEmployees(tx, companyId, r.assigneeIds);
+      if (!assigneeIds.length) throw new BadRequestException(`Assign at least one member to ${name}.`);
+      const blockedReason = String(r.blockedReason ?? '').trim();
+      if (status === LOCATION_STATUS.BLOCKED && !blockedReason) throw new BadRequestException(`Say what is blocking ${name}.`);
+      details[locationId] = {
+        status, startDate: r.startDate, dueDate: r.dueDate, assigneeIds,
+        remarks: String(r.remarks ?? '').trim() || null, blockedReason: blockedReason || null,
+      };
+    }
+    return { locationIds: Object.keys(details).map(Number), details };
   }
 
   private async validEmployees(tx: any, companyId: number, raw: any): Promise<number[]> {
@@ -452,8 +538,21 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
     const row = await this.loadRow(issueId, rowId);
     await this.assertMayWork(issue, row, employeeId, role);
 
+    const isManager = await this.manages(companyId, projectId, employeeId, role);
+    if (!isManager && data?.status !== undefined && data.status !== row.status) {
+      // Employees move their own location between Not started, In progress
+      // and Completed; Review, Blocked and anything after the task is closed
+      // are the project manager's.
+      if (!EMPLOYEE_LOCATION_STATUSES.includes(String(data.status))) {
+        throw new ForbiddenException('You can set a location to Not started, In progress or Completed.');
+      }
+      if (issue.status === 'DONE' || issue.status === 'CANCELLED') {
+        throw new ForbiddenException('This task is closed. Ask the project manager to reopen it.');
+      }
+    }
+
     const managing = ['assigneeIds', 'startDate', 'dueDate'].filter((k) => data?.[k] !== undefined);
-    if (managing.length && !(await this.manages(companyId, projectId, employeeId, role))) {
+    if (managing.length && !isManager) {
       throw new ForbiddenException('Only the project manager can change who works a location or when it is due.');
     }
 
@@ -505,6 +604,12 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
       log.push({ action: 'UPDATED', field: key, oldValue: iso((row as any)[key]), newValue: iso(data[key]) });
       // A new due date earns a new overdue notice.
       if (key === 'dueDate') update.overdueNotifiedAt = null;
+    }
+
+    const effectiveStart = update.startDate !== undefined ? update.startDate : row.startDate;
+    const effectiveDue = update.dueDate !== undefined ? update.dueDate : row.dueDate;
+    if (effectiveStart && effectiveDue && new Date(effectiveDue) < new Date(effectiveStart)) {
+      throw new BadRequestException('Due date cannot be before start date.');
     }
 
     let added: number[] = [];
@@ -594,6 +699,52 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
     }
     await this.syncParent(issueId, actor);
     return { removed: true, soft: keep };
+  }
+
+  /**
+   * Make `locationId` the task's one location (per-location tracking off).
+   * Any other location comes off as removeRow would take it: deleted when
+   * nothing was recorded there, kept as removed when something was. Runs in
+   * the caller's transaction when given one.
+   */
+  async setTaskLocation(tx: any, companyId: number, issueId: number, actorId: number, locationId: number) {
+    const id = Number(locationId);
+    if (!Number.isInteger(id) || id <= 0) throw new BadRequestException('Choose a location.');
+    const active = await tx.issueLocation.findMany({
+      where: { issueId, removedAt: null },
+      include: { _count: { select: { timeLogs: true, attachments: true } } },
+    });
+    if (active.length === 1 && active[0].locationId === id) return;
+    for (const row of active.filter((r: any) => r.locationId !== id)) {
+      const activityCount = await tx.issueLocationActivity.count({
+        where: { issueLocationId: row.id, action: { notIn: ['ADDED', 'ASSIGNED', 'UNASSIGNED'] } },
+      });
+      const keep = locationHasHistory({
+        status: row.status, timeLogCount: row._count.timeLogs, attachmentCount: row._count.attachments, activityCount,
+      });
+      if (keep) {
+        await tx.issueLocation.update({ where: { id: row.id }, data: { removedAt: new Date(), removedById: actorId } });
+        await tx.issueLocationActivity.create({ data: { issueLocationId: row.id, action: 'REMOVED', actorId } });
+      } else {
+        await tx.issueLocation.delete({ where: { id: row.id } });
+      }
+    }
+    if (!active.some((r: any) => r.locationId === id)) {
+      await this.attachLocations(tx, { companyId, issueId, actorId, locationIds: [id] });
+    }
+  }
+
+  /** PUT /projects/:p/issues/:id/locations — replace the task's location. Managers only. */
+  async setLocationFor(
+    companyId: number, projectId: number, issueId: number, employeeId: number | null, role: string | undefined, locationId: any,
+  ) {
+    const actor = this.requireEmployee(employeeId);
+    await this.loadIssue(companyId, projectId, issueId, employeeId, role);
+    if (!(await this.manages(companyId, projectId, employeeId, role))) {
+      throw new ForbiddenException('Only the project manager can change where a task is carried out.');
+    }
+    await this.prisma.$transaction((tx) => this.setTaskLocation(tx, companyId, issueId, actor, locationId));
+    return this.getForIssue(companyId, projectId, issueId, employeeId, role);
   }
 
   async addComment(
@@ -717,8 +868,9 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
   async activity(
     companyId: number, projectId: number, issueId: number, rowId: number, employeeId: number | null, role?: string,
   ) {
-    await this.loadIssue(companyId, projectId, issueId, employeeId, role);
-    await this.loadRow(issueId, rowId);
+    const issue = await this.loadIssue(companyId, projectId, issueId, employeeId, role);
+    const row = await this.loadRow(issueId, rowId);
+    if (!issue.seesAll && !isOwnLocation(row, issue, employeeId)) throw new NotFoundException('That location is not on this task.');
     const [entries, files] = await Promise.all([
       this.prisma.issueLocationActivity.findMany({
         where: { issueLocationId: rowId },
@@ -747,6 +899,11 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
       })),
       evidence: files,
     };
+  }
+
+  /** For callers outside this service that created locations in their own transaction. */
+  notifyAssignedFor(issue: { key: string; title: string; projectId: number; companyId: number }, assigned: { employeeId: number; locationName: string }[], actor: number) {
+    return this.notifyAssigned(issue, assigned, actor);
   }
 
   private async notifyAssigned(
@@ -783,6 +940,7 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
     const locations = await this.prisma.issueLocation.findMany({
       where: { issueId }, select: { status: true, removedAt: true },
     });
+    if (!LOCATION_TRACKING_ENABLED) return;
     const target = parentStatusFor(issue.status, locations);
     if (!target) return;
 
@@ -790,9 +948,8 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
       where: { board: { projectId: issue.projectId }, isArchived: false },
       orderBy: { position: 'asc' },
     });
-    const column = target === 'DONE'
-      // The same rule as IssuesService.doneColumn: lowest Done column, never Archived.
-      ? columns.find((c) => c.type === 'DONE' && !/archiv/i.test(c.name || ''))
+    const column = target === 'IN_REVIEW'
+      ? columns.find((c) => c.type === 'IN_REVIEW') ?? columns.find((c) => /review/i.test(c.name || ''))
       : columns.find((c) => c.type === 'IN_PROGRESS')
         ?? columns.find((c) => /progress|doing/i.test(c.name || ''));
 
@@ -800,7 +957,7 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
       where: { id: issueId },
       data: {
         status: target,
-        completedAt: target === 'DONE' ? new Date() : null,
+        completedAt: null,
         ...(column ? { columnId: column.id } : {}),
       },
     });
@@ -843,10 +1000,11 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
     const me = employeeId ?? -1;
     return {
       OR: [
+        // Their own: assigned to it, or nobody is and they are on the task.
         { assignees: { some: { employeeId: me } } },
-        { issue: { assigneeId: me } },
+        { assignees: { none: {} }, issue: { assigneeId: me } },
+        { assignees: { none: {} }, issue: { members: { some: { employeeId: me } } } },
         { issue: { reporterId: me } },
-        { issue: { members: { some: { employeeId: me } } } },
         { issue: { project: { leadId: me } } },
         {
           issue: {

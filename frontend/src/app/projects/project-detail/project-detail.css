@@ -3323,7 +3323,146 @@ svg[lucide], svg[class*=lucide] {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 1rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TASK FORM PROPERTIES GRID (Unified, Balanced Layout)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.task-properties-grid-container {
+  margin-left: 38px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.properties-grid-row {
+  display: grid;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.properties-grid-row.schedule-row {
+  grid-template-columns: auto minmax(135px, 1fr) minmax(135px, 1fr) minmax(120px, 1fr);
+}
+
+.properties-grid-row.context-row {
+  grid-template-columns: minmax(180px, 1.4fr) minmax(140px, 1fr);
+}
+
+.properties-grid-row.context-row.has-milestone {
+  grid-template-columns: minmax(150px, 1.2fr) minmax(150px, 1.2fr) minmax(130px, 1fr);
+}
+
+.prop-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.col-members .attached-members-flex-row {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-start-date jira-date-picker,
+.col-due-date jira-date-picker {
+  display: block;
+  width: 100%;
+}
+
+.col-start-date ::ng-deep .jira-datepicker-container,
+.col-start-date ::ng-deep .jira-datepicker-trigger,
+.col-due-date ::ng-deep .jira-datepicker-container,
+.col-due-date ::ng-deep .jira-datepicker-trigger {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  height: 36px !important;
+}
+
+.col-priority .popover-container,
+.col-priority .attached-priority-btn {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.col-priority .attached-priority-btn {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: #ffffff;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #172b4d;
+  transition: all 0.15s ease;
+}
+
+.col-priority .attached-priority-btn:hover:not(.is-readonly) {
+  background: #f7f8f9;
+  border-color: #8590a2;
+}
+
+.col-phase .milestone-picker-wrapper,
+.col-milestone .milestone-picker-wrapper {
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.col-phase .milestone-picker,
+.col-milestone .milestone-picker {
+  width: 100%;
+  height: 36px;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  padding: 6px 30px 6px 32px;
+  font-size: 13px;
+  color: #172b4d;
+  background: #ffffff;
+  outline: none;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.col-phase .milestone-picker:focus,
+.col-milestone .milestone-picker:focus {
+  border-color: #1373e5;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.12);
+}
+
+.col-phase .milestone-picker-icon,
+.col-milestone .milestone-picker-icon {
+  position: absolute;
+  left: 10px;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.col-phase .milestone-picker-chevron,
+.col-milestone .milestone-picker-chevron {
+  position: absolute;
+  right: 10px;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.col-labels .attached-labels-flex-row {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .modal-meta-attached-row {
@@ -11385,14 +11524,89 @@ input[type=text], input[type=email], input[type=password] {
 @media (max-width:900px) { .pfv-row { grid-template-columns:minmax(65px,.7fr) minmax(0,1.3fr) 82px 30px; } .pfv-row .pfv-dates, .pfv-row .pfv-meta { display:none; } }
 
 /* Task panel: Pre-Requisite & SME */
-.tp-extra { display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin:4px 0 18px; }
-.tp-extra-field { display:flex; flex-direction:column; gap:6px; }
-.tp-extra-field label { font-size:12px; font-weight:700; color:#5e6c84; text-transform:uppercase; letter-spacing:.04em; }
-.tp-extra-field textarea, .tp-extra-field select { width:100%; border:1px solid #dfe1e6; border-radius:8px; padding:8px 10px;
-  font-size:13.5px; color:#172b4d; background:#fff; font-family:inherit; resize:vertical; }
-.tp-extra-field textarea:focus, .tp-extra-field select:focus { outline:none; border-color:#4f46e5; box-shadow:0 0 0 3px rgba(79,70,229,.12); }
-.tp-extra-hint { font-size:11.5px; color:#94a3b8; }
-@media (max-width:700px) { .tp-extra { grid-template-columns:1fr; } }
+.tp-extra {
+  display: grid !important;
+  grid-template-columns: 1.3fr 1fr !important;
+  gap: 16px !important;
+  margin: 0 0 16px 38px !important;
+  align-items: flex-start !important;
+}
+
+.tp-extra-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tp-extra-field textarea {
+  width: 100% !important;
+  border: 1px solid #dfe1e6 !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  color: #172b4d !important;
+  background: #fff !important;
+  font-family: inherit !important;
+  resize: vertical !important;
+  min-height: 42px !important;
+  line-height: 1.4 !important;
+  box-sizing: border-box !important;
+  transition: all 0.15s ease !important;
+}
+
+.tp-extra-field textarea:focus {
+  outline: none !important;
+  border-color: #1373e5 !important;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.12) !important;
+}
+
+.sme-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.sme-select-wrapper select {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  padding: 0 30px 0 32px;
+  font-size: 13px;
+  color: #172b4d;
+  background: #fff;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sme-select-wrapper select:focus {
+  border-color: #1373e5;
+  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.12);
+}
+
+.sme-select-icon {
+  position: absolute;
+  left: 10px;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.sme-select-chevron {
+  position: absolute;
+  right: 10px;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.tp-extra-hint { font-size: 11.5px; color: #94a3b8; }
+@media (max-width:700px) { .tp-extra { grid-template-columns:1fr !important; margin-left: 0 !important; } }
 
 /* ==========================================================================
    Required Fields & Validation Enhancements
@@ -11611,5 +11825,23 @@ input[type=text], input[type=email], input[type=password] {
 .card-locations-bar span { display: block; height: 100%; background: #16A34A; }
 
 /* Locations field on the board's create form. */
-.tp-locations { margin: 16px 0; display: grid; gap: 6px; }
-.tp-locations > label { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #42526e; }
+.tp-locations {
+  margin: 0 0 20px 38px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+}
+
+@media (max-width: 700px) {
+  .tp-locations {
+    margin-left: 0 !important;
+  }
+}
+
+/* "(optional)" beside a section label. */
+.optional-tag { font-weight: 500; text-transform: none; letter-spacing: 0; color: #94A3B8; font-size: 12px; }
+
+/* The locations a card covers, while per-location tracking is off. */
+.card-location-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 2px; }
+.card-location-chip { background: #EFF6FF; color: #1E40AF; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 600; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-location-more { color: #64748B; font-size: 11px; font-weight: 600; padding: 1px 2px; }

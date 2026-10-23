@@ -91,7 +91,7 @@ function getStatusColors(status: string): { bg: string; color: string } {
 import { TaskTransferComponent } from '../shared/components/task-transfer/task-transfer';
 import { LocationPickerComponent } from '../shared/components/task-locations/location-picker';
 import { LocationExecutionsComponent } from '../shared/components/task-locations/location-executions';
-import { TaskLocationsService, TaskLocation } from '../services/task-locations.service';
+import { TaskLocationsService, TaskLocation, LOCATION_TRACKING_ENABLED } from '../services/task-locations.service';
 @Component({
   selector: 'app-projects',
   standalone: true,
@@ -2374,6 +2374,8 @@ export class ProjectsComponent implements OnInit {
   taskLocations = signal<TaskLocation[]>([]);
   /** Tasks page: the flat, location-wise execution view instead of the task list. */
   myTasksByLocation = signal(false);
+  /** Per-location tracking (and the By location view), off for now. */
+  readonly locationTracking = LOCATION_TRACKING_ENABLED;
   private taskLocationsApi = inject(TaskLocationsService);
   phaseDropdownOpen = signal(false);
   phaseSearch = '';
@@ -2859,10 +2861,11 @@ export class ProjectsComponent implements OnInit {
       e['phase'] = 'Choose the project phase.';
     }
 
-    // Locations, for project and general work, once the company has any — the
-    // same conditional rule as phases, and the server's.
+
+    // At least one location for project and general work, once the company
+    // has set any up — the server's rule too.
     if (!preSales && this.taskLocations().length && !(f.locationIds as number[]).length) {
-      e['locations'] = 'Choose at least one location.';
+      e['locations'] = 'Choose a location.';
     }
 
     // Both dates for ordinary work. A pre-sales task has a single scheduled
@@ -3129,6 +3132,8 @@ export class ProjectsComponent implements OnInit {
   tfMilestone = signal<string>('ALL');
   /** §8: narrow My Tasks to one delivery phase. */
   tfPhase = signal<string>('ALL');
+  /** The task's location, as "City, State". */
+  tfLocation = signal<string>('ALL');
   tfDueFrom = signal<string>('');
   tfDueTo = signal<string>('');
   tfDuration = signal<string>('ALL');
@@ -3164,6 +3169,7 @@ export class ProjectsComponent implements OnInit {
   taskMilestoneOptions = computed(() => this.taskOptionsFrom(t => t.milestone?.name));
   // §8: only phases actually present, so no option returns nothing.
   taskPhaseOptions = computed(() => this.taskOptionsFrom(t => t.phase));
+  taskLocationOptions = computed(() => this.taskOptionsFrom(t => (t as any).location));
   taskPriorityOptions = computed(() => this.taskOptionsFrom(t => t.priority));
 
   taskAssigneeList = computed(() => {
@@ -3270,7 +3276,7 @@ export class ProjectsComponent implements OnInit {
   activeTaskFilterCount = computed(() =>
     [
       this.tfProject(), this.tfProjectCode(), this.tfAssignee(),
-      this.tfStatus(), this.tfPriority(), this.tfMilestone(), this.tfPhase(),
+      this.tfStatus(), this.tfPriority(), this.tfMilestone(), this.tfPhase(), this.tfLocation(),
       this.tfDuration()
     ].filter(v => v !== 'ALL').length
     + (this.tfDueFrom() ? 1 : 0)
@@ -3289,6 +3295,7 @@ export class ProjectsComponent implements OnInit {
     this.tfPriority.set('ALL');
     this.tfMilestone.set('ALL');
     this.tfPhase.set('ALL');
+    this.tfLocation.set('ALL');
     this.tfDuration.set('ALL');
     this.tfDueFrom.set('');
     this.tfDueTo.set('');
@@ -3302,6 +3309,7 @@ export class ProjectsComponent implements OnInit {
     const priority = this.tfPriority();
     const milestone = this.tfMilestone();
     const phase = this.tfPhase();
+    const location = this.tfLocation();
     const duration = this.tfDuration();
     const dueFrom = this.tfDueFrom();
     const dueTo = this.tfDueTo();
@@ -3310,6 +3318,7 @@ export class ProjectsComponent implements OnInit {
       if (project !== 'ALL' && (t.parent?.name || '') !== project) return false;
       if (code !== 'ALL' && (t.projectCode || '') !== code) return false;
       if (status !== 'ALL' && t.status !== status) return false;
+      if (location !== 'ALL' && ((t as any).location || '') !== location) return false;
       if (priority !== 'ALL' && (t.priority || '') !== priority) return false;
       if (milestone !== 'ALL' && (t.milestone?.name || '') !== milestone) return false;
       if (phase !== 'ALL' && (t.phase || '') !== phase) return false;
@@ -3971,6 +3980,23 @@ export class ProjectsComponent implements OnInit {
         },
       };
     });
+    // Where the task is carried out, right after the task itself.
+    if (!this.taskTableColDefs.some((c: any) => c.headerName === 'Location')) {
+      const at = this.taskTableColDefs.findIndex((c: any) => c.headerName === 'Evidence');
+      const esc = (t: string) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
+      this.taskTableColDefs.splice(at === -1 ? 2 : at, 0, {
+        headerName: 'Location', field: 'location', width: 150, minWidth: 120, sortable: true,
+        cellRenderer: (p: any) => {
+          if (!p.value) return '<span class="task-evidence-empty">—</span>';
+          const [city, state] = String(p.value).split(/,\s*(.+)/);
+          return `<div title="${esc(p.value)}" style="display:flex;flex-direction:column;justify-content:center;line-height:1.25;height:100%;min-width:0">
+            <span style="font-size:13px;font-weight:500;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(city)}</span>
+            ${state ? `<span style="font-size:11px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(state)}</span>` : ''}
+          </div>`;
+        },
+      });
+    }
+
     const assigneeColumn: any = this.taskTableColDefs.find((column: any) => column.headerName === 'Assigned to');
     if (!assigneeColumn) return;
 

@@ -1141,7 +1141,7 @@
             <span>Filters</span>
             <span class="quick-filter-count" *ngIf="activeTaskFilterCount() > 0">{{ activeTaskFilterCount() }}</span>
           </button>
-          <button type="button" class="toggle-done-pill" (click)="myTasksByLocation.set(!myTasksByLocation())"
+          <button type="button" class="toggle-done-pill" *ngIf="locationTracking" (click)="myTasksByLocation.set(!myTasksByLocation())"
                   [class.active]="myTasksByLocation()" title="Every location of every task, one row each">
             <svg lucideMapPin size="14"></svg>
             <span>By location</span>
@@ -1459,6 +1459,19 @@
               (ngModelChange)="tfPhase.set($event)">
               <option value="ALL">All phases</option>
               <option *ngFor="let p of taskPhaseOptions()" [value]="p">{{ p }}</option>
+            </select>
+          </div>
+
+          <!-- Location: hidden when none of the tasks in hand has one. -->
+          <div class="tf-field-group" *ngIf="taskLocationOptions().length > 0">
+            <label class="tf-field-label">Location</label>
+            <select
+              class="tf-select-control"
+              [class.is-active]="tfLocation() !== 'ALL'"
+              [ngModel]="tfLocation()"
+              (ngModelChange)="tfLocation.set($event)">
+              <option value="ALL">All locations</option>
+              <option *ngFor="let l of taskLocationOptions()" [value]="l">{{ l }}</option>
             </select>
           </div>
 
@@ -2052,11 +2065,11 @@
          when they all do. Not offered on pre-sales tasks. -->
     <div class="form-group" *ngIf="taskForm.parentKind !== 'LEAD' && (taskLocations().length || isAdmin)">
       <label class="form-label">
-        Locations <span class="req" *ngIf="taskLocations().length">*</span>
+        Location <span class="req" *ngIf="taskLocations().length">*</span>
         <a *ngIf="isAdmin" routerLink="/settings/master-data" [queryParams]="{ tab: 'task-locations' }"
            class="form-label-link" (click)="isCreateTaskOpen.set(false)">Manage locations</a>
       </label>
-      <app-location-picker *ngIf="taskLocations().length" [locations]="taskLocations()"
+      <app-location-picker *ngIf="taskLocations().length" [locations]="taskLocations()" [single]="true"
         [selected]="taskForm.locationIds" (selectedChange)="taskForm.locationIds = $event; revalidateTask()" />
       <span class="field-hint" *ngIf="!taskLocations().length">No task locations are set up yet.</span>
       <span class="field-error" *ngIf="taskError('locations') as m">{{ m }}</span>

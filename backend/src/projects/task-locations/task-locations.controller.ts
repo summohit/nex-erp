@@ -74,6 +74,17 @@ export class IssueLocationsController {
     return this.locations.addLocations(req.user.companyId, projectId, issueId, req.user.employeeId ?? null, req.user.role, body);
   }
 
+  /** Replace the task's one location: `{ locationId }`. */
+  @Put()
+  set(
+    @Req() req,
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('issueId', ParseIntPipe) issueId: number,
+    @Body() body: { locationId: number },
+  ) {
+    return this.locations.setLocationFor(req.user.companyId, projectId, issueId, req.user.employeeId ?? null, req.user.role, body?.locationId);
+  }
+
   @Patch(':locId')
   update(
     @Req() req,

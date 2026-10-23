@@ -62,8 +62,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
             return EMPTY;
           }),
           catchError((refreshErr) => {
-            authService.logout();
-            router.navigate(['/login']);
+            // Sign out only when the server REJECTED the refresh token. A
+            // refresh that never got an answer — the API restarting, the
+            // network dropping — says nothing about the session, which is
+            // still good for a week; signing out then is what used to log
+            // everyone out whenever the backend restarted.
+            const rejected = refreshErr?.status === 401 || refreshErr?.status === 403
+              || refreshErr?.message === 'No refresh token';
+            if (rejected) {
+              authService.logout();
+              router.navigate(['/login']);
+            }
             return throwError(() => refreshErr);
           }),
         );

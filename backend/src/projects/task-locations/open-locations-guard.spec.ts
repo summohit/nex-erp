@@ -1,4 +1,9 @@
 import { IssuesService } from '../issues/issues.service';
+import { LOCATION_TRACKING_ENABLED } from './location-rules';
+
+/** The guard exists only while per-location tracking is switched on. */
+const whenTracking = LOCATION_TRACKING_ENABLED ? it : it.skip;
+const whenNotTracking = LOCATION_TRACKING_ENABLED ? it.skip : it;
 
 /**
  * A task carried out at several locations reaches Done through its locations.
@@ -57,12 +62,12 @@ describe('IssuesService — open locations on the Done transition', () => {
     await expect(moveToDone('ADMIN')).resolves.toBeDefined();
   });
 
-  it('refuses Done while locations are open, saying how many', async () => {
+  whenTracking('refuses Done while locations are open, saying how many', async () => {
     locationRows = [{ status: 'COMPLETED' }, { status: 'IN_PROGRESS' }, { status: 'BLOCKED' }];
     await expect(moveToDone('ADMIN')).rejects.toThrow(/2 of 3 locations are still open/);
   });
 
-  it('lets an administrator override, and records it', async () => {
+  whenTracking('lets an administrator override, and records it', async () => {
     locationRows = [{ status: 'NOT_STARTED' }];
     await expect(moveToDone('ADMIN', { overrideOpenLocations: true })).resolves.toBeDefined();
     expect(prisma.issueActivity.create).toHaveBeenCalledWith(
@@ -70,9 +75,14 @@ describe('IssuesService — open locations on the Done transition', () => {
     );
   });
 
-  it('ignores the override flag from anyone but an administrator', async () => {
+  whenTracking('ignores the override flag from anyone but an administrator', async () => {
     locationRows = [{ status: 'NOT_STARTED' }];
     await expect(moveToDone('EMPLOYEE', { overrideOpenLocations: true, completionRemark: 'done' }))
       .rejects.toThrow(/still open/);
+  });
+
+  whenNotTracking('allows Done with open locations while tracking is off', async () => {
+    locationRows = [{ status: 'NOT_STARTED' }];
+    await expect(moveToDone('ADMIN')).resolves.toBeDefined();
   });
 });

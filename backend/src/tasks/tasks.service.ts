@@ -7,7 +7,7 @@ import { TasksGateway } from '../events/tasks/tasks.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CrmService } from '../crm/crm.service';
 import { TaskLocationsService } from '../projects/task-locations/task-locations.service';
-import { locationProgress } from '../projects/task-locations/location-rules';
+import { locationProgress, isOwnLocation, LOCATION_TRACKING_ENABLED } from '../projects/task-locations/location-rules';
 import { MyTaskDto, NormalisedStatus, TaskPerson } from './dto/my-task.dto';
 import { canCreateTask } from './task-permissions';
 import { APPROVAL_STATE, needsApprovalOnCreate } from '../approvals/two-step-approval';
@@ -543,10 +543,8 @@ export class TasksService {
       }
     }
 
-    // Where the work happens. Required for project and general tasks once the
-    // company has set up locations at all — the same conditional rule phases
-    // follow, so a company that has not adopted locations is unaffected.
-    // Pre-sales tasks never carry locations.
+    // Where the work happens: at least one location for project and general
+    // tasks, once the company has set any up. Pre-sales tasks carry none.
     const locationIds = [...new Set((data.locationIds ?? []).map(Number).filter(Boolean))];
     if (this.taskLocations && data.parentKind !== 'LEAD' && !locationIds.length) {
       const locationsExist = await this.prisma.taskLocation.count({ where: { companyId, isActive: true } });
@@ -771,7 +769,13 @@ export class TasksService {
         projectTicket: { select: { id: true, ticketNumber: true } },
         assignee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         _count: { select: { attachments: true } },
-        locations: { where: { removedAt: null }, select: { status: true, dueDate: true } },
+        locations: {
+          where: { removedAt: null },
+          select: {
+            status: true, dueDate: true, assignees: { select: { employeeId: true } },
+            location: { select: { name: true, parent: { select: { name: true } } } },
+          },
+        },
         members: {
           select: {
             employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
@@ -808,7 +812,19 @@ export class TasksService {
         : { kind: 'PROJECT' as const, id: i.project!.id, name: i.project!.name };
 
       return {
-        locations: i.locations.length ? locationProgress(i.locations, now) : null,
+        // The task's location, as "City, State".
+        location: (() => {
+          const l = (i.locations ?? [])[0]?.location;
+          return l ? (l.parent ? `${l.name}, ${l.parent.name}` : l.name) : null;
+        })(),
+        locations: (() => {
+          // Outside the admin's company-wide view, count only this person's locations.
+          const locs = i.locations ?? [];
+          const mine = everyone || !LOCATION_TRACKING_ENABLED ? locs : locs.filter((l) => isOwnLocation(l, {
+            assigneeId: i.assignee?.id ?? null, members: (i.members ?? []).map((m) => ({ employeeId: m.employee.id })),
+          }, employeeId));
+          return mine.length ? locationProgress(mine, now) : null;
+        })(),
         approvalState: i.approvalState ?? null,
         approvalRejectionReason: i.approvalRejectionReason ?? null,
         source: general ? 'GENERAL' : 'PROJECT',

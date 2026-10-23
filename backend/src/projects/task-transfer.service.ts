@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import * as xlsx from 'xlsx';
 import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../prisma/prisma.service';
 import { IssuesService } from './issues/issues.service';
 import { PROJECT_ROLE } from './project-roles';
+import { TaskLocationsService } from './task-locations/task-locations.service';
 
 /**
  * Task export / import in the "template project task" layout.
@@ -19,7 +20,7 @@ import { PROJECT_ROLE } from './project-roles';
 export const TEMPLATE_COLUMNS = [
   'S.No', 'Project Name', 'Project Code', 'Task Name', 'Task Description', 'Phase',
   'Assign Hours', 'Pre-Requisite', 'Dependency', 'Assign to', 'SME / Govern',
-  'Start Date', 'End Date',
+  'Start Date', 'End Date', 'Location',
 ] as const;
 const EXTRA_COLUMNS = ['Task ID', 'Task Key', 'Status', 'Logged Hours', 'Created Date'] as const;
 
@@ -51,6 +52,8 @@ interface ParsedRow {
   smeId?: number | null;
   startDate?: Date | null;
   dueDate?: Date | null;
+  /** The task's one location, from the Location column ("City, State"). */
+  locationId?: number;
   taskId?: number;
   errors: string[];
   warnings: string[];
@@ -58,7 +61,11 @@ interface ParsedRow {
 
 @Injectable()
 export class TaskTransferService {
-  constructor(private prisma: PrismaService, private issues: IssuesService) {}
+  constructor(
+    private prisma: PrismaService,
+    private issues: IssuesService,
+    @Optional() private taskLocations?: TaskLocationsService,
+  ) {}
 
   // ── Export ────────────────────────────────────────────────────────────────
 
@@ -91,6 +98,11 @@ export class TaskTransferService {
         sme: { select: { user: { select: { email: true } } } },
         blockedBy: { select: { dependsOnIssue: { select: { key: true } } } },
         timeLogs: { select: { durationMin: true } },
+        locations: {
+          where: { removedAt: null },
+          select: { location: { select: { name: true, parent: { select: { name: true } } } } },
+          take: 1,
+        },
       },
       orderBy: [{ projectId: 'asc' }, { createdAt: 'asc' }],
     } as any) as any[];
@@ -107,7 +119,7 @@ export class TaskTransferService {
         t.estimatedHours ?? '', t.prerequisites ?? '',
         (t.blockedBy || []).map((d: any) => d.dependsOnIssue?.key).filter(Boolean).join(', '),
         emails.join(', '), t.sme?.user?.email ?? '',
-        this.day(t.startDate), this.day(t.dueDate),
+        this.day(t.startDate), this.day(t.dueDate), this.locationLabel(t.locations?.[0]?.location),
         t.id, t.key, t.status, Math.round(logged * 100) / 100, this.day(t.createdAt),
       ];
     });
@@ -124,7 +136,7 @@ export class TaskTransferService {
       ? await this.prisma.project.findMany({ where: { companyId, id: { in: projectIds } }, select: { id: true, name: true, key: true } })
       : [];
     const sample = projects.length === 1
-      ? [[1, projects[0].name, projects[0].key, '', '', '', '', '', '', '', '', '', '']]
+      ? [[1, projects[0].name, projects[0].key, '', '', '', '', '', '', '', '', '', '', '']]
       : [];
     return await this.workbook(
       [[...TEMPLATE_COLUMNS], ...sample],
@@ -178,12 +190,18 @@ export class TaskTransferService {
             startDate: r.startDate ?? undefined,
             dueDate: r.dueDate ?? undefined,
             assigneeId: r.assigneeIds[0],
+            locationIds: r.locationId ? [r.locationId] : undefined,
           }, role);
           id = created.id;
           await this.prisma.issue.update({
             where: { id },
             data: { prerequisites: r.prerequisites, smeId: r.smeId ?? null },
           });
+        }
+        // An updated row with a Location replaces the task's location; blank leaves it.
+        if (r.taskId && r.locationId && this.taskLocations) {
+          await this.prisma.$transaction((tx) =>
+            this.taskLocations!.setTaskLocation(tx, companyId, id!, actorEmployeeId, r.locationId!));
         }
         if (r.assigneeIds.length) {
           await this.prisma.$transaction([
@@ -273,6 +291,18 @@ export class TaskTransferService {
       where: { companyId },
       select: { id: true, firstName: true, lastName: true, employeeCode: true, user: { select: { email: true } } },
     });
+    // Locations, matched as "City, State" (or "State, " for a state itself),
+    // or by name alone where that name is unique — Chandigarh, for one, is not.
+    const locations = await this.prisma.taskLocation.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, name: true, parent: { select: { name: true } } },
+    });
+    const locByLabel = new Map(locations.map((l) => [this.locationLabel(l).toLowerCase(), l.id]));
+    const locByName = new Map<string, number[]>();
+    for (const l of locations) {
+      const k = l.name.trim().toLowerCase();
+      locByName.set(k, [...(locByName.get(k) ?? []), l.id]);
+    }
     const byKey = new Map(projects.map((p) => [p.key.toLowerCase(), p]));
     const byName = new Map(projects.map((p) => [p.name.trim().toLowerCase(), p]));
     const phaseByName = new Map(phases.map((p) => [p.name.trim().toLowerCase(), p.id]));
@@ -332,6 +362,22 @@ export class TaskTransferService {
       p.startDate = this.parseDate(r['Start Date'], 'Start Date', p);
       p.dueDate = this.parseDate(r['End Date'], 'End Date', p);
       if (p.startDate && p.dueDate && p.dueDate < p.startDate) p.errors.push('End Date is before Start Date');
+
+      const locText = String(r['Location'] ?? '').trim();
+      if (locText) {
+        if (/[;\n]/.test(locText) || locText.split(',').length > 2) {
+          p.errors.push('Location: a task has one location — give a single "City, State"');
+        } else {
+          const exact = locByLabel.get(locText.replace(/\s*,\s*/, ', ').toLowerCase());
+          const byNameIds = locByName.get(locText.toLowerCase()) ?? [];
+          if (exact) p.locationId = exact;
+          else if (byNameIds.length === 1) p.locationId = byNameIds[0];
+          else if (byNameIds.length > 1) p.errors.push(`Location "${locText}" is in more than one state — write it as "City, State"`);
+          else p.errors.push(`Unknown location "${locText}"`);
+        }
+      } else if (locations.length && !r['Task ID']) {
+        p.errors.push('Location is required');
+      }
 
       if (project) {
         const onBoard = new Set([...(project.members || []).map((m) => m.employeeId), project.leadId].filter(Boolean) as number[]);
@@ -439,9 +485,16 @@ export class TaskTransferService {
       ['• Assign to: email (or employee code / full name) of people on that project. Several: comma-separated.'],
       ['• SME / Govern: email of the project\'s PM or Technical Architect.'],
       ['• Dates: DD/MM/YYYY. Keep the Task ID column from an export to update tasks instead of creating new ones.'],
+      ['• Location: one per task, as "City, State" from the Locations list below. Required for new tasks.'],
       [],
       ['Phases'],
       ...phases.map((p) => [p.name]),
+      [],
+      ['Locations'],
+      ...(await this.prisma.taskLocation.findMany({
+        where: { companyId, isActive: true },
+        select: { name: true, parent: { select: { name: true } } },
+      })).map((l) => this.locationLabel(l)).sort((a, b) => a.localeCompare(b)).map((l) => [l]),
       [],
       ['Project Code', 'Project', 'Person', 'Email', 'Employee Code', 'Project Role'],
       ...members.map((m) => [
@@ -457,6 +510,12 @@ export class TaskTransferService {
    * sometimes with pasted images inlined as data: URLs), which is unreadable
    * in Excel and can blow past its 32,767-character cell limit.
    */
+  /** "Mumbai, Maharashtra" — how a location is written in the sheet. */
+  private locationLabel(l?: { name: string; parent?: { name: string } | null } | null): string {
+    if (!l) return '';
+    return l.parent ? `${l.name}, ${l.parent.name}` : l.name;
+  }
+
   private plainText(html?: string | null): string {
     if (!html) return '';
     return String(html)
@@ -490,7 +549,7 @@ export class TaskTransferService {
       : /Task Name|^Task$/.test(h) ? 44
       : /Week|Assigned to/.test(h) ? 24
       : /Project Name|Assign to|SME/.test(h) ? 28
-      : /Dependency|Phase/.test(h) ? 20
+      : /Dependency|Phase|Location/.test(h) ? 20
       : /S\.No/.test(h) ? 7
       : 15;
     ws.columns = header.map((h) => ({ header: h, key: h, width: widthFor(h) }));
@@ -557,7 +616,7 @@ export class TaskTransferService {
       for (const r of reference) {
         const row = rs.addRow(r);
         const first = String(r[0] ?? '');
-        if (r.length === 1 && /^(How to fill this file|Phases)$/.test(first)) {
+        if (r.length === 1 && /^(How to fill this file|Phases|Locations)$/.test(first)) {
           row.font = { bold: true, size: 13, color: { argb: 'FF4338CA' } };
           row.height = 24;
         } else if (r.length > 1 && first === 'Project Code') {

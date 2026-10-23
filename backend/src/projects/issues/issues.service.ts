@@ -47,7 +47,7 @@ function sameValue(next: unknown, current: unknown): boolean {
   return String(next) === String(current);
 }
 import { assertWithinAllowedHours, remainingHours, HoursExceeded } from '../../tasks/task-hours';
-import { locationProgress } from '../task-locations/location-rules';
+import { locationProgress, isOwnLocation, LOCATION_TRACKING_ENABLED } from '../task-locations/location-rules';
 import { TaskLocationsService } from '../task-locations/task-locations.service';
 import { resolveProjectViewer, taskVisibilityFilter, mayChangeAnyTask, seesEveryTask, PROJECT_ROLE } from '../project-roles';
 import { isSuperAdmin, isCompanyAdmin } from '../../common/company-roles';
@@ -175,6 +175,7 @@ export class IssuesService {
      * this method, the task form, a ticket conversion, a template and a
      * project copy all draw from the same counter, so none of them can collide.
      */
+    let locationAssignments: { employeeId: number; locationName: string }[] = [];
     const { issue, activity } = await this.prisma.$transaction(async (tx) => {
       const { issueSeq } = await tx.project.update({
         where: { id: projectId },
@@ -235,10 +236,17 @@ export class IssuesService {
 
       // Where the task is carried out, when the board's create form chose any.
       // Optional here: quick-add, subtasks and imports raise tasks without.
-      const locationIds = Array.isArray(data.locationIds) ? data.locationIds : [];
-      if (locationIds.length && this.taskLocations) {
+      // `locations` carries each location's own status, dates and people from
+      // the create form; plain `locationIds` takes the defaults.
+      if (this.taskLocations && Array.isArray(data.locations) && data.locations.length) {
+        const { locationIds, details } = await this.taskLocations.parseDrafts(tx, companyId, data.locations);
+        const made = await this.taskLocations.attachLocations(tx, {
+          companyId, issueId: created.id, actorId: reporterId, locationIds, details,
+        });
+        locationAssignments = made.assigned;
+      } else if (this.taskLocations && Array.isArray(data.locationIds) && data.locationIds.length) {
         await this.taskLocations.attachLocations(tx, {
-          companyId, issueId: created.id, actorId: reporterId, locationIds,
+          companyId, issueId: created.id, actorId: reporterId, locationIds: data.locationIds,
         });
       }
 
@@ -247,6 +255,10 @@ export class IssuesService {
 
     this.tasksGateway.emitIssueUpdated(issue.id, projectId, issue);
     this.tasksGateway.emitActivityAdded(issue.id, activity);
+    if (locationAssignments.length && this.taskLocations) {
+      await this.taskLocations.notifyAssignedFor(issue, locationAssignments, reporterId);
+      await this.taskLocations.syncParent(issue.id, reporterId);
+    }
 
     return issue;
   }
@@ -377,7 +389,7 @@ export class IssuesService {
           where: { removedAt: null },
           select: {
             status: true, dueDate: true, locationId: true,
-            location: { select: { name: true, parentId: true } },
+            location: { select: { name: true, parentId: true, parent: { select: { name: true } } } },
             assignees: { select: { employeeId: true } },
           },
         },
@@ -408,7 +420,15 @@ export class IssuesService {
 
     return issues.map(issue => ({
       ...issue,
-      locationProgress: issue.locations.length ? locationProgress(issue.locations) : null,
+      locationProgress: (() => {
+        // Employees count only their own locations, as the panel shows them.
+        const seesAll = !LOCATION_TRACKING_ENABLED || seesEveryTask(viewer) || (employeeId != null && issue.reporterId === employeeId);
+        const locs = issue.locations ?? [];
+        const mine = seesAll ? locs : locs.filter((l: any) => isOwnLocation(l, {
+          assigneeId: issue.assigneeId, members: issue.members as any,
+        }, employeeId));
+        return mine.length ? locationProgress(mine) : null;
+      })(),
       assigneeApproverIds: chainFor(issue.assigneeId)
     }));
   }
@@ -480,6 +500,7 @@ export class IssuesService {
   private async assertLocationsAllowDone(
     companyId: number, actorEmployeeId: number, issue: any, targetStatus: string | undefined, data: any, role?: string,
   ) {
+    if (!LOCATION_TRACKING_ENABLED) return;
     if (targetStatus !== 'DONE' || issue.status === 'DONE') return;
     const rows = await this.prisma.issueLocation.findMany({
       where: { issueId: issue.id, companyId, removedAt: null },

@@ -68,7 +68,9 @@ export class OnboardingComponent {
           this.masterData.getDesignations().subscribe(res => this.designations.set(res));
         }
       },
-      error: () => {
+      error: (err) => {
+        // As on the dashboard: sign out only when the session was rejected.
+        if (err?.status !== 401 && err?.status !== 403) return;
         this.authService.logout();
         this.toast.info('Session expired. Please log in again.');
         this.router.navigate(['/']);

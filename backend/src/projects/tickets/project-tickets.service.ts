@@ -380,6 +380,16 @@ export class ProjectTicketsService {
       select: { id: true, key: true, title: true, status: true },
     });
 
+    // The assignee is a member of the task too, as everywhere else a task is
+    // made — the task's Members list and the card's faces read member rows,
+    // so an assignee who is not one shows nobody on the task at all.
+    if (ticket.proposedAssigneeId) {
+      await tx.issueMember.createMany({
+        data: [{ issueId: issue.id, employeeId: ticket.proposedAssigneeId }],
+        skipDuplicates: true,
+      });
+    }
+
     return tx.projectTicket.update({
       where: { id: ticket.id },
       data: {

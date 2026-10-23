@@ -53,12 +53,14 @@ declare var Quill: any;
 import { TaskTransferComponent } from '../../shared/components/task-transfer/task-transfer';
 import { TaskLocationPanelComponent, PanelPerson } from '../../shared/components/task-locations/task-location-panel';
 import { LocationPickerComponent } from '../../shared/components/task-locations/location-picker';
-import { TaskLocationsService, TaskLocation } from '../../services/task-locations.service';
+import { LocationDraftsComponent, LocationDraft, draftComplete } from '../../shared/components/task-locations/location-drafts';
+import { TaskLocationsSimpleComponent } from '../../shared/components/task-locations/task-locations-simple';
+import { TaskLocationsService, TaskLocation, LOCATION_TRACKING_ENABLED } from '../../services/task-locations.service';
 import { JiraDatePickerComponent } from '../../shared/components/jira-date-picker';
 @Component({
   selector: 'app-project-detail',
   standalone: true,
-  imports: [ProjectsComponent, TaskTransferComponent, TaskLocationPanelComponent, LocationPickerComponent, JiraDatePickerComponent, RouterLink, 
+  imports: [ProjectsComponent, TaskTransferComponent, TaskLocationPanelComponent, LocationPickerComponent, LocationDraftsComponent, TaskLocationsSimpleComponent, JiraDatePickerComponent, RouterLink, 
     CommonModule, FormsModule, DragDropModule, MilestonesTabComponent,
     TicketsTabComponent, BudgetRequestsTabComponent, DiscussionsTabComponent,
     TaskHoursRequestPanelComponent,
@@ -116,10 +118,45 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   taskLocations = signal<TaskLocation[]>([]);
   /** Locations chosen in the create form; once the task exists its panel takes over. */
   newLocationIds = signal<number[]>([]);
+  /** Per-location tracking (details, progress panel, card pill), off for now. */
+  readonly locationTracking = LOCATION_TRACKING_ENABLED;
+  /** Every location on a card, for the hover text behind its chips. */
+  cardLocationTitle(issue: any): string {
+    return (issue.locations ?? [])
+      .map((l: any) => l.location?.parent?.name ? `${l.location.name}, ${l.location.parent.name}` : l.location?.name)
+      .join(' · ');
+  }
+  removePickedLocation(id: number) {
+    this.newLocationIds.update((ids) => ids.filter((x) => x !== id));
+  }
+  /** Each picked location's status, dates, members and remarks. */
+  locationDrafts = signal<LocationDraft[]>([]);
+  /** The task's members as ids — each new location starts with them. */
+  /** The open task's assignee and members, as ids. */
+  selectedIssueMemberIds = computed<number[]>(() => {
+    const i = this.selectedIssue();
+    if (!i) return [];
+    const ids = (i.members ?? []).map((m: any) => m.employeeId ?? m.employee?.id);
+    if (i.assigneeId) ids.unshift(i.assigneeId);
+    return [...new Set<number>(ids.filter(Boolean))];
+  });
+  draftMemberIds = computed(() => this.draftMembers().map((m: any) => m.id ?? m.employeeId));
+  /** A form date (string or Date) as YYYY-MM-DD, for the location date inputs. */
+  dayOf(v: any): string {
+    if (!v) return '';
+    const d = v instanceof Date ? v : new Date(v);
+    if (Number.isNaN(d.getTime())) return String(v).slice(0, 10);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
   /** Who can be put on a task location: the project's members. */
   locationPeople = computed<PanelPerson[]>(() => (this.project()?.members ?? []).map((m: any) => {
     const e = m.employee ?? m;
-    return { id: e.id ?? m.employeeId, firstName: e.firstName ?? '', lastName: e.lastName ?? '' };
+    return {
+      id: e.id ?? m.employeeId,
+      firstName: e.firstName ?? '',
+      lastName: e.lastName ?? '',
+      avatarUrl: e.avatarUrl || m.avatarUrl || null,
+    };
   }));
   board = signal<any>(null);
   
@@ -756,6 +793,24 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   listFilterAssigneeIds = signal<number[]>([]);
   listFilterStatuses = signal<string[]>([]);
   listFilterPriorities = signal<string[]>([]);
+  /** Location ids to show; empty shows every task. */
+  listFilterLocationIds = signal<number[]>([]);
+  listLocationSearch = signal('');
+  /** The locations this project's tasks actually use, as filter options. */
+  listLocationOptions = computed(() => {
+    const seen = new Map<number, string>();
+    for (const i of this.allIssues() || []) {
+      for (const l of i.locations || []) {
+        if (l.locationId && !seen.has(l.locationId)) {
+          seen.set(l.locationId, l.location?.parent?.name ? `${l.location.name}, ${l.location.parent.name}` : l.location?.name);
+        }
+      }
+    }
+    const q = this.listLocationSearch().trim().toLowerCase();
+    return [...seen].map(([id, label]) => ({ id, label }))
+      .filter((o) => !q || o.label.toLowerCase().includes(q))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  });
   listFilterMyIssues = signal<boolean>(false);
 
   /** The single filter for where a task sits in the workflow. A board list IS
@@ -818,6 +873,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       });
     }
 
+    if (this.listFilterLocationIds().length > 0) {
+      const want = new Set(this.listFilterLocationIds());
+      issues = issues.filter(i => (i.locations || []).some((l: any) => want.has(l.locationId)));
+    }
     if (this.listFilterPriorities().length > 0) {
       issues = issues.filter(i => this.listFilterPriorities().includes(i.priority));
     }
@@ -973,8 +1032,14 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
   }
   
+  toggleListFilterLocation(id: number) {
+    const current = this.listFilterLocationIds();
+    this.listFilterLocationIds.set(current.includes(id) ? current.filter(x => x !== id) : [...current, id]);
+  }
+
   clearListFilters() {
     this.listSearchQuery.set('');
+    this.listFilterLocationIds.set([]);
     this.listFilterAssigneeIds.set([]);
     this.listFilterStatuses.set([]);
     this.listFilterPriorities.set([]);
@@ -2987,7 +3052,19 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return !!pmMembers?.some((m: any) => m.employeeId === issue.assigneeId);
   }
 
+  /**
+   * Who may close a task — move it to Done or Cancelled: the Super Admin and
+   * this project's Project Managers. The server's rule (assertCanCompleteOrArchive),
+   * mirrored so employees are never offered a move that will be refused.
+   */
+  canCloseTasks(): boolean {
+    if (this.roles.isSuperAdmin()) return true;
+    const me = this.currentEmployeeId();
+    return !!me && !!this.project()?.members?.some((m: any) => m.role === 'PROJECT_MANAGER' && m.employeeId === me);
+  }
+
   canMoveIntoReviewOrDone(issue: any, columnId: number): boolean {
+    if (this.isDoneOrArchiveColumn(columnId) && !this.canCloseTasks()) return false;
     if (this.isAssigneeProjectManager(issue) && this.isDoneOrArchiveColumn(columnId)) {
       return this.isProjectOwner;
     }
@@ -3020,6 +3097,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   canDropOnColumn(drag: any, columnId: number): boolean {
+    // Employees cannot drop a card on Done or Cancelled at all.
+    if ((this.isDoneOrArchiveColumn(columnId) || this.isCancelColumn(columnId))
+        && drag?.data?.columnId !== columnId && !this.canCloseTasks()) return false;
     return this.isAdjacentColumnMove(drag?.data, columnId);
   }
 
@@ -3066,6 +3146,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (!issue) return false;
     if ((this.isReviewColumn(columnId) || this.isDoneOrArchiveColumn(columnId)) && !this.canMoveIntoReviewOrDone(issue, columnId)) return true;
     // Cancelling: the same people who may close the task.
+    if (this.isCancelColumn(columnId) && issue.columnId !== columnId && !this.canCloseTasks()) return true;
     if (this.isCancelColumn(columnId) && issue.columnId !== columnId) {
       if (this.isAssigneeProjectManager(issue) ? !this.isProjectOwner : !(this.isProjectOwner || this.canCompleteIssue(issue))) return true;
     }
@@ -3243,6 +3324,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   openCreateIssue(columnId?: number, initialTitle?: string, initialHours?: any, initialPhaseId?: number | null) {
     this.selectedIssue.set(null);
     this.newLocationIds.set([]);
+    this.locationDrafts.set([]);
     // Fetched each time: an admin may have just added some.
     this.taskLocationsApi.list(true).subscribe({ next: (l) => this.taskLocations.set(l || []), error: () => {} });
     this.draftMembers.set([]);
@@ -4419,6 +4501,24 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
         return `<div style="display: flex; align-items: center; height: 100%;">${membersHtml}</div>`;
       }
+    },
+    // Where the task is carried out: its one location, with the state, sortable
+    // and filterable as plain text.
+    {
+      headerName: 'Location',
+      width: 170,
+      valueGetter: (params: any) => this.cardLocationTitle(params.data),
+      cellRenderer: (params: any) => {
+        const issue = params.data;
+        const first = issue?.locations?.[0]?.location;
+        if (!first) return '<span style="color: #94a3b8; font-size: 12px;">—</span>';
+        const esc = (t: string) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
+        const more = issue.locations.length > 1 ? ` <span style="color: #64748b; font-size: 11px;">+${issue.locations.length - 1}</span>` : '';
+        return `<div title="${esc(params.value)}" style="display: flex; flex-direction: column; line-height: 1.25; justify-content: center; height: 100%; min-width: 0;">
+                  <span style="font-size: 13px; font-weight: 500; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(first.name)}${more}</span>
+                  ${first.parent?.name ? `<span style="font-size: 11px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(first.parent.name)}</span>` : ''}
+                </div>`;
+      },
     },
     // §7: assigned, logged and remaining as three sortable columns rather than
     // one combined cell -- "who is out of hours" is a question you answer by
@@ -6373,9 +6473,17 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         return this.isFieldInvalid(f.key);
       });
 
-      // Required once the company has set up locations, as on the Tasks page.
+      // At least one location, once the company has set any up.
       if (!firstInvalid && this.taskLocations().length && !this.newLocationIds().length) {
         this.toast.error('Please fill in all required fields: Locations is required');
+        this.scrollToField('task-field-locations');
+        return;
+      }
+      // With per-location tracking on, every location picked needs its status,
+      // dates and at least one member.
+      const incomplete = this.locationTracking && this.locationDrafts().find((d) => !draftComplete(d));
+      if (!firstInvalid && incomplete) {
+        this.toast.error('Each location needs a status, start and due dates, and at least one member');
         this.scrollToField('task-field-locations');
         return;
       }
@@ -6406,7 +6514,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         smeId: Number(this.issueForm.smeId),
         estimatedHours: Number(this.issueForm.estimatedHours),
         assigneeId: pendingMembers[0]?.id || null,
-        locationIds: this.newLocationIds().length ? this.newLocationIds() : undefined,
+        ...(this.locationTracking && this.locationDrafts().length
+          ? { locations: this.locationDrafts().map(({ touched, ...d }) => d) }
+          : { locationIds: this.newLocationIds().length ? this.newLocationIds() : undefined }),
       };
 
       this.projectsService.createIssue(this.projectId, payload).subscribe({
@@ -6607,10 +6717,45 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   currentIssueMembers = computed(() => {
     const issue = this.selectedIssue();
     if (issue && issue.members) {
+      // A task whose assignee was never made a member (tickets converted
+      // before 23 Oct 2026, among others) still shows who it belongs to.
+      if (!issue.members.length && issue.assignee) {
+        return [{ employeeId: issue.assignee.id, employee: issue.assignee }];
+      }
       return issue.members;
     }
     return this.draftMembers();
   });
+
+  /** One line per activity entry: what the person did. */
+  activityText(item: any): string {
+    const field = item.field ? String(item.field) : '';
+    switch (item.action) {
+      case 'CREATED': return 'created this card';
+      case 'STATUS_CHANGED':
+        return field === 'status'
+          ? `moved this card to ${this.statusLabel(item.newValue)}`
+          : `moved this card to ${this.getColumnName(item.newValue) || item.newValue}`;
+      case 'ASSIGNED': return 'assigned this card';
+      case 'WORK_STARTED': return 'started the timer';
+      case 'WORK_STOPPED': return 'stopped the timer';
+      case 'TIME_LOGGED': return 'logged time';
+      case 'COMMENT_ADDED': return 'commented';
+      case 'APPROVED':
+      case 'APPROVAL_GRANTED': return 'approved this task';
+      case 'REJECTED':
+      case 'APPROVAL_REJECTED': return 'sent this task back for changes';
+      case 'APPROVAL_EDITED': return `changed ${field || 'a field'} while approving`;
+      case 'ARCHIVED': return 'archived this card';
+      case 'UNARCHIVED': return 'restored this card from the archive';
+      case 'LOCATION_OVERRIDE': return 'marked this task done with locations still open';
+      default: return String(item.action || 'updated this card').toLowerCase().replace(/_/g, ' ');
+    }
+  }
+
+  private statusLabel(s: string): string {
+    return ({ TODO: 'To Do', IN_PROGRESS: 'In Progress', IN_REVIEW: 'In Review', DONE: 'Done', CANCELLED: 'Cancelled' } as any)[s] ?? s;
+  }
 
   isMemberLoading(employeeId: number): boolean {
     return this.loadingMemberIds().has(employeeId);

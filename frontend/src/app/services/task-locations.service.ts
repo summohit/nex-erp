@@ -61,6 +61,7 @@ export interface IssueLocationRow {
 
 export interface IssueLocations {
   canManage: boolean;
+  taskStatus?: string;
   progress: LocationProgress;
   locations: IssueLocationRow[];
 }
@@ -82,6 +83,15 @@ export interface LocationReportRow extends LocationProgress {
   pending: number;
   pendingLocations: string[];
 }
+
+/**
+ * Per-location execution tracking: each location's own status, people,
+ * dates, time and evidence; the Location Progress panel; the "N/M locations"
+ * card pill; and Tasks → By location. Off for now (23 Oct 2026) — tasks just
+ * name their locations. The server has the same switch in
+ * backend/src/projects/task-locations/location-rules.ts; flip both together.
+ */
+export const LOCATION_TRACKING_ENABLED = false;
 
 @Injectable({ providedIn: 'root' })
 export class TaskLocationsService {
@@ -116,8 +126,19 @@ export class TaskLocationsService {
   forIssue(projectId: number, issueId: number): Observable<IssueLocations> {
     return this.http.get<IssueLocations>(this.base(projectId, issueId));
   }
-  add(projectId: number, issueId: number, data: { locationIds: number[]; assigneeIds?: number[]; dueDate?: string | null }): Observable<IssueLocations> {
+  add(projectId: number, issueId: number, data: {
+    locationIds?: number[];
+    assigneeIds?: number[];
+    startDate?: string | null;
+    dueDate?: string | null;
+    status?: LocationStatus;
+    locations?: any[];
+  }): Observable<IssueLocations> {
     return this.http.post<IssueLocations>(this.base(projectId, issueId), data);
+  }
+  /** Replace the task's one location. */
+  setLocation(projectId: number, issueId: number, locationId: number): Observable<IssueLocations> {
+    return this.http.put<IssueLocations>(this.base(projectId, issueId), { locationId });
   }
   updateRow(projectId: number, issueId: number, rowId: number, data: any): Observable<IssueLocations> {
     return this.http.patch<IssueLocations>(`${this.base(projectId, issueId)}/${rowId}`, data);

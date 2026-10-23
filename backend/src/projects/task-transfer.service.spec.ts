@@ -28,6 +28,8 @@ describe('TaskTransferService preview', () => {
       { id: 9, firstName: 'Out', lastName: 'Sider', employeeCode: '20009', user: { email: 'out@x.com' } },
     ]) },
     issue: { findMany: jest.fn().mockResolvedValue([{ id: 500, projectId: 7 }]) },
+    // No locations set up: the Location column is then optional.
+    taskLocation: { findMany: jest.fn().mockResolvedValue([]) },
   };
   const svc = new TaskTransferService(prisma, {} as any);
   const row = (o: Partial<Record<string, any>>) =>
@@ -97,10 +99,43 @@ describe('TaskTransferService export', () => {
       }]) },
       projectPhase: { findMany: jest.fn().mockResolvedValue([]) },
       projectMember: { findMany: jest.fn().mockResolvedValue([]) },
+      taskLocation: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const buf = await new TaskTransferService(prisma, {} as any).exportTasks(1, {});
     const rows: any[] = xlsx.utils.sheet_to_json(xlsx.read(buf).Sheets['task']);
     expect(rows[0]['Task Description'].length).toBeLessThan(32767);
     expect(rows[0]['Task Description']).not.toMatch(/<p>|base64/);
+  });
+});
+
+describe('TaskTransferService — the Location column', () => {
+  const prisma: any = {
+    project: { findMany: jest.fn().mockResolvedValue([{ id: 7, name: 'P', key: 'K', leadId: 1, members: [] }]) },
+    projectPhase: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
+    employee: { findMany: jest.fn().mockResolvedValue([]) },
+    issue: { findMany: jest.fn().mockResolvedValue([]) },
+    taskLocation: { findMany: jest.fn().mockResolvedValue([
+      { id: 1, name: 'Mumbai', parent: { name: 'Maharashtra' } },
+      { id: 2, name: 'Chandigarh', parent: { name: 'Punjab' } },
+      { id: 3, name: 'Chandigarh', parent: { name: 'Haryana' } },
+    ]) },
+  };
+  const svc = new TaskTransferService(prisma, {} as any);
+  const preview = async (location: string) => (await svc.preview(1, fileOf([
+    [...TEMPLATE_COLUMNS, 'Task ID'].map((c) => ({ 'Project Code': 'K', 'Task Name': 'T', Location: location } as any)[c] ?? ''),
+  ]))).rows[0];
+
+  it('reads "City, State" and a unique city name', async () => {
+    expect((await preview('Mumbai, Maharashtra')).ok).toBe(true);
+    expect((await preview('mumbai')).ok).toBe(true);
+  });
+  it('asks for the state when a city name repeats', async () => {
+    expect((await preview('Chandigarh')).errors.join()).toMatch(/more than one state/);
+    expect((await preview('Chandigarh, Punjab')).ok).toBe(true);
+  });
+  it('requires a location on a new task and refuses several', async () => {
+    expect((await preview('')).errors.join()).toMatch(/Location is required/);
+    expect((await preview('Mumbai; Pune')).errors.join()).toMatch(/one location/);
+    expect((await preview('Atlantis')).errors.join()).toMatch(/Unknown location/);
   });
 });

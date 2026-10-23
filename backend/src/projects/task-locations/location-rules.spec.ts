@@ -1,4 +1,4 @@
-import { locationHasHistory, locationProgress, parentStatusFor, isLocationOverdue } from './location-rules';
+import { locationHasHistory, locationProgress, parentStatusFor, isLocationOverdue, isOwnLocation } from './location-rules';
 
 const now = new Date('2026-10-23T10:00:00Z');
 
@@ -32,13 +32,17 @@ describe('location rules', () => {
   });
 
   describe('parent status', () => {
-    it('completes the parent when every active location is done', () => {
+    it('sends the parent to review when every active location is done', () => {
       expect(parentStatusFor('IN_PROGRESS', [
         { status: 'COMPLETED' }, { status: 'NOT_STARTED', removedAt: '2026-10-01' },
-      ])).toBe('DONE');
+      ])).toBe('IN_REVIEW');
     });
-    it('reopens a done parent when a location is open again', () => {
+    it('reopens a parent in review or done when a location is open again', () => {
       expect(parentStatusFor('DONE', [{ status: 'COMPLETED' }, { status: 'NOT_STARTED' }])).toBe('IN_PROGRESS');
+      expect(parentStatusFor('IN_REVIEW', [{ status: 'COMPLETED' }, { status: 'IN_PROGRESS' }])).toBe('IN_PROGRESS');
+    });
+    it('leaves a parent already in review or done alone while all are complete', () => {
+      expect(parentStatusFor('IN_REVIEW', [{ status: 'COMPLETED' }])).toBeNull();
     });
     it('starts a to-do parent once work begins anywhere', () => {
       expect(parentStatusFor('TODO', [{ status: 'IN_PROGRESS' }, { status: 'NOT_STARTED' }])).toBe('IN_PROGRESS');
@@ -48,6 +52,19 @@ describe('location rules', () => {
       expect(parentStatusFor('CANCELLED', [{ status: 'COMPLETED' }])).toBeNull();
       expect(parentStatusFor('TODO', [])).toBeNull();
       expect(parentStatusFor('DONE', [{ status: 'COMPLETED' }])).toBeNull();
+    });
+  });
+
+  describe('own locations', () => {
+    const issue = { assigneeId: 7, members: [{ employeeId: 8 }] };
+    it('is yours when you are assigned to it', () => {
+      expect(isOwnLocation({ assignees: [{ employeeId: 5 }] }, issue, 5)).toBe(true);
+      expect(isOwnLocation({ assignees: [{ employeeId: 5 }] }, issue, 7)).toBe(false);
+    });
+    it('falls back to the task people when nobody is assigned', () => {
+      expect(isOwnLocation({ assignees: [] }, issue, 7)).toBe(true);
+      expect(isOwnLocation({ assignees: [] }, issue, 8)).toBe(true);
+      expect(isOwnLocation({ assignees: [] }, issue, 9)).toBe(false);
     });
   });
 });
