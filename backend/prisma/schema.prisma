@@ -4876,14 +4876,34 @@ model TaskLocation {
   /// truth about those tasks, so it is hidden from new ones instead.
   isActive  Boolean        @default(true)
   position  Int            @default(0)
+  /// A site that belongs to one project (23 Oct 2026). Null for the shared
+  /// states and cities, and for sites in the company-wide list.
+  projectId Int?
   companyId Int
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
   executions IssueLocation[]
+  projectLinks ProjectLocation[]
 
+  @@index([projectId])
   @@index([companyId, isActive])
   @@index([parentId])
+}
+
+/// The cities a project is carried out in (23 Oct 2026). The project's own
+/// sites hang under these cities (TaskLocation.projectId). Once a project has
+/// any, its tasks can only be placed at those cities or sites.
+model ProjectLocation {
+  id         Int          @id @default(autoincrement())
+  projectId  Int
+  locationId Int
+  location   TaskLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  companyId  Int
+  createdAt  DateTime     @default(now())
+
+  @@unique([projectId, locationId])
+  @@index([companyId])
 }
 
 /// One location of a parent task, tracked on its own.

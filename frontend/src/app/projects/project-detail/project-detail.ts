@@ -3326,7 +3326,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.newLocationIds.set([]);
     this.locationDrafts.set([]);
     // Fetched each time: an admin may have just added some.
-    this.taskLocationsApi.list(true).subscribe({ next: (l) => this.taskLocations.set(l || []), error: () => {} });
+    // The project's own cities and sites when it lists any (23 Oct 2026).
+    this.taskLocationsApi.forProject(this.projectId).subscribe({ next: (l) => this.taskLocations.set(l || []), error: () => {} });
     this.draftMembers.set([]);
     this.loadingMemberIds.set(new Set());
     this.comments.set([]);

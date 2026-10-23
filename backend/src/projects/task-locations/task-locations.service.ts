@@ -129,7 +129,8 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
 
   async listLocations(companyId: number, activeOnly: boolean) {
     const rows = await this.prisma.taskLocation.findMany({
-      where: { companyId, ...(activeOnly ? { isActive: true } : {}) },
+      // A project's own sites are not in the company-wide list (23 Oct 2026).
+      where: { companyId, projectId: null, ...(activeOnly ? { isActive: true } : {}) },
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
       include: { _count: { select: { executions: true } } },
     });
@@ -239,6 +240,161 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
     await this.prisma.taskLocation.deleteMany({ where: { id: { in: subtree.filter((x) => x !== id) } } });
     await this.prisma.taskLocation.delete({ where: { id } });
     return { deleted: true, disabled: false };
+  }
+
+  // ── A project's locations (23 Oct 2026) ─────────────────────────────────
+
+  /**
+   * Where this project's tasks may be placed: its cities and its active sites.
+   * Null when the project lists no cities, so it keeps using the whole list.
+   */
+  async projectAllowedIds(tx: any, projectId: number): Promise<Set<number> | null> {
+    const links = await tx.projectLocation.findMany({ where: { projectId }, select: { locationId: true } });
+    if (!links.length) return null;
+    const sites = await tx.taskLocation.findMany({ where: { projectId, isActive: true }, select: { id: true } });
+    return new Set<number>([...links.map((l: any) => l.locationId), ...sites.map((s: any) => s.id)]);
+  }
+
+  /** GET /projects/:id/locations — the chosen cities, the project's sites, and picker options. */
+  async getProjectLocations(companyId: number, projectId: number) {
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId }, select: { id: true } });
+    if (!project) throw new NotFoundException('Project not found');
+    const SEL = { id: true, name: true, code: true, level: true, parentId: true, isActive: true, position: true } as const;
+    const links = await this.prisma.projectLocation.findMany({
+      where: { projectId },
+      include: { location: { select: { ...SEL, parent: { select: { id: true, name: true } } } } },
+    });
+    const sites = await this.prisma.taskLocation.findMany({
+      where: { companyId, projectId }, orderBy: [{ position: 'asc' }, { name: 'asc' }], select: SEL,
+    });
+    const states = new Map<number, any>();
+    for (const l of links) if (l.location.parent) states.set(l.location.parent.id, l.location.parent);
+    const stateRows = states.size ? await this.prisma.taskLocation.findMany({ where: { id: { in: [...states.keys()] } }, select: SEL }) : [];
+    // Open work per location, so the form can say what blocks a removal.
+    const open = await this.prisma.issueLocation.groupBy({
+      by: ['locationId'],
+      where: { issue: { projectId }, removedAt: null, status: { not: LOCATION_STATUS.COMPLETED }, locationId: { in: [...links.map((l) => l.locationId), ...sites.map((s) => s.id)] } },
+      _count: { _all: true },
+    });
+    const openBy: Record<number, number> = Object.fromEntries(open.map((o) => [o.locationId, o._count._all]));
+    const cityName = new Map(links.map((l) => [l.locationId, { city: l.location.name, state: l.location.parent?.name ?? '' }]));
+    return {
+      cities: links.map((l) => ({ id: l.locationId, city: l.location.name, state: l.location.parent?.name ?? '', openTasks: openBy[l.locationId] ?? 0 })),
+      sites: sites.map((st) => ({
+        id: st.id, name: st.name, isActive: st.isActive, cityId: st.parentId,
+        city: cityName.get(st.parentId ?? -1)?.city ?? '', state: cityName.get(st.parentId ?? -1)?.state ?? '',
+        openTasks: openBy[st.id] ?? 0,
+      })).filter((st) => st.isActive),
+      // What a task in this project may pick: states only as group headers.
+      options: links.length
+        ? [...stateRows.map((st) => ({ ...st, headerOnly: true })), ...links.map((l) => { const { parent, ...loc } = l.location; return loc; }), ...sites.filter((st) => st.isActive)]
+        : null,
+    };
+  }
+
+  /** The state or city row with this name, created in the company list when missing. */
+  private async ensureLocation(tx: any, companyId: number, level: 'STATE' | 'CITY', name: string, parentId: number | null) {
+    const found = await tx.taskLocation.findFirst({
+      where: { companyId, level, parentId, projectId: null, name: { equals: name, mode: 'insensitive' } },
+      select: { id: true, isActive: true },
+    });
+    if (found) {
+      if (!found.isActive) await tx.taskLocation.update({ where: { id: found.id }, data: { isActive: true } });
+      return found.id as number;
+    }
+    const made = await tx.taskLocation.create({ data: { companyId, name, level, parentId }, select: { id: true } });
+    return made.id as number;
+  }
+
+  /**
+   * PUT /projects/:id/locations — replace the project's cities and sites.
+   * Body: { cities: [{ state, city }], sites: [{ id?, name, state, city }] }.
+   * States and cities are found by name in the company list, or added to it
+   * (the form offers India's states and cities without any setup). A city or
+   * site with open task work cannot be taken off. Admins and project managers.
+   */
+  async setProjectLocations(companyId: number, projectId: number, employeeId: number | null, role: string | undefined, body: any) {
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, companyId }, select: { id: true } });
+    if (!project) throw new NotFoundException('Project not found');
+    if (!(await this.manages(companyId, projectId, employeeId, role))) {
+      throw new ForbiddenException('Only an administrator or the project manager can change project locations.');
+    }
+    const clean = (v: any) => String(v ?? '').trim().replace(/\s+/g, ' ').slice(0, 120);
+    const keyOf = (state: string, city: string) => `${state.toLowerCase()}|${city.toLowerCase()}`;
+    const cities: { state: string; city: string }[] = [];
+    for (const raw of Array.isArray(body?.cities) ? body.cities : []) {
+      const state = clean(raw?.state), city = clean(raw?.city);
+      if (!state || !city) continue;
+      if (!cities.some((c) => keyOf(c.state, c.city) === keyOf(state, city))) cities.push({ state, city });
+    }
+    const wanted: { id: number | null; name: string; key: string }[] = [];
+    for (const raw of Array.isArray(body?.sites) ? body.sites : []) {
+      const name = clean(raw?.name), key = keyOf(clean(raw?.state), clean(raw?.city));
+      if (!name) continue;
+      if (!cities.some((c) => keyOf(c.state, c.city) === key)) throw new BadRequestException(`Site "${name}" is not under one of the chosen cities.`);
+      if (wanted.some((w) => w.key === key && w.name.toLowerCase() === name.toLowerCase())) {
+        throw new BadRequestException(`Site "${name}" is listed twice in the same city.`);
+      }
+      wanted.push({ id: Number(raw?.id) > 0 ? Number(raw.id) : null, name, key });
+    }
+
+    const [links, sites] = await Promise.all([
+      this.prisma.projectLocation.findMany({
+        where: { projectId }, include: { location: { select: { id: true, name: true, parent: { select: { name: true } } } } },
+      }),
+      this.prisma.taskLocation.findMany({ where: { companyId, projectId }, select: { id: true, name: true, parentId: true, isActive: true } }),
+    ]);
+    const wantedKeys = new Set(cities.map((c) => keyOf(c.state, c.city)));
+    const removedCities = links.filter((l) => !wantedKeys.has(keyOf(l.location.parent?.name ?? '', l.location.name))).map((l) => l.location);
+    const keptSiteIds = new Set(wanted.map((w) => w.id).filter((x): x is number => x != null));
+    if ([...keptSiteIds].some((id) => !sites.some((st) => st.id === id))) throw new BadRequestException('One of those sites is not on this project.');
+    const removedSites = sites.filter((st) => st.isActive && !keptSiteIds.has(st.id));
+
+    // Blocked while tasks still have open work there (23 Oct 2026 decision).
+    const blocking = [...removedCities, ...removedSites];
+    if (blocking.length) {
+      const open = await this.prisma.issueLocation.findMany({
+        where: { issue: { projectId }, removedAt: null, status: { not: LOCATION_STATUS.COMPLETED }, locationId: { in: blocking.map((b) => b.id) } },
+        select: { locationId: true, issue: { select: { key: true } } },
+      });
+      if (open.length) {
+        const by = new Map<number, string[]>();
+        for (const o of open) by.set(o.locationId, [...(by.get(o.locationId) ?? []), o.issue.key]);
+        const parts = blocking.filter((b) => by.has(b.id)).map((b) => {
+          const keys = by.get(b.id)!;
+          return `${b.name} (${keys.length} open task${keys.length === 1 ? '' : 's'}: ${keys.slice(0, 3).join(', ')}${keys.length > 3 ? '…' : ''})`;
+        });
+        throw new BadRequestException(`Cannot remove ${parts.join('; ')}. Complete those tasks or move them to another location first.`);
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const cityIdBy = new Map<string, number>();
+      for (const c of cities) {
+        const stateId = await this.ensureLocation(tx, companyId, 'STATE', c.state, null);
+        cityIdBy.set(keyOf(c.state, c.city), await this.ensureLocation(tx, companyId, 'CITY', c.city, stateId));
+      }
+      if (removedCities.length) {
+        await tx.projectLocation.deleteMany({ where: { projectId, locationId: { in: removedCities.map((c) => c.id) } } });
+      }
+      const have = new Set(links.map((l) => l.locationId));
+      const fresh = [...cityIdBy.values()].filter((id) => !have.has(id));
+      if (fresh.length) await tx.projectLocation.createMany({ data: fresh.map((locationId) => ({ projectId, locationId, companyId })), skipDuplicates: true });
+
+      for (const st of removedSites) {
+        const used = await tx.issueLocation.count({ where: { locationId: st.id } });
+        if (used) await tx.taskLocation.update({ where: { id: st.id }, data: { isActive: false } });
+        else await tx.taskLocation.delete({ where: { id: st.id } });
+      }
+      let position = 0;
+      for (const w of wanted) {
+        position++;
+        const parentId = cityIdBy.get(w.key)!;
+        if (w.id) await tx.taskLocation.update({ where: { id: w.id }, data: { name: w.name, parentId, isActive: true, position } });
+        else await tx.taskLocation.create({ data: { companyId, projectId, name: w.name, level: 'SITE', parentId, position } });
+      }
+    }, { timeout: 30000 });
+    return this.getProjectLocations(companyId, projectId);
   }
 
   /** The location and everything beneath it. */
@@ -411,7 +567,7 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
 
     const locations = await tx.taskLocation.findMany({
       where: { id: { in: ids }, companyId: opts.companyId },
-      select: { id: true, name: true, isActive: true },
+      select: { id: true, name: true, isActive: true, level: true, projectId: true },
     });
     if (locations.length !== ids.length) throw new BadRequestException('One of those locations does not exist.');
 
@@ -420,6 +576,17 @@ export class TaskLocationsService implements OnModuleInit, OnModuleDestroy {
       where: { issueId: opts.issueId, locationId: { in: ids } },
     });
     const existingBy = new Map(existing.map((e) => [e.locationId, e]));
+
+    // Project locations (23 Oct 2026): a project that lists its cities takes
+    // tasks only at those cities or its own sites; another project's site is
+    // never available. Locations already on the task stay as they are.
+    const projectOf = await tx.issue.findUnique({ where: { id: opts.issueId }, select: { projectId: true } });
+    const allowed = projectOf?.projectId ? await this.projectAllowedIds(tx, projectOf.projectId) : null;
+    const outside = locations.filter((l: any) => !existingBy.has(l.id)
+      && ((l.projectId != null && l.projectId !== projectOf?.projectId) || (allowed && !allowed.has(l.id))));
+    if (outside.length) {
+      throw new BadRequestException(`${outside.map((l: any) => l.name).join(', ')} is not one of this project's locations.`);
+    }
 
     const inactive = locations.filter((l: any) => !l.isActive && !existingBy.has(l.id));
     if (inactive.length) {

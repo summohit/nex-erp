@@ -79,13 +79,15 @@ let pickerSeq = 0;
             @if (g.state) {
               <div class="lp-state-header">
                 <label class="lp-checkbox-label">
-                  <input
-                    [type]="single() ? 'radio' : 'checkbox'"
-                    [name]="radioName"
-                    class="lp-custom-check"
-                    [checked]="isOn(g.state.id)"
-                    (change)="toggle(g.state.id)"
-                  />
+                  @if (!g.state.headerOnly) {
+                    <input
+                      [type]="single() ? 'radio' : 'checkbox'"
+                      [name]="radioName"
+                      class="lp-custom-check"
+                      [checked]="isOn(g.state.id)"
+                      (change)="toggle(g.state.id)"
+                    />
+                  }
                   <span class="lp-level-icon state"><svg lucideGlobe size="13"></svg></span>
                   <strong class="lp-state-name">{{ g.state.name }}</strong>
                   <span class="lp-child-tag" *ngIf="g.items.length">{{ g.items.length }} sub-locations</span>
@@ -475,7 +477,7 @@ export class LocationPickerComponent {
 
   shownIds = computed(() =>
     this.groups().flatMap((g) => [
-      ...(g.state ? [g.state.id] : []),
+      ...(g.state && !g.state.headerOnly ? [g.state.id] : []),
       ...g.items.map((i) => i.loc.id),
     ])
   );
@@ -502,12 +504,12 @@ export class LocationPickerComponent {
   }
 
   stateFullyOn(g: Group) {
-    return !!g.state && this.subtree(g.state.id).every((id) => this.isOn(id));
+    return !!g.state && this.subtree(g.state.id).filter((id) => !this.byId().get(id)?.headerOnly).every((id) => this.isOn(id));
   }
 
   toggleState(g: Group) {
     if (!g.state) return;
-    const ids = this.subtree(g.state.id);
+    const ids = this.subtree(g.state.id).filter((id) => !this.byId().get(id)?.headerOnly);
     this.selected.update((s) =>
       this.stateFullyOn(g)
         ? s.filter((x) => !ids.includes(x))

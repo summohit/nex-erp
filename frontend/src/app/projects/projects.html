@@ -3463,6 +3463,13 @@
         </div>
 
         <div class="cbm-field-group">
+          <label class="cbm-field-label">Project locations</label>
+          <app-project-locations-editor [locations]="projLocAll()"
+            [(cities)]="projLocCities" [(sites)]="projLocSites" />
+          <span class="cbm-field-helper">Pick the states and cities this project works in, and add its sites. Tasks in the project can only be placed at these cities or sites.</span>
+        </div>
+
+        <div class="cbm-field-group">
           <label class="cbm-field-label">On-site Address</label>
           <textarea
             class="cbm-input cbm-textarea" rows="2"

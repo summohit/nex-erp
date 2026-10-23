@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of, switchMap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 /** A place work can be carried out: a state, a city in it, or a site. */
@@ -13,6 +13,8 @@ export interface TaskLocation {
   isActive: boolean;
   position: number;
   usageCount?: number;
+  /** Shown as a group heading only: a task in this project cannot be placed at it. */
+  headerOnly?: boolean;
 }
 
 export type LocationStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'IN_REVIEW' | 'COMPLETED' | 'BLOCKED';
@@ -36,6 +38,19 @@ export interface LocationProgress {
 }
 
 export interface LocationPerson { id: number; firstName: string; lastName: string | null; avatarUrl: string | null }
+
+/** A city a project works in, by name (23 Oct 2026). */
+export interface ProjectCity { id?: number; state: string; city: string; openTasks?: number }
+/** A site that belongs to one project. */
+export interface ProjectSite { id?: number; name: string; state: string; city: string; openTasks?: number }
+
+/** A project's cities and sites, and what its tasks may pick. */
+export interface ProjectLocations {
+  cities: ProjectCity[];
+  sites: ProjectSite[];
+  /** States (as headers), cities and active sites; null = the project lists none. */
+  options: TaskLocation[] | null;
+}
 
 /** One location of one task, as the task detail shows it. */
 export interface IssueLocationRow {
@@ -97,6 +112,20 @@ export const LOCATION_TRACKING_ENABLED = false;
 export class TaskLocationsService {
   private http = inject(HttpClient);
   private api = environment.apiUrl;
+
+  projectLocations(projectId: number): Observable<ProjectLocations> {
+    return this.http.get<ProjectLocations>(`${this.api}/projects/${projectId}/locations`);
+  }
+  saveProjectLocations(projectId: number, body: { cities: ProjectCity[]; sites: ProjectSite[] }): Observable<ProjectLocations> {
+    return this.http.put<ProjectLocations>(`${this.api}/projects/${projectId}/locations`, body);
+  }
+  /** What a task in this project may be placed at: its own locations, else the whole list. */
+  forProject(projectId: number | null | undefined): Observable<TaskLocation[]> {
+    if (!projectId) return this.list(true);
+    return this.projectLocations(projectId).pipe(
+      switchMap((p) => (p.options ? of(p.options) : this.list(true))),
+    );
+  }
 
   list(activeOnly = false): Observable<TaskLocation[]> {
     return this.http.get<TaskLocation[]>(`${this.api}/task-locations${activeOnly ? '?activeOnly=true' : ''}`);

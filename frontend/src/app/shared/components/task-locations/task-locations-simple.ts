@@ -100,7 +100,8 @@ export class TaskLocationsSimpleComponent implements OnChanges {
   startEdit() {
     this.picked.set(this.current().slice(0, 1).map((r) => r.locationId));
     this.editing.set(true);
-    if (!this.master().length) this.api.list(true).subscribe((m) => this.master.set(m));
+    // The project's own cities and sites when it lists any (23 Oct 2026).
+    if (!this.master().length) this.api.forProject(this.projectId()).subscribe((m) => this.master.set(m));
   }
 
   /** Replace the task's location with the one picked. */

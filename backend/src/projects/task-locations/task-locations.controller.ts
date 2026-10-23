@@ -149,3 +149,20 @@ export class IssueLocationsController {
     return this.locations.activity(req.user.companyId, projectId, issueId, locId, req.user.employeeId ?? null, req.user.role);
   }
 }
+
+/** A project's own cities and sites (23 Oct 2026). */
+@UseGuards(AuthGuard)
+@Controller('projects/:projectId/locations')
+export class ProjectLocationsController {
+  constructor(private readonly locations: TaskLocationsService) {}
+
+  @Get()
+  get(@Req() req, @Param('projectId', ParseIntPipe) projectId: number) {
+    return this.locations.getProjectLocations(req.user.companyId, projectId);
+  }
+
+  @Put()
+  set(@Req() req, @Param('projectId', ParseIntPipe) projectId: number, @Body() body: any) {
+    return this.locations.setProjectLocations(req.user.companyId, projectId, req.user.employeeId ?? null, req.user.role, body);
+  }
+}

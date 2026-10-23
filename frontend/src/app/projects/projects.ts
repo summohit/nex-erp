@@ -91,11 +91,12 @@ function getStatusColors(status: string): { bg: string; color: string } {
 import { TaskTransferComponent } from '../shared/components/task-transfer/task-transfer';
 import { LocationPickerComponent } from '../shared/components/task-locations/location-picker';
 import { LocationExecutionsComponent } from '../shared/components/task-locations/location-executions';
-import { TaskLocationsService, TaskLocation, LOCATION_TRACKING_ENABLED } from '../services/task-locations.service';
+import { TaskLocationsService, TaskLocation, ProjectCity, ProjectSite, LOCATION_TRACKING_ENABLED } from '../services/task-locations.service';
+import { ProjectLocationsEditorComponent } from '../shared/components/task-locations/project-locations-editor';
 @Component({
   selector: 'app-projects',
   standalone: true,
-  imports: [TaskTransferComponent, LocationPickerComponent, LocationExecutionsComponent, 
+  imports: [TaskTransferComponent, LocationPickerComponent, LocationExecutionsComponent, ProjectLocationsEditorComponent, 
     CommonModule, FormsModule, RouterModule, LucidePlus, LucideKanban,
     LucideX, LucideUser, LucideChevronLeft, LucideBrainCircuit,
     LucideCheck, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw,
@@ -2555,10 +2556,7 @@ export class ProjectsComponent implements OnInit {
       });
     }
     // Fetched every time the modal opens: an admin may have just added some.
-    this.taskLocationsApi.list(true).subscribe({
-      next: (l) => this.taskLocations.set(l || []),
-      error: () => {},
-    });
+    this.loadTaskLocationOptions();
     // §8: the phase list, fetched alongside the task types it sits beside.
     if (!this.projectPhases().length) {
       this.masterDataService.getProjectPhases().subscribe({
@@ -2713,8 +2711,28 @@ export class ProjectsComponent implements OnInit {
     }
   }
 
+  /**
+   * The Location field's options: the chosen project's own cities and sites
+   * when it lists any (23 Oct 2026), else the company-wide list. A location
+   * that is no longer offered is dropped from the form.
+   */
+  private loadTaskLocationOptions() {
+    const projectId = this.taskForm?.parentKind === 'PROJECT' ? Number(this.taskForm.projectId) || null : null;
+    this.taskLocationsApi.forProject(projectId).subscribe({
+      next: (l) => {
+        this.taskLocations.set(l || []);
+        const ok = new Set((l || []).map((x) => x.id));
+        if (this.taskForm?.locationIds?.some((id: number) => !ok.has(id))) {
+          this.taskForm.locationIds = this.taskForm.locationIds.filter((id: number) => ok.has(id));
+        }
+      },
+      error: () => {},
+    });
+  }
+
   selectTaskProject(id: number) {
     this.taskForm.projectId = id;
+    this.loadTaskLocationOptions();
     this.taskProjectDropdownOpen.set(false);
     this.revalidateTask();
   }
@@ -2897,6 +2915,7 @@ export class ProjectsComponent implements OnInit {
 
   setParentKind(kind: 'GENERAL' | 'PROJECT' | 'LEAD') {
     this.taskForm.parentKind = kind;
+    this.loadTaskLocationOptions();
     this.closeAllTaskDropdowns();
     this.revalidateTask();
     this.onTaskScheduleDateChange();
@@ -4416,7 +4435,30 @@ export class ProjectsComponent implements OnInit {
     this.selectedBg.set(bg);
   }
 
+  // ─── Project locations (23 Oct 2026): states → cities → the project's sites ───
+  projLocAll = signal<TaskLocation[]>([]);
+  projLocCities = signal<ProjectCity[]>([]);
+  projLocSites = signal<ProjectSite[]>([]);
+  private loadProjectLocationForm(projectId: number | null) {
+    this.projLocCities.set([]);
+    this.projLocSites.set([]);
+    this.taskLocationsApi.list(true).subscribe({ next: (l) => this.projLocAll.set(l || []), error: () => {} });
+    if (projectId) {
+      this.taskLocationsApi.projectLocations(projectId).subscribe({
+        next: (p) => { this.projLocCities.set(p.cities); this.projLocSites.set(p.sites); },
+        error: () => {},
+      });
+    }
+  }
+  private projectLocationBody() {
+    return {
+      cities: this.projLocCities().map((c) => ({ state: c.state, city: c.city })),
+      sites: this.projLocSites().map((s) => ({ id: s.id, name: s.name, state: s.state, city: s.city })),
+    };
+  }
+
   openCreateModal() {
+    this.loadProjectLocationForm(null);
     this.editingProjectId.set(null);
     this.projectForm = this.emptyProjectForm();
     this.stagedFiles.set([]);
@@ -4430,6 +4472,7 @@ export class ProjectsComponent implements OnInit {
   openEditModal(project: any, event: Event) {
     if (event) event.stopPropagation();
     this.editingProjectId.set(project.id);
+    this.loadProjectLocationForm(project.id);
     // Files staged during an earlier Create must not follow the user into an
     // Edit of a different project — they would look attached and then upload
     // themselves to the wrong board.
@@ -4751,6 +4794,14 @@ export class ProjectsComponent implements OnInit {
         return;
       }
     }
+    // Locations first: a city with open tasks cannot be removed, and the
+    // rest of the form should not save while that is unresolved.
+    try {
+      await firstValueFrom(this.taskLocationsApi.saveProjectLocations(id, this.projectLocationBody()));
+    } catch (err: any) {
+      this.toast.error(err?.error?.message || 'Could not save the project locations');
+      return;
+    }
     this.projectsService.updateProject(id, payload).subscribe({
         next: () => {
           // Files staged while editing were previously dropped on the floor —
@@ -4771,8 +4822,15 @@ export class ProjectsComponent implements OnInit {
 
   private createFromForm(payload: any) {
       this.projectsService.createProject(payload).subscribe({
-        next: (res) => {
+        next: async (res) => {
           this.loadProjects();
+          if (this.projLocCities().length) {
+            try {
+              await firstValueFrom(this.taskLocationsApi.saveProjectLocations(res.id, this.projectLocationBody()));
+            } catch (err: any) {
+              this.toast.error(`Project created, but its locations were not saved: ${err?.error?.message || 'please add them from Edit'}`);
+            }
+          }
           // Files first, then navigate — landing on the board while uploads
           // are still in flight would show an Attachments tab that is missing
           // what the user just added.
