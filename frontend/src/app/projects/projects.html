@@ -3464,7 +3464,7 @@
 
         <div class="cbm-field-group">
           <label class="cbm-field-label">Project locations</label>
-          <app-project-locations-editor [locations]="projLocAll()"
+          <app-project-locations-editor [locations]="projLocAll()" [loading]="projLocLoading()"
             [(cities)]="projLocCities" [(sites)]="projLocSites" />
           <span class="cbm-field-helper">Pick the states and cities this project works in, and add its sites. Tasks in the project can only be placed at these cities or sites.</span>
         </div>
@@ -3510,7 +3510,7 @@
       <button 
         type="button" 
         class="cbm-btn-submit" 
-        [disabled]="stagedUploading() || !projectForm.name.trim() || isDateRangeInvalid()"
+        [disabled]="stagedUploading() || projLocLoading() || !projectForm.name.trim() || isDateRangeInvalid()"
         (click)="saveProject()">
         <svg *ngIf="!stagedUploading()" lucideCheck size="16"></svg>
         <svg *ngIf="stagedUploading()" lucideLoader2 size="16" class="cbm-upload-spinner"></svg>

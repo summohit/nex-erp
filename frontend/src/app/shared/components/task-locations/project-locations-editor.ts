@@ -21,6 +21,9 @@ const key = (state: string, city: string) => `${state.toLowerCase()}|${city.toLo
   standalone: true,
   imports: [CommonModule, LucideX, LucideLock, LucidePlus, LucideGlobe, LucideBuilding2, LucideMapPin, LucideSearch],
   template: `
+    @if (loading()) {
+      <div class="ple-loading">Loading this project's locations…</div>
+    } @else {
     <div class="ple">
       <div class="ple-label"><svg lucideGlobe size="13"></svg> States</div>
       <div class="ple-search">
@@ -53,7 +56,7 @@ const key = (state: string, city: string) => `${state.toLowerCase()}|${city.toLo
               </button>
             }
             <span class="ple-add">
-              <input #cityIn type="text" placeholder="Other city…" (keydown.enter)="$event.preventDefault(); addCity(s, cityIn)" />
+              <input #cityIn type="text" placeholder="Other city…" (keydown.enter)="$event.preventDefault(); addCity(s, cityIn)" (blur)="addCity(s, cityIn)" />
               <button type="button" (click)="addCity(s, cityIn)" title="Add city"><svg lucidePlus size="12"></svg></button>
             </span>
           </div>
@@ -73,7 +76,7 @@ const key = (state: string, city: string) => `${state.toLowerCase()}|${city.toLo
                   </span>
                 }
                 <span class="ple-add">
-                  <input #siteIn type="text" placeholder="Add a site…" (keydown.enter)="$event.preventDefault(); addSite(s, c.city, siteIn)" />
+                  <input #siteIn type="text" placeholder="Add a site…" (keydown.enter)="$event.preventDefault(); addSite(s, c.city, siteIn)" (blur)="addSite(s, c.city, siteIn)" />
                   <button type="button" (click)="addSite(s, c.city, siteIn)" title="Add site"><svg lucidePlus size="12"></svg></button>
                 </span>
               </div>
@@ -87,6 +90,7 @@ const key = (state: string, city: string) => `${state.toLowerCase()}|${city.toLo
         <div class="ple-foot">No locations chosen: tasks can use any location in the company list.</div>
       }
     </div>
+    }
   `,
   styles: [`
     .ple { display: flex; flex-direction: column; gap: 8px; }
@@ -109,11 +113,14 @@ const key = (state: string, city: string) => `${state.toLowerCase()}|${city.toLo
     .ple-add input { border: 0; outline: none; font-size: 12px; width: 110px; padding: 3px 0; background: transparent; }
     .ple-muted { color: #64748b; font-weight: 400; font-size: 11.5px; }
     .ple-foot { font-size: 11.5px; color: #64748b; }
+    .ple-loading { font-size: 12.5px; color: #64748b; padding: 10px 12px; border: 1px dashed #cbd5e1; border-radius: 10px; background: #f8fafc; }
   `],
 })
 export class ProjectLocationsEditorComponent {
   /** The company's location list, so states and cities added there show too. */
   locations = input<TaskLocation[]>([]);
+  /** The project's saved locations are still loading: nothing to edit yet. */
+  loading = input(false);
   cities = model<ProjectCity[]>([]);
   sites = model<ProjectSite[]>([]);
 

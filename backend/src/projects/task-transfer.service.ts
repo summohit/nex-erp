@@ -24,6 +24,23 @@ export const TEMPLATE_COLUMNS = [
 ] as const;
 const EXTRA_COLUMNS = ['Task ID', 'Task Key', 'Status', 'Logged Hours', 'Created Date'] as const;
 
+/**
+ * Other names people give the template's columns in their own trackers
+ * (24 Oct 2026: the DRDO plan said "Engineer Name"), matched like the real ones.
+ */
+const COLUMN_ALIASES: Record<string, (typeof TEMPLATE_COLUMNS)[number]> = {
+  'engineer name': 'Assign to', 'engineer': 'Assign to', 'assignee': 'Assign to', 'assigned to': 'Assign to',
+  'hours': 'Assign Hours', 'estimated hours': 'Assign Hours',
+  'due date': 'End Date', 'work location': 'Location', 'city': 'Location',
+};
+
+/** Old or common city names to the names in the location list. */
+const CITY_ALIASES: Record<string, string> = {
+  bangalore: 'bengaluru', bombay: 'mumbai', calcutta: 'kolkata', madras: 'chennai', gurgaon: 'gurugram',
+  mysore: 'mysuru', mangalore: 'mangaluru', poona: 'pune', trivandrum: 'thiruvananthapuram', cochin: 'kochi',
+  baroda: 'vadodara', allahabad: 'prayagraj', belgaum: 'belagavi', hubli: 'hubballi', gulbarga: 'kalaburagi',
+};
+
 export interface ImportRowResult {
   row: number;           // spreadsheet row number (header = 1)
   sNo: string;
@@ -230,11 +247,18 @@ export class TaskTransferService {
         const target = keyByRow.get(ref) ?? await this.findTaskByRef(companyId, r.projectId!, ref);
         if (!target) { r.warnings.push(`Dependency "${ref}" not found — not linked`); continue; }
         if (target.id === id) continue;
-        await this.prisma.issueDependency.upsert({
-          where: { issueId_dependsOnIssueId: { issueId: id, dependsOnIssueId: target.id } },
-          update: {},
-          create: { issueId: id, dependsOnIssueId: target.id, companyId, createdById: actorEmployeeId },
-        });
+        // One link that cannot be saved is reported on its row; it must not
+        // abort the links after it with a 500 (24 Oct 2026: tasks were all
+        // created, then the rest of the dependencies were silently lost).
+        try {
+          await this.prisma.issueDependency.upsert({
+            where: { issueId_dependsOnIssueId: { issueId: id, dependsOnIssueId: target.id } },
+            update: {},
+            create: { issueId: id, dependsOnIssueId: target.id, companyId, createdById: actorEmployeeId },
+          });
+        } catch (e: any) {
+          r.warnings.push(`Dependency "${ref}" could not be linked: ${e?.message?.split('\n').pop() || 'error'}`);
+        }
       }
     }
 
@@ -267,8 +291,8 @@ export class TaskTransferService {
     const rows = json.map((obj) => {
       const out: Record<string, any> = {};
       for (const [k, v] of Object.entries(obj)) {
-        const col = [...TEMPLATE_COLUMNS, ...EXTRA_COLUMNS].find((c) => norm(c) === norm(k));
-        if (col) out[col] = v;
+        const col = [...TEMPLATE_COLUMNS, ...EXTRA_COLUMNS].find((c) => norm(c) === norm(k)) ?? COLUMN_ALIASES[norm(k)];
+        if (col && (out[col] === undefined || String(out[col] ?? '').trim() === '')) out[col] = v;
       }
       return out;
     }).filter((r) => Object.values(r).some((v) => String(v ?? '').trim() !== ''));
@@ -346,7 +370,10 @@ export class TaskTransferService {
 
       const phaseText = String(r['Phase'] ?? '').trim();
       if (phaseText) {
-        const id = phaseByName.get(phaseText.toLowerCase());
+        // The full name, or just its number: "3", "Phase 3", "Phase-3" → "Phase-3 Build & …".
+        const num = phaseText.match(/^(?:phase\s*-?\s*)?(\d+)$/i)?.[1];
+        const byNumber = num ? phases.filter((ph) => new RegExp(`^phase\\s*-?\\s*${num}(?!\\d)`, 'i').test(ph.name.trim())) : [];
+        const id = phaseByName.get(phaseText.toLowerCase()) ?? (byNumber.length === 1 ? byNumber[0].id : undefined);
         if (!id) p.errors.push(`Unknown phase "${phaseText}"`); else p.phaseId = id;
       } else if (phasesExist && !r['Task ID']) {
         p.errors.push('Phase is required');
@@ -363,7 +390,9 @@ export class TaskTransferService {
       p.dueDate = this.parseDate(r['End Date'], 'End Date', p);
       if (p.startDate && p.dueDate && p.dueDate < p.startDate) p.errors.push('End Date is before Start Date');
 
-      const locText = String(r['Location'] ?? '').trim();
+      // "Bangalore" finds Bengaluru: old city names map to the list's.
+      const locText = String(r['Location'] ?? '').trim()
+        .split(',').map((part, i) => (i === 0 ? CITY_ALIASES[part.trim().toLowerCase()] ?? part.trim() : part.trim())).join(', ');
       if (locText) {
         if (/[;\n]/.test(locText) || locText.split(',').length > 2) {
           p.errors.push('Location: a task has one location — give a single "City, State"');
@@ -388,8 +417,21 @@ export class TaskTransferService {
           project.leadId,
         ].filter(Boolean) as number[]);
 
+        // Two people can share a name: the one on this project wins.
+        const onBoardByName = (ref: string) => {
+          const q = ref.trim().toLowerCase();
+          return employees.find((e) => onBoard.has(e.id) && (
+            e.user?.email?.toLowerCase() === q
+            || (e.employeeCode && e.employeeCode.toLowerCase() === q)
+            || `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim().toLowerCase() === q));
+        };
+        // A first name alone ("Sandeep") is enough when one person on the project has it.
+        const onBoardByFirst = (ref: string) => {
+          const hits = employees.filter((e) => onBoard.has(e.id) && (e.firstName ?? '').trim().toLowerCase() === ref.trim().toLowerCase());
+          return hits.length === 1 ? hits[0] : undefined;
+        };
         for (const ref of String(r['Assign to'] ?? '').split(/[,;]/).map((s) => s.trim()).filter(Boolean)) {
-          const e = empLookup(ref);
+          const e = onBoardByName(ref) ?? onBoardByFirst(ref) ?? empLookup(ref);
           if (!e) p.errors.push(`Assign to: nobody called "${ref}"`);
           else if (!onBoard.has(e.id)) p.errors.push(`Assign to: ${e.firstName} ${e.lastName ?? ''} is not on this project`.trim());
           else p.assigneeIds.push(e.id);
@@ -397,7 +439,7 @@ export class TaskTransferService {
 
         const smeText = String(r['SME / Govern'] ?? '').trim();
         if (smeText) {
-          const e = empLookup(smeText);
+          const e = onBoardByName(smeText) ?? onBoardByFirst(smeText) ?? empLookup(smeText);
           if (!e) p.errors.push(`SME: nobody called "${smeText}"`);
           else if (!leads.has(e.id)) p.errors.push(`SME: ${e.firstName} ${e.lastName ?? ''} is not this project's PM or Technical Architect`.trim());
           else p.smeId = e.id;
@@ -433,7 +475,11 @@ export class TaskTransferService {
   private parseDate(v: any, label: string, p: ParsedRow): Date | null | undefined {
     if (v === '' || v == null) return undefined;
     if (v instanceof Date && !isNaN(v.getTime())) {
-      return new Date(Date.UTC(v.getFullYear(), v.getMonth(), v.getDate()));
+      // SheetJS hands an Excel date over a few seconds or minutes short of
+      // local midnight (24 Oct 2026: 26 Oct arrived as 25 Oct 23:59:50 IST and
+      // every imported task landed a day early). Read the day at midday.
+      const mid = new Date(v.getTime() + 12 * 3600 * 1000);
+      return new Date(Date.UTC(mid.getFullYear(), mid.getMonth(), mid.getDate()));
     }
     if (typeof v === 'number') {
       const d = xlsx.SSF.parse_date_code(v);

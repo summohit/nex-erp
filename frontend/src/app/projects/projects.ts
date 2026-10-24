@@ -4439,14 +4439,23 @@ export class ProjectsComponent implements OnInit {
   projLocAll = signal<TaskLocation[]>([]);
   projLocCities = signal<ProjectCity[]>([]);
   projLocSites = signal<ProjectSite[]>([]);
+  /**
+   * The edit form is still fetching the project's saved locations. Save waits
+   * for it: saving an empty list before they arrive would take them all off.
+   */
+  projLocLoading = signal(false);
+  /** Loading the saved locations failed: Save leaves them untouched. */
+  private projLocFailed = false;
   private loadProjectLocationForm(projectId: number | null) {
     this.projLocCities.set([]);
     this.projLocSites.set([]);
+    this.projLocFailed = false;
+    this.projLocLoading.set(!!projectId);
     this.taskLocationsApi.list(true).subscribe({ next: (l) => this.projLocAll.set(l || []), error: () => {} });
     if (projectId) {
       this.taskLocationsApi.projectLocations(projectId).subscribe({
-        next: (p) => { this.projLocCities.set(p.cities); this.projLocSites.set(p.sites); },
-        error: () => {},
+        next: (p) => { this.projLocCities.set(p.cities); this.projLocSites.set(p.sites); this.projLocLoading.set(false); },
+        error: () => { this.projLocFailed = true; this.projLocLoading.set(false); },
       });
     }
   }
@@ -4796,11 +4805,17 @@ export class ProjectsComponent implements OnInit {
     }
     // Locations first: a city with open tasks cannot be removed, and the
     // rest of the form should not save while that is unresolved.
-    try {
-      await firstValueFrom(this.taskLocationsApi.saveProjectLocations(id, this.projectLocationBody()));
-    } catch (err: any) {
-      this.toast.error(err?.error?.message || 'Could not save the project locations');
+    if (this.projLocLoading()) {
+      this.toast.error('Project locations are still loading. Try again in a moment.');
       return;
+    }
+    if (!this.projLocFailed) {
+      try {
+        await firstValueFrom(this.taskLocationsApi.saveProjectLocations(id, this.projectLocationBody()));
+      } catch (err: any) {
+        this.toast.error(err?.error?.message || 'Could not save the project locations');
+        return;
+      }
     }
     this.projectsService.updateProject(id, payload).subscribe({
         next: () => {
