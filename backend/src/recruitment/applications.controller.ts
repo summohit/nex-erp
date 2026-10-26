@@ -19,6 +19,11 @@ export class ApplicationsController {
 
   // --- Static Endpoints ---
 
+  @Get('offer-letters')
+  getOfferLetters(@Request() req) {
+    return this.offerLettersService.listIssued(req.user.companyId);
+  }
+
   @Get('my-interviews')
   getMyInterviews(@Request() req) {
     return this.applicationsService.getMyInterviews(req.user.companyId, req.user.sub, req.user.role);

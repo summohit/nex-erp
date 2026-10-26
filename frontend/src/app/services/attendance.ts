@@ -183,6 +183,10 @@ export class AttendanceService {
   }
 
   // B3: clock-ins / clock-outs made outside the office radius.
+  getApprovalHistory(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/approval-history`);
+  }
+
   getPendingGeofence(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/geofence/pending`);
   }

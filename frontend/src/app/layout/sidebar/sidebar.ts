@@ -132,6 +132,9 @@ export class SidebarComponent implements OnInit {
     return sections.map(section => ({
       ...section,
       items: section.items.map((item: any) => {
+        if (item.id === 'recruitment' && item.subItems?.some((sub: any) => sub.route === '/recruitment/candidates') && !item.subItems.some((sub: any) => sub.route === '/recruitment/offer-letters')) {
+          return { ...item, subItems: [...item.subItems, { id: 'recruitment/offer-letters', title: 'Offer Letters', route: '/recruitment/offer-letters' }] };
+        }
         if (item.id !== 'attendance' || !item.subItems?.length) return item;
 
         const leaveItems = item.subItems.filter((sub: any) => LEAVE_MENU_ROUTES.has(sub.route));

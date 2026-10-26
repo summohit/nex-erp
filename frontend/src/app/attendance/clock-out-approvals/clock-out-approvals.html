@@ -28,6 +28,9 @@
         <span class="tab-badge info" *ngIf="staleCount() === 0 && totalCount() > 0">{{ totalCount() }}</span>
         <span class="tab-badge" *ngIf="totalCount() === 0">0</span>
       </button>
+      <button type="button" class="coa-main-tab-btn" [class.active]="activeQueueTab() === 'HISTORY'" (click)="switchTab('HISTORY')">
+        <svg lucideClock [size]="16"></svg><span>History</span>
+      </button>
     </div>
 
     <!-- Right Controls: Quick Date Range + Habitual Late-Comers Trigger -->
@@ -39,6 +42,7 @@
         </span>
         <button type="button" class="coa-range" [class.on]="quickRange() === 'ALL'" (click)="setQuickRange('ALL')">All</button>
         <button type="button" class="coa-range" [class.on]="quickRange() === 'TODAY'" (click)="setQuickRange('TODAY')">Today</button>
+        <button type="button" class="coa-range" [class.on]="quickRange() === 'YESTERDAY'" (click)="setQuickRange('YESTERDAY')">Yesterday</button>
         <button type="button" class="coa-range" [class.on]="quickRange() === '30'" (click)="setQuickRange('30')">30d</button>
         <button type="button" class="coa-range" [class.on]="quickRange() === '60'" (click)="setQuickRange('60')">60d</button>
         <button type="button" class="coa-range" [class.on]="quickRange() === '90'" (click)="setQuickRange('90')">90d</button>
@@ -68,6 +72,15 @@
   </div>
 
   <!-- ── Collapsible Habitual Late-Comers Drawer/Panel ──────────────────────── -->
+  <section class="history-card" *ngIf="activeQueueTab() === 'HISTORY'">
+    <div class="history-heading"><div><h2>Approval history</h2><p>Decided requests, filtered by attendance date using the period above.</p></div><button type="button" (click)="loadHistory()">Refresh</button></div>
+    <div class="history-filters"><label>Search<input type="search" placeholder="Employee or reviewer" [ngModel]="historySearch()" (ngModelChange)="historySearch.set($event); historyPage.set(1)"></label><label>Request type<select [ngModel]="historyType()" (ngModelChange)="historyType.set($event); historyPage.set(1)"><option value="ALL">All types</option><option value="LATE">Late clock-out</option><option value="GEO">Out-of-office</option></select></label><label>Outcome<select [ngModel]="historyOutcome()" (ngModelChange)="historyOutcome.set($event); historyPage.set(1)"><option value="ALL">All outcomes</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select></label></div>
+    <p class="history-message" *ngIf="historyLoading()">Loading history...</p><p class="history-message" *ngIf="historyError()">Could not load history. <button type="button" (click)="loadHistory()">Try again</button></p><p class="history-message" *ngIf="!historyLoading() && !historyError() && !historyFiltered().length">No decisions match these filters.</p>
+    <div class="history-scroll" *ngIf="!historyLoading() && !historyError() && historyFiltered().length"><table><thead><tr><th>Employee</th><th>Request</th><th>Attendance date</th><th>Outcome</th><th>Decided by</th><th>Decided on</th><th>Note</th></tr></thead><tbody><tr *ngFor="let row of historyPageRows()"><td><strong>{{ row.employee.firstName }} {{ row.employee.lastName }}</strong><small>{{ row.employee.employeeCode || row.employee.department?.name || '' }}</small></td><td>{{ row.type === 'LATE' ? 'Late clock-out' : 'Out-of-office' }}</td><td>{{ row.date | date:'mediumDate':'UTC' }}</td><td><span class="history-status" [class.rejected]="row.outcome === 'REJECTED'">{{ row.outcome | titlecase }}</span></td><td>{{ row.reviewer ? row.reviewer.firstName + ' ' + row.reviewer.lastName : 'Unavailable' }}</td><td>{{ row.decidedAt ? (row.decidedAt | date:'medium') : 'Unavailable' }}</td><td>{{ row.note || '?' }}</td></tr></tbody></table></div>
+    <div class="history-footer" *ngIf="!historyLoading() && !historyError() && historyFiltered().length"><span>{{ historyFiltered().length }} decisions</span><div><button type="button" [disabled]="historyPage() <= 1" (click)="historyPage.set(historyPage() - 1)">Previous</button><span>Page {{ historyPage() > historyPages() ? historyPages() : historyPage() }} of {{ historyPages() }}</span><button type="button" [disabled]="historyPage() >= historyPages()" (click)="historyPage.set(historyPage() + 1)">Next</button></div></div>
+    <p class="history-note">This shows the current recorded decision for each attendance record; earlier decisions may not be retained if a request was reopened.</p>
+  </section>
+
   <div class="coa-offenders-panel" *ngIf="offendersOpen() && canApprove() === true">
     <div class="coa-offenders-head">
       <div class="coa-offenders-title">

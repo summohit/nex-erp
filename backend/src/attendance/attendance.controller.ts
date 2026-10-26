@@ -82,6 +82,11 @@ export class AttendanceController {
     );
   }
 
+  @Get('approval-history')
+  getApprovalHistory(@Request() req) {
+    return this.attendanceService.getApprovalHistory(req.user.companyId, req.user.role, req.user.employeeId ?? null);
+  }
+
   @Get('clock-out/pending')
   getPendingClockOuts(@Request() req) {
     return this.attendanceService.getPendingClockOuts(

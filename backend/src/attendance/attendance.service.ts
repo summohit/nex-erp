@@ -1287,6 +1287,37 @@ export class AttendanceService {
     return { year: y, from: from ? day(from) : null, to: to ? day(to) : null, leaveType: leaveType.name, employees };
   }
 
+  async getApprovalHistory(companyId: number, role?: string | null, employeeId?: number | null) {
+    const canLate = await this.mayApproveClockOut(companyId, role, employeeId);
+    const canGeo = this.mayApproveGeofence(role);
+    if (!canLate && !canGeo) throw new ForbiddenException('You cannot view attendance approval history.');
+    const conditions: any[] = [];
+    if (canLate) conditions.push({ clockOutApproval: { in: ['APPROVED', 'REJECTED'] } });
+    if (canGeo) conditions.push({ geofenceApproval: { in: ['APPROVED', 'REJECTED'] } });
+    const rows = await this.prisma.attendance.findMany({
+      where: { employee: { companyId }, OR: conditions },
+      select: {
+        id: true, date: true, clockOutApproval: true, clockOutApprovedAt: true, clockOutReviewNote: true,
+        geofenceApproval: true, geofenceReviewedAt: true, geofenceReviewNote: true,
+        employee: { select: { firstName: true, lastName: true, employeeCode: true, department: { select: { name: true } } } },
+        clockOutApprovedBy: { select: { firstName: true, lastName: true } },
+        geofenceReviewedBy: { select: { firstName: true, lastName: true } },
+      },
+    });
+    const history: any[] = [];
+    for (const row of rows) {
+      if (canLate && ['APPROVED', 'REJECTED'].includes(row.clockOutApproval ?? '')) history.push({
+        id: row.id, type: 'LATE', date: row.date, employee: row.employee, outcome: row.clockOutApproval,
+        decidedAt: row.clockOutApprovedAt, reviewer: row.clockOutApprovedBy, note: row.clockOutReviewNote,
+      });
+      if (canGeo && ['APPROVED', 'REJECTED'].includes(row.geofenceApproval ?? '')) history.push({
+        id: row.id, type: 'GEO', date: row.date, employee: row.employee, outcome: row.geofenceApproval,
+        decidedAt: row.geofenceReviewedAt, reviewer: row.geofenceReviewedBy, note: row.geofenceReviewNote,
+      });
+    }
+    return history.sort ( (a, b) => (b.decidedAt?.getTime() ?? 0) - (a.decidedAt?.getTime() ?? 0));
+  }
+
   async getPendingClockOuts(
     companyId: number, role?: string | null, employeeId?: number | null,
   ) {

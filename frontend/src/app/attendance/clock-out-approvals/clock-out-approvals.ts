@@ -107,10 +107,37 @@ export class ClockOutApprovalsComponent implements OnInit {
   visibleGeoRows = computed(() => this.geoRows());
 
   // The out-of-office queue's own filters, page and selection. It can run to
-  activeQueueTab = signal<'GEO' | 'LATE'>('GEO');
+  activeQueueTab = signal<'GEO' | 'LATE' | 'HISTORY'>('GEO');
 
   // ── Quick date range, shared by both queues ──
-  quickRange = signal<'ALL' | 'TODAY' | '30' | '60' | '90' | 'CUSTOM'>('ALL');
+  historyRows = signal<any[]>([]);
+  historyLoading = signal(false);
+  historyError = signal(false);
+  historySearch = signal('');
+  historyType = signal('ALL');
+  historyOutcome = signal('ALL');
+  historyPage = signal(1);
+  historyFiltered = computed(() => {
+    const q = this.historySearch().trim().toLowerCase();
+    const from = this.geoFrom(), to = this.geoTo();
+    return this.historyRows().filter(r => {
+      const day = String(r.date).slice(0, 10);
+      const name = `${r.employee?.firstName || ''} ${r.employee?.lastName || ''} ${r.employee?.employeeCode || ''} ${r.reviewer?.firstName || ''} ${r.reviewer?.lastName || ''}`.toLowerCase();
+      return (!q || name.includes(q)) && (this.historyType() === 'ALL' || r.type === this.historyType()) &&
+        (this.historyOutcome() === 'ALL' || r.outcome === this.historyOutcome()) && (!from || day >= from) && (!to || day <= to);
+    });
+  });
+  historyPages = computed(() => Math.max(1, Math.ceil(this.historyFiltered().length / 25)));
+  historyPageRows = computed(() => this.historyFiltered().slice((Math.min(this.historyPage(), this.historyPages()) - 1) * 25, Math.min(this.historyPage(), this.historyPages()) * 25));
+  loadHistory() {
+    this.historyLoading.set(true); this.historyError.set(false);
+    this.attendanceService.getApprovalHistory().subscribe({
+      next: rows => { this.historyRows.set(rows); this.historyLoading.set(false); },
+      error: () => { this.historyError.set(true); this.historyLoading.set(false); },
+    });
+  }
+
+  quickRange = signal<'ALL' | 'TODAY' | 'YESTERDAY' | '30' | '60' | '90' | 'CUSTOM'>('ALL');
   customFrom = signal('');
   customTo = signal('');
 
@@ -119,10 +146,11 @@ export class ClockOutApprovalsComponent implements OnInit {
   }
 
   /** Today / last 30 / 60 / 90 days / custom — applied to both tabs at once. */
-  setQuickRange(range: 'ALL' | 'TODAY' | '30' | '60' | '90' | 'CUSTOM') {
+  setQuickRange(range: 'ALL' | 'TODAY' | 'YESTERDAY' | '30' | '60' | '90' | 'CUSTOM') {
     this.quickRange.set(range);
     let from = '', to = '';
     if (range === 'TODAY') { from = to = this.ymd(new Date()); }
+    else if (range === 'YESTERDAY') { const date = new Date(); date.setDate(date.getDate() - 1); from = to = this.ymd(date); }
     else if (range === '30' || range === '60' || range === '90') {
       const start = new Date(); start.setDate(start.getDate() - (Number(range) - 1));
       from = this.ymd(start); to = this.ymd(new Date());
@@ -417,6 +445,7 @@ export class ClockOutApprovalsComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.setQuickRange('YESTERDAY');
     this.attendanceService.canApproveGeofence().subscribe({
       next: (res) => {
         const canGeo = !!res?.canApprove;
@@ -580,10 +609,14 @@ export class ClockOutApprovalsComponent implements OnInit {
     );
   });
 
-  switchTab(tab: 'GEO' | 'LATE'): void {
+  switchTab(tab: 'GEO' | 'LATE' | 'HISTORY'): void {
+    const range = this.quickRange();
     this.activeQueueTab.set(tab);
     this.clearFilters();
     this.resetGeoFilters();
+    this.setQuickRange(range);
+    this.historyPage.set(1);
+    if (tab === 'HISTORY') this.loadHistory();
   }
 
   applyAttendanceFilters(filters: AttendanceFilterValue): void {

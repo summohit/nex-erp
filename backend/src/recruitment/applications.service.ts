@@ -1,3 +1,4 @@
+import { lockJobCapacity, closeFilledJobs } from './job-capacity';
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -365,7 +366,9 @@ export class ApplicationsService {
       };
     }
 
-    const updated = await this.prisma.jobApplication.update({
+    const updated = await this.prisma.$transaction(async tx => {
+      await lockJobCapacity(tx, companyId);
+      const result = await tx.jobApplication.update({
       where: { id: application.id },
       data: {
         status: finalStatus,
@@ -381,6 +384,9 @@ export class ApplicationsService {
         ...approvalFields,
         approvalStatus
       },
+      });
+      await closeFilledJobs(tx, companyId);
+      return result;
     });
 
     if (approvalStatus === 'PENDING_APPROVAL' && application.approvalStatus !== 'PENDING_APPROVAL') {
@@ -556,6 +562,7 @@ export class ApplicationsService {
     const hashedPassword = await bcrypt.hash('nexerp2026', 10);
 
     const newEmployee = await this.prisma.$transaction(async (tx) => {
+      await lockJobCapacity(tx, companyId);
       const user = await tx.user.create({
         data: {
           email: application.email,
@@ -614,6 +621,7 @@ export class ApplicationsService {
         }
       });
 
+      await closeFilledJobs(tx, companyId);
       return employee;
     });
 

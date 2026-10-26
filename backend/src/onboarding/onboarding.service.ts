@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { lockJobCapacity, closeFilledJobs } from '../recruitment/job-capacity';
 
 import { MailService } from '../mail/mail.service';
 
@@ -91,10 +92,7 @@ export class OnboardingService {
         newStatus = 'IN_PROGRESS';
       }
 
-      await this.prisma.employee.update({
-        where: { id: empId },
-        data: { onboardingStatus: newStatus }
-      });
+      await this.setOnboardingStatus(companyId, empId, newStatus);
     }
 
     return this.prisma.onboardingTemplate.delete({
@@ -162,10 +160,7 @@ export class OnboardingService {
     }
 
     if (newStatus !== employee.onboardingStatus) {
-      await this.prisma.employee.update({
-        where: { id: employee.id },
-        data: { onboardingStatus: newStatus }
-      });
+      await this.setOnboardingStatus(companyId, employee.id, newStatus);
 
       if (newStatus === 'COMPLETED' && employee.user?.email) {
         this.mailService.sendOnboardingCompletedEmail(
@@ -215,10 +210,7 @@ export class OnboardingService {
     }
 
     if (newStatus !== task.employee.onboardingStatus) {
-      await this.prisma.employee.update({
-        where: { id: task.employeeId },
-        data: { onboardingStatus: newStatus }
-      });
+      await this.setOnboardingStatus(companyId, task.employeeId, newStatus);
 
       if (newStatus === 'COMPLETED' && task.employee.user?.email) {
         this.mailService.sendOnboardingCompletedEmail(
@@ -238,12 +230,17 @@ export class OnboardingService {
     
     if (!employee) throw new NotFoundException('Employee not found');
 
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { onboardingStatus: status }
-    });
+    await this.setOnboardingStatus(companyId, employeeId, status);
 
     return { success: true, status };
+  }
+
+  private async setOnboardingStatus(companyId: number, employeeId: number, status: string) {
+    await this.prisma.$transaction(async tx => {
+      await lockJobCapacity(tx, companyId);
+      await tx.employee.update({ where: { id: employeeId, companyId }, data: { onboardingStatus: status } });
+      if (status === 'COMPLETED') await closeFilledJobs(tx, companyId);
+    });
   }
 
   async getCompanyPipelineSummary(companyId: number) {

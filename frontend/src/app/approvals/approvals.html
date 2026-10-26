@@ -34,6 +34,7 @@
         <span class="date-pills-label">Period</span>
         <button type="button" class="date-pill" [class.active]="quickRange() === 'ALL'" (click)="setQuickRange('ALL')">All</button>
         <button type="button" class="date-pill" [class.active]="quickRange() === 'TODAY'" (click)="setQuickRange('TODAY')">Today</button>
+        <button type="button" class="date-pill" [class.active]="quickRange() === 'YESTERDAY'" (click)="setQuickRange('YESTERDAY')">Yesterday</button>
         <button type="button" class="date-pill" [class.active]="quickRange() === '7'" (click)="setQuickRange('7')">7d</button>
         <button type="button" class="date-pill" [class.active]="quickRange() === '30'" (click)="setQuickRange('30')">30d</button>
         <button type="button" class="date-pill" [class.active]="quickRange() === 'MONTH'" (click)="setQuickRange('MONTH')">Month</button>

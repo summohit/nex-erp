@@ -299,6 +299,12 @@ export const routes: Routes = [
         loadComponent: () => import('./recruitment/candidates/candidates').then(m => m.CandidatesComponent)
       },
       {
+        path: 'recruitment/offer-letters',
+        canActivate: [permissionGuard],
+        data: { module: 'recruitment/candidates' },
+        loadComponent: () => import('./recruitment/offer-letters/offer-letters').then(m => m.OfferLettersComponent)
+      },
+      {
         path: 'recruitment/interviews',
         canActivate: [permissionGuard],
         data: { module: 'recruitment/interviews' },

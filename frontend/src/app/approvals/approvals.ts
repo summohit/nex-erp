@@ -86,7 +86,7 @@ export class ApprovalsComponent implements OnInit {
   departmentFilter = signal('');
   fromDate = signal('');
   toDate = signal('');
-  quickRange = signal<'ALL' | 'TODAY' | '7' | '30' | 'MONTH' | 'CUSTOM'>('ALL');
+  quickRange = signal<'ALL' | 'TODAY' | 'YESTERDAY' | '7' | '30' | 'MONTH' | 'CUSTOM'>('ALL');
   sortOrder = signal<'NEWEST' | 'OLDEST'>('NEWEST');
 
   page = signal(1);
@@ -188,6 +188,7 @@ export class ApprovalsComponent implements OnInit {
   });
 
   ngOnInit() {
+    this.setQuickRange('YESTERDAY');
     this.loadWfhMonth();
     this.load();
   }
@@ -257,7 +258,7 @@ export class ApprovalsComponent implements OnInit {
     this.selected.set(new Set());
   }
 
-  setQuickRange(r: 'ALL' | 'TODAY' | '7' | '30' | 'MONTH') {
+  setQuickRange(r: 'ALL' | 'TODAY' | 'YESTERDAY' | '7' | '30' | 'MONTH') {
     this.quickRange.set(r);
     const now = new Date();
     const todayStr = this.ymd(now);
@@ -267,6 +268,11 @@ export class ApprovalsComponent implements OnInit {
     } else if (r === 'TODAY') {
       this.fromDate.set(todayStr);
       this.toDate.set(todayStr);
+    } else if (r === 'YESTERDAY') {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      this.fromDate.set(this.ymd(yesterday));
+      this.toDate.set(this.ymd(yesterday));
     } else if (r === '7' || r === '30') {
       const start = new Date();
       start.setDate(start.getDate() - (Number(r) - 1));

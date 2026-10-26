@@ -878,6 +878,32 @@ export class OfferLettersService {
     return `Your surname in lowercase, followed by the last 4 digits of your phone number (e.g. surname${masked.slice(-4)})`;
   }
 
+  /** List issued envelopes without exposing their signing tokens or signature data. */
+  async listIssued(companyId: number) {
+    const offers = await this.prisma.offerLetter.findMany({
+      where: { companyId, issuedAt: { not: null }, application: { companyId } },
+      orderBy: { issuedAt: 'desc' },
+      select: { id: true, status: true, issuedAt: true, application: { select: {
+        id: true, fullName: true, email: true, photoUrl: true, job: { select: { title: true } },
+        offeredSalary: true, approvalBudget: true, approvalStatus: true,
+        approvalDecidedAt: true, approvalDecidedById: true,
+      } } },
+    });
+    const ids = [...new Set(offers.map(o => o.application.approvalDecidedById).filter((id): id is number => id != null))];
+    const users = await this.prisma.user.findMany({
+      where: { companyId, id: { in: ids } },
+      select: { id: true, email: true, employee: { select: { firstName: true, lastName: true } } },
+    });
+    const names = new Map(users.map(u => [u.id, u.employee ? `${u.employee.firstName} ${u.employee.lastName}`.trim() : u.email]));
+    return offers.map(o => ({
+      id: o.id, applicationId: o.application.id, candidate: o.application.fullName,
+      email: o.application.email, photoUrl: o.application.photoUrl, job: o.application.job.title, status: o.status, issuedAt: o.issuedAt,
+      salary: o.application.offeredSalary, budget: o.application.approvalBudget,
+      approvalStatus: o.application.approvalStatus, approvalDecidedAt: o.application.approvalDecidedAt,
+      approver: o.application.approvalDecidedById != null ? names.get(o.application.approvalDecidedById) ?? null : null,
+    }));
+  }
+
   /** Metadata for the unlock screen — safe to expose without the password. */
   /**
    * Email the offer to the candidate with their signing link.

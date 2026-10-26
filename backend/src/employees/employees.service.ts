@@ -1,3 +1,4 @@
+import { lockJobCapacity, closeFilledJobs } from '../recruitment/job-capacity';
 import { ALL_DOCUMENT_TYPES } from './profile-completeness/profile-documents';
 import { Injectable, ConflictException, NotFoundException, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -395,6 +396,7 @@ export class EmployeesService {
    */
   async promoteTraineeAfterSignedOffer(traineeId: number, applicationId: number, companyId: number) {
     const result = await this.prisma.$transaction(async (tx) => {
+      await lockJobCapacity(tx, companyId);
       const [trainee, application] = await Promise.all([
         tx.employee.findFirst({ where: { id: traineeId, companyId } }),
         tx.jobApplication.findFirst({ where: { id: applicationId, companyId }, include: { job: true } }),
@@ -439,6 +441,7 @@ export class EmployeesService {
             completedStages: Array.from(new Set([...(application.completedStages || []), 'HIRED', 'ONBOARDED'])),
           },
         });
+        await closeFilledJobs(tx, companyId);
         return { employee, offeredSalary: application.offeredSalary };
       }
 
@@ -458,6 +461,7 @@ export class EmployeesService {
           completedStages: Array.from(new Set([...(application.completedStages || []), 'HIRED', 'ONBOARDED'])),
         },
       });
+      await closeFilledJobs(tx, companyId);
       return { employee, offeredSalary: application.offeredSalary };
     });
 
