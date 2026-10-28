@@ -175,6 +175,38 @@ export class ProjectsController {
     return this.projectsService.changeProjectKey(req.user.companyId, id, key, req.user.employeeId ?? null);
   }
 
+  // ── Subprojects (administrators; checked in the service) ──────────────
+
+  /** A new subproject: `{ name, subCode, pmIds, memberIds?, budgetAmount?, startDate?, endDate? }`. */
+  @Post(':id/subprojects')
+  createSubproject(@Req() req, @Param('id', ParseIntPipe) id: number, @Body() body: any) {
+    return this.projectsService.createSubproject(req.user.companyId, req.user.employeeId ?? req.user.sub, req.user.role, id, body);
+  }
+
+  /** Put an existing project under this one: `{ projectId, subCode }`. Renames its code and tasks. */
+  @Post(':id/subprojects/attach')
+  attachSubproject(@Req() req, @Param('id', ParseIntPipe) id: number, @Body() body: any) {
+    return this.projectsService.attachSubproject(req.user.companyId, req.user.employeeId ?? null, req.user.role, id, body);
+  }
+
+  /** Take this subproject out from under its parent. */
+  @Post(':id/detach')
+  detachSubproject(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.projectsService.detachSubproject(req.user.companyId, req.user.role, id);
+  }
+
+  /** Change this subproject's own part of the code: `{ subCode }`. */
+  @Patch(':id/sub-code')
+  changeSubCode(@Req() req, @Param('id', ParseIntPipe) id: number, @Body('subCode') subCode: string) {
+    return this.projectsService.changeSubCode(req.user.companyId, req.user.employeeId ?? null, req.user.role, id, subCode);
+  }
+
+  /** SEPARATE or SHARED budgets for this parent's subprojects: `{ budgetMode }`. */
+  @Patch(':id/budget-mode')
+  setBudgetMode(@Req() req, @Param('id', ParseIntPipe) id: number, @Body('budgetMode') budgetMode: string) {
+    return this.projectsService.setBudgetMode(req.user.companyId, req.user.role, id, budgetMode);
+  }
+
   private assertSuperAdmin(req: any) {
     if (!['SUPERADMIN', 'SUPER_ADMIN'].includes(req.user?.role)) {
       throw new ForbiddenException('Only a super admin can change a project code');
