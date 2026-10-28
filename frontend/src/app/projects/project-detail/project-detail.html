@@ -3032,7 +3032,7 @@
                 <span class="card-location-chip" *ngFor="let l of issue.locations.slice(0, 2)">{{ l.location.name }}</span>
                 <span class="card-location-more" *ngIf="issue.locations.length > 2">+{{ issue.locations.length - 2 }}</span>
               </div>
-              <div class="card-locations" *ngIf="locationTracking && issue.locationProgress as lp"
+              <div class="card-locations" *ngIf="(locationTracking ? issue.locationProgress : null) as lp"
                    [title]="lp.completed + ' of ' + lp.total + ' locations completed'">
                 <div class="card-locations-row">
                   <span>{{ lp.completed }}/{{ lp.total }} locations</span>

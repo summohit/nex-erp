@@ -396,7 +396,7 @@
       <div class="form-group profile-pic-group">
         <label class="profile-picture-label"><svg lucideImage size="16" aria-hidden="true"></svg><span>Profile Picture</span><svg lucideCircleHelp size="15" class="help-icon photo-help-icon" title="Upload a clear, front-facing JPG, PNG, or GIF under 5 MB" aria-label="Profile photo requirements"></svg></label>
         <div class="profile-pic-upload" [class.has-image]="formData.avatarUrl" [class.readonly]="!canEditPersonalDetails">
-          <input #avatarInput type="file" (change)="handleAvatarUpload($event)" accept="image/*" *ngIf="canEditPersonalDetails" [disabled]="isUploadingAvatar || isSavingAvatar" class="file-input">
+          <input #avatarInput type="file" (change)="handleAvatarUpload($event)" accept="image/*" [disabled]="!canEditPersonalDetails || isUploadingAvatar || isSavingAvatar" class="file-input">
 
           <div class="avatar-preview">
             <img [src]="formData.avatarUrl || 'assets/default-avatar.png'" alt="Avatar" *ngIf="formData.avatarUrl">

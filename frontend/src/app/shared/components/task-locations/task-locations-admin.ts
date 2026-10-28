@@ -223,7 +223,7 @@ interface TreeRow {
                         [class.expanded]="!r.isCollapsed"
                         (click)="toggleCollapse(r.loc.id)"
                         [title]="r.isCollapsed ? 'Expand child locations' : 'Collapse child locations'">
-                        <svg [lucideChevronRight]="r.isCollapsed" [lucideChevronDown]="!r.isCollapsed" size="14"></svg>
+                        @if (r.isCollapsed) { <svg lucideChevronRight size="14"></svg> } @else { <svg lucideChevronDown size="14"></svg> }
                       </button>
                     } @else {
                       <span class="chevron-placeholder"></span>
