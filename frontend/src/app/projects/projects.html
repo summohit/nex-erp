@@ -363,6 +363,13 @@
         </div>
         <div class="board-card-footer">
           <span class="board-title">{{ p.name }}</span>
+              <!-- Where it sits: under a parent, or holding subprojects. -->
+              <span class="card-struct sub" *ngIf="p.parentId" [title]="parentOf(p) ? 'Subproject of ' + parentOf(p).key + ' — ' + parentOf(p).name : 'Subproject'">
+                ↳ Subproject{{ parentOf(p) ? ' of ' + parentOf(p).key : '' }}
+              </span>
+              <span class="card-struct parent" *ngIf="!p.parentId && subprojectCount(p) > 0">
+                {{ subprojectCount(p) }} subproject{{ subprojectCount(p) === 1 ? '' : 's' }}
+              </span>
           <div class="card-meta-row">
             <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
             <div class="card-badge" *ngIf="p._count?.issues">{{ p._count.issues }} tasks</div>
@@ -431,6 +438,13 @@
         </div>
         <div class="board-card-footer">
           <span class="board-title">{{ p.name }}</span>
+              <!-- Where it sits: under a parent, or holding subprojects. -->
+              <span class="card-struct sub" *ngIf="p.parentId" [title]="parentOf(p) ? 'Subproject of ' + parentOf(p).key + ' — ' + parentOf(p).name : 'Subproject'">
+                ↳ Subproject{{ parentOf(p) ? ' of ' + parentOf(p).key : '' }}
+              </span>
+              <span class="card-struct parent" *ngIf="!p.parentId && subprojectCount(p) > 0">
+                {{ subprojectCount(p) }} subproject{{ subprojectCount(p) === 1 ? '' : 's' }}
+              </span>
           <div class="card-meta-row">
             <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
             <div class="card-badge" *ngIf="p._count?.issues">{{ p._count.issues }} tasks</div>
@@ -842,6 +856,17 @@
         </label>
 
         <label class="project-filter-field">
+          <span>Structure</span>
+          <select [ngModel]="draftFilterStructure()" (ngModelChange)="draftFilterStructure.set($event)">
+            <option value="ALL">All projects</option>
+            <option value="PARENT">Parent projects</option>
+            <option value="SUB">Subprojects</option>
+            <option value="STANDALONE">Standalone projects</option>
+            <option *ngFor="let par of parentProjectOptions()" [value]="'UNDER:' + par.id">{{ par.key }} and its subprojects</option>
+          </select>
+        </label>
+
+        <label class="project-filter-field">
           <span>Started on or after</span>
           <input type="date" [ngModel]="draftFilterStartFrom()" (ngModelChange)="draftFilterStartFrom.set($event)" />
         </label>
@@ -937,6 +962,13 @@
             </div>
             <div class="board-card-footer">
               <span class="board-title">{{ p.name }}</span>
+              <!-- Where it sits: under a parent, or holding subprojects. -->
+              <span class="card-struct sub" *ngIf="p.parentId" [title]="parentOf(p) ? 'Subproject of ' + parentOf(p).key + ' — ' + parentOf(p).name : 'Subproject'">
+                ↳ Subproject{{ parentOf(p) ? ' of ' + parentOf(p).key : '' }}
+              </span>
+              <span class="card-struct parent" *ngIf="!p.parentId && subprojectCount(p) > 0">
+                {{ subprojectCount(p) }} subproject{{ subprojectCount(p) === 1 ? '' : 's' }}
+              </span>
               <div class="card-meta-row">
                 <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
                 <div class="card-badge" *ngIf="p._count?.issues">{{ p._count.issues }} tasks</div>
@@ -1722,6 +1754,13 @@
         </div>
         <div class="board-card-footer">
           <span class="board-title">{{ p.name }}</span>
+              <!-- Where it sits: under a parent, or holding subprojects. -->
+              <span class="card-struct sub" *ngIf="p.parentId" [title]="parentOf(p) ? 'Subproject of ' + parentOf(p).key + ' — ' + parentOf(p).name : 'Subproject'">
+                ↳ Subproject{{ parentOf(p) ? ' of ' + parentOf(p).key : '' }}
+              </span>
+              <span class="card-struct parent" *ngIf="!p.parentId && subprojectCount(p) > 0">
+                {{ subprojectCount(p) }} subproject{{ subprojectCount(p) === 1 ? '' : 's' }}
+              </span>
           <div class="card-meta-row">
             <span class="board-key" *ngIf="p.key">{{ p.key }}</span>
             <div class="card-badge" *ngIf="p._count?.issues">{{ p._count.issues }} tasks</div>

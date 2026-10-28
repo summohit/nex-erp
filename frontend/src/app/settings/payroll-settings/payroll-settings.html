@@ -1,71 +1,1386 @@
-<div class="settings-container">
-  <div class="settings-header">
-    <h2>Payroll Configuration Rules</h2>
-    <p>Define standard salary component percentages for automatic Annexure generation.</p>
+<div class="payroll-admin-container">
+  <!-- Top Header Section (MIRA Global Pattern) -->
+  <div class="page-header">
+    <div class="header-content">
+      <div class="simple-breadcrumb">
+        <span>Settings</span>
+        <span class="crumb-sep">/</span>
+        <span class="crumb-current">Payroll</span>
+      </div>
+      <div class="title-with-badge">
+        <h1>Payroll Configuration & Engine Masters</h1>
+        <span class="status-pill live-pill">
+          <span class="live-dot"></span>
+          Engine Active · FY 2026-27
+        </span>
+      </div>
+      <p>Configurable salary components, versioned salary groups, Indian statutory compliance, and real-time CTC simulator.</p>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn-refresh" (click)="loadAllMasters()" [disabled]="isLoading()" title="Reload Master Data">
+        <svg lucideRefreshCw [size]="14" [class.spin-anim]="isLoading()"></svg>
+        <span>Refresh</span>
+      </button>
+    </div>
   </div>
 
-  <div class="settings-content" *ngIf="!isLoading">
-    <div class="card">
-      <div class="card-body">
-        <h3 class="section-title">Earnings Breakdown</h3>
-        
-        <div class="form-group">
-          <label>Basic Salary (% of Total CTC)</label>
-          <div class="input-group">
-            <input type="number" class="form-control" [(ngModel)]="settings.basicPercent">
-            <span class="input-group-addon">%</span>
-          </div>
-          <small class="help-text">Standard practice is 40% - 50%.</small>
-        </div>
+  <!-- Navigation Tabs Bar -->
+  <div class="tabs-nav-bar">
+    <button class="tab-button" [class.active]="activeTab() === 'components'" (click)="setTab('components')">
+      <svg lucideSliders [size]="16"></svg>
+      <span>Salary Components</span>
+      <span class="tab-count-pill">{{ components().length }}</span>
+    </button>
 
-        <div class="form-group">
-          <label>HRA (% of Total CTC)</label>
-          <div class="input-group">
-            <input type="number" class="form-control" [(ngModel)]="settings.hraPercent">
-            <span class="input-group-addon">%</span>
-          </div>
-          <small class="help-text">Standard practice is 20% (or 40-50% of Basic).</small>
-        </div>
-        
-        <div class="form-group">
-          <label>Special Allowance</label>
-          <div class="input-group">
-            <input type="text" class="form-control" value="Auto-balanced" disabled>
-          </div>
-          <small class="help-text">Special Allowance automatically balances the remaining amount to match the exact target CTC.</small>
-        </div>
+    <button class="tab-button" [class.active]="activeTab() === 'groups'" (click)="setTab('groups')">
+      <svg lucideLayers [size]="16"></svg>
+      <span>Salary Groups</span>
+      <span class="tab-count-pill">{{ salaryGroups().length }}</span>
+    </button>
 
-        <h3 class="section-title" style="margin-top: 30px;">Deductions Breakdown</h3>
+    <button class="tab-button" [class.active]="activeTab() === 'tax'" (click)="setTab('tax')">
+      <svg lucideReceipt [size]="16"></svg>
+      <span>Tax Regimes & Slabs</span>
+    </button>
 
-        <div class="form-group">
-          <label>Provident Fund (Employer Contribution) (% of Basic)</label>
-          <div class="input-group">
-            <input type="number" class="form-control" [(ngModel)]="settings.pfPercent">
-            <span class="input-group-addon">%</span>
-          </div>
-          <small class="help-text">Standard is 12% of Basic.</small>
+    <button class="tab-button" [class.active]="activeTab() === 'statutory'" (click)="setTab('statutory')">
+      <svg lucideShieldCheck [size]="16"></svg>
+      <span>Statutory Rates</span>
+      <span class="tab-count-pill">{{ statutoryRates().length }}</span>
+    </button>
+
+    <button class="tab-button highlight-tab" [class.active]="activeTab() === 'calculator'" (click)="setTab('calculator')">
+      <svg lucideCalculator [size]="16"></svg>
+      <span>⚡ Salary Calculator</span>
+    </button>
+
+    <button class="tab-button" [class.active]="activeTab() === 'audit'" (click)="setTab('audit')">
+      <svg lucideHistory [size]="16"></svg>
+      <span>Audit Trail</span>
+    </button>
+  </div>
+
+  <!-- Loading Bar -->
+  <div *ngIf="isLoading()" class="loading-bar">
+    <div class="spinner"></div>
+    <span>Syncing master definitions from central database...</span>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB 1: SALARY COMPONENTS (W1, W2) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div *ngIf="!isLoading() && activeTab() === 'components'" class="tab-pane animate-fade">
+    <!-- Component Stats Summary Cards -->
+    <div class="stats-overview-grid">
+      <div class="stat-card">
+        <div class="stat-icon-wrap icon-blue">
+          <svg lucideCoins [size]="20"></svg>
         </div>
-
-        <div class="form-group">
-          <label>Gratuity (% of Basic)</label>
-          <div class="input-group">
-            <input type="number" class="form-control" [(ngModel)]="settings.gratuityPercent">
-            <span class="input-group-addon">%</span>
-          </div>
-          <small class="help-text">Standard is 4.81% of Basic.</small>
+        <div class="stat-body">
+          <span class="stat-label">Total Components</span>
+          <span class="stat-value">{{ componentStats().total }}</span>
+          <span class="stat-hint">Active in database</span>
         </div>
       </div>
-      
-      <div class="card-footer">
-        <button class="btn-primary" (click)="saveSettings()" [disabled]="isSaving">
-          {{ isSaving ? 'Saving...' : 'Save Configuration' }}
+
+      <div class="stat-card">
+        <div class="stat-icon-wrap icon-green">
+          <svg lucideTrendingUp [size]="20"></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">Earnings (Gross)</span>
+          <span class="stat-value text-green">{{ componentStats().earnings }}</span>
+          <span class="stat-hint">Basic, HRA, Allowances</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon-wrap icon-red">
+          <svg lucideShieldCheck [size]="20"></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">Employee Deductions</span>
+          <span class="stat-value text-red">{{ componentStats().employeeDeductions }}</span>
+          <span class="stat-hint">PF, ESIC, PT, TDS</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon-wrap icon-amber">
+          <svg lucideInfo [size]="20"></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">Employer Contributions</span>
+          <span class="stat-value text-amber">{{ componentStats().employerContributions }}</span>
+          <span class="stat-hint">Hidden from payslip</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="pane-card">
+      <div class="table-toolbar">
+        <div class="toolbar-left">
+          <div class="search-input-box">
+            <svg lucideSearch [size]="16" class="search-icon"></svg>
+            <input 
+              type="text" 
+              class="search-field" 
+              placeholder="Search components by code, name, or description..."
+              [ngModel]="componentSearch()"
+              (ngModelChange)="componentSearch.set($event)"
+            />
+            <button *ngIf="componentSearch()" class="clear-search-btn" (click)="componentSearch.set('')">
+              <svg lucideX [size]="13"></svg>
+            </button>
+          </div>
+
+          <div class="category-filter-pills">
+            <button 
+              class="filter-pill" 
+              [class.active]="componentCategoryFilter() === 'ALL'" 
+              (click)="componentCategoryFilter.set('ALL')">
+              All ({{ componentStats().total }})
+            </button>
+            <button 
+              class="filter-pill" 
+              [class.active]="componentCategoryFilter() === 'EARNING'" 
+              (click)="componentCategoryFilter.set('EARNING')">
+              Earnings ({{ componentStats().earnings }})
+            </button>
+            <button 
+              class="filter-pill" 
+              [class.active]="componentCategoryFilter() === 'EMPLOYEE_DEDUCTION'" 
+              (click)="componentCategoryFilter.set('EMPLOYEE_DEDUCTION')">
+              Deductions ({{ componentStats().employeeDeductions }})
+            </button>
+            <button 
+              class="filter-pill" 
+              [class.active]="componentCategoryFilter() === 'EMPLOYER_CONTRIBUTION'" 
+              (click)="componentCategoryFilter.set('EMPLOYER_CONTRIBUTION')">
+              Employer Share ({{ componentStats().employerContributions }})
+            </button>
+          </div>
+        </div>
+
+        <button class="btn-primary" (click)="openCreateComponentModal()">
+          <svg lucidePlus [size]="16"></svg>
+          <span>Add Component</span>
+        </button>
+      </div>
+
+      <!-- Components Data Table -->
+      <div class="table-container">
+        <table class="modern-table">
+          <thead>
+            <tr>
+              <th style="width: 50px; text-align: center;">#</th>
+              <th>Component Code</th>
+              <th>Display Name</th>
+              <th>Category</th>
+              <th>Structure Scope</th>
+              <th>Payslip Visibility</th>
+              <th>Taxable</th>
+              <th>Loss of Pay (LOP)</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let comp of filteredComponents()" [class.row-inactive]="!comp.isActive">
+              <td style="text-align: center;">
+                <span class="order-chip">#{{ comp.displayOrder }}</span>
+              </td>
+              <td>
+                <div class="code-chip-interactive" (click)="copyCode(comp.code)" title="Click to copy component code">
+                  <code>{{ comp.code }}</code>
+                </div>
+              </td>
+              <td>
+                <div class="component-name-cell">
+                  <span class="comp-title">{{ comp.name }}</span>
+                  <span *ngIf="comp.description" class="comp-desc">{{ comp.description }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="category-pill" [ngClass]="{
+                  'cat-earning': comp.category === 'EARNING',
+                  'cat-deduction': comp.category === 'EMPLOYEE_DEDUCTION',
+                  'cat-employer': comp.category === 'EMPLOYER_CONTRIBUTION',
+                  'cat-reimbursement': comp.category === 'REIMBURSEMENT'
+                }">
+                  <span class="cat-dot"></span>
+                  <span>{{ comp.category === 'EMPLOYER_CONTRIBUTION' ? 'Employer Share' : (comp.category === 'EMPLOYEE_DEDUCTION' ? 'Employee Deduction' : (comp.category === 'EARNING' ? 'Earning' : 'Reimbursement')) }}</span>
+                </span>
+              </td>
+              <td>
+                <div class="scope-tags-row">
+                  <span class="scope-tag" [class.active]="comp.partOfCtc" title="Included in CTC">CTC</span>
+                  <span class="scope-tag" [class.active]="comp.partOfGross" title="Included in Gross Salary">Gross</span>
+                </div>
+              </td>
+              <td>
+                <span *ngIf="comp.showOnPayslip" class="status-badge badge-visible">
+                  <svg lucideEye [size]="13"></svg>
+                  <span>Visible on Slip</span>
+                </span>
+                <span *ngIf="!comp.showOnPayslip" class="status-badge badge-hidden" title="Excluded from salary slip as per company policy (CTC only)">
+                  <svg lucideEyeOff [size]="13"></svg>
+                  <span>Hidden (CTC only)</span>
+                </span>
+              </td>
+              <td>
+                <span class="status-dot-pill" [class.status-positive]="comp.taxable" [class.status-neutral]="!comp.taxable">
+                  <span class="dot"></span>
+                  <span>{{ comp.taxable ? 'Taxable' : 'Exempt' }}</span>
+                </span>
+              </td>
+              <td>
+                <span class="status-dot-pill" [class.status-positive]="comp.reduceForLop" [class.status-neutral]="!comp.reduceForLop">
+                  <span class="dot"></span>
+                  <span>{{ comp.reduceForLop ? 'Pro-rated' : 'Fixed' }}</span>
+                </span>
+              </td>
+              <td style="text-align: right;">
+                <div class="row-actions-wrap">
+                  <button class="btn-action-edit" (click)="openEditComponentModal(comp)" title="Edit Component">
+                    <svg lucidePencil [size]="13"></svg>
+                    <span>Edit</span>
+                  </button>
+                  <button *ngIf="!comp.isSystem" class="btn-action-delete" (click)="deleteComponent(comp)" title="Delete Component">
+                    <svg lucideTrash2 [size]="13"></svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+
+            <tr *ngIf="filteredComponents().length === 0">
+              <td colspan="9" class="empty-state-cell">
+                <div class="empty-state-box">
+                  <svg lucideSearch [size]="28" class="text-muted"></svg>
+                  <p class="empty-title">No matching components found</p>
+                  <p class="empty-desc">Try clearing your search query or selecting a different category filter.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB 2: SALARY GROUPS (W3) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div *ngIf="!isLoading() && activeTab() === 'groups'" class="tab-pane animate-fade">
+    <div class="groups-split-layout">
+      <!-- Left Column: Groups Directory -->
+      <div class="groups-sidebar pane-card">
+        <div class="sidebar-header">
+          <h3 class="pane-title">
+            Structures <span class="structures-count">({{ filteredSalaryGroups().length }})</span>
+          </h3>
+          <button class="btn-xs btn-primary" (click)="openCreateGroupModal()">
+            <svg lucidePlus [size]="13"></svg>
+            <span>Add</span>
+          </button>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-input-box compact-search">
+          <svg lucideSearch [size]="14" class="search-icon"></svg>
+          <input 
+            type="text" 
+            class="search-field" 
+            placeholder="Search structures..."
+            [ngModel]="groupSearch()"
+            (ngModelChange)="groupSearch.set($event)"
+          />
+          <button *ngIf="groupSearch()" class="clear-search-btn" (click)="groupSearch.set('')">
+            <svg lucideX [size]="12"></svg>
+          </button>
+        </div>
+
+        <!-- Structure Cards List -->
+        <div class="group-cards-list">
+          <div *ngFor="let g of filteredSalaryGroups()" 
+               class="group-card-item" 
+               [class.active-group]="selectedGroup()?.id === g.id"
+               (click)="selectedGroup.set(g)">
+            <div class="card-row-top">
+              <span class="group-name-text">{{ g.name }}</span>
+              <span class="payee-tag-minimal" [ngClass]="'payee-' + payeeKind(g.payeeType)">{{ payeeLabel(g.payeeType) }}</span>
+            </div>
+            
+            <div class="card-row-sub">
+              <code class="code-text-sub">{{ g.code }}</code>
+              <span class="dot-sep">·</span>
+              <span>{{ g.lines.length }} rules</span>
+              <span *ngIf="g.flatTdsPct" class="sub-tds">· TDS {{ g.flatTdsPct }}%</span>
+            </div>
+          </div>
+
+          <div *ngIf="filteredSalaryGroups().length === 0" class="empty-filter-state">
+            <p class="empty-text-sub">No structures match search</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Selected Group Details & Formula Rules -->
+      <div class="group-detail-view pane-card" *ngIf="selectedGroup()">
+        <!-- Clean Minimal Group Header -->
+        <div class="group-clean-header">
+          <div class="header-left-col">
+            <div class="title-meta-line">
+              <h2 class="group-main-title">{{ selectedGroup()?.name }}</h2>
+              <code class="group-code-pill" (click)="copyCode(selectedGroup()?.code || '')" title="Click to copy code">
+                {{ selectedGroup()?.code }}
+              </code>
+              <span class="group-ver-pill">v{{ selectedGroup()?.version }}.0</span>
+              <span class="group-payee-pill" [ngClass]="'payee-' + payeeKind(selectedGroup()?.payeeType)">
+                {{ payeeLabel(selectedGroup()?.payeeType, 'Regular Employee') }}
+              </span>
+            </div>
+            <p class="group-clean-desc">
+              {{ selectedGroup()?.description || 'Standard compensation structure with monthly earnings, statutory contributions, and balancing components.' }}
+            </p>
+          </div>
+
+          <div class="header-right-actions">
+            <button class="btn-sm btn-outline-modern" (click)="openEditGroupModal(selectedGroup()!)">
+              <svg lucidePencil [size]="13"></svg>
+              <span>Edit</span>
+            </button>
+            <button class="btn-sm btn-primary" (click)="calcGroupId = selectedGroup()!.id; setTab('calculator')">
+              <svg lucideCalculator [size]="13"></svg>
+              <span>Simulate</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Formula Lines Table -->
+        <div class="formula-section">
+          <div class="section-subhead">
+            <div>
+              <h4 class="subhead-title">Calculation Sequence</h4>
+              <p class="subhead-desc">Evaluated strictly in order · Other Allowance auto-absorbs remaining Gross</p>
+            </div>
+            <span class="count-pill-sm">{{ selectedGroup()?.lines?.length || 0 }} rules</span>
+          </div>
+
+          <div class="table-container">
+            <table class="modern-table minimal-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px; text-align: center;">#</th>
+                  <th style="width: 230px;">Salary Component</th>
+                  <th style="width: 100px;">Type</th>
+                  <th>Formula / Rule Definition</th>
+                  <th style="width: 160px;">Condition</th>
+                  <th style="width: 145px; text-align: right;" title="HR Recruiter override: Can HR change this amount for an individual candidate during hiring? (Finance has full access to edit all formulas anytime)">HR Offer Override</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let line of selectedGroup()?.lines; let i = index" [class.highlight-balancing]="line.calcType === 'BALANCING'">
+                  <td style="text-align: center;" class="cell-seq-num">
+                    {{ i + 1 }}
+                  </td>
+                  <td>
+                    <div class="comp-cell-wrap">
+                      <div class="comp-title-row">
+                        <span class="comp-title-clean">{{ line.component?.name || ('Component #' + line.componentId) }}</span>
+                        <span *ngIf="line.component?.showOnPayslip === false" class="tag-hidden-slip" title="Finance Policy: Hidden on employee salary slip (CTC Cost only)">
+                          Hidden on slip
+                        </span>
+                      </div>
+                      <div class="comp-sub-row">
+                        <code class="code-text-sub">{{ line.component?.code }}</code>
+                        <span class="dot-sep">·</span>
+                        <span class="text-xs text-muted">{{ line.component?.category === 'EMPLOYER_CONTRIBUTION' ? 'Employer Share' : (line.component?.category === 'EMPLOYEE_DEDUCTION' ? 'Deduction' : 'Earning') }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="type-text" [ngClass]="{
+                      'text-type-formula': line.calcType === 'FORMULA',
+                      'text-type-balancing': line.calcType === 'BALANCING',
+                      'text-type-fixed': line.calcType === 'FIXED',
+                      'text-type-statutory': line.calcType === 'STATUTORY'
+                    }">
+                      {{ line.calcType === 'FORMULA' ? 'Formula' : (line.calcType === 'BALANCING' ? 'Balancing' : (line.calcType === 'FIXED' ? 'Fixed' : (line.calcType === 'STATUTORY' ? 'Statutory' : 'Input'))) }}
+                    </span>
+                  </td>
+                  <td>
+                    <div *ngIf="line.calcType === 'FORMULA'" class="formula-code-box">
+                      <code>{{ line.formula }}</code>
+                    </div>
+                    <div *ngIf="line.calcType === 'BALANCING'" class="balancing-text-clean">
+                      Auto-balances to Monthly Gross (Gross — Earnings)
+                    </div>
+                    <div *ngIf="line.calcType === 'FIXED'" class="fixed-text-clean">
+                      {{ formatCurrency(line.amount) }}<span class="freq-sub"> / mo</span>
+                    </div>
+                    <div *ngIf="line.calcType === 'STATUTORY'" class="statutory-text-clean">
+                      Evaluated from Statutory Rates master
+                    </div>
+                    <div *ngIf="line.calcType === 'INPUT'" class="text-xs text-muted">
+                      Monthly variable input
+                    </div>
+                  </td>
+                  <td>
+                    <code *ngIf="line.condition" class="condition-code-clean">{{ line.condition }}</code>
+                    <span *ngIf="!line.condition" class="text-muted text-xs">—</span>
+                  </td>
+                  <td style="text-align: right;">
+                    <span *ngIf="line.overrideAllowed" class="override-status-allowed" title="HR is allowed to customize this amount during candidate offer letter creation">✓ Editable by HR</span>
+                    <span *ngIf="!line.overrideAllowed" class="override-status-locked" title="Finance Policy: Locked for HR during hiring (Finance can edit anytime via the Edit button above)">🔒 Locked for HR</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB 3: TAX REGIMES (W4) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div *ngIf="!isLoading() && activeTab() === 'tax'" class="tab-pane animate-fade">
+    <!-- Regime Selector Bar -->
+    <div class="regime-nav-card pane-card">
+      <div class="regime-toggle-buttons">
+        <button 
+          class="regime-toggle-btn" 
+          [class.active]="selectedRegimeTab() === 'NEW'" 
+          (click)="selectedRegimeTab.set('NEW')">
+          <span class="toggle-main">New Tax Regime (Sec 115BAC)</span>
+          <span class="toggle-sub">Default · Higher ₹75,000 Standard Deduction</span>
+        </button>
+        <button 
+          class="regime-toggle-btn" 
+          [class.active]="selectedRegimeTab() === 'OLD'" 
+          (click)="selectedRegimeTab.set('OLD')">
+          <span class="toggle-main">Old Tax Regime (With Declarations)</span>
+          <span class="toggle-sub">Supports 80C, 80D, HRA & Home Loan</span>
+        </button>
+      </div>
+
+      <div class="regime-actions-bar">
+        <span class="fy-badge">
+          <svg lucideReceipt [size]="13"></svg>
+          <span>FY 2026-27</span>
+        </span>
+        <ng-container *ngFor="let regime of taxRegimes()">
+          <button *ngIf="regime.code === selectedRegimeTab()" class="btn-primary" (click)="openEditTaxRegimeModal(regime)">
+            <svg lucidePencil [size]="14"></svg>
+            <span>Edit Slabs & Rules</span>
+          </button>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- Active Regime Content -->
+    <div *ngFor="let regime of taxRegimes()">
+      <div *ngIf="regime.code === selectedRegimeTab()" class="regime-body-grid">
+        <!-- Top Metrics for Active Regime -->
+        <div class="regime-kpi-strip">
+          <div class="kpi-mini-card">
+            <span class="kpi-mini-label">Standard Deduction</span>
+            <span class="kpi-mini-val text-primary">{{ formatCurrency(regime.standardDeduction) }}</span>
+            <span class="kpi-mini-desc">Flat deduction from gross taxable income</span>
+          </div>
+
+          <div class="kpi-mini-card">
+            <span class="kpi-mini-label">Sec 87A Full Rebate Limit</span>
+            <span class="kpi-mini-val text-green">{{ formatCurrency(regime.rebateIncomeLimit) }}</span>
+            <span class="kpi-mini-desc">Tax is ₹0 if income is within this limit</span>
+          </div>
+
+          <div class="kpi-mini-card">
+            <span class="kpi-mini-label">Max Sec 87A Rebate</span>
+            <span class="kpi-mini-val text-green">{{ formatCurrency(regime.rebateMaxAmount) }}</span>
+            <span class="kpi-mini-desc">Maximum tax concession available</span>
+          </div>
+
+          <div class="kpi-mini-card">
+            <span class="kpi-mini-label">Health & Education Cess</span>
+            <span class="kpi-mini-val text-amber">{{ regime.cessPct }}%</span>
+            <span class="kpi-mini-desc">Calculated on gross income tax</span>
+          </div>
+        </div>
+
+        <div class="regime-details-split">
+          <!-- Slabs Progression Table -->
+          <div class="pane-card">
+            <div class="card-header-simple">
+              <h3 class="pane-title">Income Tax Slabs (FY 2026-27)</h3>
+              <p class="pane-subtitle">Progressive tax calculation tiers</p>
+            </div>
+
+            <div class="table-container" style="margin-top: 12px;">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>Slab Range (Income Bracket)</th>
+                    <th>Tax Rate</th>
+                    <th>Progressive Slabs Visual</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let slab of regime.slabs">
+                    <td class="font-medium">
+                      {{ formatCurrency(slab.fromAmount) }} — 
+                      <span *ngIf="slab.toAmount != null">{{ formatCurrency(slab.toAmount) }}</span>
+                      <span *ngIf="slab.toAmount == null" class="text-muted">Above {{ formatCurrency(slab.fromAmount) }} (No upper cap)</span>
+                    </td>
+                    <td>
+                      <span class="tax-rate-pill" [class.rate-zero]="slab.ratePct === 0" [class.rate-high]="slab.ratePct >= 20">
+                        {{ slab.ratePct }}%
+                      </span>
+                    </td>
+                    <td>
+                      <div class="slab-progress-bar-wrap">
+                        <div class="slab-progress-bar" [style.width.%]="(slab.ratePct / 30) * 100"></div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Chapter VI-A Allowed Deductions (for Old Regime) -->
+          <div class="pane-card">
+            <div class="card-header-simple">
+              <h3 class="pane-title">Chapter VI-A Allowed Deductions</h3>
+              <p class="pane-subtitle">Exemptions and deductions available in this regime</p>
+            </div>
+
+            <div *ngIf="regime.sections.length > 0" class="sections-list" style="margin-top: 14px;">
+              <div *ngFor="let sec of regime.sections" class="section-item-card">
+                <div class="sec-left">
+                  <code class="sec-code-tag">{{ sec.code }}</code>
+                  <span class="sec-name">{{ sec.name }}</span>
+                </div>
+                <span class="sec-cap font-semibold">
+                  {{ sec.maxLimit != null ? formatCurrency(sec.maxLimit) : 'Actual / Computed' }}
+                </span>
+              </div>
+            </div>
+
+            <div *ngIf="regime.sections.length === 0" class="empty-sections-note">
+              <svg lucideInfo [size]="20" class="text-muted"></svg>
+              <p>Under the <strong>New Tax Regime (Sec 115BAC)</strong>, traditional Chapter VI-A itemized deductions (like 80C, 80D, and HRA) are disallowable, in exchange for significantly lower slab rates and a higher Standard Deduction of ₹75,000.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB 4: STATUTORY RATES (W5) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div *ngIf="!isLoading() && activeTab() === 'statutory'" class="tab-pane animate-fade">
+    <!-- Statutory Highlights Cards -->
+    <div class="stats-overview-grid">
+      <div class="stat-card">
+        <div class="stat-icon-wrap icon-blue">
+          <svg lucideShieldCheck [size]="20"></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">Provident Fund (EPFO)</span>
+          <span class="stat-value text-blue">12% / 12%</span>
+          <span class="stat-hint">₹15,000 Statutory Wage Ceiling</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon-wrap icon-green">
+          <svg lucideShieldCheck [size]="20"></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">Employee State Insurance (ESIC)</span>
+          <span class="stat-value text-green">0.75% / 3.25%</span>
+          <span class="stat-hint">Applicable if Gross ≤ ₹21,000</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon-wrap icon-amber">
+          <svg lucideCoins [size]="20"></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">Minimum Basic Floor</span>
+          <span class="stat-value text-amber">₹13,780</span>
+          <span class="stat-hint">Minimum wage statutory floor</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon-wrap icon-purple">
+          <svg lucideTrendingUp [size]="20"></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">Gratuity Accrual</span>
+          <span class="stat-value text-purple">4.81%</span>
+          <span class="stat-hint">Payment of Gratuity Act formula</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statutory Rates Table Card -->
+    <div class="pane-card">
+      <div class="table-toolbar">
+        <div>
+          <h3 class="pane-title">Statutory Compliance Rates & Ceilings</h3>
+          <p class="pane-subtitle">Configured per Indian labor laws, updated automatically on change</p>
+        </div>
+
+        <div class="search-input-box" style="width: 320px;">
+          <svg lucideSearch [size]="16" class="search-icon"></svg>
+          <input 
+            type="text" 
+            class="search-field" 
+            placeholder="Search rate codes or states..."
+            [ngModel]="statutorySearch()"
+            (ngModelChange)="statutorySearch.set($event)"
+          />
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="modern-table">
+          <thead>
+            <tr>
+              <th>Rate Code</th>
+              <th>Applicable State</th>
+              <th>Rate / Amount</th>
+              <th>Wage Ceiling (Cap)</th>
+              <th>Eligibility Limit</th>
+              <th>Effective Date</th>
+              <th>Legal & Compliance Notes</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let rate of filteredStatutoryRates()">
+              <td>
+                <div class="code-chip-interactive" (click)="copyCode(rate.code)">
+                  <code>{{ rate.code }}</code>
+                </div>
+              </td>
+              <td>
+                <span class="state-badge">{{ rate.stateCode || 'All India (Central)' }}</span>
+              </td>
+              <td>
+                <span *ngIf="rate.ratePct != null" class="font-bold text-primary">{{ rate.ratePct }}%</span>
+                <span *ngIf="rate.fixedAmount != null" class="font-bold">{{ formatCurrency(rate.fixedAmount) }}</span>
+              </td>
+              <td>{{ rate.wageCeiling ? formatCurrency(rate.wageCeiling) : '—' }}</td>
+              <td>{{ rate.eligibilityLimit ? formatCurrency(rate.eligibilityLimit) : '—' }}</td>
+              <td class="text-muted text-xs">{{ formatDate(rate.effectiveFrom) }}</td>
+              <td class="text-muted text-xs notes-col">{{ rate.notes || '—' }}</td>
+              <td style="text-align: right;">
+                <button class="btn-action-edit" (click)="openEditStatutoryModal(rate)">
+                  <svg lucidePencil [size]="14"></svg>
+                  <span>Edit</span>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB 5: ⚡ SALARY CALCULATOR & SIMULATOR (W7) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div *ngIf="!isLoading() && activeTab() === 'calculator'" class="tab-pane animate-fade">
+    <div class="calculator-fintech-layout">
+      <!-- Left Config Card -->
+      <div class="calc-sidebar pane-card">
+        <div class="sidebar-header">
+          <div>
+            <h3 class="pane-title">Salary Simulator</h3>
+            <p class="pane-subtitle">Pure calculation engine verified against Finance Excel</p>
+          </div>
+        </div>
+
+        <!-- Mode Toggle -->
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label">CTC Entry Mode</label>
+          <div class="mode-toggle-group">
+            <button 
+              class="mode-btn" 
+              [class.active]="calcCtcType === 'monthly'" 
+              (click)="calcCtcType = 'monthly'; runCalculator()">
+              Monthly CTC
+            </button>
+            <button 
+              class="mode-btn" 
+              [class.active]="calcCtcType === 'annual'" 
+              (click)="calcCtcType = 'annual'; runCalculator()">
+              Annual CTC
+            </button>
+          </div>
+        </div>
+
+        <!-- CTC Numeric Input -->
+        <div class="form-group">
+          <div class="label-with-hint">
+            <label class="form-label">Cost to Company (CTC)</label>
+            <span class="text-xs text-muted font-medium">{{ formatCurrency(calcCtcAmount) }}</span>
+          </div>
+          <div class="input-with-currency">
+            <span class="currency-symbol">₹</span>
+            <input 
+              type="number" 
+              class="form-control-large" 
+              [(ngModel)]="calcCtcAmount" 
+              (ngModelChange)="runCalculator()" 
+              [step]="calcCtcType === 'monthly' ? 5000 : 50000"
+            />
+          </div>
+        </div>
+
+        <!-- Quick Presets Pills -->
+        <div class="form-group" *ngIf="calcCtcType === 'annual'">
+          <label class="form-label text-xs">Quick CTC Presets</label>
+          <div class="presets-row">
+            <button 
+              *ngFor="let p of ctcPresets" 
+              class="preset-pill" 
+              [class.active]="calcCtcAmount === p"
+              (click)="setCtcPreset(p)">
+              ₹{{ (p / 100000) }}L
+            </button>
+          </div>
+        </div>
+
+        <!-- Salary Group Selector -->
+        <div class="form-group">
+          <label class="form-label">Salary Structure Group</label>
+          <select class="form-control" [(ngModel)]="calcGroupId" (ngModelChange)="runCalculator()">
+            <option *ngFor="let g of salaryGroups()" [ngValue]="g.id">
+              {{ g.name }} ({{ g.code }})
+            </option>
+          </select>
+        </div>
+
+        <!-- Tax Regime Selector -->
+        <div class="form-group">
+          <label class="form-label">Tax Regime</label>
+          <select class="form-control" [(ngModel)]="calcRegimeCode" (ngModelChange)="runCalculator()">
+            <option value="NEW">New Tax Regime (Sec 115BAC) — Default</option>
+            <option value="OLD">Old Tax Regime (With Declarations)</option>
+          </select>
+        </div>
+
+        <button class="btn-primary w-full" (click)="runCalculator()" [disabled]="isCalculating()" style="margin-top: 10px;">
+          <svg lucideCalculator [size]="16"></svg>
+          <span>Recalculate Breakdown</span>
+        </button>
+      </div>
+
+      <!-- Right Output Card -->
+      <div class="calc-results-view pane-card" *ngIf="calcResult()">
+        <!-- Hero KPI Strip -->
+        <div class="fintech-kpi-banner">
+          <div class="kpi-hero-cell">
+            <span class="kpi-hero-label">Monthly Gross Pay</span>
+            <div class="kpi-hero-val">{{ formatCurrency(calcResult()?.grossMonthly) }}</div>
+            <span class="kpi-hero-sub">Annual: {{ formatCurrency(calcResult()?.grossAnnual) }}</span>
+          </div>
+
+          <div class="kpi-hero-cell">
+            <span class="kpi-hero-label">Employer Cost (PF/ESI)</span>
+            <div class="kpi-hero-val text-amber">{{ formatCurrency(calcResult()?.totalEmployerContributionsMonthly) }}</div>
+            <span class="kpi-hero-sub">
+              <span class="tag-in-ctc">🛡️ Inside CTC</span>
+            </span>
+          </div>
+
+          <div class="kpi-hero-cell highlight-cell">
+            <span class="kpi-hero-label">Net Take-Home Pay</span>
+            <div class="kpi-hero-val text-green">{{ formatCurrency(calcResult()?.netPayMonthly) }}</div>
+            <span class="kpi-hero-sub text-green">Annual: {{ formatCurrency(calcResult()?.netPayAnnual) }}</span>
+          </div>
+        </div>
+
+        <!-- Payslip Rule Callout Banner -->
+        <div class="policy-notice-banner">
+          <div class="policy-icon">🛡️</div>
+          <div class="policy-text">
+            <strong>Finance & Payslip Policy Confirmed:</strong> Employer PF ({{ formatCurrency(calcResult()?.totalEmployerContributionsMonthly) }}/mo) is included in Cost-to-Company (CTC), but is <strong>strictly hidden from the employee's salary slip</strong>.
+          </div>
+        </div>
+
+        <!-- Breakdown Table -->
+        <div class="table-container" style="margin-top: 16px;">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Category</th>
+                <th style="text-align: right;">Monthly (₹)</th>
+                <th style="text-align: right;">Annual (₹)</th>
+                <th>Payslip Display</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let line of calcResult()?.lines" [class.highlight-row]="line.code === 'OTHER_ALLOWANCE'">
+                <td>
+                  <div class="component-line-info">
+                    <span class="line-comp-name font-semibold">{{ line.name }}</span>
+                    <span *ngIf="line.code === 'OTHER_ALLOWANCE'" class="badge badge-neutral text-xs">Balancing Figure</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="badge" [ngClass]="{
+                    'badge-earning': line.category === 'EARNING',
+                    'badge-deduction': line.category === 'EMPLOYEE_DEDUCTION',
+                    'badge-employer': line.category === 'EMPLOYER_CONTRIBUTION'
+                  }">
+                    {{ line.category === 'EMPLOYER_CONTRIBUTION' ? 'Employer Share' : (line.category === 'EMPLOYEE_DEDUCTION' ? 'Employee Deduction' : 'Earning') }}
+                  </span>
+                </td>
+                <td style="text-align: right;" class="font-bold font-mono">
+                  {{ formatCurrency(line.monthly) }}
+                </td>
+                <td style="text-align: right;" class="text-muted font-mono">
+                  {{ formatCurrency(line.annual) }}
+                </td>
+                <td>
+                  <span *ngIf="line.showOnPayslip" class="status-badge badge-visible">
+                    <svg lucideEye [size]="12"></svg>
+                    <span>Visible</span>
+                  </span>
+                  <span *ngIf="!line.showOnPayslip" class="status-badge badge-hidden">
+                    <svg lucideEyeOff [size]="12"></svg>
+                    <span>Hidden</span>
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Annual Income Tax Projection Card -->
+        <div *ngIf="calcResult()?.tax" class="tax-projection-card">
+          <div class="card-header-simple">
+            <h4 class="subhead-title">Annual Income Tax Projection ({{ calcResult()?.tax?.regimeCode }} Regime)</h4>
+            <span class="badge badge-neutral">Section 115BAC Rules Applied</span>
+          </div>
+
+          <div class="tax-metrics-row">
+            <div class="tax-col">
+              <span class="tax-col-lbl">Taxable Income</span>
+              <span class="tax-col-val">{{ formatCurrency(calcResult()?.tax?.taxableIncome) }}</span>
+            </div>
+            <div class="tax-col">
+              <span class="tax-col-lbl">Std Deduction</span>
+              <span class="tax-col-val text-primary">-{{ formatCurrency(calcResult()?.tax?.standardDeduction) }}</span>
+            </div>
+            <div class="tax-col">
+              <span class="tax-col-lbl">Sec 87A Rebate</span>
+              <span class="tax-col-val text-green">{{ formatCurrency(calcResult()?.tax?.rebate87A) }}</span>
+            </div>
+            <div class="tax-col">
+              <span class="tax-col-lbl">Net Annual Tax</span>
+              <span class="tax-col-val font-bold">{{ formatCurrency(calcResult()?.tax?.totalAnnualTax) }}</span>
+            </div>
+            <div class="tax-col highlight-tds">
+              <span class="tax-col-lbl">Projected Monthly TDS</span>
+              <span class="tax-col-val text-amber font-bold">{{ formatCurrency(calcResult()?.tax?.monthlyTds) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB 6: AUDIT TRAIL (W13) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div *ngIf="!isLoading() && activeTab() === 'audit'" class="tab-pane animate-fade">
+    <div class="pane-card">
+      <div class="table-toolbar">
+        <div>
+          <h3 class="pane-title">Configuration Audit Trail</h3>
+          <p class="pane-subtitle">Every modification to salary components, groups, tax slabs, or statutory rates is logged</p>
+        </div>
+
+        <div class="category-filter-pills">
+          <button class="filter-pill" [class.active]="auditEntityFilter() === 'ALL'" (click)="auditEntityFilter.set('ALL')">All</button>
+          <button class="filter-pill" [class.active]="auditEntityFilter() === 'SALARY_GROUP'" (click)="auditEntityFilter.set('SALARY_GROUP')">Salary Groups</button>
+          <button class="filter-pill" [class.active]="auditEntityFilter() === 'COMPONENT'" (click)="auditEntityFilter.set('COMPONENT')">Components</button>
+          <button class="filter-pill" [class.active]="auditEntityFilter() === 'STATUTORY_RATE'" (click)="auditEntityFilter.set('STATUTORY_RATE')">Statutory Rates</button>
+          <button class="filter-pill" [class.active]="auditEntityFilter() === 'TAX_REGIME'" (click)="auditEntityFilter.set('TAX_REGIME')">Tax Regimes</button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="modern-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Target Entity</th>
+              <th>Action</th>
+              <th>Reason / Trigger</th>
+              <th>Modified Snapshot</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let log of filteredAuditLogs()">
+              <td class="text-xs text-muted font-mono">{{ formatDate(log.createdAt) }}</td>
+              <td>
+                <span class="entity-chip">{{ log.entity }} #{{ log.entityId }}</span>
+              </td>
+              <td>
+                <span class="action-badge" [ngClass]="{
+                  'action-create': log.action === 'CREATE',
+                  'action-update': log.action === 'UPDATE',
+                  'action-version': log.action === 'VERSION'
+                }">{{ log.action }}</span>
+              </td>
+              <td class="font-medium text-sm">{{ log.reason || '—' }}</td>
+              <td class="text-xs text-muted">
+                {{ log.after ? (log.after.name || log.after.code || 'Payload logged') : '—' }}
+              </td>
+            </tr>
+
+            <tr *ngIf="filteredAuditLogs().length === 0">
+              <td colspan="5" class="empty-state-cell">
+                <div class="empty-state-box">
+                  <p class="empty-title">No audit records found</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- MODAL: ADD / EDIT COMPONENT (W2) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div *ngIf="isComponentModalOpen()" class="modal-backdrop animate-fade">
+    <div class="modal-dialog modal-component">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon-pill">
+            <svg lucideCoins [size]="18"></svg>
+          </div>
+          <div>
+            <h3>{{ componentForm.id ? 'Edit Component — ' + componentForm.code : 'Add Salary Component' }}</h3>
+            <span class="modal-subtitle">Define component categorization, tax treatment, and payslip rules</span>
+          </div>
+        </div>
+        <button class="modal-close" (click)="closeComponentModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label class="form-label">
+              <span>Component Code</span>
+              <span class="required-star">*</span>
+            </label>
+            <input 
+              type="text" 
+              class="form-control font-mono uppercase-input" 
+              [class.input-error]="componentErrors().code"
+              [(ngModel)]="componentForm.code" 
+              (ngModelChange)="clearComponentError('code')"
+              [disabled]="componentForm.id" 
+              placeholder="e.g. SPECIAL_ALLOWANCE"
+            />
+            <span class="field-error-text" *ngIf="componentErrors().code">
+              ⚠️ {{ componentErrors().code }}
+            </span>
+            <span class="input-hint" *ngIf="!componentErrors().code">Unique system identifier</span>
+          </div>
+          <div class="form-group flex-1">
+            <label class="form-label">
+              <span>Display Name</span>
+              <span class="required-star">*</span>
+            </label>
+            <input 
+              type="text" 
+              class="form-control" 
+              [class.input-error]="componentErrors().name"
+              [(ngModel)]="componentForm.name" 
+              (ngModelChange)="clearComponentError('name')"
+              placeholder="e.g. Special Allowance"
+            />
+            <span class="field-error-text" *ngIf="componentErrors().name">
+              ⚠️ {{ componentErrors().name }}
+            </span>
+            <span class="input-hint" *ngIf="!componentErrors().name">Shown on payslips & offer letters</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <span>Category Classification</span>
+            <span class="required-star">*</span>
+          </label>
+          <select class="form-control" [(ngModel)]="componentForm.category" (ngModelChange)="onCategoryChange()">
+            <option value="EARNING">Earning (Part of Monthly Gross Salary)</option>
+            <option value="EMPLOYEE_DEDUCTION">Employee Deduction (Withheld from Gross Salary)</option>
+            <option value="EMPLOYER_CONTRIBUTION">Employer Contribution (Part of CTC, Excluded from Payslip)</option>
+            <option value="REIMBURSEMENT">Reimbursement</option>
+          </select>
+          <span class="input-hint text-amber" *ngIf="componentForm.category === 'EMPLOYER_CONTRIBUTION'">
+            🛡️ Finance Policy: Automatically configured with <strong>Show on Payslip = Off</strong>.
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description / Internal Purpose</label>
+          <textarea 
+            class="form-control" 
+            [(ngModel)]="componentForm.description" 
+            rows="2" 
+            placeholder="Explain calculation logic, statutory references, or internal guidelines..."
+          ></textarea>
+        </div>
+
+        <!-- Component Configuration Flags -->
+        <div class="form-group">
+          <label class="form-label">Configuration & Compliance Flags</label>
+          <div class="flags-card-grid">
+            <label class="flag-toggle-card" [class.checked]="componentForm.partOfCtc">
+              <input type="checkbox" [(ngModel)]="componentForm.partOfCtc">
+              <div class="flag-texts">
+                <span class="flag-title">Part of CTC</span>
+                <span class="flag-desc">Included in Cost to Company</span>
+              </div>
+            </label>
+
+            <label class="flag-toggle-card" [class.checked]="componentForm.showOnPayslip">
+              <input type="checkbox" [(ngModel)]="componentForm.showOnPayslip">
+              <div class="flag-texts">
+                <span class="flag-title">Show on Payslip</span>
+                <span class="flag-desc">{{ componentForm.category === 'EMPLOYER_CONTRIBUTION' ? 'Hidden (Company cost only)' : 'Visible on employee slip' }}</span>
+              </div>
+            </label>
+
+            <label class="flag-toggle-card" [class.checked]="componentForm.taxable">
+              <input type="checkbox" [(ngModel)]="componentForm.taxable">
+              <div class="flag-texts">
+                <span class="flag-title">Taxable</span>
+                <span class="flag-desc">Subject to income tax</span>
+              </div>
+            </label>
+
+            <label class="flag-toggle-card" [class.checked]="componentForm.reduceForLop">
+              <input type="checkbox" [(ngModel)]="componentForm.reduceForLop">
+              <div class="flag-texts">
+                <span class="flag-title">Reduce for LOP</span>
+                <span class="flag-desc">Pro-rated on unpaid leaves</span>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-outline-modern" (click)="closeComponentModal()">Cancel</button>
+        <button class="btn-primary" (click)="saveComponent()">
+          <svg lucideCheck [size]="15"></svg>
+          <span>Save Component</span>
         </button>
       </div>
     </div>
   </div>
-  
-  <div class="loading-state" *ngIf="isLoading">
-    <div class="spinner"></div>
-    <p>Loading settings...</p>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- MODAL: ADD / EDIT SALARY GROUP (W3) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div *ngIf="isGroupModalOpen()" class="modal-backdrop animate-fade">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg lucideLayers [size]="20" class="text-primary"></svg>
+          <h3>{{ groupForm.code ? 'Edit Structure: ' + groupForm.name + ' (New Version)' : 'Create New Salary Structure Group' }}</h3>
+        </div>
+        <button class="modal-close" (click)="closeGroupModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label class="form-label">
+              <span>Group Code</span>
+              <span class="required-star">*</span>
+            </label>
+            <input 
+              type="text" 
+              class="form-control font-mono" 
+              [class.input-error]="groupErrors().code"
+              [(ngModel)]="groupForm.code" 
+              (ngModelChange)="clearGroupError('code')"
+              placeholder="e.g. REGULAR_CUSTOM"
+            />
+            <span class="field-error-text" *ngIf="groupErrors().code">⚠️ {{ groupErrors().code }}</span>
+          </div>
+          <div class="form-group flex-2">
+            <label class="form-label">
+              <span>Display Name</span>
+              <span class="required-star">*</span>
+            </label>
+            <input 
+              type="text" 
+              class="form-control" 
+              [class.input-error]="groupErrors().name"
+              [(ngModel)]="groupForm.name" 
+              (ngModelChange)="clearGroupError('name')"
+              placeholder="e.g. Regular Staff Structure"
+            />
+            <span class="field-error-text" *ngIf="groupErrors().name">⚠️ {{ groupErrors().name }}</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label class="form-label">Payee Type</label>
+            <select class="form-control" [(ngModel)]="groupForm.payeeType">
+              <option value="EMPLOYEE">Regular Employee</option>
+              <option value="CONTRACTOR">Contractor / Consultant</option>
+              <option value="INTERN">Intern / Trainee</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label class="form-label">Effective From Date *</label>
+            <input type="date" class="form-control" [(ngModel)]="groupForm.effectiveFrom">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description & Applicability</label>
+          <input type="text" class="form-control" [(ngModel)]="groupForm.description" placeholder="Notes on applicable roles, designations, or wage limits...">
+        </div>
+
+        <!-- Formulas Table in Modal -->
+        <div class="modal-inner-section">
+          <div class="table-toolbar" style="padding: 0; margin-bottom: 8px;">
+            <div>
+              <h4 class="subhead-title">Component Formulas ({{ groupForm.lines?.length || 0 }})</h4>
+              <p class="subhead-desc">Configure order, calculation rules, formulas, and conditions</p>
+            </div>
+            <button class="btn-sm btn-outline-modern" (click)="addGroupLine()">
+              <svg lucidePlus [size]="14"></svg>
+              <span>+ Add Component Line</span>
+            </button>
+          </div>
+
+          <div class="table-container" style="max-height: 380px;">
+            <table class="modern-table">
+              <thead>
+                <tr>
+                  <th>Component</th>
+                  <th>Calc Type</th>
+                  <th>Formula / Rule</th>
+                  <th>Condition</th>
+                  <th style="text-align: center;">Override</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let line of groupForm.lines; let i = index">
+                  <td style="min-width: 170px;">
+                    <select class="form-control" [(ngModel)]="line.componentId">
+                      <option *ngFor="let c of components()" [ngValue]="c.id">
+                        {{ c.name }} ({{ c.code }})
+                      </option>
+                    </select>
+                  </td>
+                  <td style="min-width: 130px;">
+                    <select class="form-control" [(ngModel)]="line.calcType">
+                      <option value="FORMULA">FORMULA</option>
+                      <option value="FIXED">FIXED Amount</option>
+                      <option value="BALANCING">BALANCING (Gross)</option>
+                      <option value="STATUTORY">STATUTORY</option>
+                      <option value="INPUT">MONTHLY INPUT</option>
+                    </select>
+                  </td>
+                  <td style="min-width: 220px;">
+                    <input *ngIf="line.calcType === 'FORMULA'" type="text" class="form-control font-mono" [(ngModel)]="line.formula" placeholder="e.g. BASIC * 0.4">
+                    <input *ngIf="line.calcType === 'FIXED'" type="number" class="form-control" [(ngModel)]="line.amount" placeholder="Fixed ₹ amount">
+                    <span *ngIf="line.calcType === 'BALANCING'" class="text-xs text-muted">Auto-balances to remaining gross</span>
+                    <span *ngIf="line.calcType === 'STATUTORY'" class="text-xs text-muted">From statutory rates</span>
+                  </td>
+                  <td style="min-width: 140px;">
+                    <input type="text" class="form-control font-mono text-xs" [(ngModel)]="line.condition" placeholder="e.g. BASIC <= 21000">
+                  </td>
+                  <td style="text-align: center;">
+                    <input type="checkbox" [(ngModel)]="line.overrideAllowed" title="Allow HR to override amount on hire">
+                  </td>
+                  <td>
+                    <button class="btn-delete-row" (click)="removeGroupLine(i)">✕</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-outline-modern" (click)="closeGroupModal()">Cancel</button>
+        <button class="btn-primary" (click)="saveSalaryGroup()">Save Group Version</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- MODAL: EDIT STATUTORY RATE (W5) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div *ngIf="isStatutoryModalOpen()" class="modal-backdrop animate-fade">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg lucideShieldCheck [size]="20" class="text-primary"></svg>
+          <h3>Edit Statutory Rate — {{ statutoryForm.code }}</h3>
+        </div>
+        <button class="modal-close" (click)="closeStatutoryModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label class="form-label">Rate Code</label>
+            <input type="text" class="form-control font-mono" [value]="statutoryForm.code" disabled>
+          </div>
+          <div class="form-group flex-1">
+            <label class="form-label">Applicable State</label>
+            <input type="text" class="form-control" [value]="statutoryForm.stateCode || 'All India'" disabled>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label class="form-label">Percentage Rate (%)</label>
+            <input type="number" class="form-control" [(ngModel)]="statutoryForm.ratePct" step="0.25" placeholder="e.g. 12">
+          </div>
+          <div class="form-group flex-1">
+            <label class="form-label">Fixed Amount (₹)</label>
+            <input type="number" class="form-control" [(ngModel)]="statutoryForm.fixedAmount" placeholder="e.g. 13780 for floor">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label class="form-label">Wage Ceiling (₹)</label>
+            <input type="number" class="form-control" [(ngModel)]="statutoryForm.wageCeiling" placeholder="e.g. 15000 for PF">
+          </div>
+          <div class="form-group flex-1">
+            <label class="form-label">Eligibility Wage Limit (₹)</label>
+            <input type="number" class="form-control" [(ngModel)]="statutoryForm.eligibilityLimit" placeholder="e.g. 21000 for ESI">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Compliance & Legal Notes</label>
+          <textarea class="form-control" [(ngModel)]="statutoryForm.notes" rows="2" placeholder="Gazette notification, circular reference..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-outline-modern" (click)="closeStatutoryModal()">Cancel</button>
+        <button class="btn-primary" (click)="saveStatutoryRate()">Save Statutory Rate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- MODAL: EDIT TAX REGIME & SLABS (W4) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div *ngIf="isTaxRegimeModalOpen()" class="modal-backdrop animate-fade">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg lucideReceipt [size]="20" class="text-primary"></svg>
+          <h3>Edit Tax Regime & Slabs — {{ taxRegimeForm.name }}</h3>
+        </div>
+        <button class="modal-close" (click)="closeTaxRegimeModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label class="form-label">Standard Deduction (₹)</label>
+            <input type="number" class="form-control" [(ngModel)]="taxRegimeForm.standardDeduction" placeholder="e.g. 75000">
+          </div>
+          <div class="form-group flex-1">
+            <label class="form-label">Health & Education Cess (%)</label>
+            <input type="number" class="form-control" [(ngModel)]="taxRegimeForm.cessPct" step="0.5" placeholder="e.g. 4">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label class="form-label">Sec 87A Full Rebate Limit (₹)</label>
+            <input type="number" class="form-control" [(ngModel)]="taxRegimeForm.rebateIncomeLimit" placeholder="e.g. 1200000">
+          </div>
+          <div class="form-group flex-1">
+            <label class="form-label">Sec 87A Max Rebate Amount (₹)</label>
+            <input type="number" class="form-control" [(ngModel)]="taxRegimeForm.rebateMaxAmount" placeholder="e.g. 60000">
+          </div>
+        </div>
+
+        <!-- Slabs in Modal -->
+        <div class="modal-inner-section">
+          <div class="table-toolbar" style="padding: 0; margin-bottom: 8px;">
+            <div>
+              <h4 class="subhead-title">Income Tax Slabs ({{ taxRegimeForm.slabs?.length || 0 }})</h4>
+              <p class="subhead-desc">Slabs are evaluated progressively in ascending order</p>
+            </div>
+            <button class="btn-sm btn-outline-modern" (click)="addTaxSlab()">
+              <svg lucidePlus [size]="14"></svg>
+              <span>+ Add Slab</span>
+            </button>
+          </div>
+
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>From (₹)</th>
+                <th>Up to (₹, blank = no limit)</th>
+                <th>Tax Rate (%)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let slab of taxRegimeForm.slabs; let i = index">
+                <td>
+                  <input type="number" class="form-control font-mono" [(ngModel)]="slab.fromAmount">
+                </td>
+                <td>
+                  <input type="number" class="form-control font-mono" [(ngModel)]="slab.toAmount" placeholder="No limit">
+                </td>
+                <td>
+                  <input type="number" class="form-control font-mono" [(ngModel)]="slab.ratePct" step="1">
+                </td>
+                <td style="text-align: center;">
+                  <button class="btn-delete-row" (click)="removeTaxSlab(i)">✕</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-outline-modern" (click)="closeTaxRegimeModal()">Cancel</button>
+        <button class="btn-primary" (click)="saveTaxRegime()">Save Tax Regime & Slabs</button>
+      </div>
+    </div>
   </div>
 </div>

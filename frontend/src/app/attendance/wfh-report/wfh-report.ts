@@ -201,7 +201,7 @@ type StatusFilter = 'ALL' | 'APPROVED' | 'PENDING' | 'ASSIGNED' | 'REJECTED';
       <p>
         {{ data()?.people?.length
           ? 'No employees match your active search or status filter criteria.'
-          : 'When employees request Work From Home or HR assigns WFH days, they will appear here.' }}
+          : 'When HR or Superadmin assigns Work From Home days, they will appear here.' }}
       </p>
       <button *ngIf="hasActiveFilters()" type="button" class="btn-reset-filters" (click)="clearFilters()">
         Reset Filters

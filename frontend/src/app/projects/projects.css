@@ -7803,3 +7803,12 @@
 /* A subproject row, indented under its parent. Rendered inside the grid, so ::ng-deep. */
 .boards-grid-table ::ng-deep .board-title-sub { padding-left: 18px; color: #334155; }
 .boards-grid-table ::ng-deep .board-title-sub .sub-arrow { color: #94a3b8; margin-right: 6px; }
+
+/* Board cards: a subproject names its parent; a parent shows how many it holds. */
+.card-struct { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; margin: 2px 0 4px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+.card-struct.sub { background: #EEF2FF; color: #4338CA; }
+.card-struct.parent { background: #F0FDF4; color: #15803D; }
+/* List view tags, inside the grid. */
+.boards-grid-table ::ng-deep .struct-tag { margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; vertical-align: middle; }
+.boards-grid-table ::ng-deep .struct-tag.sub { background: #EEF2FF; color: #4338CA; }
+.boards-grid-table ::ng-deep .struct-tag.parent { background: #F0FDF4; color: #15803D; }

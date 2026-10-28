@@ -358,4 +358,176 @@ export class PayrollService {
   deleteExpenseClaim(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/expenses/${id}`);
   }
+
+  // ── Configurable Payroll Masters & Engine (Phase 1 & 2) ───────────────────
+
+  getPayrollComponents(): Observable<MasterComponent[]> {
+    return this.http.get<MasterComponent[]>(`${this.apiUrl}/masters/components`);
+  }
+
+  createPayrollComponent(data: any): Observable<MasterComponent> {
+    return this.http.post<MasterComponent>(`${this.apiUrl}/masters/components`, data);
+  }
+
+  updatePayrollComponent(id: number, data: any): Observable<MasterComponent> {
+    return this.http.put<MasterComponent>(`${this.apiUrl}/masters/components/${id}`, data);
+  }
+
+  deletePayrollComponent(id: number): Observable<{ success: boolean; message: string }> {
+    return this.http.delete<{ success: boolean; message: string }>(`${this.apiUrl}/masters/components/${id}`);
+  }
+
+  getPayrollSalaryGroups(includeRetired = false): Observable<MasterSalaryGroup[]> {
+    const qs = includeRetired ? '?includeRetired=true' : '';
+    return this.http.get<MasterSalaryGroup[]>(`${this.apiUrl}/masters/groups${qs}`);
+  }
+
+  getPayrollSalaryGroup(id: number): Observable<MasterSalaryGroup> {
+    return this.http.get<MasterSalaryGroup>(`${this.apiUrl}/masters/groups/${id}`);
+  }
+
+  savePayrollSalaryGroup(data: any): Observable<MasterSalaryGroup> {
+    return this.http.post<MasterSalaryGroup>(`${this.apiUrl}/masters/groups`, data);
+  }
+
+  getPayrollStatutoryRates(): Observable<MasterStatutoryRate[]> {
+    return this.http.get<MasterStatutoryRate[]>(`${this.apiUrl}/masters/statutory-rates`);
+  }
+
+  savePayrollStatutoryRate(data: any): Observable<MasterStatutoryRate> {
+    return this.http.post<MasterStatutoryRate>(`${this.apiUrl}/masters/statutory-rates`, data);
+  }
+
+  updatePayrollStatutoryRate(id: number, data: any): Observable<MasterStatutoryRate> {
+    return this.http.put<MasterStatutoryRate>(`${this.apiUrl}/masters/statutory-rates/${id}`, data);
+  }
+
+  getPayrollTaxRegimes(financialYear = '2026-27'): Observable<MasterTaxRegime[]> {
+    return this.http.get<MasterTaxRegime[]>(`${this.apiUrl}/masters/tax-regimes?financialYear=${financialYear}`);
+  }
+
+  updatePayrollTaxRegime(id: number, data: any): Observable<MasterTaxRegime> {
+    return this.http.put<MasterTaxRegime>(`${this.apiUrl}/masters/tax-regimes/${id}`, data);
+  }
+
+  validatePayrollFormula(formula: string): Observable<{ valid: boolean; sampleResult?: number; error?: string; variables?: string[] }> {
+    return this.http.post<any>(`${this.apiUrl}/masters/validate-formula`, { formula });
+  }
+
+  calculateSalary(params: {
+    annualCtc?: number;
+    monthlyCtc?: number;
+    groupId?: number;
+    groupCode?: string;
+    regimeCode?: 'NEW' | 'OLD';
+    financialYear?: string;
+    declarations?: { [key: string]: number };
+    overrides?: { [key: string]: number };
+  }): Observable<SalaryCalculationResult> {
+    return this.http.post<SalaryCalculationResult>(`${this.apiUrl}/masters/calculate`, params);
+  }
+
+  getPayrollAuditLog(limit = 100): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/masters/audit-log?limit=${limit}`);
+  }
+}
+
+export interface MasterComponent {
+  id: number;
+  code: string;
+  name: string;
+  category: 'EARNING' | 'EMPLOYEE_DEDUCTION' | 'EMPLOYER_CONTRIBUTION' | 'REIMBURSEMENT';
+  partOfCtc: boolean;
+  partOfGross: boolean;
+  taxable: boolean;
+  reduceForLop: boolean;
+  showOnPayslip: boolean;
+  showOnAnnexure: boolean;
+  displayOrder: number;
+  isSystem: boolean;
+  isActive: boolean;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface MasterSalaryGroupLine {
+  id?: number;
+  componentId: number;
+  component?: MasterComponent;
+  calcType: 'FIXED' | 'FORMULA' | 'STATUTORY' | 'BALANCING' | 'INPUT';
+  amount?: number | null;
+  formula?: string | null;
+  condition?: string | null;
+  overrideAllowed: boolean;
+  displayOrder: number;
+}
+
+export interface MasterSalaryGroup {
+  id: number;
+  code: string;
+  version: number;
+  name: string;
+  description?: string;
+  payeeType: 'EMPLOYEE' | 'CONSULTANT' | 'TRAINEE';
+  flatTdsPct?: number | null;
+  gstApplicable: boolean;
+  effectiveFrom: string;
+  retiredAt?: string | null;
+  isActive: boolean;
+  lines: MasterSalaryGroupLine[];
+}
+
+export interface MasterStatutoryRate {
+  id: number;
+  code: string;
+  stateCode?: string | null;
+  ratePct?: number | null;
+  wageCeiling?: number | null;
+  eligibilityLimit?: number | null;
+  fixedAmount?: number | null;
+  notes?: string;
+  effectiveFrom: string;
+}
+
+export interface MasterTaxRegime {
+  id: number;
+  code: 'NEW' | 'OLD';
+  financialYear: string;
+  name: string;
+  standardDeduction: number;
+  rebateIncomeLimit: number;
+  rebateMaxAmount: number;
+  cessPct: number;
+  isDefault: boolean;
+  slabs: { fromAmount: number; toAmount: number | null; ratePct: number }[];
+  sections: { code: string; name: string; maxLimit: number | null; proofRequired: boolean }[];
+}
+
+export interface SalaryCalculationResult {
+  ctcMonthly: number;
+  ctcAnnual: number;
+  grossMonthly: number;
+  grossAnnual: number;
+  totalEarningsMonthly: number;
+  totalEarningsAnnual: number;
+  totalDeductionsMonthly: number;
+  totalDeductionsAnnual: number;
+  totalEmployerContributionsMonthly: number;
+  totalEmployerContributionsAnnual: number;
+  netPayMonthly: number;
+  netPayAnnual: number;
+  lines: {
+    code: string;
+    name: string;
+    category: string;
+    monthly: number;
+    annual: number;
+    partOfCtc: boolean;
+    partOfGross: boolean;
+    showOnPayslip: boolean;
+    showOnAnnexure: boolean;
+  }[];
+  tax?: any;
+  warnings: string[];
 }

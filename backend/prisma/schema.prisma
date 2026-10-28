@@ -4995,3 +4995,217 @@ model IssueLocationActivity {
 
   @@index([issueLocationId, createdAt])
 }
+
+// ═══════════════════════════════════════════
+// PAYROLL ENGINE — CONFIGURABLE MASTERS (Phase 1, Task 1.1)
+// ═══════════════════════════════════════════
+// Replaces the rates and splits hardcoded in payroll.service.ts,
+// salary-template.ts and the offer-letter annexure. Built alongside the legacy
+// SalaryComponent / SalaryStructure tables, which stay in use until the new
+// engine's output is reconciled with Finance's workbook — nothing here is read
+// by the current payroll run. See docs/PAYROLL_EXECUTION_TRACKER.md.
+//
+// companyId is a plain indexed column (no relation), the same way Payslip
+// carries it, so these tables can be added without touching Company.
+
+/// A statutory rate (PF, ESI, PT, LWF) as it stood from a date, optionally for
+/// one state. A rate change is a new row with a later effectiveFrom, never an
+/// edit, so a past month always recomputes with the rate that applied then.
+model PayrollStatutoryRate {
+  id               Int       @id @default(autoincrement())
+  companyId        Int
+  /// PF_EMPLOYEE | PF_EMPLOYER | ESI_EMPLOYEE | ESI_EMPLOYER | PT | LWF_EMPLOYEE | LWF_EMPLOYER
+  code             String
+  /// Indian state code (e.g. "UP"); null = applies in every state.
+  stateCode        String?
+  ratePct          Float?
+  /// Wage the rate is applied to at most (PF: 15000). Null = uncapped.
+  wageCeiling      Float?
+  /// Wage at or below which the rate applies at all (ESI: 21000).
+  eligibilityLimit Float?
+  /// Flat monthly amount when the rule is not a percentage.
+  fixedAmount      Float?
+  /// Wage-band slabs for state taxes such as PT: [{ from, to, amount }].
+  slabs            Json?
+  notes            String?
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([companyId, code, stateCode, effectiveFrom])
+  @@index([companyId, code])
+}
+
+/// One line that can appear in a salary: an earning, an employee deduction,
+/// or an employer contribution. How much it comes to is decided by the salary
+/// group line that uses it; this row only says what kind of line it is and
+/// where it shows.
+model PayrollComponent {
+  id             Int                      @id @default(autoincrement())
+  companyId      Int
+  /// Stable identifier used in formulas (BASIC, HRA, EMPLOYER_PF ...). Upper snake case.
+  code           String
+  name           String
+  /// EARNING | EMPLOYEE_DEDUCTION | EMPLOYER_CONTRIBUTION | REIMBURSEMENT
+  category       String
+  /// Counts toward CTC. Earnings and employer contributions; not employee deductions.
+  partOfCtc      Boolean                  @default(true)
+  /// Counts toward gross pay (earnings only).
+  partOfGross    Boolean                  @default(true)
+  taxable        Boolean                  @default(true)
+  /// Pro-rated down for loss-of-pay days.
+  reduceForLop   Boolean                  @default(true)
+  /// Printed on the employee payslip. False for employer contributions —
+  /// Finance's rule: the employer's share is not shown on the salary slip.
+  showOnPayslip  Boolean                  @default(true)
+  /// Printed on the offer-letter annexure (employer share is shown there).
+  showOnAnnexure Boolean                  @default(true)
+  displayOrder   Int                      @default(0)
+  /// Seeded component the engine depends on; can be renamed, not deleted.
+  isSystem       Boolean                  @default(false)
+  isActive       Boolean                  @default(true)
+  description    String?
+  groupLines     PayrollSalaryGroupLine[]
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId, category])
+}
+
+/// A salary structure template (Regular – capped PF, Consultant, Trainee ...).
+/// Versioned: editing a group in use creates version n+1 and retires n, so a
+/// profile or offer pinned to version n keeps its exact rules.
+model PayrollSalaryGroup {
+  id            Int                      @id @default(autoincrement())
+  companyId     Int
+  code          String
+  version       Int                      @default(1)
+  name          String
+  description   String?
+  /// EMPLOYEE | CONSULTANT | TRAINEE — decides payslip vs payout statement and TDS section.
+  payeeType     String                   @default("EMPLOYEE")
+  /// Consultants: TDS % on the fee (194J technical 2%, other 10%). Null for employees.
+  flatTdsPct    Float?
+  /// Consultants: add GST on top of the fee when a GSTIN is on file.
+  gstApplicable Boolean                  @default(false)
+  effectiveFrom DateTime
+  /// Set when a newer version replaces this one.
+  retiredAt     DateTime?
+  isActive      Boolean                  @default(true)
+  lines         PayrollSalaryGroupLine[]
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  @@unique([companyId, code, version])
+  @@index([companyId, isActive])
+}
+
+/// How one component is worked out inside a salary group.
+///
+/// calcType:
+///   FIXED      — `amount` per month
+///   FORMULA    — `formula`, an expression over CTC_MONTHLY, GROSS and other
+///                component codes, e.g. "MAX(CTC_MONTHLY * 0.5, 13780)" or "BASIC * 0.4"
+///   STATUTORY  — taken from PayrollStatutoryRate for `statutoryCode`
+///   BALANCING  — whatever is left so earnings add up to gross exactly (one per group)
+///   INPUT      — entered per month (bonus, incentive); zero in the template
+model PayrollSalaryGroupLine {
+  id              Int                @id @default(autoincrement())
+  groupId         Int
+  group           PayrollSalaryGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  componentId     Int
+  component       PayrollComponent   @relation(fields: [componentId], references: [id], onDelete: Restrict)
+  calcType        String
+  amount          Float?
+  formula         String?
+  statutoryCode   String?
+  /// Expression that must be true for the line to apply, e.g. "GROSS <= 21000".
+  condition       String?
+  minAmount       Float?
+  maxAmount       Float?
+  /// HR may change this line on an individual offer (with a reason).
+  overrideAllowed Boolean            @default(false)
+  displayOrder    Int                @default(0)
+
+  @@unique([groupId, componentId])
+  @@index([componentId])
+}
+
+/// An income-tax regime for one financial year ("2026-27"). Slabs and
+/// deduction sections hang off it; next year's rules are a new row.
+model PayrollTaxRegime {
+  id                Int                 @id @default(autoincrement())
+  companyId         Int
+  /// NEW | OLD
+  code              String
+  financialYear     String
+  name              String
+  standardDeduction Float               @default(0)
+  /// Section 87A: taxable income up to this gets the rebate...
+  rebateIncomeLimit Float               @default(0)
+  /// ...of at most this much tax.
+  rebateMaxAmount   Float               @default(0)
+  cessPct           Float               @default(4)
+  /// [{ fromIncome, ratePct }] — surcharge bands on total income.
+  surcharge         Json?
+  /// Regime applied when an employee has not chosen one.
+  isDefault         Boolean             @default(false)
+  isActive          Boolean             @default(true)
+  slabs             PayrollTaxSlab[]
+  sections          PayrollTaxSection[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([companyId, code, financialYear])
+}
+
+model PayrollTaxSlab {
+  id         Int              @id @default(autoincrement())
+  regimeId   Int
+  regime     PayrollTaxRegime @relation(fields: [regimeId], references: [id], onDelete: Cascade)
+  fromAmount Float
+  /// Null = no upper bound (top slab).
+  toAmount   Float?
+  ratePct    Float
+  position   Int              @default(0)
+
+  @@index([regimeId])
+}
+
+/// A deduction an employee may declare under a regime (80C, 80D, HRA, 24(b) ...).
+model PayrollTaxSection {
+  id            Int              @id @default(autoincrement())
+  regimeId      Int
+  regime        PayrollTaxRegime @relation(fields: [regimeId], references: [id], onDelete: Cascade)
+  code          String
+  name          String
+  /// Annual cap; null = no cap / computed (e.g. HRA exemption).
+  maxLimit      Float?
+  proofRequired Boolean          @default(true)
+  isActive      Boolean          @default(true)
+  position      Int              @default(0)
+
+  @@unique([regimeId, code])
+}
+
+/// Who changed which payroll master, from what to what, and why.
+model PayrollAuditLog {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  /// Table touched, e.g. "PayrollStatutoryRate".
+  entity      String
+  entityId    Int
+  /// CREATE | UPDATE | RETIRE | DELETE
+  action      String
+  before      Json?
+  after       Json?
+  reason      String?
+  actorUserId Int?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, entity, entityId])
+  @@index([companyId, createdAt])
+}

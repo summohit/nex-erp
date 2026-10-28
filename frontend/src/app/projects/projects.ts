@@ -1078,9 +1078,17 @@ export class ProjectsComponent implements OnInit {
       flex: 1.5,
       minWidth: 150,
       // A subproject sits indented under its parent, marked with an arrow.
-      cellRenderer: (params: any) => params.data?.parentId
-        ? `<span class="board-title board-title-sub"><span class="sub-arrow">↳</span>${params.value || '—'}</span>`
-        : `<span class="board-title">${params.value || '—'}</span>`
+      cellRenderer: (params: any) => {
+        const name = params.value || '—';
+        if (params.data?.parentId) {
+          const parent = this.parentOf(params.data);
+          return `<span class="board-title board-title-sub"><span class="sub-arrow">↳</span>${name}<span class="struct-tag sub" title="Subproject of ${parent ? parent.key + ' — ' + parent.name : 'another project'}">Subproject</span></span>`;
+        }
+        const n = this.subprojectCount(params.data);
+        return n
+          ? `<span class="board-title">${name}<span class="struct-tag parent" title="${n} subproject${n === 1 ? '' : 's'}">Parent · ${n}</span></span>`
+          : `<span class="board-title">${name}</span>`;
+      }
     },
     {
       headerName: 'Members',
@@ -1554,6 +1562,8 @@ export class ProjectsComponent implements OnInit {
   /** §5: where the project sits in the closure process. */
   filterClosureStatus = signal<string>('ALL');
   filterPriority = signal<string>('ALL');
+  /** ALL, PARENT (has subprojects), SUB (is one), STANDALONE (neither), or "UNDER:<id>" for one parent's family. */
+  filterStructure = signal<string>('ALL');
   filterStartFrom = signal<string>('');
   filterDeadlineTo = signal<string>('');
 
@@ -1564,6 +1574,7 @@ export class ProjectsComponent implements OnInit {
   draftFilterStatus = signal<string>('ALL');
   draftFilterClosureStatus = signal<string>('ALL');
   draftFilterPriority = signal<string>('ALL');
+  draftFilterStructure = signal<string>('ALL');
   draftFilterStartFrom = signal<string>('');
   draftFilterDeadlineTo = signal<string>('');
 
@@ -1939,7 +1950,7 @@ export class ProjectsComponent implements OnInit {
     [
       this.filterClientId(), this.filterPmId(), this.filterDepartmentId(),
       this.filterCategory(), this.filterStatus(), this.filterPriority(),
-      this.filterClosureStatus()
+      this.filterClosureStatus(), this.filterStructure()
     ].filter(v => v !== 'ALL').length
     + (this.filterMemberIds().length ? 1 : 0)
     + (this.filterStartFrom() ? 1 : 0)
@@ -1955,6 +1966,7 @@ export class ProjectsComponent implements OnInit {
     this.filterStatus.set('ALL');
     this.filterClosureStatus.set('ALL');
     this.filterPriority.set('ALL');
+    this.filterStructure.set('ALL');
     this.filterStartFrom.set('');
     this.filterDeadlineTo.set('');
     this.resetProjectFilterDraft();
@@ -1968,6 +1980,7 @@ export class ProjectsComponent implements OnInit {
     this.draftFilterStatus.set(this.filterStatus());
     this.draftFilterClosureStatus.set(this.filterClosureStatus());
     this.draftFilterPriority.set(this.filterPriority());
+    this.draftFilterStructure.set(this.filterStructure());
     this.draftFilterStartFrom.set(this.filterStartFrom());
     this.draftFilterDeadlineTo.set(this.filterDeadlineTo());
     this.filtersOpen.set(true);
@@ -1985,6 +1998,7 @@ export class ProjectsComponent implements OnInit {
     this.draftFilterStatus.set('ALL');
     this.draftFilterClosureStatus.set('ALL');
     this.draftFilterPriority.set('ALL');
+    this.draftFilterStructure.set('ALL');
     this.draftFilterStartFrom.set('');
     this.draftFilterDeadlineTo.set('');
   }
@@ -1997,9 +2011,31 @@ export class ProjectsComponent implements OnInit {
     this.filterStatus.set(this.draftFilterStatus());
     this.filterClosureStatus.set(this.draftFilterClosureStatus());
     this.filterPriority.set(this.draftFilterPriority());
+    this.filterStructure.set(this.draftFilterStructure());
     this.filterStartFrom.set(this.draftFilterStartFrom());
     this.filterDeadlineTo.set(this.draftFilterDeadlineTo());
     this.filtersOpen.set(false);
+  }
+
+  /** Ids of projects that have at least one subproject. */
+  parentProjectIds = computed(() => new Set(this.myProjects().filter((p: any) => p.parentId).map((p: any) => p.parentId)));
+
+  /** Parent projects, for the Structure filter's "Under …" options. */
+  parentProjectOptions = computed(() => {
+    const ids = this.parentProjectIds();
+    return this.myProjects().filter((p: any) => ids.has(p.id))
+      .sort((a: any, b: any) => String(a.key).localeCompare(String(b.key)));
+  });
+
+  /** A subproject's parent, when it is in this person's list. */
+  parentOf(p: any): any | null {
+    if (!p?.parentId) return null;
+    return this.myProjects().find((x: any) => x.id === p.parentId) ?? null;
+  }
+
+  /** How many subprojects this person can see under a project. */
+  subprojectCount(p: any): number {
+    return this.myProjects().filter((x: any) => x.parentId === p.id).length;
   }
 
   private applyProjectFilters(list: any[]): any[] {
@@ -2014,7 +2050,16 @@ export class ProjectsComponent implements OnInit {
     const deadlineTo = this.filterDeadlineTo();
 
     const memberIds = this.filterMemberIds();
+    const structure = this.filterStructure();
+    const parentIds = this.parentProjectIds();
     return list.filter(p => {
+      if (structure === 'PARENT' && !parentIds.has(p.id)) return false;
+      if (structure === 'SUB' && !p.parentId) return false;
+      if (structure === 'STANDALONE' && (p.parentId || parentIds.has(p.id))) return false;
+      if (structure.startsWith('UNDER:')) {
+        const id = Number(structure.slice(6));
+        if (p.id !== id && p.parentId !== id) return false;
+      }
       if (memberIds.length && !(p.members || []).some((m: any) => memberIds.includes(m.employeeId))) return false;
       if (client !== 'ALL' && String(p.client?.id ?? '') !== client) return false;
       if (dept !== 'ALL' && String(p.department?.id ?? '') !== dept) return false;
