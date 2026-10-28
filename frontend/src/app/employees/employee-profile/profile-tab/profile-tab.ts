@@ -9,7 +9,7 @@ import {
   LucideCreditCard, LucideUser, LucideShieldCheck, LucideGraduationCap,
   LucidePlane, LucideUsers, LucideSettings, LucideEdit2, LucidePaperclip, LucideMapPin,
   LucideUploadCloud, LucideFileText, LucideCheckCircle2, LucideMail,
-  LucideBriefcase, LucideCalendar, LucideClock
+  LucideBriefcase, LucideCalendar, LucideClock, LucideCircleHelp, LucideImage
 } from '@lucide/angular';
 import { EmployeeService, Employee } from '../../../services/employee.service';
 import { MasterDataService, Branch, Department, Designation } from '../../../services/master-data.service';
@@ -75,7 +75,9 @@ export interface ProfileFormErrors {
     LucideMail,
     LucideBriefcase,
     LucideCalendar,
-    LucideClock
+    LucideClock,
+    LucideCircleHelp,
+    LucideImage
   ],
   templateUrl: './profile-tab.html',
   styleUrls: ['./profile-tab.css']
@@ -663,7 +665,7 @@ export class ProfileTabComponent implements OnInit {
   }
 
   handleAvatarUpload(event: any) {
-    if (!this.isOwner) return;
+    if (!this.canEditPersonalDetails) return;
     const file = event.target.files[0];
     if (!file) return;
     // Upload the file and keep only its URL. A data: URL saved here lands in
@@ -675,6 +677,10 @@ export class ProfileTabComponent implements OnInit {
       next: (res) => {
         this.isUploadingAvatar = false;
         this.formData.avatarUrl = res.url;
+        // Photos are an independent asset. Persist immediately so a user does
+        // not lose a newly uploaded photo by navigating away without saving
+        // unrelated profile fields.
+        this.saveAvatarUrl(res.url, 'Profile photo updated');
       },
       error: (err: any) => {
         this.isUploadingAvatar = false;
@@ -685,6 +691,43 @@ export class ProfileTabComponent implements OnInit {
   }
 
   isUploadingAvatar = false;
+  isSavingAvatar = false;
+
+  private saveAvatarUrl(avatarUrl: string, successMessage: string) {
+    if (!this.employeeData?.id) return;
+    this.isSavingAvatar = true;
+    this.employeeService.updateProfile(this.employeeData.id, { avatarUrl }).subscribe({
+      next: () => {
+        this.isSavingAvatar = false;
+        this.toast.success(successMessage);
+        this.refreshProfile.emit();
+      },
+      error: (err: any) => {
+        this.isSavingAvatar = false;
+        this.toast.error(err?.error?.message || 'Could not save the profile photo');
+      },
+    });
+  }
+
+  downloadAvatar() {
+    const url = this.formData.avatarUrl;
+    if (!url) return;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${this.formData.firstName || 'employee'}-${this.formData.lastName || 'photo'}-profile-photo`;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  removeAvatar() {
+    if (!this.canEditPersonalDetails || !this.formData.avatarUrl || this.isSavingAvatar) return;
+    if (!window.confirm('Remove this profile photo?')) return;
+    this.formData.avatarUrl = '';
+    this.saveAvatarUrl('', 'Profile photo removed');
+  }
 
   isSaving = false;
 

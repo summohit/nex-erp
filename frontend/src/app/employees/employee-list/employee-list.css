@@ -58,6 +58,66 @@
   box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.1);
 }
 
+.employee-search-dropdown {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 320px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  padding: 4px;
+}
+
+.employee-search-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #0f172a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.employee-search-option:hover,
+.employee-search-option:focus-visible {
+  background: #eff6ff;
+  outline: none;
+}
+
+.employee-search-avatar {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.employee-search-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.employee-search-details { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.employee-search-name { font-size: 13px; font-weight: 650; }
+.employee-search-meta { font-size: 11.5px; color: #64748b; }
+
 .filter-card {
   display: flex;
   flex-wrap: wrap;
@@ -470,8 +530,59 @@
 .grid-container {
   height: 650px;
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
+}
+
+/* The grid is sized to its container, so the horizontal rail is redundant. */
+:host ::ng-deep .grid-container .ag-body-horizontal-scroll,
+:host ::ng-deep .grid-container .ag-body-horizontal-scroll-viewport {
+  display: none !important;
+}
+
+/* Keep the directory readable at every width: long department and designation
+   values wrap in their cells while the grid retains its native horizontal
+   scroll for the remaining columns. */
+.grid-container .ag-cell.ag-cell-wrap-text {
+  display: flex;
+  align-items: center;
+  line-height: 18px !important;
+  white-space: normal !important;
+}
+
+.grid-container .ag-header-cell-label {
+  min-width: 0;
+}
+
+.grid-container .ag-cell {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.grid-container .ag-cell-value {
+  max-width: 100%;
+}
+
+/* Separated employees remain in the directory for audit purposes, but are
+   deliberately muted so they are immediately distinguishable from live staff. */
+:host ::ng-deep .grid-container .ag-row.offboarded-employee-row .ag-cell {
+  background: #f3f4f6 !important;
+  color: #64748b;
+}
+
+:host ::ng-deep .grid-container .ag-row.offboarded-employee-row:hover .ag-cell {
+  background: #e9edf2 !important;
+}
+
+/* Deactivated accounts are retained for administration, but use the same
+   neutral treatment so they cannot be mistaken for active colleagues. */
+:host ::ng-deep .grid-container .ag-row.deactivated-employee-row .ag-cell {
+  background: #f3f4f6 !important;
+  color: #64748b;
+}
+
+:host ::ng-deep .grid-container .ag-row.deactivated-employee-row:hover .ag-cell {
+  background: #e9edf2 !important;
 }
 
 

@@ -51,6 +51,8 @@ export interface JobApplication {
   updatedAt: string;
   job?: {
     title: string;
+    recruiterId?: number | null;
+    recruiter?: { id: number; firstName: string; lastName: string; avatarUrl?: string | null } | null;
     descriptionHtml?: string;
     department?: { name: string };
     designation?: { name: string };
@@ -58,6 +60,7 @@ export interface JobApplication {
     minSalary?: number;
     maxSalary?: number;
   };
+  offerLetter?: { status: string } | null;
   followUps?: CandidateFollowUp[];
 }
 

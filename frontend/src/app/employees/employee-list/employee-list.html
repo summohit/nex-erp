@@ -35,15 +35,24 @@
 
   <div class="filter-card">
     <div class="filter-group search-group">
-      <button class="cmd-k-btn" (click)="openSearchModal()">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <svg lucideSearch size="16" class="search-icon"></svg>
-          <span style="color: #64748B;">Search employees...</span>
-        </div>
-        <div class="cmd-k-badge">
-          <span class="cmd-key">⌘</span><span class="cmd-key">K</span>
-        </div>
-      </button>
+      <svg lucideSearch size="16" class="search-icon"></svg>
+      <input #directorySearch type="search" [ngModel]="searchText"
+        (ngModelChange)="onDirectorySearch($event)" (focus)="inlineSearchOpen = true"
+        (blur)="inlineSearchOpen = false" autocomplete="off"
+        placeholder="Search employees..." aria-label="Search employees">
+      <div class="employee-search-dropdown" *ngIf="inlineSearchOpen && directorySearchSuggestions().length">
+        <button type="button" class="employee-search-option" *ngFor="let employee of directorySearchSuggestions()"
+          (mousedown)="$event.preventDefault()" (click)="selectDirectorySuggestion(employee)">
+          <span class="employee-search-avatar">
+            <img *ngIf="employee.avatarUrl || employee.user?.avatarUrl" [src]="employee.avatarUrl || employee.user?.avatarUrl" alt="">
+            <span *ngIf="!(employee.avatarUrl || employee.user?.avatarUrl)">{{ getEmployeeInitials(employee) }}</span>
+          </span>
+          <span class="employee-search-details">
+            <span class="employee-search-name">{{ employee.firstName }} {{ employee.lastName }}</span>
+            <span class="employee-search-meta">{{ employee.department?.name || 'Unassigned' }} · {{ employee.designation?.name || employee.employeeCode || 'Employee' }}</span>
+          </span>
+        </button>
+      </div>
     </div>
     
     <div class="filter-group">
@@ -82,7 +91,16 @@
       </app-searchable-select>
     </div>
 
-    <button class="btn-clear-filters" (click)="clearFilters()" *ngIf="searchText || filterDepartmentId || filterDesignationId || filterRole || filterOnboardingStatus">
+    <div class="filter-group">
+      <app-searchable-select
+        [options]="offboardingStatusOptions"
+        placeholder="All Offboarding Statuses"
+        [value]="filterOffboardingStatus"
+        (valueChange)="filterOffboardingStatus = $event; applyFilters()">
+      </app-searchable-select>
+    </div>
+
+    <button class="btn-clear-filters" (click)="clearFilters()" *ngIf="searchText || filterDepartmentId || filterDesignationId || filterRole || filterOnboardingStatus || filterOffboardingStatus">
       <svg lucideX size="14"></svg> Clear filters
     </button>
   </div>
@@ -211,52 +229,3 @@
   (saveSuccess)="onSaveSuccess()">
 </app-employee-drawer>
 
-<!-- Command-K Search Modal -->
-<div class="cmd-k-overlay" *ngIf="isSearchModalOpen()" (click)="closeSearchModal()">
-  <div class="cmd-k-modal" (click)="$event.stopPropagation()">
-    <div class="cmd-k-header">
-      <svg lucideSearch size="20" class="cmd-k-search-icon"></svg>
-      <input type="text" class="cmd-k-input" placeholder="Search employees by name, department, or role..." [ngModel]="modalSearchQuery()" (ngModelChange)="modalSearchQuery.set($event)" autofocus>
-      <button class="cmd-k-close" (click)="closeSearchModal()">Esc</button>
-    </div>
-    <div class="cmd-k-body">
-      <div class="cmd-k-empty" *ngIf="filteredModalEmployees().length === 0">
-        <div *ngIf="!modalSearchQuery()">Type to start searching...</div>
-        <div *ngIf="modalSearchQuery()">No employees found matching "{{ modalSearchQuery() }}"</div>
-      </div>
-      <div class="cmd-k-list" *ngIf="filteredModalEmployees().length > 0">
-        <div class="cmd-k-item" *ngFor="let emp of filteredModalEmployees()" (click)="selectModalEmployee(emp)">
-          <div class="cmd-k-avatar">
-            <img *ngIf="emp.avatarUrl || emp.user?.avatarUrl" [src]="emp.avatarUrl || emp.user?.avatarUrl" alt="Avatar">
-            <div *ngIf="!(emp.avatarUrl || emp.user?.avatarUrl)" class="cmd-k-avatar-circle">
-              {{ emp.firstName ? emp.firstName.charAt(0) : '' }}{{ emp.lastName ? emp.lastName.charAt(0) : '' }}
-            </div>
-          </div>
-          <div class="cmd-k-details">
-            <div class="cmd-k-name">{{ emp.firstName }} {{ emp.lastName }}
-              <span *ngIf="emp.isProjectManager" style="background: #EDE9FE; color: #6D28D9; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; border: 1px solid #DDD6FE; margin-left: 6px;">PM</span>
-            </div>
-            <div class="cmd-k-subtext">{{ emp.department?.name || 'General' }} &bull; {{ emp.designation?.name || 'Staff' }}</div>
-          </div>
-          <!-- Same actions as the grid row menu. stopPropagation stops a button
-               click from also firing the row's own select handler. -->
-          <div class="cmd-k-actions" *ngIf="isAdmin()" (click)="$event.stopPropagation()">
-            <button type="button" class="cmd-k-action" (click)="viewProfile(emp)">View Profile</button>
-            <button type="button" class="cmd-k-action" (click)="editFromSearch(emp)">Edit</button>
-            <button type="button" class="cmd-k-action tone-primary"
-                    *ngIf="emp.user?.email && emp.user?.status === 'PENDING'"
-                    (click)="resendVerification(emp)">Resend Verification</button>
-            <button type="button" class="cmd-k-action"
-                    [class.tone-danger]="emp.user?.status !== 'SUSPENDED'"
-                    [class.tone-primary]="emp.user?.status === 'SUSPENDED'"
-                    (click)="deleteEmployee(emp)">
-              {{ emp.user?.status === 'SUSPENDED' ? 'Activate' : 'Deactivate' }}
-            </button>
-          </div>
-
-          <svg lucideChevronRight size="16" class="cmd-k-arrow" *ngIf="!isAdmin()"></svg>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>

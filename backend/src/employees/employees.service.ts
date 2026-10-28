@@ -64,7 +64,20 @@ export class EmployeesService {
         designation: { select: { name: true } },
         branch: { select: { name: true } },
         shift: { select: { id: true, name: true, startTime: true, endTime: true } },
-        documents: true
+        documents: true,
+        // The directory only needs the latest exit request to show the
+        // offboarding milestone and link into its full history.
+        resignations: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            intendedLastWorkingDay: true,
+            approvedLastWorkingDay: true,
+            createdAt: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' }
     });

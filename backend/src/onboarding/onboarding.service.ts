@@ -162,11 +162,8 @@ export class OnboardingService {
     if (newStatus !== employee.onboardingStatus) {
       await this.setOnboardingStatus(companyId, employee.id, newStatus);
 
-      if (newStatus === 'COMPLETED' && employee.user?.email) {
-        this.mailService.sendOnboardingCompletedEmail(
-          employee.user.email,
-          `${employee.firstName} ${employee.lastName}`
-        ).catch(e => console.error('Failed to send onboarding complete email:', e));
+      if (newStatus === 'COMPLETED') {
+        void this.notifyOnboardingCompleted(companyId, employee.id);
       }
     }
 
@@ -212,11 +209,8 @@ export class OnboardingService {
     if (newStatus !== task.employee.onboardingStatus) {
       await this.setOnboardingStatus(companyId, task.employeeId, newStatus);
 
-      if (newStatus === 'COMPLETED' && task.employee.user?.email) {
-        this.mailService.sendOnboardingCompletedEmail(
-          task.employee.user.email,
-          `${task.employee.firstName} ${task.employee.lastName}`
-        ).catch(e => console.error('Failed to send onboarding complete email:', e));
+      if (newStatus === 'COMPLETED') {
+        void this.notifyOnboardingCompleted(companyId, task.employeeId);
       }
     }
 
@@ -241,6 +235,55 @@ export class OnboardingService {
       await tx.employee.update({ where: { id: employeeId, companyId }, data: { onboardingStatus: status } });
       if (status === 'COMPLETED') await closeFilledJobs(tx, companyId);
     });
+  }
+
+  /** Notify both the new colleague and their reporting manager after onboarding completes. */
+  private async notifyOnboardingCompleted(companyId: number, employeeId: number) {
+    try {
+      const employee = await this.prisma.employee.findFirst({
+        where: { id: employeeId, companyId },
+        include: {
+          user: true,
+          department: { select: { name: true } },
+          designation: { select: { name: true } },
+          branch: { select: { name: true } },
+          manager: { include: { user: true } },
+        },
+      });
+      if (!employee) return;
+
+      const employeeName = `${employee.firstName} ${employee.lastName}`.trim();
+      const notifications: Promise<unknown>[] = [];
+
+      if (employee.user?.email) {
+        notifications.push(
+          this.mailService.sendOnboardingCompletedEmail(employee.user.email, employeeName),
+        );
+      }
+
+      const managerEmail = employee.manager?.user?.email;
+      if (managerEmail && managerEmail.toLowerCase() !== employee.user?.email?.toLowerCase()) {
+        const managerName = `${employee.manager?.firstName || ''} ${employee.manager?.lastName || ''}`.trim();
+        notifications.push(
+          this.mailService.sendManagerOnboardingCompletedEmail({
+            managerEmail,
+            managerName,
+            employeeName,
+            employeeCode: employee.employeeCode,
+            designation: employee.designation?.name,
+            department: employee.department?.name,
+            joiningDate: employee.joiningDate,
+            workLocation: employee.workLocation || employee.branch?.name,
+            employeeEmail: employee.user?.email,
+          }),
+        );
+      }
+
+      await Promise.allSettled(notifications);
+    } catch (error) {
+      // Email delivery must never prevent an onboarding action from succeeding.
+      console.error('Failed to send onboarding completion notifications:', error);
+    }
   }
 
   async getCompanyPipelineSummary(companyId: number) {

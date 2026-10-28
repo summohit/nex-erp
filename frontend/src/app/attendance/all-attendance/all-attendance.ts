@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed, inject, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -77,7 +77,7 @@ interface WorkLocationBreakdown {
   templateUrl: './all-attendance.html',
   styleUrls: ['./all-attendance.css']
 })
-export class AllAttendanceComponent implements OnInit {
+export class AllAttendanceComponent implements OnInit, OnDestroy {
   private attendanceService = inject(AttendanceService);
   private masterDataService = inject(MasterDataService);
   private employeeService = inject(EmployeeService);
@@ -105,6 +105,8 @@ export class AllAttendanceComponent implements OnInit {
     status: string;
     logs: any[];
     durationStr: string;
+    durationLogs: any[];
+    durationRecord: AttendanceRecord | undefined;
     isToday: boolean;
     /** Nobody clocked out — the 23:00 sweep closed the day. */
     autoClockedOut: boolean;
@@ -121,6 +123,9 @@ export class AllAttendanceComponent implements OnInit {
     } | null;
   } | null>(null);
   isDetailsModalOpen = signal(false);
+  /** Refreshes active-session durations while the day-detail modal stays open. */
+  private activeDurationTick: ReturnType<typeof setInterval> | null = null;
+  activeDurationNow = signal(Date.now());
   /** Floating tooltip state positioned dynamically to avoid table overflow clipping. */
   hoveredTooltip = signal<{
     day: DayMatrixStatus;
@@ -314,6 +319,10 @@ export class AllAttendanceComponent implements OnInit {
     this.load();
   }
 
+  ngOnDestroy() {
+    if (this.activeDurationTick) clearInterval(this.activeDurationTick);
+  }
+
   /** Opens the employee-by-employee ranking without changing this matrix view. */
   openAttendanceList(): void {
     this.router.navigate(['/attendance/list']);
@@ -495,6 +504,16 @@ export class AllAttendanceComponent implements OnInit {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  /** Calendar key in the attendance system's single source of truth: IST. */
+  private getIstDateString(value: Date | string): string {
+    const date = new Date(value);
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(date);
+    const part = (type: string) => parts.find((item) => item.type === type)?.value || '';
+    return `${part('year')}-${part('month')}-${part('day')}`;
   }
 
   // Days in month calculation for the grid header
@@ -739,8 +758,13 @@ export class AllAttendanceComponent implements OnInit {
             status = 'Present';
           }
 
-          const inTime = this.formatTime(record.clockIn);
-          const outTime = record.clockOut ? this.formatTime(record.clockOut) : '...';
+          // The attendance row is the payroll source, while logs are the
+          // punch timeline source.  Some legacy rows use different timestamp
+          // serialisation for those two shapes, so use the timeline values in
+          // the hover card just as the detail modal does.
+          const timeline = this.tooltipTimeline(record);
+          const inTime = this.formatTime(timeline.clockIn);
+          const outTime = timeline.clockOut ? this.formatTime(timeline.clockOut) : '...';
           tooltip = `In: ${inTime} · Out: ${outTime}`;
           if (holiday) tooltip = `Worked on holiday (${holiday.name || 'Holiday'}) · ${tooltip}`;
           if (record.clockOutReason) {
@@ -1786,13 +1810,48 @@ export class AllAttendanceComponent implements OnInit {
 
   formatTime(value: string | null): string {
     if (!value) return '—';
-    return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const date = this.attendanceInstant(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    // Attendance timestamps are persisted as UTC.  Always render them in IST,
+    // rather than inheriting the browser/host time zone, so the matrix hover
+    // agrees with the session modal and all other attendance screens.
+    return date.toLocaleTimeString('en-IN', {
+      timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true,
+    });
+  }
+
+  /**
+   * API responses can contain legacy wall-clock timestamps with no UTC suffix.
+   * Those values are attendance times in IST, not browser-local/UTC times.
+   * Parse them explicitly so both the displayed punch and elapsed duration use
+   * exactly the same instant.
+   */
+  private attendanceInstant(value: string | Date): Date {
+    if (value instanceof Date) return value;
+    const raw = String(value || '').trim();
+    if (!raw) return new Date(NaN);
+    if (/([zZ]|[+-]\d\d:\d\d)$/.test(raw)) return new Date(raw);
+    const iso = raw.replace(' ', 'T');
+    return new Date(`${iso}+05:30`);
+  }
+
+  /**
+   * The hover card should echo the session modal: first punch in and last
+   * punch out.  Fall back to the attendance row for records without logs.
+   */
+  tooltipTimeline(record: AttendanceRecord): { clockIn: string | null; clockOut: string | null } {
+    const logs = Array.isArray(record.logs) ? record.logs.filter((log: any) => log?.clockIn) : [];
+    if (!logs.length) return { clockIn: record.clockIn, clockOut: record.clockOut };
+    return {
+      clockIn: logs[0].clockIn ?? record.clockIn,
+      clockOut: logs[logs.length - 1].clockOut ?? record.clockOut,
+    };
   }
 
   getDurationMinutes(inTime: string | null, outTime: string | null): number {
     if (!inTime || !outTime) return 0;
-    const start = new Date(inTime).getTime();
-    const end = new Date(outTime).getTime();
+    const start = this.attendanceInstant(inTime).getTime();
+    const end = this.attendanceInstant(outTime).getTime();
     return Math.max(0, Math.floor((end - start) / 60000));
   }
 
@@ -1804,6 +1863,33 @@ export class AllAttendanceComponent implements OnInit {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     return { text: `${h}h ${m}m`, isOngoing: false };
+  }
+
+  private durationForSessions(logs: any[], nowMs = Date.now()): { minutes: number; active: boolean } {
+    let minutes = 0;
+    let active = false;
+    for (const log of logs || []) {
+      if (!log?.clockIn) continue;
+      const start = this.attendanceInstant(log.clockIn).getTime();
+      const end = log.clockOut ? this.attendanceInstant(log.clockOut).getTime() : nowMs;
+      if (Number.isFinite(start) && end > start) minutes += Math.floor((end - start) / 60_000);
+      if (!log.clockOut) active = true;
+    }
+    return { minutes, active };
+  }
+
+  /**
+   * The Attendance row is the daily source of truth.  Logs are a session
+   * timeline and may contain legacy values from before a regularisation.  Use
+   * the row for the day total so every screen agrees with the modal.
+   */
+  private durationForAttendance(record: AttendanceRecord | undefined, logs: any[], nowMs = Date.now()): { minutes: number; active: boolean } {
+    if (record?.clockIn) {
+      const start = this.attendanceInstant(record.clockIn).getTime();
+      const end = record.clockOut ? this.attendanceInstant(record.clockOut).getTime() : nowMs;
+      return { minutes: Number.isFinite(start) && end > start ? Math.floor((end - start) / 60_000) : 0, active: !record.clockOut };
+    }
+    return this.durationForSessions(logs, nowMs);
   }
 
   exportToCsv() {
@@ -1867,24 +1953,26 @@ export class AllAttendanceComponent implements OnInit {
         }];
       }
 
-      if (record.clockIn && record.clockOut) {
-        const diffMs = new Date(record.clockOut).getTime() - new Date(record.clockIn).getTime();
-        const hours = Math.floor(diffMs / (1000 * 60 * 60));
-        const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const sessionDuration = this.durationForAttendance(record, logs);
+      if (logs.length && !sessionDuration.active) {
+        const hours = Math.floor(sessionDuration.minutes / 60);
+        const mins = sessionDuration.minutes % 60;
         // The clock-out is a cutoff, not a departure, so the span it closes is
         // not time anyone stood behind. Say "up to" rather than assert it.
         durationStr = record.autoClockedOut
           ? `up to ${hours} hrs ${mins} mins`
           : `${hours} hrs ${mins} mins`;
-      } else if (record.clockIn) {
+      } else if (logs.length) {
         // An open session is only "active" if it's today; a past day with no
         // clock-out means the person never clocked out (imported/historical).
-        const dayStr = this.getLocalDateString(new Date(day.date));
-        const todayStr = this.getLocalDateString(new Date());
+        // The record date is stored at IST midnight, which is the previous
+        // UTC day. Comparing browser-local dates incorrectly treated an open
+        // 27 Oct IST session as historical and froze its duration.
+        const dayStr = this.getIstDateString(day.date);
+        const todayStr = this.getIstDateString(new Date());
         if (dayStr === todayStr) {
-          const diffMs = new Date().getTime() - new Date(record.clockIn).getTime();
-          const hours = Math.floor(diffMs / (1000 * 60 * 60));
-          const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          const hours = Math.floor(sessionDuration.minutes / 60);
+          const mins = sessionDuration.minutes % 60;
           durationStr = `${hours} hrs ${mins} mins (Active)`;
         } else {
           durationStr = 'Did not clock out';
@@ -1903,13 +1991,27 @@ export class AllAttendanceComponent implements OnInit {
       status: day.status,
       logs,
       durationStr,
-      isToday: this.getLocalDateString(new Date(day.date)) === this.getLocalDateString(new Date()),
+      durationLogs: logs,
+      durationRecord: record,
+      isToday: this.getIstDateString(day.date) === this.getIstDateString(new Date()),
       autoClockedOut: !!record?.autoClockedOut,
       missedClockOutReason: record?.clockOutReason ?? null,
       outsideOffice: this.outsideOfficeNote(record)
     });
 
     this.isDetailsModalOpen.set(true);
+    if (this.activeDurationTick) clearInterval(this.activeDurationTick);
+    this.activeDurationTick = setInterval(() => this.activeDurationNow.set(Date.now()), 60_000);
+  }
+
+  displayedDuration(details: any): string {
+    // Read the signal so Angular recalculates this label every minute for an
+    // open session instead of freezing the duration from when the modal opened.
+    this.activeDurationNow();
+    if (!details?.isToday) return details?.durationStr || '—';
+    const duration = this.durationForAttendance(details.durationRecord, details.durationLogs || []);
+    if (!duration.active) return details?.durationStr || '—';
+    return `${Math.floor(duration.minutes / 60)} hrs ${duration.minutes % 60} mins (Active)`;
   }
 
   private outsideOfficeNote(record: any): NonNullable<ReturnType<typeof this.selectedDayDetails>>['outsideOffice'] {
@@ -1927,6 +2029,10 @@ export class AllAttendanceComponent implements OnInit {
   closeDayDetailsModal() {
     this.isDetailsModalOpen.set(false);
     this.selectedDayDetails.set(null);
+    if (this.activeDurationTick) {
+      clearInterval(this.activeDurationTick);
+      this.activeDurationTick = null;
+    }
   }
 
   openDetail(record: AttendanceRecord) {

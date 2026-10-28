@@ -1,5 +1,5 @@
 import { lockJobCapacity, closeFilledJobs } from './job-capacity';
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { PayrollSettingsService } from '../payroll/payroll-settings.service';
@@ -192,7 +192,8 @@ export class ApplicationsService {
             department: { select: { name: true } },
             designation: { select: { name: true } }
           }
-        }
+        },
+        offerLetter: { select: { status: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -216,7 +217,8 @@ export class ApplicationsService {
             designation: { select: { name: true } },
             branch: { select: { name: true, address: true } }
           }
-        }
+        },
+        offerLetter: { select: { status: true } },
       },
     });
 
@@ -246,6 +248,18 @@ export class ApplicationsService {
     if (Array.isArray(parsed)) return JSON.stringify({ answers: parsed, __candidateFollowUps: followUps });
     if (parsed && typeof parsed === 'object') return JSON.stringify({ ...parsed, __candidateFollowUps: followUps });
     return JSON.stringify({ answers: parsed, __candidateFollowUps: followUps });
+  }
+
+  /** Extra interview scheduling fields live with the application's other
+   * compatibility metadata, preserving existing answers without a schema migration. */
+  private async saveInterviewScheduleMeta(applicationId: number, answers: string | null | undefined, interviewId: number, meta: Record<string, any>) {
+    let parsed: any;
+    try { parsed = answers ? JSON.parse(answers) : {}; } catch { parsed = {}; }
+    const base = Array.isArray(parsed) ? { answers: parsed } : (parsed && typeof parsed === 'object' ? parsed : { answers: parsed });
+    await this.prisma.jobApplication.update({
+      where: { id: applicationId },
+      data: { answers: JSON.stringify({ ...base, __interviewScheduleMeta: { ...(base.__interviewScheduleMeta || {}), [String(interviewId)]: meta } }) },
+    });
   }
 
   async getFollowUps(applicationId: number, companyId: number) {
@@ -304,11 +318,23 @@ export class ApplicationsService {
     // Why the company is paying above the candidate's profile budget. Required
     // whenever the offer exceeds it; ignored otherwise.
     approvalReason?: string | null,
+    actorRole?: string | null,
   ) {
     const application = await this.findOne(id, companyId);
 
     const target = this.normaliseStage(status);
     this.assertStageAllowed(application, target);
+
+    // Once a candidate has signed and accepted their offer, moving them to a
+    // terminal/holding lane is an exceptional decision. Enforce it here (not
+    // just in the board UI) so direct API calls cannot bypass the authority.
+    const offerIsSigned = application.offerLetter?.status === 'ACCEPTED';
+    const requiresSuperAdmin = offerIsSigned && ['ON_HOLD', 'REJECTED'].includes(target);
+    if (requiresSuperAdmin && String(actorRole || '').toUpperCase() !== 'SUPERADMIN') {
+      throw new ForbiddenException(
+        'Only a Super Admin can move a candidate with a signed offer letter to On Hold or Rejected.',
+      );
+    }
 
     let approvalStatus = application.approvalStatus;
     let finalStatus = status;
@@ -919,12 +945,11 @@ export class ApplicationsService {
   }
 
   async scheduleInterview(applicationId: number, companyId: number, data: any) {
-    if (!data.locationUrl || !data.locationUrl.trim()) {
-      throw new BadRequestException('Meeting link is required');
-    }
-
     const scheduledAt = parseIstDateTime(data?.scheduledAt);
     if (!scheduledAt) throw new BadRequestException('A valid interview date and time is required');
+    const reminderAt = data?.reminderAt ? parseIstDateTime(data.reminderAt) : null;
+    if (data?.reminderAt && !reminderAt) throw new BadRequestException('A valid reminder date and time is required');
+    if (reminderAt && reminderAt >= scheduledAt) throw new BadRequestException('The reminder must be before the interview begins');
 
     const app = await this.findOne(applicationId, companyId);
     const interview = await this.prisma.interview.create({
@@ -940,6 +965,27 @@ export class ApplicationsService {
       include: {
         interviewer: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } }
       }
+    });
+
+    // A scheduled round belongs in the recruitment flow as well as the
+    // interviewer's queue. Never pull candidates backwards from a later stage.
+    const currentStage = this.normaliseStage(app.status);
+    if (['APPLIED', 'PHONE_SCREENING'].includes(currentStage)) {
+      await this.prisma.jobApplication.update({
+        where: { id: app.id },
+        data: {
+          status: 'INTERVIEW',
+          completedStages: this.recordStage(app, 'INTERVIEW'),
+        },
+      });
+    }
+
+    await this.saveInterviewScheduleMeta(app.id, app.answers, interview.id, {
+      interviewType: data.interviewType || 'VIDEO',
+      interviewerComments: data.interviewerComments?.trim() || null,
+      candidateComments: data.candidateComments?.trim() || null,
+      reminderAt: reminderAt?.toISOString() || null,
+      reminderSentAt: null,
     });
 
     const when = interview.scheduledAt.toLocaleString('en-IN', {
@@ -960,7 +1006,7 @@ export class ApplicationsService {
     }
 
     // Notify candidate
-    if (app.email) {
+    if (app.email && interview.locationUrl) {
       await this.mailService.sendInterviewScheduledEmail(
         app.email, 
         app.fullName, 
@@ -996,14 +1042,25 @@ export class ApplicationsService {
     if (data.durationMins) updateData.durationMins = parseInt(data.durationMins, 10);
     if (data.locationUrl !== undefined) updateData.locationUrl = this.normalizeUrl(data.locationUrl);
     if (data.interviewerId !== undefined) updateData.interviewerId = data.interviewerId;
-
-    return this.prisma.interview.update({
+    const updated = await this.prisma.interview.update({
       where: { id: interviewId },
       data: updateData,
       include: {
         interviewer: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } }
       }
     });
+    if (data.interviewType !== undefined || data.interviewerComments !== undefined || data.candidateComments !== undefined || data.reminderAt !== undefined) {
+      const reminderAt = data.reminderAt ? parseIstDateTime(data.reminderAt) : null;
+      if (data.reminderAt && !reminderAt) throw new BadRequestException('A valid reminder date and time is required');
+      await this.saveInterviewScheduleMeta(interview.applicationId, interview.application.answers, interviewId, {
+        interviewType: data.interviewType || 'VIDEO',
+        interviewerComments: data.interviewerComments?.trim() || null,
+        candidateComments: data.candidateComments?.trim() || null,
+        reminderAt: reminderAt?.toISOString() || null,
+        reminderSentAt: null,
+      });
+    }
+    return updated;
   }
 
   async deleteInterview(interviewId: number, companyId: number) {

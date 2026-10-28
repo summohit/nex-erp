@@ -55,6 +55,13 @@
         <svg lucideRotateCcw size="14" [class.spin-anim]="isLoading()"></svg>
         <span>Refresh</span>
       </button>
+      <div class="iv-view-switch" role="group" aria-label="Interview layout">
+        <button type="button" [class.active]="viewMode() === 'cards'" (click)="setViewMode('cards')">Cards</button>
+        <button type="button" [class.active]="viewMode() === 'table'" (click)="setViewMode('table')">Table</button>
+      </div>
+      <button type="button" class="iv-btn-add" (click)="openScheduleInterview()">
+        <span>+</span> Add Interview
+      </button>
     </div>
   </div>
 
@@ -119,6 +126,19 @@
         <span class="kpi-sub">Evaluated candidates</span>
       </div>
     </button>
+
+    <button
+      type="button"
+      class="iv-kpi-card tone-slate"
+      [class.active]="activeTab() === 'cancelled'"
+      (click)="setTab('cancelled')">
+      <div class="kpi-icon-box"><svg lucideX size="19"></svg></div>
+      <div class="kpi-meta">
+        <span class="kpi-label">Cancelled</span>
+        <strong class="kpi-val">{{ stats().cancelled }}</strong>
+        <span class="kpi-sub">Cancelled sessions</span>
+      </div>
+    </button>
   </div>
 
   <!-- ── 3. Unified Search & Filter Toolbar Card ────────────────────────────── -->
@@ -154,6 +174,10 @@
         <button type="button" class="iv-pill" [class.on]="activeTab() === 'completed'" (click)="setTab('completed')">
           <span>Completed</span>
           <span class="pill-count">{{ stats().completed }}</span>
+        </button>
+        <button type="button" class="iv-pill" [class.on]="activeTab() === 'cancelled'" (click)="setTab('cancelled')">
+          <span>Cancelled</span>
+          <span class="pill-count">{{ stats().cancelled }}</span>
         </button>
       </div>
     </div>
@@ -261,22 +285,15 @@
 
   <!-- Main Content Grid -->
   <div class="interviews-grid-section" *ngIf="!isLoading()">
-    <div class="interviews-grid" *ngIf="filteredInterviews().length > 0">
-      <div class="interview-card" *ngFor="let interview of filteredInterviews()" [class.is-completed]="interview.status === 'COMPLETED' || !!interview.rating">
+    <div class="interviews-grid" *ngIf="filteredInterviews().length > 0 && viewMode() === 'cards'">
+      <div class="interview-card" *ngFor="let interview of filteredInterviews()" [class.is-completed]="interviewStatus(interview) === 'COMPLETED'"
+           role="button" tabindex="0" (click)="openCandidateDetails(interview)" (keydown.enter)="openCandidateDetails(interview)" (keydown.space)="openCandidateDetails(interview); $event.preventDefault()"
+           title="Open candidate details">
         <!-- Card Top Bar: Status & Date -->
         <div class="card-header">
           <div class="status-indicator">
-            <span *ngIf="interview.status === 'COMPLETED' || !!interview.rating" class="badge-status completed">
-              <svg lucideCheckCircle2 size="12"></svg>
-              <span>Completed</span>
-            </span>
-            <span *ngIf="interview.status !== 'COMPLETED' && !interview.rating && isUpcoming(interview.scheduledAt)" class="badge-status upcoming">
-              <svg lucideClock size="12"></svg>
-              <span>Upcoming</span>
-            </span>
-            <span *ngIf="interview.status !== 'COMPLETED' && !interview.rating && !isUpcoming(interview.scheduledAt)" class="badge-status needs-review">
-              <svg lucideAlertCircle size="12"></svg>
-              <span>Needs Review</span>
+            <span class="badge-status" [ngClass]="interviewStatus(interview).toLowerCase().replace('_', '-')">
+              <span>{{ interviewStatusLabel(interview) }}</span>
             </span>
           </div>
 
@@ -287,7 +304,7 @@
         </div>
 
         <!-- Candidate Profile Header -->
-        <div class="candidate-profile-block">
+        <div class="candidate-profile-block" role="button" tabindex="0" (click)="openCandidateDetails(interview); $event.stopPropagation()" (keydown.enter)="openCandidateDetails(interview); $event.stopPropagation()" title="Open candidate details">
           <div class="candidate-avatar">
             <img 
               *ngIf="interview.application?.photoUrl" 
@@ -307,10 +324,11 @@
               {{ interview.application?.fullName }}
             </h3>
             <div class="candidate-sub-tags">
-              <span class="role-pill" [title]="interview.application?.job?.title">
+              <button type="button" class="role-pill role-link" [title]="'Open job details: ' + (interview.application?.job?.title || '')"
+                (click)="openJobDetails(interview); $event.stopPropagation()">
                 <svg lucideBriefcase size="11"></svg>
                 <span>{{ interview.application?.job?.title || 'Candidate' }}</span>
-              </span>
+              </button>
               <span class="exp-pill" *ngIf="interview.application?.experienceYears">
                 {{ interview.application.experienceYears }} exp
               </span>
@@ -342,6 +360,7 @@
               [href]="interview.locationUrl.startsWith('http') ? interview.locationUrl : 'https://' + interview.locationUrl" 
               target="_blank" 
               class="link-action join-call"
+              (click)="$event.stopPropagation()"
               title="Open video meeting">
               <svg lucideVideo size="13"></svg>
               <span>Join Meeting</span>
@@ -353,6 +372,7 @@
               [href]="interview.application.resumeUrl" 
               target="_blank" 
               class="link-action view-resume"
+              (click)="$event.stopPropagation()"
               title="View candidate resume">
               <svg lucideFileText size="13"></svg>
               <span>Resume</span>
@@ -391,12 +411,41 @@
             class="btn-cta" 
             [class.btn-edit]="interview.rating" 
             [class.btn-review]="!interview.rating"
-            (click)="openFeedbackModal(interview)">
+            (click)="openFeedbackModal(interview); $event.stopPropagation()">
             <svg lucideMessageSquare size="14"></svg>
             <span>{{ interview.rating ? 'Edit Feedback' : 'Provide Feedback' }}</span>
           </button>
         </div>
       </div>
+    </div>
+
+    <div class="interviews-table-wrap" *ngIf="filteredInterviews().length > 0 && viewMode() === 'table'">
+      <table class="interviews-table">
+        <thead>
+          <tr>
+            <th>Scheduled</th>
+            <th>Candidate</th>
+            <th>Job</th>
+            <th>Round</th>
+            <th>Interviewer</th>
+            <th>Duration</th>
+            <th>Status</th>
+            <th class="table-action-head">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let interview of filteredInterviews()" (click)="openCandidateDetails(interview)" tabindex="0" (keydown.enter)="openCandidateDetails(interview)">
+            <td class="table-date"><strong>{{ interview.scheduledAt | date:'dd MMM yyyy':'Asia/Kolkata' }}</strong><span>{{ interview.scheduledAt | date:'shortTime':'Asia/Kolkata' }} IST</span></td>
+            <td><button type="button" class="table-candidate" (click)="openCandidateDetails(interview); $event.stopPropagation()"><span class="table-avatar" [style.backgroundColor]="getAvatarBg(interview.application?.fullName)">{{ getInitials(interview.application?.fullName) }}</span><span><strong>{{ interview.application?.fullName || 'Candidate' }}</strong><small>{{ interview.application?.email }}</small></span></button></td>
+            <td><button type="button" class="table-job-link" (click)="openJobDetails(interview); $event.stopPropagation()">{{ interview.application?.job?.title || '—' }}</button></td>
+            <td>{{ interview.title || 'Technical Evaluation' }}</td>
+            <td>{{ interview.interviewer?.firstName }} {{ interview.interviewer?.lastName }}</td>
+            <td>{{ interview.durationMins || 30 }} mins</td>
+            <td><span class="table-status" [ngClass]="interviewStatus(interview).toLowerCase().replace('_', '-')">{{ interviewStatusLabel(interview) }}</span></td>
+            <td class="table-actions"><a *ngIf="interview.locationUrl" [href]="interview.locationUrl.startsWith('http') ? interview.locationUrl : 'https://' + interview.locationUrl" target="_blank" (click)="$event.stopPropagation()">Join</a><button type="button" (click)="openFeedbackModal(interview); $event.stopPropagation()">{{ interview.rating ? 'Edit feedback' : 'Feedback' }}</button></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- Empty State -->
@@ -418,6 +467,33 @@
   <div class="loading-state-wrapper" *ngIf="isLoading()">
     <div class="loading-spinner-circle"></div>
     <p>Loading assigned interviews...</p>
+  </div>
+</div>
+
+<!-- Schedule interview: structured table form so every operational detail is visible at once. -->
+<div class="modal-overlay" *ngIf="isScheduleModalOpen()" (click)="closeScheduleInterview()">
+  <div class="schedule-modal" role="dialog" aria-modal="true" aria-label="Schedule interview" (click)="$event.stopPropagation()">
+    <div class="schedule-modal-header">
+      <div><h2>Schedule Interview</h2><p>Set the candidate, panel, timing, notes, and optional meeting link.</p></div>
+      <button type="button" class="btn-close-modal" (click)="closeScheduleInterview()"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="schedule-table-wrap">
+      <table class="schedule-form-table"><tbody>
+        <tr><th>Job <span>*</span></th><td><select [ngModel]="scheduleForm().jobId" (ngModelChange)="setScheduleJob($event)"><option [ngValue]="null">Select job</option><option *ngFor="let job of scheduleJobs()" [ngValue]="job.id">{{ job.title }}</option></select></td></tr>
+        <tr><th>Candidate <span>*</span></th><td><select [ngModel]="scheduleForm().applicationId" (ngModelChange)="setScheduleField('applicationId', $event)"><option [ngValue]="null">Select candidate</option><option *ngFor="let candidate of scheduleJobCandidates()" [ngValue]="candidate.id">{{ candidate.fullName }} · {{ candidate.email }}</option></select></td></tr>
+        <tr><th>Interviewer <span>*</span></th><td><select [ngModel]="scheduleForm().interviewerId" (ngModelChange)="setScheduleField('interviewerId', $event)"><option [ngValue]="null">Select interviewer</option><option *ngFor="let employee of scheduleInterviewers()" [ngValue]="employee.id">{{ employee.firstName }} {{ employee.lastName }}</option></select></td></tr>
+        <tr><th>Round <span>*</span></th><td><input type="text" placeholder="e.g. Technical Round 1" [ngModel]="scheduleForm().title" (ngModelChange)="setScheduleField('title', $event)"></td></tr>
+        <tr><th>Interview type</th><td><select [ngModel]="scheduleForm().interviewType" (ngModelChange)="setScheduleField('interviewType', $event)"><option value="VIDEO">Video interview</option><option value="PHONE">Phone interview</option><option value="IN_PERSON">In person</option><option value="OTHER">Other</option></select></td></tr>
+        <tr><th>Start date &amp; time <span>*</span></th><td><input type="datetime-local" [ngModel]="scheduleForm().scheduledAt" (ngModelChange)="setScheduleStart($event)"></td></tr>
+        <tr><th>End date &amp; time <span>*</span></th><td><input type="datetime-local" [ngModel]="scheduleForm().endAt" (ngModelChange)="setScheduleEnd($event)"></td></tr>
+        <tr><th>Duration</th><td><span class="duration-readout">{{ scheduleDurationLabel() }}</span></td></tr>
+        <tr><th>Comments for interviewer</th><td><textarea rows="2" placeholder="Private preparation notes" [ngModel]="scheduleForm().interviewerComments" (ngModelChange)="setScheduleField('interviewerComments', $event)"></textarea></td></tr>
+        <tr><th>Comments for candidate</th><td><textarea rows="2" placeholder="Instructions shared with the candidate" [ngModel]="scheduleForm().candidateComments" (ngModelChange)="setScheduleField('candidateComments', $event)"></textarea></td></tr>
+        <tr><th>Send reminder</th><td><input type="datetime-local" [ngModel]="scheduleForm().reminderAt" (ngModelChange)="setScheduleField('reminderAt', $event)"><small>Optional. An in-app reminder is sent to the selected interviewer.</small></td></tr>
+        <tr><th>Meeting link</th><td><input type="url" placeholder="Optional Zoom, Meet, or Teams link" [ngModel]="scheduleForm().locationUrl" (ngModelChange)="setScheduleField('locationUrl', $event)"><small>Leave blank for in-person or phone interviews.</small></td></tr>
+      </tbody></table>
+    </div>
+    <div class="schedule-modal-footer"><button type="button" class="btn-modal-cancel" (click)="closeScheduleInterview()">Cancel</button><button type="button" class="btn-modal-submit" [disabled]="isSavingSchedule()" (click)="submitScheduledInterview()">{{ isSavingSchedule() ? 'Scheduling…' : 'Schedule Interview' }}</button></div>
   </div>
 </div>
 

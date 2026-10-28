@@ -8,6 +8,7 @@ import { environment } from '../../../environments/environment';
 import { CandidatesService, JobApplication, CandidateFollowUp } from '../../services/candidates.service';
 import { JobsService, Job } from '../../services/jobs.service';
 import { HotToastService } from '@ngneat/hot-toast';
+import { AuthService } from '../../services/auth.service';
 import { 
   LucideX, LucideLayoutGrid, LucideTable, LucideFileText, 
   LucideMail, LucidePhone, LucideLink, LucideGlobe, LucideBriefcase,
@@ -16,7 +17,7 @@ import {
   LucideCheckCircle, LucideXCircle, LucideArrowLeft, LucideChevronRight,
   LucideFilter, LucideDownload, LucideAlertCircle, LucideCheckCircle2,
   LucidePenLine, LucideCopy, LucideExternalLink, LucideChevronDown,
-  LucideCheck, LucideMapPin,
+  LucideCheck, LucideMapPin, LucideUser,
   LucideEdit2,
   LucideSearch,
   LucideRotateCcw,
@@ -45,7 +46,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LucideCheckCircle, LucideXCircle, LucideArrowLeft, LucideChevronRight,
     LucideFilter, LucideDownload, LucideAlertCircle, LucideCheckCircle2,
     LucidePenLine, LucideCopy, LucideExternalLink, LucideChevronDown,
-    LucideCheck, LucideMapPin,
+    LucideCheck, LucideMapPin, LucideUser,
     LucideEdit2,
     LucideSearch,
     LucideRotateCcw,
@@ -61,6 +62,7 @@ export class CandidatesComponent implements OnInit {
   private candidatesService = inject(CandidatesService);
   private jobsService = inject(JobsService);
   private toast = inject(HotToastService);
+  private authService = inject(AuthService);
   private datePipe = inject(DatePipe);
   private http = inject(HttpClient);
   private route = inject(ActivatedRoute);
@@ -170,6 +172,12 @@ export class CandidatesComponent implements OnInit {
    * offer that has not been signed off.
    */
   stageBlockReason(app: JobApplication, target: string): string | null {
+    const hasSignedOffer = app.offerLetter?.status === 'ACCEPTED';
+    const isSuperAdmin = String(this.authService.currentUser()?.role || '').toUpperCase() === 'SUPERADMIN';
+    if (hasSignedOffer && ['ON_HOLD', 'REJECTED'].includes(target) && !isSuperAdmin) {
+      return 'Only a Super Admin can change a signed offer to On Hold or Rejected';
+    }
+
     const missing = this.blockedStagesFor(app, target);
     if (missing.length > 0) {
       return `Requires ${missing.map(k => this.stageLabel(k)).join(', ')} first`;
@@ -223,7 +231,7 @@ export class CandidatesComponent implements OnInit {
 
   // Detail drawer
   selectedApp = signal<JobApplication | null>(null);
-  activeTab = signal<'details' | 'interviews'>('details');
+  activeTab = signal<'details' | 'interviews' | 'history'>('details');
   showInterviewForm = signal(false);
   showSalaryPrompt = signal(false);
   pendingStatusChange = signal<{ id: number, status: string } | null>(null);
@@ -527,6 +535,7 @@ export class CandidatesComponent implements OnInit {
   isSubmittingInterview = signal<boolean>(false);
   attemptedInterviewSubmit = signal<boolean>(false);
   interviews = signal<any[]>([]);
+  drawerFollowUps = signal<CandidateFollowUp[]>([]);
   minDate = new Date().toISOString().slice(0, 16);
   employees = signal<any[]>([]);
   parseInt = parseInt;
@@ -1088,6 +1097,7 @@ export class CandidatesComponent implements OnInit {
     
     // Load interviews if already fetched, or fetch them
     this.loadInterviews(app.id);
+    this.loadDrawerFollowUps(app.id);
     this.loadOfferLetter(app.id);
 
     // Also load employees for interviewer dropdown if not loaded
@@ -1512,6 +1522,36 @@ export class CandidatesComponent implements OnInit {
     });
   }
 
+  loadDrawerFollowUps(appId: number) {
+    this.candidatesService.getFollowUps(appId).subscribe({
+      next: data => this.drawerFollowUps.set(data || []),
+      error: () => this.drawerFollowUps.set([]),
+    });
+  }
+
+  interviewStatusLabel(interview: any): string {
+    if (interview?.status === 'CANCELLED') return 'Cancelled';
+    if (interview?.status === 'COMPLETED' || interview?.rating) return 'Completed';
+    return new Date(interview?.scheduledAt) >= new Date() ? 'Scheduled' : 'Needs feedback';
+  }
+
+  interviewStatusClass(interview: any): string {
+    return this.interviewStatusLabel(interview).toLowerCase().replace(/\s+/g, '-');
+  }
+
+  evaluationCount(): number {
+    return this.interviews().filter(interview => !!interview.rating || !!interview.feedback).length;
+  }
+
+  hasEvaluations(): boolean {
+    return this.evaluationCount() > 0;
+  }
+
+  followUpStatusClass(followUp: CandidateFollowUp): string {
+    if (followUp.status === 'PENDING' && new Date(followUp.scheduledAt) < new Date()) return 'overdue';
+    return String(followUp.status || 'PENDING').toLowerCase();
+  }
+
   editScheduledInterview(interview: any) {
     this.editInterviewMode.set(interview.id);
     this.newInterview.set({
@@ -1583,6 +1623,13 @@ export class CandidatesComponent implements OnInit {
           this.toast.success('Interview scheduled');
           this.cancelInterviewForm();
           this.loadInterviews(app.id);
+          // Scheduling advances active candidates to the Interview pipeline
+          // stage on the server; refresh the drawer and board to show it.
+          this.candidatesService.getApplication(app.id).subscribe({
+            next: updated => this.selectedApp.set(updated),
+            error: () => {},
+          });
+          this.loadApplications(false);
           this.isSubmittingInterview.set(false);
         },
         error: () => {
@@ -1774,6 +1821,7 @@ export class CandidatesComponent implements OnInit {
   filterNotice = signal<string>('');
   filterStatus = signal<string>('');
   filterFollowUpStatus = signal<string>('');
+  filterAssignedHr = signal<string>('');
   filterMinCtc = signal<string>('');
   filterMaxCtc = signal<string>('');
 
@@ -1795,6 +1843,17 @@ export class CandidatesComponent implements OnInit {
       id: j.id,
       name: `${j.title}${j.department?.name ? ' (' + j.department.name + ')' : ''}`
     }));
+  });
+
+  assignedHrOptions = computed<SearchableSelectOption[]>(() => {
+    const recruiters = new Map<number, string>();
+    for (const job of this.jobs()) {
+      const recruiter = job.recruiter;
+      if (recruiter?.id) recruiters.set(recruiter.id, `${recruiter.firstName} ${recruiter.lastName}`.trim());
+    }
+    return [...recruiters.entries()]
+      .map(([id, name]) => ({ id: String(id), name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   });
 
   positionSelectOptions = computed<SearchableSelectOption[]>(() => {
@@ -1826,6 +1885,7 @@ export class CandidatesComponent implements OnInit {
     if (this.filterNotice()) count++;
     if (this.filterStatus()) count++;
     if (this.filterFollowUpStatus()) count++;
+    if (this.filterAssignedHr()) count++;
     if (this.filterMinCtc() || this.filterMaxCtc()) count++;
     return count;
   });
@@ -1840,6 +1900,7 @@ export class CandidatesComponent implements OnInit {
     this.filterNotice.set('');
     this.filterStatus.set('');
     this.filterFollowUpStatus.set('');
+    this.filterAssignedHr.set('');
     this.filterMinCtc.set('');
     this.filterMaxCtc.set('');
     this.onFilterChange();
@@ -1850,6 +1911,7 @@ export class CandidatesComponent implements OnInit {
     const q = this.searchQuery().trim().toLowerCase();
     const pos = this.filterPosition(), loc = this.filterLocation(), nt = this.filterNotice();
     const st = this.filterStatus(), followUpStatus = this.filterFollowUpStatus();
+    const assignedHr = this.filterAssignedHr();
     const min = parseFloat(this.filterMinCtc()), max = parseFloat(this.filterMaxCtc());
     return this.applications().filter(a => {
       if (q) {
@@ -1863,6 +1925,7 @@ export class CandidatesComponent implements OnInit {
       if (loc && (a.currentLocation || '') !== loc) return false;
       if (nt && (a.noticePeriod || '') !== nt) return false;
       if (st && this.normaliseStage(a.status) !== st) return false;
+      if (assignedHr && String(a.job?.recruiterId || '') !== assignedHr) return false;
       const followUp = this.nextFollowUp(a);
       if (followUpStatus === 'NONE' && followUp) return false;
       if (followUpStatus === 'OVERDUE' && (!followUp || followUp.status !== 'PENDING' || new Date(followUp.scheduledAt) >= new Date())) return false;
@@ -1973,14 +2036,14 @@ export class CandidatesComponent implements OnInit {
     const target = this.completingFollowUp();
     if (!target || !this.completionRemarks.trim()) return;
     this.candidatesService.updateFollowUp(target.app.id, target.followUp.id, { status: 'COMPLETED', completionRemarks: this.completionRemarks }).subscribe({
-      next: () => { this.completingFollowUp.set(null); this.toast.success('Follow-up marked completed'); this.loadApplications(false); },
+      next: () => { this.completingFollowUp.set(null); this.toast.success('Follow-up marked completed'); this.loadDrawerFollowUps(target.app.id); this.loadApplications(false); },
       error: () => this.toast.error('Could not update follow-up')
     });
   }
 
   updateFollowUpStage(app: JobApplication, followUp: CandidateFollowUp, status: string) {
     this.candidatesService.updateFollowUp(app.id, followUp.id, { status }).subscribe({
-      next: () => { this.toast.success('Follow-up stage updated'); this.loadApplications(false); },
+      next: () => { this.toast.success('Follow-up stage updated'); this.loadDrawerFollowUps(app.id); this.loadApplications(false); },
       error: () => this.toast.error('Could not update follow-up stage')
     });
   }
@@ -1992,7 +2055,7 @@ export class CandidatesComponent implements OnInit {
     if (!app || !this.followUpForm.title.trim() || !this.followUpForm.scheduledAt) return;
     this.isSavingFollowUp.set(true);
     this.candidatesService.createFollowUp(app.id, this.followUpForm).subscribe({
-      next: () => { this.isSavingFollowUp.set(false); this.closeFollowUpModal(); this.toast.success('Candidate follow-up scheduled'); this.loadApplications(false); },
+      next: () => { this.isSavingFollowUp.set(false); this.closeFollowUpModal(); this.toast.success('Candidate follow-up scheduled'); this.loadDrawerFollowUps(app.id); this.loadApplications(false); },
       error: (err) => { this.isSavingFollowUp.set(false); this.toast.error(err?.error?.message || 'Could not schedule follow-up'); }
     });
   }

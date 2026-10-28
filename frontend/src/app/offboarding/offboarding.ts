@@ -5,6 +5,7 @@ import { OffboardingService, Resignation, OffboardingTask, ExitInterview } from 
 import { AuthService } from '../services/auth.service';
 import { EmployeeService, Employee } from '../services/employee.service';
 import { HotToastService } from '@ngneat/hot-toast';
+import { ActivatedRoute } from '@angular/router';
 import { 
   LucideDoorOpen, 
   LucideCheckCircle2, 
@@ -43,6 +44,7 @@ export class OffboardingComponent implements OnInit {
   private authService = inject(AuthService);
   private employeeService = inject(EmployeeService);
   private toast = inject(HotToastService);
+  private route = inject(ActivatedRoute);
 
   activeTab = signal<'resignations' | 'tasks' | 'exit'>('resignations');
   
@@ -52,6 +54,7 @@ export class OffboardingComponent implements OnInit {
   
   currentUserRole = signal<string>('');
   currentEmployeeId = signal<number>(0);
+  private focusedEmployeeId = signal<number | null>(null);
 
   // Modals
   showResignModal = signal(false);
@@ -80,6 +83,9 @@ export class OffboardingComponent implements OnInit {
     return this.resignations().filter((item) => {
       const matchesStatus = status === 'ALL' || item.status === status;
       const matchesSearch = !query || [
+        item.employee?.firstName,
+        item.employee?.lastName,
+        item.employee?.employeeCode,
         item.employee?.user?.email,
         item.reason,
         item.approver?.email,
@@ -116,6 +122,14 @@ export class OffboardingComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.route.queryParamMap.subscribe((params) => {
+      const employeeId = Number(params.get('employeeId'));
+      this.focusedEmployeeId.set(Number.isInteger(employeeId) && employeeId > 0 ? employeeId : null);
+      if (employeeId > 0) {
+        this.activeTab.set('resignations');
+        this.loadData();
+      }
+    });
   }
 
   isManagerOrAdmin() {
@@ -213,6 +227,14 @@ export class OffboardingComponent implements OnInit {
     if (this.activeTab() === 'resignations') {
       this.offboardingService.getResignations().subscribe(res => {
         this.resignations.set(res);
+        const focusedEmployeeId = this.focusedEmployeeId();
+        if (focusedEmployeeId) {
+          const focused = res.find((item) => item.employeeId === focusedEmployeeId);
+          if (focused) {
+            this.resignationSearch.set(this.employeeName(focused));
+            this.openResignationDetails(focused);
+          }
+        }
         this.setResignationPage(this.resignationPage());
         this.hydrateResignationAvatars();
       });

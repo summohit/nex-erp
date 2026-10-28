@@ -4,6 +4,7 @@ import { JobsService } from './jobs.service';
 import { ApplicationsController } from './applications.controller';
 import { ApplicationsService } from './applications.service';
 import { OfferLettersService } from './offer-letters.service';
+import { InterviewRemindersCron } from './interview-reminders.cron';
 
 import { LettersModule } from '../letters/letters.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -15,7 +16,7 @@ import { EmployeesModule } from '../employees/employees.module';
 @Module({
   imports: [PrismaModule, PayrollModule, NotificationsModule, MailModule, LettersModule, EmployeesModule],
   controllers: [JobsController, ApplicationsController],
-  providers: [JobsService, ApplicationsService, OfferLettersService],
+  providers: [JobsService, ApplicationsService, OfferLettersService, InterviewRemindersCron],
   exports: [ApplicationsService, OfferLettersService]
 })
 export class RecruitmentModule {}

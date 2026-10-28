@@ -39,6 +39,16 @@
   flex-wrap: wrap;
 }
 
+.period-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.period-filter .form-control {
+  min-width: 132px;
+}
+
 .search-group {
   position: relative;
   flex: 1;

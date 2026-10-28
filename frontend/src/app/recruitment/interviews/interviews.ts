@@ -1,7 +1,7 @@
 import { Component, signal, computed, OnInit, inject } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -23,7 +23,7 @@ import {
   LucideChevronRight,
 } from '@lucide/angular';
 
-export type InterviewTab = 'all' | 'upcoming' | 'needs-review' | 'completed';
+export type InterviewTab = 'all' | 'upcoming' | 'needs-review' | 'completed' | 'cancelled';
 
 @Component({
   selector: 'app-interviews',
@@ -56,9 +56,16 @@ export type InterviewTab = 'all' | 'upcoming' | 'needs-review' | 'completed';
 export class InterviewsComponent implements OnInit {
   private http = inject(HttpClient);
   private toast = inject(HotToastService);
+  private router = inject(Router);
 
   interviews = signal<any[]>([]);
   isLoading = signal(true);
+  isScheduleModalOpen = signal(false);
+  isSavingSchedule = signal(false);
+  scheduleJobs = signal<any[]>([]);
+  scheduleApplications = signal<any[]>([]);
+  scheduleEmployees = signal<any[]>([]);
+  scheduleForm = signal<any>(this.emptyScheduleForm());
 
   // Search, tabs, and filters
   searchText = signal('');
@@ -70,6 +77,7 @@ export class InterviewsComponent implements OnInit {
   jobFilter = signal<string>('');
   roundFilter = signal<string>('');
   sortOrder = signal<'NEWEST' | 'OLDEST'>('NEWEST');
+  viewMode = signal<'cards' | 'table'>('cards');
 
   // Quick feedback tags
   readonly feedbackTags = [
@@ -87,12 +95,11 @@ export class InterviewsComponent implements OnInit {
     const list = this.interviews();
     const total = list.length;
     const now = new Date();
-    const completed = list.filter((i) => !!i.rating || i.status === 'COMPLETED').length;
-    const needsReview = list.filter((i) => !i.rating && i.status !== 'COMPLETED').length;
-    const upcoming = list.filter(
-      (i) => !i.rating && i.status !== 'COMPLETED' && new Date(i.scheduledAt) >= now
-    ).length;
-    return { total, upcoming, needsReview, completed };
+    const completed = list.filter((i) => this.interviewStatus(i, now) === 'COMPLETED').length;
+    const cancelled = list.filter((i) => this.interviewStatus(i, now) === 'CANCELLED').length;
+    const needsReview = list.filter((i) => this.interviewStatus(i, now) === 'NEEDS_REVIEW').length;
+    const upcoming = list.filter((i) => this.interviewStatus(i, now) === 'UPCOMING').length;
+    return { total, upcoming, needsReview, completed, cancelled };
   });
 
   availableJobs = computed(() => {
@@ -154,13 +161,12 @@ export class InterviewsComponent implements OnInit {
     return list
       .filter((i) => {
         // Tab filter
-        const isCompleted = !!i.rating || i.status === 'COMPLETED';
-        const isScheduledUpcoming = !isCompleted && new Date(i.scheduledAt) >= now;
-        const isNeedsReview = !isCompleted;
+        const interviewStatus = this.interviewStatus(i, now);
 
-        if (tab === 'completed' && !isCompleted) return false;
-        if (tab === 'upcoming' && !isScheduledUpcoming) return false;
-        if (tab === 'needs-review' && !isNeedsReview) return false;
+        if (tab === 'completed' && interviewStatus !== 'COMPLETED') return false;
+        if (tab === 'upcoming' && interviewStatus !== 'UPCOMING') return false;
+        if (tab === 'needs-review' && interviewStatus !== 'NEEDS_REVIEW') return false;
+        if (tab === 'cancelled' && interviewStatus !== 'CANCELLED') return false;
 
         if (interviewerF && String(i.interviewer?.id || '') !== interviewerF) return false;
 
@@ -245,6 +251,70 @@ export class InterviewsComponent implements OnInit {
 
   ngOnInit() {
     this.fetchMyInterviews();
+    this.loadScheduleOptions();
+  }
+
+  private emptyScheduleForm() {
+    return { jobId: null, applicationId: null, interviewerId: null, title: '', interviewType: 'VIDEO', scheduledAt: '', endAt: '', interviewerComments: '', candidateComments: '', reminderAt: '', locationUrl: '' };
+  }
+
+  loadScheduleOptions() {
+    this.http.get<any[]>(`${environment.apiUrl}/recruitment/jobs`).subscribe({ next: rows => this.scheduleJobs.set(rows || []), error: () => this.toast.error('Could not load jobs') });
+    this.http.get<any[]>(`${environment.apiUrl}/recruitment/applications`).subscribe({ next: rows => this.scheduleApplications.set(rows || []), error: () => this.toast.error('Could not load candidates') });
+    this.http.get<any[]>(`${environment.apiUrl}/employees`).subscribe({ next: rows => this.scheduleEmployees.set(rows || []), error: () => this.toast.error('Could not load interviewers') });
+  }
+
+  scheduleJobCandidates = computed(() => {
+    const jobId = this.scheduleForm().jobId;
+    return this.scheduleApplications().filter(candidate => !jobId || Number(candidate.jobId) === Number(jobId));
+  });
+
+  scheduleInterviewers = computed(() => this.scheduleEmployees().filter(employee => employee?.user?.status !== 'SUSPENDED'));
+
+  scheduleDurationLabel = computed(() => {
+    const { scheduledAt, endAt } = this.scheduleForm();
+    if (!scheduledAt || !endAt) return 'Select start and end times';
+    const minutes = Math.round((new Date(endAt).getTime() - new Date(scheduledAt).getTime()) / 60_000);
+    return minutes > 0 ? `${minutes} minutes` : 'End time must be after start time';
+  });
+
+  openScheduleInterview() {
+    this.scheduleForm.set(this.emptyScheduleForm());
+    this.isScheduleModalOpen.set(true);
+  }
+
+  closeScheduleInterview() {
+    this.isScheduleModalOpen.set(false);
+    this.isSavingSchedule.set(false);
+  }
+
+  setScheduleField(field: string, value: any) {
+    this.scheduleForm.update(form => ({ ...form, [field]: value }));
+  }
+
+  setScheduleJob(jobId: any) {
+    this.scheduleForm.update(form => ({ ...form, jobId, applicationId: null }));
+  }
+
+  setScheduleStart(value: string) { this.setScheduleField('scheduledAt', value); }
+  setScheduleEnd(value: string) { this.setScheduleField('endAt', value); }
+
+  submitScheduledInterview() {
+    const form = this.scheduleForm();
+    if (!form.jobId || !form.applicationId || !form.interviewerId || !form.title?.trim() || !form.scheduledAt || !form.endAt) {
+      this.toast.error('Job, candidate, interviewer, round, start, and end time are required');
+      return;
+    }
+    const durationMins = Math.round((new Date(form.endAt).getTime() - new Date(form.scheduledAt).getTime()) / 60_000);
+    if (durationMins <= 0) { this.toast.error('End time must be after start time'); return; }
+    const candidate = this.scheduleApplications().find(item => Number(item.id) === Number(form.applicationId));
+    if (!candidate || Number(candidate.jobId) !== Number(form.jobId)) { this.toast.error('Choose a candidate from the selected job'); return; }
+    this.isSavingSchedule.set(true);
+    const payload = { ...form, durationMins };
+    this.http.post(`${environment.apiUrl}/recruitment/applications/${form.applicationId}/interviews`, payload).subscribe({
+      next: () => { this.toast.success('Interview scheduled'); this.closeScheduleInterview(); this.fetchMyInterviews(); },
+      error: (err) => { this.toast.error(err?.error?.message || 'Could not schedule interview'); this.isSavingSchedule.set(false); },
+    });
   }
 
   fetchMyInterviews() {
@@ -295,6 +365,10 @@ export class InterviewsComponent implements OnInit {
     this.sortOrder.update((curr) => (curr === 'NEWEST' ? 'OLDEST' : 'NEWEST'));
   }
 
+  setViewMode(view: 'cards' | 'table') {
+    this.viewMode.set(view);
+  }
+
   clearSearch() {
     this.searchText.set('');
   }
@@ -309,6 +383,26 @@ export class InterviewsComponent implements OnInit {
     this.jobFilter.set('');
     this.roundFilter.set('');
     this.sortOrder.set('NEWEST');
+  }
+
+  /** Opens the same ATS candidate drawer used from the Candidates page. */
+  openCandidateDetails(interview: any) {
+    const applicationId = interview?.application?.id || interview?.applicationId;
+    if (!applicationId) {
+      this.toast.error('Candidate details are unavailable for this interview');
+      return;
+    }
+    this.router.navigate(['/recruitment/candidates'], { queryParams: { applicationId } });
+  }
+
+  /** Opens the detail page for the job associated with this interview. */
+  openJobDetails(interview: any) {
+    const jobId = interview?.application?.jobId || interview?.application?.job?.id;
+    if (!jobId) {
+      this.toast.error('Job details are unavailable for this interview');
+      return;
+    }
+    this.router.navigate(['/recruitment/jobs', jobId]);
   }
 
   openFeedbackModal(interview: any) {
@@ -374,6 +468,18 @@ export class InterviewsComponent implements OnInit {
 
   isUpcoming(dateStr: string): boolean {
     return new Date(dateStr) >= new Date();
+  }
+
+  /** Keep status labels consistent across the employee queue and its filters. */
+  interviewStatus(interview: any, now = new Date()): 'UPCOMING' | 'NEEDS_REVIEW' | 'COMPLETED' | 'CANCELLED' {
+    if (interview?.status === 'CANCELLED') return 'CANCELLED';
+    if (interview?.status === 'COMPLETED' || interview?.rating) return 'COMPLETED';
+    return new Date(interview?.scheduledAt) >= now ? 'UPCOMING' : 'NEEDS_REVIEW';
+  }
+
+  interviewStatusLabel(interview: any): string {
+    const labels = { UPCOMING: 'Scheduled', NEEDS_REVIEW: 'Needs feedback', COMPLETED: 'Completed', CANCELLED: 'Cancelled' };
+    return labels[this.interviewStatus(interview)];
   }
 
   submitFeedback() {

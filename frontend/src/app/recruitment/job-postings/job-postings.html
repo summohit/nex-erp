@@ -29,6 +29,16 @@
       <span class="range-separator">to</span>
       <input type="date" class="form-control date-filter" aria-label="End date" [(ngModel)]="filterPostedTo" (change)="onCustomDateChange()">
     </div>
+    <div class="period-filter">
+      <select class="form-control" [(ngModel)]="filterMonth" (change)="applyFilters()" aria-label="Filter by posting month">
+        <option value="">All months</option>
+        <option *ngFor="let month of months" [value]="month.value">{{ month.label }}</option>
+      </select>
+      <select class="form-control" [(ngModel)]="filterYear" (change)="applyFilters()" aria-label="Filter by posting year">
+        <option value="">All years</option>
+        <option *ngFor="let year of postingYears" [value]="year">{{ year }}</option>
+      </select>
+    </div>
     <div class="top-recruiter-filter">
       <span>Recruiter</span>
       <select class="form-control" [(ngModel)]="filterRecruiter" (change)="applyFilters()" aria-label="Filter by recruiter">
@@ -41,7 +51,7 @@
       <input type="text" class="form-control pl-9" placeholder="Search jobs..." [(ngModel)]="searchText" (input)="onSearch()">
     </div>
     <div class="filter-group">
-      <button class="btn-outline btn-clear" (click)="clearFilters()" *ngIf="searchText || filterStatus || filterDepartment || filterRecruiter || filterLocation || filterWorkLocationType || filterEmploymentType || filterPostedFrom || filterPostedTo">
+      <button class="btn-outline btn-clear" (click)="clearFilters()" *ngIf="searchText || filterStatus || filterDepartment || filterRecruiter || filterLocation || filterWorkLocationType || filterEmploymentType || filterPostedFrom || filterPostedTo || filterMonth || filterYear">
         <svg lucideX size="14"></svg> Clear
       </button>
       <button class="btn-outline btn-filter" (click)="openFilterDrawer()">

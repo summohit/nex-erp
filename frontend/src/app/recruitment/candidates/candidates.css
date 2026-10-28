@@ -2154,6 +2154,21 @@
 .i-status.completed { background: #dcfce7; color: #15803d; }
 .i-status.cancelled { background: #eff6ff; color: #1373e5; }
 
+/* Candidate-drawer history: interview activity, evaluations and follow-ups
+   deliberately read as separate operational records. */
+.drawer-history { display: flex; flex-direction: column; gap: 18px; }
+.drawer-history-section { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: #fff; }
+.drawer-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #eef2f7; background: #f8fafc; }
+.drawer-history-heading h4 { margin: 0; color: #0f172a; font-size: 14px; }.drawer-history-heading p { margin: 3px 0 0; color: #64748b; font-size: 12px; }
+.history-count { display: grid; min-width: 24px; height: 24px; place-items: center; border-radius: 999px; color: #1d4ed8; background: #dbeafe; font-size: 12px; font-weight: 800; }
+.history-empty { margin: 14px; padding: 14px; border: 1px dashed #cbd5e1; border-radius: 8px; color: #64748b; background: #fff; font-size: 13px; text-align: center; }
+.history-item, .evaluation-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 13px 16px; border-top: 1px solid #f1f5f9; }.history-item:first-of-type, .evaluation-item:first-of-type { border-top: 0; }
+.history-item-main { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }.history-item-main strong, .evaluation-item strong { color: #1e293b; font-size: 13px; }.history-item-main span, .history-item-main small, .evaluation-item small { color: #64748b; font-size: 12px; }.history-item-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-status { flex: 0 0 auto; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 700; color: #1d4ed8; background: #dbeafe; }.history-status.completed { color: #15803d; background: #dcfce7; }.history-status.cancelled { color: #b91c1c; background: #fee2e2; }.history-status.needs-feedback, .history-status.overdue { color: #b45309; background: #fef3c7; }.history-status.pending { color: #1d4ed8; background: #dbeafe; }
+.evaluation-item { justify-content: flex-start; }.evaluation-score { display: grid; flex: 0 0 42px; height: 42px; place-content: center; border-radius: 10px; color: #7c3aed; background: #f3e8ff; font-size: 16px; font-weight: 800; }.evaluation-score small { margin-top: -3px; color: inherit; font-size: 9px; }.evaluation-score.unrated { color: #64748b; background: #f1f5f9; }.evaluation-item p { margin: 4px 0; color: #475569; font-size: 12px; line-height: 1.45; white-space: pre-wrap; }
+.history-add-btn { border: 0; border-radius: 7px; padding: 7px 9px; color: #fff; background: #2563eb; font-size: 12px; font-weight: 700; cursor: pointer; }.history-add-btn:hover { background: #1d4ed8; }
+@media (max-width: 480px) { .drawer-history-heading { align-items: flex-start; }.history-item { flex-direction: column; }.history-status { align-self: flex-start; } }
+
 .i-details {
   display: flex;
   flex-direction: column;

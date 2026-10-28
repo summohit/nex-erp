@@ -98,6 +98,10 @@ export class JobPostingsComponent implements OnInit {
           }
           return {
             ...j,
+            // A readable reference for the posting list.  It is based on the
+            // immutable creation date, so the label remains stable if the job
+            // is edited or its published date changes later.
+            jobId: this.formatJobId(j.createdAt),
             department: j.department?.name || 'General',
             designation: j.designation?.name || '',
             location: j.branch?.name || 'Remote',
@@ -120,6 +124,19 @@ export class JobPostingsComponent implements OnInit {
         this.isLoading.set(false);
       }
     });
+  }
+
+  private formatJobId(createdAt?: Date): string {
+    if (!createdAt) return 'JOB-—';
+    const date = new Date(createdAt);
+    if (Number.isNaN(date.getTime())) return 'JOB-—';
+    const formatted = new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    }).format(date).replace(/\//g, '');
+    return `JOB-${formatted}`;
   }
 
   /** Ticking "never expires" clears any date already chosen. */
@@ -164,7 +181,18 @@ export class JobPostingsComponent implements OnInit {
   filterDuration = '';
   filterPostedFrom = '';
   filterPostedTo = '';
+  filterMonth = '';
+  filterYear = '';
   isFilterDrawerOpen = signal(false);
+
+  readonly months = [
+    { value: '0', label: 'January' }, { value: '1', label: 'February' },
+    { value: '2', label: 'March' }, { value: '3', label: 'April' },
+    { value: '4', label: 'May' }, { value: '5', label: 'June' },
+    { value: '6', label: 'July' }, { value: '7', label: 'August' },
+    { value: '8', label: 'September' }, { value: '9', label: 'October' },
+    { value: '10', label: 'November' }, { value: '11', label: 'December' },
+  ];
 
   /** Values are derived from the postings so historical data is always filterable. */
   get postingLocations(): string[] {
@@ -173,6 +201,15 @@ export class JobPostingsComponent implements OnInit {
 
   get postingEmploymentTypes(): string[] {
     return [...new Set(this.jobs().map(job => job.type).filter(Boolean))].sort();
+  }
+
+  get postingYears(): string[] {
+    return [...new Set(this.jobs()
+      .map(job => job.postedDate || job.createdAt)
+      .filter(Boolean)
+      .map(date => String(new Date(date as Date).getFullYear())))]
+      .filter(year => year !== 'NaN')
+      .sort((a, b) => Number(b) - Number(a));
   }
 
   defaultColDef: ColDef = {
@@ -205,19 +242,29 @@ export class JobPostingsComponent implements OnInit {
   };
 
   colDefs: ColDef[] = [
+    {
+      headerName: 'Job ID',
+      field: 'jobId',
+      width: 145,
+      minWidth: 145,
+      flex: 0,
+      pinned: 'left',
+      cellRenderer: (params: any) => `<span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;font-weight:700;color:#2563EB;white-space:nowrap;">${params.value || 'JOB-—'}</span>`,
+    },
     { 
       headerName: 'Job Title', 
       field: 'title',
-      minWidth: 220,
-      flex: 1.5,
+      minWidth: 320,
+      flex: 2.3,
       pinned: 'left',
+      wrapText: true,
+      autoHeight: true,
       cellRenderer: (params: any) => {
         if (!params.value) return '';
         const exp = params.data.experienceYears ? `<span style="font-size: 11px; color: #64748B; margin-left: 6px;">(${params.data.experienceYears})</span>` : '';
-        return `<div style="font-weight: 600; color: #0F172A;">${params.value}${exp}</div>`;
+        return `<div style="font-weight:600;color:#0F172A;white-space:normal;line-height:18px;padding:7px 0;">${params.value}${exp}</div>`;
       }
     },
-    { field: 'department', headerName: 'Department' },
     { field: 'experienceYears', headerName: 'Experience', width: 140, flex: 0 },
     { field: 'type', headerName: 'Type', width: 120, flex: 0 },
     {
@@ -356,7 +403,9 @@ export class JobPostingsComponent implements OnInit {
       this.filterWorkLocationType ||
       this.filterEmploymentType ||
       this.filterPostedFrom ||
-      this.filterPostedTo
+      this.filterPostedTo ||
+      this.filterMonth ||
+      this.filterYear
     );
   }
 
@@ -366,6 +415,14 @@ export class JobPostingsComponent implements OnInit {
     if (this.filterLocation && job?.location !== this.filterLocation) return false;
     if (this.filterWorkLocationType && job?.workLocationType !== this.filterWorkLocationType) return false;
     if (this.filterEmploymentType && job?.type !== this.filterEmploymentType) return false;
+
+    const filterDateValue = job?.postedDate || job?.createdAt;
+    if (this.filterMonth || this.filterYear) {
+      if (!filterDateValue) return false;
+      const filterDate = new Date(filterDateValue);
+      if (this.filterMonth && filterDate.getMonth() !== Number(this.filterMonth)) return false;
+      if (this.filterYear && filterDate.getFullYear() !== Number(this.filterYear)) return false;
+    }
 
     if (this.filterPostedFrom || this.filterPostedTo) {
       const dateValue = job?.postedDate;
@@ -395,6 +452,8 @@ export class JobPostingsComponent implements OnInit {
     this.filterDuration = '';
     this.filterPostedFrom = '';
     this.filterPostedTo = '';
+    this.filterMonth = '';
+    this.filterYear = '';
     this.onSearch();
     if (this.gridApi) {
       this.gridApi.setFilterModel(null);

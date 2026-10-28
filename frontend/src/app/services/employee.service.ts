@@ -28,6 +28,15 @@ export interface Employee {
   esiNumber?: string;
   workLocation?: string;
   onboardingStatus?: string;
+  joiningDate?: string | null;
+  offboardingStatus?: 'NONE' | 'IN_PROGRESS' | 'SEPARATED' | string;
+  resignations?: Array<{
+    id: number;
+    status: string;
+    intendedLastWorkingDay?: string | null;
+    approvedLastWorkingDay?: string | null;
+    createdAt?: string;
+  }>;
 }
 
 @Injectable({

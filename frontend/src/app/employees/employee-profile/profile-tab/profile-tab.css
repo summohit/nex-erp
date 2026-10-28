@@ -856,6 +856,30 @@ select.form-control:disabled {
   color: #9ca3af;
 }
 
+.avatar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.avatar-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: #374151;
+  background: #fff;
+  font: 600 12px inherit;
+  cursor: pointer;
+}
+
+.avatar-action:hover:not(:disabled) { border-color: #93c5fd; color: #1d4ed8; background: #eff6ff; }
+.avatar-action.danger:hover:not(:disabled) { border-color: #fecaca; color: #b91c1c; background: #fef2f2; }
+.avatar-action:disabled { cursor: not-allowed; opacity: .6; }
+
 /* Actions */
 /**
  * The save bar stays on screen while the form is scrolled.
@@ -972,6 +996,23 @@ select.form-control:disabled {
   font-weight: bold;
   cursor: help;
 }
+
+.photo-help-icon {
+  margin-left: 3px;
+  vertical-align: -2px;
+  color: #64748b;
+  background: transparent;
+  border-radius: 0;
+  cursor: help;
+}
+
+.profile-picture-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-picture-label > svg:first-child { color: #2563eb; }
 
 
 /* ==================== MODALS (PREMIUM LIGHT ERP DESIGN) ==================== */

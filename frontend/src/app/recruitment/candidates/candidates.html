@@ -119,6 +119,18 @@
           </app-searchable-select>
         </div>
 
+        <!-- Assigned HR filter: a candidate inherits the recruiter assigned to their job. -->
+        <div class="filter-searchable-pill" [class.filter-active]="!!filterAssignedHr()">
+          <app-searchable-select
+            [options]="assignedHrOptions()"
+            placeholder="All assigned HR"
+            [value]="filterAssignedHr()"
+            [clearable]="true"
+            (valueChange)="filterAssignedHr.set($event || '')">
+            <svg prefix lucideUser size="13.5"></svg>
+          </app-searchable-select>
+        </div>
+
         <!-- Position Filter -->
         <div class="filter-searchable-pill" [class.filter-active]="!!filterPosition()">
           <app-searchable-select
@@ -457,6 +469,9 @@
       </button>
       <button class="tab-btn" [class.active]="activeTab() === 'interviews'" (click)="activeTab.set('interviews')">
         <svg lucideUsers size="16"></svg> Interviews
+      </button>
+      <button class="tab-btn" [class.active]="activeTab() === 'history'" (click)="activeTab.set('history')">
+        <svg lucideClock size="16"></svg> History & Evaluations
       </button>
     </div>
 
@@ -1122,6 +1137,60 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- HISTORY TAB: operational history is kept separate from interview scheduling. -->
+    <div class="tab-content drawer-history" *ngIf="activeTab() === 'history'">
+      <section class="drawer-history-section">
+        <div class="drawer-history-heading">
+          <div><h4>Interview history</h4><p>Every scheduled interview and its current status.</p></div>
+          <span class="history-count">{{ interviews().length }}</span>
+        </div>
+        <div class="history-empty" *ngIf="!interviews().length">No interviews have been scheduled for this candidate.</div>
+        <article class="history-item" *ngFor="let interview of interviews()">
+          <div class="history-item-main">
+            <strong>{{ interview.title || 'Interview' }}</strong>
+            <span>{{ interview.scheduledAt | date:'dd MMM yyyy, h:mm a':'Asia/Kolkata' }} IST · {{ interview.durationMins || 30 }} min</span>
+            <small *ngIf="interview.interviewer">Interviewer: {{ interview.interviewer.firstName }} {{ interview.interviewer.lastName }}</small>
+          </div>
+          <span class="history-status" [ngClass]="interviewStatusClass(interview)">{{ interviewStatusLabel(interview) }}</span>
+        </article>
+      </section>
+
+      <section class="drawer-history-section">
+        <div class="drawer-history-heading">
+          <div><h4>Interview evaluations</h4><p>Ratings and feedback submitted by interviewers.</p></div>
+          <span class="history-count">{{ evaluationCount() }}</span>
+        </div>
+        <div class="history-empty" *ngIf="!hasEvaluations()">No evaluations have been submitted yet.</div>
+        <article class="evaluation-item" *ngFor="let interview of interviews()">
+          <ng-container *ngIf="interview.rating || interview.feedback">
+            <div class="evaluation-score" [class.unrated]="!interview.rating">{{ interview.rating || '—' }}<small>/5</small></div>
+            <div>
+              <strong>{{ interview.title || 'Interview' }}</strong>
+              <p>{{ interview.feedback || 'No written feedback was provided.' }}</p>
+              <small>{{ interview.interviewer ? interview.interviewer.firstName + ' ' + interview.interviewer.lastName : 'Unassigned interviewer' }}</small>
+            </div>
+          </ng-container>
+        </article>
+      </section>
+
+      <section class="drawer-history-section">
+        <div class="drawer-history-heading">
+          <div><h4>Follow-up history</h4><p>Calls, messages, notes, and their outcomes.</p></div>
+          <button type="button" class="history-add-btn" (click)="openFollowUpModal(app)">+ Add follow-up</button>
+        </div>
+        <div class="history-empty" *ngIf="!drawerFollowUps().length">No follow-ups have been recorded for this candidate.</div>
+        <article class="history-item followup-item" *ngFor="let followUp of drawerFollowUps()">
+          <div class="history-item-main">
+            <strong>{{ followUp.title }}</strong>
+            <span>{{ followUp.type }} · {{ followUp.scheduledAt | date:'dd MMM yyyy, h:mm a':'Asia/Kolkata' }}</span>
+            <small *ngIf="followUp.completionRemarks">Outcome: {{ followUp.completionRemarks }}</small>
+            <small *ngIf="!followUp.completionRemarks && followUp.notes">{{ followUp.notes }}</small>
+          </div>
+          <span class="history-status" [ngClass]="followUpStatusClass(followUp)">{{ followUpStatusClass(followUp) === 'overdue' ? 'Overdue' : followUp.status }}</span>
+        </article>
+      </section>
     </div>
   </div>
 

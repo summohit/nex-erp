@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, HostListener, computed } from '@angular/core';
+import { Component, inject, OnInit, signal, HostListener, computed, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
@@ -43,6 +43,8 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 })
 export class EmployeeListComponent implements OnInit {
 
+  @ViewChild('directorySearch') directorySearch?: ElementRef<HTMLInputElement>;
+
   private employeeService = inject(EmployeeService);
   private masterDataService = inject(MasterDataService);
   private toast = inject(HotToastService);
@@ -70,6 +72,11 @@ export class EmployeeListComponent implements OnInit {
     { id: 'IN_PROGRESS', name: 'In Progress' },
     { id: 'COMPLETED', name: 'Completed' }
   ];
+  offboardingStatusOptions = [
+    { id: 'NONE', name: 'Not started' },
+    { id: 'IN_PROGRESS', name: 'In progress' },
+    { id: 'SEPARATED', name: 'Offboarded' },
+  ];
 
   viewMode = signal<'table' | 'cards'>('cards');
   isDrawerOpen = false;
@@ -94,46 +101,53 @@ export class EmployeeListComponent implements OnInit {
     }
   }
 
-  // --- Modal Search State ---
-  isSearchModalOpen = signal<boolean>(false);
-  modalSearchQuery = signal<string>('');
-  
-  filteredModalEmployees = computed(() => {
-    const q = this.modalSearchQuery().toLowerCase().trim();
-    if (!q) return []; // Only show results when typing, or return top employees
-    return this.employees().filter(e => 
-      (e.firstName && e.firstName.toLowerCase().includes(q)) || 
-      (e.lastName && e.lastName.toLowerCase().includes(q)) ||
-      (e.department?.name && e.department.name.toLowerCase().includes(q)) ||
-      (e.designation?.name && e.designation.name.toLowerCase().includes(q))
-    ).slice(0, 10); // Limit to top 10 results
-  });
+  inlineSearchOpen = false;
 
   @HostListener('window:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent) {
     if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
       event.preventDefault();
-      this.openSearchModal();
+      this.focusDirectorySearch();
     }
-    if (event.key === 'Escape' && this.isSearchModalOpen()) {
-      this.closeSearchModal();
+    if (event.key === 'Escape' && this.inlineSearchOpen) {
+      this.inlineSearchOpen = false;
+      this.directorySearch?.nativeElement.blur();
     }
   }
 
-  openSearchModal() {
-    this.modalSearchQuery.set('');
-    this.isSearchModalOpen.set(true);
+  focusDirectorySearch() {
+    this.inlineSearchOpen = true;
+    setTimeout(() => this.directorySearch?.nativeElement.focus());
   }
 
-  closeSearchModal() {
-    this.isSearchModalOpen.set(false);
+  onDirectorySearch(value: string) {
+    this.searchText = value;
+    this.inlineSearchOpen = true;
+    this.onSearch();
   }
 
-  selectModalEmployee(emp: Employee) {
-    this.closeSearchModal();
-    this.openProfile(emp);
+  directorySearchSuggestions(): Employee[] {
+    const query = this.searchText.trim().toLowerCase();
+    if (!query) return [];
+    return this.employees().filter((employee: any) => {
+      const searchable = [employee.firstName, employee.lastName, employee.employeeCode,
+        employee.user?.email, employee.department?.name, employee.designation?.name]
+        .filter(Boolean).join(' ').toLowerCase();
+      return searchable.includes(query);
+    }).slice(0, 8);
   }
-  // -------------------------
+
+  selectDirectorySuggestion(employee: Employee) {
+    this.searchText = `${employee.firstName || ''} ${employee.lastName || ''}`.trim();
+    this.inlineSearchOpen = false;
+    // AG Grid's quick filter indexes the raw first-name field separately from
+    // the last name, so a full display name can fail to match even though the
+    // suggestion came from that row. Filter by the employee's unique code
+    // while keeping the full, readable name in the input.
+    if (this.gridApi) {
+      this.gridApi.setGridOption('quickFilterText', employee.employeeCode || employee.user?.email || employee.firstName || '');
+    }
+  }
 
   // Filters state
   searchText = '';
@@ -141,10 +155,10 @@ export class EmployeeListComponent implements OnInit {
   filterDesignationId: number | null = null;
   filterRole: string | null = null;
   filterOnboardingStatus: string | null = null;
+  filterOffboardingStatus: string | null = null;
 
   defaultColDef: ColDef = {
-    flex: 1,
-    minWidth: 150,
+    minWidth: 120,
     filter: true,
     sortable: true
   };
@@ -153,6 +167,25 @@ export class EmployeeListComponent implements OnInit {
   paginationPageSizeSelector = [20, 50, 100, 200];
 
   gridOptions = {
+    headerHeight: 48,
+    rowHeight: 70,
+    // The directory uses a compact desktop layout; prevent AG Grid from
+    // rendering a second horizontal scrollbar beneath the table.
+    suppressHorizontalScroll: true,
+    // Keep former employees visually separate from the live directory.
+    rowClassRules: {
+      'offboarded-employee-row': (params: any) => params.data?.offboardingStatus === 'SEPARATED',
+      'deactivated-employee-row': (params: any) =>
+        ['SUSPENDED', 'INACTIVE', 'BLOCKED'].includes(String(params.data?.user?.status || '').toUpperCase()),
+    },
+    selectionColumnDef: {
+      width: 52,
+      minWidth: 52,
+      maxWidth: 52,
+      sortable: false,
+      resizable: false,
+      suppressHeaderMenuButton: true,
+    },
     rowSelection: {
       mode: 'multiRow' as const,
       checkboxes: true,
@@ -162,6 +195,9 @@ export class EmployeeListComponent implements OnInit {
     // Clicking the person opens their full profile in a popup (17 Oct 2026).
     onCellClicked: (e: any) => {
       if (e.colDef?.field === 'firstName' && e.data?.id) this.openProfile(e.data);
+      if (e.colDef?.field === 'offboardingStatus' && e.data?.id) {
+        this.router.navigate(['/offboarding'], { queryParams: { employeeId: e.data.id } });
+      }
     },
   };
 
@@ -173,8 +209,7 @@ export class EmployeeListComponent implements OnInit {
     { 
       headerName: 'Employee Name',
       field: 'firstName',
-      minWidth: 260,
-      flex: 1.5,
+      width: 280,
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         const fn = params.data.firstName || '';
@@ -205,26 +240,34 @@ export class EmployeeListComponent implements OnInit {
     },
     {
       field: 'employeeCode',
-      headerName: 'Employee ID',
-      width: 130,
+      headerName: 'ID',
+      width: 115,
       valueFormatter: (params) => params.value || '—'
     },
     {
       field: 'department.name',
       headerName: 'Department',
-      flex: 1.2,
+      width: 205,
+      wrapText: true,
       valueFormatter: (params) => params.value || 'Unassigned'
     },
     { 
       field: 'designation.name', 
       headerName: 'Designation',
-      flex: 1.2,
-      valueFormatter: (params) => params.value || 'Unassigned'
+      width: 190,
+      cellRenderer: (params: any) => {
+        const value = String(params.value || 'Unassigned')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+        return `<div style="display:flex; align-items:center; height:100%; white-space:normal; line-height:18px; overflow:hidden;">${value}</div>`;
+      }
     },
     {
       field: 'user.role',
       headerName: 'Role',
-      width: 180,
+      width: 125,
       cellRenderer: (params: any) => {
         let badges = '';
         if (params.value) {
@@ -245,7 +288,7 @@ export class EmployeeListComponent implements OnInit {
     {
       field: 'user.status',
       headerName: 'Status',
-      width: 140,
+      width: 115,
       cellRenderer: (params: any) => {
         if (!params.value) return '';
         const statusStr = params.value;
@@ -264,10 +307,9 @@ export class EmployeeListComponent implements OnInit {
     {
       field: 'onboardingStatus',
       headerName: 'Onboarding',
-      width: 140,
+      width: 150,
       cellRenderer: (params: any) => {
-        if (!params.value) return '';
-        const statusStr = params.value;
+        const statusStr = params.value || 'PENDING';
         let color = '#64748B'; let bg = '#F1F5F9'; let label = statusStr;
         if (statusStr === 'PENDING') {
           color = '#64748B'; bg = '#F1F5F9'; label = 'Pending';
@@ -277,16 +319,29 @@ export class EmployeeListComponent implements OnInit {
           color = '#16A34A'; bg = '#DCFCE7'; label = 'Completed';
         }
 
-        return `<span style="background: ${bg}; color: ${color}; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;">${label}</span>`;
+        return `<span style="background:${bg}; color:${color}; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700;">${label}</span>`;
+      }
+    },
+    {
+      field: 'offboardingStatus',
+      headerName: 'Offboarding',
+      width: 150,
+      cellRenderer: (params: any) => {
+        const status = params.value || 'NONE';
+        if (status === 'NONE') return `<span style="font-size:12px; color:#94A3B8;">N/A</span>`;
+        const separated = status === 'SEPARATED';
+        const label = separated ? 'Offboarded' : 'In progress';
+        const background = separated ? '#F1F5F9' : '#FFF7ED';
+        const color = separated ? '#475569' : '#C2410C';
+        return `<button type="button" style="padding:0; border:0; background:transparent; cursor:pointer;"><span style="background:${background}; color:${color}; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700;">${label}</span></button>`;
       }
     },
     { 
       headerName: 'Actions',
-      width: 90,
+      width: 72,
       flex: 0,
       sortable: false,
       filter: false,
-      pinned: 'right',
       cellRenderer: ActionCellRendererComponent,
       cellRendererParams: {
         onEdit: (data: any) => this.openDrawer(data),
@@ -298,7 +353,7 @@ export class EmployeeListComponent implements OnInit {
     }
   ];
 
-  /** Shared by the grid row menu and the directory search modal. */
+  /** Shared by the grid row menu and the directory search suggestions. */
   resendVerification(emp: any) {
     if (!emp?.user?.email) return;
     this.authService.resendVerification(emp.user.email).subscribe({
@@ -308,13 +363,11 @@ export class EmployeeListComponent implements OnInit {
   }
 
   viewProfile(emp: any) {
-    this.closeSearchModal();
     this.openProfile(emp);
   }
 
-  /** Opens the edit drawer for a search-modal result. */
+  /** Opens the edit drawer from a directory search result. */
   editFromSearch(emp: any) {
-    this.closeSearchModal();
     this.openDrawer(emp);
   }
 
@@ -341,6 +394,9 @@ export class EmployeeListComponent implements OnInit {
     }
     if (this.filterOnboardingStatus) {
       list = list.filter(e => (e.onboardingStatus || (e as any).onboardingStatus) === this.filterOnboardingStatus);
+    }
+    if (this.filterOffboardingStatus) {
+      list = list.filter(e => ((e as any).offboardingStatus || 'NONE') === this.filterOffboardingStatus);
     }
     if (this.searchText && this.searchText.trim()) {
       const q = this.searchText.toLowerCase().trim();
@@ -393,6 +449,24 @@ export class EmployeeListComponent implements OnInit {
 
   onGridReady(params: any) {
     this.gridApi = params.api;
+    // Keep the directory's key identifiers in the requested order, ahead of
+    // the wider descriptive fields.  The row-selection checkbox remains the
+    // grid's leading utility column.
+    this.gridApi.applyColumnState({
+      state: [
+        { colId: 'employeeCode' },
+        { colId: 'firstName' },
+        { colId: 'department.name' },
+        { colId: 'designation.name' },
+        { colId: 'user.role' },
+        { colId: 'user.status' },
+        { colId: 'onboardingStatus' },
+        { colId: 'offboardingStatus' },
+        { colId: 'Actions' },
+      ],
+      applyOrder: true,
+    });
+    this.gridApi.sizeColumnsToFit();
   }
 
   onSearch() {
@@ -430,6 +504,10 @@ export class EmployeeListComponent implements OnInit {
       filterModel['onboardingStatus'] = { filterType: 'text', type: 'equals', filter: this.filterOnboardingStatus };
     }
 
+    if (this.filterOffboardingStatus) {
+      filterModel['offboardingStatus'] = { filterType: 'text', type: 'equals', filter: this.filterOffboardingStatus };
+    }
+
     this.gridApi.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
   }
 
@@ -439,6 +517,7 @@ export class EmployeeListComponent implements OnInit {
     this.filterDesignationId = null;
     this.filterRole = null;
     this.filterOnboardingStatus = null;
+    this.filterOffboardingStatus = null;
     this.onSearch();
     if (this.gridApi) {
       this.gridApi.setFilterModel(null);
@@ -449,11 +528,16 @@ export class EmployeeListComponent implements OnInit {
     this.isLoading.set(true);
     this.employeeService.getEmployees().subscribe({
       next: (data) => {
-        // Deactivated staff stay in the directory but sink below current employees.
+        // Former employees always sit below the live directory.  Deactivated
+        // employees remain below active staff but above employees who have
+        // fully completed offboarding.
         const sorted = [...data].sort((a: any, b: any) => {
-          const ia = a.user?.status === 'SUSPENDED' ? 1 : 0;
-          const ib = b.user?.status === 'SUSPENDED' ? 1 : 0;
-          return ia - ib;
+          const rank = (employee: any) => {
+            if (employee.offboardingStatus === 'SEPARATED') return 2;
+            if (employee.user?.status === 'SUSPENDED') return 1;
+            return 0;
+          };
+          return rank(a) - rank(b);
         });
         this.employees.set(sorted);
         this.isLoading.set(false);

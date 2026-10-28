@@ -994,6 +994,89 @@ export class MailService {
     }
   }
 
+  async sendManagerOnboardingCompletedEmail(params: {
+    managerEmail: string;
+    managerName?: string | null;
+    employeeName: string;
+    employeeCode?: string | null;
+    designation?: string | null;
+    department?: string | null;
+    joiningDate?: Date | string | null;
+    workLocation?: string | null;
+    employeeEmail?: string | null;
+    preview?: boolean;
+  }) {
+    const value = (item?: string | null) => this.escapeHtml(item?.trim() || 'Not specified');
+    const joiningDate = params.joiningDate
+      ? new Date(params.joiningDate).toLocaleDateString('en-IN', {
+          day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata',
+        })
+      : 'Not specified';
+    const employeeName = this.escapeHtml(params.employeeName);
+    const designation = value(params.designation);
+    const previewBanner = params.preview
+      ? '<div style="padding:10px 24px;background:#fff7ed;color:#9a3412;font-size:12px;font-weight:700;text-align:center;letter-spacing:.04em;">EMAIL DESIGN PREVIEW — DEMONSTRATION DATA</div>'
+      : '';
+
+    const detailRows = [
+      ['Employee ID', value(params.employeeCode)],
+      ['Designation', designation],
+      ['Department', value(params.department)],
+      ['Official email', value(params.employeeEmail)],
+      ['Joining date', this.escapeHtml(joiningDate)],
+      ['Work location', value(params.workLocation)],
+    ].map(([label, item]) => `
+      <tr>
+        <td style="padding:11px 0;color:#64748b;font-size:13px;width:42%;border-bottom:1px solid #e8eef6;">${label}</td>
+        <td style="padding:11px 0;color:#172554;font-size:13px;font-weight:600;border-bottom:1px solid #e8eef6;">${item}</td>
+      </tr>`).join('');
+
+    const htmlContent = `
+      <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+        <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #dbe5f1;box-shadow:0 12px 32px rgba(15,23,42,.10);">
+          ${previewBanner}
+          <div style="padding:30px 34px;background:linear-gradient(135deg,#0f3d82 0%,#1769c2 100%);color:#ffffff;">
+            <div style="font-size:12px;font-weight:700;letter-spacing:.1em;opacity:.82;text-transform:uppercase;">Team update</div>
+            <h1 style="font-size:27px;line-height:1.2;margin:10px 0 8px;font-weight:700;">A new team member is ready</h1>
+            <p style="margin:0;font-size:15px;line-height:1.5;opacity:.9;">Onboarding is complete and the employee is ready to begin.</p>
+          </div>
+          <div style="padding:30px 34px 34px;">
+            <p style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#334155;">Hi ${value(params.managerName || 'Manager')},</p>
+            <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#475569;">
+              <strong style="color:#0f172a;">${employeeName}</strong> has completed onboarding and will be working under you as <strong style="color:#0f172a;">${designation}</strong>.
+            </p>
+            <div style="border:1px solid #d9e7fa;border-radius:14px;overflow:hidden;margin:0 0 24px;">
+              <div style="padding:17px 20px;background:#eff6ff;">
+                <div style="font-size:19px;font-weight:700;color:#123b73;">${employeeName}</div>
+                <div style="margin-top:5px;font-size:13px;font-weight:700;color:#1d6ed2;text-transform:uppercase;letter-spacing:.04em;">${designation}</div>
+              </div>
+              <div style="padding:5px 20px 8px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">${detailRows}</table></div>
+            </div>
+            <div style="padding:15px 17px;border-left:4px solid #22c55e;background:#f0fdf4;border-radius:7px;color:#166534;font-size:14px;line-height:1.55;">
+              Please help ${employeeName} settle into the team, align priorities, and get started on their role.
+            </div>
+            <p style="margin:25px 0 0;font-size:14px;line-height:1.55;color:#64748b;">Thank you for supporting a smooth start.</p>
+          </div>
+        </div>
+      </div>`;
+    const subject = `${params.preview ? 'Preview: ' : ''}New team member onboarded: ${params.employeeName}`;
+
+    try {
+      if (this.brevoApiKey) {
+        return await this.sendBrevoEmail({ to: params.managerEmail, subject, html: htmlContent });
+      }
+      return await this.sendWithRetry({
+        from: `"MIRA" <${this.fromEmail}>`,
+        to: params.managerEmail,
+        envelope: { from: this.fromEmail, to: params.managerEmail },
+        subject,
+        html: htmlContent,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send manager onboarding email to ${params.managerEmail}: ${this.errorDetail(error)}`);
+    }
+  }
+
   async sendInterviewScheduledEmail(email: string, candidateName: string, interviewTitle: string, scheduledAt: string, duration: number, meetingLink: string) {
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">

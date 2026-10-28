@@ -783,13 +783,13 @@
             }">{{ tip.day.status }}</span>
       <span class="cell-tooltip-date">{{ tip.day.dayNumber }} {{ tip.day.weekdayStr }}</span>
     </div>
-    <div class="cell-tooltip-body" *ngIf="tip.day.record?.clockIn">
+    <div class="cell-tooltip-body" *ngIf="tooltipTimeline(tip.day.record!).clockIn">
       <div class="cell-tooltip-times">
-        <span class="cell-tooltip-time"><strong>In:</strong> {{ formatTime(tip.day.record?.clockIn || null) }}</span>
-        <span class="cell-tooltip-time"><strong>Out:</strong> {{ tip.day.record?.clockOut ? formatTime(tip.day.record?.clockOut || null) : 'Not clocked out' }}</span>
+        <span class="cell-tooltip-time"><strong>In:</strong> {{ formatTime(tooltipTimeline(tip.day.record!).clockIn) }}</span>
+        <span class="cell-tooltip-time"><strong>Out:</strong> {{ tooltipTimeline(tip.day.record!).clockOut ? formatTime(tooltipTimeline(tip.day.record!).clockOut) : 'Not clocked out' }}</span>
       </div>
-      <div class="cell-tooltip-detail" *ngIf="tip.day.record?.totalHours">
-        <strong>Duration:</strong> {{ formatHours(tip.day.record?.totalHours || 0) }}
+      <div class="cell-tooltip-detail" *ngIf="tooltipTimeline(tip.day.record!).clockIn && tooltipTimeline(tip.day.record!).clockOut">
+        <strong>Duration:</strong> {{ calculateWorkHours(tooltipTimeline(tip.day.record!).clockIn, tooltipTimeline(tip.day.record!).clockOut).text }}
       </div>
       <div class="cell-tooltip-detail cell-tooltip-missed" *ngIf="tip.day.record?.clockOutReason">
         ⏱ Missed clock-out: "{{ tip.day.record?.clockOutReason }}"
@@ -1032,7 +1032,7 @@
                   CLOCK IN
                 </div>
                 <div class="session-time-val">
-                  {{ punch.clockIn ? (punch.clockIn | date:'shortTime') : '--' }}
+                  {{ punch.clockIn ? formatTime(punch.clockIn) : '--' }}
                 </div>
                 <div *ngIf="punch.clockInLat" class="session-geo-meta">
                   <span class="geo-coords">Lat: {{ punch.clockInLat | number:'1.4-4' }}<br>Lng: {{ punch.clockInLng | number:'1.4-4' }}</span>
@@ -1050,7 +1050,7 @@
                   CLOCK OUT
                 </div>
                 <div class="session-time-val">
-                  {{ punch.clockOut ? (punch.clockOut | date:'shortTime') : (selectedDayDetails()?.isToday ? 'Ongoing...' : 'Did not clock out') }}
+                  {{ punch.clockOut ? formatTime(punch.clockOut) : (selectedDayDetails()?.isToday ? 'Ongoing...' : 'Did not clock out') }}
                   <span class="auto-closed-chip" *ngIf="punch.autoClockedOut" title="Closed by the system at its 11:00 PM cutoff — not a recorded clock-out">
                     auto
                   </span>
@@ -1084,7 +1084,7 @@
       <!-- Total Duration Worked Box -->
       <div class="session-duration-summary">
         <span class="duration-title">⏱️ Total Duration Worked:</span>
-        <span class="duration-highlight">{{ selectedDayDetails()?.durationStr }}</span>
+        <span class="duration-highlight">{{ displayedDuration(selectedDayDetails()) }}</span>
       </div>
     </div>
 
