@@ -530,13 +530,33 @@
 .grid-container {
   height: 650px;
   width: 100%;
-  overflow-x: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* The grid is sized to its container, so the horizontal rail is redundant. */
+/* AG Grid renders separate scrollbar components as well as scrollable
+   viewports. Remove both layers so neither rail is visible in the directory. */
 :host ::ng-deep .grid-container .ag-body-horizontal-scroll,
-:host ::ng-deep .grid-container .ag-body-horizontal-scroll-viewport {
+:host ::ng-deep .grid-container .ag-body-vertical-scroll {
   display: none !important;
+}
+
+:host ::ng-deep .grid-container .ag-body-horizontal-scroll::-webkit-scrollbar,
+:host ::ng-deep .grid-container .ag-body-vertical-scroll::-webkit-scrollbar,
+.grid-container .ag-center-cols-viewport::-webkit-scrollbar,
+.grid-container .ag-body-viewport::-webkit-scrollbar,
+.grid-container::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+:host ::ng-deep .grid-container .ag-center-cols-viewport,
+:host ::ng-deep .grid-container .ag-body-viewport,
+:host ::ng-deep .grid-container .ag-body-horizontal-scroll-viewport,
+:host ::ng-deep .grid-container .ag-body-vertical-scroll-viewport {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
 /* Keep the directory readable at every width: long department and designation
@@ -547,6 +567,15 @@
   align-items: center;
   line-height: 18px !important;
   white-space: normal !important;
+}
+
+/* `autoHeight` takes care of multi-line Department and Designation values.
+   Keep short values vertically comfortable and ensure a long word cannot run
+   into the next grid column. */
+:host ::ng-deep .grid-container .ag-cell[col-id="department.name"],
+:host ::ng-deep .grid-container .ag-cell[col-id="designation.name"] {
+  min-height: 70px;
+  overflow-wrap: anywhere;
 }
 
 .grid-container .ag-header-cell-label {

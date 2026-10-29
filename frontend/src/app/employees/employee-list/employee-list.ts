@@ -169,9 +169,10 @@ export class EmployeeListComponent implements OnInit {
   gridOptions = {
     headerHeight: 48,
     rowHeight: 70,
-    // The directory uses a compact desktop layout; prevent AG Grid from
-    // rendering a second horizontal scrollbar beneath the table.
-    suppressHorizontalScroll: true,
+    // Keep every directory column at a readable width.  On a narrow viewport
+    // AG Grid's horizontal rail is intentionally available rather than
+    // shrinking text until names, emails, and job titles are cut off.
+    suppressHorizontalScroll: false,
     // Keep former employees visually separate from the live directory.
     rowClassRules: {
       'offboarded-employee-row': (params: any) => params.data?.offboardingStatus === 'SEPARATED',
@@ -209,7 +210,8 @@ export class EmployeeListComponent implements OnInit {
     { 
       headerName: 'Employee Name',
       field: 'firstName',
-      width: 280,
+      width: 360,
+      minWidth: 330,
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         const fn = params.data.firstName || '';
@@ -228,11 +230,11 @@ export class EmployeeListComponent implements OnInit {
             : `<div style="width: 34px; height: 34px; border-radius: 50%; background: #E2E8F0; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #475569; font-size: 12px; flex-shrink: 0; text-transform: lowercase;">${initials}</div>`;
 
         return `
-          <div style="display: flex; align-items: center; gap: 12px; line-height: 1.25; padding: 4px 0;">
+          <div style="display: flex; align-items: center; gap: 12px; line-height: 1.25; padding: 4px 0; min-width: 0; width: 100%;">
             ${avatarHtml}
-            <div>
-              <div style="font-weight: 700; color: #0F172A; font-size: 13px;">${fullName}</div>
-              <div style="font-size: 11.5px; color: #64748B; margin-top: 1px;">${email}</div>
+            <div style="min-width: 0; flex: 1;">
+              <div style="font-weight: 700; color: #0F172A; font-size: 13px; white-space: normal; overflow-wrap: anywhere;">${fullName}</div>
+              <div style="font-size: 11.5px; color: #64748B; margin-top: 1px; white-space: normal; overflow-wrap: anywhere;">${email}</div>
             </div>
           </div>
         `;
@@ -247,21 +249,37 @@ export class EmployeeListComponent implements OnInit {
     {
       field: 'department.name',
       headerName: 'Department',
-      width: 205,
+      width: 230,
+      minWidth: 190,
       wrapText: true,
+      // Department names can be long (for example, "Information Technology
+      // (IT)"). Let AG Grid grow that row instead of painting the second line
+      // over the department in the next row.
+      autoHeight: true,
+      cellStyle: {
+        display: 'flex',
+        alignItems: 'center',
+        lineHeight: '18px',
+        whiteSpace: 'normal',
+        overflowWrap: 'anywhere',
+        paddingTop: '8px',
+        paddingBottom: '8px',
+      },
       valueFormatter: (params) => params.value || 'Unassigned'
     },
     { 
       field: 'designation.name', 
       headerName: 'Designation',
-      width: 190,
+      width: 250,
+      minWidth: 210,
+      autoHeight: true,
       cellRenderer: (params: any) => {
         const value = String(params.value || 'Unassigned')
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;');
-        return `<div style="display:flex; align-items:center; height:100%; white-space:normal; line-height:18px; overflow:hidden;">${value}</div>`;
+        return `<div style="display:flex; align-items:center; height:100%; white-space:normal; overflow-wrap:anywhere; line-height:18px; overflow:hidden;">${value}</div>`;
       }
     },
     {
