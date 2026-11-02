@@ -2,9 +2,19 @@ import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Requ
 import { ApplicationsService } from './applications.service';
 import { OfferLettersService } from './offer-letters.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 
+/**
+ * Candidates, offers and salary approvals are HR / admin work: every route
+ * needs the recruitment/candidates permission, as the Candidates page does.
+ * Interviewers (any role with recruitment/interviews) keep their own list and
+ * may record feedback on interviews assigned to them. Until now every route
+ * here was open to any signed-in employee.
+ */
 @Controller('recruitment/applications')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
+@Permissions('recruitment/candidates')
 export class ApplicationsController {
   constructor(
     private readonly applicationsService: ApplicationsService,
@@ -25,6 +35,7 @@ export class ApplicationsController {
   }
 
   @Get('my-interviews')
+  @Permissions('recruitment/candidates', 'recruitment/interviews')
   getMyInterviews(@Request() req) {
     return this.applicationsService.getMyInterviews(req.user.companyId, req.user.sub, req.user.role);
   }
@@ -45,8 +56,9 @@ export class ApplicationsController {
   }
 
   @Put('interviews/:interviewId')
+  @Permissions('recruitment/candidates', 'recruitment/interviews')
   updateInterview(@Request() req, @Param('interviewId', ParseIntPipe) interviewId: number, @Body() body: any) {
-    return this.applicationsService.updateInterview(interviewId, req.user.companyId, body);
+    return this.applicationsService.updateInterview(interviewId, req.user.companyId, body, { userId: req.user.sub, role: req.user.role });
   }
 
   @Delete('interviews/:interviewId')

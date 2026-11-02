@@ -3,6 +3,7 @@ import { JobsController } from './jobs.controller';
 import { JobsService } from './jobs.service';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { PermissionsService } from '../permissions/permissions.service';
 
 describe('JobsController', () => {
   let controller: JobsController;
@@ -30,6 +31,10 @@ describe('JobsController', () => {
         {
           provide: PrismaService,
           useValue: {},
+        },
+        {
+          provide: PermissionsService,
+          useValue: { hasPermission: jest.fn() },
         },
       ],
     }).compile();

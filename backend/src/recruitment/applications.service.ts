@@ -1020,13 +1020,22 @@ export class ApplicationsService {
     return interview;
   }
 
-  async updateInterview(interviewId: number, companyId: number, data: any) {
+  async updateInterview(interviewId: number, companyId: number, data: any, actor?: { userId: number; role: string }) {
     const interview = await this.prisma.interview.findUnique({
       where: { id: interviewId },
       include: { application: true }
     });
     if (!interview || interview.application.companyId !== companyId) {
       throw new NotFoundException('Interview not found');
+    }
+    // HR and admins may change anything. Anyone else must be the interviewer,
+    // and may only record the outcome: feedback, rating and status.
+    if (actor && !['SUPERADMIN', 'ADMIN', 'HR'].includes(actor.role)) {
+      const me = await this.prisma.employee.findFirst({ where: { userId: actor.userId, companyId }, select: { id: true } });
+      if (!me || interview.interviewerId !== me.id) {
+        throw new ForbiddenException('Only the interviewer, HR or an administrator can update this interview');
+      }
+      data = { feedback: data?.feedback, rating: data?.rating, status: data?.status };
     }
 
     const updateData: any = {};

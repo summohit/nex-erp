@@ -28,6 +28,9 @@ import AppreciationScreen from '../screens/Team/AppreciationScreen';
 import ShiftRosterScreen from '../screens/Team/ShiftRosterScreen';
 import LeaveQuotaScreen from '../screens/Team/LeaveQuotaScreen';
 import AssetsScreen from '../screens/Team/AssetsScreen';
+import JobPostingsScreen from '../screens/Recruitment/JobPostingsScreen';
+import CandidatesScreen from '../screens/Recruitment/CandidatesScreen';
+import InterviewsScreen from '../screens/Recruitment/InterviewsScreen';
 import ESSScreen from '../screens/ESS/ESSScreen';
 import CRMScreen from '../screens/CRM/CRMScreen';
 import NotificationsScreen from '../screens/Notifications/NotificationsScreen';
@@ -189,6 +192,9 @@ export default function AppNavigator() {
             <Stack.Screen name="ShiftRoster" component={ShiftRosterScreen} />
             <Stack.Screen name="LeaveQuota" component={LeaveQuotaScreen} />
             <Stack.Screen name="Assets" component={AssetsScreen} />
+            <Stack.Screen name="JobPostings" component={JobPostingsScreen} />
+            <Stack.Screen name="Candidates" component={CandidatesScreen} />
+            <Stack.Screen name="Interviews" component={InterviewsScreen} />
             <Stack.Screen name="CRM" component={CRMScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="Payslips" component={PayslipsScreen} />
