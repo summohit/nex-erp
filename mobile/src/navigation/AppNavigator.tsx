@@ -24,6 +24,9 @@ import OrgChartScreen from '../screens/Team/OrgChartScreen';
 import OnboardingTrackerScreen from '../screens/Team/OnboardingTrackerScreen';
 import ProfileCompletionScreen from '../screens/Team/ProfileCompletionScreen';
 import EmployeeDocumentsScreen from '../screens/Team/EmployeeDocumentsScreen';
+import AppreciationScreen from '../screens/Team/AppreciationScreen';
+import ShiftRosterScreen from '../screens/Team/ShiftRosterScreen';
+import LeaveQuotaScreen from '../screens/Team/LeaveQuotaScreen';
 import ESSScreen from '../screens/ESS/ESSScreen';
 import CRMScreen from '../screens/CRM/CRMScreen';
 import NotificationsScreen from '../screens/Notifications/NotificationsScreen';
@@ -181,6 +184,9 @@ export default function AppNavigator() {
             <Stack.Screen name="OnboardingTracker" component={OnboardingTrackerScreen} />
             <Stack.Screen name="ProfileCompletion" component={ProfileCompletionScreen} />
             <Stack.Screen name="EmployeeDocuments" component={EmployeeDocumentsScreen} />
+            <Stack.Screen name="Appreciation" component={AppreciationScreen} />
+            <Stack.Screen name="ShiftRoster" component={ShiftRosterScreen} />
+            <Stack.Screen name="LeaveQuota" component={LeaveQuotaScreen} />
             <Stack.Screen name="CRM" component={CRMScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="Payslips" component={PayslipsScreen} />

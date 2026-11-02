@@ -1,6 +1,18 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
+
+/**
+ * Giving awards and managing award types is for HR and administrators, as on
+ * the web. These routes used to be open to any signed-in user, and the edit
+ * and delete routes did not even check the company.
+ */
+const AWARD_MANAGERS = ['SUPERADMIN', 'ADMIN', 'HR'];
+function requireAwardManager(req: any) {
+  if (!AWARD_MANAGERS.includes(req.user?.role)) {
+    throw new ForbiddenException('Only HR and administrators can manage awards.');
+  }
+}
 
 @Controller('appreciation')
 @UseGuards(AuthGuard)
@@ -74,6 +86,7 @@ export class AppreciationController {
   // Create Award Type (Admin / HR)
   @Post('award-types')
   async createAwardType(@Request() req, @Body() data: any) {
+    requireAwardManager(req);
     return this.prisma.awardType.create({
       data: {
         title: data.title,
@@ -87,7 +100,9 @@ export class AppreciationController {
 
   // Update Award Type (Admin / HR)
   @Put('award-types/:id')
-  async updateAwardType(@Param('id') id: string, @Body() data: any) {
+  async updateAwardType(@Request() req, @Param('id') id: string, @Body() data: any) {
+    requireAwardManager(req);
+    await this.ownAwardType(req, id);
     return this.prisma.awardType.update({
       where: { id: Number(id) },
       data: {
@@ -101,7 +116,9 @@ export class AppreciationController {
 
   // Delete Award Type
   @Delete('award-types/:id')
-  async deleteAwardType(@Param('id') id: string) {
+  async deleteAwardType(@Request() req, @Param('id') id: string) {
+    requireAwardManager(req);
+    await this.ownAwardType(req, id);
     return this.prisma.awardType.delete({
       where: { id: Number(id) }
     });
@@ -110,6 +127,13 @@ export class AppreciationController {
   // Create Appreciation (Grant Award)
   @Post()
   async createAppreciation(@Request() req, @Body() data: any) {
+    requireAwardManager(req);
+    // The award type and the person must both be in the caller's company.
+    const [type, emp] = await Promise.all([
+      this.prisma.awardType.findFirst({ where: { id: Number(data.awardTypeId), companyId: req.user.companyId }, select: { id: true } }),
+      this.prisma.employee.findFirst({ where: { id: Number(data.employeeId), companyId: req.user.companyId }, select: { id: true } }),
+    ]);
+    if (!type || !emp) throw new NotFoundException('Award type or employee not found');
     return this.prisma.appreciation.create({
       data: {
         awardTypeId: Number(data.awardTypeId),
@@ -137,9 +161,17 @@ export class AppreciationController {
 
   // Delete Appreciation
   @Delete(':id')
-  async deleteAppreciation(@Param('id') id: string) {
+  async deleteAppreciation(@Request() req, @Param('id') id: string) {
+    requireAwardManager(req);
+    const found = await this.prisma.appreciation.findFirst({ where: { id: Number(id), companyId: req.user.companyId }, select: { id: true } });
+    if (!found) throw new NotFoundException('Appreciation not found');
     return this.prisma.appreciation.delete({
       where: { id: Number(id) }
     });
+  }
+
+  private async ownAwardType(req: any, id: string) {
+    const t = await this.prisma.awardType.findFirst({ where: { id: Number(id), companyId: req.user.companyId }, select: { id: true } });
+    if (!t) throw new NotFoundException('Award type not found');
   }
 }
