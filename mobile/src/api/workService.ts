@@ -68,6 +68,15 @@ export interface AttendanceApproval {
   employee: PersonLite;
 }
 
+export interface EarlyRelease {
+  id: number;
+  type: 'DAYS' | 'HOURS';
+  date: string;
+  reason?: string | null;
+  employee?: PersonLite;
+  visit?: { requestNumber?: string | null; location?: string | null } | null;
+}
+
 export const workService = {
   async getCapabilities(): Promise<TaskCapabilities> {
     const { data } = await apiClient.get('/tasks/capabilities');
@@ -130,5 +139,18 @@ export const workService = {
   },
   async decideOutOfOffice(id: number, action: 'APPROVE' | 'REJECT', note?: string) {
     await apiClient.post(`/attendance/geofence/${id}/review`, { action, note });
+  },
+
+  // Field visit early release: project manager or super admin.
+  async canApproveEarlyRelease(): Promise<boolean> {
+    const { data } = await apiClient.get('/field-visit-early-release/can-approve');
+    return !!data?.canApprove;
+  },
+  async getPendingEarlyReleases(): Promise<EarlyRelease[]> {
+    const { data } = await apiClient.get('/field-visit-early-release/pending');
+    return data || [];
+  },
+  async decideEarlyRelease(id: number, action: 'APPROVE' | 'REJECT', note?: string) {
+    await apiClient.post(`/field-visit-early-release/${id}/review`, { action, note });
   },
 };

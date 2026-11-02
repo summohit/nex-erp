@@ -5,6 +5,7 @@ import AppScreen from '../../components/AppScreen';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuthStore } from '../../store/authStore';
 import { useProfileStore } from '../../store/profileStore';
+import { useDashboardStore } from '../../store/dashboardStore';
 import { employeeService } from '../../api/employeeService';
 import { PulseSkeleton } from '../../components/SharedUI';
 import { Check, Briefcase, GraduationCap, User, PhoneCall, Files } from 'lucide-react-native';
@@ -116,6 +117,10 @@ export default function ProfileScreen() {
         // Immediately persist to DB so CRM reflects the change without a separate Save tap
         await employeeService.updateProfile(empId as number, { ...formData, avatarUrl: url });
         handleFormChange({ avatarUrl: url });
+        // The header avatar reads the dashboard store; update it now rather
+        // than after the next dashboard refresh.
+        const dash = useDashboardStore.getState();
+        if (dash.profile) useDashboardStore.setState({ profile: { ...dash.profile, avatarUrl: url } });
         await fetchProfile(empId);
       }
     } catch {

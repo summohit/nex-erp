@@ -31,6 +31,7 @@ import {
   ticketService, Ticket, TicketStats, TicketPermissions, TicketEmployee,
   NewTicketAttachment, TicketType, TicketPriority, TicketPlatform,
 } from '../../api/ticketService';
+import { htmlToText } from '../../utils/htmlText';
 import { employeeService, Department } from '../../api/employeeService';
 
 const TYPES: TicketType[] = ['BUG', 'FEATURE_REQUEST', 'IMPROVEMENT', 'QUESTION'];
@@ -741,7 +742,7 @@ export default function TicketsScreen() {
                       <Text style={styles.sectionLabel}>Description</Text>
                       {/* Web writes rich text; strip tags so mobile shows readable copy. */}
                       <Text style={styles.descText}>
-                        {detail.description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}
+                        {htmlToText(detail.description)}
                       </Text>
                     </>
                   )}
@@ -800,7 +801,7 @@ export default function TicketsScreen() {
                           </Text>
                           <Text style={styles.commentTime}>{c.createdAt.split('T')[0]}</Text>
                         </View>
-                        <Text style={styles.commentText}>{c.body}</Text>
+                        <Text style={styles.commentText}>{htmlToText(c.body)}</Text>
                       </View>
                     </View>
                   ))}

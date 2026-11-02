@@ -29,6 +29,9 @@ import {
   HomeTask,
   WorkspaceHubSection,
 } from './HomeSections';
+import { DashTab, DashTabSwitch, TeamTab, OrgTab, canSeeTeam, canSeeOrg } from './RoleTabs';
+import WorkspaceInsights from './WorkspaceInsights';
+import { PersonSheetHost } from '../../components/PersonSheet';
 import { CLOCK_ERROR, clockRefusal } from '../../api/attendanceService';
 import {
   Clock,
@@ -164,6 +167,12 @@ export default function DashboardScreen() {
   const [liveWorkedTime, setLiveWorkedTime] = useState({ hours: 0, minutes: 0 });
   const [timeFilter, setTimeFilter] = useState<'7D' | '30D' | '3M'>('7D');
   const [refreshing, setRefreshing] = useState(false);
+  // Role-based tabs, as on the web: employees see only their workspace.
+  const [dashTab, setDashTab] = useState<DashTab>('workspace');
+  const [tabReload, setTabReload] = useState(0);
+  const [teamPending, setTeamPending] = useState(0);
+  const showTeam = canSeeTeam(user?.role, user?.isManager);
+  const showOrg = canSeeOrg(user?.role);
   const [feedback, setFeedback] = useState<{
     visible: boolean;
     type: ModalType;
@@ -282,6 +291,7 @@ export default function DashboardScreen() {
   };
 
   const onRefresh = async () => {
+    setTabReload((n) => n + 1);
     setRefreshing(true);
     await Promise.all([fetchDashboardData(), loadHomeSections(), loadVisitDays()]);
     setRefreshing(false);
@@ -910,6 +920,15 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <>
+            {showTeam && (
+              <DashTabSwitch value={dashTab} onChange={setDashTab} showOrg={showOrg} pending={teamPending} />
+            )}
+            {showTeam && dashTab === 'team' ? (
+              <TeamTab onNavigate={safeNavigate} reloadKey={tabReload} onPendingChange={setTeamPending} />
+            ) : showOrg && dashTab === 'org' ? (
+              <OrgTab onNavigate={safeNavigate} reloadKey={tabReload} />
+            ) : (
+            <>
             {/* 1. EXECUTIVE GRADIENT SHIFT & ATTENDANCE COMMAND HERO */}
             <View style={styles.heroAttendanceCard}>
               <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
@@ -1085,7 +1104,7 @@ export default function DashboardScreen() {
               <TouchableOpacity
                 style={styles.quickTile}
                 activeOpacity={0.75}
-                onPress={() => safeNavigate('Attendance')}
+                onPress={() => safeNavigate('Attendance', { initialTab: 'timesheets' })}
               >
                 <View style={[styles.quickTileIcon, { backgroundColor: '#ECFDF5' }]}>
                   <CalendarClock size={21} color="#059669" strokeWidth={2.2} />
@@ -1115,6 +1134,10 @@ export default function DashboardScreen() {
                 <Text style={styles.quickTileLabel}>Field Visit</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Web dashboard sections: announcements, today at a glance, stat
+                cards, week calendar, and approval queues for approvers. */}
+            <WorkspaceInsights onNavigate={safeNavigate} reloadKey={tabReload} showApprovals={showTeam} />
 
             {/* 4. EXECUTIVE BENTO GRID (LEAVE & PROJECTS) */}
             <View style={styles.sectionHeadingRow}>
@@ -1348,9 +1371,13 @@ export default function DashboardScreen() {
                 </View>
               )}
             </View>
+            </>
+            )}
           </>
         )}
       </ScrollView>
+
+      <PersonSheetHost />
 
       <FeedbackModal
         visible={feedback.visible}

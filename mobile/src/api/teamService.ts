@@ -51,8 +51,15 @@ export interface Notice {
 export const teamService = {
   /** Leave from everyone below the signed-in person in the reporting line. */
   async getTeamLeaveRequests(): Promise<TeamLeaveRequest[]> {
-    const { data } = await apiClient.get('/leaves/requests/managers');
-    return data || [];
+    // Same as the web: HR and admins see every request in the company; the
+    // server refuses anyone else, who gets their reporting line instead.
+    try {
+      const { data } = await apiClient.get('/leaves/requests');
+      return data || [];
+    } catch {
+      const { data } = await apiClient.get('/leaves/requests/managers');
+      return data || [];
+    }
   },
 
   /** Approve or reject. The server checks the reporting line again. */
@@ -68,8 +75,9 @@ export const teamService = {
   },
 
   async getNotices(): Promise<Notice[]> {
+    // The server sends { notices, canPost }; older builds sent the bare list.
     const { data } = await apiClient.get('/notices');
-    return data || [];
+    return Array.isArray(data) ? data : data?.notices || [];
   },
 
   async markNoticeRead(id: number) {

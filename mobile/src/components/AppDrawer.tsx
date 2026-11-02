@@ -247,6 +247,16 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   '/m/approvals': { screen: 'Approvals' },
   '/m/team-leave': { screen: 'TeamLeave' },
   '/m/team-attendance': { screen: 'TeamAttendance' },
+  // Web routes the server's sidebar sends that already have a mobile screen;
+  // unmapped ones opened the website instead (2 Nov 2026).
+  '/approvals': { screen: 'Approvals' },
+  '/attendance/clock-out-approvals': { screen: 'Approvals' },
+  '/attendance': { screen: 'Attendance' },
+  '/attendance/all': { screen: 'TeamAttendance' },
+  '/attendance/timeline': { screen: 'TeamAttendance' },
+  '/attendance/balances': { screen: 'Leaves', params: { initialTab: 'leaves' } },
+  '/field-visits/live': { screen: 'FieldVisit' },
+  '/employees/me/profile/': { screen: 'Profile' },
 };
 
 // Client-side group bucketing for visual grouping

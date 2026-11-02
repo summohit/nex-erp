@@ -73,7 +73,14 @@ function TabBarItem({
             {label}
           </Animated.Text>
         ) : (
-          <Text style={styles.idleLabel} numberOfLines={1}>{label}</Text>
+          <Text
+            style={styles.idleLabel}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            {label}
+          </Text>
         )}
       </Animated.View>
     </TouchableOpacity>
@@ -157,8 +164,8 @@ const styles = StyleSheet.create({
     height: 54,
   },
   tabItemActive: {
-    // Room for the longest name ("Attendance") on narrow phones.
-    flex: 2.5,
+    // Balanced active width allowing all labels to fit without ellipsis
+    flex: 1.8,
   },
   tabInner: {
     flex: 1,

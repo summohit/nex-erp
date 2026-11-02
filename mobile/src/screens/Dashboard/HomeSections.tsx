@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { CheckSquare, Ticket, Award, ChevronRight, Sparkles, Calendar } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, Image, ScrollView } from 'react-native';
+import { CheckSquare, Ticket, Award, ChevronRight, Sparkles, Calendar, X } from 'lucide-react-native';
+import { Avatar, PersonTap, usePersonSheet, PersonLite } from '../../components/PersonSheet';
 import { apiClient } from '../../api/apiClient';
 
 /**
@@ -35,7 +36,8 @@ export interface HomeAppreciation {
   awardTitle?: string;
   summary?: string;
   givenDate?: string;
-  employee?: { firstName: string; lastName: string; designation?: string | null } | null;
+  photoUrl?: string | null;
+  employee?: (PersonLite & { firstName: string; lastName: string; designation?: string | null; department?: string | null }) | null;
 }
 
 export interface HomeSectionsData {
@@ -93,6 +95,8 @@ export function WorkspaceHubSection({
   onViewTickets: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<'tasks' | 'tickets' | 'kudos'>('tasks');
+  const [kudos, setKudos] = useState<HomeAppreciation | null>(null);
+  const openPerson = usePersonSheet((st) => st.open);
 
   const tabs = [
     {
@@ -298,12 +302,17 @@ export function WorkspaceHubSection({
           {data.appreciations.slice(0, MAX_ROWS).map((a, i) => {
             const name = a.employee ? `${a.employee.firstName} ${a.employee.lastName}`.trim() : 'Team member';
             return (
-              <View key={a.id} style={[styles.itemRow, i > 0 && styles.itemDivider]}>
-                <View style={styles.kudosAvatar}>
-                  <Text style={styles.kudosAvatarText}>{(a.employee?.firstName || '?').charAt(0)}</Text>
-                </View>
+              <TouchableOpacity key={a.id} style={[styles.itemRow, i > 0 && styles.itemDivider]} onPress={() => setKudos(a)} activeOpacity={0.8}>
+                <PersonTap person={a.employee}>
+                  <Avatar person={a.employee} size={40} />
+                </PersonTap>
                 <View style={styles.itemMain}>
                   <Text style={styles.itemTitle} numberOfLines={1}>{name}</Text>
+                  {!!(a.employee?.designation || a.employee?.department) && (
+                    <Text style={styles.kudosRole} numberOfLines={1}>
+                      {[a.employee?.designation, a.employee?.department].filter(Boolean).join(' · ')}
+                    </Text>
+                  )}
                   <Text style={styles.kudosAwardTitle} numberOfLines={1}>
                     {a.awardTitle || 'Excellence Award'}
                   </Text>
@@ -312,16 +321,56 @@ export function WorkspaceHubSection({
                   ) : null}
                 </View>
                 <Text style={styles.dateChipText}>{shortDate(a.givenDate)}</Text>
-              </View>
+              </TouchableOpacity>
             );
           })}
         </View>
       )}
+
+      <Modal visible={!!kudos} transparent animationType="fade" onRequestClose={() => setKudos(null)}>
+        <TouchableOpacity style={styles.kBackdrop} activeOpacity={1} onPress={() => setKudos(null)}>
+          <TouchableOpacity activeOpacity={1} style={styles.kSheet}>
+            <TouchableOpacity style={styles.kClose} onPress={() => setKudos(null)}><X size={18} color="#334155" /></TouchableOpacity>
+            <ScrollView contentContainerStyle={styles.kBody}>
+              {kudos?.photoUrl ? <Image source={{ uri: kudos.photoUrl }} style={styles.kPhoto} resizeMode="cover" /> : null}
+              <View style={styles.kBadge}>
+                <Award size={16} color="#D97706" />
+                <Text style={styles.kBadgeText}>{kudos?.awardTitle || 'Appreciation'}</Text>
+              </View>
+              <TouchableOpacity style={styles.kPerson} onPress={() => { const e = kudos?.employee; setKudos(null); openPerson(e); }} activeOpacity={0.8}>
+                <Avatar person={kudos?.employee} size={52} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.kName}>{kudos?.employee ? `${kudos.employee.firstName} ${kudos.employee.lastName || ''}`.trim() : 'Team member'}</Text>
+                  <Text style={styles.kRole} numberOfLines={2}>
+                    {[kudos?.employee?.designation, kudos?.employee?.department].filter(Boolean).join(' · ') || 'View profile'}
+                  </Text>
+                </View>
+                <ChevronRight size={18} color="#94A3B8" />
+              </TouchableOpacity>
+              <Text style={styles.kDate}>Given on {kudos?.givenDate ? new Date(kudos.givenDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}</Text>
+              {!!kudos?.summary && <Text style={styles.kSummary}>{kudos.summary}</Text>}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  kudosRole: { fontSize: 11, color: '#64748B', marginTop: 1 },
+  kBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', padding: 20 },
+  kSheet: { backgroundColor: '#fff', borderRadius: 22, maxHeight: '85%', overflow: 'hidden' },
+  kClose: { position: 'absolute', right: 12, top: 12, zIndex: 2, width: 34, height: 34, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  kBody: { padding: 20, paddingTop: 22, gap: 12 },
+  kPhoto: { width: '100%', height: 190, borderRadius: 14, backgroundColor: '#F1F5F9' },
+  kBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: '#FFFBEB', borderColor: '#FDE68A', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  kBadgeText: { fontSize: 13, fontWeight: '800', color: '#B45309' },
+  kPerson: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  kName: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
+  kRole: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  kDate: { fontSize: 12, color: '#64748B', fontWeight: '600' },
+  kSummary: { fontSize: 15, lineHeight: 23, color: '#1E293B' },
   hubCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
