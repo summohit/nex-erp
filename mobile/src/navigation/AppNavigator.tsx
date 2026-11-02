@@ -31,6 +31,8 @@ import AssetsScreen from '../screens/Team/AssetsScreen';
 import JobPostingsScreen from '../screens/Recruitment/JobPostingsScreen';
 import CandidatesScreen from '../screens/Recruitment/CandidatesScreen';
 import InterviewsScreen from '../screens/Recruitment/InterviewsScreen';
+import OffboardingScreen from '../screens/Team/OffboardingScreen';
+import ClientsScreen from '../screens/Team/ClientsScreen';
 import ESSScreen from '../screens/ESS/ESSScreen';
 import CRMScreen from '../screens/CRM/CRMScreen';
 import NotificationsScreen from '../screens/Notifications/NotificationsScreen';
@@ -195,6 +197,8 @@ export default function AppNavigator() {
             <Stack.Screen name="JobPostings" component={JobPostingsScreen} />
             <Stack.Screen name="Candidates" component={CandidatesScreen} />
             <Stack.Screen name="Interviews" component={InterviewsScreen} />
+            <Stack.Screen name="Offboarding" component={OffboardingScreen} />
+            <Stack.Screen name="Clients" component={ClientsScreen} />
             <Stack.Screen name="CRM" component={CRMScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="Payslips" component={PayslipsScreen} />

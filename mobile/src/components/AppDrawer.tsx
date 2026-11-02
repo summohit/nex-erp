@@ -242,6 +242,8 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   '/recruitment/jobs': { screen: 'JobPostings' },
   '/recruitment/candidates': { screen: 'Candidates' },
   '/recruitment/interviews': { screen: 'Interviews' },
+  '/offboarding': { screen: 'Offboarding' },
+  '/clients': { screen: 'Clients' },
   '/assets/inventory': { screen: 'Assets', params: { initialTab: 'inventory' } },
   '/assets/assignments': { screen: 'Assets', params: { initialTab: 'assignments' } },
   '/employees': { screen: 'EmployeeDirectory' },

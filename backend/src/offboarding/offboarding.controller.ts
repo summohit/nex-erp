@@ -40,15 +40,20 @@ export class OffboardingController {
     return this.offboardingService.updateResignationStatus(
       req.user.companyId,
       parseInt(id),
-      req.user.userId,
+      req.user.sub,
       body.status,
       body.approvedLastWorkingDay ? new Date(body.approvedLastWorkingDay) : undefined,
-      body.remarks
+      body.remarks,
+      { role: req.user.role, employeeId: req.user.employeeId },
     );
   }
 
   @Get('tasks')
   async getTasks(@Request() req) {
+    // Same people who clear the tasks; the list names every leaver.
+    if (!['SUPERADMIN', 'ADMIN', 'HR', 'FINANCE'].includes(req.user.role)) {
+      throw new ForbiddenException('Not authorized to view clearance tasks');
+    }
     return this.offboardingService.getTasks(req.user.companyId);
   }
 
@@ -57,7 +62,7 @@ export class OffboardingController {
     const isAuthorized = ['SUPERADMIN', 'ADMIN', 'HR', 'FINANCE'].includes(req.user.role);
     if (!isAuthorized) throw new ForbiddenException('Not authorized to clear tasks');
 
-    return this.offboardingService.clearTask(parseInt(id), req.user.companyId, req.user.userId, body.remarks);
+    return this.offboardingService.clearTask(parseInt(id), req.user.companyId, req.user.sub, body.remarks);
   }
 
   @Post('exit-interview')
@@ -72,7 +77,7 @@ export class OffboardingController {
       req.user.companyId,
       body.employeeId,
       { feedback: body.feedback, rating: body.rating },
-      req.user.userId
+      req.user.sub
     );
   }
 

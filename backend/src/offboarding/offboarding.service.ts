@@ -106,7 +106,8 @@ export class OffboardingService {
     userId: number,
     status: string,
     approvedLastWorkingDay?: Date,
-    remarks?: string
+    remarks?: string,
+    actor?: { role: string; employeeId?: number | null },
   ) {
     const resignation = await this.prisma.resignation.findFirst({
       where: { id: resignationId, companyId },
@@ -114,6 +115,13 @@ export class OffboardingService {
     });
 
     if (!resignation) throw new NotFoundException('Resignation not found');
+    // A manager decides only for people who report to them (the list they
+    // see is already limited the same way), and never for their own.
+    if (actor?.role === 'MANAGER') {
+      if (!actor.employeeId || resignation.employee.managerId !== actor.employeeId) {
+        throw new ForbiddenException('You can only decide resignations of people who report to you');
+      }
+    }
 
     const updated = await this.prisma.resignation.update({
       where: { id: resignationId },
@@ -176,7 +184,9 @@ export class OffboardingService {
     return this.prisma.offboardingTask.findMany({
       where: { companyId },
       include: {
-        employee: { select: { id: true, userId: true } },
+        // Name and photo travel with the task: leavers are often already
+        // deactivated, so the app cannot look them up in the directory.
+        employee: { select: { id: true, userId: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true } },
         clearedBy: { select: { id: true, email: true } }
       },
       orderBy: { createdAt: 'desc' }
@@ -236,7 +246,7 @@ export class OffboardingService {
     return this.prisma.exitInterview.findMany({
       where: { companyId },
       include: {
-        employee: { select: { id: true } },
+        employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true } },
         interviewer: { select: { id: true, email: true } }
       },
       orderBy: { createdAt: 'desc' }
