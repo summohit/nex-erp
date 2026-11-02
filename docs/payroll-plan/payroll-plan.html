@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MIRA Payroll Plan</title>
+<style>
+  @page { size: A4; margin: 14mm 13mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Inter, Arial, sans-serif; color: #1e293b; font-size: 10.2pt; line-height: 1.45; margin: 0; }
+  h1 { font-size: 24pt; margin: 0 0 6px; color: #0f172a; letter-spacing: -.02em; }
+  h2 { font-size: 15pt; margin: 0 0 10px; color: #0f172a; border-bottom: 2px solid #2563eb; padding-bottom: 5px; }
+  h3 { font-size: 11.5pt; margin: 14px 0 6px; color: #1e3a8a; }
+  p { margin: 4px 0 8px; }
+  ul, ol { margin: 4px 0 8px; padding-left: 18px; }
+  li { margin-bottom: 2px; }
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+  .tight { font-size: 9.3pt; line-height: 1.38; } .tight h3 { margin: 9px 0 4px; } .tight li { margin-bottom: 1px; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 9.2pt; }
+  th, td { border: 1px solid #cbd5e1; padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: #eff6ff; color: #1e3a8a; font-weight: 600; }
+  .note { background: #fffbeb; border-left: 3px solid #f59e0b; padding: 6px 10px; font-size: 9.2pt; margin: 8px 0; }
+  .ok { background: #f0fdf4; border-left: 3px solid #22c55e; padding: 6px 10px; font-size: 9.2pt; margin: 8px 0; }
+  .muted { color: #64748b; font-size: 9pt; }
+  .tag { display: inline-block; background: #e0e7ff; color: #3730a3; border-radius: 4px; padding: 0 5px; font-size: 8.5pt; font-weight: 600; }
+  .cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; }
+  .cover .sub { font-size: 13pt; color: #475569; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .toc li { margin-bottom: 4px; }
+
+  /* flow diagram */
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 8px 0; }
+  .fb { border: 1.5px solid #2563eb; background: #eff6ff; border-radius: 8px; padding: 6px 8px; font-size: 8.6pt; font-weight: 600; color: #1e3a8a; text-align: center; min-width: 78px; }
+  .fb small { display: block; font-weight: 400; color: #475569; font-size: 7.6pt; }
+  .fb.g { border-color: #16a34a; background: #f0fdf4; color: #14532d; }
+  .fb.o { border-color: #d97706; background: #fffbeb; color: #78350f; }
+  .ar { color: #64748b; font-weight: 700; font-size: 12pt; }
+  .lane { border: 1px dashed #94a3b8; border-radius: 10px; padding: 8px 10px; margin: 8px 0; }
+  .lane > b { font-size: 9pt; color: #475569; text-transform: uppercase; letter-spacing: .05em; }
+
+  /* wireframes */
+  .wf { border: 2px solid #334155; border-radius: 8px; overflow: hidden; margin: 8px 0 6px; font-size: 8.6pt; background: #fff; }
+  .wf-bar { background: #334155; color: #fff; padding: 5px 10px; font-weight: 600; display: flex; justify-content: space-between; }
+  .wf-body { padding: 10px; }
+  .wf-tabs { display: flex; gap: 2px; border-bottom: 1px solid #94a3b8; margin-bottom: 8px; flex-wrap: wrap; }
+  .wf-tabs span { padding: 3px 8px; color: #475569; }
+  .wf-tabs span.on { border-bottom: 2px solid #2563eb; color: #1e3a8a; font-weight: 700; }
+  .btn { display: inline-block; border: 1px solid #64748b; border-radius: 4px; padding: 1px 7px; margin: 0 2px; background: #f8fafc; }
+  .btn.p { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .in { border: 1px solid #94a3b8; border-radius: 4px; padding: 2px 6px; background: #fff; min-height: 18px; color: #334155; }
+  .dd::after { content: " ▾"; color: #64748b; float: right; }
+  .lbl { color: #64748b; font-size: 7.8pt; margin-bottom: 1px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 10px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 10px; }
+  .chk::before { content: "☑ "; color: #2563eb; }
+  .unchk::before { content: "☐ "; color: #64748b; }
+  .wf table { font-size: 8.2pt; margin: 4px 0; }
+  .wf th { background: #f1f5f9; color: #334155; }
+  .box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 8px; background: #f8fafc; }
+  .steps { display: flex; gap: 4px; margin-bottom: 8px; }
+  .steps span { flex: 1; text-align: center; padding: 3px; border-radius: 4px; background: #e2e8f0; font-size: 7.8pt; }
+  .steps span.done { background: #bbf7d0; } .steps span.on { background: #2563eb; color: #fff; font-weight: 700; }
+  .cap { font-size: 8.6pt; color: #475569; margin: 0 0 12px; }
+  .right { text-align: right; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<div class="page cover">
+  <div class="muted">CES Tech · MIRA ERP</div>
+  <h1>Payroll: complete plan</h1>
+  <div class="sub">Fully configurable payroll, from master data to payslips and reports, so Finance never needs a developer to change a rate, slab, component or dropdown.</div>
+  <p style="margin-top:22px" class="muted">Prepared 22 October 2026 · Based on the current MIRA code, the old payroll tool's settings (screenshots) and the Consolidated MOM of 22 Oct 2026.</p>
+  <h3 style="margin-top:28px">Contents</h3>
+  <ol class="toc">
+    <li>Where we are today, and problems to fix</li>
+    <li>Design principles</li>
+    <li>Old and new tax regimes</li>
+    <li>The plan, phase by phase</li>
+    <li>Complete flow, end to end</li>
+    <li>Wireframes (13 screens)</li>
+    <li>Build order and questions for Finance</li>
+  </ol>
+  <div class="note" style="margin-top:24px">All tax and statutory figures in this document are <b>examples to be confirmed by a CA</b>. The new Income-tax Act 2025 applies from 1 April 2026 and renumbers sections. That is exactly why every figure is stored as editable data, not code.</div>
+</div>
+
+<!-- ============ 1. TODAY ============ -->
+<div class="page">
+  <h2>1. Where we are today, and problems to fix</h2>
+  <h3>In MIRA's code</h3>
+  <ul>
+    <li><b>Hardcoded tax and statutory rules</b> in the monthly run: PF 12% of Basic, ESI 0.75% at or below ₹21,000 gross, Professional Tax a flat ₹200 above ₹15,000, and <b>TDS = 10% of anything above ₹50,000 a month</b>, which is not how income tax works. Finance cannot change any of these.</li>
+    <li><b>Salary split settings live in three places</b> (salary template, payroll settings, offer-letter settings). An offer annexure and a payslip can disagree for the same CTC.</li>
+    <li><b>Components are only a name + Earning/Deduction.</b> No value, basis, conditions, taxable or loss-of-pay flags. Each employee's amounts are typed by hand.</li>
+    <li><b>Missing:</b> salary groups, tax regimes, slab tables, consultant TDS/GST, effective dates, salary revisions, and an audit log of setting changes.</li>
+    <li><b>Grades</b> use monthly gross; the MOM says grades are CTC-based.</li>
+  </ul>
+  <h3>In the old tool's settings (screenshots), to correct while moving data</h3>
+  <table>
+    <tr><th style="width:30%">Setting</th><th>Problem</th></tr>
+    <tr><td>Last TDS slab</td><td>Starts at ₹2,40,00,001 (2.4 crore) instead of ₹24,00,001, and stops at ₹1 crore. Income between ₹24 L and ₹2.4 Cr falls in no slab.</td></tr>
+    <tr><td>TDS slab table</td><td>Slabs only. No standard deduction, rebate, cess, surcharge or old regime.</td></tr>
+    <tr><td>EPF</td><td>Fixed ₹1,800 for everyone. Should be 12% of Basic capped at the ₹15,000 wage ceiling.</td></tr>
+    <tr><td>ESI 0.75%</td><td>Set as "% of Basic". ESI is normally on gross wages, and only at or below ₹21,000.</td></tr>
+    <tr><td>Variable Deduction 3.25%</td><td>3.25% is the employer's ESI rate; looks like the employer share entered as an employee deduction.</td></tr>
+    <tr><td>Other Deduction</td><td>Fixed ₹1,800 for all 30 people in the Employee group. Needs checking.</td></tr>
+    <tr><td>Professional Tax ₹200</td><td>Not in any group, and it depends on the state. Uttar Pradesh (Noida) has no PT.</td></tr>
+    <tr><td>Consultant TDS</td><td>Technical 2% on CTC, non-technical 10% on Basic (different bases). "Non-Technical Consultant with GST" has GST but no TDS.</td></tr>
+    <tr><td>Pay frequencies</td><td>Weekly / bi-weekly / semi-monthly kept on every component; CES pays monthly.</td></tr>
+  </table>
+
+  <h2 style="margin-top:18px">2. Design principles</h2>
+  <ol>
+    <li><b>Everything is data.</b> Every rate, slab, component, group, formula and dropdown is edited on a screen.</li>
+    <li><b>One calculation engine.</b> Offer annexure, onboarding, payroll preview, payslips and the calculator all call the same service.</li>
+    <li><b>Effective dates.</b> A change applies from its date. Finalized payslips never change: they keep a copy of amounts and the rule version used.</li>
+    <li><b>Safe editing.</b> Formulas are checked on save; a "try it" calculator shows the result before saving; nothing used on a payslip is deleted, only deactivated.</li>
+    <li><b>Audit everything.</b> Who changed what, when, old value and new value.</li>
+    <li><b>Permissions.</b> Finance edits payroll masters, HR views, the super admin has everything.</li>
+  </ol>
+</div>
+
+<!-- ============ 3. REGIMES ============ -->
+<div class="page">
+  <h2>3. Old and new tax regimes</h2>
+  <p>Each employee chooses a regime for each financial year. <b>New is the default</b> if they don't choose. MIRA stores both regimes as editable tables per financial year, and the engine works out monthly TDS from whichever one the employee picked.</p>
+
+  <h3>Comparison (FY 2025-26 figures, to be confirmed for FY 2026-27)</h3>
+  <table>
+    <tr><th style="width:24%"></th><th style="width:38%">New regime (default)</th><th>Old regime</th></tr>
+    <tr><td>Slabs</td><td>0–4 L nil · 4–8 L 5% · 8–12 L 10% · 12–16 L 15% · 16–20 L 20% · 20–24 L 25% · above 24 L 30%</td><td>0–2.5 L nil · 2.5–5 L 5% · 5–10 L 20% · above 10 L 30%<br><span class="muted">Higher nil limit for 60+ (3 L) and 80+ (5 L)</span></td></tr>
+    <tr><td>Standard deduction (salary)</td><td>₹75,000</td><td>₹50,000</td></tr>
+    <tr><td>Rebate (87A)</td><td>Up to ₹60,000 if taxable income ≤ ₹12 L, so <b>no tax up to ₹12.75 L salary</b>. Marginal relief just above.</td><td>Up to ₹12,500 if taxable income ≤ ₹5 L</td></tr>
+    <tr><td>Deductions allowed</td><td>Almost none. Employer NPS (80CCD(2)) allowed.</td><td>80C (₹1.5 L), 80CCD(1B) NPS (₹50,000), 80D health insurance, HRA exemption, LTA, home-loan interest (₹2 L), Professional Tax, and more</td></tr>
+    <tr><td>Cess</td><td colspan="2">4% health and education cess on tax after rebate</td></tr>
+    <tr><td>Surcharge</td><td>10% / 15% / 25% above ₹50 L / ₹1 Cr / ₹2 Cr (max 25%)</td><td>Same bands, up to 37% above ₹5 Cr</td></tr>
+  </table>
+
+  <h3>Worked example: taxable salary ₹10,00,000, ₹1.5 L invested in 80C</h3>
+  <div class="two">
+    <div class="box"><b>New regime</b><br>10,00,000 − 75,000 std = <b>9,25,000</b><br>4 L × 5% = 20,000<br>1.25 L × 10% = 12,500<br>Tax 32,500 − rebate 32,500 = <b>₹0</b></div>
+    <div class="box"><b>Old regime</b><br>10,00,000 − 50,000 std − 1,50,000 80C = <b>8,00,000</b><br>2.5 L × 5% = 12,500<br>3 L × 20% = 60,000<br>72,500 + 4% cess = <b>₹75,400</b></div>
+  </div>
+
+  <h3>How MIRA will handle regimes</h3>
+  <ol>
+    <li><b>Settings, per financial year:</b> a regime record with an editable slab table, standard deduction, rebate limit and maximum, marginal relief on/off, cess %, surcharge table and age-based nil limits. Next year's figures are added as a new version; last year's stay for history.</li>
+    <li><b>Deduction sections master</b> (old regime): code, name, yearly limit, proof required, which regime it applies to. All editable as section numbers change under the new Act.</li>
+    <li><b>Employee choice:</b> at the start of the year (or when joining), the employee picks a regime in their profile with a side-by-side comparison of their own estimated tax under both. Finance can lock the choice after a set date.</li>
+    <li><b>Declarations:</b> in April the employee declares planned investments (old regime). In January–February they upload proofs; Finance approves or reduces amounts; TDS for the remaining months is corrected.</li>
+    <li><b>Monthly TDS</b> = (projected yearly tax − TDS already deducted this year) ÷ months left. This spreads tax evenly and absorbs bonuses, revisions and arrears.</li>
+    <li><b>Mid-year joiners</b> enter income and TDS from their previous employer (Form 12B) so the projection is right.</li>
+    <li><b>Year end:</b> a TDS summary per employee for Form 24Q and Form 16.</li>
+  </ol>
+  <div class="note">Rates above are the FY 2025-26 rules carried into FY 2026-27 as far as we know. Finance/CA must confirm before go-live, and enter them in the settings screen. No code change needed when they differ.</div>
+</div>
+
+<!-- ============ 4. PHASES ============ -->
+<div class="page tight">
+  <h2>4. The plan, phase by phase</h2>
+
+  <h3>Phase 1 · Master data <span class="tag">every list editable</span></h3>
+  <ul>
+    <li><b>Salary components:</b> name, code (e.g. BASIC, HRA), type (Earning / Deduction / Employer contribution / Info), <b>value type</b> (Fixed, % of CTC, % of Basic, % of Gross, Formula, Balance, Slab table, Entered monthly), cap on base (PF on Basic up to ₹15,000), condition (ESI only if gross ≤ ₹21,000), rounding, min/max, flags (part of CTC, taxable, reduced for LOP, on payslip, on annexure), order, active, effective from.</li>
+    <li><b>Salary groups:</b> name, pay type (Employee / Trainee / Consultant), components with per-group values, PF yes/no, ESI yes/no, tax method (regime slabs / flat % / none), GST yes/no and rate. The old tool's 7 groups move across, corrected.</li>
+    <li><b>Tax regimes and deduction sections</b> (section 3).</li>
+    <li><b>Statutory rates:</b> PF (employee %, employer %, EPS split, wage ceiling, admin charges), ESI (employee %, employer %, limit), Professional Tax slab table per state, LWF.</li>
+    <li><b>Contractor TDS and GST:</b> sections with rate and threshold; GST rates.</li>
+    <li><b>Grades:</b> annual CTC bands, km rate, costing rate.</li>
+    <li><b>Other dropdowns:</b> payment methods, pay frequency, contract lengths (6 m / 1 y / 2 y), worker types, states, currency, working days and hours for costing, payslip and annexure wording.</li>
+  </ul>
+
+  <h3>Phase 2 · One calculation engine and a salary calculator</h3>
+  <ul>
+    <li>Input: CTC (or monthly gross), salary group, date, regime. Output: monthly and yearly breakdown, employer cost, net pay, estimated tax under both regimes.</li>
+    <li>Formulas use component codes and are validated on save (no loops, no unknown codes).</li>
+    <li>Calculator screen for Finance to compare with their Excel. Tests built from Finance's Excel examples.</li>
+    <li>Replaces the hardcoded rules and merges the three old settings sources.</li>
+  </ul>
+
+  <h3>Phase 3 · Employee pay profile</h3>
+  <ul>
+    <li>Salary group, annual CTC, effective date, regime, PAN, UAN/PF no., ESI no., bank details, payment method, component overrides with reason.</li>
+    <li>Salary revisions with history; back-dated revisions add arrears to the next payslip. Grade set from CTC.</li>
+  </ul>
+
+  <h3>Phase 4 · Recruitment → offer → onboarding <span class="tag">MOM P0/P1</span></h3>
+  <ul>
+    <li>Offer: annual CTC + salary group → engine → annexure. On acceptance the annexure is <b>locked as version 1</b>. On joining the pay profile is created from it. Later changes go through an approved revision (and re-acceptance where needed).</li>
+  </ul>
+
+  <h3>Phase 5 · Monthly payroll run</h3>
+  <ul>
+    <li>Lock attendance → monthly inputs (bonus, arrears, one-off deductions, approved expenses, loan recovery, leave encashment) → preview with warnings → calculate (LOP only on flagged components; TDS by projection) → approve → finalize (frozen) → mark paid → payslips by email/PDF.</li>
+    <li>Reports: salary register, bank transfer file, PF ECR, ESI return, PT, TDS summary (24Q / Form 16), employer cost, department totals.</li>
+  </ul>
+
+  <h3>Phase 6 · Consultants and trainees</h3>
+  <ul>
+    <li>Consultants: monthly fee, TDS at section rate, GST added when registered; payout statement. Trainees: fixed stipend, reduced only for unpaid leave.</li>
+    <li>Proposed control (legal review): once PF appears on a finalized payslip, moving to a no-PF/consultant group needs approval.</li>
+  </ul>
+
+  <h3>Phase 7 · Costing and extras</h3>
+  <ul>
+    <li>Hourly/daily cost = (CTC + employer contributions) ÷ (working days × hours), all editable; feeds project costing.</li>
+    <li>Later: reverse calculation (target net → CTC), loans, Form 16 generation.</li>
+  </ul>
+</div>
+
+<!-- ============ 5. FLOW ============ -->
+<div class="page">
+  <h2>5. Complete flow, end to end</h2>
+
+  <div class="lane"><b>A · One-time setup (Finance)</b>
+    <div class="flow">
+      <div class="fb">Dropdown masters<small>methods, states, types</small></div><span class="ar">→</span>
+      <div class="fb">Statutory rates<small>PF · ESI · PT · LWF</small></div><span class="ar">→</span>
+      <div class="fb">Tax regimes<small>slabs per FY</small></div><span class="ar">→</span>
+      <div class="fb">Components<small>value type, formula</small></div><span class="ar">→</span>
+      <div class="fb">Salary groups<small>components + rules</small></div><span class="ar">→</span>
+      <div class="fb g">Calculator check<small>vs Finance Excel</small></div>
+    </div>
+  </div>
+
+  <div class="lane"><b>B · Hiring (HR)</b>
+    <div class="flow">
+      <div class="fb">Candidate selected</div><span class="ar">→</span>
+      <div class="fb">Enter annual CTC<small>+ pick salary group</small></div><span class="ar">→</span>
+      <div class="fb">Engine builds breakup</div><span class="ar">→</span>
+      <div class="fb">Offer + annexure</div><span class="ar">→</span>
+      <div class="fb g">Accepted<small>annexure locked v1</small></div><span class="ar">→</span>
+      <div class="fb">Onboarding<small>pay profile created</small></div>
+    </div>
+  </div>
+
+  <div class="lane"><b>C · Employee year</b>
+    <div class="flow">
+      <div class="fb">Choose regime<small>compare both</small></div><span class="ar">→</span>
+      <div class="fb">Declare investments<small>April (old regime)</small></div><span class="ar">→</span>
+      <div class="fb">Monthly payslips</div><span class="ar">→</span>
+      <div class="fb">Upload proofs<small>Jan–Feb</small></div><span class="ar">→</span>
+      <div class="fb">Finance verifies</div><span class="ar">→</span>
+      <div class="fb g">Form 16<small>year end</small></div>
+    </div>
+  </div>
+
+  <div class="lane"><b>D · Every month (Finance)</b>
+    <div class="flow">
+      <div class="fb">Lock attendance<small>LOP · half days</small></div><span class="ar">→</span>
+      <div class="fb">Monthly inputs<small>bonus · arrears · expenses</small></div><span class="ar">→</span>
+      <div class="fb">Preview<small>warnings</small></div><span class="ar">→</span>
+      <div class="fb">Calculate<small>engine · TDS projection</small></div><span class="ar">→</span>
+      <div class="fb o">Approve</div><span class="ar">→</span>
+      <div class="fb g">Finalize<small>frozen</small></div><span class="ar">→</span>
+      <div class="fb">Pay<small>bank file</small></div><span class="ar">→</span>
+      <div class="fb">Payslips + reports</div>
+    </div>
+  </div>
+
+  <div class="lane"><b>E · Changes during the year</b>
+    <div class="flow">
+      <div class="fb">Salary revision<small>new CTC / group</small></div><span class="ar">→</span>
+      <div class="fb o">Approval</div><span class="ar">→</span>
+      <div class="fb">New profile version<small>effective date</small></div><span class="ar">→</span>
+      <div class="fb g">Arrears auto-added<small>if back-dated</small></div>
+    </div>
+    <div class="flow">
+      <div class="fb">Rate / slab change<small>Finance</small></div><span class="ar">→</span>
+      <div class="fb">New version<small>effective from date</small></div><span class="ar">→</span>
+      <div class="fb g">Applies to later runs only<small>finalized slips untouched</small></div>
+    </div>
+  </div>
+
+  <h3>Who does what</h3>
+  <table>
+    <tr><th>Role</th><th>Can do</th></tr>
+    <tr><td>Finance</td><td>All payroll masters, calculator, monthly run, approve declarations, reports</td></tr>
+    <tr><td>HR</td><td>Offers and annexures, onboarding, view pay profiles, request revisions</td></tr>
+    <tr><td>Super admin</td><td>Everything, including final approval of revisions and payroll</td></tr>
+    <tr><td>Employee</td><td>Regime choice, declarations and proofs, own payslips and Form 16</td></tr>
+  </table>
+</div>
+
+<!-- ============ 6. WIREFRAMES ============ -->
+<div class="page">
+  <h2>6. Wireframes</h2>
+  <p class="muted">Layouts only: final styling follows MIRA's existing screens.</p>
+
+  <div class="wf"><div class="wf-bar"><span>W1 · Payroll Settings → Salary Components</span><span>Finance</span></div><div class="wf-body">
+    <div class="wf-tabs"><span class="on">Components</span><span>Salary Groups</span><span>Tax Regimes</span><span>Statutory</span><span>Contractor TDS/GST</span><span>Grades</span><span>Dropdowns</span><span>Audit log</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="in" style="width:40%">Search components…</span><span><span class="btn">Import Excel</span><span class="btn">Export</span><span class="btn p">+ Add component</span></span></div>
+    <table>
+      <tr><th>Code</th><th>Name</th><th>Type</th><th>Value</th><th>Rule</th><th>Flags</th><th>Effective from</th><th></th></tr>
+      <tr><td>BASIC</td><td>Basic</td><td>Earning</td><td>50% of CTC (monthly)</td><td>—</td><td>CTC · Taxable · LOP</td><td>01-04-2026</td><td>Edit · History</td></tr>
+      <tr><td>HRA</td><td>House Rent Allowance</td><td>Earning</td><td>Formula: BASIC × 40%</td><td>—</td><td>CTC · Taxable · LOP</td><td>01-04-2026</td><td>Edit · History</td></tr>
+      <tr><td>SPECIAL</td><td>Special Allowance</td><td>Earning</td><td>Balance</td><td>—</td><td>CTC · Taxable · LOP</td><td>01-04-2026</td><td>Edit · History</td></tr>
+      <tr><td>PF_EE</td><td>Employee PF</td><td>Deduction</td><td>12% of BASIC</td><td>Base cap 15,000</td><td>Payslip</td><td>01-04-2026</td><td>Edit · History</td></tr>
+      <tr><td>ESI_EE</td><td>Employee ESI</td><td>Deduction</td><td>0.75% of GROSS</td><td>If GROSS ≤ 21,000</td><td>Payslip</td><td>01-04-2026</td><td>Edit · History</td></tr>
+      <tr><td>ESI_ER</td><td>Employer ESI</td><td>Employer</td><td>3.25% of GROSS</td><td>If GROSS ≤ 21,000</td><td>CTC</td><td>01-04-2026</td><td>Edit · History</td></tr>
+    </table>
+  </div></div>
+  <p class="cap">One list for all components. "History" shows every past version with its dates.</p>
+
+  <div class="wf"><div class="wf-bar"><span>W2 · Add / edit component</span><span>modal</span></div><div class="wf-body">
+    <div class="grid3">
+      <div><div class="lbl">Name *</div><div class="in">House Rent Allowance</div></div>
+      <div><div class="lbl">Code *</div><div class="in">HRA</div></div>
+      <div><div class="lbl">Type *</div><div class="in dd">Earning</div></div>
+      <div><div class="lbl">Value type * (editable list)</div><div class="in dd">Formula</div></div>
+      <div style="grid-column:span 2"><div class="lbl">Formula</div><div class="in">BASIC * 40%</div><div class="muted">✓ Valid · uses BASIC · try: CTC 6,00,000 → HRA 10,000/month</div></div>
+      <div><div class="lbl">Base cap</div><div class="in">—</div></div>
+      <div><div class="lbl">Apply only if</div><div class="in dd">Always</div></div>
+      <div><div class="lbl">Rounding</div><div class="in dd">Nearest rupee</div></div>
+      <div><div class="lbl">Min / max per month</div><div class="in">— / —</div></div>
+      <div><div class="lbl">Effective from *</div><div class="in">01-04-2026</div></div>
+      <div><div class="lbl">Display order</div><div class="in">2</div></div>
+    </div>
+    <div style="margin-top:6px"><span class="chk">Part of CTC</span> &nbsp; <span class="chk">Taxable</span> &nbsp; <span class="chk">Reduce for loss of pay</span> &nbsp; <span class="chk">Show on payslip</span> &nbsp; <span class="chk">Show on annexure</span> &nbsp; <span class="unchk">Exempt under old regime (HRA rules)</span></div>
+    <div class="right" style="margin-top:6px"><span class="btn">Cancel</span><span class="btn p">Save as new version</span></div>
+  </div></div>
+</div>
+
+<div class="page">
+  <div class="wf"><div class="wf-bar"><span>W3 · Salary group</span><span>Finance</span></div><div class="wf-body">
+    <div class="grid4">
+      <div><div class="lbl">Name *</div><div class="in">Employee Salary Group</div></div>
+      <div><div class="lbl">Pay type *</div><div class="in dd">Employee</div></div>
+      <div><div class="lbl">Tax method *</div><div class="in dd">Income-tax regime slabs</div></div>
+      <div><div class="lbl">GST</div><div class="in dd">Not applicable</div></div>
+    </div>
+    <div style="margin:6px 0"><span class="chk">PF applies</span> &nbsp; <span class="chk">ESI applies (when eligible)</span> &nbsp; <span class="chk">Professional Tax by work state</span> &nbsp; <span class="muted">Employees: 30 · <u>Manage employees</u></span></div>
+    <table>
+      <tr><th>#</th><th>Component</th><th>Default value</th><th>Value in this group</th><th></th></tr>
+      <tr><td>1</td><td>Basic</td><td>50% of CTC</td><td><span class="muted">use default</span></td><td>↑↓ ✕</td></tr>
+      <tr><td>2</td><td>HRA</td><td>BASIC × 40%</td><td><span class="muted">use default</span></td><td>↑↓ ✕</td></tr>
+      <tr><td>3</td><td>Travel Allowance</td><td>Fixed 1,600</td><td><span class="in" style="display:inline-block">2,000</span></td><td>↑↓ ✕</td></tr>
+      <tr><td>4</td><td>Medical Allowance</td><td>Fixed 1,250</td><td><span class="muted">use default</span></td><td>↑↓ ✕</td></tr>
+      <tr><td>5</td><td>Special Allowance</td><td>Balance</td><td><span class="muted">use default</span></td><td>↑↓ ✕</td></tr>
+      <tr><td>6</td><td>Employee PF</td><td>12% of BASIC (cap 15,000)</td><td><span class="muted">use default</span></td><td>↑↓ ✕</td></tr>
+    </table>
+    <div style="display:flex;justify-content:space-between"><span class="btn">+ Add component</span><span><span class="btn">Preview with CTC…</span><span class="btn p">Save</span></span></div>
+  </div></div>
+  <p class="cap">Consultant groups use tax method "Flat % (section)" plus GST; the trainee group has stipend only.</p>
+
+  <div class="wf"><div class="wf-bar"><span>W4 · Tax regimes</span><span>Finance</span></div><div class="wf-body">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="lbl">Financial year</span><span class="in dd" style="width:110px">2026-27</span><span class="btn">Copy from 2025-26</span><span class="wf-tabs" style="margin:0 0 0 auto;border:0"><span class="on">New regime</span><span>Old regime</span></span></div>
+    <div class="two">
+      <div><b>Slabs</b>
+        <table><tr><th>From (₹)</th><th>Up to (₹)</th><th>Rate %</th><th></th></tr>
+          <tr><td>0</td><td>4,00,000</td><td>0</td><td>✕</td></tr>
+          <tr><td>4,00,001</td><td>8,00,000</td><td>5</td><td>✕</td></tr>
+          <tr><td>8,00,001</td><td>12,00,000</td><td>10</td><td>✕</td></tr>
+          <tr><td>12,00,001</td><td>16,00,000</td><td>15</td><td>✕</td></tr>
+          <tr><td>16,00,001</td><td>20,00,000</td><td>20</td><td>✕</td></tr>
+          <tr><td>20,00,001</td><td>24,00,000</td><td>25</td><td>✕</td></tr>
+          <tr><td>24,00,001</td><td><i>no limit</i></td><td>30</td><td>✕</td></tr>
+        </table><span class="btn">+ Add slab</span> <span class="muted">✓ No gaps or overlaps</span>
+      </div>
+      <div><b>Rules</b>
+        <div class="grid2" style="margin-top:4px">
+          <div><div class="lbl">Standard deduction</div><div class="in">75,000</div></div>
+          <div><div class="lbl">Cess %</div><div class="in">4</div></div>
+          <div><div class="lbl">Rebate if taxable ≤</div><div class="in">12,00,000</div></div>
+          <div><div class="lbl">Maximum rebate</div><div class="in">60,000</div></div>
+          <div><div class="lbl">Marginal relief</div><div class="in dd">On</div></div>
+          <div><div class="lbl">Default regime</div><div class="in dd">Yes</div></div>
+        </div>
+        <b style="display:block;margin-top:6px">Surcharge</b>
+        <table><tr><th>Income above</th><th>%</th></tr><tr><td>50,00,000</td><td>10</td></tr><tr><td>1,00,00,000</td><td>15</td></tr><tr><td>2,00,00,000</td><td>25</td></tr></table>
+      </div>
+    </div>
+    <div class="right"><span class="btn">Test with income…</span><span class="btn p">Save FY 2026-27</span></div>
+  </div></div>
+  <p class="cap">Old regime tab has the same layout plus age-based nil limits and the deduction sections list (80C, 80D, HRA, 24(b)…), each with a limit.</p>
+</div>
+
+<div class="page">
+  <div class="wf"><div class="wf-bar"><span>W5 · Statutory rates</span><span>Finance</span></div><div class="wf-body">
+    <div class="grid3">
+      <div class="box"><b>PF</b><div class="grid2" style="margin-top:4px"><div><div class="lbl">Employee %</div><div class="in">12</div></div><div><div class="lbl">Employer %</div><div class="in">12</div></div><div><div class="lbl">EPS part %</div><div class="in">8.33</div></div><div><div class="lbl">Wage ceiling</div><div class="in">15,000</div></div></div></div>
+      <div class="box"><b>ESI</b><div class="grid2" style="margin-top:4px"><div><div class="lbl">Employee %</div><div class="in">0.75</div></div><div><div class="lbl">Employer %</div><div class="in">3.25</div></div><div><div class="lbl">Gross limit</div><div class="in">21,000</div></div><div><div class="lbl">Base</div><div class="in dd">Gross</div></div></div></div>
+      <div class="box"><b>Professional Tax</b><div class="lbl" style="margin-top:4px">State</div><div class="in dd">Uttar Pradesh</div><div class="muted" style="margin-top:4px">No PT in this state</div><span class="btn" style="margin-top:4px">Edit slabs</span></div>
+    </div>
+    <div class="muted" style="margin-top:6px">Each block shows "Effective from" and a History link.</div>
+  </div></div>
+
+  <div class="wf"><div class="wf-bar"><span>W6 · Dropdown masters</span><span>Finance</span></div><div class="wf-body">
+    <div class="grid3">
+      <div class="box"><b>Payment methods</b><br>Bank transfer · UPI · Cheque · Cash<br><span class="btn">+ Add</span></div>
+      <div class="box"><b>Contract lengths</b><br>6 months · 1 year · 2 years<br><span class="btn">+ Add</span></div>
+      <div class="box"><b>Worker types</b><br>Employee · Trainee · Technical consultant · Non-technical consultant<br><span class="btn">+ Add</span></div>
+      <div class="box"><b>Value types</b><br>Fixed · % of CTC · % of Basic · % of Gross · Formula · Balance · Slab · Monthly input</div>
+      <div class="box"><b>Costing</b><br>Working days/month: <span class="in" style="display:inline-block">26</span> Hours/day: <span class="in" style="display:inline-block">8</span><br><span class="chk">Include employer PF/ESI</span></div>
+      <div class="box"><b>Grades (annual CTC)</b><br>G1 0–3 L · G2 3–6 L · G3 6–12 L · G4 12 L+<br><span class="btn">Edit bands</span></div>
+    </div>
+  </div></div>
+
+  <div class="wf"><div class="wf-bar"><span>W7 · Salary calculator</span><span>Finance · HR</span></div><div class="wf-body">
+    <div class="grid4">
+      <div><div class="lbl">Annual CTC</div><div class="in">6,00,000</div></div>
+      <div><div class="lbl">Salary group</div><div class="in dd">Employee Salary Group</div></div>
+      <div><div class="lbl">Work state</div><div class="in dd">Uttar Pradesh</div></div>
+      <div><div class="lbl">As on</div><div class="in">01-11-2026</div></div>
+    </div>
+    <table style="margin-top:6px">
+      <tr><th>Component</th><th class="right">Monthly</th><th class="right">Yearly</th></tr>
+      <tr><td>Basic</td><td class="right">25,000</td><td class="right">3,00,000</td></tr>
+      <tr><td>HRA</td><td class="right">10,000</td><td class="right">1,20,000</td></tr>
+      <tr><td>Travel + Medical</td><td class="right">2,850</td><td class="right">34,200</td></tr>
+      <tr><td>Special Allowance (balance)</td><td class="right">10,350</td><td class="right">1,24,200</td></tr>
+      <tr><td><b>Employer PF</b> (in CTC)</td><td class="right">1,800</td><td class="right">21,600</td></tr>
+      <tr><td><b>Gross</b></td><td class="right"><b>48,200</b></td><td class="right"><b>5,78,400</b></td></tr>
+      <tr><td>Employee PF</td><td class="right">−1,800</td><td class="right">−21,600</td></tr>
+      <tr><td>Estimated TDS · new regime / old regime (no declarations)</td><td class="right">0 / 1,576</td><td class="right">0 / 18,907</td></tr>
+      <tr><td><b>Net pay (new regime)</b></td><td class="right"><b>46,400</b></td><td class="right"><b>5,56,800</b></td></tr>
+    </table>
+    <div class="right"><span class="btn">Download Excel</span><span class="btn">Print annexure</span></div>
+  </div></div>
+  <p class="cap">Figures are illustrative. Finance uses this to check the engine against their Excel before any rule goes live.</p>
+</div>
+
+<div class="page">
+  <div class="wf"><div class="wf-bar"><span>W8 · Offer letter: salary step</span><span>HR · Recruitment</span></div><div class="wf-body">
+    <div class="grid3">
+      <div><div class="lbl">Annual CTC *</div><div class="in">6,00,000</div></div>
+      <div><div class="lbl">Salary group *</div><div class="in dd">Employee Salary Group</div></div>
+      <div><div class="lbl">Grade (automatic)</div><div class="in">G2</div></div>
+    </div>
+    <div class="box" style="margin-top:6px"><b>Annexure preview</b> <span class="muted">(same engine as payroll)</span><br>Basic 25,000 · HRA 10,000 · Travel 1,600 · Medical 1,250 · Special 10,350 · Employer PF 1,800 → Monthly CTC 50,000</div>
+    <div style="margin-top:6px"><span class="unchk">Override a component (needs reason)</span></div>
+    <div class="right"><span class="btn">Back</span><span class="btn p">Generate offer + annexure</span></div>
+    <div class="ok" style="margin-top:6px">When the candidate accepts: "Annexure v1 locked · 22-10-2026". On joining, the pay profile is created from v1.</div>
+  </div></div>
+
+  <div class="wf"><div class="wf-bar"><span>W9 · Employee → Pay profile</span><span>Finance · HR (view)</span></div><div class="wf-body">
+    <div class="grid4">
+      <div><div class="lbl">Salary group</div><div class="in dd">Employee Salary Group</div></div>
+      <div><div class="lbl">Annual CTC</div><div class="in">6,00,000</div></div>
+      <div><div class="lbl">Tax regime FY 26-27</div><div class="in dd">New</div></div>
+      <div><div class="lbl">Grade</div><div class="in">G2</div></div>
+      <div><div class="lbl">PAN</div><div class="in">ABCDE1234F</div></div>
+      <div><div class="lbl">UAN</div><div class="in">1012…</div></div>
+      <div><div class="lbl">Payment method</div><div class="in dd">Bank transfer</div></div>
+      <div><div class="lbl">Bank / IFSC</div><div class="in">HDFC · HDFC0001234</div></div>
+    </div>
+    <b style="display:block;margin-top:6px">Revisions</b>
+    <table><tr><th>Version</th><th>Effective</th><th>CTC</th><th>Group</th><th>Reason</th><th>Approved by</th></tr>
+      <tr><td>v2</td><td>01-10-2026</td><td>6,00,000</td><td>Employee</td><td>Appraisal</td><td>Super admin</td></tr>
+      <tr><td>v1</td><td>15-03-2026</td><td>5,20,000</td><td>Employee</td><td>Offer accepted</td><td>—</td></tr></table>
+    <div class="right"><span class="btn">Component overrides</span><span class="btn p">New revision</span></div>
+  </div></div>
+
+  <div class="wf"><div class="wf-bar"><span>W10 · My tax (employee)</span><span>Employee</span></div><div class="wf-body">
+    <div class="two">
+      <div class="box"><b>Choose your regime · FY 2026-27</b><br>
+        <table><tr><th></th><th class="right">New</th><th class="right">Old</th></tr>
+          <tr><td>Taxable income</td><td class="right">5,03,400</td><td class="right">5,28,400</td></tr>
+          <tr><td>Yearly tax</td><td class="right"><b>0</b></td><td class="right">18,907</td></tr></table>
+        <span class="btn p">Pick New (lower)</span> <span class="btn">Pick Old</span><div class="muted">Old regime shown before declarations · locks on 30-04-2026</div></div>
+      <div class="box"><b>Declarations (old regime)</b>
+        <table><tr><th>Section</th><th class="right">Declared</th><th>Proof</th></tr>
+          <tr><td>80C</td><td class="right">1,50,000</td><td>Upload</td></tr>
+          <tr><td>80D</td><td class="right">25,000</td><td>Upload</td></tr>
+          <tr><td>HRA rent</td><td class="right">1,20,000</td><td>Rent receipts</td></tr></table>
+        <span class="btn">+ Add</span> <span class="btn p">Submit</span></div>
+    </div>
+  </div></div>
+</div>
+
+<div class="page">
+  <div class="wf"><div class="wf-bar"><span>W11 · Monthly payroll run · October 2026</span><span>Finance</span></div><div class="wf-body">
+    <div class="steps"><span class="done">1 Lock attendance</span><span class="done">2 Monthly inputs</span><span class="on">3 Preview</span><span>4 Approve</span><span>5 Finalize</span><span>6 Pay &amp; payslips</span></div>
+    <div class="grid4" style="margin-bottom:6px">
+      <div class="box">Employees<br><b>51</b></div><div class="box">Gross<br><b>₹24.6 L</b></div><div class="box">Deductions<br><b>₹2.1 L</b></div><div class="box">Net pay<br><b>₹22.5 L</b></div>
+    </div>
+    <div class="note">⚠ 3 warnings: 2 without bank details · 1 net pay change over 20% vs September</div>
+    <table><tr><th>Employee</th><th>Group</th><th class="right">Paid days</th><th class="right">Gross</th><th class="right">LOP</th><th class="right">TDS</th><th class="right">Net</th><th>Flags</th></tr>
+      <tr><td>Amit Kumar</td><td>Employee</td><td class="right">31</td><td class="right">48,200</td><td class="right">0</td><td class="right">0</td><td class="right">46,400</td><td></td></tr>
+      <tr><td>Akshara Shukla</td><td>Employee</td><td class="right">29</td><td class="right">48,200</td><td class="right">3,110</td><td class="right">0</td><td class="right">43,290</td><td>2 LOP</td></tr>
+      <tr><td>Ajay Sagar</td><td>Technical Consultant</td><td class="right">31</td><td class="right">60,000</td><td class="right">0</td><td class="right">1,200</td><td class="right">58,800</td><td>No bank</td></tr>
+    </table>
+    <div class="right"><span class="btn">Export register</span><span class="btn">Back to inputs</span><span class="btn p">Send for approval</span></div>
+  </div></div>
+
+  <div class="wf"><div class="wf-bar"><span>W12 · Payslip</span><span>Employee · PDF</span></div><div class="wf-body">
+    <div style="display:flex;justify-content:space-between"><b>CES Tech · Payslip October 2026</b><span class="muted">Regime: New · Paid days 31/31</span></div>
+    <div class="two" style="margin-top:6px">
+      <table><tr><th>Earnings</th><th class="right">₹</th></tr><tr><td>Basic</td><td class="right">25,000</td></tr><tr><td>HRA</td><td class="right">10,000</td></tr><tr><td>Travel</td><td class="right">1,600</td></tr><tr><td>Medical</td><td class="right">1,250</td></tr><tr><td>Special</td><td class="right">10,350</td></tr><tr><td><b>Total</b></td><td class="right"><b>48,200</b></td></tr></table>
+      <table><tr><th>Deductions</th><th class="right">₹</th></tr><tr><td>Employee PF</td><td class="right">1,800</td></tr><tr><td>TDS</td><td class="right">0</td></tr><tr><td>LOP</td><td class="right">0</td></tr><tr><td colspan="2" style="height:34px"></td></tr><tr><td><b>Total</b></td><td class="right"><b>1,800</b></td></tr></table>
+    </div>
+    <div class="right"><b>Net pay ₹46,400</b> · Year-to-date tax ₹0</div>
+  </div></div>
+
+  <div class="wf"><div class="wf-bar"><span>W13 · Audit log</span><span>Finance · Super admin</span></div><div class="wf-body">
+    <table><tr><th>When</th><th>Who</th><th>What</th><th>Old</th><th>New</th><th>Effective</th></tr>
+      <tr><td>22-10-2026 14:05</td><td>Finance user</td><td>ESI_EE base</td><td>% of Basic</td><td>% of Gross</td><td>01-11-2026</td></tr>
+      <tr><td>21-10-2026 11:40</td><td>Finance user</td><td>New regime slab 7</td><td>24,00,00,001 – 1,00,00,000</td><td>24,00,001 – no limit</td><td>01-04-2026</td></tr>
+      <tr><td>20-10-2026 17:12</td><td>Super admin</td><td>Revision · Amit Kumar</td><td>CTC 5,20,000</td><td>CTC 6,00,000</td><td>01-10-2026</td></tr>
+    </table>
+  </div></div>
+</div>
+
+<!-- ============ 7. ORDER + QUESTIONS ============ -->
+<div class="page">
+  <h2>7. Build order</h2>
+  <table>
+    <tr><th>Step</th><th>What</th><th>Screens</th><th>Why this order</th></tr>
+    <tr><td>1</td><td>Phase 1 masters + Phase 2 engine and calculator</td><td>W1–W7, W13</td><td>Everything else depends on these</td></tr>
+    <tr><td>2</td><td>Move the old tool's 7 groups (corrected); switch the monthly run to the engine</td><td>—</td><td>Removes hardcoded TDS / PF / ESI</td></tr>
+    <tr><td>3</td><td>Pay profiles, revisions, regime choice and declarations</td><td>W9, W10</td><td>Each employee gets their own pay record and tax setup</td></tr>
+    <tr><td>4</td><td>Offer → locked annexure → onboarding</td><td>W8</td><td>MOM P0</td></tr>
+    <tr><td>5</td><td>Run steps, approvals, reports; consultants and trainees</td><td>W11, W12</td><td>Monthly operations</td></tr>
+    <tr><td>6</td><td>Costing, reverse calculation, loans, Form 16</td><td>—</td><td>Lower priority</td></tr>
+  </table>
+
+  <h2 style="margin-top:18px">Questions for Finance (before step 2)</h2>
+  <ol>
+    <li>FY 2026-27 slabs, standard deduction, rebate, cess and surcharge for both regimes (CA to confirm under the new Income-tax Act).</li>
+    <li>Default regime for employees who don't choose, and the date the choice locks.</li>
+    <li>ESI base (gross or Basic), and whether "Variable Deduction 3.25%" is really the employer's ESI share.</li>
+    <li>PF on capped Basic (₹15,000) for everyone, or full Basic for some?</li>
+    <li>Professional Tax: which states do employees work in? (UP has none.)</li>
+    <li>Consultant TDS base (fee or CTC) and the missing TDS on "Non-Technical Consultant with GST".</li>
+    <li>What "Other Deduction ₹1,800" is.</li>
+    <li>Grade CTC bands; costing days and hours, and what goes into cost.</li>
+    <li>Who approves salary revisions and the monthly run (Finance head, super admin, both?).</li>
+  </ol>
+  <div class="note">Nothing in this document changes how anyone is paid today. Current payroll keeps running until step 2 switches it to the new engine, after Finance has checked the calculator against their Excel.</div>
+</div>
+
+</body>
+</html>
