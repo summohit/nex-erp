@@ -349,7 +349,6 @@
               </td>
               <td class="project-cell">
                 <button type="button" class="project-info row-link" (click)="openProject(r, $event)" title="Open project board">
-                  <svg lucideBuilding [size]="14" class="cell-icon"></svg>
                   <span class="project-name" title="{{ r.project.name }}">{{ r.project.name }}</span>
                 </button>
                 @if (r.tasks.length) {
@@ -365,14 +364,23 @@
               </td>
               <td class="date-cell nowrap">
                 <div class="date-info">
-                  <svg lucideCalendarDays [size]="13" class="cell-icon"></svg>
-                  <span>{{ r.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(r.startDate | date:'dd-MM-yyyy') !== (r.endDate | date:'dd-MM-yyyy')"><span class="date-to">to</span>{{ r.endDate | date:'dd-MM-yyyy' }}</ng-container></span>
+                  <span><span class="date-start">{{ r.startDate | date:'dd-MM-yyyy' }}</span><ng-container *ngIf="(r.startDate | date:'dd-MM-yyyy') !== (r.endDate | date:'dd-MM-yyyy')"><span class="date-to">to</span><span class="date-end">{{ r.endDate | date:'dd-MM-yyyy' }}</span></ng-container></span>
                   @if (isPastVisit(r)) {
                     <span class="past-visit-tag" [class.past-overdue]="r.status === 'PENDING_APPROVAL'" [title]="r.status === 'PENDING_APPROVAL' ? 'Trip date has passed without approval' : 'Previous/past visit'">
                       {{ r.status === 'PENDING_APPROVAL' ? 'Past date' : 'Past' }}
                     </span>
                   }
                 </div>
+                @if (r.postponeState) {
+                  <div class="postpone-tag" [class.awaiting]="r.postponeState === 'AWAITING'"
+                       [title]="r.postponeState === 'AWAITING' ? 'Postpone awaiting approval' : ((r.postponeCount || 0) > 1 ? 'Postponed ' + r.postponeCount + ' times' : 'Postponed')">
+                    @if (r.postponeState === 'AWAITING') {
+                      Postpone → {{ $any(r).pendingChange?.startDate | date:'dd-MM-yy' }}
+                    } @else {
+                      Postponed<ng-container *ngIf="r.postponedFrom"> · was {{ r.postponedFrom | date:'dd-MM-yy' }}</ng-container>
+                    }
+                  </div>
+                }
               </td>
               <td class="num">
                 <span class="badge-num days-badge">{{ r.visitDays }}d</span>

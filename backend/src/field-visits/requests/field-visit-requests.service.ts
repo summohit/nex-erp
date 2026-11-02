@@ -532,9 +532,34 @@ export class FieldVisitRequestsService {
     // Same rule as getOne's canReview, per row, so the table can offer
     // Approve / Reject without opening each request.
     const approver = this.isApprover(role);
+    // Postponed tab: an approved postpone leaves no status behind, only the
+    // activity trail, so it is read from there.
+    const trail = await this.prisma.fieldVisitRequestActivity.findMany({
+      where: { requestId: { in: rows.map((r) => r.id) }, action: { in: ['MODIFICATION_REQUESTED', 'MODIFICATION_APPROVED'] } },
+      orderBy: { id: 'asc' }, select: { requestId: true, action: true, detail: true },
+    });
+    const asked = new Map<number, string>();
+    const postponed = new Map<number, string | null>();
+    const postponeCount = new Map<number, number>();
+    for (const a of trail) {
+      if (a.action === 'MODIFICATION_REQUESTED') asked.set(a.requestId, a.detail ?? '');
+      else {
+        const detail = asked.get(a.requestId);
+        if (detail?.startsWith('Asked to postpone')) {
+          // Older entries did not record the original dates. The first postpone's are kept.
+          postponeCount.set(a.requestId, (postponeCount.get(a.requestId) ?? 0) + 1);
+          const from = detail.match(/^Asked to postpone from (\d{4}-\d{2}-\d{2})/)?.[1] ?? null;
+          if (!postponed.has(a.requestId)) postponed.set(a.requestId, from);
+        }
+        asked.delete(a.requestId);
+      }
+    }
     return rows.map((r: any) => ({
       ...r,
       canReview: approver && r.status === FIELD_VISIT_STATUS.PENDING,
+      postponeState: r.pendingChange?.kind === 'POSTPONE' ? 'AWAITING' : postponed.has(r.id) ? 'POSTPONED' : null,
+      postponedFrom: postponed.get(r.id) ?? null,
+      postponeCount: postponeCount.get(r.id) ?? 0,
     }));
   }
 
@@ -590,14 +615,17 @@ export class FieldVisitRequestsService {
         && mayRaise,
       canRequestPostpone: request.status === FIELD_VISIT_STATUS.APPROVED
         && !request.pendingChange
-        && mayRaise,
+        && (mayRaise || (request.members ?? []).some((m: any) => (m.employee?.id ?? m.employeeId) === employeeId)),
+      /** Postpones outright rather than asking. */
+      postponesDirectly: mayRaise,
       // The project manager or anyone going may ask; an admin approves.
       canRequestCancel: request.status === FIELD_VISIT_STATUS.APPROVED
         && !request.pendingChange
         && (mayRaise || (request.members ?? []).some((m: any) => (m.employee?.id ?? m.employeeId) === employeeId)),
       /** CHANGE, POSTPONE or CANCEL, when something is waiting. */
       pendingChangeKind: request.pendingChange ? ((request.pendingChange as any).kind ?? 'CHANGE') : null,
-      canReviewChange: !!request.pendingChange && this.isApprover(role),
+      canReviewChange: !!request.pendingChange
+        && (this.isApprover(role) || ((request.pendingChange as any).kind === 'POSTPONE' && mayRaise)),
       // Mirrors cancel() and complete(): administrators only, and only while
       // the trip can still be stopped or closed.
       canCancel: this.isApprover(role)
@@ -1605,8 +1633,12 @@ export class FieldVisitRequestsService {
       tasks: request.tasks.map((t) => ({ name: t.name, description: t.description ?? undefined, issueId: t.issueId })) as any,
     };
     const { project, fields, employeeIds, tasks } = await this.normalize(companyId, current);
-    if (!(await this.mayRaise(companyId, project, role, employeeId))) {
-      throw new ForbiddenException('Only the project manager can ask to postpone this field visit');
+    // A project manager or admin postpones outright; someone going asks, and
+    // either a project manager or an admin decides.
+    const manager = await this.mayRaise(companyId, project, role, employeeId);
+    const going = employeeId != null && request.members.some((m) => m.employeeId === employeeId);
+    if (!manager && !going) {
+      throw new ForbiddenException('Only the project manager or someone going can postpone this field visit');
     }
     if (this.day(fields.startDate) === this.day(request.startDate) && this.day(fields.endDate) === this.day(request.endDate)) {
       throw new BadRequestException('Pick new dates — these are the dates already approved');
@@ -1615,7 +1647,7 @@ export class FieldVisitRequestsService {
       throw new BadRequestException('Postponing moves a trip later; to bring it forward, request a change');
     }
 
-    return this.proposeChange(companyId, employeeId, request, {
+    const proposed = await this.proposeChange(companyId, employeeId, request, {
       ...fields,
       startDate: fields.startDate.toISOString(),
       endDate: fields.endDate.toISOString(),
@@ -1623,7 +1655,16 @@ export class FieldVisitRequestsService {
       tasks,
       kind: 'POSTPONE',
       reason,
-    }, `postpone to ${this.day(fields.startDate)}–${this.day(fields.endDate)}`);
+    }, `postpone from ${this.day(request.startDate)} to ${this.day(fields.startDate)}–${this.day(fields.endDate)}`,
+    { notify: !manager, managerIds: this.projectManagerIds(project) });
+    return manager ? this.approveModification(companyId, employeeId, role, id) : proposed;
+  }
+
+  private projectManagerIds(project: any): number[] {
+    return [...new Set<number>([
+      ...(project?.leadId ? [project.leadId] : []),
+      ...(project?.members ?? []).filter((m: any) => m.role === 'PROJECT_MANAGER').map((m: any) => m.employeeId),
+    ])];
   }
 
   /**
@@ -1663,6 +1704,7 @@ export class FieldVisitRequestsService {
     companyId: number, employeeId: number | null,
     request: { id: number; requestNumber: string; location: string },
     proposal: Record<string, any>, what: string,
+    opts: { notify?: boolean; managerIds?: number[] } = {},
   ) {
     const updated = await this.prisma.$transaction(async (tx) => {
       const saved = await tx.fieldVisitRequest.update({
@@ -1679,6 +1721,7 @@ export class FieldVisitRequestsService {
       });
       return saved;
     });
+    if (opts.notify === false) return updated;
 
     const asker = employeeId != null
       ? await this.prisma.employee.findUnique({ where: { id: employeeId }, select: { firstName: true, lastName: true } })
@@ -1697,6 +1740,15 @@ export class FieldVisitRequestsService {
       type: 'ACTION_REQUIRED',
       linkUrl: this.LINK,
     });
+    if (opts.managerIds?.length) {
+      await this.notifications.notifyEmployees(opts.managerIds, {
+        companyId, excludeEmployeeId: employeeId,
+        title: titles[proposal.kind] ?? titles.CHANGE,
+        message: `${asker ? this.who(asker) : 'Someone'} asked to ${what} for ${request.requestNumber}`
+          + ` at ${request.location}: ${proposal.reason}`,
+        type: 'ACTION_REQUIRED', linkUrl: this.LINK,
+      });
+    }
     return updated;
   }
 
@@ -1846,11 +1898,15 @@ export class FieldVisitRequestsService {
     companyId: number, reviewerId: number | null, role: string, id: number,
   ) {
     const request = await this.loadForDecision(companyId, id);
-    if (!this.isApprover(role)) {
-      throw new ForbiddenException('Only an administrator rules on a change to an approved field visit');
-    }
     if (!request.pendingChange) {
       throw new BadRequestException('There is no change waiting on this trip');
+    }
+    // A postpone can be decided by the project manager as well as an admin.
+    const postpone = (request.pendingChange as any).kind === 'POSTPONE';
+    if (!this.isApprover(role) && !(postpone && await this.mayRaise(
+      companyId, await this.loadProject(companyId, request.project.id, request.project.isSystem), role, reviewerId,
+    ))) {
+      throw new ForbiddenException('Only an administrator rules on a change to an approved field visit');
     }
     return request;
   }

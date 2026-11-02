@@ -1091,3 +1091,13 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+
+.postpone-tag { display: inline-block; margin-top: 4px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #EEF2FF; color: #4338CA; white-space: nowrap; }
+.postpone-tag.awaiting { background: #FEF3C7; color: #92400E; }
+
+.date-cell .postpone-tag { display: block; width: fit-content; margin: 3px 0 0; padding: 0 6px; font-size: 10.5px; line-height: 16px; font-weight: 600; }
+.date-cell .date-info { flex-wrap: wrap; row-gap: 3px; }
+.date-cell { white-space: normal; max-width: 230px; }
+.date-cell .date-info > span:not(.past-visit-tag) { white-space: nowrap; }
+.date-start { color: #15803D; font-weight: 600; }
+.date-end { color: #B91C1C; font-weight: 600; }

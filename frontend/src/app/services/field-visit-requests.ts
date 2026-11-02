@@ -99,6 +99,10 @@ export interface FieldVisitRequest {
   canRequestCancel?: boolean;
   /** CHANGE, POSTPONE or CANCEL, when a request is waiting. */
   pendingChangeKind?: 'CHANGE' | 'POSTPONE' | 'CANCEL' | null;
+  postponeState?: 'AWAITING' | 'POSTPONED' | null;
+  postponedFrom?: string | null;
+  postponeCount?: number;
+  postponesDirectly?: boolean;
   canReviewChange?: boolean;
 }
 

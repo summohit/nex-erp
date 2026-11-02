@@ -190,9 +190,9 @@ describe('asking with a reason (15 Oct 2026)', () => {
     expect(prisma.fieldVisitRequest.update.mock.calls[0][0].data.pendingChange.reason).toBe('No reason given (older app)');
   });
 
-  it('parks a postpone with the new dates and keeps everything else', async () => {
+  it('parks a postpone from someone going, with the new dates and everything else kept', async () => {
     const { service, prisma } = makeService();
-    await service.requestPostpone(1, PM, 'EMPLOYEE', 9, { startDate: '2026-09-29', endDate: '2026-10-01', reason: 'Site not ready' });
+    await service.requestPostpone(1, 60, 'EMPLOYEE', 9, { startDate: '2026-09-29', endDate: '2026-10-01', reason: 'Site not ready' });
     const proposal = prisma.fieldVisitRequest.update.mock.calls[0][0].data.pendingChange;
     expect(proposal).toMatchObject({
       kind: 'POSTPONE', reason: 'Site not ready', startTime: '09:00', endTime: '18:00', employeeIds: [60, 61],
@@ -210,9 +210,9 @@ describe('asking with a reason (15 Oct 2026)', () => {
       .rejects.toThrow(/moves a trip later/);
   });
 
-  it('refuses a postpone from someone only going on the trip', async () => {
+  it('refuses a postpone from someone neither managing nor going', async () => {
     const { service } = makeService();
-    await expect(service.requestPostpone(1, 60, 'EMPLOYEE', 9, { startDate: '2026-09-29', endDate: '2026-10-01', reason: 'x' }))
+    await expect(service.requestPostpone(1, 999, 'EMPLOYEE', 9, { startDate: '2026-09-29', endDate: '2026-10-01', reason: 'x' }))
       .rejects.toBeInstanceOf(ForbiddenException);
   });
 

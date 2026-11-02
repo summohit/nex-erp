@@ -518,10 +518,10 @@
             <input type="date" [(ngModel)]="postponeEnd" [min]="postponeStart" aria-label="New end date" />
           </div>
           <label>Why is it being postponed?</label>
-          <textarea rows="3" [(ngModel)]="postponeReason" placeholder="An administrator approves this. Hours, people and tasks stay as they are."></textarea>
+          <textarea rows="3" [(ngModel)]="postponeReason" [placeholder]="request()!.postponesDirectly ? 'Applies straight away. Hours, people and tasks stay as they are.' : 'The project manager or an administrator approves this. Hours, people and tasks stay as they are.'"></textarea>
           <div class="reject-actions">
             <button class="ghost-btn" type="button" (click)="isPostponing.set(false)">Never mind</button>
-            <button class="primary-btn" type="button" [disabled]="isWorking()" (click)="submitPostpone()">Send for approval</button>
+            <button class="primary-btn" type="button" [disabled]="isWorking()" (click)="submitPostpone()">{{ request()!.postponesDirectly ? 'Postpone' : 'Send for approval' }}</button>
           </div>
         </div>
       }

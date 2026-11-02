@@ -125,6 +125,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
     { key: 'APPROVED', label: 'Approved' },
     // A trip whose days are all done. It had no tab, so "All 9" never added
     // up to the tabs beside it.
+    { key: 'POSTPONED', label: 'Postponed' },
     { key: 'COMPLETED', label: 'Completed' },
     { key: 'REJECTED', label: 'Rejected' },
     { key: 'CANCELLED', label: 'Cancelled' },
@@ -226,6 +227,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
     for (const s of this.statuses) if (s.key) counts[s.key] = 0;
     for (const r of rows) {
       if (counts[r.status] !== undefined) counts[r.status]++;
+      if (r.postponeState) counts['POSTPONED']++;
     }
     return counts;
   });
@@ -248,6 +250,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
   filteredRequests = computed(() => {
     const status = this.statusFilter();
     const rows = this.baseRows();
+    if (status === 'POSTPONED') return rows.filter((r) => r.postponeState);
     return status ? rows.filter((r) => r.status === status) : rows;
   });
 

@@ -281,7 +281,7 @@ export class FieldVisitRequestDetailComponent implements OnInit {
     }
     this.run(
       this.api.requestPostpone(this.id, { startDate: this.postponeStart, endDate: this.postponeEnd, reason: this.postponeReason.trim() }),
-      'Postpone sent for approval',
+      this.request()?.postponesDirectly ? 'Field visit postponed' : 'Postpone sent for approval',
       () => this.isPostponing.set(false),
     );
   }
