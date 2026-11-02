@@ -22,6 +22,7 @@ import ArchivedTab from './tabs/ArchivedTab';
 import FieldVisitsTab from './tabs/FieldVisitsTab';
 import DiscussionsTab from './tabs/DiscussionsTab';
 import TicketsTab from './tabs/TicketsTab';
+import { safeGoBack } from '../../navigation/navigationUtils';
 import { GradientBanner, PulseSkeleton } from '../../components/SharedUI';
 
 const TABS = [
@@ -139,7 +140,7 @@ export default function ProjectDetailScreen() {
   };
 
   if (accessDenied) {
-    return <AccessDeniedView onBack={() => navigation.goBack()} />;
+    return <AccessDeniedView onBack={() => safeGoBack(navigation)} />;
   }
 
   return (

@@ -32,6 +32,7 @@ import {
 import AppScreen from '../../components/AppScreen';
 import { apiClient } from '../../api/apiClient';
 import { useAuthStore } from '../../store/authStore';
+import { safeGoBack } from '../../navigation/navigationUtils';
 import { theme } from '../../theme/theme';
 
 /**
@@ -119,7 +120,7 @@ export default function EmployeeManageScreen() {
           role: myRole === 'SUPERADMIN' ? [...ROLES, { value: 'SUPERADMIN', label: 'Super Admin' }] : ROLES,
         });
       })
-      .catch((e) => Alert.alert('Could not load', errMsg(e), [{ text: 'OK', onPress: () => navigation.goBack() }]))
+      .catch((e) => Alert.alert('Could not load', errMsg(e), [{ text: 'OK', onPress: () => safeGoBack(navigation) }]))
       .finally(() => setLoading(false));
   }, [id, myRole, navigation]);
 
@@ -174,7 +175,7 @@ export default function EmployeeManageScreen() {
         });
       }
       Alert.alert('Saved', 'Employee placement and access permissions updated.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        { text: 'OK', onPress: () => safeGoBack(navigation) },
       ]);
     } catch (e) {
       Alert.alert('Could not save', errMsg(e));

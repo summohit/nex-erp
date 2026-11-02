@@ -40,6 +40,7 @@ import MediaPickerModal from '../Profile/components/MediaPickerModal';
 import { workService, PersonLite } from '../../api/workService';
 import { getCurrentLocation, requestLocationPermission } from '../../store/dashboardStore';
 import { theme } from '../../theme/theme';
+import { safeGoBack } from '../../navigation/navigationUtils';
 import { initials } from './fvFormat';
 
 type PickerKind = 'PROJECT' | 'SITE' | 'PEOPLE' | 'TASKS' | null;
@@ -183,7 +184,7 @@ export default function FieldVisitRequestForm() {
         setRemarks(v.remarks ?? '');
         setAttachments((v.attachments ?? []).map((a) => ({ fileName: a.fileName, fileUrl: a.fileUrl, fileSize: a.fileSize ?? undefined })));
       })
-      .catch((e: any) => Alert.alert('Could not load', e?.response?.data?.message || 'Please try again.', [{ text: 'OK', onPress: () => navigation.goBack() }]))
+      .catch((e: any) => Alert.alert('Could not load', e?.response?.data?.message || 'Please try again.', [{ text: 'OK', onPress: () => safeGoBack(navigation) }]))
       .finally(() => setLoadingVisit(false));
   }, [params.id, navigation]);
 
@@ -325,7 +326,7 @@ export default function FieldVisitRequestForm() {
       if (mode === 'change') {
         saved = await fv.requestChange(params.id!, body);
         Alert.alert('Change sent', `The change to ${saved?.requestNumber ?? 'this visit'} is waiting for approval. The visit stays as it is until then.`,
-          [{ text: 'OK', onPress: () => navigation.goBack() }]);
+          [{ text: 'OK', onPress: () => safeGoBack(navigation) }]);
         return;
       }
       if (mode === 'edit') {
@@ -340,7 +341,7 @@ export default function FieldVisitRequestForm() {
         : saved?.status === 'APPROVED'
           ? `${saved.requestNumber} is approved — clock in from Today when you reach the site.`
           : `${saved?.requestNumber ?? 'Your request'} is waiting for approval.`;
-      Alert.alert(title, message, [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      Alert.alert(title, message, [{ text: 'OK', onPress: () => safeGoBack(navigation) }]);
     } catch (e: any) {
       const msg = e?.response?.data?.message;
       Alert.alert(send ? 'Could not send' : 'Could not save', Array.isArray(msg) ? msg.join('\n') : msg || 'Please try again.');
@@ -388,7 +389,7 @@ export default function FieldVisitRequestForm() {
       ) : (
         <ScrollView contentContainerStyle={styles.scrollBody} keyboardShouldPersistTaps="handled">
           {/* Back Pill */}
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => safeGoBack(navigation)} style={styles.backButton} activeOpacity={0.7}>
             <ArrowLeft size={16} color="#0F172A" strokeWidth={2.4} />
             <Text style={styles.backButtonText}>Cancel & Go Back</Text>
           </TouchableOpacity>

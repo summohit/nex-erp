@@ -27,3 +27,13 @@ export function navigateTo(navigation: any, screen: string, params?: any) {
     navigation.navigate(screen, params);
   }
 }
+
+/**
+ * Back, or Home when there is nothing to go back to (a screen opened straight
+ * from a notification, a deep link or a reload). A bare goBack() there throws
+ * "GO_BACK was not handled by any navigator".
+ */
+export function safeGoBack(navigation: any) {
+  if (navigation?.canGoBack?.()) navigation.goBack();
+  else navigateTo(navigation, 'Home');
+}

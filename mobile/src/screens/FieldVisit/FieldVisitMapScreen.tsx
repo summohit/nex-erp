@@ -5,6 +5,7 @@ import { ArrowLeft, Navigation, MapPin, Clock, Route as RouteIcon, RefreshCw } f
 import RouteMap from '../../components/RouteMap';
 import { fieldVisitRequestService as fv, RoutePreview } from '../../api/fieldVisitRequestService';
 import { getCurrentLocation, requestLocationPermission } from '../../store/dashboardStore';
+import { safeGoBack } from '../../navigation/navigationUtils';
 import { colors, status, shadow } from '../../theme/ds';
 
 /** How often the map re-reads your position while it is open. */
@@ -70,7 +71,7 @@ export default function FieldVisitMapScreen() {
         }}
       />
 
-      <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()} activeOpacity={0.85}>
+      <TouchableOpacity style={styles.back} onPress={() => safeGoBack(navigation)} activeOpacity={0.85}>
         <ArrowLeft size={20} color={colors.text} />
       </TouchableOpacity>
       <TouchableOpacity style={[styles.back, styles.refresh]} onPress={refresh} activeOpacity={0.85}>

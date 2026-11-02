@@ -38,6 +38,7 @@ import {
 } from '../../api/fieldVisitRequestService';
 import ReasonSheet from './ReasonSheet';
 import { theme } from '../../theme/theme';
+import { safeGoBack } from '../../navigation/navigationUtils';
 import {
   fvStatus, FV_ACTIVITY, dateLabel, timeLabel, clockAt, whenLabel, range, who, metres, mapsUrl, initials,
 } from './fvFormat';
@@ -239,7 +240,7 @@ export default function FieldVisitDetailScreen() {
 
   const back = (
     <TouchableOpacity
-      onPress={() => navigation.goBack()}
+      onPress={() => safeGoBack(navigation)}
       style={styles.backButton}
       activeOpacity={0.7}
       accessibilityRole="button"

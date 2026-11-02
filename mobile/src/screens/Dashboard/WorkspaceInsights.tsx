@@ -1,8 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Linking, Platform } from 'react-native';
 import {
-  Megaphone, ChevronRight, ChevronLeft, UserCheck, CalendarDays, CheckSquare, FolderKanban, Ticket,
-  Timer, ClipboardCheck, Sparkles, Info, MapPin, FileText,
+  Megaphone,
+  ChevronRight,
+  ChevronLeft,
+  UserCheck,
+  CalendarDays,
+  CheckSquare,
+  FolderKanban,
+  Ticket,
+  Timer,
+  ClipboardCheck,
+  Sparkles,
+  Info,
+  MapPin,
+  FileText,
+  Palmtree,
+  Building2,
+  Laptop,
+  PartyPopper,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
 } from 'lucide-react-native';
 import { apiClient, API_URL } from '../../api/apiClient';
 import { Avatar, PersonTap, PersonLite } from '../../components/PersonSheet';
@@ -122,11 +142,39 @@ export default function WorkspaceInsights({ onNavigate, reloadKey, showApprovals
     const wfh = common.onWfhToday?.length || 0;
     const ms = (common.todayJoinings?.length || 0) + (common.todayAnniversaries?.length || 0);
     return [
-      { text: leave ? `${leave} on leave today` : 'Full team present', accent: !!leave, people: common.onLeaveToday || [], note: (p: any) => p.leaveType + (p.isHalfDay ? ' (half day)' : '') },
-      { text: wfh ? `${wfh} working remotely` : 'No WFH today', accent: !!wfh, people: common.onWfhToday || [], note: () => 'Working from home' },
-      { text: ms ? `${ms} celebration${ms > 1 ? 's' : ''} today` : 'No joinings or anniversaries today', accent: !!ms,
+      {
+        id: 'leave',
+        title: leave ? `${leave} on leave today` : 'Full team present',
+        subtitle: leave ? 'Tap to view team members' : 'No scheduled leaves today',
+        accent: !!leave,
+        count: leave,
+        people: common.onLeaveToday || [],
+        note: (p: any) => p.leaveType + (p.isHalfDay ? ' (half day)' : ''),
+        iconType: 'leave',
+      },
+      {
+        id: 'wfh',
+        title: wfh ? `${wfh} working remotely` : 'All working in office',
+        subtitle: wfh ? 'Working from home today' : 'No remote requests today',
+        accent: !!wfh,
+        count: wfh,
+        people: common.onWfhToday || [],
+        note: () => 'Working from home',
+        iconType: 'wfh',
+      },
+      {
+        id: 'celebrations',
+        title: ms ? `${ms} team celebration${ms > 1 ? 's' : ''}` : 'No celebrations today',
+        subtitle: ms ? 'Work anniversaries & new joiners' : 'No anniversaries or joiners today',
+        accent: !!ms,
+        count: ms,
         people: [...(common.todayJoinings || []), ...(common.todayAnniversaries || [])],
-        note: (p: any) => (p.years ? `${p.years} year${p.years > 1 ? 's' : ''} at the company` : 'Joins today') },
+        note: (p: any) =>
+          p.years
+            ? `${p.years} year${p.years > 1 ? 's' : ''} at company`
+            : 'Joins today',
+        iconType: 'celebrations',
+      },
     ];
   }, [common]);
 
@@ -190,30 +238,202 @@ export default function WorkspaceInsights({ onNavigate, reloadKey, showApprovals
       )}
 
       {glance.length > 0 && (
-        <View style={styles.glance}>
-          <View style={styles.headLeft}>
-            <View style={styles.dot} />
-            <Text style={styles.glanceLabel}>TODAY AT A GLANCE</Text>
-          </View>
-          {glance.map((g) => (
-            <View key={g.text}>
-              <TouchableOpacity disabled={!g.people.length} onPress={() => setOpenGlance((o) => (o === g.text ? null : g.text))}>
-                <Text style={[styles.glanceItem, g.accent && styles.glanceAccent]}>
-                  • {g.text}{g.people.length ? (openGlance === g.text ? '  ▲' : '  ▼') : ''}
-                </Text>
-              </TouchableOpacity>
-              {openGlance === g.text && g.people.map((p: PersonLite & any, i: number) => (
-                <PersonTap key={`${p.id}-${i}`} person={p} style={styles.glancePerson}>
-                  <Avatar person={p} size={30} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.glanceName} numberOfLines={1}>{`${p.firstName} ${p.lastName || ''}`.trim()}</Text>
-                    <Text style={styles.glanceNote} numberOfLines={1}>{[g.note(p), p.designation].filter(Boolean).join(' · ')}</Text>
-                  </View>
-                </PersonTap>
-              ))}
+        <View style={styles.glanceCard}>
+          {/* Header Row */}
+          <View style={styles.glanceHead}>
+            <View style={styles.glanceHeadLeft}>
+              <View style={styles.livePulseDotWrap}>
+                <View style={styles.livePulseDot} />
+              </View>
+              <Text style={styles.glanceLabel}>TODAY AT A GLANCE</Text>
             </View>
-          ))}
-          {weekMinutes != null && <Text style={styles.glanceWeek}>This week: <Text style={styles.bold}>{fmtMin(weekMinutes)}</Text> logged</Text>}
+            <View style={styles.glanceDateBadge}>
+              <Text style={styles.glanceDateBadgeText}>
+                {new Date().toLocaleDateString('en-IN', {
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short',
+                })}
+              </Text>
+            </View>
+          </View>
+
+          {/* Interactive Tiles */}
+          <View style={styles.glanceTilesContainer}>
+            {glance.map((g) => {
+              const isOpen = openGlance === g.id;
+              const hasPeople = g.people.length > 0;
+
+              // Visual styling configuration depending on iconType and accent
+              let iconBg = '#F1F5F9';
+              let iconColor = '#64748B';
+              let cardBg = '#F8FAFC';
+              let borderColor = '#E2E8F0';
+              let titleColor = '#0F172A';
+              let subColor = '#64748B';
+              let countPillBg = '#EFF6FF';
+              let countPillColor = '#1373E5';
+              let IconComp: any = CheckCircle2;
+
+              if (g.iconType === 'leave') {
+                if (g.accent) {
+                  IconComp = Palmtree;
+                  iconBg = '#FEF3C7';
+                  iconColor = '#D97706';
+                  cardBg = '#FFFBEB';
+                  borderColor = '#FDE68A';
+                  titleColor = '#92400E';
+                  subColor = '#B45309';
+                  countPillBg = '#FEF3C7';
+                  countPillColor = '#B45309';
+                } else {
+                  IconComp = CheckCircle2;
+                  iconBg = '#ECFDF5';
+                  iconColor = '#10B981';
+                  cardBg = '#F8FAFC';
+                  borderColor = '#E2E8F0';
+                  titleColor = '#0F172A';
+                  subColor = '#64748B';
+                }
+              } else if (g.iconType === 'wfh') {
+                if (g.accent) {
+                  IconComp = Laptop;
+                  iconBg = '#DBEAFE';
+                  iconColor = '#1D4ED8';
+                  cardBg = '#EFF6FF';
+                  borderColor = '#BFDBFE';
+                  titleColor = '#1E40AF';
+                  subColor = '#2563EB';
+                  countPillBg = '#DBEAFE';
+                  countPillColor = '#1D4ED8';
+                } else {
+                  IconComp = Building2;
+                  iconBg = '#F1F5F9';
+                  iconColor = '#64748B';
+                  cardBg = '#F8FAFC';
+                  borderColor = '#E2E8F0';
+                  titleColor = '#0F172A';
+                  subColor = '#64748B';
+                }
+              } else if (g.iconType === 'celebrations') {
+                if (g.accent) {
+                  IconComp = PartyPopper;
+                  iconBg = '#F3E8FF';
+                  iconColor = '#7E22CE';
+                  cardBg = '#FAF5FF';
+                  borderColor = '#E9D5FF';
+                  titleColor = '#6B21A8';
+                  subColor = '#7E22CE';
+                  countPillBg = '#F3E8FF';
+                  countPillColor = '#7E22CE';
+                } else {
+                  IconComp = Sparkles;
+                  iconBg = '#F1F5F9';
+                  iconColor = '#94A3B8';
+                  cardBg = '#F8FAFC';
+                  borderColor = '#E2E8F0';
+                  titleColor = '#475569';
+                  subColor = '#94A3B8';
+                }
+              }
+
+              return (
+                <View key={g.id} style={styles.glanceTileWrapper}>
+                  <TouchableOpacity
+                    style={[
+                      styles.glanceTile,
+                      { backgroundColor: cardBg, borderColor },
+                      isOpen && styles.glanceTileActive,
+                    ]}
+                    disabled={!hasPeople}
+                    onPress={() => setOpenGlance((o) => (o === g.id ? null : g.id))}
+                    activeOpacity={hasPeople ? 0.75 : 1}
+                  >
+                    <View style={[styles.glanceTileIconBox, { backgroundColor: iconBg }]}>
+                      <IconComp size={16} color={iconColor} />
+                    </View>
+
+                    <View style={{ flex: 1, gap: 1 }}>
+                      <Text style={[styles.glanceTileTitle, { color: titleColor }]}>
+                        {g.title}
+                      </Text>
+                      <Text style={[styles.glanceTileSubtitle, { color: subColor }]}>
+                        {g.subtitle}
+                      </Text>
+                    </View>
+
+                    {hasPeople && (
+                      <View style={styles.glanceTileRight}>
+                        <View style={[styles.glanceCountPill, { backgroundColor: countPillBg }]}>
+                          <Text style={[styles.glanceCountPillText, { color: countPillColor }]}>
+                            {g.count}
+                          </Text>
+                        </View>
+                        {isOpen ? (
+                          <ChevronUp size={16} color={iconColor} />
+                        ) : (
+                          <ChevronDown size={16} color={iconColor} />
+                        )}
+                      </View>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Expanded People List */}
+                  {isOpen && hasPeople && (
+                    <View style={styles.glanceExpandedBox}>
+                      {g.people.map((p: PersonLite & any, i: number) => (
+                        <PersonTap
+                          key={`${p.id}-${i}`}
+                          person={p}
+                          style={styles.glancePersonRow}
+                        >
+                          <Avatar person={p} size={34} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.glancePersonName} numberOfLines={1}>
+                              {`${p.firstName} ${p.lastName || ''}`.trim()}
+                            </Text>
+                            <Text style={styles.glancePersonRole} numberOfLines={1}>
+                              {p.designation || p.department || 'Team member'}
+                            </Text>
+                          </View>
+                          <View style={styles.glanceNotePill}>
+                            <Text style={styles.glanceNotePillText} numberOfLines={1}>
+                              {g.note(p)}
+                            </Text>
+                          </View>
+                          <ChevronRight size={14} color="#CBD5E1" />
+                        </PersonTap>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Logged This Week Bar */}
+          {weekMinutes != null && (
+            <TouchableOpacity
+              style={styles.weekLoggedCard}
+              onPress={() => onNavigate('Attendance', { initialTab: 'timesheets' })}
+              activeOpacity={0.8}
+            >
+              <View style={styles.weekLoggedIconBox}>
+                <Clock size={16} color="#1373E5" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.weekLoggedLabel}>THIS WEEK'S WORK</Text>
+                <Text style={styles.weekLoggedValue}>
+                  {fmtMin(weekMinutes)}{' '}
+                  <Text style={styles.weekLoggedTarget}>logged</Text>
+                </Text>
+              </View>
+              <View style={styles.weekLoggedAction}>
+                <Text style={styles.weekLoggedActionText}>Timesheets</Text>
+                <ChevronRight size={14} color="#1373E5" />
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -325,16 +545,207 @@ const styles = StyleSheet.create({
   noticeTitle: { flex: 1, fontSize: 14, fontWeight: '700', color: '#0F172A' },
   noticeBody: { fontSize: 12, color: '#64748B' },
   noticeDate: { fontSize: 11, color: '#94A3B8' },
-  glance: { backgroundColor: '#FFFFFF', borderRadius: 18, borderWidth: 1, borderColor: '#E2E8F0', padding: 14, gap: 4 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
-  glanceLabel: { fontSize: 12, fontWeight: '800', color: '#0F172A', letterSpacing: 0.5 },
-  glancePerson: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingLeft: 12 },
-  glanceName: { fontSize: 13, fontWeight: '700', color: '#0F172A' },
-  glanceNote: { fontSize: 11, color: '#64748B' },
-  glanceItem: { fontSize: 13, color: '#334155' },
-  glanceAccent: { color: '#1373E5', fontWeight: '700' },
-  glanceWeek: { fontSize: 12, color: '#64748B', marginTop: 2 },
-  bold: { fontWeight: '800', color: '#0F172A' },
+  // -------------------------------------------------------------
+  // TODAY AT A GLANCE STYLES
+  // -------------------------------------------------------------
+  glanceCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    gap: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0F172A',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  glanceHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  glanceHeadLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  livePulseDotWrap: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#D1FAE5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  livePulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  glanceLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: 0.5,
+  },
+  glanceDateBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  glanceDateBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  glanceTilesContainer: {
+    gap: 8,
+  },
+  glanceTileWrapper: {
+    gap: 6,
+  },
+  glanceTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  glanceTileActive: {
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
+  },
+  glanceTileIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glanceTileTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  glanceTileSubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  glanceTileRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  glanceCountPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  glanceCountPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  glanceExpandedBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 4,
+  },
+  glancePersonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  glancePersonName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  glancePersonRole: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  glanceNotePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+    maxWidth: 120,
+  },
+  glanceNotePillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  weekLoggedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    padding: 12,
+    marginTop: 2,
+  },
+  weekLoggedIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  weekLoggedLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0369A1',
+    letterSpacing: 0.5,
+  },
+  weekLoggedValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0C4A6E',
+    marginTop: 1,
+  },
+  weekLoggedTarget: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0284C7',
+  },
+  weekLoggedAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  weekLoggedActionText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1373E5',
+  },
   kpiRow: { gap: 10, paddingRight: 4 },
   kpi: { width: 150, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', borderTopWidth: 3, padding: 12, gap: 3 },
   kpiIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },

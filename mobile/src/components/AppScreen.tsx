@@ -19,6 +19,7 @@ import {
 import BottomNavBar from './BottomNavBar';
 import AppDrawer from './AppDrawer';
 import { useDashboardStore } from '../store/dashboardStore';
+import { safeGoBack } from '../navigation/navigationUtils';
 import { useAuthStore } from '../store/authStore';
 
 function initialsOf(firstName?: string, lastName?: string, email?: string) {
@@ -106,8 +107,8 @@ export function ScreenHeader({
           onPress={
             onBack
               ? onBack
-              : showBack && navigation.canGoBack()
-              ? () => navigation.goBack()
+              : showBack
+              ? () => safeGoBack(navigation)
               : onOpenDrawer
           }
           accessibilityRole="button"
