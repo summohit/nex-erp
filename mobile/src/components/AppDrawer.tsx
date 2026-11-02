@@ -229,6 +229,8 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   // so this is the route that actually arrives for most people.
   '/field-visits/my': { screen: 'FieldVisit' },
   '/employees/me/profile': { screen: 'Profile' },
+  '/employees/directory': { screen: 'EmployeeDirectory' },
+  '/employees': { screen: 'EmployeeDirectory' },
   '/settings/security': { screen: 'Security' },
   '/attendance/holidays': { screen: 'Attendance', params: { initialTab: 'holidays' } },
   '/payroll/expenses': { screen: 'Attendance', params: { initialTab: 'expenses' } },
@@ -238,7 +240,6 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   '/tasks': { screen: 'MyTasks' },
   '/timesheets': { screen: 'WeeklyTimesheet' },
   '/notices': { screen: 'Notices' },
-  '/task-requests': { screen: 'Approvals' },
   '/attendance/approvals': { screen: 'Approvals' },
   '/m/my-tasks': { screen: 'MyTasks' },
   '/m/weekly-timesheet': { screen: 'WeeklyTimesheet' },
@@ -250,6 +251,7 @@ const ROUTE_TO_NAV: Record<string, { screen: string; params?: any }> = {
   // Web routes the server's sidebar sends that already have a mobile screen;
   // unmapped ones opened the website instead (2 Nov 2026).
   '/approvals': { screen: 'Approvals' },
+  '/task-requests': { screen: 'ApprovalRequests' },
   '/attendance/clock-out-approvals': { screen: 'Approvals' },
   '/attendance': { screen: 'Attendance' },
   '/attendance/all': { screen: 'TeamAttendance' },
@@ -293,6 +295,7 @@ const GROUP_ORDER = ['WORKSPACE', 'MY TEAM', 'FINANCE', 'OPERATIONS', 'SYSTEM'];
 // Items that are fully implemented and always shown
 const ALWAYS_ON_ITEMS: { group: string; id: string; title: string; icon: string; route: string }[] = [
   { group: 'MY TEAM', id: 'm-approvals', title: 'Approvals', icon: 'user-check', route: '/m/approvals' },
+  { group: 'MY TEAM', id: 'm-approval-requests', title: 'Approval Requests', icon: 'check-square', route: '/task-requests' },
   { group: 'MY TEAM', id: 'm-team-attendance', title: 'Team Attendance', icon: 'calendar-days', route: '/m/team-attendance' },
 ];
 
@@ -728,6 +731,7 @@ function StaticMenuFallback({
         { id: 'my-tasks', title: 'Tasks', icon: 'check-square', screen: 'MyTasks' },
         { id: 'weekly-timesheet', title: 'Timesheet', icon: 'timer', screen: 'WeeklyTimesheet' },
         { id: 'approvals', title: 'Approvals', icon: 'user-check', screen: 'Approvals' },
+        { id: 'approval-requests', title: 'Approval Requests', icon: 'check-square', screen: 'ApprovalRequests' },
         { id: 'team-attendance', title: 'Team Attendance', icon: 'calendar-days', screen: 'TeamAttendance' },
         { id: 'my-shift', title: 'My Shift', icon: 'clock', screen: 'MyShift' },
         { id: 'team-leave', title: 'Team Leave', icon: 'users', screen: 'TeamLeave' },

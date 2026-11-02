@@ -14,6 +14,7 @@ import {
   MapPin,
   Users,
   LayoutDashboard,
+  ArrowLeft,
 } from 'lucide-react-native';
 import BottomNavBar from './BottomNavBar';
 import AppDrawer from './AppDrawer';
@@ -68,6 +69,7 @@ export function ScreenHeader({
   transparent = false,
   hideTitle = false,
   light = false,
+  showBack = false,
   onOpenDrawer,
 }: {
   title?: string;
@@ -79,6 +81,8 @@ export function ScreenHeader({
   hideTitle?: boolean;
   /** White title and subtitle, for a header over a coloured banner (project page). */
   light?: boolean;
+  /** A back arrow in place of the menu button, for screens opened from another one. */
+  showBack?: boolean;
   onOpenDrawer: () => void;
 }) {
   const navigation = useNavigation<any>();
@@ -95,11 +99,13 @@ export function ScreenHeader({
         <TouchableOpacity
           style={styles.iconBtn}
           activeOpacity={0.7}
-          onPress={onOpenDrawer}
+          onPress={showBack && navigation.canGoBack() ? () => navigation.goBack() : onOpenDrawer}
           accessibilityRole="button"
-          accessibilityLabel="Open menu"
+          accessibilityLabel={showBack ? 'Go back' : 'Open menu'}
         >
-          <Menu size={19} color="#0F172A" strokeWidth={2.4} />
+          {showBack && navigation.canGoBack()
+            ? <ArrowLeft size={20} color="#0F172A" strokeWidth={2.4} />
+            : <Menu size={19} color="#0F172A" strokeWidth={2.4} />}
         </TouchableOpacity>
 
         {!hideTitle && !!title ? (
@@ -108,9 +114,9 @@ export function ScreenHeader({
               <HeaderIcon size={18} color={iconTheme.color} strokeWidth={2.3} />
             </View>
             <View style={styles.headerTitleCol}>
-              <Text style={[styles.headerTitle, light && styles.headerTitleLight]} numberOfLines={1}>{title}</Text>
+              <Text style={[styles.headerTitle, light && styles.headerTitleLight]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>{title}</Text>
               {!!subtitle && (
-                <Text style={[styles.headerSubtitle, light && styles.headerSubtitleLight]} numberOfLines={1}>{subtitle}</Text>
+                <Text style={[styles.headerSubtitle, light && styles.headerSubtitleLight]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{subtitle}</Text>
               )}
             </View>
           </View>
@@ -166,6 +172,7 @@ export default function AppScreen({
   transparent = false,
   hideTitle = false,
   light = false,
+  showBack = false,
   children,
 }: {
   title?: string;
@@ -178,6 +185,7 @@ export default function AppScreen({
   hideTitle?: boolean;
   /** White header text, for screens with a coloured background behind the header. */
   light?: boolean;
+  showBack?: boolean;
   children: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -195,6 +203,7 @@ export default function AppScreen({
         transparent={transparent}
         hideTitle={hideTitle}
         light={light}
+        showBack={showBack}
         onOpenDrawer={() => setDrawerOpen(true)}
       />
       <View style={styles.content}>{children}</View>

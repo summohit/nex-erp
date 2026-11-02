@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, Modal, TouchableOpacity, Linking, ActivityIndicator, ScrollView } from 'react-native';
 import { X, Mail, Phone, Building2, Briefcase, UserRound, CalendarDays, MapPin } from 'lucide-react-native';
 import { create } from 'zustand';
+import { useNavigation } from '@react-navigation/native';
 import { apiClient } from '../api/apiClient';
 
 /**
@@ -60,6 +61,7 @@ const when = (d?: string | null) =>
 
 export function PersonSheetHost() {
   const { person, close } = usePersonSheet();
+  const navigation = useNavigation<any>();
   const [full, setFull] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -119,6 +121,14 @@ export function PersonSheetHost() {
                 )}
               </View>
             )}
+            {!!person?.id && (
+              <TouchableOpacity
+                style={styles.fullBtn}
+                onPress={() => { const id = person.id; close(); navigation.navigate('EmployeeProfile', { id, person: p }); }}
+              >
+                <Text style={styles.fullBtnText}>View full profile</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </TouchableOpacity>
       </TouchableOpacity>
@@ -141,5 +151,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, fontSize: 14, color: '#334155' },
   actions: { alignSelf: 'stretch', marginTop: 16, gap: 8 },
   action: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, backgroundColor: '#EFF6FF' },
+  fullBtn: { alignSelf: 'stretch', marginTop: 14, height: 44, borderRadius: 12, backgroundColor: '#1373E5', alignItems: 'center', justifyContent: 'center' },
+  fullBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   actionText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1D4ED8' },
 });

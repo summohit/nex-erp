@@ -170,7 +170,7 @@ export default function NoticesScreen() {
     : { label: 'Live', bg: '#ECFDF5', text: '#047857' };
 
   return (
-    <AppScreen title="Notice Board" subtitle={`${counts.ACTIVE} active${unread ? ` · ${unread} unread` : ''}`}>
+    <AppScreen showBack title="Notice Board" subtitle={`${counts.ACTIVE} active${unread ? ` · ${unread} unread` : ''}`}>
       {loading ? <ActivityIndicator style={styles.loader} color={theme.colors.primary} /> : (
         <FlatList
           data={shown}

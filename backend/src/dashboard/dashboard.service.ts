@@ -558,13 +558,13 @@ export class DashboardService {
       const name = `${e.firstName} ${e.lastName ?? ''}`.trim();
       if (e.dateOfBirth) {
         const key = byMonthDay.get(`${e.dateOfBirth.getMonth()}-${e.dateOfBirth.getDate()}`);
-        if (key) events.push({ date: key, type: 'BIRTHDAY', title: name, subtitle: 'Birthday', avatarUrl: e.avatarUrl, mine: e.id === employeeId });
+        if (key) events.push({ date: key, type: 'BIRTHDAY', title: name, subtitle: 'Birthday', avatarUrl: e.avatarUrl, employeeId: e.id, mine: e.id === employeeId });
       }
       if (e.joiningDate) {
         const key = byMonthDay.get(`${e.joiningDate.getMonth()}-${e.joiningDate.getDate()}`);
         const years = key ? Number(key.slice(0, 4)) - e.joiningDate.getFullYear() : 0;
         if (key && years > 0) {
-          events.push({ date: key, type: 'ANNIVERSARY', title: name, subtitle: `${years} year${years > 1 ? 's' : ''} at work`, avatarUrl: e.avatarUrl, mine: e.id === employeeId });
+          events.push({ date: key, type: 'ANNIVERSARY', title: name, subtitle: `${years} year${years > 1 ? 's' : ''} at work`, avatarUrl: e.avatarUrl, employeeId: e.id, mine: e.id === employeeId });
         }
       }
     }
@@ -583,6 +583,8 @@ export class DashboardService {
             title: name,
             subtitle: mine ? `${l.leaveType?.name || 'Leave'} (You)` : l.leaveType?.name || 'Leave',
             avatarUrl: l.employee?.avatarUrl ?? null,
+            // Lets the app open this person's profile from the calendar.
+            employeeId: l.employeeId,
             mine
           });
         }

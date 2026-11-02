@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, RefreshControl, TouchableOpacity, Text, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppScreen from '../../components/AppScreen';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { useAuthStore } from '../../store/authStore';
 import { useProfileStore } from '../../store/profileStore';
 import { useDashboardStore } from '../../store/dashboardStore';
@@ -63,7 +63,12 @@ export default function ProfileScreen() {
   // Only ever an Employee id. The old `|| user.id` fallback mixed in a User id,
   // which /employees/:id/profile then resolved as an employee — showing an
   // unrelated person's profile to any user whose ids did not happen to line up.
-  const empId = user?.employeeId;
+  // HR and admins open this screen for someone else from the directory
+  // (route param employeeId); otherwise it is the signed-in person's own.
+  const route = useRoute<any>();
+  const otherId: number | undefined = route.params?.employeeId;
+  const editingOther = !!otherId && otherId !== user?.employeeId;
+  const empId = otherId ?? user?.employeeId;
 
   // Fetch on mount (master data) and on every tab focus (profile stays fresh with CRM edits)
   useEffect(() => {
@@ -120,7 +125,7 @@ export default function ProfileScreen() {
         // The header avatar reads the dashboard store; update it now rather
         // than after the next dashboard refresh.
         const dash = useDashboardStore.getState();
-        if (dash.profile) useDashboardStore.setState({ profile: { ...dash.profile, avatarUrl: url } });
+        if (!editingOther && dash.profile) useDashboardStore.setState({ profile: { ...dash.profile, avatarUrl: url } });
         await fetchProfile(empId);
       }
     } catch {
@@ -183,8 +188,9 @@ export default function ProfileScreen() {
     >
     <AppScreen
       showBottomNav={false}
-      hideTitle
-      title="Profile"
+      hideTitle={!editingOther}
+      showBack={editingOther}
+      title={editingOther ? `Edit ${profileData?.firstName || 'employee'}` : 'Profile'}
       subtitle="Employee details"
       right={
         <TouchableOpacity

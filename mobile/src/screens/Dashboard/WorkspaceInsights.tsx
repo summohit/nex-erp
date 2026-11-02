@@ -26,7 +26,7 @@ const mondayOf = (d: Date) => {
   return m;
 };
 
-type CalEvent = { date: string; type: string; title: string; subtitle?: string; avatarUrl?: string | null; mine?: boolean };
+type CalEvent = { date: string; type: string; title: string; subtitle?: string; avatarUrl?: string | null; mine?: boolean; employeeId?: number };
 const EVENT_TONE: Record<string, { bg: string; border: string; text: string; label: string }> = {
   HOLIDAY: { bg: '#FEF2F2', border: '#FECACA', text: '#B91C1C', label: 'Holiday' },
   LEAVE: { bg: '#FFFBEB', border: '#FDE68A', text: '#B45309', label: 'Leave' },
@@ -38,6 +38,10 @@ const EVENT_TONE: Record<string, { bg: string; border: string; text: string; lab
 // The web hides shifts by default; so does mobile.
 const HIDDEN_TYPES = new Set(['SHIFT']);
 
+// Dashboard queue rows open the matching tab of the Approval Requests screen.
+const QUEUE_TAB: Record<string, string> = {
+  hours: 'HOURS', tasks: 'TASKS', budget: 'BUDGET', scope: 'SCOPE', locs: 'LOCATIONS', visits: 'VISITS', tickets: 'TICKETS',
+};
 const isPending = (s?: string) => !s || /^(PENDING|REQUESTED)/.test(String(s).toUpperCase());
 
 export default function WorkspaceInsights({ onNavigate, reloadKey, showApprovals }: {
@@ -263,13 +267,19 @@ export default function WorkspaceInsights({ onNavigate, reloadKey, showApprovals
                 {list.length ? list.map((e, i) => {
                   const tone = EVENT_TONE[e.type] || EVENT_TONE.DAY_OFF;
                   return (
-                    <View key={i} style={[styles.event, { backgroundColor: tone.bg, borderLeftColor: tone.text }]}>
-                      {e.avatarUrl ? <Image source={{ uri: e.avatarUrl }} style={styles.avatar} /> : null}
+                    <PersonTap
+                      key={i}
+                      // Holidays and days off are nobody's; only people open a profile.
+                      person={e.employeeId ? { id: e.employeeId, firstName: e.title, avatarUrl: e.avatarUrl } : null}
+                      style={[styles.event, { backgroundColor: tone.bg, borderLeftColor: tone.text }]}
+                    >
+                      {e.employeeId ? <Avatar person={{ id: e.employeeId, firstName: e.title, avatarUrl: e.avatarUrl }} size={22} />
+                        : e.avatarUrl ? <Image source={{ uri: e.avatarUrl }} style={styles.avatar} /> : null}
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.eventTitle, { color: tone.text }]} numberOfLines={1}>{e.title}</Text>
                         {!!e.subtitle && <Text style={styles.eventSub} numberOfLines={1}>{e.subtitle}</Text>}
                       </View>
-                    </View>
+                    </PersonTap>
                   );
                 }) : <Text style={styles.noEvents}>—</Text>}
               </View>
@@ -282,17 +292,18 @@ export default function WorkspaceInsights({ onNavigate, reloadKey, showApprovals
         <View style={styles.card}>
           <View style={styles.head}>
             <Text style={styles.title}>Approval requests · {queueTotal}</Text>
-            <TouchableOpacity style={styles.link} onPress={() => Linking.openURL(`${WEB_URL}/task-requests`)}>
+            <TouchableOpacity style={styles.link} onPress={() => onNavigate('ApprovalRequests')}>
               <Text style={styles.linkText}>Open full page</Text>
               <ChevronRight size={14} color="#1373E5" />
             </TouchableOpacity>
           </View>
           {queues.map(({ key, label, n, Icon }) => (
-            <View key={key} style={styles.queueRow}>
+            <TouchableOpacity key={key} style={styles.queueRow} onPress={() => onNavigate('ApprovalRequests', { queue: QUEUE_TAB[key] })} activeOpacity={0.7}>
               <Icon size={15} color={n ? '#1373E5' : '#94A3B8'} />
               <Text style={[styles.queueLabel, !n && styles.muted]}>{label}</Text>
               <Text style={[styles.queueNum, !n && styles.muted]}>{n}</Text>
-            </View>
+              <ChevronRight size={14} color="#CBD5E1" />
+            </TouchableOpacity>
           ))}
         </View>
       )}
