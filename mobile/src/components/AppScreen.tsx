@@ -66,16 +66,19 @@ export function ScreenHeader({
   title = '',
   subtitle,
   right,
+  headerAvatar,
   transparent = false,
   hideTitle = false,
   light = false,
   showBack = false,
+  onBack,
   onOpenDrawer,
 }: {
   title?: string;
   subtitle?: string;
   crumbs?: Crumb[];
   right?: React.ReactNode;
+  headerAvatar?: React.ReactNode;
   showBreadcrumbs?: boolean;
   transparent?: boolean;
   hideTitle?: boolean;
@@ -83,6 +86,7 @@ export function ScreenHeader({
   light?: boolean;
   /** A back arrow in place of the menu button, for screens opened from another one. */
   showBack?: boolean;
+  onBack?: () => void;
   onOpenDrawer: () => void;
 }) {
   const navigation = useNavigation<any>();
@@ -99,20 +103,30 @@ export function ScreenHeader({
         <TouchableOpacity
           style={styles.iconBtn}
           activeOpacity={0.7}
-          onPress={showBack && navigation.canGoBack() ? () => navigation.goBack() : onOpenDrawer}
+          onPress={
+            onBack
+              ? onBack
+              : showBack && navigation.canGoBack()
+              ? () => navigation.goBack()
+              : onOpenDrawer
+          }
           accessibilityRole="button"
-          accessibilityLabel={showBack ? 'Go back' : 'Open menu'}
+          accessibilityLabel={showBack || onBack ? 'Go back' : 'Open menu'}
         >
-          {showBack && navigation.canGoBack()
+          {showBack || onBack
             ? <ArrowLeft size={20} color="#0F172A" strokeWidth={2.4} />
             : <Menu size={19} color="#0F172A" strokeWidth={2.4} />}
         </TouchableOpacity>
 
         {!hideTitle && !!title ? (
           <View style={styles.headerCenter}>
-            <View style={[styles.titleIconBadge, { backgroundColor: iconTheme.bg, borderColor: iconTheme.border }]}>
-              <HeaderIcon size={18} color={iconTheme.color} strokeWidth={2.3} />
-            </View>
+            {headerAvatar ? (
+              <View style={styles.headerAvatarBadge}>{headerAvatar}</View>
+            ) : (
+              <View style={[styles.titleIconBadge, { backgroundColor: iconTheme.bg, borderColor: iconTheme.border }]}>
+                <HeaderIcon size={18} color={iconTheme.color} strokeWidth={2.3} />
+              </View>
+            )}
             <View style={styles.headerTitleCol}>
               <Text style={[styles.headerTitle, light && styles.headerTitleLight]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>{title}</Text>
               {!!subtitle && (
@@ -167,18 +181,21 @@ export default function AppScreen({
   subtitle,
   crumbs,
   right,
+  headerAvatar,
   showBreadcrumbs = false,
   showBottomNav = true,
   transparent = false,
   hideTitle = false,
   light = false,
   showBack = false,
+  onBack,
   children,
 }: {
   title?: string;
   subtitle?: string;
   crumbs?: Crumb[];
   right?: React.ReactNode;
+  headerAvatar?: React.ReactNode;
   showBreadcrumbs?: boolean;
   showBottomNav?: boolean;
   transparent?: boolean;
@@ -186,6 +203,7 @@ export default function AppScreen({
   /** White header text, for screens with a coloured background behind the header. */
   light?: boolean;
   showBack?: boolean;
+  onBack?: () => void;
   children: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -199,11 +217,13 @@ export default function AppScreen({
         subtitle={subtitle}
         crumbs={crumbs}
         right={right}
+        headerAvatar={headerAvatar}
         showBreadcrumbs={showBreadcrumbs}
         transparent={transparent}
         hideTitle={hideTitle}
         light={light}
         showBack={showBack}
+        onBack={onBack}
         onOpenDrawer={() => setDrawerOpen(true)}
       />
       <View style={styles.content}>{children}</View>
@@ -249,6 +269,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
+  headerAvatarBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   titleIconBadge: {
     width: 38,
     height: 38,
