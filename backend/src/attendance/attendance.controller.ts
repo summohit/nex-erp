@@ -5,6 +5,17 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { isSuperAdmin, normaliseRole } from '../common/company-roles';
 
+/**
+ * Everybody's attendance is for the company owner and HR only, the same rule
+ * the web's Attendance screen follows. The permission guard alone let Admin
+ * through, so the API answered where the screen refused.
+ */
+function requireCompanyAttendance(req: any) {
+  if (!['SUPERADMIN', 'HR'].includes(req.user?.role)) {
+    throw new ForbiddenException("Only Super Admin and HR can see everyone's attendance.");
+  }
+}
+
 @Controller('attendance')
 @UseGuards(AuthGuard, PermissionsGuard)
 export class AttendanceController {
@@ -196,6 +207,7 @@ export class AttendanceController {
   @Get('today-summary')
   @Permissions('attendance/all')
   getTodaySummary(@Request() req, @Query('date') date?: string, @Query('departmentId') departmentId?: string) {
+    requireCompanyAttendance(req);
     return this.attendanceService.getTodaySummary(req.user.companyId, {
       date: date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined,
       departmentId: departmentId ? Number(departmentId) || undefined : undefined,
@@ -216,6 +228,7 @@ export class AttendanceController {
   @Get('roster-days')
   @Permissions('attendance/all')
   getRosterDays(@Request() req, @Query('from') from: string, @Query('to') to: string) {
+    requireCompanyAttendance(req);
     return this.attendanceService.getRosterDays(req.user.companyId, from, to);
   }
 
@@ -232,6 +245,7 @@ export class AttendanceController {
     @Query('to') to?: string,
     @Query('all') all?: string,
   ) {
+    requireCompanyAttendance(req);
     if (!this.mayViewAllAttendance(req.user.role)) {
       throw new ForbiddenException('Only Super Admin and HR can view all employees attendance.');
     }

@@ -429,6 +429,14 @@ export default function AppDrawer({ visible, onClose, activeScreen = 'Home' }: A
 
   /** In the app when it has the screen, otherwise the same page on the web. */
   function openRoute(item: MenuItem) {
+    // Attendance is one menu entry, as on the web: Super Admin and HR land on
+    // everybody's attendance, everyone else on their own.
+    const r = String(user?.role || '').toUpperCase();
+    if ((item.route === '/attendance' || item.route === '/attendance/timesheets') && (r === 'SUPERADMIN' || r === 'HR')) {
+      onClose();
+      navigateTo(navigation, 'TeamAttendance');
+      return;
+    }
     const nav = item.route ? ROUTE_TO_NAV[item.route] : null;
     onClose();
     if (nav) { navigateTo(navigation, nav.screen, nav.params); return; }

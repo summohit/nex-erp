@@ -6,6 +6,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { useAuthStore } from '../store/authStore';
 import { Home, FolderKanban, Clock, CalendarDays, UserCircle } from 'lucide-react-native';
 
 /**
@@ -113,7 +114,15 @@ export default function BottomNavBar({
     prev.current = activeRoute;
   }
 
+  const role = useAuthStore((st) => String(st.user?.role || '').toUpperCase());
+
   const handlePress = (routeName: string) => {
+    // Attendance follows the role, as the menu and the web do: Super Admin and
+    // HR open everybody's attendance (their own is one tap away, "Mine").
+    if (routeName === 'Attendance' && (role === 'SUPERADMIN' || role === 'HR')) {
+      navigation.navigate('TeamAttendance');
+      return;
+    }
     if (onTabPress) {
       onTabPress(routeName);
       return;
