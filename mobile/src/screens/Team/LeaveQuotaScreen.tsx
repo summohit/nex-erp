@@ -50,7 +50,8 @@ export default function LeaveQuotaScreen() {
   const departments = useMemo(() => [...new Set((report?.rows || []).map((r) => r.employee.department).filter(Boolean))].sort() as string[], [report]);
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = (report?.rows || []).filter((r) =>
+    // People who have left are hidden, as they no longer take leave.
+    const list = (report?.rows || []).filter((r) => r.employee.isActive !== false &&
       (!dept || r.employee.department === dept) && (!onlyMissing || r.hasNoBalances) &&
       (!q || `${r.employee.name} ${r.employee.employeeCode || ''} ${r.employee.designation || ''}`.toLowerCase().includes(q)));
     return list.sort((a, b) =>
@@ -62,7 +63,7 @@ export default function LeaveQuotaScreen() {
   const sums = useMemo(() => rows.reduce((s, r) => ({
     allocated: s.allocated + r.totals.allocated, used: s.used + r.totals.used, remaining: s.remaining + r.totals.remaining,
   }), { allocated: 0, used: 0, remaining: 0 }), [rows]);
-  const missing = (report?.rows || []).filter((r) => r.hasNoBalances).length;
+  const missing = (report?.rows || []).filter((r) => r.employee.isActive !== false && r.hasNoBalances).length;
   const isAll = report?.scope === 'ALL';
 
   const toggle = (id: number) => setOpenRows((s) => { const x = new Set(s); x.has(id) ? x.delete(id) : x.add(id); return x; });

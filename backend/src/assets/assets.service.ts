@@ -369,6 +369,11 @@ export class AssetsService {
     });
     if (!request) throw new NotFoundException('Hardware request not found');
 
+    // Deciding requests is for the people who see everyone's (see
+    // getHardwareRequests). It used to be open to any employee.
+    if (!['SUPERADMIN', 'ADMIN', 'HR'].includes(userRole)) {
+      throw new ForbiddenException('Only HR and administrators can decide hardware requests');
+    }
     if (request.employee.userId === userId && userRole !== 'SUPERADMIN') {
       throw new ForbiddenException('You cannot approve or reject your own hardware request');
     }
