@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile, BadRequestException, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile, BadRequestException, ForbiddenException, ParseIntPipe } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProfileCompletenessService } from './profile-completeness/profile-completeness.service';
 import {
@@ -7,6 +7,23 @@ import {
 import { EmployeesService } from './employees.service';
 import { EmployeesImportService } from './employees-import.service';
 import { AuthGuard } from '../auth/auth.guard';
+
+/**
+ * Adding, editing, importing and deactivating employees belongs to the people
+ * who run the directory. These routes used to check only that the caller was
+ * signed in, so any employee could suspend a colleague or create an account
+ * with any role.
+ */
+const DIRECTORY_MANAGERS = ['SUPERADMIN', 'ADMIN', 'HR'];
+function requireDirectoryManager(req: any, role?: string | null) {
+  if (!DIRECTORY_MANAGERS.includes(req.user?.role)) {
+    throw new ForbiddenException('Only HR and administrators can change employee records.');
+  }
+  // Only a super admin can make another super admin.
+  if (role === 'SUPERADMIN' && req.user.role !== 'SUPERADMIN') {
+    throw new ForbiddenException('Only a super admin can grant the super admin role.');
+  }
+}
 
 @Controller('employees')
 @UseGuards(AuthGuard)
@@ -26,6 +43,7 @@ export class EmployeesController {
     @Body('designationId') designationId?: string,
     @Body('role') role?: string
   ) {
+    requireDirectoryManager(req, role);
     if (!file) {
       throw new BadRequestException('No file uploaded.');
     }
@@ -53,6 +71,7 @@ export class EmployeesController {
 
   @Post('send-welcome-emails')
   sendWelcomeEmails(@Request() req, @Body('employeeIds') employeeIds: number[]) {
+    requireDirectoryManager(req);
     if (!Array.isArray(employeeIds) || employeeIds.length === 0) {
       throw new BadRequestException('employeeIds must be a non-empty array.');
     }
@@ -71,6 +90,7 @@ export class EmployeesController {
 
   @Post()
   create(@Request() req, @Body() data: any) {
+    requireDirectoryManager(req, data?.role);
     return this.employeesService.create(req.user.companyId, data);
   }
 
@@ -82,6 +102,7 @@ export class EmployeesController {
 
   @Put(':id')
   update(@Request() req, @Param('id') id: string, @Body() data: any) {
+    requireDirectoryManager(req, data?.role);
     return this.employeesService.update(+id, req.user.companyId, data);
   }
 
@@ -101,6 +122,7 @@ export class EmployeesController {
 
   @Delete(':id')
   delete(@Request() req, @Param('id') id: string) {
+    requireDirectoryManager(req);
     return this.employeesService.delete(+id, req.user.companyId);
   }
 

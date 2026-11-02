@@ -69,6 +69,10 @@ export default function ProfileScreen() {
   const otherId: number | undefined = route.params?.employeeId;
   const editingOther = !!otherId && otherId !== user?.employeeId;
   const empId = otherId ?? user?.employeeId;
+  // e.g. "Upload for them" from the documents and completion screens opens on Documents.
+  useEffect(() => {
+    if (route.params?.initialTab) setActiveTab(route.params.initialTab);
+  }, [route.params?.initialTab, setActiveTab]);
 
   // Fetch on mount (master data) and on every tab focus (profile stays fresh with CRM edits)
   useEffect(() => {

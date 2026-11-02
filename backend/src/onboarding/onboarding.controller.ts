@@ -1,6 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ParseIntPipe, ForbiddenException } from '@nestjs/common';
 import { OnboardingService } from './onboarding.service';
 import { AuthGuard } from '../auth/auth.guard';
+
+/** The HR side of onboarding: templates, the board, and moving people along it. */
+const ONBOARDING_MANAGERS = ['SUPERADMIN', 'ADMIN', 'HR'];
+function requireOnboardingManager(req: any) {
+  if (!ONBOARDING_MANAGERS.includes(req.user?.role)) {
+    throw new ForbiddenException('Only HR and administrators can manage onboarding.');
+  }
+}
 
 @Controller('onboarding')
 @UseGuards(AuthGuard)
@@ -14,17 +22,19 @@ export class OnboardingController {
 
   @Post('templates')
   async addTemplate(@Request() req, @Body() data: { title: string, description?: string }) {
+    requireOnboardingManager(req);
     return this.onboardingService.addTemplate(req.user.companyId, data);
   }
 
   @Delete('templates/:id')
   async deleteTemplate(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    requireOnboardingManager(req);
     return this.onboardingService.deleteTemplate(req.user.companyId, id);
   }
 
   @Get('board')
   async getOnboardingBoard(@Request() req) {
-    // Ideally add an RBAC check here to ensure they are HR or ADMIN
+    requireOnboardingManager(req);
     return this.onboardingService.getOnboardingBoard(req.user.companyId);
   }
 
@@ -40,11 +50,13 @@ export class OnboardingController {
 
   @Put('tasks/:id/toggle')
   async toggleTask(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('isCompleted') isCompleted: boolean) {
+    requireOnboardingManager(req);
     return this.onboardingService.toggleTaskForAdmin(req.user.companyId, id, isCompleted);
   }
 
   @Put('employee/:id/status')
   async updateEmployeeStatus(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('status') status: string) {
+    requireOnboardingManager(req);
     return this.onboardingService.updateEmployeeStatus(req.user.companyId, id, status);
   }
 }

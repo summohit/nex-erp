@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useAuthStore } from '../../store/authStore';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
-import { Mail, Phone, FileText, ChevronRight, UserRound, Pencil, History } from 'lucide-react-native';
+import { Mail, Phone, FileText, ChevronRight, UserRound, Pencil, History, Settings2 } from 'lucide-react-native';
 import AppScreen from '../../components/AppScreen';
 import { apiClient } from '../../api/apiClient';
 import { Avatar } from '../../components/PersonSheet';
@@ -115,6 +115,13 @@ export default function EmployeeProfileScreen() {
             {!!p?.joiningDate && <Text style={styles.tag}>{tenure(p.joiningDate)}</Text>}
             {p?.offboardingStatus === 'SEPARATED' && <Text style={[styles.tag, styles.tagGrey]}>Left</Text>}
           </View>
+          {['SUPERADMIN', 'ADMIN', 'HR'].includes(String(role)) && !limited && (
+            <TouchableOpacity style={styles.manageBtn} onPress={() => navigation.navigate('EmployeeManage', { id })} activeOpacity={0.8}>
+              <Settings2 size={15} color="#1373E5" />
+              <Text style={styles.manageText}>Manage role, manager, shift & access</Text>
+            </TouchableOpacity>
+          )}
+          {String(p?.user?.status).toUpperCase() === 'SUSPENDED' && <Text style={[styles.tag, styles.tagGrey]}>Deactivated</Text>}
           <View style={styles.actions}>
             {!!email && (
               <TouchableOpacity style={styles.action} onPress={() => Linking.openURL(`mailto:${email}`)}>
@@ -305,6 +312,8 @@ const styles = StyleSheet.create({
   resume: { paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 2 },
   resumeTitle: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
   resumeSub: { fontSize: 12, color: '#64748B' },
+  manageBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingHorizontal: 14, height: 38, borderRadius: 12, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' },
+  manageText: { fontSize: 13, fontWeight: '700', color: '#1373E5' },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, height: 38, borderRadius: 12, backgroundColor: '#1373E5' },
   editText: { color: '#fff', fontWeight: '800', fontSize: 13 },
   event: { flexDirection: 'row', gap: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' },

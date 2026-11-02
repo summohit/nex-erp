@@ -639,7 +639,7 @@ export class EmployeesService {
     const employee = await this.prisma.employee.findFirst({
       where: { id, companyId },
       include: {
-        user: { select: { email: true, role: true, id: true } },
+        user: { select: { email: true, role: true, id: true, status: true } },
         department: { select: { name: true } },
         designation: { select: { name: true } },
         branch: { select: { name: true } },

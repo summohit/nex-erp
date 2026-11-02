@@ -19,6 +19,11 @@ import TeamMembersScreen from '../screens/Projects/TeamMembersScreen';
 import ApprovalRequestsScreen from '../screens/Team/ApprovalRequestsScreen';
 import EmployeeDirectoryScreen from '../screens/Team/EmployeeDirectoryScreen';
 import EmployeeProfileScreen from '../screens/Team/EmployeeProfileScreen';
+import EmployeeManageScreen from '../screens/Team/EmployeeManageScreen';
+import OrgChartScreen from '../screens/Team/OrgChartScreen';
+import OnboardingTrackerScreen from '../screens/Team/OnboardingTrackerScreen';
+import ProfileCompletionScreen from '../screens/Team/ProfileCompletionScreen';
+import EmployeeDocumentsScreen from '../screens/Team/EmployeeDocumentsScreen';
 import ESSScreen from '../screens/ESS/ESSScreen';
 import CRMScreen from '../screens/CRM/CRMScreen';
 import NotificationsScreen from '../screens/Notifications/NotificationsScreen';
@@ -171,6 +176,11 @@ export default function AppNavigator() {
             <Stack.Screen name="EmployeeProfile" component={EmployeeProfileScreen} />
             {/* The Profile tab's editor, opened for another employee by HR / admins. */}
             <Stack.Screen name="EmployeeEdit" component={ProfileScreen} />
+            <Stack.Screen name="EmployeeManage" component={EmployeeManageScreen} />
+            <Stack.Screen name="OrgChart" component={OrgChartScreen} />
+            <Stack.Screen name="OnboardingTracker" component={OnboardingTrackerScreen} />
+            <Stack.Screen name="ProfileCompletion" component={ProfileCompletionScreen} />
+            <Stack.Screen name="EmployeeDocuments" component={EmployeeDocumentsScreen} />
             <Stack.Screen name="CRM" component={CRMScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="Payslips" component={PayslipsScreen} />

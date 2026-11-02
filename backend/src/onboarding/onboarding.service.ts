@@ -104,9 +104,20 @@ export class OnboardingService {
   async getOnboardingBoard(companyId: number) {
     const employees = await this.prisma.employee.findMany({
       where: { companyId },
-      include: {
+      // Only what the board shows. This used to return every column of every
+      // employee — bank, passport and ID numbers included.
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        employeeCode: true,
+        joiningDate: true,
+        onboardingStatus: true,
+        createdAt: true,
         user: { select: { email: true } },
         designation: { select: { name: true } },
+        department: { select: { name: true } },
         onboardingTasks: true
       },
       orderBy: { createdAt: 'desc' }
