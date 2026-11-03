@@ -141,6 +141,18 @@ export class PayrollCalculator {
       }
     }
 
+    // PF_BASE follows BASIC as lines are evaluated: capped at the PF wage ceiling
+    // unless the group pays PF on full Basic. A getter, so it is always current.
+    const pfFullBasic = input.salaryGroup.pfWageBasis === 'FULL_BASIC';
+    Object.defineProperty(context, 'PF_BASE', {
+      enumerable: true,
+      get: () => {
+        const basic = Number(context['BASIC'] ?? 0);
+        const ceiling = Number(context['PF_WAGE_CEILING'] ?? 0);
+        return pfFullBasic || !(ceiling > 0) ? basic : Math.min(basic, ceiling);
+      },
+    });
+
     const overrides = input.componentOverrides || {};
     const lines = input.salaryGroup.lines;
     const computedValues = new Map<string, number>();

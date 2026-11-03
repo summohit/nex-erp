@@ -169,8 +169,49 @@ export class PayrollMastersController {
   getAuditLog(
     @Req() req: Request,
     @Query('limit') limit?: string,
+    @Query('entity') entity?: string,
+    @Query('entityId') entityId?: string,
   ) {
     const companyId = (req.user as any).companyId;
-    return this.mastersService.getAuditLog(companyId, limit ? parseInt(limit, 10) : 100);
+    return this.mastersService.getAuditLog(
+      companyId,
+      limit ? parseInt(limit, 10) : 100,
+      entity || undefined,
+      entityId ? parseInt(entityId, 10) : undefined,
+    );
+  }
+
+  // ═══════════════════════════════════════════
+  // 7. YEAR SETTINGS, COMPANY CONFIG, DROPDOWNS (Phase 1)
+  // ═══════════════════════════════════════════
+
+  @Get('year-settings')
+  getYearSetting(@Req() req: Request, @Query('financialYear') financialYear = '2026-27') {
+    return this.mastersService.getYearSetting((req.user as any).companyId, financialYear);
+  }
+
+  @Put('year-settings')
+  saveYearSetting(@Req() req: Request, @Query('financialYear') financialYear = '2026-27', @Body() body: any) {
+    return this.mastersService.saveYearSetting((req.user as any).companyId, financialYear, body ?? {}, (req.user as any).id);
+  }
+
+  @Get('config')
+  getCompanyConfig(@Req() req: Request) {
+    return this.mastersService.getCompanyConfig((req.user as any).companyId);
+  }
+
+  @Put('config')
+  saveCompanyConfig(@Req() req: Request, @Body() body: any) {
+    return this.mastersService.saveCompanyConfig((req.user as any).companyId, body ?? {}, (req.user as any).id);
+  }
+
+  @Get('dropdowns')
+  getDropdowns(@Req() req: Request) {
+    return this.mastersService.getDropdowns((req.user as any).companyId);
+  }
+
+  @Put('dropdowns/:listKey')
+  saveDropdown(@Req() req: Request, @Param('listKey') listKey: string, @Body('options') options: string[]) {
+    return this.mastersService.saveDropdown((req.user as any).companyId, listKey, options, (req.user as any).id);
   }
 }

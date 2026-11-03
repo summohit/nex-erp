@@ -15,6 +15,32 @@ import {
 } from '../engine/formula-evaluator';
 import { RATE_VARIABLES } from './payroll-seed-data';
 
+/** Starting values for the payroll dropdowns (plan W6). Finance edits them in Payroll Rules. */
+const DROPDOWN_DEFAULTS: Record<string, { name: string; options: string[] }> = {
+  PAYMENT_METHOD: { name: 'Payment methods', options: ['Bank transfer', 'UPI', 'Cheque', 'Cash'] },
+  CONTRACT_LENGTH: { name: 'Contract lengths', options: ['6 months', '1 year', '2 years'] },
+  WORKER_TYPE: { name: 'Worker types', options: ['Employee', 'Trainee', 'Technical consultant', 'Non-technical consultant'] },
+};
+
+function dropdownValue(label: string): string {
+  return label.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'OPTION';
+}
+
+/** "2026-27" from "2026-27", "2026-2027" or "2026". */
+function normaliseFy(fy: string): string {
+  const m = String(fy || '').match(/^(\d{4})/);
+  if (!m) throw new BadRequestException('Financial year must look like 2026-27');
+  const y = Number(m[1]);
+  return `${y}-${String((y + 1) % 100).padStart(2, '0')}`;
+}
+
+function parseDate(v: any): Date | null {
+  if (v == null || v === '') return null;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) throw new BadRequestException(`Invalid date: ${v}`);
+  return d;
+}
+
 @Injectable()
 export class PayrollMastersService {
   constructor(private prisma: PrismaService) {}
@@ -205,6 +231,7 @@ export class PayrollMastersService {
       payeeType?: string;
       flatTdsPct?: number;
       gstApplicable?: boolean;
+      pfWageBasis?: string;
       effectiveFrom: string;
       lines: {
         componentId: number;
@@ -248,6 +275,7 @@ export class PayrollMastersService {
           payeeType: data.payeeType || 'EMPLOYEE',
           flatTdsPct: data.flatTdsPct ?? null,
           gstApplicable: data.gstApplicable ?? false,
+          pfWageBasis: data.pfWageBasis === 'FULL_BASIC' ? 'FULL_BASIC' : 'CAPPED',
           effectiveFrom: effectiveDate,
           lines: {
             create: data.lines.map((l, index) => ({
@@ -378,7 +406,9 @@ export class PayrollMastersService {
       where: { companyId, financialYear, isActive: true },
       include: {
         slabs: { orderBy: { position: 'asc' } },
-        sections: { where: { isActive: true }, orderBy: { position: 'asc' } },
+        // All sections, switched-off ones too, so Finance can turn them back on.
+        // The calculator only uses active ones (see calculateSalary).
+        sections: { orderBy: { position: 'asc' } },
       },
     });
   }
@@ -391,7 +421,10 @@ export class PayrollMastersService {
       rebateIncomeLimit?: number;
       rebateMaxAmount?: number;
       cessPct?: number;
+      surcharge?: { fromIncome: number; ratePct: number }[];
       slabs?: { fromAmount: number; toAmount?: number | null; ratePct: number; position?: number }[];
+      /** Deduction sections (old regime): limit, proof needed, on/off. Matched by code. */
+      sections?: { code: string; maxLimit?: number | null; proofRequired?: boolean; isActive?: boolean }[];
     },
     actorUserId?: number,
   ) {
@@ -417,9 +450,25 @@ export class PayrollMastersService {
         });
       }
 
+      for (const sec of data.sections || []) {
+        await tx.payrollTaxSection.updateMany({
+          where: { regimeId: regId, code: String(sec.code) },
+          data: {
+            ...(sec.maxLimit !== undefined && { maxLimit: sec.maxLimit == null ? null : Number(sec.maxLimit) }),
+            ...(sec.proofRequired !== undefined && { proofRequired: !!sec.proofRequired }),
+            ...(sec.isActive !== undefined && { isActive: !!sec.isActive }),
+          },
+        });
+      }
+
       return tx.payrollTaxRegime.update({
         where: { id: regId },
         data: {
+          ...(data.surcharge !== undefined && {
+            surcharge: (data.surcharge || [])
+              .map((b) => ({ fromIncome: Number(b.fromIncome), ratePct: Number(b.ratePct) }))
+              .filter((b) => b.fromIncome > 0 && b.ratePct >= 0) as any,
+          }),
           ...(data.standardDeduction !== undefined && { standardDeduction: Number(data.standardDeduction) }),
           ...(data.rebateIncomeLimit !== undefined && { rebateIncomeLimit: Number(data.rebateIncomeLimit) }),
           ...(data.rebateMaxAmount !== undefined && { rebateMaxAmount: Number(data.rebateMaxAmount) }),
@@ -452,6 +501,7 @@ export class PayrollMastersService {
         'CTC_MONTHLY',
         'CTC_ANNUAL',
         'GROSS',
+        'PF_BASE',
         ...Object.keys(RATE_VARIABLES),
         ...components.map((c) => c.code),
       ]);
@@ -475,6 +525,7 @@ export class PayrollMastersService {
         PF_EMPLOYER_PCT: 12,
         PF_EMPLOYEE_PCT: 12,
         PF_WAGE_CEILING: 15000,
+        PF_BASE: Math.min(sampleCtc / 12 * 0.5, 15000),
         ESI_EMPLOYER_PCT: 3.25,
         ESI_EMPLOYEE_PCT: 0.75,
         ESI_LIMIT: 21000,
@@ -565,6 +616,7 @@ export class PayrollMastersService {
         payeeType: group.payeeType,
         flatTdsPct: group.flatTdsPct ?? undefined,
         gstApplicable: group.gstApplicable,
+        pfWageBasis: group.pfWageBasis === 'FULL_BASIC' ? 'FULL_BASIC' : 'CAPPED',
         sheet: '',
         lines: group.lines.map((l: any) => ({
           component: l.component.code,
@@ -627,12 +679,159 @@ export class PayrollMastersService {
   }
 
   // ═══════════════════════════════════════════
+  // 5b. YEAR SETTINGS, COMPANY CONFIG, DROPDOWNS (Phase 1)
+  // ═══════════════════════════════════════════
+
+  /** Year settings for one FY. Not saved yet → the decided starting values (3 Nov 2026), unsaved. */
+  async getYearSetting(companyId: number, financialYear: string) {
+    const fy = normaliseFy(financialYear);
+    const saved = await this.prisma.payrollYearSetting.findUnique({
+      where: { companyId_financialYear: { companyId, financialYear: fy } },
+    });
+    if (saved) return { ...saved, saved: true };
+    const startYear = Number(fy.slice(0, 4));
+    return {
+      companyId,
+      financialYear: fy,
+      defaultRegimeCode: 'NEW',
+      regimeLockDate: new Date(Date.UTC(startYear, 3, 30)), // 30 April
+      newJoinerChoiceDays: 30,
+      tdsMethod: 'SPREAD',
+      proofWindowStart: new Date(Date.UTC(startYear + 1, 0, 1)), // 1 Jan
+      proofWindowEnd: new Date(Date.UTC(startYear + 1, 1, 28)), // 28 Feb
+      saved: false,
+    };
+  }
+
+  async saveYearSetting(
+    companyId: number,
+    financialYear: string,
+    data: {
+      defaultRegimeCode?: string;
+      regimeLockDate?: string;
+      newJoinerChoiceDays?: number;
+      tdsMethod?: string;
+      proofWindowStart?: string | null;
+      proofWindowEnd?: string | null;
+    },
+    actorUserId?: number,
+  ) {
+    const fy = normaliseFy(financialYear);
+    const before = await this.getYearSetting(companyId, fy);
+    const regime = data.defaultRegimeCode ?? before.defaultRegimeCode;
+    if (!['NEW', 'OLD'].includes(regime)) throw new BadRequestException('Default regime must be NEW or OLD');
+    const method = data.tdsMethod ?? before.tdsMethod;
+    if (!['SPREAD', 'FIXED'].includes(method)) throw new BadRequestException('TDS method must be SPREAD or FIXED');
+    const days = data.newJoinerChoiceDays ?? before.newJoinerChoiceDays;
+    if (!(Number.isInteger(Number(days)) && Number(days) >= 0 && Number(days) <= 365)) {
+      throw new BadRequestException('New-joiner window must be 0–365 days');
+    }
+    const lock = parseDate(data.regimeLockDate) ?? before.regimeLockDate;
+    const proofStart = data.proofWindowStart === undefined ? before.proofWindowStart : parseDate(data.proofWindowStart);
+    const proofEnd = data.proofWindowEnd === undefined ? before.proofWindowEnd : parseDate(data.proofWindowEnd);
+    if (proofStart && proofEnd && proofEnd < proofStart) throw new BadRequestException('Proof window ends before it starts');
+
+    const values = {
+      defaultRegimeCode: regime,
+      regimeLockDate: lock,
+      newJoinerChoiceDays: Number(days),
+      tdsMethod: method,
+      proofWindowStart: proofStart,
+      proofWindowEnd: proofEnd,
+    };
+    const saved = await this.prisma.payrollYearSetting.upsert({
+      where: { companyId_financialYear: { companyId, financialYear: fy } },
+      create: { companyId, financialYear: fy, ...values },
+      update: values,
+    });
+    // Keep the regimes' "default" flag in step with the year's default.
+    await this.prisma.payrollTaxRegime.updateMany({ where: { companyId, financialYear: fy }, data: { isDefault: false } });
+    await this.prisma.payrollTaxRegime.updateMany({ where: { companyId, financialYear: fy, code: regime }, data: { isDefault: true } });
+    await this.logAudit(companyId, 'PayrollYearSetting', saved.id, before.saved ? 'UPDATE' : 'CREATE', before.saved ? before : null, saved, actorUserId);
+    return { ...saved, saved: true };
+  }
+
+  async getCompanyConfig(companyId: number) {
+    const saved = await this.prisma.payrollCompanyConfig.findUnique({ where: { companyId } });
+    return saved
+      ? { ...saved, saved: true }
+      : { companyId, gradeBasis: 'MONTHLY_GROSS', costingWorkingDays: 26, costingHoursPerDay: 8, costingIncludeEmployer: true, saved: false };
+  }
+
+  async saveCompanyConfig(
+    companyId: number,
+    data: { gradeBasis?: string; costingWorkingDays?: number; costingHoursPerDay?: number; costingIncludeEmployer?: boolean },
+    actorUserId?: number,
+  ) {
+    const before = await this.getCompanyConfig(companyId);
+    const gradeBasis = data.gradeBasis ?? before.gradeBasis;
+    if (!['MONTHLY_GROSS', 'ANNUAL_CTC'].includes(gradeBasis)) throw new BadRequestException('Grade basis must be MONTHLY_GROSS or ANNUAL_CTC');
+    const workingDays = Number(data.costingWorkingDays ?? before.costingWorkingDays);
+    const hours = Number(data.costingHoursPerDay ?? before.costingHoursPerDay);
+    if (!(workingDays > 0 && workingDays <= 31)) throw new BadRequestException('Working days per month must be 1–31');
+    if (!(hours > 0 && hours <= 24)) throw new BadRequestException('Hours per day must be 1–24');
+    const values = {
+      gradeBasis,
+      costingWorkingDays: workingDays,
+      costingHoursPerDay: hours,
+      costingIncludeEmployer: data.costingIncludeEmployer ?? before.costingIncludeEmployer,
+    };
+    const saved = await this.prisma.payrollCompanyConfig.upsert({ where: { companyId }, create: { companyId, ...values }, update: values });
+    await this.logAudit(companyId, 'PayrollCompanyConfig', saved.id, before.saved ? 'UPDATE' : 'CREATE', before.saved ? before : null, saved, actorUserId);
+    return { ...saved, saved: true };
+  }
+
+  /** Every dropdown list; lists never saved come back with their starting values (unsaved). */
+  async getDropdowns(companyId: number) {
+    const rows = await this.prisma.payrollDropdownOption.findMany({
+      where: { companyId, isActive: true },
+      orderBy: [{ listKey: 'asc' }, { position: 'asc' }],
+    });
+    return Object.entries(DROPDOWN_DEFAULTS).map(([listKey, meta]) => {
+      const options = rows.filter((r) => r.listKey === listKey);
+      return {
+        listKey,
+        name: meta.name,
+        saved: options.length > 0,
+        options: options.length
+          ? options.map((o) => ({ value: o.value, label: o.label }))
+          : meta.options.map((label) => ({ value: dropdownValue(label), label })),
+      };
+    });
+  }
+
+  /** Replace one list. Removed options are switched off, not deleted — payslips may refer to them. */
+  async saveDropdown(companyId: number, listKey: string, labels: string[], actorUserId?: number) {
+    if (!(listKey in DROPDOWN_DEFAULTS)) throw new BadRequestException('Unknown dropdown list');
+    const clean = [...new Set((labels || []).map((l) => String(l || '').trim()).filter(Boolean))];
+    if (!clean.length) throw new BadRequestException('A list needs at least one option');
+    if (clean.some((l) => l.length > 80)) throw new BadRequestException('Options must be 80 characters or fewer');
+    const before = (await this.getDropdowns(companyId)).find((d) => d.listKey === listKey);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payrollDropdownOption.updateMany({ where: { companyId, listKey }, data: { isActive: false } });
+      for (const [i, label] of clean.entries()) {
+        const value = dropdownValue(label);
+        await tx.payrollDropdownOption.upsert({
+          where: { companyId_listKey_value: { companyId, listKey, value } },
+          create: { companyId, listKey, value, label, position: i, isActive: true },
+          update: { label, position: i, isActive: true },
+        });
+      }
+    });
+    const after = (await this.getDropdowns(companyId)).find((d) => d.listKey === listKey);
+    await this.logAudit(companyId, 'PayrollDropdown', 0, 'UPDATE', before, after, actorUserId);
+    return after;
+  }
+
+  // ═══════════════════════════════════════════
   // 6. AUDIT LOG (W13)
   // ═══════════════════════════════════════════
 
-  async getAuditLog(companyId: number, limit = 100) {
+  /** Latest changes; pass entity + entityId for one record's history (e.g. a component). */
+  async getAuditLog(companyId: number, limit = 100, entity?: string, entityId?: number) {
     return this.prisma.payrollAuditLog.findMany({
-      where: { companyId },
+      where: { companyId, ...(entity && { entity }), ...(entityId && { entityId }) },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });

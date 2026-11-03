@@ -41,9 +41,12 @@ import {
   MasterStatutoryRate,
   MasterTaxRegime,
   SalaryCalculationResult,
+  PayrollYearSetting,
+  PayrollCompanyConfig,
+  PayrollDropdownList,
 } from '../../services/payroll.service';
 
-type ActiveSettingsTab = 'components' | 'groups' | 'statutory' | 'tax' | 'calculator' | 'audit';
+type ActiveSettingsTab = 'components' | 'groups' | 'statutory' | 'tax' | 'setup' | 'calculator' | 'audit';
 
 @Component({
   selector: 'app-payroll-settings',
@@ -174,6 +177,7 @@ export class PayrollSettingsComponent implements OnInit {
     payeeType: 'EMPLOYEE',
     flatTdsPct: 0,
     gstApplicable: false,
+    pfWageBasis: 'CAPPED',
     effectiveFrom: new Date().toISOString().slice(0, 10),
     lines: [],
   };
@@ -245,6 +249,8 @@ export class PayrollSettingsComponent implements OnInit {
     rebateMaxAmount: 0,
     cessPct: 4,
     slabs: [],
+    surcharge: [],
+    sections: [],
   };
 
   // Salary Calculator state (W7)
@@ -267,6 +273,123 @@ export class PayrollSettingsComponent implements OnInit {
     });
   });
 
+  // Component history (one component's audit entries)
+  historyFor = signal<MasterComponent | null>(null);
+  historyEntries = signal<any[]>([]);
+  historyLoading = signal<boolean>(false);
+
+  openComponentHistory(comp: MasterComponent) {
+    this.historyFor.set(comp);
+    this.historyEntries.set([]);
+    this.historyLoading.set(true);
+    this.payrollService.getPayrollAuditLog(50, 'PayrollComponent', comp.id).subscribe({
+      next: (rows) => { this.historyEntries.set(rows); this.historyLoading.set(false); },
+      error: () => { this.historyLoading.set(false); this.toast.error('Failed to load history'); },
+    });
+  }
+
+  closeComponentHistory() {
+    this.historyFor.set(null);
+  }
+
+  /** Fields that differ between two audit snapshots — what a history row shows. */
+  changedFields(before: any, after: any): { field: string; from: any; to: any }[] {
+    if (!before || !after) return [];
+    const skip = new Set(['updatedAt', 'createdAt', 'id', 'companyId']);
+    return Object.keys({ ...before, ...after })
+      .filter((k) => !skip.has(k) && typeof after[k] !== 'object' && before[k] !== after[k])
+      .map((k) => ({ field: k, from: before[k], to: after[k] }));
+  }
+
+  // Year & lists (Phase 1: year settings, company config, dropdowns)
+  readonly setupFinancialYear = '2026-27';
+  yearSetting = signal<PayrollYearSetting | null>(null);
+  yearForm: any = null;
+  companyConfig = signal<PayrollCompanyConfig | null>(null);
+  configForm: any = null;
+  dropdowns = signal<PayrollDropdownList[]>([]);
+  /** listKey → the option being typed into that list's "add" box. */
+  dropdownDraft: Record<string, string> = {};
+  savingSetup = signal<string | null>(null);
+
+  loadSetup() {
+    this.payrollService.getPayrollYearSetting(this.setupFinancialYear).subscribe({
+      next: (y) => {
+        this.yearSetting.set(y);
+        this.yearForm = {
+          ...y,
+          regimeLockDate: this.toDateInput(y.regimeLockDate),
+          proofWindowStart: this.toDateInput(y.proofWindowStart),
+          proofWindowEnd: this.toDateInput(y.proofWindowEnd),
+        };
+      },
+      error: () => this.toast.error('Failed to load year settings'),
+    });
+    this.payrollService.getPayrollCompanyConfig().subscribe({
+      next: (c) => { this.companyConfig.set(c); this.configForm = { ...c }; },
+      error: () => this.toast.error('Failed to load payroll options'),
+    });
+    this.payrollService.getPayrollDropdowns().subscribe({
+      next: (d) => this.dropdowns.set(d.map((l) => ({ ...l, options: [...l.options] }))),
+      error: () => this.toast.error('Failed to load dropdown lists'),
+    });
+  }
+
+  private toDateInput(v: string | null | undefined): string {
+    return v ? String(v).slice(0, 10) : '';
+  }
+
+  saveYearSetting() {
+    this.savingSetup.set('year');
+    this.payrollService.savePayrollYearSetting(this.setupFinancialYear, {
+      defaultRegimeCode: this.yearForm.defaultRegimeCode,
+      regimeLockDate: this.yearForm.regimeLockDate,
+      newJoinerChoiceDays: Number(this.yearForm.newJoinerChoiceDays),
+      tdsMethod: this.yearForm.tdsMethod,
+      proofWindowStart: this.yearForm.proofWindowStart || null,
+      proofWindowEnd: this.yearForm.proofWindowEnd || null,
+    }).subscribe({
+      next: () => { this.savingSetup.set(null); this.toast.success(`FY ${this.setupFinancialYear} settings saved`); this.loadSetup(); this.loadAllMasters(); },
+      error: (e) => { this.savingSetup.set(null); this.toast.error(e.error?.message || 'Failed to save year settings'); },
+    });
+  }
+
+  saveCompanyConfig() {
+    this.savingSetup.set('config');
+    this.payrollService.savePayrollCompanyConfig({
+      gradeBasis: this.configForm.gradeBasis,
+      costingWorkingDays: Number(this.configForm.costingWorkingDays),
+      costingHoursPerDay: Number(this.configForm.costingHoursPerDay),
+      costingIncludeEmployer: !!this.configForm.costingIncludeEmployer,
+    }).subscribe({
+      next: () => { this.savingSetup.set(null); this.toast.success('Grades & costing saved'); this.loadSetup(); },
+      error: (e) => { this.savingSetup.set(null); this.toast.error(e.error?.message || 'Failed to save'); },
+    });
+  }
+
+  addDropdownOption(list: PayrollDropdownList) {
+    const label = (this.dropdownDraft[list.listKey] || '').trim();
+    if (!label) return;
+    if (list.options.some((o) => o.label.toLowerCase() === label.toLowerCase())) {
+      this.toast.error('That option is already in the list');
+      return;
+    }
+    list.options.push({ value: '', label });
+    this.dropdownDraft[list.listKey] = '';
+  }
+
+  removeDropdownOption(list: PayrollDropdownList, index: number) {
+    list.options.splice(index, 1);
+  }
+
+  saveDropdown(list: PayrollDropdownList) {
+    this.savingSetup.set(list.listKey);
+    this.payrollService.savePayrollDropdown(list.listKey, list.options.map((o) => o.label)).subscribe({
+      next: () => { this.savingSetup.set(null); this.toast.success(`${list.name} saved`); this.loadSetup(); },
+      error: (e) => { this.savingSetup.set(null); this.toast.error(e.error?.message || 'Failed to save list'); },
+    });
+  }
+
   ngOnInit() {
     this.loadAllMasters();
   }
@@ -277,6 +400,8 @@ export class PayrollSettingsComponent implements OnInit {
       this.runCalculator();
     } else if (tab === 'audit' && this.auditLogs().length === 0) {
       this.loadAuditLogs();
+    } else if (tab === 'setup' && !this.yearForm) {
+      this.loadSetup();
     }
   }
 
@@ -469,6 +594,7 @@ export class PayrollSettingsComponent implements OnInit {
       payeeType: 'EMPLOYEE',
       flatTdsPct: 0,
       gstApplicable: false,
+      pfWageBasis: 'CAPPED',
       effectiveFrom: new Date().toISOString().slice(0, 10),
       lines: this.components().map((c, i) => ({
         componentId: c.id,
@@ -493,6 +619,7 @@ export class PayrollSettingsComponent implements OnInit {
       payeeType: group.payeeType,
       flatTdsPct: group.flatTdsPct || 0,
       gstApplicable: group.gstApplicable || false,
+      pfWageBasis: group.pfWageBasis || 'CAPPED',
       effectiveFrom: new Date().toISOString().slice(0, 10),
       lines: (group.lines || []).map((l) => ({
         componentId: l.componentId,
@@ -604,6 +731,8 @@ export class PayrollSettingsComponent implements OnInit {
       rebateMaxAmount: regime.rebateMaxAmount,
       cessPct: regime.cessPct,
       slabs: (regime.slabs || []).map((s) => ({ ...s })),
+      surcharge: ((regime as any).surcharge || []).map((b: any) => ({ ...b })),
+      sections: (regime.sections || []).map((sec) => ({ ...sec, isActive: sec.isActive !== false })),
     };
     this.isTaxRegimeModalOpen.set(true);
   }
@@ -625,6 +754,15 @@ export class PayrollSettingsComponent implements OnInit {
 
   removeTaxSlab(index: number) {
     this.taxRegimeForm.slabs.splice(index, 1);
+  }
+
+  addSurchargeBand() {
+    const last = this.taxRegimeForm.surcharge[this.taxRegimeForm.surcharge.length - 1];
+    this.taxRegimeForm.surcharge.push({ fromIncome: last ? last.fromIncome * 2 : 5000000, ratePct: last ? last.ratePct + 5 : 10 });
+  }
+
+  removeSurchargeBand(index: number) {
+    this.taxRegimeForm.surcharge.splice(index, 1);
   }
 
   saveTaxRegime() {

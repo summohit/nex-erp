@@ -259,13 +259,16 @@ export class PayrollService {
    * Replace the company's grades. Bands must not overlap -- a gross in two
    * grades would have no answer -- and only the top one may be open-ended.
    */
-  async saveSalaryGrades(companyId: number, input: { name: string; label?: string | null; minGross: number; maxGross: number | null; kmRate?: number | null }[]) {
+  async saveSalaryGrades(companyId: number, input: { name: string; label?: string | null; minGross: number; maxGross: number | null; kmRate?: number | null; minAnnualCtc?: number | null; maxAnnualCtc?: number | null }[]) {
+    const optionalNumber = (v: any) => (v == null || v === '' ? null : Number(v));
     const grades = (input || []).map((g) => ({
       name: String(g.name || '').trim(),
       label: g.label ? String(g.label).trim() : null,
       minGross: Number(g.minGross) || 0,
       maxGross: g.maxGross == null || (g.maxGross as any) === '' ? null : Number(g.maxGross),
       kmRate: g.kmRate == null || (g.kmRate as any) === '' ? null : Number(g.kmRate),
+      minAnnualCtc: optionalNumber(g.minAnnualCtc),
+      maxAnnualCtc: optionalNumber(g.maxAnnualCtc),
       position: 0,
     })).sort((a, b) => a.minGross - b.minGross);
     if (grades.some((g) => g.kmRate != null && !(g.kmRate >= 0 && g.kmRate <= 1000))) {
@@ -279,6 +282,9 @@ export class PayrollService {
     grades.forEach((g, i) => {
       if (g.maxGross != null && g.maxGross < g.minGross) {
         throw new BadRequestException(`${g.name}: the maximum is below the minimum`);
+      }
+      if (g.minAnnualCtc != null && g.maxAnnualCtc != null && g.maxAnnualCtc < g.minAnnualCtc) {
+        throw new BadRequestException(`${g.name}: the maximum annual CTC is below the minimum`);
       }
       if (g.maxGross == null && i !== grades.length - 1) {
         throw new BadRequestException(`${g.name}: only the highest grade can have no maximum`);

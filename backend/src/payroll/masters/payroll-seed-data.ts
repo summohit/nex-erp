@@ -158,6 +158,8 @@ export interface SeedSalaryGroup {
   payeeType: 'EMPLOYEE' | 'CONSULTANT' | 'TRAINEE';
   flatTdsPct?: number;
   gstApplicable?: boolean;
+  /** PF wage base: CAPPED = MIN(BASIC, PF wage ceiling), FULL_BASIC = all of Basic. Default CAPPED. */
+  pfWageBasis?: 'CAPPED' | 'FULL_BASIC';
   /** Sheet tab the group reproduces. */
   sheet: string;
   /** Listed in evaluation order: a line may only use codes listed above it. */

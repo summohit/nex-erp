@@ -1951,3 +1951,29 @@
 .font-bold { font-weight: 700 !important; }
 .text-xs { font-size: 11px !important; }
 .text-sm { font-size: 12.5px !important; }
+
+/* ─── Year & Lists tab ─── */
+.setup-pane { display: flex; flex-direction: column; gap: 16px; }
+.setup-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 18px; margin-top: 12px; }
+.setup-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: #334155; min-height: 38px; cursor: pointer; }
+.setup-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.setup-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.setup-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 6px 5px 12px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 12.5px; font-weight: 500; }
+.setup-chip button { border: 0; background: transparent; color: #64748b; cursor: pointer; font-size: 11px; width: 18px; height: 18px; border-radius: 50%; }
+.setup-chip button:hover { background: #dbeafe; color: #b91c1c; }
+.setup-add { display: flex; gap: 8px; }
+.unsaved-pill { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 600; }
+.field-hint-text { display: block; margin-top: 4px; font-size: 11.5px; color: #64748b; }
+.row-muted td { opacity: 0.5; }
+
+/* ─── Component history ─── */
+.history-list { display: flex; flex-direction: column; gap: 10px; }
+.history-row { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; }
+.history-head { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; }
+.history-action { font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #eef2ff; color: #4338ca; }
+.history-action[data-a="DELETE"] { background: #fee2e2; color: #b91c1c; }
+.history-action[data-a="CREATE"] { background: #dcfce7; color: #15803d; }
+.history-changes { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: #334155; }
+.history-old { color: #b91c1c; text-decoration: line-through; }
+.history-new { color: #15803d; font-weight: 600; }
+.history-note { margin: 6px 0 0; font-size: 12.5px; }

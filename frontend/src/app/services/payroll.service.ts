@@ -52,6 +52,9 @@ export interface SalaryGrade {
   maxGross: number | null;
   /** Field visit travel: ₹ per km for own-vehicle trips. Null = vehicle default. */
   kmRate?: number | null;
+  /** Annual CTC band (Payroll plan: grades are CTC-based). */
+  minAnnualCtc?: number | null;
+  maxAnnualCtc?: number | null;
 }
 
 /** How a monthly gross splits into components. */
@@ -427,9 +430,61 @@ export class PayrollService {
     return this.http.post<SalaryCalculationResult>(`${this.apiUrl}/masters/calculate`, params);
   }
 
-  getPayrollAuditLog(limit = 100): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/masters/audit-log?limit=${limit}`);
+  getPayrollAuditLog(limit = 100, entity?: string, entityId?: number): Observable<any[]> {
+    const extra = entity ? `&entity=${encodeURIComponent(entity)}${entityId ? `&entityId=${entityId}` : ''}` : '';
+    return this.http.get<any[]>(`${this.apiUrl}/masters/audit-log?limit=${limit}${extra}`);
   }
+
+  getPayrollYearSetting(financialYear = '2026-27'): Observable<PayrollYearSetting> {
+    return this.http.get<PayrollYearSetting>(`${this.apiUrl}/masters/year-settings?financialYear=${financialYear}`);
+  }
+
+  savePayrollYearSetting(financialYear: string, data: Partial<PayrollYearSetting>): Observable<PayrollYearSetting> {
+    return this.http.put<PayrollYearSetting>(`${this.apiUrl}/masters/year-settings?financialYear=${financialYear}`, data);
+  }
+
+  getPayrollCompanyConfig(): Observable<PayrollCompanyConfig> {
+    return this.http.get<PayrollCompanyConfig>(`${this.apiUrl}/masters/config`);
+  }
+
+  savePayrollCompanyConfig(data: Partial<PayrollCompanyConfig>): Observable<PayrollCompanyConfig> {
+    return this.http.put<PayrollCompanyConfig>(`${this.apiUrl}/masters/config`, data);
+  }
+
+  getPayrollDropdowns(): Observable<PayrollDropdownList[]> {
+    return this.http.get<PayrollDropdownList[]>(`${this.apiUrl}/masters/dropdowns`);
+  }
+
+  savePayrollDropdown(listKey: string, options: string[]): Observable<PayrollDropdownList> {
+    return this.http.put<PayrollDropdownList>(`${this.apiUrl}/masters/dropdowns/${listKey}`, { options });
+  }
+}
+
+export interface PayrollYearSetting {
+  financialYear: string;
+  defaultRegimeCode: 'NEW' | 'OLD';
+  regimeLockDate: string;
+  newJoinerChoiceDays: number;
+  tdsMethod: 'SPREAD' | 'FIXED';
+  proofWindowStart: string | null;
+  proofWindowEnd: string | null;
+  /** False until Finance saves this year — the values shown are the starting ones. */
+  saved: boolean;
+}
+
+export interface PayrollCompanyConfig {
+  gradeBasis: 'MONTHLY_GROSS' | 'ANNUAL_CTC';
+  costingWorkingDays: number;
+  costingHoursPerDay: number;
+  costingIncludeEmployer: boolean;
+  saved: boolean;
+}
+
+export interface PayrollDropdownList {
+  listKey: string;
+  name: string;
+  saved: boolean;
+  options: { value: string; label: string }[];
 }
 
 export interface MasterComponent {
@@ -472,6 +527,7 @@ export interface MasterSalaryGroup {
   payeeType: 'EMPLOYEE' | 'CONSULTANT' | 'TRAINEE';
   flatTdsPct?: number | null;
   gstApplicable: boolean;
+  pfWageBasis?: 'CAPPED' | 'FULL_BASIC';
   effectiveFrom: string;
   retiredAt?: string | null;
   isActive: boolean;
@@ -501,7 +557,7 @@ export interface MasterTaxRegime {
   cessPct: number;
   isDefault: boolean;
   slabs: { fromAmount: number; toAmount: number | null; ratePct: number }[];
-  sections: { code: string; name: string; maxLimit: number | null; proofRequired: boolean }[];
+  sections: { code: string; name: string; maxLimit: number | null; proofRequired: boolean; isActive?: boolean }[];
 }
 
 export interface SalaryCalculationResult {

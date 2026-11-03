@@ -50,6 +50,11 @@
       <span class="tab-count-pill">{{ statutoryRates().length }}</span>
     </button>
 
+    <button class="tab-button" [class.active]="activeTab() === 'setup'" (click)="setTab('setup')">
+      <svg lucideCalendarDays [size]="16"></svg>
+      <span>Year &amp; Lists</span>
+    </button>
+
     <button class="tab-button highlight-tab" [class.active]="activeTab() === 'calculator'" (click)="setTab('calculator')">
       <svg lucideCalculator [size]="16"></svg>
       <span>⚡ Salary Calculator</span>
@@ -246,6 +251,10 @@
                   <button class="btn-action-edit" (click)="openEditComponentModal(comp)" title="Edit Component">
                     <svg lucidePencil [size]="13"></svg>
                     <span>Edit</span>
+                  </button>
+                  <button class="btn-action-edit" (click)="openComponentHistory(comp)" title="Every change to this component">
+                    <svg lucideHistory [size]="13"></svg>
+                    <span>History</span>
                   </button>
                   <button *ngIf="!comp.isSystem" class="btn-action-delete" (click)="deleteComponent(comp)" title="Delete Component">
                     <svg lucideTrash2 [size]="13"></svg>
@@ -699,6 +708,134 @@
   <!-- ══════════════════════════════════════════════════════════ -->
   <!-- TAB 5: ⚡ SALARY CALCULATOR & SIMULATOR (W7) -->
   <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB: YEAR & LISTS (Phase 1 — year settings, grades & costing, dropdowns) -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div *ngIf="!isLoading() && activeTab() === 'setup'" class="tab-pane animate-fade setup-pane">
+    <!-- Year settings -->
+    <div class="pane-card" *ngIf="yearForm">
+      <div class="table-toolbar">
+        <div>
+          <h3 class="pane-title">Tax year settings · FY {{ setupFinancialYear }}</h3>
+          <p class="pane-subtitle">
+            Regime choice, lock dates and how monthly TDS is worked out.
+            <span class="unsaved-pill" *ngIf="!yearSetting()?.saved">Starting values — not saved yet</span>
+          </p>
+        </div>
+        <button class="btn-primary" (click)="saveYearSetting()" [disabled]="savingSetup() === 'year'">
+          {{ savingSetup() === 'year' ? 'Saving…' : 'Save FY ' + setupFinancialYear }}
+        </button>
+      </div>
+      <div class="setup-grid">
+        <div class="form-group">
+          <label class="form-label">Default regime</label>
+          <select class="form-control" [(ngModel)]="yearForm.defaultRegimeCode">
+            <option value="NEW">New regime</option>
+            <option value="OLD">Old regime</option>
+          </select>
+          <span class="field-hint-text">Used when an employee doesn't choose.</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Regime choice locks on</label>
+          <input type="date" class="form-control" [(ngModel)]="yearForm.regimeLockDate">
+          <span class="field-hint-text">For existing employees.</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">New joiners choose within (days)</label>
+          <input type="number" class="form-control" min="0" max="365" [(ngModel)]="yearForm.newJoinerChoiceDays">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Monthly TDS method</label>
+          <select class="form-control" [(ngModel)]="yearForm.tdsMethod">
+            <option value="SPREAD">Spread evenly (projected tax − TDS so far) ÷ months left</option>
+            <option value="FIXED">Fixed: yearly tax ÷ 12</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Proof upload opens</label>
+          <input type="date" class="form-control" [(ngModel)]="yearForm.proofWindowStart">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Proof upload closes</label>
+          <input type="date" class="form-control" [(ngModel)]="yearForm.proofWindowEnd">
+        </div>
+      </div>
+    </div>
+
+    <!-- Grades & costing -->
+    <div class="pane-card" *ngIf="configForm">
+      <div class="table-toolbar">
+        <div>
+          <h3 class="pane-title">Grades &amp; costing</h3>
+          <p class="pane-subtitle">
+            Grade bands themselves are edited in Payroll → Grades.
+            <span class="unsaved-pill" *ngIf="!companyConfig()?.saved">Starting values — not saved yet</span>
+          </p>
+        </div>
+        <button class="btn-primary" (click)="saveCompanyConfig()" [disabled]="savingSetup() === 'config'">
+          {{ savingSetup() === 'config' ? 'Saving…' : 'Save' }}
+        </button>
+      </div>
+      <div class="setup-grid">
+        <div class="form-group">
+          <label class="form-label">Grade is decided by</label>
+          <select class="form-control" [(ngModel)]="configForm.gradeBasis">
+            <option value="MONTHLY_GROSS">Monthly gross (current)</option>
+            <option value="ANNUAL_CTC">Annual CTC band</option>
+          </select>
+          <span class="field-hint-text">Annual CTC takes effect once employees have pay profiles (Phase 2).</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Costing: working days / month</label>
+          <input type="number" class="form-control" min="1" max="31" [(ngModel)]="configForm.costingWorkingDays">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Costing: hours / day</label>
+          <input type="number" class="form-control" min="1" max="24" step="0.5" [(ngModel)]="configForm.costingHoursPerDay">
+        </div>
+        <div class="form-group">
+          <label class="form-label">&nbsp;</label>
+          <label class="setup-check">
+            <input type="checkbox" [(ngModel)]="configForm.costingIncludeEmployer">
+            <span>Include employer PF / ESI in cost</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dropdown lists -->
+    <div class="setup-lists">
+      <div class="pane-card" *ngFor="let list of dropdowns()">
+        <div class="table-toolbar">
+          <div>
+            <h3 class="pane-title">{{ list.name }}</h3>
+            <p class="pane-subtitle">
+              {{ list.options.length }} option{{ list.options.length === 1 ? '' : 's' }}
+              <span class="unsaved-pill" *ngIf="!list.saved">Starting values</span>
+            </p>
+          </div>
+          <button class="btn-sm btn-primary" (click)="saveDropdown(list)" [disabled]="savingSetup() === list.listKey">
+            {{ savingSetup() === list.listKey ? 'Saving…' : 'Save' }}
+          </button>
+        </div>
+        <div class="setup-chips">
+          <span class="setup-chip" *ngFor="let o of list.options; let i = index">
+            {{ o.label }}
+            <button type="button" (click)="removeDropdownOption(list, i)" [attr.aria-label]="'Remove ' + o.label">✕</button>
+          </span>
+        </div>
+        <div class="setup-add">
+          <input class="form-control" [(ngModel)]="dropdownDraft[list.listKey]" placeholder="Add an option…"
+            (keydown.enter)="addDropdownOption(list)">
+          <button class="btn-sm btn-outline-modern" (click)="addDropdownOption(list)">
+            <svg lucidePlus [size]="14"></svg>
+            <span>Add</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div *ngIf="!isLoading() && activeTab() === 'calculator'" class="tab-pane animate-fade">
     <div class="calculator-fintech-layout">
       <!-- Left Config Card -->
@@ -916,10 +1053,12 @@
 
         <div class="category-filter-pills">
           <button class="filter-pill" [class.active]="auditEntityFilter() === 'ALL'" (click)="auditEntityFilter.set('ALL')">All</button>
-          <button class="filter-pill" [class.active]="auditEntityFilter() === 'SALARY_GROUP'" (click)="auditEntityFilter.set('SALARY_GROUP')">Salary Groups</button>
-          <button class="filter-pill" [class.active]="auditEntityFilter() === 'COMPONENT'" (click)="auditEntityFilter.set('COMPONENT')">Components</button>
-          <button class="filter-pill" [class.active]="auditEntityFilter() === 'STATUTORY_RATE'" (click)="auditEntityFilter.set('STATUTORY_RATE')">Statutory Rates</button>
-          <button class="filter-pill" [class.active]="auditEntityFilter() === 'TAX_REGIME'" (click)="auditEntityFilter.set('TAX_REGIME')">Tax Regimes</button>
+          <button class="filter-pill" [class.active]="auditEntityFilter() === 'PayrollSalaryGroup'" (click)="auditEntityFilter.set('PayrollSalaryGroup')">Salary Groups</button>
+          <button class="filter-pill" [class.active]="auditEntityFilter() === 'PayrollComponent'" (click)="auditEntityFilter.set('PayrollComponent')">Components</button>
+          <button class="filter-pill" [class.active]="auditEntityFilter() === 'PayrollStatutoryRate'" (click)="auditEntityFilter.set('PayrollStatutoryRate')">Statutory Rates</button>
+          <button class="filter-pill" [class.active]="auditEntityFilter() === 'PayrollTaxRegime'" (click)="auditEntityFilter.set('PayrollTaxRegime')">Tax Regimes</button>
+          <button class="filter-pill" [class.active]="auditEntityFilter() === 'PayrollYearSetting'" (click)="auditEntityFilter.set('PayrollYearSetting')">Year Settings</button>
+          <button class="filter-pill" [class.active]="auditEntityFilter() === 'PayrollDropdown'" (click)="auditEntityFilter.set('PayrollDropdown')">Lists</button>
         </div>
       </div>
 
@@ -1157,6 +1296,14 @@
             </select>
           </div>
           <div class="form-group flex-1">
+            <label class="form-label">PF wage base</label>
+            <select class="form-control" [(ngModel)]="groupForm.pfWageBasis">
+              <option value="CAPPED">Capped at the PF wage ceiling (₹15,000)</option>
+              <option value="FULL_BASIC">Full Basic (no cap)</option>
+            </select>
+            <span class="field-hint-text">Formulas read this as <code>PF_BASE</code>, e.g. <code>PF_BASE * PF_EMPLOYEE_PCT / 100</code></span>
+          </div>
+          <div class="form-group flex-1">
             <label class="form-label">Effective From Date *</label>
             <input type="date" class="form-control" [(ngModel)]="groupForm.effectiveFrom">
           </div>
@@ -1375,11 +1522,88 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Surcharge bands -->
+        <div class="modal-inner-section">
+          <div class="table-toolbar" style="padding: 0; margin-bottom: 8px;">
+            <div>
+              <h4 class="subhead-title">Surcharge ({{ taxRegimeForm.surcharge?.length || 0 }})</h4>
+              <p class="subhead-desc">Extra % on tax when taxable income is above the amount</p>
+            </div>
+            <button class="btn-sm btn-outline-modern" (click)="addSurchargeBand()">
+              <svg lucidePlus [size]="14"></svg>
+              <span>Add band</span>
+            </button>
+          </div>
+          <table class="modern-table" *ngIf="taxRegimeForm.surcharge?.length">
+            <thead><tr><th>Income above (₹)</th><th>Surcharge (%)</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let b of taxRegimeForm.surcharge; let i = index">
+                <td><input type="number" class="form-control font-mono" [(ngModel)]="b.fromIncome"></td>
+                <td><input type="number" class="form-control font-mono" [(ngModel)]="b.ratePct" step="1"></td>
+                <td style="text-align: center;"><button class="btn-delete-row" (click)="removeSurchargeBand(i)">✕</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Deduction sections (old regime) -->
+        <div class="modal-inner-section" *ngIf="taxRegimeForm.sections?.length">
+          <div class="table-toolbar" style="padding: 0; margin-bottom: 8px;">
+            <div>
+              <h4 class="subhead-title">Deductions employees can declare ({{ taxRegimeForm.sections.length }})</h4>
+              <p class="subhead-desc">Yearly limit, whether proof must be uploaded, and on/off per section</p>
+            </div>
+          </div>
+          <table class="modern-table">
+            <thead><tr><th>Section</th><th>Yearly limit (₹, blank = actual)</th><th>Proof needed</th><th>Allowed</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let sec of taxRegimeForm.sections" [class.row-muted]="!sec.isActive">
+                <td><code class="sec-code-tag">{{ sec.code }}</code> {{ sec.name }}</td>
+                <td><input type="number" class="form-control font-mono" [(ngModel)]="sec.maxLimit" placeholder="Actual"></td>
+                <td style="text-align: center;"><input type="checkbox" [(ngModel)]="sec.proofRequired" [disabled]="!sec.isActive"></td>
+                <td style="text-align: center;"><input type="checkbox" [(ngModel)]="sec.isActive"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div class="modal-footer">
         <button class="btn-outline-modern" (click)="closeTaxRegimeModal()">Cancel</button>
         <button class="btn-primary" (click)="saveTaxRegime()">Save Tax Regime & Slabs</button>
+      </div>
+    </div>
+  </div>
+  <!-- Component history -->
+  <div *ngIf="historyFor() as comp" class="modal-backdrop animate-fade" (click)="closeComponentHistory()">
+    <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg lucideHistory [size]="20" class="text-primary"></svg>
+          <h3>History · {{ comp.code }} — {{ comp.name }}</h3>
+        </div>
+        <button class="modal-close" (click)="closeComponentHistory()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted" *ngIf="historyLoading()">Loading…</p>
+        <p class="text-muted" *ngIf="!historyLoading() && !historyEntries().length">No changes recorded for this component yet.</p>
+        <div class="history-list" *ngIf="historyEntries().length">
+          <div class="history-row" *ngFor="let h of historyEntries()">
+            <div class="history-head">
+              <span class="history-action" [attr.data-a]="h.action">{{ h.action }}</span>
+              <span class="text-muted">{{ h.createdAt | date: 'd MMM y, HH:mm' }}</span>
+            </div>
+            <ul class="history-changes" *ngIf="changedFields(h.before, h.after).length; else noDiff">
+              <li *ngFor="let c of changedFields(h.before, h.after)">
+                <strong>{{ c.field }}</strong>: <span class="history-old">{{ c.from ?? '—' }}</span> → <span class="history-new">{{ c.to ?? '—' }}</span>
+              </li>
+            </ul>
+            <ng-template #noDiff>
+              <p class="text-muted history-note">{{ h.action === 'CREATE' ? 'Component created.' : h.action === 'DELETE' ? 'Component removed.' : 'No field changes.' }}</p>
+            </ng-template>
+          </div>
+        </div>
       </div>
     </div>
   </div>

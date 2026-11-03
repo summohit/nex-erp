@@ -766,7 +766,7 @@ export class PayrollComponent implements OnInit {
   }
 
   openGradesModal() {
-    this.gradesDraft = this.salaryGrades().map(g => ({ name: g.name, label: g.label ?? '', minGross: g.minGross, maxGross: g.maxGross, kmRate: g.kmRate ?? null }));
+    this.gradesDraft = this.salaryGrades().map(g => ({ name: g.name, label: g.label ?? '', minGross: g.minGross, maxGross: g.maxGross, kmRate: g.kmRate ?? null, minAnnualCtc: g.minAnnualCtc ?? null, maxAnnualCtc: g.maxAnnualCtc ?? null }));
     this.payrollService.getUngradedKmRate().subscribe({
       next: (r) => this.ungradedKmRateDraft = r.ungradedKmRate,
       error: () => this.ungradedKmRateDraft = null,
@@ -778,7 +778,7 @@ export class PayrollComponent implements OnInit {
   addGradeRow() {
     const last = this.gradesDraft[this.gradesDraft.length - 1];
     const min = last ? (last.maxGross ?? last.minGross) + 1 : 0;
-    this.gradesDraft.push({ name: `G${this.gradesDraft.length + 1}`, label: '', minGross: min, maxGross: null });
+    this.gradesDraft.push({ name: `G${this.gradesDraft.length + 1}`, label: '', minGross: min, maxGross: null, minAnnualCtc: null, maxAnnualCtc: null });
   }
 
   removeGradeRow(i: number) {

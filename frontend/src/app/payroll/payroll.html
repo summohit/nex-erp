@@ -3474,6 +3474,8 @@
                   <th>Level / Description</th>
                   <th style="width: 180px;">From (₹ / mo)</th>
                   <th style="width: 180px;">To (₹ / mo)</th>
+                  <th style="width: 170px;" title="Annual CTC band — used for grades once Payroll Rules → Year &amp; Lists sets grades by annual CTC">CTC from (₹ / yr)</th>
+                  <th style="width: 170px;" title="Leave empty on the highest grade">CTC to (₹ / yr)</th>
                   <th style="width: 140px;" title="Field visit travel allowance for own-vehicle trips">Travel ₹ / km</th>
                   <th style="width: 44px;"></th>
                 </tr>
@@ -3498,6 +3500,18 @@
                     <div class="currency-input-sm">
                       <span class="curr-tag">₹</span>
                       <input class="form-control form-control-sm" type="number" min="0" [(ngModel)]="g.maxGross" placeholder="No ceiling">
+                    </div>
+                  </td>
+                  <td>
+                    <div class="currency-input-sm">
+                      <span class="curr-tag">₹</span>
+                      <input class="form-control form-control-sm" type="number" min="0" [(ngModel)]="g.minAnnualCtc" placeholder="e.g. 300000" aria-label="Annual CTC from">
+                    </div>
+                  </td>
+                  <td>
+                    <div class="currency-input-sm">
+                      <span class="curr-tag">₹</span>
+                      <input class="form-control form-control-sm" type="number" min="0" [(ngModel)]="g.maxAnnualCtc" placeholder="No ceiling" aria-label="Annual CTC to">
                     </div>
                   </td>
                   <td>

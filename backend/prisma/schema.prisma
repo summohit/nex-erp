@@ -1085,6 +1085,10 @@ model SalaryGrade {
   label     String? // e.g. "Support staff"
   minGross  Float    @default(0) // inclusive
   maxGross  Float? // inclusive; null = no ceiling
+  /// Annual CTC band (Payroll plan: grades are CTC-based). Which band decides a
+  /// grade is PayrollCompanyConfig.gradeBasis; until then monthly gross does.
+  minAnnualCtc Float?
+  maxAnnualCtc Float?
   /// Field visit travel allowance: rupees per km for own-vehicle trips by
   /// people in this grade (15 Oct 2026). Null = the vehicle's default rate.
   kmRate    Float?
@@ -5091,6 +5095,9 @@ model PayrollSalaryGroup {
   flatTdsPct    Float?
   /// Consultants: add GST on top of the fee when a GSTIN is on file.
   gstApplicable Boolean                  @default(false)
+  /// PF wage base for this group: CAPPED = MIN(BASIC, PF wage ceiling), FULL_BASIC = all of Basic.
+  /// Formulas read it as PF_BASE. Per-employee overrides come with pay profiles (Phase 2).
+  pfWageBasis   String                   @default("CAPPED")
   effectiveFrom DateTime
   /// Set when a newer version replaces this one.
   retiredAt     DateTime?
@@ -5209,3 +5216,57 @@ model PayrollAuditLog {
   @@index([companyId, entity, entityId])
   @@index([companyId, createdAt])
 }
+
+/// Payroll rules that apply to one financial year (Payroll plan, decisions 3 Nov 2026).
+model PayrollYearSetting {
+  id                   Int      @id @default(autoincrement())
+  companyId            Int
+  financialYear        String // "2026-27"
+  /// Regime used when an employee hasn't chosen: NEW | OLD
+  defaultRegimeCode    String   @default("NEW")
+  /// Existing employees' regime choice locks on this date.
+  regimeLockDate       DateTime
+  /// New joiners may choose within this many days of joining.
+  newJoinerChoiceDays  Int      @default(30)
+  /// SPREAD = (projected yearly tax − TDS so far) ÷ months left; FIXED = yearly tax ÷ 12
+  tdsMethod            String   @default("SPREAD")
+  /// Window for employees to upload investment proofs (old regime).
+  proofWindowStart     DateTime?
+  proofWindowEnd       DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([companyId, financialYear])
+}
+
+/// Company-wide payroll options that aren't per year.
+model PayrollCompanyConfig {
+  id                       Int      @id @default(autoincrement())
+  companyId                Int      @unique
+  /// MONTHLY_GROSS (current) | ANNUAL_CTC — which band on SalaryGrade decides a grade.
+  gradeBasis               String   @default("MONTHLY_GROSS")
+  /// Costing: hourly cost = (CTC + employer contributions) ÷ (working days × hours).
+  costingWorkingDays       Float    @default(26)
+  costingHoursPerDay       Float    @default(8)
+  costingIncludeEmployer   Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
+/// Editable dropdown lists for payroll (W6): payment methods, contract lengths, worker types…
+model PayrollDropdownOption {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  /// PAYMENT_METHOD | CONTRACT_LENGTH | WORKER_TYPE
+  listKey   String
+  value     String
+  label     String
+  position  Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, listKey, value])
+  @@index([companyId, listKey])
+}
+

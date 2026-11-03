@@ -165,4 +165,31 @@ describe('PayrollCalculator (matching MNC_Payroll_PF_Min_15000.xlsx)', () => {
       expect(tax.monthlyTds).toBe(Math.round(75400 / 12));
     });
   });
+
+  describe('PF_BASE follows the group\'s PF wage basis', () => {
+    const groupWith = (pfWageBasis?: 'CAPPED' | 'FULL_BASIC') => ({
+      code: 'PF_BASE_TEST',
+      name: 'PF base test',
+      description: '',
+      payeeType: 'EMPLOYEE' as const,
+      sheet: '',
+      pfWageBasis,
+      lines: [
+        { component: 'BASIC', calcType: 'FORMULA' as const, formula: 'CTC_MONTHLY * 0.5' },
+        { component: 'EMPLOYEE_PF', calcType: 'FORMULA' as const, formula: 'PF_BASE * PF_EMPLOYEE_PCT / 100' },
+      ],
+    });
+    const pf = (pfWageBasis?: 'CAPPED' | 'FULL_BASIC') =>
+      PayrollCalculator.calculate({ monthlyCtc: 60000, salaryGroup: groupWith(pfWageBasis) as any })
+        .lines.find((l) => l.code === 'EMPLOYEE_PF')!.monthly;
+
+    it('caps PF at 12% of the ₹15,000 wage ceiling by default', () => {
+      expect(pf()).toBe(1800);
+      expect(pf('CAPPED')).toBe(1800);
+    });
+
+    it('uses all of Basic when the group pays PF on full Basic', () => {
+      expect(pf('FULL_BASIC')).toBe(3600); // 12% of 30,000
+    });
+  });
 });
