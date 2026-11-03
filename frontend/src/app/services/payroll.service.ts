@@ -636,6 +636,8 @@ export interface SalaryCalculationResult {
 export interface PayProfileRow {
   employeeId: number;
   name: string;
+  avatarUrl: string | null;
+  employeeCode: string | null;
   department: string | null;
   designation: string | null;
   payType: string;
@@ -687,6 +689,8 @@ export interface PayProfileVersion {
 export interface PayProfileDetail {
   employee: {
     id: number; firstName: string; lastName: string; payType: string; employmentType: string | null; joiningDate: string | null;
+    avatarUrl: string | null; employeeCode: string | null;
+    department?: { name: string } | null; designation?: { name: string } | null;
     bankName: string | null; bankAccountNumber: string | null; ifscCode: string | null;
     panNumber: string | null; uanNumber: string | null; pfNumber: string | null; esiNumber: string | null;
     panVerifiedAt: string | null; uanVerifiedAt: string | null; bankVerifiedAt: string | null;

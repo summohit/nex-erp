@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { PayrollMastersService } from '../masters/payroll-masters.service';
 import { isCompanyAdmin, isPayrollRole, normaliseRole } from '../../common/company-roles';
 import { READABLE_DOCUMENTS } from './document-reader.service';
+import { INACTIVE_USER_STATUSES } from './inactive-users';
 
 /** Finance and company admins change pay; HR may look (Payroll plan: "who does what"). */
 export function isPayrollEditor(role?: string | null): boolean {
@@ -79,9 +80,9 @@ export class PayProfilesService {
   /** Everyone on payroll with their current profile and what's missing — Finance's checklist. */
   async list(companyId: number) {
     const employees = await this.prisma.employee.findMany({
-      where: { companyId, user: { status: { not: 'SUSPENDED' } }, offboardingStatus: { not: 'SEPARATED' } },
+      where: { companyId, user: { status: { notIn: INACTIVE_USER_STATUSES } }, offboardingStatus: { not: 'SEPARATED' } },
       select: {
-        id: true, firstName: true, lastName: true, payType: true, employmentType: true,
+        id: true, firstName: true, lastName: true, payType: true, employmentType: true, avatarUrl: true, employeeCode: true,
         bankAccountNumber: true, ifscCode: true, panNumber: true, uanNumber: true,
         panVerifiedAt: true, uanVerifiedAt: true, bankVerifiedAt: true,
         department: { select: { name: true } },
@@ -119,6 +120,8 @@ export class PayProfilesService {
         details,
         employeeId: e.id,
         name: `${e.firstName} ${e.lastName}`.trim(),
+        avatarUrl: e.avatarUrl,
+        employeeCode: e.employeeCode,
         department: e.department?.name ?? null,
         designation: e.designation?.name ?? null,
         payType: e.payType,
@@ -134,7 +137,7 @@ export class PayProfilesService {
     const employee = await this.prisma.employee.findFirst({
       where: { id: employeeId, companyId },
       select: {
-        id: true, firstName: true, lastName: true, payType: true, employmentType: true, joiningDate: true,
+        id: true, firstName: true, lastName: true, payType: true, employmentType: true, joiningDate: true, avatarUrl: true, employeeCode: true,
         department: { select: { name: true } }, designation: { select: { name: true } },
         bankName: true, bankAccountNumber: true, ifscCode: true,
         panNumber: true, uanNumber: true, pfNumber: true, esiNumber: true,
@@ -385,7 +388,7 @@ export class PayProfilesService {
       this.prisma.employee.findMany({
         where: {
           companyId,
-          user: { status: { not: 'SUSPENDED' } },
+          user: { status: { notIn: INACTIVE_USER_STATUSES } },
           offboardingStatus: { not: 'SEPARATED' },
         },
         select: {

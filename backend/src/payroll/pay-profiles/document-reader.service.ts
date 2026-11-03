@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { GoogleGenAI } from '@google/genai';
 import axios from 'axios';
 import { PrismaService } from '../../prisma/prisma.service';
+import { INACTIVE_USER_STATUSES } from './inactive-users';
 
 /** The uploaded document types we read, and the details each can give. */
 export const READABLE_DOCUMENTS: Record<string, 'PAN' | 'UAN' | 'BANK'> = {
@@ -95,7 +96,7 @@ export class DocumentReaderService {
         documentType: { in: Object.keys(READABLE_DOCUMENTS) },
         employee: {
           companyId,
-          user: { status: { not: 'SUSPENDED' } },
+          user: { status: { notIn: INACTIVE_USER_STATUSES } },
           ...(employeeIds?.length && { id: { in: employeeIds } }),
         },
       },
