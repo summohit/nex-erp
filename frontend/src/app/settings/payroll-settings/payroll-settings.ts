@@ -616,7 +616,8 @@ export class PayrollSettingsComponent implements OnInit {
       code: group.code,
       name: group.name,
       description: group.description || '',
-      payeeType: group.payeeType,
+      // Older groups may say CONTRACTOR / INTERN — show them as the current options.
+      payeeType: this.payeeKind(group.payeeType) === 'consultant' ? 'CONSULTANT' : this.payeeKind(group.payeeType) === 'intern' ? 'TRAINEE' : 'EMPLOYEE',
       flatTdsPct: group.flatTdsPct || 0,
       gstApplicable: group.gstApplicable || false,
       pfWageBasis: group.pfWageBasis || 'CAPPED',
