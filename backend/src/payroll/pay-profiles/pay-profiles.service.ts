@@ -407,6 +407,15 @@ export class PayProfilesService {
       (await this.prisma.employeePayProfile.findMany({ where: { companyId }, select: { employeeId: true }, distinct: ['employeeId'] })).map((p) => p.employeeId),
     );
 
+    // Last paid payslip per employee — used when no salary set-up exists (e.g. Aug paid, Sep/Oct ₹0 drafts).
+    const paidSlips = await this.prisma.payslip.findMany({
+      where: { companyId, employeeId: { in: employees.map((e) => e.id) }, status: { in: ['PAID', 'FINALIZED'] }, totalEarnings: { gt: 0 } },
+      orderBy: [{ year: 'desc' }, { month: 'desc' }],
+      select: { employeeId: true, month: true, year: true, totalEarnings: true, lossOfPay: true, items: { select: { componentName: true, type: true, amount: true } } },
+    });
+    const lastPaid = new Map<number, (typeof paidSlips)[number]>();
+    for (const p of paidSlips) if (!lastPaid.has(p.employeeId)) lastPaid.set(p.employeeId, p);
+
     // Offer letters by candidate email: onboarded/hired before merely offered, newest first.
     const apps = await this.prisma.jobApplication.findMany({
       where: { companyId, offeredSalary: { gt: 0 }, status: { in: ['ONBOARDED', 'HIRED', 'OFFERED'] }, email: { in: employees.map((e) => e.user?.email).filter((x): x is string => !!x) } },
@@ -438,6 +447,22 @@ export class PayProfilesService {
         const code = OLD_TO_NEW[oldName.toLowerCase()];
         if (s.component.type === 'EARNING') currentGross += s.amount;
         if (code) current.set(code, (current.get(code) ?? 0) + s.amount);
+      }
+      // No salary set-up: take it from the last paid payslip. Its earnings are already the full month —
+      // loss of pay is deducted separately (Aug: ₹8,000 earnings, ₹1,290 LOP, ₹6,710 net).
+      let source: string | null = null;
+      if (!(currentGross > 0)) {
+        const slip = lastPaid.get(e.id);
+        if (slip) {
+          for (const it of slip.items) {
+            if (it.type !== 'EARNING' || !(it.amount > 0) || NOT_COMPARED.test(it.componentName)) continue;
+            const code = OLD_TO_NEW[it.componentName.trim().toLowerCase()];
+            if (code) current.set(code, (current.get(code) ?? 0) + it.amount);
+          }
+          currentGross = slip.totalEarnings;
+          const month = new Date(slip.year, slip.month - 1, 1).toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+          source = `No salary set up in MIRA — monthly gross taken from the ${month} paid payslip (₹${Math.round(currentGross).toLocaleString('en-IN')}). Confirm before saving.`;
+        }
       }
       const group = this.proposeGroup(e, groups);
       const base = { employeeId: e.id, name, avatarUrl: e.avatarUrl, payType: e.payType, employmentType: e.employmentType, currentGrossMonthly: round(currentGross) };
@@ -481,7 +506,7 @@ export class PayProfilesService {
       }
       const grossOk = Math.abs(out.grossMonthly - currentGross) <= 1;
       // Things Finance must look at before approving this row.
-      const warnings = [...out.warnings];
+      const warnings = [...(source ? [source] : []), ...out.warnings];
       for (const l of out.lines) {
         if (l.monthly < 0) warnings.push(`${l.name} comes out negative (₹${l.monthly}) — this group doesn't fit a salary this low.`);
       }
