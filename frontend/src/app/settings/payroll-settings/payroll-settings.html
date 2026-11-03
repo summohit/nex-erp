@@ -716,97 +716,430 @@
   <!-- Formula help content: used by the Formula Help tab and the drawer in the editors -->
   <ng-template #formulaHelpContent>
     <div class="fh">
-      <div class="fh-card">
-        <h4>How a salary is worked out</h4>
-        <ol class="fh-steps">
-          <li>Lines are calculated <strong>top to bottom</strong>, in the order shown in the salary group. A line can use any component <strong>above</strong> it.</li>
-          <li>Just before the <strong>Balancing</strong> line, the engine works out <code>GROSS</code> = <code>CTC_MONTHLY</code> − employer contributions (employer PF, employer ESI…).</li>
-          <li>The <strong>Balancing</strong> line takes whatever is left so earnings add up to gross (for trainees and consultants: to CTC).</li>
-          <li>Lines <strong>below</strong> the Balancing line are calculated last — put anything that needs <code>GROSS</code> (like ESI) there.</li>
-        </ol>
+      <!-- 01: Engine Lifecycle Pipeline -->
+      <div class="fh-card fh-hero-card">
+        <div class="fh-card-header">
+          <div class="fh-header-left">
+            <div class="fh-icon-badge">
+              <svg lucideLayers [size]="20"></svg>
+            </div>
+            <div>
+              <h4 class="fh-title">Salary Engine Execution Flow</h4>
+              <p class="fh-subtitle">Every salary group is evaluated top-to-bottom across 4 sequential stages during payroll calculation.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-grid">
+          <!-- Step 1 -->
+          <div class="pipeline-step-card">
+            <div class="pipeline-step-top">
+              <span class="step-number-badge">01</span>
+              <span class="step-phase-tag phase-blue">Pre-Balancing</span>
+            </div>
+            <div class="pipeline-step-body">
+              <div class="step-title">Top-to-Bottom Order</div>
+              <p class="step-desc">
+                Lines evaluate strictly sequentially. A formula can reference any component line placed <strong>above</strong> it.
+              </p>
+              <div class="step-code-pill">
+                <code>HRA = BASIC * 0.4</code>
+              </div>
+            </div>
+            <div class="pipeline-step-connector">
+              <svg lucideArrowRight [size]="14"></svg>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="pipeline-step-card">
+            <div class="pipeline-step-top">
+              <span class="step-number-badge">02</span>
+              <span class="step-phase-tag phase-purple">Gross Resolution</span>
+            </div>
+            <div class="pipeline-step-body">
+              <div class="step-title">Gross Computation</div>
+              <p class="step-desc">
+                Right before the Balancing line, the engine automatically resolves gross earnings from monthly CTC:
+              </p>
+              <div class="step-code-pill">
+                <code>GROSS = CTC − Employer Contrib</code>
+              </div>
+            </div>
+            <div class="pipeline-step-connector">
+              <svg lucideArrowRight [size]="14"></svg>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="pipeline-step-card">
+            <div class="pipeline-step-top">
+              <span class="step-number-badge">03</span>
+              <span class="step-phase-tag phase-emerald">Balancing Line</span>
+            </div>
+            <div class="pipeline-step-body">
+              <div class="step-title">Balancing Remainder</div>
+              <p class="step-desc">
+                The designated Balancing line takes whatever is left so earnings add up to Gross (or CTC).
+              </p>
+              <div class="step-code-pill">
+                <code>Special Allw = Remainder</code>
+              </div>
+            </div>
+            <div class="pipeline-step-connector">
+              <svg lucideArrowRight [size]="14"></svg>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="pipeline-step-card">
+            <div class="pipeline-step-top">
+              <span class="step-number-badge">04</span>
+              <span class="step-phase-tag phase-amber">Post-Balancing</span>
+            </div>
+            <div class="pipeline-step-body">
+              <div class="step-title">Gross-Dependent Lines</div>
+              <p class="step-desc">
+                Lines placed below Balancing execute last. Put deductions needing finalized <code>GROSS</code> here.
+              </p>
+              <div class="step-code-pill">
+                <code>ESI_EE = GROSS * 0.75%</code>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="fh-card">
-        <h4>Formula vs Condition</h4>
-        <p><strong>Formula</strong> — how much the component is. Example: <code>BASIC * 0.4</code> (HRA = 40% of Basic).</p>
-        <p><strong>Condition</strong> — whether the line applies at all. Empty = always. If it's false, the component is ₹0.
-          Example: <code>GROSS &lt;= ESI_LIMIT</code> (ESI only up to ₹21,000).</p>
+      <!-- 02: Formula vs Condition Comparison -->
+      <div class="comparison-grid">
+        <!-- Formula Card -->
+        <div class="concept-card concept-formula">
+          <div class="concept-header">
+            <div class="concept-badge-wrap">
+              <span class="concept-badge badge-formula">Value Engine</span>
+            </div>
+            <h4 class="concept-title">
+              <svg lucideCalculator [size]="18"></svg>
+              <span>Formula (Numeric Amount)</span>
+            </h4>
+            <p class="concept-desc">
+              Determines <strong>how much</strong> the component pays or deducts. Evaluates arithmetic expressions, variables, and statutory rates.
+            </p>
+          </div>
+          <div class="concept-code-box">
+            <div class="code-box-header">
+              <span class="code-box-tag">EXAMPLE FORMULA</span>
+              <button type="button" class="btn-code-copy" (click)="copyCode('BASIC * 0.4')" title="Copy example">
+                <svg lucideCopy [size]="12"></svg>
+                <span>Copy</span>
+              </button>
+            </div>
+            <div class="code-box-content">
+              <code>BASIC * 0.4</code>
+            </div>
+            <div class="code-box-explanation">
+              Sets HRA to exactly 40% of the employee's calculated Basic pay.
+            </div>
+          </div>
+        </div>
+
+        <!-- Condition Card -->
+        <div class="concept-card concept-condition">
+          <div class="concept-header">
+            <div class="concept-badge-wrap">
+              <span class="concept-badge badge-condition">Eligibility Gate</span>
+            </div>
+            <h4 class="concept-title">
+              <svg lucideFilter [size]="18"></svg>
+              <span>Condition (Gatekeeper)</span>
+            </h4>
+            <p class="concept-desc">
+              Determines <strong>whether</strong> the line item triggers at all. If empty, it always runs. If false, the line becomes <strong>₹0</strong>.
+            </p>
+          </div>
+          <div class="concept-code-box">
+            <div class="code-box-header">
+              <span class="code-box-tag">EXAMPLE CONDITION</span>
+              <button type="button" class="btn-code-copy" (click)="copyCode('GROSS <= ESI_LIMIT')" title="Copy example">
+                <svg lucideCopy [size]="12"></svg>
+                <span>Copy</span>
+              </button>
+            </div>
+            <div class="code-box-content">
+              <code>GROSS &lt;= ESI_LIMIT</code>
+            </div>
+            <div class="code-box-explanation">
+              Employee ESI only applies if Gross earnings do not exceed ₹21,000 threshold.
+            </div>
+          </div>
+        </div>
       </div>
 
+      <!-- 03: Reference Data Tables -->
       <ng-container *ngIf="formulaHelp() as h; else helpLoading">
         <div class="fh-card">
-          <h4>Salary values</h4>
-          <table class="modern-table fh-table">
-            <thead><tr><th>Name</th><th>What it is</th><th>Comes from</th><th>Can be used</th></tr></thead>
-            <tbody>
-              <tr *ngFor="let v of h.salary">
-                <td><button type="button" class="fh-code" (click)="copyCode(v.name)" title="Copy">{{ v.name }}</button></td>
-                <td>{{ v.meaning }}</td>
-                <td class="text-muted">{{ v.source }}</td>
-                <td class="text-muted">{{ v.when }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="fh-section-header">
+            <div>
+              <h4 class="fh-table-title">System &amp; Salary Variables</h4>
+              <p class="fh-table-sub">Built-in engine variables available dynamically during formula evaluation.</p>
+            </div>
+            <span class="count-pill">{{ h.salary.length }} variables</span>
+          </div>
+          <div class="table-responsive">
+            <table class="modern-table fh-table">
+              <thead>
+                <tr>
+                  <th style="width: 170px;">Variable Name</th>
+                  <th>Description</th>
+                  <th style="width: 210px;">Comes From</th>
+                  <th style="width: 230px;">Applicability</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let v of h.salary">
+                  <td>
+                    <button type="button" class="fh-code" (click)="copyCode(v.name)" title="Click to copy variable">
+                      <span>{{ v.name }}</span>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                  <td class="font-medium text-slate-800">{{ v.meaning }}</td>
+                  <td><span class="source-tag">{{ v.source }}</span></td>
+                  <td><span class="scope-tag" [class.scope-post]="v.when.includes('below')">{{ v.when }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="fh-card">
-          <h4>Rates (change them in Statutory Rates)</h4>
-          <table class="modern-table fh-table">
-            <thead><tr><th>Name</th><th>What it is</th><th>Today</th><th>Comes from</th></tr></thead>
-            <tbody>
-              <tr *ngFor="let v of h.rates">
-                <td><button type="button" class="fh-code" (click)="copyCode(v.name)" title="Copy">{{ v.name }}</button></td>
-                <td>{{ v.meaning }}</td>
-                <td class="font-semibold">{{ v.value ?? '—' }}</td>
-                <td class="text-muted">{{ v.source }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="fh-section-header">
+            <div>
+              <h4 class="fh-table-title">Statutory Rates &amp; Limits</h4>
+              <p class="fh-table-sub">Configured under the Statutory Rates tab; can be updated as government rates change.</p>
+            </div>
+            <span class="count-pill">{{ h.rates.length }} rates</span>
+          </div>
+          <div class="table-responsive">
+            <table class="modern-table fh-table">
+              <thead>
+                <tr>
+                  <th style="width: 220px;">Rate Constant</th>
+                  <th>Description</th>
+                  <th style="width: 120px;">Active Value</th>
+                  <th style="width: 220px;">Configuration Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let v of h.rates">
+                  <td>
+                    <button type="button" class="fh-code" (click)="copyCode(v.name)" title="Click to copy rate name">
+                      <span>{{ v.name }}</span>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                  <td class="font-medium text-slate-800">{{ v.meaning }}</td>
+                  <td><span class="rate-val-pill">{{ v.value ?? '—' }}</span></td>
+                  <td class="text-muted">{{ v.source }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="fh-card">
-          <h4>Components (their value in this salary)</h4>
-          <p class="text-muted fh-note">Use a component's code to use its amount — only from lines above.</p>
-          <div class="fh-chips">
-            <button type="button" class="fh-chip" *ngFor="let c of h.components" (click)="copyCode(c.name)" [title]="c.meaning + ' · ' + categoryLabel(c.category)">
-              <code>{{ c.name }}</code><span>{{ c.meaning }}</span>
+          <div class="fh-section-header">
+            <div>
+              <h4 class="fh-table-title">Component References</h4>
+              <p class="fh-table-sub">Click any component code below to copy it for use in formulas placed below it.</p>
+            </div>
+            <span class="count-pill">{{ h.components.length }} components</span>
+          </div>
+          <div class="fh-chips-grid">
+            <button type="button" class="fh-chip-modern" *ngFor="let c of h.components" (click)="copyCode(c.name)" [title]="c.meaning + ' · ' + categoryLabel(c.category)">
+              <div class="chip-code-badge">{{ c.name }}</div>
+              <div class="chip-label">{{ c.meaning }}</div>
+              <span class="chip-copy-icon"><svg lucideCopy [size]="11"></svg></span>
             </button>
           </div>
         </div>
 
         <div class="fh-card">
-          <h4>Functions and operators</h4>
-          <table class="modern-table fh-table">
-            <thead><tr><th>Function</th><th>What it does</th><th>Example</th></tr></thead>
-            <tbody>
-              <tr *ngFor="let f of h.functions">
-                <td><code>{{ f.name }}</code></td>
-                <td>{{ f.meaning }}</td>
-                <td><code>{{ f.example }}</code></td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="fh-note">Operators: <span *ngFor="let o of h.operators; let last = last"><code>{{ o }}</code>{{ last ? '' : ' · ' }}</span></p>
+          <div class="fh-section-header">
+            <div>
+              <h4 class="fh-table-title">Built-in Mathematical Functions &amp; Operators</h4>
+              <p class="fh-table-sub">Supported expressions for complex tiering, minimums, maximums, and rounding.</p>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="modern-table fh-table">
+              <thead>
+                <tr>
+                  <th style="width: 140px;">Function</th>
+                  <th>Syntax &amp; Behavior</th>
+                  <th>Example Usage</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let f of h.functions">
+                  <td><span class="fn-name-pill">{{ f.name }}</span></td>
+                  <td class="font-medium text-slate-800">{{ f.meaning }}</td>
+                  <td>
+                    <button type="button" class="fh-code-example" (click)="copyCode(f.example)" title="Click to copy example">
+                      <code>{{ f.example }}</code>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="operators-banner">
+            <span class="operators-label">Supported Arithmetic &amp; Logical Operators:</span>
+            <div class="operators-list">
+              <span class="op-key" *ngFor="let o of h.operators">{{ o }}</span>
+            </div>
+          </div>
         </div>
 
         <div class="fh-card">
-          <h4>Common examples</h4>
-          <table class="modern-table fh-table">
-            <thead><tr><th>Component</th><th>Formula</th><th>Condition</th></tr></thead>
-            <tbody>
-              <tr><td>Basic (50% of CTC, minimum floor)</td><td><code>MAX(CTC_MONTHLY * 0.5, BASIC_FLOOR)</code></td><td>—</td></tr>
-              <tr><td>HRA (40% of Basic)</td><td><code>BASIC * 0.4</code></td><td>—</td></tr>
-              <tr><td>Employee PF</td><td><code>PF_BASE * PF_EMPLOYEE_PCT / 100</code></td><td>—</td></tr>
-              <tr><td>Employer PF</td><td><code>PF_BASE * PF_EMPLOYER_PCT / 100</code></td><td>—</td></tr>
-              <tr><td>Employee ESI <em>(below Balancing)</em></td><td><code>GROSS * ESI_EMPLOYEE_PCT / 100</code></td><td><code>GROSS &lt;= ESI_LIMIT</code></td></tr>
-              <tr><td>Employer ESI <em>(below Balancing)</em></td><td><code>GROSS * ESI_EMPLOYER_PCT / 100</code></td><td><code>GROSS &lt;= ESI_LIMIT</code></td></tr>
-              <tr><td>Professional Tax</td><td><code>PT_AMOUNT</code></td><td><code>GROSS &gt; 15000</code></td></tr>
-            </tbody>
-          </table>
-          <p class="fh-note">Tip: in a component's editor, <strong>Test</strong> checks a formula and shows its result for a sample CTC before you save.</p>
+          <div class="fh-section-header">
+            <div>
+              <h4 class="fh-table-title">Standard Indian Payroll Recipe Examples</h4>
+              <p class="fh-table-sub">Proven formulas and conditions complying with standard Indian labor laws and tax norms.</p>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="modern-table fh-table">
+              <thead>
+                <tr>
+                  <th style="width: 250px;">Component</th>
+                  <th>Formula Expression</th>
+                  <th style="width: 240px;">Condition</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div class="recipe-name">Basic Salary</div>
+                    <div class="recipe-desc">50% of CTC, with statutory minimum floor</div>
+                  </td>
+                  <td>
+                    <button type="button" class="fh-code-example" (click)="copyCode('MAX(CTC_MONTHLY * 0.5, BASIC_FLOOR)')" title="Copy">
+                      <code>MAX(CTC_MONTHLY * 0.5, BASIC_FLOOR)</code>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                  <td><span class="text-muted">— Always applies</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="recipe-name">House Rent Allowance (HRA)</div>
+                    <div class="recipe-desc">40% of Basic (50% in metro cities)</div>
+                  </td>
+                  <td>
+                    <button type="button" class="fh-code-example" (click)="copyCode('BASIC * 0.4')" title="Copy">
+                      <code>BASIC * 0.4</code>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                  <td><span class="text-muted">— Always applies</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="recipe-name">Employee PF (EPF)</div>
+                    <div class="recipe-desc">12% on wage capped at ₹15,000 or full Basic</div>
+                  </td>
+                  <td>
+                    <button type="button" class="fh-code-example" (click)="copyCode('PF_BASE * PF_EMPLOYEE_PCT / 100')" title="Copy">
+                      <code>PF_BASE * PF_EMPLOYEE_PCT / 100</code>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                  <td><span class="text-muted">— Always applies</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="recipe-name">Employer PF (EPS + EPF)</div>
+                    <div class="recipe-desc">12% employer statutory liability</div>
+                  </td>
+                  <td>
+                    <button type="button" class="fh-code-example" (click)="copyCode('PF_BASE * PF_EMPLOYER_PCT / 100')" title="Copy">
+                      <code>PF_BASE * PF_EMPLOYER_PCT / 100</code>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                  <td><span class="text-muted">— Always applies</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="recipe-name">Employee ESI</div>
+                    <div class="recipe-desc">0.75% of Gross, only for wages ≤ ₹21,000 (Placed below Balancing)</div>
+                  </td>
+                  <td>
+                    <button type="button" class="fh-code-example" (click)="copyCode('GROSS * ESI_EMPLOYEE_PCT / 100')" title="Copy">
+                      <code>GROSS * ESI_EMPLOYEE_PCT / 100</code>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                  <td>
+                    <button type="button" class="fh-code-example" (click)="copyCode('GROSS <= ESI_LIMIT')" title="Copy">
+                      <code>GROSS &lt;= ESI_LIMIT</code>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="recipe-name">Employer ESI</div>
+                    <div class="recipe-desc">3.25% of Gross, only for wages ≤ ₹21,000 (Placed below Balancing)</div>
+                  </td>
+                  <td>
+                    <button type="button" class="fh-code-example" (click)="copyCode('GROSS * ESI_EMPLOYER_PCT / 100')" title="Copy">
+                      <code>GROSS * ESI_EMPLOYER_PCT / 100</code>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                  <td>
+                    <button type="button" class="fh-code-example" (click)="copyCode('GROSS <= ESI_LIMIT')" title="Copy">
+                      <code>GROSS &lt;= ESI_LIMIT</code>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="recipe-name">Professional Tax (PT)</div>
+                    <div class="recipe-desc">State statutory deduction when gross exceeds slab floor</div>
+                  </td>
+                  <td>
+                    <button type="button" class="fh-code-example" (click)="copyCode('PT_AMOUNT')" title="Copy">
+                      <code>PT_AMOUNT</code>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                  <td>
+                    <button type="button" class="fh-code-example" (click)="copyCode('GROSS > 15000')" title="Copy">
+                      <code>GROSS &gt; 15000</code>
+                      <svg lucideCopy [size]="11"></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="fh-tip-box">
+            <svg lucideSparkles [size]="16"></svg>
+            <span><strong>Pro-Tip:</strong> In any component's formula editor, click <strong>Test</strong> to instantly verify syntax and simulate results against a test CTC before committing.</span>
+          </div>
         </div>
       </ng-container>
-      <ng-template #helpLoading><p class="text-muted">Loading the list of names…</p></ng-template>
+      <ng-template #helpLoading>
+        <div class="fh-loading-box">
+          <svg lucideRefreshCw class="animate-spin" [size]="20"></svg>
+          <span>Loading salary engine master definitions…</span>
+        </div>
+      </ng-template>
     </div>
   </ng-template>
 
@@ -831,121 +1164,223 @@
   <!-- ══════════════════════════════════════════════════════════ -->
   <div *ngIf="!isLoading() && activeTab() === 'setup'" class="tab-pane animate-fade setup-pane">
     <!-- Year settings -->
-    <div class="pane-card" *ngIf="yearForm">
-      <div class="table-toolbar">
-        <div>
-          <h3 class="pane-title">Tax year settings · FY {{ setupFinancialYear }}</h3>
-          <p class="pane-subtitle">
-            Regime choice, lock dates and how monthly TDS is worked out.
-            <span class="unsaved-pill" *ngIf="!yearSetting()?.saved">Starting values — not saved yet</span>
-          </p>
+    <div class="pane-card setup-card" *ngIf="yearForm">
+      <div class="table-toolbar setup-card-toolbar">
+        <div class="setup-title-group">
+          <div class="setup-icon-badge badge-blue">
+            <svg lucideCalendarDays [size]="20"></svg>
+          </div>
+          <div>
+            <div class="setup-heading-row">
+              <h3 class="pane-title">Tax Year Policy</h3>
+              <span class="fy-badge">FY {{ setupFinancialYear }}</span>
+              <span class="unsaved-pill" *ngIf="!yearSetting()?.saved">
+                <svg lucideAlertCircle [size]="12"></svg> Starting values — not saved yet
+              </span>
+              <span class="saved-pill" *ngIf="yearSetting()?.saved">
+                <svg lucideCheckCircle2 [size]="12"></svg> Active FY Policy
+              </span>
+            </div>
+            <p class="pane-subtitle">
+              Configure regime defaults, employee lock deadlines, TDS distribution, and investment proof verification windows.
+            </p>
+          </div>
         </div>
         <button class="btn-primary" (click)="saveYearSetting()" [disabled]="savingSetup() === 'year'">
-          {{ savingSetup() === 'year' ? 'Saving…' : 'Save FY ' + setupFinancialYear }}
+          <svg lucideSave [size]="15"></svg>
+          <span>{{ savingSetup() === 'year' ? 'Saving…' : 'Save FY ' + setupFinancialYear }}</span>
         </button>
       </div>
-      <div class="setup-grid">
-        <div class="form-group">
-          <label class="form-label">Default regime</label>
-          <select class="form-control" [(ngModel)]="yearForm.defaultRegimeCode">
-            <option value="NEW">New regime</option>
-            <option value="OLD">Old regime</option>
-          </select>
-          <span class="field-hint-text">Used when an employee doesn't choose.</span>
+
+      <!-- Section 1: Regime & TDS Settings -->
+      <div class="setup-subcard">
+        <div class="setup-subcard-header">
+          <h4 class="setup-subcard-title">
+            <svg lucideSliders [size]="15"></svg>
+            <span>Tax Regime &amp; TDS Policy</span>
+          </h4>
+          <span class="setup-subcard-meta">Applicable to all employee tax computations for {{ setupFinancialYear }}</span>
         </div>
-        <div class="form-group">
-          <label class="form-label">Regime choice locks on</label>
-          <input type="date" class="form-control" [(ngModel)]="yearForm.regimeLockDate">
-          <span class="field-hint-text">For existing employees.</span>
+        <div class="setup-grid-4">
+          <div class="form-group">
+            <label class="form-label">Default Tax Regime</label>
+            <select class="form-control" [(ngModel)]="yearForm.defaultRegimeCode">
+              <option value="NEW">New Tax Regime (Sec 115BAC)</option>
+              <option value="OLD">Old Tax Regime (With Declarations)</option>
+            </select>
+            <span class="field-hint-text">Assigned when employee doesn't choose.</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Regime Choice Locks On</label>
+            <input type="date" class="form-control" [(ngModel)]="yearForm.regimeLockDate">
+            <span class="field-hint-text">Cutoff deadline for existing staff election.</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">New Joiners Choice Window</label>
+            <div class="input-unit-wrapper">
+              <input type="number" class="form-control" min="0" max="365" [(ngModel)]="yearForm.newJoinerChoiceDays">
+              <span class="input-unit">days</span>
+            </div>
+            <span class="field-hint-text">Allowed days from DOJ to choose regime.</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Monthly TDS Method</label>
+            <select class="form-control" [(ngModel)]="yearForm.tdsMethod">
+              <option value="SPREAD">Spread evenly (projected tax − TDS so far) ÷ months left</option>
+              <option value="FIXED">Fixed: yearly tax ÷ 12</option>
+            </select>
+            <span class="field-hint-text">Recomputes tax monthly based on remaining months.</span>
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">New joiners choose within (days)</label>
-          <input type="number" class="form-control" min="0" max="365" [(ngModel)]="yearForm.newJoinerChoiceDays">
+      </div>
+
+      <!-- Section 2: Proof & Receipt Submission Window -->
+      <div class="proof-window-banner">
+        <div class="proof-window-content">
+          <div class="proof-window-icon">
+            <svg lucideFileText [size]="20"></svg>
+          </div>
+          <div class="proof-window-text">
+            <div class="proof-window-title">Proof &amp; Investment Submission Window</div>
+            <div class="proof-window-desc">
+              Designated period during which employees can upload tax saving proofs, rent receipts (HRA), and investment documentation for admin verification.
+            </div>
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Monthly TDS method</label>
-          <select class="form-control" [(ngModel)]="yearForm.tdsMethod">
-            <option value="SPREAD">Spread evenly (projected tax − TDS so far) ÷ months left</option>
-            <option value="FIXED">Fixed: yearly tax ÷ 12</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Proof upload opens</label>
-          <input type="date" class="form-control" [(ngModel)]="yearForm.proofWindowStart">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Proof upload closes</label>
-          <input type="date" class="form-control" [(ngModel)]="yearForm.proofWindowEnd">
+        <div class="proof-date-range">
+          <div class="proof-date-item">
+            <span class="proof-date-label">Window Opens</span>
+            <input type="date" class="form-control proof-input" [(ngModel)]="yearForm.proofWindowStart">
+          </div>
+          <div class="proof-date-arrow">
+            <svg lucideArrowRight [size]="16"></svg>
+          </div>
+          <div class="proof-date-item">
+            <span class="proof-date-label">Window Closes</span>
+            <input type="date" class="form-control proof-input" [(ngModel)]="yearForm.proofWindowEnd">
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Grades & costing -->
-    <div class="pane-card" *ngIf="configForm">
-      <div class="table-toolbar">
-        <div>
-          <h3 class="pane-title">Grades &amp; costing</h3>
-          <p class="pane-subtitle">
-            Grade bands themselves are edited in Payroll → Grades.
-            <span class="unsaved-pill" *ngIf="!companyConfig()?.saved">Starting values — not saved yet</span>
-          </p>
+    <div class="pane-card setup-card" *ngIf="configForm">
+      <div class="table-toolbar setup-card-toolbar">
+        <div class="setup-title-group">
+          <div class="setup-icon-badge badge-purple">
+            <svg lucideLayers [size]="20"></svg>
+          </div>
+          <div>
+            <div class="setup-heading-row">
+              <h3 class="pane-title">Grades &amp; Costing Parameters</h3>
+              <span class="unsaved-pill" *ngIf="!companyConfig()?.saved">
+                <svg lucideAlertCircle [size]="12"></svg> Starting values — not saved yet
+              </span>
+              <span class="saved-pill" *ngIf="companyConfig()?.saved">
+                <svg lucideCheckCircle2 [size]="12"></svg> Saved
+              </span>
+            </div>
+            <p class="pane-subtitle">
+              Grade bands themselves are edited in Payroll → Grades. Costing hours and days power internal project billing.
+            </p>
+          </div>
         </div>
         <button class="btn-primary" (click)="saveCompanyConfig()" [disabled]="savingSetup() === 'config'">
-          {{ savingSetup() === 'config' ? 'Saving…' : 'Save' }}
+          <svg lucideSave [size]="15"></svg>
+          <span>{{ savingSetup() === 'config' ? 'Saving…' : 'Save Parameters' }}</span>
         </button>
       </div>
-      <div class="setup-grid">
+
+      <div class="setup-grid-3">
         <div class="form-group">
-          <label class="form-label">Grade is decided by</label>
+          <label class="form-label">Grade is Decided By</label>
           <select class="form-control" [(ngModel)]="configForm.gradeBasis">
             <option value="MONTHLY_GROSS">Monthly gross (current)</option>
             <option value="ANNUAL_CTC">Annual CTC band</option>
           </select>
-          <span class="field-hint-text">Annual CTC takes effect once employees have pay profiles (Phase 2).</span>
+          <span class="field-hint-text">Annual CTC takes effect once employees have pay profiles.</span>
         </div>
         <div class="form-group">
-          <label class="form-label">Costing: working days / month</label>
-          <input type="number" class="form-control" min="1" max="31" [(ngModel)]="configForm.costingWorkingDays">
+          <label class="form-label">Costing: Working Days / Month</label>
+          <div class="input-unit-wrapper">
+            <input type="number" class="form-control" min="1" max="31" [(ngModel)]="configForm.costingWorkingDays">
+            <span class="input-unit">days/mo</span>
+          </div>
+          <span class="field-hint-text">Used for per-day rate computation.</span>
         </div>
         <div class="form-group">
-          <label class="form-label">Costing: hours / day</label>
-          <input type="number" class="form-control" min="1" max="24" step="0.5" [(ngModel)]="configForm.costingHoursPerDay">
+          <label class="form-label">Costing: Hours / Day</label>
+          <div class="input-unit-wrapper">
+            <input type="number" class="form-control" min="1" max="24" step="0.5" [(ngModel)]="configForm.costingHoursPerDay">
+            <span class="input-unit">hrs/day</span>
+          </div>
+          <span class="field-hint-text">Used for hourly billable costing.</span>
         </div>
-        <div class="form-group">
-          <label class="form-label">&nbsp;</label>
-          <label class="setup-check">
-            <input type="checkbox" [(ngModel)]="configForm.costingIncludeEmployer">
-            <span>Include employer PF / ESI in cost</span>
-          </label>
+      </div>
+
+      <!-- Costing Toggle Switch Card -->
+      <div class="setup-toggle-card" [class.active]="configForm.costingIncludeEmployer" (click)="configForm.costingIncludeEmployer = !configForm.costingIncludeEmployer">
+        <div class="toggle-card-info">
+          <div class="toggle-card-icon" [class.active]="configForm.costingIncludeEmployer">
+            <svg lucideShieldCheck [size]="20"></svg>
+          </div>
+          <div>
+            <div class="toggle-card-title">Include Employer Statutory Contributions (PF / ESI) in Costing</div>
+            <div class="toggle-card-desc">
+              When checked, the internal cost of an employee incorporates employer PF (12%) and employer ESI (3.25%) on top of gross salary.
+            </div>
+          </div>
+        </div>
+        <div class="toggle-switch-wrapper">
+          <span class="toggle-badge" [class.active]="configForm.costingIncludeEmployer">
+            {{ configForm.costingIncludeEmployer ? 'Included' : 'Excluded' }}
+          </span>
+          <div class="custom-toggle" [class.on]="configForm.costingIncludeEmployer">
+            <div class="toggle-circle"></div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Dropdown lists -->
     <div class="setup-lists">
-      <div class="pane-card" *ngFor="let list of dropdowns()">
-        <div class="table-toolbar">
-          <div>
-            <h3 class="pane-title">{{ list.name }}</h3>
-            <p class="pane-subtitle">
-              {{ list.options.length }} option{{ list.options.length === 1 ? '' : 's' }}
-              <span class="unsaved-pill" *ngIf="!list.saved">Starting values</span>
-            </p>
+      <div class="pane-card setup-list-card" *ngFor="let list of dropdowns()">
+        <div class="table-toolbar setup-card-toolbar">
+          <div class="setup-title-group">
+            <div class="setup-icon-badge badge-teal">
+              <svg lucideSliders [size]="16"></svg>
+            </div>
+            <div>
+              <div class="setup-heading-row">
+                <h3 class="pane-title text-base">{{ list.name }}</h3>
+                <span class="count-pill">{{ list.options.length }}</span>
+                <span class="unsaved-pill" *ngIf="!list.saved">Starting</span>
+              </div>
+              <p class="pane-subtitle text-xs">Used across employee contracts &amp; profiles</p>
+            </div>
           </div>
           <button class="btn-sm btn-primary" (click)="saveDropdown(list)" [disabled]="savingSetup() === list.listKey">
-            {{ savingSetup() === list.listKey ? 'Saving…' : 'Save' }}
+            <svg lucideCheck [size]="13"></svg>
+            <span>{{ savingSetup() === list.listKey ? 'Saving…' : 'Save' }}</span>
           </button>
         </div>
-        <div class="setup-chips">
-          <span class="setup-chip" *ngFor="let o of list.options; let i = index">
-            {{ o.label }}
-            <button type="button" (click)="removeDropdownOption(list, i)" [attr.aria-label]="'Remove ' + o.label">✕</button>
-          </span>
+        <div class="setup-chips-container">
+          <div class="setup-chips">
+            <span class="setup-chip" *ngFor="let o of list.options; let i = index">
+              <span>{{ o.label }}</span>
+              <button type="button" (click)="removeDropdownOption(list, i)" [attr.aria-label]="'Remove ' + o.label">
+                <svg lucideX [size]="11"></svg>
+              </button>
+            </span>
+            <span class="text-xs text-muted" *ngIf="list.options.length === 0">No options defined yet.</span>
+          </div>
         </div>
-        <div class="setup-add">
-          <input class="form-control" [(ngModel)]="dropdownDraft[list.listKey]" placeholder="Add an option…"
-            (keydown.enter)="addDropdownOption(list)">
-          <button class="btn-sm btn-outline-modern" (click)="addDropdownOption(list)">
+        <div class="setup-add-modern">
+          <div class="setup-add-input-wrap">
+            <input class="form-control setup-add-input" [(ngModel)]="dropdownDraft[list.listKey]" placeholder="Add new option…"
+              (keydown.enter)="addDropdownOption(list)">
+          </div>
+          <button class="btn-sm btn-primary setup-add-btn" (click)="addDropdownOption(list)">
             <svg lucidePlus [size]="14"></svg>
             <span>Add</span>
           </button>
@@ -1364,113 +1799,164 @@
     <div class="modal-dialog modal-xl">
       <div class="modal-header">
         <div class="modal-title-wrap">
-          <svg lucideLayers [size]="20" class="text-primary"></svg>
-          <h3>{{ groupForm.code ? 'Edit Structure: ' + groupForm.name + ' (New Version)' : 'Create New Salary Structure Group' }}</h3>
+          <div class="modal-icon-pill">
+            <svg lucideLayers [size]="20"></svg>
+          </div>
+          <div>
+            <div class="modal-title-row">
+              <h3>{{ groupForm.code ? 'Edit Structure: ' + groupForm.name : 'Create New Salary Structure Group' }}</h3>
+              <span class="structure-version-tag">{{ groupForm.code ? '(New Version)' : 'Draft' }}</span>
+            </div>
+            <span class="modal-subtitle">Configure basic structure, calculation rules, mathematical formulas, and statutory lines</span>
+          </div>
         </div>
-        <button class="modal-close" (click)="closeGroupModal()">✕</button>
+        <button class="modal-close" (click)="closeGroupModal()" title="Close dialog">✕</button>
       </div>
 
       <div class="modal-body">
-        <div class="form-row">
-          <div class="form-group flex-1">
-            <label class="form-label">
-              <span>Group Code</span>
-              <span class="required-star">*</span>
-            </label>
-            <input 
-              type="text" 
-              class="form-control font-mono" 
-              [class.input-error]="groupErrors().code"
-              [(ngModel)]="groupForm.code" 
-              (ngModelChange)="clearGroupError('code')"
-              placeholder="e.g. REGULAR_CUSTOM"
-            />
-            <span class="field-error-text" *ngIf="groupErrors().code">⚠️ {{ groupErrors().code }}</span>
+        <!-- Top Structure Parameters Card -->
+        <div class="group-meta-card">
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label class="form-label">
+                <span>Group Code</span>
+                <span class="required-star">*</span>
+              </label>
+              <input 
+                type="text" 
+                id="group-field-code"
+                class="form-control font-mono" 
+                [class.input-error]="groupErrors()['code']"
+                [(ngModel)]="groupForm.code" 
+                (input)="clearGroupError('code')"
+                placeholder="e.g. REGULAR_CUSTOM"
+              />
+              <span class="field-error-text" *ngIf="groupErrors()['code']">⚠️ {{ groupErrors()['code'] }}</span>
+            </div>
+            <div class="form-group flex-2">
+              <label class="form-label">
+                <span>Display Name</span>
+                <span class="required-star">*</span>
+              </label>
+              <input 
+                type="text" 
+                id="group-field-name"
+                class="form-control" 
+                [class.input-error]="groupErrors()['name']"
+                [(ngModel)]="groupForm.name" 
+                (input)="clearGroupError('name')"
+                placeholder="e.g. Regular Staff Structure"
+              />
+              <span class="field-error-text" *ngIf="groupErrors()['name']">⚠️ {{ groupErrors()['name'] }}</span>
+            </div>
           </div>
-          <div class="form-group flex-2">
-            <label class="form-label">
-              <span>Display Name</span>
-              <span class="required-star">*</span>
-            </label>
-            <input 
-              type="text" 
-              class="form-control" 
-              [class.input-error]="groupErrors().name"
-              [(ngModel)]="groupForm.name" 
-              (ngModelChange)="clearGroupError('name')"
-              placeholder="e.g. Regular Staff Structure"
-            />
-            <span class="field-error-text" *ngIf="groupErrors().name">⚠️ {{ groupErrors().name }}</span>
-          </div>
-        </div>
 
-        <div class="form-row">
-          <div class="form-group flex-1">
-            <label class="form-label">Payee Type</label>
-            <select class="form-control" [(ngModel)]="groupForm.payeeType">
-              <option value="EMPLOYEE">Regular Employee</option>
-              <option value="CONSULTANT">Consultant / Contractor</option>
-              <option value="TRAINEE">Trainee / Intern</option>
-            </select>
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label class="form-label">Payee Type</label>
+              <select class="form-control" [(ngModel)]="groupForm.payeeType">
+                <option value="EMPLOYEE">Regular Employee</option>
+                <option value="CONSULTANT">Consultant / Contractor</option>
+                <option value="TRAINEE">Trainee / Intern</option>
+              </select>
+            </div>
+            <div class="form-group flex-1">
+              <label class="form-label">PF Wage Base</label>
+              <select class="form-control" [(ngModel)]="groupForm.pfWageBasis">
+                <option value="CAPPED">Capped at PF ceiling (₹15,000)</option>
+                <option value="FULL_BASIC">Full Basic (no cap)</option>
+              </select>
+              <span class="field-hint-text">Formula variable: <code>PF_BASE</code></span>
+            </div>
+            <div class="form-group flex-1">
+              <label class="form-label">
+                <span>Effective From Date</span>
+                <span class="required-star">*</span>
+              </label>
+              <input 
+                type="date" 
+                id="group-field-effectiveFrom"
+                class="form-control" 
+                [class.input-error]="groupErrors()['effectiveFrom']"
+                [(ngModel)]="groupForm.effectiveFrom"
+                (input)="clearGroupError('effectiveFrom')"
+              />
+              <span class="field-error-text" *ngIf="groupErrors()['effectiveFrom']">⚠️ {{ groupErrors()['effectiveFrom'] }}</span>
+            </div>
           </div>
-          <div class="form-group flex-1">
-            <label class="form-label">PF wage base</label>
-            <select class="form-control" [(ngModel)]="groupForm.pfWageBasis">
-              <option value="CAPPED">Capped at the PF wage ceiling (₹15,000)</option>
-              <option value="FULL_BASIC">Full Basic (no cap)</option>
-            </select>
-            <span class="field-hint-text">Formulas read this as <code>PF_BASE</code>, e.g. <code>PF_BASE * PF_EMPLOYEE_PCT / 100</code></span>
-          </div>
-          <div class="form-group flex-1">
-            <label class="form-label">Effective From Date *</label>
-            <input type="date" class="form-control" [(ngModel)]="groupForm.effectiveFrom">
-          </div>
-        </div>
 
-        <div class="form-group">
-          <label class="form-label">Description & Applicability</label>
-          <input type="text" class="form-control" [(ngModel)]="groupForm.description" placeholder="Notes on applicable roles, designations, or wage limits...">
+          <div class="form-group">
+            <label class="form-label">Description & Applicability</label>
+            <input type="text" class="form-control" [(ngModel)]="groupForm.description" placeholder="Notes on applicable roles, designations, or wage limits...">
+          </div>
         </div>
 
         <!-- Formulas Table in Modal -->
         <div class="modal-inner-section">
-          <div class="table-toolbar" style="padding: 0; margin-bottom: 8px;">
-            <div>
-              <h4 class="subhead-title">Component Formulas ({{ groupForm.lines?.length || 0 }})</h4>
+          <div class="table-toolbar formulas-toolbar">
+            <div class="formulas-title-wrap">
+              <h4 class="subhead-title">
+                Component Formulas
+                <span class="count-badge-accent">{{ groupForm.lines?.length || 0 }}</span>
+              </h4>
               <p class="subhead-desc">
                 Configure order, calculation rules, formulas, and conditions ·
                 <button type="button" class="help-link" (click)="openHelpDrawer()">What can I use in a formula or condition?</button>
               </p>
             </div>
-            <button class="btn-sm btn-outline-modern" (click)="addGroupLine()">
+            <button class="btn-sm btn-outline-modern btn-add-line" (click)="addGroupLine()">
               <svg lucidePlus [size]="14"></svg>
-              <span>+ Add Component Line</span>
+              <span>Add Component Line</span>
             </button>
           </div>
 
-          <div class="table-container" style="max-height: 380px;">
-            <table class="modern-table">
+          <div class="field-error-text banner-error" *ngIf="groupErrors()['lines']">
+            ⚠️ {{ groupErrors()['lines'] }}
+          </div>
+
+          <div class="table-container formulas-table-wrap">
+            <table class="modern-table formulas-modern-table">
               <thead>
                 <tr>
-                  <th>Component</th>
-                  <th>Calc Type</th>
-                  <th>Formula / Rule</th>
-                  <th>Condition</th>
-                  <th style="text-align: center;">Override</th>
-                  <th></th>
+                  <th style="width: 44px; text-align: center;">#</th>
+                  <th style="min-width: 240px;">Component</th>
+                  <th style="min-width: 145px;">Calc Type</th>
+                  <th style="min-width: 280px;">Formula / Rule</th>
+                  <th style="min-width: 170px;">Condition</th>
+                  <th style="width: 80px; text-align: center;">Override</th>
+                  <th style="width: 50px; text-align: center;"></th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let line of groupForm.lines; let i = index">
-                  <td style="min-width: 170px;">
-                    <select class="form-control" [(ngModel)]="line.componentId">
-                      <option *ngFor="let c of components()" [ngValue]="c.id">
-                        {{ c.name }} ({{ c.code }})
-                      </option>
-                    </select>
+                <tr *ngFor="let line of groupForm.lines; let i = index" class="formula-row">
+                  <td style="text-align: center;">
+                    <span class="row-order-pill">{{ i + 1 }}</span>
                   </td>
-                  <td style="min-width: 130px;">
-                    <select class="form-control" [(ngModel)]="line.calcType">
+                  <td style="min-width: 240px;">
+                    <div class="comp-select-wrap">
+                      <select 
+                        id="group-field-line_{{i}}_component"
+                        class="form-control" 
+                        [class.input-error]="groupErrors()['line_' + i + '_component']"
+                        [(ngModel)]="line.componentId"
+                        (ngModelChange)="clearGroupError('line_' + i + '_component')"
+                      >
+                        <option *ngFor="let c of components()" [ngValue]="c.id">
+                          {{ c.name }} ({{ c.code }})
+                        </option>
+                      </select>
+                      <div class="comp-meta-row">
+                        <span class="comp-cat-tag" [ngClass]="getComponentCategoryTag(line.componentId).class">
+                          {{ getComponentCategoryTag(line.componentId).label }}
+                        </span>
+                      </div>
+                      <span class="field-error-text" *ngIf="groupErrors()['line_' + i + '_component']">
+                        ⚠️ {{ groupErrors()['line_' + i + '_component'] }}
+                      </span>
+                    </div>
+                  </td>
+                  <td style="min-width: 145px;">
+                    <select class="form-control font-medium" [(ngModel)]="line.calcType">
                       <option value="FORMULA">FORMULA</option>
                       <option value="FIXED">FIXED Amount</option>
                       <option value="BALANCING">BALANCING (Gross)</option>
@@ -1478,24 +1964,86 @@
                       <option value="INPUT">MONTHLY INPUT</option>
                     </select>
                   </td>
-                  <td style="min-width: 220px;">
-                    <input *ngIf="line.calcType === 'FORMULA'" type="text" class="form-control font-mono" [(ngModel)]="line.formula" placeholder="e.g. BASIC * 0.4"
-                      autocomplete="off" spellcheck="false"
-                      (input)="onFormulaInput($event, line, 'formula')" (keydown)="onFormulaKey($event)" (blur)="closeSuggestSoon()">
-                    <input *ngIf="line.calcType === 'FIXED'" type="number" class="form-control" [(ngModel)]="line.amount" placeholder="Fixed ₹ amount">
-                    <span *ngIf="line.calcType === 'BALANCING'" class="text-xs text-muted">Auto-balances to remaining gross</span>
-                    <span *ngIf="line.calcType === 'STATUTORY'" class="text-xs text-muted">From statutory rates</span>
+                  <td style="min-width: 280px;">
+                    <div *ngIf="line.calcType === 'FORMULA'" class="formula-cell-input">
+                      <input 
+                        type="text" 
+                        id="group-field-line_{{i}}_formula"
+                        class="form-control font-mono" 
+                        [class.input-error]="groupErrors()['line_' + i + '_formula']"
+                        [(ngModel)]="line.formula" 
+                        placeholder="e.g. BASIC * 0.4"
+                        autocomplete="off" 
+                        spellcheck="false"
+                        (input)="onFormulaInput($event, line, 'formula'); clearGroupError('line_' + i + '_formula')" 
+                        (keydown)="onFormulaKey($event)" 
+                        (blur)="closeSuggestSoon()"
+                      />
+                      <span class="field-error-text" *ngIf="groupErrors()['line_' + i + '_formula']">
+                        ⚠️ {{ groupErrors()['line_' + i + '_formula'] }}
+                      </span>
+                    </div>
+
+                    <div *ngIf="line.calcType === 'FIXED'" class="fixed-cell-input">
+                      <div class="input-with-currency">
+                        <span class="currency-prefix">₹</span>
+                        <input 
+                          type="number" 
+                          id="group-field-line_{{i}}_amount"
+                          class="form-control input-padded-currency font-mono" 
+                          [class.input-error]="groupErrors()['line_' + i + '_amount']"
+                          [(ngModel)]="line.amount" 
+                          (input)="clearGroupError('line_' + i + '_amount')"
+                          placeholder="Fixed ₹ amount"
+                        />
+                      </div>
+                      <span class="field-error-text" *ngIf="groupErrors()['line_' + i + '_amount']">
+                        ⚠️ {{ groupErrors()['line_' + i + '_amount'] }}
+                      </span>
+                    </div>
+
+                    <div *ngIf="line.calcType === 'BALANCING'" class="calc-type-badge badge-purple">
+                      <svg lucideScale [size]="13"></svg>
+                      <span>Auto-balances to remaining gross</span>
+                    </div>
+
+                    <div *ngIf="line.calcType === 'STATUTORY'" class="calc-type-badge badge-blue">
+                      <svg lucideShieldCheck [size]="13"></svg>
+                      <span>From statutory compliance rules</span>
+                    </div>
+
+                    <div *ngIf="line.calcType === 'INPUT'" class="calc-type-badge badge-slate">
+                      <svg lucidePencil [size]="13"></svg>
+                      <span>Variable input per payroll cycle</span>
+                    </div>
                   </td>
-                  <td style="min-width: 140px;">
-                    <input type="text" class="form-control font-mono text-xs" [(ngModel)]="line.condition" placeholder="e.g. GROSS <= ESI_LIMIT"
-                      autocomplete="off" spellcheck="false"
-                      (input)="onFormulaInput($event, line, 'condition')" (keydown)="onFormulaKey($event)" (blur)="closeSuggestSoon()">
+                  <td style="min-width: 170px;">
+                    <input 
+                      type="text" 
+                      id="group-field-line_{{i}}_condition"
+                      class="form-control font-mono text-xs" 
+                      [class.input-error]="groupErrors()['line_' + i + '_condition']"
+                      [(ngModel)]="line.condition" 
+                      placeholder="e.g. GROSS <= ESI_LIMIT"
+                      autocomplete="off" 
+                      spellcheck="false"
+                      (input)="onFormulaInput($event, line, 'condition'); clearGroupError('line_' + i + '_condition')" 
+                      (keydown)="onFormulaKey($event)" 
+                      (blur)="closeSuggestSoon()"
+                    />
+                    <span class="field-error-text" *ngIf="groupErrors()['line_' + i + '_condition']">
+                      ⚠️ {{ groupErrors()['line_' + i + '_condition'] }}
+                    </span>
                   </td>
                   <td style="text-align: center;">
-                    <input type="checkbox" [(ngModel)]="line.overrideAllowed" title="Allow HR to override amount on hire">
+                    <label class="override-checkbox-wrap" title="Allow HR to override amount on hire">
+                      <input type="checkbox" [(ngModel)]="line.overrideAllowed" class="custom-checkbox">
+                    </label>
                   </td>
-                  <td>
-                    <button class="btn-delete-row" (click)="removeGroupLine(i)">✕</button>
+                  <td style="text-align: center;">
+                    <button class="btn-delete-row-modern" (click)="removeGroupLine(i)" title="Remove component line">
+                      <svg lucideTrash2 [size]="14"></svg>
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -1506,7 +2054,10 @@
 
       <div class="modal-footer">
         <button class="btn-outline-modern" (click)="closeGroupModal()">Cancel</button>
-        <button class="btn-primary" (click)="saveSalaryGroup()">Save Group Version</button>
+        <button class="btn-primary btn-save-modal" (click)="saveSalaryGroup()">
+          <svg lucideCheck [size]="16"></svg>
+          <span>Save Group Version</span>
+        </button>
       </div>
     </div>
   </div>
@@ -1575,128 +2126,348 @@
   <!-- MODAL: EDIT TAX REGIME & SLABS (W4) -->
   <!-- ══════════════════════════════════════════════════════════ -->
   <div *ngIf="isTaxRegimeModalOpen()" class="modal-backdrop animate-fade">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
       <div class="modal-header">
         <div class="modal-title-wrap">
-          <svg lucideReceipt [size]="20" class="text-primary"></svg>
-          <h3>Edit Tax Regime & Slabs — {{ taxRegimeForm.name }}</h3>
+          <div class="modal-icon-pill">
+            <svg lucideReceipt [size]="20"></svg>
+          </div>
+          <div>
+            <div class="modal-title-row">
+              <h3>Edit Tax Regime & Slabs</h3>
+              <span class="structure-version-tag">{{ taxRegimeForm.name }}</span>
+            </div>
+            <span class="modal-subtitle">Configure standard deduction, Section 87A rebate ceilings, and progressive tax slabs</span>
+          </div>
         </div>
-        <button class="modal-close" (click)="closeTaxRegimeModal()">✕</button>
+        <button class="modal-close" (click)="closeTaxRegimeModal()" title="Close dialog">✕</button>
       </div>
 
       <div class="modal-body">
-        <div class="form-row">
-          <div class="form-group flex-1">
-            <label class="form-label">Standard Deduction (₹)</label>
-            <input type="number" class="form-control" [(ngModel)]="taxRegimeForm.standardDeduction" placeholder="e.g. 75000">
-          </div>
-          <div class="form-group flex-1">
-            <label class="form-label">Health & Education Cess (%)</label>
-            <input type="number" class="form-control" [(ngModel)]="taxRegimeForm.cessPct" step="0.5" placeholder="e.g. 4">
-          </div>
-        </div>
+        <!-- Top Tax Regime Parameters Card -->
+        <div class="group-meta-card">
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label class="form-label">
+                <span>Standard Deduction (₹)</span>
+                <span class="required-star">*</span>
+              </label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input 
+                  type="number" 
+                  id="regime-field-standardDeduction"
+                  class="form-control input-padded-currency font-mono" 
+                  [class.input-error]="taxRegimeErrors()['standardDeduction']"
+                  [(ngModel)]="taxRegimeForm.standardDeduction" 
+                  (input)="clearRegimeError('standardDeduction')"
+                  placeholder="e.g. 75000"
+                />
+              </div>
+              <span class="field-error-text" *ngIf="taxRegimeErrors()['standardDeduction']">
+                ⚠️ {{ taxRegimeErrors()['standardDeduction'] }}
+              </span>
+            </div>
 
-        <div class="form-row">
-          <div class="form-group flex-1">
-            <label class="form-label">Sec 87A Full Rebate Limit (₹)</label>
-            <input type="number" class="form-control" [(ngModel)]="taxRegimeForm.rebateIncomeLimit" placeholder="e.g. 1200000">
+            <div class="form-group flex-1">
+              <label class="form-label">
+                <span>Health & Education Cess (%)</span>
+                <span class="required-star">*</span>
+              </label>
+              <div class="input-with-percent">
+                <input 
+                  type="number" 
+                  id="regime-field-cessPct"
+                  class="form-control input-padded-percent font-mono" 
+                  [class.input-error]="taxRegimeErrors()['cessPct']"
+                  [(ngModel)]="taxRegimeForm.cessPct" 
+                  (input)="clearRegimeError('cessPct')"
+                  step="0.5" 
+                  placeholder="e.g. 4"
+                />
+                <span class="percent-suffix">%</span>
+              </div>
+              <span class="field-error-text" *ngIf="taxRegimeErrors()['cessPct']">
+                ⚠️ {{ taxRegimeErrors()['cessPct'] }}
+              </span>
+            </div>
           </div>
-          <div class="form-group flex-1">
-            <label class="form-label">Sec 87A Max Rebate Amount (₹)</label>
-            <input type="number" class="form-control" [(ngModel)]="taxRegimeForm.rebateMaxAmount" placeholder="e.g. 60000">
+
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label class="form-label">
+                <span>Sec 87A Full Rebate Limit (₹)</span>
+                <span class="required-star">*</span>
+              </label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input 
+                  type="number" 
+                  id="regime-field-rebateIncomeLimit"
+                  class="form-control input-padded-currency font-mono" 
+                  [class.input-error]="taxRegimeErrors()['rebateIncomeLimit']"
+                  [(ngModel)]="taxRegimeForm.rebateIncomeLimit" 
+                  (input)="clearRegimeError('rebateIncomeLimit')"
+                  placeholder="e.g. 1200000"
+                />
+              </div>
+              <span class="field-error-text" *ngIf="taxRegimeErrors()['rebateIncomeLimit']">
+                ⚠️ {{ taxRegimeErrors()['rebateIncomeLimit'] }}
+              </span>
+            </div>
+
+            <div class="form-group flex-1">
+              <label class="form-label">
+                <span>Sec 87A Max Rebate Amount (₹)</span>
+                <span class="required-star">*</span>
+              </label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input 
+                  type="number" 
+                  id="regime-field-rebateMaxAmount"
+                  class="form-control input-padded-currency font-mono" 
+                  [class.input-error]="taxRegimeErrors()['rebateMaxAmount']"
+                  [(ngModel)]="taxRegimeForm.rebateMaxAmount" 
+                  (input)="clearRegimeError('rebateMaxAmount')"
+                  placeholder="e.g. 60000"
+                />
+              </div>
+              <span class="field-error-text" *ngIf="taxRegimeErrors()['rebateMaxAmount']">
+                ⚠️ {{ taxRegimeErrors()['rebateMaxAmount'] }}
+              </span>
+            </div>
           </div>
         </div>
 
         <!-- Slabs in Modal -->
         <div class="modal-inner-section">
-          <div class="table-toolbar" style="padding: 0; margin-bottom: 8px;">
-            <div>
-              <h4 class="subhead-title">Income Tax Slabs ({{ taxRegimeForm.slabs?.length || 0 }})</h4>
+          <div class="table-toolbar formulas-toolbar">
+            <div class="formulas-title-wrap">
+              <h4 class="subhead-title">
+                Income Tax Slabs
+                <span class="count-badge-accent">{{ taxRegimeForm.slabs?.length || 0 }}</span>
+              </h4>
               <p class="subhead-desc">Slabs are evaluated progressively in ascending order</p>
             </div>
-            <button class="btn-sm btn-outline-modern" (click)="addTaxSlab()">
+            <button class="btn-sm btn-outline-modern btn-add-line" (click)="addTaxSlab()">
               <svg lucidePlus [size]="14"></svg>
-              <span>+ Add Slab</span>
+              <span>Add Slab</span>
             </button>
           </div>
 
-          <table class="modern-table">
-            <thead>
-              <tr>
-                <th>From (₹)</th>
-                <th>Up to (₹, blank = no limit)</th>
-                <th>Tax Rate (%)</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let slab of taxRegimeForm.slabs; let i = index">
-                <td>
-                  <input type="number" class="form-control font-mono" [(ngModel)]="slab.fromAmount">
-                </td>
-                <td>
-                  <input type="number" class="form-control font-mono" [(ngModel)]="slab.toAmount" placeholder="No limit">
-                </td>
-                <td>
-                  <input type="number" class="form-control font-mono" [(ngModel)]="slab.ratePct" step="1">
-                </td>
-                <td style="text-align: center;">
-                  <button class="btn-delete-row" (click)="removeTaxSlab(i)">✕</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="field-error-text banner-error" *ngIf="taxRegimeErrors()['slabs']">
+            ⚠️ {{ taxRegimeErrors()['slabs'] }}
+          </div>
+
+          <div class="table-container formulas-table-wrap">
+            <table class="modern-table formulas-modern-table">
+              <thead>
+                <tr>
+                  <th style="width: 44px; text-align: center;">#</th>
+                  <th style="min-width: 220px;">From (₹)</th>
+                  <th style="min-width: 240px;">Up to (₹, blank = no limit)</th>
+                  <th style="min-width: 170px;">Tax Rate (%)</th>
+                  <th style="width: 50px; text-align: center;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let slab of taxRegimeForm.slabs; let i = index" class="formula-row">
+                  <td style="text-align: center;">
+                    <span class="row-order-pill">{{ i + 1 }}</span>
+                  </td>
+                  <td style="min-width: 220px;">
+                    <div class="fixed-cell-input">
+                      <div class="input-with-currency">
+                        <span class="currency-prefix">₹</span>
+                        <input 
+                          type="number" 
+                          id="regime-field-slab_{{i}}_from"
+                          class="form-control input-padded-currency font-mono" 
+                          [class.input-error]="taxRegimeErrors()['slab_' + i + '_from']"
+                          [(ngModel)]="slab.fromAmount"
+                          (input)="clearRegimeError('slab_' + i + '_from')"
+                          placeholder="0"
+                        />
+                      </div>
+                      <span class="field-error-text" *ngIf="taxRegimeErrors()['slab_' + i + '_from']">
+                        ⚠️ {{ taxRegimeErrors()['slab_' + i + '_from'] }}
+                      </span>
+                    </div>
+                  </td>
+                  <td style="min-width: 240px;">
+                    <div class="fixed-cell-input">
+                      <div class="input-with-currency">
+                        <span class="currency-prefix">₹</span>
+                        <input 
+                          type="number" 
+                          id="regime-field-slab_{{i}}_to"
+                          class="form-control input-padded-currency font-mono" 
+                          [class.input-error]="taxRegimeErrors()['slab_' + i + '_to']"
+                          [(ngModel)]="slab.toAmount" 
+                          (input)="clearRegimeError('slab_' + i + '_to')"
+                          placeholder="No upper limit (∞)"
+                        />
+                      </div>
+                      <span class="field-error-text" *ngIf="taxRegimeErrors()['slab_' + i + '_to']">
+                        ⚠️ {{ taxRegimeErrors()['slab_' + i + '_to'] }}
+                      </span>
+                    </div>
+                  </td>
+                  <td style="min-width: 170px;">
+                    <div class="fixed-cell-input">
+                      <div class="input-with-percent">
+                        <input 
+                          type="number" 
+                          id="regime-field-slab_{{i}}_rate"
+                          class="form-control input-padded-percent font-mono" 
+                          [class.input-error]="taxRegimeErrors()['slab_' + i + '_rate']"
+                          [(ngModel)]="slab.ratePct" 
+                          (input)="clearRegimeError('slab_' + i + '_rate')"
+                          step="1"
+                          placeholder="0"
+                        />
+                        <span class="percent-suffix">%</span>
+                      </div>
+                      <span class="field-error-text" *ngIf="taxRegimeErrors()['slab_' + i + '_rate']">
+                        ⚠️ {{ taxRegimeErrors()['slab_' + i + '_rate'] }}
+                      </span>
+                    </div>
+                  </td>
+                  <td style="text-align: center;">
+                    <button class="btn-delete-row-modern" (click)="removeTaxSlab(i)" title="Remove slab">
+                      <svg lucideTrash2 [size]="14"></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Surcharge bands -->
         <div class="modal-inner-section">
-          <div class="table-toolbar" style="padding: 0; margin-bottom: 8px;">
-            <div>
-              <h4 class="subhead-title">Surcharge ({{ taxRegimeForm.surcharge?.length || 0 }})</h4>
-              <p class="subhead-desc">Extra % on tax when taxable income is above the amount</p>
+          <div class="table-toolbar formulas-toolbar">
+            <div class="formulas-title-wrap">
+              <h4 class="subhead-title">
+                Surcharge Bands
+                <span class="count-badge-accent">{{ taxRegimeForm.surcharge?.length || 0 }}</span>
+              </h4>
+              <p class="subhead-desc">Extra % on tax when taxable income is above the threshold</p>
             </div>
-            <button class="btn-sm btn-outline-modern" (click)="addSurchargeBand()">
+            <button class="btn-sm btn-outline-modern btn-add-line" (click)="addSurchargeBand()">
               <svg lucidePlus [size]="14"></svg>
-              <span>Add band</span>
+              <span>Add Band</span>
             </button>
           </div>
-          <table class="modern-table" *ngIf="taxRegimeForm.surcharge?.length">
-            <thead><tr><th>Income above (₹)</th><th>Surcharge (%)</th><th></th></tr></thead>
-            <tbody>
-              <tr *ngFor="let b of taxRegimeForm.surcharge; let i = index">
-                <td><input type="number" class="form-control font-mono" [(ngModel)]="b.fromIncome"></td>
-                <td><input type="number" class="form-control font-mono" [(ngModel)]="b.ratePct" step="1"></td>
-                <td style="text-align: center;"><button class="btn-delete-row" (click)="removeSurchargeBand(i)">✕</button></td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-container formulas-table-wrap" *ngIf="taxRegimeForm.surcharge?.length">
+            <table class="modern-table formulas-modern-table">
+              <thead>
+                <tr>
+                  <th style="width: 44px; text-align: center;">#</th>
+                  <th>Income Above (₹)</th>
+                  <th>Surcharge (%)</th>
+                  <th style="width: 50px; text-align: center;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let b of taxRegimeForm.surcharge; let i = index" class="formula-row">
+                  <td style="text-align: center;">
+                    <span class="row-order-pill">{{ i + 1 }}</span>
+                  </td>
+                  <td>
+                    <div class="input-with-currency">
+                      <span class="currency-prefix">₹</span>
+                      <input 
+                        type="number" 
+                        id="regime-field-surcharge_{{i}}_income"
+                        class="form-control input-padded-currency font-mono" 
+                        [class.input-error]="taxRegimeErrors()['surcharge_' + i + '_income']"
+                        [(ngModel)]="b.fromIncome"
+                        (input)="clearRegimeError('surcharge_' + i + '_income')"
+                      />
+                    </div>
+                    <span class="field-error-text" *ngIf="taxRegimeErrors()['surcharge_' + i + '_income']">
+                      ⚠️ {{ taxRegimeErrors()['surcharge_' + i + '_income'] }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="input-with-percent">
+                      <input 
+                        type="number" 
+                        id="regime-field-surcharge_{{i}}_rate"
+                        class="form-control input-padded-percent font-mono" 
+                        [class.input-error]="taxRegimeErrors()['surcharge_' + i + '_rate']"
+                        [(ngModel)]="b.ratePct" 
+                        (input)="clearRegimeError('surcharge_' + i + '_rate')"
+                        step="1"
+                      />
+                      <span class="percent-suffix">%</span>
+                    </div>
+                    <span class="field-error-text" *ngIf="taxRegimeErrors()['surcharge_' + i + '_rate']">
+                      ⚠️ {{ taxRegimeErrors()['surcharge_' + i + '_rate'] }}
+                    </span>
+                  </td>
+                  <td style="text-align: center;">
+                    <button class="btn-delete-row-modern" (click)="removeSurchargeBand(i)" title="Remove surcharge band">
+                      <svg lucideTrash2 [size]="14"></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Deduction sections (old regime) -->
         <div class="modal-inner-section" *ngIf="taxRegimeForm.sections?.length">
-          <div class="table-toolbar" style="padding: 0; margin-bottom: 8px;">
-            <div>
-              <h4 class="subhead-title">Deductions employees can declare ({{ taxRegimeForm.sections.length }})</h4>
-              <p class="subhead-desc">Yearly limit, whether proof must be uploaded, and on/off per section</p>
+          <div class="table-toolbar formulas-toolbar">
+            <div class="formulas-title-wrap">
+              <h4 class="subhead-title">
+                Deductions Employees Can Declare
+                <span class="count-badge-accent">{{ taxRegimeForm.sections.length }}</span>
+              </h4>
+              <p class="subhead-desc">Yearly limit, proof upload requirement, and section active status</p>
             </div>
           </div>
-          <table class="modern-table">
-            <thead><tr><th>Section</th><th>Yearly limit (₹, blank = actual)</th><th>Proof needed</th><th>Allowed</th></tr></thead>
-            <tbody>
-              <tr *ngFor="let sec of taxRegimeForm.sections" [class.row-muted]="!sec.isActive">
-                <td><code class="sec-code-tag">{{ sec.code }}</code> {{ sec.name }}</td>
-                <td><input type="number" class="form-control font-mono" [(ngModel)]="sec.maxLimit" placeholder="Actual"></td>
-                <td style="text-align: center;"><input type="checkbox" [(ngModel)]="sec.proofRequired" [disabled]="!sec.isActive"></td>
-                <td style="text-align: center;"><input type="checkbox" [(ngModel)]="sec.isActive"></td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-container formulas-table-wrap">
+            <table class="modern-table formulas-modern-table">
+              <thead>
+                <tr>
+                  <th style="min-width: 240px;">Section</th>
+                  <th style="min-width: 200px;">Yearly Limit (₹, blank = actual)</th>
+                  <th style="width: 110px; text-align: center;">Proof Needed</th>
+                  <th style="width: 90px; text-align: center;">Allowed</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let sec of taxRegimeForm.sections" [class.row-muted]="!sec.isActive" class="formula-row">
+                  <td><code class="sec-code-tag">{{ sec.code }}</code> <span class="font-medium" style="margin-left: 6px;">{{ sec.name }}</span></td>
+                  <td>
+                    <div class="input-with-currency">
+                      <span class="currency-prefix">₹</span>
+                      <input type="number" class="form-control input-padded-currency font-mono" [(ngModel)]="sec.maxLimit" placeholder="Actual / Computed">
+                    </div>
+                  </td>
+                  <td style="text-align: center;">
+                    <input type="checkbox" [(ngModel)]="sec.proofRequired" [disabled]="!sec.isActive" class="custom-checkbox">
+                  </td>
+                  <td style="text-align: center;">
+                    <input type="checkbox" [(ngModel)]="sec.isActive" class="custom-checkbox">
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       <div class="modal-footer">
         <button class="btn-outline-modern" (click)="closeTaxRegimeModal()">Cancel</button>
-        <button class="btn-primary" (click)="saveTaxRegime()">Save Tax Regime & Slabs</button>
+        <button class="btn-primary btn-save-modal" (click)="saveTaxRegime()">
+          <svg lucideCheck [size]="16"></svg>
+          <span>Save Tax Regime & Slabs</span>
+        </button>
       </div>
     </div>
   </div>

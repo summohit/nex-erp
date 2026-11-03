@@ -1,53 +1,136 @@
 <div class="pp-page" [class.pp-embedded]="embedded">
   <header class="pp-header">
-    <div>
-      <button type="button" class="pp-back" *ngIf="!embedded" (click)="backToPayroll()">← Payroll</button>
-      <h1 *ngIf="!embedded">Pay Profiles</h1>
-      <h2 class="pp-tab-title" *ngIf="embedded">Pay Profiles</h2>
-      <p>Each employee's salary group, CTC and statutory details. Every change is a new version — nothing is overwritten.</p>
+    <div class="pp-header-intro">
+      <button type="button" class="pp-back-link" *ngIf="!embedded" (click)="backToPayroll()">
+        <svg lucideArrowLeft [size]="14"></svg>
+        <span>Back to Payroll</span>
+      </button>
+      <div class="pp-title-row">
+        <h1 *ngIf="!embedded" class="pp-main-title">Pay Profiles</h1>
+        <h2 class="pp-tab-title" *ngIf="embedded">Pay Profiles</h2>
+        <span class="pp-tag-badge">Phase 2 Engine</span>
+      </div>
+      <p class="pp-header-desc">
+        Each employee's salary group, CTC and statutory details. Every change is a new version — nothing is overwritten.
+      </p>
     </div>
     <div class="pp-header-actions" *ngIf="canEdit()">
-      <button type="button" class="pp-btn" (click)="startReading()" [disabled]="reading()?.running"
-        title="Read PAN, UAN and bank numbers from uploaded documents — you verify each one">
-        {{ reading()?.running ? 'Reading documents…' : 'Read documents with AI' }}
-      </button>
+      <a class="pp-btn" routerLink="/payroll/dry-run" title="November payslips on the new engine — nothing is saved">Dry run payslips</a>
+      <a class="pp-btn" routerLink="/payroll/compare" title="Old monthly run vs the new engine, per employee — nothing is saved">
+        <span>Compare old vs new payroll</span>
+      </a>
       <button type="button" class="pp-btn pp-btn-primary" (click)="openImport()">
-        Import from current salaries
+        <svg lucideUpload [size]="15"></svg>
+        <span>Import from current salaries</span>
       </button>
     </div>
   </header>
 
-  <div class="pp-reading" *ngIf="reading() as rd">
-    <ng-container *ngIf="rd.running">
-      <div class="pp-reading-bar"><span [style.width.%]="rd.total ? (rd.done / rd.total) * 100 : 0"></span></div>
-      <span>Reading documents: {{ rd.done }} of {{ rd.total }} · {{ rd.suggested }} values found so far</span>
-    </ng-container>
-    <span *ngIf="!rd.running && rd.finishedAt && rd.total">
-      Last read {{ rd.finishedAt | date: 'd MMM, HH:mm' }}: {{ rd.suggested }} values to check, {{ rd.unreadable }} unreadable{{ rd.failed ? ', ' + rd.failed + ' failed' : '' }}.
-      <span *ngIf="rd.lastError" class="pp-muted">({{ rd.lastError }})</span>
-    </span>
+  <!-- AI Reading Progress Banner -->
+  <div class="pp-reading-banner" *ngIf="reading() as rd">
+    <div class="pp-reading-content" *ngIf="rd.running">
+      <div class="pp-reading-info">
+        <div class="pp-reading-spinner">
+          <svg lucideRefreshCw class="animate-spin" [size]="16"></svg>
+        </div>
+        <div>
+          <div class="pp-reading-title">AI Document Reader in Progress</div>
+          <div class="pp-reading-sub">Processing employee documents with Gemini · {{ rd.done }} of {{ rd.total }} completed · {{ rd.suggested }} values extracted</div>
+        </div>
+      </div>
+      <div class="pp-reading-progress-wrap">
+        <div class="pp-reading-bar">
+          <span [style.width.%]="rd.total ? (rd.done / rd.total) * 100 : 0"></span>
+        </div>
+        <span class="pp-reading-pct">{{ rd.total ? ((rd.done * 100 / rd.total) | number:'1.0-0') : 0 }}%</span>
+      </div>
+    </div>
+    <div class="pp-reading-summary" *ngIf="!rd.running && rd.finishedAt && rd.total">
+      <div class="pp-summary-left">
+        <svg lucideSparkles [size]="15"></svg>
+        <span>
+          Last AI scan ({{ rd.finishedAt | date: 'd MMM, HH:mm' }}): 
+          <strong>{{ rd.suggested }} values</strong> found for review, {{ rd.unreadable }} unreadable{{ rd.failed ? ', ' + rd.failed + ' failed' : '' }}.
+        </span>
+      </div>
+      <span *ngIf="rd.lastError" class="pp-error-tag">{{ rd.lastError }}</span>
+    </div>
   </div>
 
-  <div class="pp-stats">
-    <button type="button" class="pp-stat" [class.on]="filter() === 'ALL'" (click)="filter.set('ALL')">
-      <span>Employees</span><strong>{{ counts().all }}</strong><small>{{ counts().withProfile }} with a profile</small>
+  <!-- KPI Filter Cards -->
+  <div class="pp-stats-grid">
+    <!-- Stat 1 -->
+    <button type="button" class="pp-stat-card" [class.on]="filter() === 'ALL'" (click)="filter.set('ALL')">
+      <div class="pp-stat-top">
+        <span class="pp-stat-label">Employees</span>
+        <div class="pp-stat-icon icon-blue">
+          <svg lucideUsers [size]="18"></svg>
+        </div>
+      </div>
+      <div class="pp-stat-val">{{ counts().all }}</div>
+      <div class="pp-stat-sub">
+        <span class="sub-dot ok"></span>
+        <span>{{ counts().withProfile }} with a profile</span>
+      </div>
     </button>
-    <button type="button" class="pp-stat warn" [class.on]="filter() === 'NO_PROFILE'" (click)="filter.set('NO_PROFILE')">
-      <span>No pay profile</span><strong>{{ counts().noProfile }}</strong><small>not ready for the new payroll</small>
+
+    <!-- Stat 2 -->
+    <button type="button" class="pp-stat-card warn" [class.on]="filter() === 'NO_PROFILE'" (click)="filter.set('NO_PROFILE')">
+      <div class="pp-stat-top">
+        <span class="pp-stat-label">No pay profile</span>
+        <div class="pp-stat-icon icon-amber">
+          <svg lucideAlertCircle [size]="18"></svg>
+        </div>
+      </div>
+      <div class="pp-stat-val text-amber">{{ counts().noProfile }}</div>
+      <div class="pp-stat-sub">
+        <span class="sub-dot warn"></span>
+        <span>not ready for the new payroll</span>
+      </div>
     </button>
-    <button type="button" class="pp-stat warn" [class.on]="filter() === 'MISSING_DETAILS'" (click)="filter.set('MISSING_DETAILS')">
-      <span>Details to verify</span><strong>{{ counts().missingDetails }}</strong><small>PAN, UAN or bank not verified</small>
+
+    <!-- Stat 3 -->
+    <button type="button" class="pp-stat-card warn" [class.on]="filter() === 'MISSING_DETAILS'" (click)="filter.set('MISSING_DETAILS')">
+      <div class="pp-stat-top">
+        <span class="pp-stat-label">Missing details</span>
+        <div class="pp-stat-icon icon-rose">
+          <svg lucideFileCheck [size]="18"></svg>
+        </div>
+      </div>
+      <div class="pp-stat-val text-rose">{{ counts().missingDetails }}</div>
+      <div class="pp-stat-sub">
+        <span class="sub-dot rose"></span>
+        <span>bank, PAN or UAN unverified</span>
+      </div>
     </button>
-    <button type="button" class="pp-stat" [class.on]="filter() === 'UPCOMING'" (click)="filter.set('UPCOMING')">
-      <span>Upcoming changes</span><strong>{{ counts().upcoming }}</strong><small>a version that starts later</small>
+
+    <!-- Stat 4 -->
+    <button type="button" class="pp-stat-card" [class.on]="filter() === 'UPCOMING'" (click)="filter.set('UPCOMING')">
+      <div class="pp-stat-top">
+        <span class="pp-stat-label">Upcoming changes</span>
+        <div class="pp-stat-icon icon-indigo">
+          <svg lucideCalendarDays [size]="18"></svg>
+        </div>
+      </div>
+      <div class="pp-stat-val text-indigo">{{ counts().upcoming }}</div>
+      <div class="pp-stat-sub">
+        <span class="sub-dot info"></span>
+        <span>a version that starts later</span>
+      </div>
     </button>
   </div>
 
-  <div class="pp-card">
+  <!-- Main Table Card -->
+  <div class="pp-card pp-table-card">
     <div class="pp-toolbar">
-      <input class="pp-input pp-search" type="search" placeholder="Search name, department, designation or group…"
-        [ngModel]="search()" (ngModelChange)="search.set($event)">
-      <span class="pp-muted">{{ filtered().length }} shown</span>
+      <div class="pp-search-wrap">
+        <svg lucideSearch class="pp-search-icon" [size]="16"></svg>
+        <input class="pp-input pp-search-input" type="search" placeholder="Search name, department, designation or group…"
+          [ngModel]="search()" (ngModelChange)="search.set($event)">
+      </div>
+      <div class="pp-toolbar-meta">
+        <span class="pp-count-pill">{{ filtered().length }} shown</span>
+      </div>
     </div>
 
     <div class="pp-loading" *ngIf="loading()">
@@ -58,40 +141,83 @@
       <table class="pp-table">
         <thead>
           <tr>
-            <th>Employee</th>
-            <th>Salary group</th>
-            <th class="num">Annual CTC</th>
-            <th>From</th>
+            <th style="min-width: 250px;">Employee</th>
+            <th style="width: 160px;">Salary Group</th>
+            <th class="num" style="width: 170px;">Annual CTC</th>
+            <th style="width: 140px;">From</th>
             <th>Needs</th>
-            <th></th>
+            <th style="width: 44px;"></th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let r of filtered()" (click)="open(r)" class="pp-row">
             <td>
-              <strong>{{ r.name }}</strong>
-              <span class="pp-sub">{{ r.designation || '—' }}{{ r.department ? ' · ' + r.department : '' }}
-                <em class="pp-tag" *ngIf="r.payType === 'CONSULTANT'">Consultant</em></span>
+              <div class="pp-emp-cell">
+                <div class="pp-avatar" [style.background]="getAvatarBg(r.name)">
+                  <img *ngIf="r.avatarUrl" class="pp-avatar-img" [src]="r.avatarUrl" [alt]="r.name" (error)="r.avatarUrl = null">
+                  <ng-container *ngIf="!r.avatarUrl">{{ getInitials(r.name) }}</ng-container>
+                </div>
+                <div class="pp-emp-info">
+                  <div class="pp-emp-name">{{ r.name }}</div>
+                  <div class="pp-emp-sub">
+                    <span>{{ r.designation || 'Staff' }}</span>
+                    <span class="dot-sep" *ngIf="r.department">·</span>
+                    <span *ngIf="r.department">{{ r.department }}</span>
+                    <span class="pp-tag" *ngIf="r.payType === 'CONSULTANT'">Consultant</span>
+                  </div>
+                  <a class="pp-profile-link" [routerLink]="['/employees', r.employeeId, 'profile']" (click)="$event.stopPropagation()">
+                    {{ r.employeeCode ? r.employeeCode + ' · ' : '' }}View profile ↗
+                  </a>
+                </div>
+              </div>
             </td>
             <td>
-              <code *ngIf="r.current">{{ r.current.salaryGroupCode }}</code>
-              <span class="pp-muted" *ngIf="!r.current">—</span>
+              <span class="pp-group-code" *ngIf="r.current">{{ r.current.salaryGroupCode }}</span>
+              <span class="pp-muted-dash" *ngIf="!r.current">—</span>
             </td>
             <td class="num">
-              {{ r.current ? money(r.current.annualCtc) : '—' }}
-              <span class="pp-sub pp-upcoming" *ngIf="r.upcoming">→ {{ money(r.upcoming.annualCtc) }} from {{ r.upcoming.effectiveFrom | date: 'd MMM y' }}</span>
+              <span class="pp-ctc-text" *ngIf="r.current">{{ money(r.current.annualCtc) }}</span>
+              <span class="pp-muted-dash" *ngIf="!r.current">—</span>
+              <span class="pp-upcoming-tag" *ngIf="r.upcoming">
+                <svg lucideArrowRight [size]="10"></svg>
+                {{ money(r.upcoming.annualCtc) }} from {{ r.upcoming.effectiveFrom | date: 'd MMM y' }}
+              </span>
             </td>
-            <td>{{ r.current ? (r.current.effectiveFrom | date: 'd MMM y') : '—' }}</td>
             <td>
-              <span class="pp-chip red" *ngIf="!r.current">Pay profile</span>
-              <ng-container *ngFor="let k of ['PAN', 'UAN', 'BANK']">
-                <span class="pp-state" *ngIf="$any(r.details)[k] as st" [attr.data-s]="st">{{ stateLabel(k, st) }}</span>
-              </ng-container>
+              <span class="pp-date-text" *ngIf="r.current">{{ r.current.effectiveFrom | date: 'd MMM y' }}</span>
+              <span class="pp-muted-dash" *ngIf="!r.current">—</span>
             </td>
-            <td class="pp-go">›</td>
+            <td>
+              <div class="pp-chips-wrap">
+                <span class="pp-chip-status danger" *ngIf="!r.current">
+                  <svg lucideAlertCircle [size]="11"></svg>
+                  <span>Pay profile</span>
+                </span>
+                <ng-container *ngFor="let k of ['PAN', 'UAN', 'BANK']">
+                  <span class="pp-chip-status" *ngIf="$any(r.details)[k] as st" [attr.data-s]="st">
+                    <svg lucideCheckCircle2 [size]="11" *ngIf="st === 'VERIFIED'"></svg>
+                    <svg lucideSparkles [size]="11" *ngIf="st === 'SUGGESTED'"></svg>
+                    <svg lucideFileCheck [size]="11" *ngIf="st === 'UNVERIFIED' || st === 'DOCUMENT'"></svg>
+                    <svg lucideAlertCircle [size]="11" *ngIf="st === 'MISSING'"></svg>
+                    <span>{{ stateLabel(k, st) }}</span>
+                  </span>
+                </ng-container>
+              </div>
+            </td>
+            <td class="pp-go">
+              <div class="pp-row-arrow">
+                <svg lucideChevronRight [size]="16"></svg>
+              </div>
+            </td>
           </tr>
           <tr *ngIf="!filtered().length">
-            <td colspan="6" class="pp-empty">Nobody matches this filter.</td>
+            <td colspan="6" class="pp-empty-cell">
+              <div class="pp-empty-state">
+                <svg lucideUsers [size]="32"></svg>
+                <div class="empty-title">No employees found</div>
+                <div class="empty-desc">No employee matches the current filter or search criteria.</div>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -102,107 +228,248 @@
 <!-- Import review -->
 <div class="pp-backdrop" *ngIf="importOpen()" (click)="closeImport()">
   <div class="pp-modal" (click)="$event.stopPropagation()">
+    <!-- Header -->
     <div class="pp-modal-head">
-      <div>
-        <h2>Import from current salaries</h2>
-        <p>For each employee without a profile: the salary group they'd go on and the CTC that gives the gross they're paid today.
-          <strong>Nothing is saved until you tick rows and press Save.</strong> Salaries paid today don't change.</p>
+      <div class="pp-modal-head-main">
+        <div class="pp-modal-icon-badge">
+          <svg lucideUpload [size]="20"></svg>
+        </div>
+        <div>
+          <div class="pp-modal-title-row">
+            <h2>Import from Current Salaries</h2>
+            <span class="pp-count-chip" *ngIf="preview() as p">{{ p.summary.total }} Employees</span>
+          </div>
+          <p>
+            Assign salary groups and calculate annual CTC based on existing monthly payouts.
+            <strong>Nothing is saved until you tick rows and press Save.</strong> Salaries paid today remain unchanged.
+          </p>
+        </div>
       </div>
-      <button type="button" class="pp-x" (click)="closeImport()">✕</button>
+      <button type="button" class="pp-modal-close" (click)="closeImport()" title="Close dialog">
+        <svg lucideX [size]="18"></svg>
+      </button>
     </div>
 
+    <!-- Shimmer Loader -->
     <div class="pp-loading" *ngIf="importLoading()">
-      <p class="pp-muted">Working out each employee's breakup…</p>
-      <div class="pp-skel" *ngFor="let i of [1,2,3,4]"></div>
+      <div class="pp-loader-status">
+        <svg lucideRefreshCw [size]="18" class="animate-spin"></svg>
+        <span>Calculating salary breakups and evaluating group rules…</span>
+      </div>
+      <div class="pp-skel" *ngFor="let i of [1,2,3,4,5]"></div>
     </div>
 
+    <!-- Content -->
     <ng-container *ngIf="!importLoading() && preview() as p">
-      <div class="pp-import-stats">
-        <button type="button" class="pp-pill" [class.on]="importStatusFilter() === 'ALL'" (click)="importStatusFilter.set('ALL')">All {{ p.summary.total }}</button>
-        <button type="button" class="pp-pill ok" [class.on]="importStatusFilter() === 'MATCH'" (click)="importStatusFilter.set('MATCH')">Matches {{ p.summary.match }}</button>
-        <button type="button" class="pp-pill warn" [class.on]="importStatusFilter() === 'REVIEW'" (click)="importStatusFilter.set('REVIEW')">Review {{ p.summary.review }}</button>
-        <button type="button" class="pp-pill red" [class.on]="importStatusFilter() === 'NO_SALARY'" (click)="importStatusFilter.set('NO_SALARY')">No salary / group {{ p.summary.noSalary + p.summary.noGroup }}</button>
-        <span class="pp-muted" *ngIf="p.summary.alreadyHaveProfile">{{ p.summary.alreadyHaveProfile }} already have a profile and aren't listed.</span>
+      <!-- Filter Bar -->
+      <div class="pp-import-toolbar">
+        <div class="pp-filter-tabs">
+          <button type="button" class="pp-tab-btn" [class.active]="importStatusFilter() === 'ALL'" (click)="importStatusFilter.set('ALL')">
+            <svg lucideUsers [size]="14"></svg>
+            <span>All</span>
+            <span class="tab-chip">{{ p.summary.total }}</span>
+          </button>
+          <button type="button" class="pp-tab-btn ok" [class.active]="importStatusFilter() === 'MATCH'" (click)="importStatusFilter.set('MATCH')">
+            <svg lucideCheckCircle2 [size]="14"></svg>
+            <span>Matches</span>
+            <span class="tab-chip ok">{{ p.summary.match }}</span>
+          </button>
+          <button type="button" class="pp-tab-btn warn" [class.active]="importStatusFilter() === 'REVIEW'" (click)="importStatusFilter.set('REVIEW')">
+            <svg lucideAlertCircle [size]="14"></svg>
+            <span>Review Needed</span>
+            <span class="tab-chip warn">{{ p.summary.review }}</span>
+          </button>
+          <button type="button" class="pp-tab-btn red" [class.active]="importStatusFilter() === 'NO_SALARY'" (click)="importStatusFilter.set('NO_SALARY')">
+            <svg lucideAlertTriangle [size]="14"></svg>
+            <span>No Salary / Group</span>
+            <span class="tab-chip red">{{ p.summary.noSalary + p.summary.noGroup }}</span>
+          </button>
+        </div>
+
+        <span class="pp-configured-notice" *ngIf="p.summary.alreadyHaveProfile">
+          <svg lucideShieldCheck [size]="14"></svg>
+          <span>{{ p.summary.alreadyHaveProfile }} already have profiles</span>
+        </span>
       </div>
 
-      <div class="pp-help">
-        <strong>Review</strong> means gross is the same but some components come out different (for example Basic is 50% of CTC in the
-        salary group but 50% of gross today), or there's a warning. Open a row to see why, change the group or CTC if needed, then tick it.
+      <!-- Informative Banner -->
+      <div class="pp-help-banner">
+        <div class="pp-help-icon">
+          <svg lucideInfo [size]="18"></svg>
+        </div>
+        <div class="pp-help-content">
+          <strong>Review Needed</strong> indicates the monthly gross matches current payout, but component allocations (e.g. Basic % or statutory limits) differ under the target group formula. Click <strong>Why?</strong> to inspect variance, adjust group/CTC if needed, then check the row to import.
+        </div>
       </div>
 
+      <!-- Table Container -->
       <div class="pp-table-wrap pp-import-table">
         <table class="pp-table">
           <thead>
             <tr>
-              <th class="chk"><input type="checkbox" (change)="toggleAll($any($event.target).checked)" title="Tick / untick everyone shown"></th>
-              <th>Employee</th>
-              <th>Status</th>
-              <th class="num">Gross today</th>
-              <th>Salary group</th>
-              <th class="num">Annual CTC</th>
-              <th class="num">New gross</th>
-              <th></th>
+              <th class="chk">
+                <input type="checkbox" class="pp-custom-chk" (change)="toggleAll($any($event.target).checked)" title="Select / deselect all visible rows">
+              </th>
+              <th>EMPLOYEE</th>
+              <th>STATUS</th>
+              <th class="num">GROSS TODAY</th>
+              <th>SALARY GROUP</th>
+              <th class="num">ANNUAL CTC</th>
+              <th class="num">NEW GROSS</th>
+              <th class="text-center">ANALYSIS</th>
             </tr>
           </thead>
           <tbody>
             <ng-container *ngFor="let d of visibleDrafts()">
-              <tr [class.pp-selected]="d.selected">
-                <td class="chk"><input type="checkbox" [(ngModel)]="d.selected" (ngModelChange)="touch()" [disabled]="!canSelect(d)"></td>
-                <td><strong>{{ d.name }}</strong><span class="pp-sub">{{ d.employmentType || '—' }}{{ d.payType === 'CONSULTANT' ? ' · Consultant' : '' }}</span></td>
-                <td><span class="pp-status" [attr.data-s]="d.status">{{ statusLabel(d.status) }}</span></td>
-                <td class="num">{{ money(d.currentGrossMonthly) }}</td>
-                <td>
-                  <select class="pp-input pp-sm" [(ngModel)]="d.salaryGroupCode" (ngModelChange)="touch()">
-                    <option [ngValue]="null">— pick —</option>
-                    <option *ngFor="let g of p.groups" [ngValue]="g.code">{{ g.name }} ({{ g.payeeType | titlecase }})</option>
-                  </select>
+              <tr [class.pp-selected]="d.selected" [class.pp-row-open]="d.open">
+                <td class="chk">
+                  <input type="checkbox" class="pp-custom-chk" [(ngModel)]="d.selected" (ngModelChange)="touch()" [disabled]="!canSelect(d)">
                 </td>
-                <td class="num"><input class="pp-input pp-sm pp-num" type="number" min="0" step="1000" [(ngModel)]="d.annualCtc" (ngModelChange)="touch()"></td>
-                <td class="num">{{ money(d.proposedGrossMonthly) }}</td>
                 <td>
-                  <button type="button" class="pp-link" *ngIf="d.differences?.length || d.warnings?.length" (click)="d.open = !d.open; touch()">
-                    {{ d.open ? 'Hide' : 'Why?' }}
+                  <div class="pp-emp-cell">
+                    <div class="pp-avatar pp-avatar-sm" [style.background]="getAvatarBg(d.name)">
+                      <img *ngIf="d.avatarUrl" class="pp-avatar-img" [src]="d.avatarUrl" [alt]="d.name" (error)="d.avatarUrl = null">
+                      <ng-container *ngIf="!d.avatarUrl">{{ getInitials(d.name) }}</ng-container>
+                    </div>
+                    <div class="pp-emp-info">
+                      <div class="pp-emp-name">{{ d.name }}</div>
+                      <div class="pp-emp-sub">
+                        <span class="pp-sub-badge" *ngIf="d.employmentType && d.employmentType !== '—'">{{ d.employmentType }}</span>
+                        <span class="pp-sub-badge consultant" *ngIf="d.payType === 'CONSULTANT'">Consultant</span>
+                        <span class="pp-sub-text" *ngIf="(!d.employmentType || d.employmentType === '—') && d.payType !== 'CONSULTANT'">Full Time</span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <span class="pp-status-pill" [attr.data-s]="d.status">
+                    <span class="status-dot"></span>
+                    <span>{{ statusLabel(d.status) }}</span>
+                  </span>
+                </td>
+                <td class="num">
+                  <span class="pp-gross-today-val">{{ money(d.currentGrossMonthly) }}</span>
+                </td>
+                <td>
+                  <div class="pp-select-wrap">
+                    <select class="pp-table-select" [(ngModel)]="d.salaryGroupCode" (ngModelChange)="touch()">
+                      <option [ngValue]="null">— Select Salary Group —</option>
+                      <option *ngFor="let g of p.groups" [ngValue]="g.code">{{ g.name }} ({{ g.payeeType | titlecase }})</option>
+                    </select>
+                    <svg lucideChevronDown [size]="14" class="pp-select-arrow"></svg>
+                  </div>
+                </td>
+                <td class="num">
+                  <div class="pp-ctc-input-wrap">
+                    <span class="pp-ctc-prefix">₹</span>
+                    <input class="pp-table-input" type="number" min="0" step="1000" [(ngModel)]="d.annualCtc" (ngModelChange)="touch()" placeholder="0">
+                  </div>
+                </td>
+                <td class="num">
+                  <span class="pp-new-gross-val" [class.matched]="d.proposedGrossMonthly === d.currentGrossMonthly && d.proposedGrossMonthly">
+                    {{ money(d.proposedGrossMonthly) }}
+                  </span>
+                </td>
+                <td class="text-center">
+                  <button type="button" class="btn-why-pill" [class.active]="d.open" *ngIf="d.differences?.length || d.warnings?.length" (click)="d.open = !d.open; touch()">
+                    <span>{{ d.open ? 'Hide' : 'Why?' }}</span>
+                    <svg lucideChevronUp [size]="13" *ngIf="d.open"></svg>
+                    <svg lucideChevronDown [size]="13" *ngIf="!d.open"></svg>
                   </button>
+                  <span class="pp-muted-dash" *ngIf="!d.differences?.length && !d.warnings?.length">—</span>
                 </td>
               </tr>
-              <tr *ngIf="d.open" class="pp-detail">
-                <td></td>
-                <td colspan="7">
-                  <ul class="pp-warn-list" *ngIf="d.warnings?.length">
-                    <li *ngFor="let w of d.warnings">⚠ {{ w }}</li>
-                  </ul>
-                  <table class="pp-diff" *ngIf="d.differences?.length">
-                    <thead><tr><th>Component</th><th class="num">Today</th><th class="num">Salary group</th><th class="num">Change</th></tr></thead>
-                    <tbody>
-                      <tr *ngFor="let x of d.differences">
-                        <td><code>{{ x.code }}</code></td>
-                        <td class="num">{{ money(x.current) }}</td>
-                        <td class="num">{{ money(x.proposed) }}</td>
-                        <td class="num" [class.up]="x.proposed > x.current" [class.down]="x.proposed < x.current">
-                          {{ x.proposed > x.current ? '+' : '' }}{{ money(x.proposed - x.current) }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  <p class="pp-muted pp-note">Changing the group or CTC here only affects what gets saved; re-open the import to recalculate the breakup.</p>
+
+              <!-- Detailed Discrepancy Card -->
+              <tr *ngIf="d.open" class="pp-expanded-row">
+                <td colspan="8">
+                  <div class="pp-discrepancy-card">
+                    <div class="pp-disc-head">
+                      <div class="pp-disc-title">
+                        <svg lucideAlertCircle [size]="15"></svg>
+                        <span>Breakdown & Variance Analysis</span>
+                      </div>
+                      <span class="pp-disc-emp-name">{{ d.name }}</span>
+                    </div>
+
+                    <!-- Warnings -->
+                    <div class="pp-disc-warnings" *ngIf="d.warnings?.length">
+                      <div class="pp-warn-item" *ngFor="let w of d.warnings">
+                        <svg lucideAlertTriangle [size]="14"></svg>
+                        <span>{{ w }}</span>
+                      </div>
+                    </div>
+
+                    <!-- Diff Table -->
+                    <div class="pp-diff-table-container" *ngIf="d.differences?.length">
+                      <table class="pp-diff-table">
+                        <thead>
+                          <tr>
+                            <th>COMPONENT</th>
+                            <th class="num">TODAY'S PAYOUT</th>
+                            <th class="num">NEW GROUP FORMULA</th>
+                            <th class="num">VARIANCE / DELTA</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr *ngFor="let x of d.differences">
+                            <td>
+                              <span class="pp-diff-code">{{ x.code }}</span>
+                            </td>
+                            <td class="num">{{ money(x.current) }}</td>
+                            <td class="num font-semibold">{{ money(x.proposed) }}</td>
+                            <td class="num">
+                              <span class="diff-chip" [class.up]="x.proposed > x.current" [class.down]="x.proposed < x.current" [class.same]="x.proposed === x.current">
+                                {{ x.proposed > x.current ? '+' : '' }}{{ money(x.proposed - x.current) }}
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div class="pp-disc-footer-note">
+                      <svg lucideInfo [size]="13"></svg>
+                      <span>Changing the group or CTC here updates the target version-1 pay profile. Historical payroll in previous cycles is never overwritten.</span>
+                    </div>
+                  </div>
                 </td>
               </tr>
             </ng-container>
-            <tr *ngIf="!visibleDrafts().length"><td colspan="8" class="pp-empty">Nobody in this group.</td></tr>
+
+            <tr *ngIf="!visibleDrafts().length">
+              <td colspan="8" class="pp-empty-cell">
+                <div class="pp-empty-state">
+                  <svg lucideUsers [size]="28"></svg>
+                  <div class="empty-title">No employees found</div>
+                  <div class="empty-desc">No employees match the selected status category.</div>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
 
+      <!-- Modal Footer -->
       <div class="pp-modal-foot">
-        <label class="pp-field">
-          <span>Profiles start from</span>
-          <input class="pp-input" type="date" [(ngModel)]="importEffectiveFrom">
-        </label>
+        <div class="pp-start-date-group">
+          <label class="pp-start-date-label">
+            <svg lucideCalendarDays [size]="15"></svg>
+            <span>Profiles start from:</span>
+          </label>
+          <input class="pp-date-input" type="date" [(ngModel)]="importEffectiveFrom">
+        </div>
+
         <div class="pp-foot-actions">
-          <span class="pp-muted">{{ selectedCount() }} ticked</span>
-          <button type="button" class="pp-btn" (click)="closeImport()">Cancel</button>
-          <button type="button" class="pp-btn pp-btn-primary" (click)="saveImport()" [disabled]="importSaving() || !selectedCount()">
-            {{ importSaving() ? 'Saving…' : 'Save ' + selectedCount() + ' profile' + (selectedCount() === 1 ? '' : 's') }}
+          <div class="pp-selected-pill" [class.has-selection]="selectedCount() > 0">
+            <svg lucideCheck [size]="13"></svg>
+            <span><strong>{{ selectedCount() }}</strong> selected</span>
+          </div>
+          <button type="button" class="pp-btn-cancel" (click)="closeImport()">Cancel</button>
+          <button type="button" class="pp-btn-save" (click)="saveImport()" [disabled]="importSaving() || !selectedCount()">
+            <svg lucideUpload [size]="14" *ngIf="!importSaving()"></svg>
+            <svg lucideRefreshCw [size]="14" class="animate-spin" *ngIf="importSaving()"></svg>
+            <span>{{ importSaving() ? 'Saving Profiles…' : 'Save ' + selectedCount() + ' Pay Profile' + (selectedCount() === 1 ? '' : 's') }}</span>
           </button>
         </div>
       </div>

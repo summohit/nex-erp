@@ -3,6 +3,7 @@ import { AuthGuard } from '../../auth/auth.guard';
 import { PayProfilesService, assertPayrollEditor, assertPayrollViewer } from './pay-profiles.service';
 import { DocumentReaderService } from './document-reader.service';
 import { PayrollCompareService } from './payroll-compare.service';
+import { PayrollDryRunService } from './payroll-dry-run.service';
 
 /** Pay profiles (Payroll plan Phase 2). Finance and admins change them; HR can look. */
 @Controller('payroll/pay-profiles')
@@ -12,6 +13,7 @@ export class PayProfilesController {
     private readonly profiles: PayProfilesService,
     private readonly reader: DocumentReaderService,
     private readonly comparer: PayrollCompareService,
+    private readonly dryRun: PayrollDryRunService,
   ) {}
 
   @Get()
@@ -38,6 +40,14 @@ export class PayProfilesController {
   compare(@Req() req: any, @Query('month') month: string, @Query('year') year: string) {
     assertPayrollViewer(req.user.role);
     return this.comparer.compare(req.user.companyId, Number(month), Number(year));
+  }
+
+  /** Payslips for a month on the new engine, with loss of pay. Read-only — nothing is saved. */
+  @Get('dry-run')
+  runDry(@Req() req: any, @Query('month') month: string, @Query('year') year: string, @Query('fullMonth') fullMonth?: string, @Query('currentProfiles') currentProfiles?: string) {
+    assertPayrollViewer(req.user.role);
+    const on = (v?: string) => v === '1' || v === 'true';
+    return this.dryRun.run(req.user.companyId, Number(month), Number(year), on(fullMonth), on(currentProfiles));
   }
 
   /** Send uploaded PAN / UAN / bank documents to Gemini; results are suggestions only. */

@@ -14,11 +14,12 @@ import { PayProfilesService } from './pay-profiles/pay-profiles.service';
 import { PayProfilesController } from './pay-profiles/pay-profiles.controller';
 import { DocumentReaderService } from './pay-profiles/document-reader.service';
 import { PayrollCompareService } from './pay-profiles/payroll-compare.service';
+import { PayrollDryRunService } from './pay-profiles/payroll-dry-run.service';
 
 @Module({
   imports: [PrismaModule, ApprovalsModule, NotificationsModule],
   controllers: [PayrollController, PayrollSettingsController, PayrollMastersController, PayProfilesController],
-  providers: [PayrollService, PdfService, EmailService, PayrollSettingsService, PayrollMastersService, PayProfilesService, DocumentReaderService, PayrollCompareService],
+  providers: [PayrollService, PdfService, EmailService, PayrollSettingsService, PayrollMastersService, PayProfilesService, DocumentReaderService, PayrollCompareService, PayrollDryRunService],
   exports: [PayrollService, PdfService, EmailService, PayrollSettingsService, PayrollMastersService, PayProfilesService]
 })
 export class PayrollModule {}

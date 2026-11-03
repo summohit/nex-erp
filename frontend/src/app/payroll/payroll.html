@@ -349,17 +349,10 @@
 
         <!-- Action Strip -->
         <div class="preflight-actions-strip" *ngIf="previewIsAlarming()">
-          <button class="btn btn-override-lop" (click)="generatePayslips(true)">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-            Generate Without Loss of Pay (Override)
-          </button>
-          <button class="btn btn-ghost-generate" (click)="generatePayslips(false)">
+          <!-- Loss of pay always follows attendance and leave; the "without loss of pay" override was removed 3 Nov 2026. -->
+          <button class="btn btn-override-lop" (click)="generatePayslips(false)">
             Generate Standard (With LOP)
           </button>
-          <span class="actions-hint-text">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-            Override pays everyone as though present for all working days. Biometric & attendance logs remain untouched.
-          </span>
         </div>
       </div>
 

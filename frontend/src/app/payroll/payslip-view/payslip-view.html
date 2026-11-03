@@ -1,0 +1,76 @@
+<div class="drawer-overlay" (click)="closed.emit()">
+  <div class="drawer-content payslip-modal-content" (click)="$event.stopPropagation()">
+    <div class="drawer-header">
+      <div>
+        <h2>Payslip for {{ monthName(payslip.month) }} {{ payslip.year }}</h2>
+        <p class="edit-sub">
+          {{ payslip.employee.firstName }} {{ payslip.employee.lastName }} · {{ payslip.employee.designation?.name || 'Staff' }}
+          <span class="status-chip" [class.chip-preview]="statusLabel">{{ statusLabel || payslip.status }}</span>
+        </p>
+      </div>
+      <button class="btn-icon" (click)="closed.emit()">✕</button>
+    </div>
+    <div class="drawer-body printable-payslip">
+      <img [src]="logoUrl()" class="payslip-watermark" alt="Watermark">
+      <div class="company-brand mb-3">
+        <img [src]="logoUrl()" alt="Company Logo" style="height: 38px; max-width: 170px; object-fit: contain;">
+      </div>
+      <div class="employee-meta-grid mb-3">
+        <div class="meta-item"><span class="meta-label">Employee Name:</span> <span class="meta-val">{{ payslip.employee.firstName }} {{ payslip.employee.lastName }}</span></div>
+        <div class="meta-item"><span class="meta-label">Department:</span> <span class="meta-val">{{ payslip.employee.department?.name || 'General' }}</span></div>
+        <div class="meta-item"><span class="meta-label">Designation:</span> <span class="meta-val">{{ payslip.employee.designation?.name || 'N/A' }}</span></div>
+        <div class="meta-item"><span class="meta-label">Working Days:</span> <span class="meta-val">{{ payslip.workingDays }}</span></div>
+        <div class="meta-item"><span class="meta-label">Present Days:</span> <span class="meta-val">{{ payslip.presentDays }}</span></div>
+        <div class="meta-item"><span class="meta-label">Absent Days:</span> <span class="meta-val" [class.text-rose]="payslip.absentDays > 0">{{ payslip.absentDays }}</span></div>
+      </div>
+
+      <table class="payslip-table mb-3">
+        <thead>
+          <tr><th>Earnings</th><th>Amount (₹)</th><th>Deductions</th><th>Amount (₹)</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of payslip.items">
+            <ng-container *ngIf="item.type === 'EARNING'">
+              <td>{{ item.componentName }}</td><td>₹{{ money(item.amount) }}</td><td>-</td><td>-</td>
+            </ng-container>
+            <ng-container *ngIf="item.type === 'DEDUCTION'">
+              <td>-</td><td>-</td>
+              <td>
+                {{ cleanComponentName(item.componentName) }}
+                <span *ngIf="isStatutory(item.componentName)" class="badge-tag statutory-badge" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: #dbeafe; color: #595a5b; margin-left: 6px; display: inline-block;">Statutory</span>
+              </td>
+              <td>₹{{ money(item.amount) }}</td>
+            </ng-container>
+          </tr>
+          <tr *ngIf="payslip.lossOfPay > 0">
+            <td>-</td><td>-</td>
+            <td title="{{ payslip.absentDays }} unexcused absences">Loss of Pay (LOP) <span class="badge-tag" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px; background: #f3efff; color: #504f51; margin-left: 6px;">{{ payslip.absentDays }} Days</span></td>
+            <td>₹{{ money(payslip.lossOfPay) }}</td>
+          </tr>
+          <tr *ngIf="payslip.expenseAmount > 0">
+            <td>Expense Reimbursements</td><td>₹{{ money(payslip.expenseAmount) }}</td><td>-</td><td>-</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <th>Total Earnings</th><th>₹{{ money(payslip.totalEarnings + payslip.expenseAmount) }}</th>
+            <th>Total Deductions</th><th>₹{{ money(payslip.totalDeductions + payslip.lossOfPay) }}</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="payslip-sticky-footer">
+      <div class="net-pay-banner">
+        <div class="net-pay-left">
+          <span class="net-pay-title">Net Salary Payable (Take Home):</span>
+          <em class="net-in-words">{{ amountInWords(payslip.netPay) }}</em>
+        </div>
+        <h2 class="net-pay-val">₹{{ payslip.netPay.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</h2>
+      </div>
+      <div class="payslip-actions">
+        <ng-content></ng-content>
+      </div>
+    </div>
+  </div>
+</div>

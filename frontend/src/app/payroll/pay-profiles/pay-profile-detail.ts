@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -14,6 +14,28 @@ import {
   PayrollService,
   SalaryCalculationResult,
 } from '../../services/payroll.service';
+import {
+  LucideArrowLeft,
+  LucidePlus,
+  LucideSave,
+  LucideCheck,
+  LucideCheckCircle2,
+  LucideAlertCircle,
+  LucideFileText,
+  LucideBuilding,
+  LucideCreditCard,
+  LucideShieldCheck,
+  LucideReceipt,
+  LucideCalculator,
+  LucideCalendarDays,
+  LucideSparkles,
+  LucideCopy,
+  LucideEye,
+  LucideHistory,
+  LucideX,
+  LucideRefreshCw,
+  LucideChevronRight,
+} from '@lucide/angular';
 
 /**
  * One employee's pay profile (Payroll plan W9): today's breakup from the
@@ -22,7 +44,31 @@ import {
 @Component({
   selector: 'app-pay-profile-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    LucideArrowLeft,
+    LucidePlus,
+    LucideSave,
+    LucideCheck,
+    LucideCheckCircle2,
+    LucideAlertCircle,
+    LucideFileText,
+    LucideBuilding,
+    LucideCreditCard,
+    LucideShieldCheck,
+    LucideReceipt,
+    LucideCalculator,
+    LucideCalendarDays,
+    LucideSparkles,
+    LucideCopy,
+    LucideEye,
+    LucideHistory,
+    LucideX,
+    LucideRefreshCw,
+    LucideChevronRight,
+  ],
   templateUrl: './pay-profile-detail.html',
   styleUrls: ['./pay-profiles.css'],
 })
@@ -92,7 +138,7 @@ export class PayProfileDetailComponent implements OnInit {
   }
 
   stateLabel(s: DetailState) {
-    return ({ VERIFIED: '✓ Verified', UNVERIFIED: 'Entered, not verified', SUGGESTED: 'AI suggestion to check', DOCUMENT: 'Document only', MISSING: 'Missing' } as any)[s];
+    return ({ VERIFIED: '✓ Verified', UNVERIFIED: 'Entered, not verified', SUGGESTED: 'Suggested — check and verify', DOCUMENT: 'Document only', MISSING: 'Missing' } as any)[s];
   }
 
   fieldLabel(f: string) {
@@ -131,6 +177,9 @@ export class PayProfileDetailComponent implements OnInit {
   preview = signal<SalaryCalculationResult | null>(null);
   previewing = signal(false);
   saving = signal(false);
+  /** Field errors show after the first Save, then update as the form is fixed. */
+  submitted = signal(false);
+  serverError = signal<string | null>(null);
 
   /** Salary groups that fit the chosen worker type's "pays as". */
   groupChoices = computed(() => {
@@ -196,8 +245,69 @@ export class PayProfileDetailComponent implements OnInit {
     this.formWorkerType.set(this.form.workerType);
     this.formGroupCode.set(this.form.salaryGroupCode);
     this.preview.set(null);
+    this.submitted.set(false);
+    this.serverError.set(null);
     this.formOpen.set(true);
     this.runPreview();
+  }
+
+  closeForm() {
+    if (this.saving()) return;
+    this.formOpen.set(false);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    if (this.formOpen()) this.closeForm();
+  }
+
+  /** Every problem with the form, by field. Empty = OK to save. */
+  validate(): Record<string, string> {
+    const f = this.form;
+    const e: Record<string, string> = {};
+    if (!f) return e;
+    if (!f.salaryGroupCode) e['salaryGroupCode'] = 'Pick a salary group.';
+    else if (!this.groupChoices().some((g) => g.code === f.salaryGroupCode)) e['salaryGroupCode'] = "This group doesn't pay the chosen worker type.";
+    const ctc = Number(f.annualCtc);
+    if (f.annualCtc === null || f.annualCtc === undefined || f.annualCtc === '') e['annualCtc'] = 'Enter the annual CTC.';
+    else if (!Number.isFinite(ctc) || ctc <= 0) e['annualCtc'] = 'Annual CTC must be more than ₹0.';
+    else if (ctc < 12000) e['annualCtc'] = 'That is under ₹1,000 a month — enter the yearly amount, not monthly.';
+    else if (ctc > 50000000) e['annualCtc'] = 'More than ₹5 crore a year — check the amount.';
+    if (!f.effectiveFrom) e['effectiveFrom'] = 'Pick the date it takes effect from.';
+    else {
+      const d = new Date(f.effectiveFrom + 'T00:00:00');
+      const joinedOn = this.data()?.employee?.joiningDate;
+      const joined = joinedOn ? new Date(joinedOn) : null;
+      const latest = new Date(); latest.setFullYear(latest.getFullYear() + 1);
+      if (isNaN(d.getTime())) e['effectiveFrom'] = 'Not a valid date.';
+      else if (joined && d < new Date(joined.toISOString().slice(0, 10) + 'T00:00:00')) e['effectiveFrom'] = `Can't start before they joined (${joined.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}).`;
+      else if (d > latest) e['effectiveFrom'] = 'More than a year ahead — pick a nearer date.';
+      else if ((this.data()?.versions || []).some((v: any) => String(v.effectiveFrom).slice(0, 10) === f.effectiveFrom)) e['effectiveFrom'] = 'A version already starts on this date — pick another or revise from a later date.';
+    }
+    const monthly = ctc > 0 ? ctc / 12 : 0;
+    let overrideTotal = 0;
+    for (const [code, v] of Object.entries(f.overrides || {})) {
+      if (v === null || v === undefined || (v as any) === '') continue;
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < 0) e['override:' + code] = "Can't be negative.";
+      else overrideTotal += n;
+    }
+    if (monthly > 0 && overrideTotal > monthly) e['annualCtc'] = e['annualCtc'] || `Overrides add up to ${this.money(overrideTotal)}/month — more than the monthly CTC (${this.money(monthly)}).`;
+    if (this.cleanOverrides() && !String(f.reason || '').trim()) e['reason'] = 'Give a reason for the overrides.';
+    return e;
+  }
+
+  err(field: string): string | null {
+    return this.submitted() ? this.validate()[field] ?? null : null;
+  }
+
+  /** Not wrong, but worth a second look before saving. */
+  ctcWarning(): string | null {
+    const ctc = Number(this.form?.annualCtc);
+    const cur = this.current()?.annualCtc;
+    if (ctc > 10000000) return 'Over ₹1 crore a year — make sure this is the yearly CTC.';
+    if (cur && ctc > 0 && (ctc > cur * 2 || ctc < cur / 2)) return `Big change from the current ${this.money(cur)} — check it.`;
+    return null;
   }
 
   onWorkerTypeChange(v: string | null) {
@@ -241,11 +351,14 @@ export class PayProfileDetailComponent implements OnInit {
 
   saveVersion() {
     const f = this.form;
-    if (!f.salaryGroupCode) { this.toast.error('Pick a salary group'); return; }
-    if (!(Number(f.annualCtc) > 0)) { this.toast.error('Enter the annual CTC'); return; }
-    if (!f.effectiveFrom) { this.toast.error('Pick the date it takes effect from'); return; }
+    this.submitted.set(true);
+    this.serverError.set(null);
+    const problems = Object.values(this.validate());
+    if (problems.length) {
+      this.toast.error(problems.length === 1 ? problems[0] : `Fix the ${problems.length} highlighted fields`);
+      return;
+    }
     const overrides = this.cleanOverrides();
-    if (overrides && !f.reason.trim()) { this.toast.error('Give a reason for the overrides'); return; }
     this.saving.set(true);
     this.payroll.addPayProfileVersion(this.employeeId, {
       salaryGroupCode: f.salaryGroupCode,
@@ -263,7 +376,11 @@ export class PayProfileDetailComponent implements OnInit {
         this.toast.success(`Version ${r.profile.version} saved`);
         this.load();
       },
-      error: (e) => { this.saving.set(false); this.toast.error(e?.error?.message || 'Failed to save'); },
+      error: (e) => {
+        this.saving.set(false);
+        const m = e?.error?.message;
+        this.serverError.set(Array.isArray(m) ? m.join(' · ') : m || 'Could not save — try again.');
+      },
     });
   }
 
@@ -288,6 +405,39 @@ export class PayProfileDetailComponent implements OnInit {
 
   money(n: number | null | undefined) {
     return n == null ? '—' : '₹' + Math.round(n).toLocaleString('en-IN');
+  }
+
+  getSalaryGroupName(code: string | null | undefined): string {
+    if (!code) return '—';
+    const found = this.groups().find((g) => g.code === code);
+    return found?.name || code;
+  }
+
+  getInitials(name: string): string {
+    if (!name) return '??';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  getAvatarBg(name: string): string {
+    const colors = [
+      'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+      'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+      'linear-gradient(135deg, #ec4899, #be185d)',
+      'linear-gradient(135deg, #10b981, #047857)',
+      'linear-gradient(135deg, #f59e0b, #b45309)',
+      'linear-gradient(135deg, #06b6d4, #0e7490)',
+      'linear-gradient(135deg, #6366f1, #4338ca)',
+    ];
+    let hash = 0;
+    for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  getMonthlyEquivalent(annual: number | null | undefined): string {
+    if (!annual) return '—';
+    return '₹' + Math.round(Number(annual) / 12).toLocaleString('en-IN') + ' / mo';
   }
 
   private firstOfNextMonth() {

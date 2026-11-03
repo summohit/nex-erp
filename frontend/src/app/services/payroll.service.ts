@@ -452,6 +452,10 @@ export class PayrollService {
     return this.http.put<any>(`${this.apiUrl}/pay-profiles/${employeeId}/details`, data);
   }
 
+  dryRunPayroll(month: number, year: number, fullMonth: boolean, currentProfiles = false): Observable<PayrollDryRunResult> {
+    return this.http.get<PayrollDryRunResult>(`${this.apiUrl}/pay-profiles/dry-run?month=${month}&year=${year}&fullMonth=${fullMonth ? 1 : 0}&currentProfiles=${currentProfiles ? 1 : 0}`);
+  }
+
   comparePayroll(month: number, year: number): Observable<PayrollCompareResult> {
     return this.http.get<PayrollCompareResult>(`${this.apiUrl}/pay-profiles/compare?month=${month}&year=${year}`);
   }
@@ -669,6 +673,49 @@ export interface PayrollCompareRow {
   new: PayBreakdown | null;
   diffNet: number | null;
   reasons: string[];
+}
+
+export interface PayrollDryRunLine { code: string; name: string; full: number; paid: number; }
+
+export interface PayrollDryRunRow {
+  employeeId: number;
+  name: string;
+  avatarUrl: string | null;
+  employeeCode: string | null;
+  department: string | null;
+  designation: string | null;
+  status: 'OK' | 'CHECK' | 'BLOCKED';
+  salaryGroupCode?: string;
+  annualCtc?: number;
+  workingDays?: number;
+  presentDays?: number;
+  absences?: number;
+  earnings?: PayrollDryRunLine[];
+  grossFull?: number;
+  lossOfPay?: number;
+  grossPaid?: number;
+  deductions?: PayrollDryRunLine[];
+  totalDeductions?: number;
+  net?: number;
+  employerContributions?: number;
+  lopExempt?: boolean;
+  notes?: string[];
+  warnings: string[];
+}
+
+export interface PayrollDryRunResult {
+  month: number;
+  year: number;
+  financialYear: string;
+  regimeCode: 'NEW' | 'OLD';
+  fullMonth: boolean;
+  currentProfiles: boolean;
+  borrowedProfiles: number;
+  summary: {
+    employees: number; payslips: number; blocked: number; toCheck: number;
+    grossFull: number; lossOfPay: number; grossPaid: number; deductions: number; net: number; employerContributions: number;
+  };
+  rows: PayrollDryRunRow[];
 }
 
 export interface PayrollCompareResult {

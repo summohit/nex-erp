@@ -247,6 +247,13 @@ export const routes: Routes = [
         pathMatch: 'full'
       },
       {
+        // Phase 3: engine payslips for a month, nothing saved. Before 'payroll/:tab'.
+        path: 'payroll/dry-run',
+        canActivate: [permissionGuard],
+        data: { module: 'payroll' },
+        loadComponent: () => import('./payroll/payroll-dry-run/payroll-dry-run').then(m => m.PayrollDryRunComponent)
+      },
+      {
         // Phase 3: old run vs the engine. Before 'payroll/:tab', which would read "compare" as a tab.
         path: 'payroll/compare',
         canActivate: [permissionGuard],

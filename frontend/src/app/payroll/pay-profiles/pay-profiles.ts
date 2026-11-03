@@ -12,6 +12,29 @@ import {
   PayProfileImportRow,
   PayProfileRow,
 } from '../../services/payroll.service';
+import {
+  LucideUsers,
+  LucideAlertCircle,
+  LucideCheckCircle2,
+  LucideFileCheck,
+  LucideCalendarDays,
+  LucideSearch,
+  LucideUpload,
+  LucideSparkles,
+  LucideChevronRight,
+  LucideArrowRight,
+  LucideArrowLeft,
+  LucideX,
+  LucideRefreshCw,
+  LucideFilter,
+  LucideShieldCheck,
+  LucidePlus,
+  LucideCheck,
+  LucideChevronDown,
+  LucideChevronUp,
+  LucideInfo,
+  LucideAlertTriangle,
+} from '@lucide/angular';
 
 type Filter = 'ALL' | 'NO_PROFILE' | 'MISSING_DETAILS' | 'UPCOMING';
 
@@ -28,7 +51,32 @@ interface ImportDraft extends PayProfileImportRow {
 @Component({
   selector: 'app-pay-profiles',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    LucideUsers,
+    LucideAlertCircle,
+    LucideCheckCircle2,
+    LucideFileCheck,
+    LucideCalendarDays,
+    LucideSearch,
+    LucideUpload,
+    LucideSparkles,
+    LucideChevronRight,
+    LucideArrowRight,
+    LucideArrowLeft,
+    LucideX,
+    LucideRefreshCw,
+    LucideFilter,
+    LucideShieldCheck,
+    LucidePlus,
+    LucideCheck,
+    LucideChevronDown,
+    LucideChevronUp,
+    LucideInfo,
+    LucideAlertTriangle,
+  ],
   templateUrl: './pay-profiles.html',
   styleUrls: ['./pay-profiles.css'],
 })
@@ -142,7 +190,7 @@ export class PayProfilesComponent implements OnInit, OnDestroy {
     return ({
       VERIFIED: `${what} ✓`,
       UNVERIFIED: `${what}: check`,
-      SUGGESTED: `${what}: AI read`,
+      SUGGESTED: `${what}: to check`,
       DOCUMENT: `${what}: document only`,
       MISSING: `${what}: missing`,
     } as any)[s];
@@ -223,6 +271,28 @@ export class PayProfilesComponent implements OnInit, OnDestroy {
 
   money(n: number | null | undefined) {
     return n == null ? '—' : '₹' + Math.round(n).toLocaleString('en-IN');
+  }
+
+  getInitials(name: string): string {
+    if (!name) return '??';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  getAvatarBg(name: string): string {
+    const colors = [
+      'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+      'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+      'linear-gradient(135deg, #ec4899, #be185d)',
+      'linear-gradient(135deg, #10b981, #047857)',
+      'linear-gradient(135deg, #f59e0b, #b45309)',
+      'linear-gradient(135deg, #06b6d4, #0e7490)',
+      'linear-gradient(135deg, #6366f1, #4338ca)',
+    ];
+    let hash = 0;
+    for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
   }
 
   private firstOfMonth() {

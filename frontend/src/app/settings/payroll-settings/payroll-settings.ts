@@ -33,6 +33,8 @@ import {
   LucideCopy,
   LucideScale,
   LucideCheckCircle2,
+  LucideSave,
+  LucideHelpCircle,
 } from '@lucide/angular';
 import {
   PayrollService,
@@ -84,6 +86,8 @@ type ActiveSettingsTab = 'components' | 'groups' | 'statutory' | 'tax' | 'setup'
     LucideCopy,
     LucideScale,
     LucideCheckCircle2,
+    LucideSave,
+    LucideHelpCircle,
   ],
   templateUrl: './payroll-settings.html',
   styleUrls: ['./payroll-settings.css'],
@@ -168,7 +172,7 @@ export class PayrollSettingsComponent implements OnInit {
   salaryGroups = signal<MasterSalaryGroup[]>([]);
   selectedGroup = signal<MasterSalaryGroup | null>(null);
   groupSearch = signal<string>('');
-  groupErrors = signal<{ code?: string; name?: string }>({});
+  groupErrors = signal<Record<string, string>>({});
   isGroupModalOpen = signal<boolean>(false);
   groupForm: any = {
     code: '',
@@ -240,6 +244,7 @@ export class PayrollSettingsComponent implements OnInit {
   taxRegimes = signal<MasterTaxRegime[]>([]);
   selectedRegimeTab = signal<'NEW' | 'OLD'>('NEW');
   isTaxRegimeModalOpen = signal<boolean>(false);
+  taxRegimeErrors = signal<Record<string, string>>({});
   taxRegimeForm: any = {
     id: null,
     code: '',
@@ -564,7 +569,7 @@ export class PayrollSettingsComponent implements OnInit {
     this.componentErrors.set(cur);
   }
 
-  clearGroupError(field: 'code' | 'name') {
+  clearGroupError(field: string) {
     const cur = { ...this.groupErrors() };
     delete cur[field];
     this.groupErrors.set(cur);
@@ -770,25 +775,171 @@ export class PayrollSettingsComponent implements OnInit {
 
   removeGroupLine(index: number) {
     this.groupForm.lines.splice(index, 1);
+    // Clear any residual line errors
+    const cur = { ...this.groupErrors() };
+    Object.keys(cur).forEach((k) => {
+      if (k.startsWith('line_')) delete cur[k];
+    });
+    this.groupErrors.set(cur);
+  }
+
+  getComponentCategoryTag(componentId: number): { label: string; class: string } {
+    const c = this.components().find((item) => item.id === Number(componentId));
+    if (!c) return { label: 'CUSTOM', class: 'tag-gray' };
+    switch (c.category) {
+      case 'EARNING':
+        return { label: 'EARNING', class: 'tag-green' };
+      case 'EMPLOYEE_DEDUCTION':
+        return { label: 'DEDUCTION', class: 'tag-amber' };
+      case 'EMPLOYER_CONTRIBUTION':
+        return { label: 'STATUTORY', class: 'tag-blue' };
+      case 'REIMBURSEMENT':
+        return { label: 'REIMB', class: 'tag-purple' };
+      default:
+        return { label: 'OTHER', class: 'tag-gray' };
+    }
+  }
+
+  private validateFormulaSyntax(formula: string | undefined | null): string | null {
+    if (!formula || !formula.trim()) {
+      return 'Formula cannot be empty';
+    }
+    const s = formula.trim();
+
+    // Check parentheses count and balance
+    let depth = 0;
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === '(') depth++;
+      else if (s[i] === ')') {
+        depth--;
+        if (depth < 0) return "Unexpected closing parenthesis ')'";
+      }
+    }
+    if (depth > 0) {
+      return `Unbalanced parentheses: missing ${depth} closing ')'`;
+    }
+
+    // Check trailing binary operator
+    if (/(?:[\+\-\*\/%]|<=|>=|<|>|==|!=|\bAND\b|\bOR\b|\bNOT\b)\s*$/i.test(s)) {
+      return 'Incomplete formula ending with operator';
+    }
+
+    // Check leading invalid operator
+    if (/^[\*\/%]/.test(s)) {
+      return 'Formula cannot start with this operator';
+    }
+
+    return null;
+  }
+
+  private validateConditionSyntax(condition: string | undefined | null): string | null {
+    if (!condition || !condition.trim()) return null;
+    const s = condition.trim();
+
+    let depth = 0;
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === '(') depth++;
+      else if (s[i] === ')') {
+        depth--;
+        if (depth < 0) return "Unexpected closing parenthesis ')'";
+      }
+    }
+    if (depth > 0) {
+      return `Unbalanced parentheses in condition: missing ${depth} closing ')'`;
+    }
+
+    if (/(?:[\+\-\*\/%]|<=|>=|<|>|==|!=|\bAND\b|\bOR\b|\bNOT\b)\s*$/i.test(s)) {
+      return 'Incomplete condition ending with operator';
+    }
+
+    return null;
+  }
+
+  scrollToErrorField(fieldKey: string) {
+    setTimeout(() => {
+      let el = document.getElementById(`group-field-${fieldKey}`) as HTMLElement | null;
+      if (!el) {
+        el = document.querySelector('.modal-dialog .input-error') as HTMLElement | null;
+      }
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        el.focus();
+        if (typeof (el as any).select === 'function') {
+          (el as HTMLInputElement).select();
+        }
+      }
+    }, 80);
   }
 
   saveSalaryGroup() {
-    const errors: { code?: string; name?: string } = {};
+    const errors: Record<string, string> = {};
+
+    // 1. Group Code validation
     if (!this.groupForm.code || !this.groupForm.code.trim()) {
-      errors.code = 'Salary group code is required (e.g. REGULAR_CUSTOM)';
+      errors['code'] = 'Salary group code is required (e.g. REGULAR_CUSTOM)';
     }
+
+    // 2. Display Name validation
     if (!this.groupForm.name || !this.groupForm.name.trim()) {
-      errors.name = 'Salary group name is required (e.g. Regular Staff Structure)';
+      errors['name'] = 'Salary structure name is required (e.g. Regular Staff Structure)';
     }
+
+    // 3. Effective From Date validation
+    if (!this.groupForm.effectiveFrom || !String(this.groupForm.effectiveFrom).trim()) {
+      errors['effectiveFrom'] = 'Effective from date is required';
+    }
+
+    // 4. Lines validation
+    if (!this.groupForm.lines || this.groupForm.lines.length === 0) {
+      errors['lines'] = 'At least one component line is required';
+    } else {
+      const seenComponents = new Map<number, number>();
+
+      for (let i = 0; i < this.groupForm.lines.length; i++) {
+        const line = this.groupForm.lines[i];
+
+        // Component selection & duplicate check
+        if (!line.componentId) {
+          errors[`line_${i}_component`] = `Component is required for row #${i + 1}`;
+        } else if (seenComponents.has(Number(line.componentId))) {
+          const prevRow = seenComponents.get(Number(line.componentId))! + 1;
+          errors[`line_${i}_component`] = `Duplicate component (already chosen in row #${prevRow})`;
+        } else {
+          seenComponents.set(Number(line.componentId), i);
+        }
+
+        // Calculation type checks
+        if (line.calcType === 'FORMULA') {
+          const formErr = this.validateFormulaSyntax(line.formula);
+          if (formErr) {
+            errors[`line_${i}_formula`] = formErr;
+          }
+        } else if (line.calcType === 'FIXED') {
+          if (line.amount == null || line.amount === '' || isNaN(Number(line.amount))) {
+            errors[`line_${i}_amount`] = 'Fixed ₹ amount is required';
+          } else if (Number(line.amount) < 0) {
+            errors[`line_${i}_amount`] = 'Amount cannot be negative';
+          }
+        }
+
+        // Condition checks
+        if (line.condition && line.condition.trim()) {
+          const condErr = this.validateConditionSyntax(line.condition);
+          if (condErr) {
+            errors[`line_${i}_condition`] = condErr;
+          }
+        }
+      }
+    }
+
     this.groupErrors.set(errors);
 
-    if (Object.keys(errors).length > 0) {
-      this.toast.error('Please enter the required group code and name');
-      return;
-    }
-
-    if (!this.groupForm.lines || this.groupForm.lines.length === 0) {
-      this.toast.error('At least one component line is required');
+    const errorKeys = Object.keys(errors);
+    if (errorKeys.length > 0) {
+      const firstKey = errorKeys[0];
+      const firstMsg = errors[firstKey];
+      this.toast.error(firstMsg);
+      this.scrollToErrorField(firstKey);
       return;
     }
 
@@ -801,9 +952,38 @@ export class PayrollSettingsComponent implements OnInit {
       error: (err) => {
         const msg = err.error?.message || 'Failed to save salary group';
         this.toast.error(msg);
+
+        const newErrors: Record<string, string> = {};
+        let targetKey = 'code';
+
         if (msg.toLowerCase().includes('already exists') || msg.toLowerCase().includes('code')) {
-          this.groupErrors.set({ code: msg });
+          newErrors['code'] = msg;
+          targetKey = 'code';
+        } else if (msg.toLowerCase().includes('formula')) {
+          let matchedLine = -1;
+          for (let i = 0; i < this.groupForm.lines.length; i++) {
+            const line = this.groupForm.lines[i];
+            if (line.calcType === 'FORMULA' && line.formula) {
+              if (msg.includes(line.formula) || this.components().some((c) => c.id === line.componentId && msg.includes(c.code))) {
+                matchedLine = i;
+                break;
+              }
+            }
+          }
+          if (matchedLine >= 0) {
+            newErrors[`line_${matchedLine}_formula`] = msg;
+            targetKey = `line_${matchedLine}_formula`;
+          } else {
+            newErrors['line_0_formula'] = msg;
+            targetKey = 'line_0_formula';
+          }
+        } else {
+          newErrors['name'] = msg;
+          targetKey = 'name';
         }
+
+        this.groupErrors.set(newErrors);
+        this.scrollToErrorField(targetKey);
       },
     });
   }
@@ -837,7 +1017,30 @@ export class PayrollSettingsComponent implements OnInit {
   // TAX REGIME ACTIONS (W4)
   // ═══════════════════════════════════════════
 
+  clearRegimeError(field: string) {
+    const cur = { ...this.taxRegimeErrors() };
+    delete cur[field];
+    this.taxRegimeErrors.set(cur);
+  }
+
+  scrollToRegimeErrorField(fieldKey: string) {
+    setTimeout(() => {
+      let el = document.getElementById(`regime-field-${fieldKey}`) as HTMLElement | null;
+      if (!el) {
+        el = document.querySelector('.modal-dialog .input-error') as HTMLElement | null;
+      }
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        el.focus();
+        if (typeof (el as any).select === 'function') {
+          (el as HTMLInputElement).select();
+        }
+      }
+    }, 80);
+  }
+
   openEditTaxRegimeModal(regime: MasterTaxRegime) {
+    this.taxRegimeErrors.set({});
     this.taxRegimeForm = {
       id: regime.id,
       code: regime.code,
@@ -854,6 +1057,7 @@ export class PayrollSettingsComponent implements OnInit {
   }
 
   closeTaxRegimeModal() {
+    this.taxRegimeErrors.set({});
     this.isTaxRegimeModalOpen.set(false);
   }
 
@@ -870,6 +1074,11 @@ export class PayrollSettingsComponent implements OnInit {
 
   removeTaxSlab(index: number) {
     this.taxRegimeForm.slabs.splice(index, 1);
+    const cur = { ...this.taxRegimeErrors() };
+    Object.keys(cur).forEach((k) => {
+      if (k.startsWith('slab_')) delete cur[k];
+    });
+    this.taxRegimeErrors.set(cur);
   }
 
   addSurchargeBand() {
@@ -879,17 +1088,124 @@ export class PayrollSettingsComponent implements OnInit {
 
   removeSurchargeBand(index: number) {
     this.taxRegimeForm.surcharge.splice(index, 1);
+    const cur = { ...this.taxRegimeErrors() };
+    Object.keys(cur).forEach((k) => {
+      if (k.startsWith('surcharge_')) delete cur[k];
+    });
+    this.taxRegimeErrors.set(cur);
   }
 
   saveTaxRegime() {
     if (!this.taxRegimeForm.id) return;
+    const errors: Record<string, string> = {};
+
+    // 1. Standard Deduction validation
+    if (this.taxRegimeForm.standardDeduction == null || this.taxRegimeForm.standardDeduction === '' || isNaN(Number(this.taxRegimeForm.standardDeduction))) {
+      errors['standardDeduction'] = 'Standard Deduction is required';
+    } else if (Number(this.taxRegimeForm.standardDeduction) < 0) {
+      errors['standardDeduction'] = 'Standard Deduction cannot be negative';
+    }
+
+    // 2. Health & Education Cess validation
+    if (this.taxRegimeForm.cessPct == null || this.taxRegimeForm.cessPct === '' || isNaN(Number(this.taxRegimeForm.cessPct))) {
+      errors['cessPct'] = 'Health & Education Cess is required';
+    } else if (Number(this.taxRegimeForm.cessPct) < 0 || Number(this.taxRegimeForm.cessPct) > 100) {
+      errors['cessPct'] = 'Cess percentage must be between 0% and 100%';
+    }
+
+    // 3. Sec 87A Full Rebate Limit validation
+    if (this.taxRegimeForm.rebateIncomeLimit == null || this.taxRegimeForm.rebateIncomeLimit === '' || isNaN(Number(this.taxRegimeForm.rebateIncomeLimit))) {
+      errors['rebateIncomeLimit'] = 'Sec 87A Full Rebate Limit is required';
+    } else if (Number(this.taxRegimeForm.rebateIncomeLimit) < 0) {
+      errors['rebateIncomeLimit'] = 'Rebate limit cannot be negative';
+    }
+
+    // 4. Sec 87A Max Rebate Amount validation
+    if (this.taxRegimeForm.rebateMaxAmount == null || this.taxRegimeForm.rebateMaxAmount === '' || isNaN(Number(this.taxRegimeForm.rebateMaxAmount))) {
+      errors['rebateMaxAmount'] = 'Sec 87A Max Rebate Amount is required';
+    } else if (Number(this.taxRegimeForm.rebateMaxAmount) < 0) {
+      errors['rebateMaxAmount'] = 'Rebate amount cannot be negative';
+    }
+
+    // 5. Slabs validation
+    if (!this.taxRegimeForm.slabs || this.taxRegimeForm.slabs.length === 0) {
+      errors['slabs'] = 'At least one income tax slab is required';
+    } else {
+      for (let i = 0; i < this.taxRegimeForm.slabs.length; i++) {
+        const slab = this.taxRegimeForm.slabs[i];
+        const isLastSlab = i === this.taxRegimeForm.slabs.length - 1;
+
+        // From Amount
+        if (slab.fromAmount == null || slab.fromAmount === '' || isNaN(Number(slab.fromAmount))) {
+          errors[`slab_${i}_from`] = `From amount is required for slab #${i + 1}`;
+        } else if (Number(slab.fromAmount) < 0) {
+          errors[`slab_${i}_from`] = `From amount cannot be negative for slab #${i + 1}`;
+        }
+
+        // Up to Amount
+        if (slab.toAmount != null && slab.toAmount !== '') {
+          if (isNaN(Number(slab.toAmount))) {
+            errors[`slab_${i}_to`] = `Up to amount must be a number for slab #${i + 1}`;
+          } else if (Number(slab.toAmount) <= Number(slab.fromAmount)) {
+            errors[`slab_${i}_to`] = `Up to amount (₹${slab.toAmount}) must be greater than From amount (₹${slab.fromAmount})`;
+          }
+        } else if (!isLastSlab) {
+          errors[`slab_${i}_to`] = `Only the final slab can leave the upper limit blank (unlimited)`;
+        }
+
+        // Slab continuity check with previous slab
+        if (i > 0) {
+          const prevSlab = this.taxRegimeForm.slabs[i - 1];
+          if (prevSlab.toAmount != null && prevSlab.toAmount !== '' && !isNaN(Number(prevSlab.toAmount))) {
+            if (Number(slab.fromAmount) !== Number(prevSlab.toAmount)) {
+              errors[`slab_${i}_from`] = `Slab gap/overlap: Starts at ₹${slab.fromAmount}, but slab #${i} ended at ₹${prevSlab.toAmount}`;
+            }
+          }
+        }
+
+        // Tax Rate (%)
+        if (slab.ratePct == null || slab.ratePct === '' || isNaN(Number(slab.ratePct))) {
+          errors[`slab_${i}_rate`] = `Tax rate is required for slab #${i + 1}`;
+        } else if (Number(slab.ratePct) < 0 || Number(slab.ratePct) > 100) {
+          errors[`slab_${i}_rate`] = `Tax rate must be between 0% and 100%`;
+        }
+      }
+    }
+
+    // 6. Surcharge bands validation (if present)
+    if (this.taxRegimeForm.surcharge && this.taxRegimeForm.surcharge.length > 0) {
+      for (let i = 0; i < this.taxRegimeForm.surcharge.length; i++) {
+        const band = this.taxRegimeForm.surcharge[i];
+        if (band.fromIncome == null || band.fromIncome === '' || isNaN(Number(band.fromIncome)) || Number(band.fromIncome) <= 0) {
+          errors[`surcharge_${i}_income`] = `Income threshold must be greater than ₹0`;
+        }
+        if (band.ratePct == null || band.ratePct === '' || isNaN(Number(band.ratePct)) || Number(band.ratePct) < 0 || Number(band.ratePct) > 100) {
+          errors[`surcharge_${i}_rate`] = `Surcharge rate must be between 0% and 100%`;
+        }
+      }
+    }
+
+    this.taxRegimeErrors.set(errors);
+
+    const errorKeys = Object.keys(errors);
+    if (errorKeys.length > 0) {
+      const firstKey = errorKeys[0];
+      const firstMsg = errors[firstKey];
+      this.toast.error(firstMsg);
+      this.scrollToRegimeErrorField(firstKey);
+      return;
+    }
+
     this.payrollService.updatePayrollTaxRegime(this.taxRegimeForm.id, this.taxRegimeForm).subscribe({
       next: () => {
         this.toast.success('Tax regime and slabs updated');
         this.closeTaxRegimeModal();
         this.loadAllMasters();
       },
-      error: (err) => this.toast.error(err.error?.message || 'Failed to update tax regime'),
+      error: (err) => {
+        const msg = err.error?.message || 'Failed to update tax regime';
+        this.toast.error(msg);
+      },
     });
   }
 

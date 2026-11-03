@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from './pdf.service';
 import { EmailService } from './email.service';
 import { payableDayStatus } from '../attendance/clock-out-approval';
+import { isLopExempt } from './lop-exempt';
+import { ModuleRef } from '@nestjs/core';
 import {
   DEFAULT_TEMPLATE, LINE_COMPONENT_NAMES, SalaryTemplateRules, TemplateLine,
   gradeFor, splitGross,
@@ -50,7 +52,24 @@ export class PayrollService {
     private emailService: EmailService,
     private approvals: ApprovalsService,
     private notifications: NotificationsService,
+    private moduleRef: ModuleRef,
   ) {}
+
+  /**
+   * Payroll plan Phase 3 step 3: the month's payslips from the new engine —
+   * pay profiles, salary groups, statutory rates and tax slabs from Settings,
+   * loss of pay from attendance and leave. Exactly what the dry run shows.
+   * Employees with no pay profile aren't in the map and keep the old rules.
+   * Loaded lazily: the dry run itself depends on this service.
+   */
+  private async engineRows(companyId: number, month: number, year: number, fullMonth: boolean) {
+    if (!this.moduleRef) return new Map<number, any>(); // unit tests build the service on its own
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { PayrollDryRunService } = require('./pay-profiles/payroll-dry-run.service') as typeof import('./pay-profiles/payroll-dry-run.service');
+    const dryRun = this.moduleRef.get(PayrollDryRunService, { strict: false });
+    const result = await dryRun.run(companyId, Number(month), Number(year), fullMonth, true);
+    return new Map(result.rows.filter((r: any) => r.status !== 'BLOCKED').map((r: any) => [r.employeeId as number, r]));
+  }
 
   // ==================== 1. SALARY COMPONENTS ====================
 
@@ -545,16 +564,76 @@ export class PayrollService {
    * worth destabilising for a preview. The two are checked against each other
    * by payroll-preview.spec.ts, which is what stops them drifting apart.
    */
+  /**
+   * Working days, attendance and unpaid absences per employee for a month —
+   * the same rules previewPayroll uses (roster/shift/branch rest days,
+   * holidays, payable clock-outs, approved paid leave). For the engine dry run.
+   */
+  async attendanceForMonth(companyId: number, month: number, year: number, employeeIds: number[]) {
+    const employees = await this.prisma.employee.findMany({
+      where: { companyId, id: { in: employeeIds } },
+      include: { branch: true, shift: { select: { workingDays: true } } },
+    });
+    const totalDaysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const startDate = this.payrollDate(year, month, 1);
+    const endDate = this.payrollDate(year, month, totalDaysInMonth);
+    const holidayKeys = await this.payrollHolidayKeys(companyId, startDate, endDate);
+    const out = new Map<number, { workingDays: number; presentDays: number; absences: number; noAttendance: boolean }>();
+
+    for (const emp of employees) {
+      const restDay = await this.restDayCheck(emp, startDate, endDate);
+      let workingDays = 0;
+      for (let d = 1; d <= totalDaysInMonth; d++) {
+        const date = this.payrollDate(year, month, d);
+        if (!restDay(date) && !holidayKeys.has(this.payrollDateKey(date))) workingDays++;
+      }
+      if (workingDays === 0) workingDays = totalDaysInMonth;
+
+      const attendances = await this.prisma.attendance.findMany({
+        where: { employeeId: emp.id, date: { gte: startDate, lte: endDate } },
+        select: { date: true, status: true, clockOutApproval: true, missedClockOut: true, autoClockedOut: true, clockOutReason: true, clockIn: true, clockOut: true },
+      });
+      const byDay = new Map<string, string>();
+      for (const a of attendances) {
+        const st = payableDayStatus(a);
+        if (st) byDay.set(this.payrollDateKey(a.date), st);
+      }
+      const leaves = await this.prisma.leaveRequest.findMany({
+        where: {
+          employeeId: emp.id, status: 'APPROVED', deletedAt: null, leaveType: { isPaid: true },
+          startDate: { lte: endDate }, endDate: { gte: startDate },
+        },
+        select: { startDate: true, endDate: true, isHalfDay: true },
+      });
+
+      let absences = 0;
+      let present = 0;
+      let half = 0;
+      for (let d = 1; d <= totalDaysInMonth; d++) {
+        const date = this.payrollDate(year, month, d);
+        if (restDay(date) || holidayKeys.has(this.payrollDateKey(date))) continue;
+        const key = this.payrollDateKey(date);
+        const credit = this.attendanceCredit(byDay.get(key));
+        if (credit === 1) present++;
+        else if (credit === 0.5) half++;
+        absences += 1 - Math.min(1, credit + this.paidLeaveCredit(key, leaves));
+      }
+      out.set(emp.id, { workingDays, presentDays: present + half * 0.5, absences, noAttendance: attendances.length === 0 });
+    }
+    return out;
+  }
+
   async previewPayroll(companyId: number, month: number, year: number) {
     const employees = await this.prisma.employee.findMany({
       where: { companyId, user: { status: { not: 'SUSPENDED' } }, allowPayrollGenerate: true },
-      include: { salaryStructures: { include: { component: true } }, branch: true, shift: { select: { workingDays: true } } },
+      include: { salaryStructures: { include: { component: true } }, branch: true, shift: { select: { workingDays: true } }, user: { select: { role: true } } },
     });
 
     const totalDaysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const startDate = this.payrollDate(year, month, 1);
     const endDate = this.payrollDate(year, month, totalDaysInMonth);
     const holidayKeys = await this.payrollHolidayKeys(companyId, startDate, endDate);
+    const engine = await this.engineRows(companyId, month, year, false);
     const rows: any[] = [];
 
     for (const emp of employees) {
@@ -570,7 +649,8 @@ export class PayrollService {
           if (st.component.name.toLowerCase().includes('basic')) basicSalary = amt;
         } else if (st.component?.type === 'DEDUCTION') deductions += amt;
       }
-      if (gross <= 0) continue;
+      const fromEngine = engine.get(emp.id);
+      if (gross <= 0 && !fromEngine) continue;
 
       // Keep the preview's net pay equal to the DRAFT generator: statutory
       // deductions are part of payroll even when no salary-structure line was
@@ -640,8 +720,14 @@ export class PayrollService {
         const payableCredit = Math.min(1, attendanceCredit + this.paidLeaveCredit(key, leaves));
         absences += 1 - payableCredit;
       }
+      if (isLopExempt(emp.user?.role)) absences = 0;
 
-      const lossOfPay = Math.round((gross / workingDays) * absences * 100) / 100;
+      let lossOfPay = Math.round((gross / workingDays) * absences * 100) / 100;
+      if (fromEngine) {
+        gross = fromEngine.grossFull;
+        deductions = fromEngine.totalDeductions;
+        lossOfPay = fromEngine.lossOfPay;
+      }
       rows.push({
         employeeId: emp.id,
         name: `${emp.firstName} ${emp.lastName}`.trim(),
@@ -723,6 +809,7 @@ export class PayrollService {
         },
         branch: true,
         shift: { select: { workingDays: true } },
+        user: { select: { role: true } },
       }
     });
 
@@ -730,6 +817,8 @@ export class PayrollService {
     const startDate = this.payrollDate(year, month, 1);
     const endDate = this.payrollDate(year, month, totalDaysInMonth); // Last day of month
     const holidayKeys = await this.payrollHolidayKeys(companyId, startDate, endDate);
+    // Skipping loss of pay = the engine's full month, so PF/ESI are on full pay too.
+    const engine = await this.engineRows(companyId, month, year, !!opts.skipLossOfPay);
 
     for (const emp of employees) {
       // Rest days: the roster, else the shift, else the branch weekly offs.
@@ -796,6 +885,7 @@ export class PayrollService {
           unexcusedAbsences += 1 - payableCredit;
         }
       }
+      if (isLopExempt(emp.user?.role)) unexcusedAbsences = 0;
       
       const presentDays = presentCount + (halfDayCount * 0.5);
 
@@ -869,12 +959,28 @@ export class PayrollService {
       }
       // --- END STATUTORY COMPLIANCE ---
 
+      // New engine: replace the old salary set-up and hardcoded statutory
+      // rules with the pay profile's payslip. Earnings at the full month,
+      // loss of pay as its own figure; PF/ESI already on pay actually earned.
+      const fromEngine = engine.get(emp.id);
+      if (fromEngine) {
+        payslipItemsData.length = 0;
+        for (const l of fromEngine.earnings) payslipItemsData.push({ componentName: l.name, type: 'EARNING', amount: l.full });
+        for (const l of fromEngine.deductions) if (l.paid > 0) payslipItemsData.push({ componentName: l.name, type: 'DEDUCTION', amount: l.paid });
+        totalEarnings = fromEngine.grossFull;
+        totalDeductions = fromEngine.totalDeductions;
+      }
+      // No pay profile and no old salary set-up: nothing to pay, so no ₹0 draft.
+      if (!fromEngine && totalEarnings <= 0) continue;
+
       // Loss of Pay (LOP) calculation based on actual unexcused working day absences
       const dailyRate = workingDaysInMonth > 0 ? (totalEarnings / workingDaysInMonth) : 0;
       // Waived for the whole run when asked — see the note on this method.
       const lossOfPay = opts.skipLossOfPay
         ? 0
-        : Math.round(dailyRate * unexcusedAbsences * 100) / 100;
+        : fromEngine
+          ? fromEngine.lossOfPay
+          : Math.round(dailyRate * unexcusedAbsences * 100) / 100;
 
       // Leave encashment, on the December slip only. Deliberately after the
       // statutory block and after dailyRate: a one-off payout must not inflate

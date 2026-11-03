@@ -1,0 +1,623 @@
+<div class="dr-page">
+  <!-- Top Navigation & Header -->
+  <header class="dr-header">
+    <div class="dr-header-left">
+      <div class="dr-breadcrumb-row">
+        <button type="button" class="dr-back-pill" (click)="back()">
+          <svg lucideArrowLeft [size]="14"></svg>
+          <span>Back to Compare Old vs New</span>
+        </button>
+      </div>
+      <div class="dr-title-row">
+        <h1>Dry Run Payslips</h1>
+        <span class="dr-badge-simulation">
+          <svg lucideSparkles [size]="13"></svg>
+          <span>Engine Pre-flight Sandbox</span>
+        </span>
+        <span class="dr-badge-safe">
+          <svg lucideShieldCheck [size]="13"></svg>
+          <span>Read-Only · Nothing Saved</span>
+        </span>
+      </div>
+      <p class="dr-header-desc">
+        Pre-flight payslip computation powered by the Phase 2 formula engine using assigned pay profiles and attendance loss of pay.
+        <strong>Live payroll batches and draft payslips remain 100% untouched.</strong>
+      </p>
+    </div>
+
+    <!-- Period & Simulation Control Deck -->
+    <div class="dr-control-deck">
+      <div class="dr-deck-row">
+        <!-- Period Selectors -->
+        <div class="dr-period-group">
+          <div class="dr-period-label">
+            <svg lucideCalendar [size]="14"></svg>
+            <span>Period:</span>
+          </div>
+          <div class="dr-select-wrap">
+            <select class="dr-select" [(ngModel)]="month">
+              <option *ngFor="let m of months; let i = index" [ngValue]="i + 1">{{ m }}</option>
+            </select>
+            <svg lucideChevronDown [size]="14" class="dr-select-arrow"></svg>
+          </div>
+          <div class="dr-select-wrap dr-year-wrap">
+            <select class="dr-select" [(ngModel)]="year">
+              <option *ngFor="let y of years" [ngValue]="y">{{ y }}</option>
+            </select>
+            <svg lucideChevronDown [size]="14" class="dr-select-arrow"></svg>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="dr-deck-actions">
+          <button type="button" class="dr-btn-run" (click)="run()" [disabled]="loading()">
+            <svg lucideRefreshCw [size]="14" [class.animate-spin]="loading()"></svg>
+            <span>{{ loading() ? 'Simulating…' : 'Run Simulation' }}</span>
+          </button>
+          <button type="button" class="dr-btn-export" (click)="exportCsv()" [disabled]="!result()">
+            <svg lucideDownload [size]="14"></svg>
+            <span>Export CSV</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Simulation Options / Toggles -->
+      <div class="dr-deck-options">
+        <label class="dr-toggle-item" title="Ignore attendance logs — recommended for testing a month currently in progress">
+          <input type="checkbox" [(ngModel)]="fullMonth" class="dr-checkbox">
+          <div class="toggle-text">
+            <span class="toggle-title">Full month (ignore attendance)</span>
+            <span class="toggle-desc">No loss-of-pay deductions</span>
+          </div>
+        </label>
+        <label class="dr-toggle-item" title="Borrow latest pay profiles for prior months that occurred before their scheduled effective date">
+          <input type="checkbox" [(ngModel)]="currentProfiles" class="dr-checkbox">
+          <div class="toggle-text">
+            <span class="toggle-title">Use current pay profiles</span>
+            <span class="toggle-desc">Simulate with active compensation</span>
+          </div>
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <!-- Skeleton Loader -->
+  <div class="dr-skel-wrap" *ngIf="loading() && !result()">
+    <div class="dr-skel-grid">
+      <div class="dr-skel card-skel" *ngFor="let i of [1,2,3,4]"></div>
+    </div>
+    <div class="dr-skel row-skel" *ngFor="let i of [1,2,3,4,5]"></div>
+  </div>
+
+  <ng-container *ngIf="result() as r">
+    <!-- Advisory & Policy Banners -->
+    <div class="dr-banners-stack">
+      <!-- Attendance / LOP Policy Applied -->
+      <div class="dr-banner-card banner-info" *ngIf="!r.fullMonth">
+        <div class="banner-icon icon-blue">
+          <svg lucideCalendar [size]="18"></svg>
+        </div>
+        <div class="banner-content">
+          <div class="banner-title">Attendance &amp; Loss of Pay (LOP) Rules Active</div>
+          <div class="banner-text">
+            Loss of pay is computed from attendance records for <strong>{{ months[r.month - 1] }} {{ r.year }}</strong> (absent days ÷ working days), deducted strictly on components marked <em>"reduce for loss of pay"</em>. Statutory PF and ESI contributions are computed on actual earned gross.
+          </div>
+        </div>
+      </div>
+
+      <!-- Borrowed Active Profiles -->
+      <div class="dr-banner-card banner-warn" *ngIf="r.borrowedProfiles">
+        <div class="banner-icon icon-amber">
+          <svg lucideAlertCircle [size]="18"></svg>
+        </div>
+        <div class="banner-content">
+          <div class="banner-title">Simulating Active Profiles for {{ r.borrowedProfiles }} Employee{{ r.borrowedProfiles === 1 ? '' : 's' }}</div>
+          <div class="banner-text">
+            {{ r.borrowedProfiles }} employee pay profile{{ r.borrowedProfiles === 1 ? ' starts' : 's start' }} after <strong>{{ months[r.month - 1] }} {{ r.year }}</strong>. Their active CTC, salary groups, and tax regimes are simulated here so you can verify the new engine against historical payroll disbursements.
+          </div>
+        </div>
+      </div>
+
+      <!-- Full Month Mode -->
+      <div class="dr-banner-card banner-slate" *ngIf="r.fullMonth">
+        <div class="banner-icon icon-slate">
+          <svg lucideInfo [size]="18"></svg>
+        </div>
+        <div class="banner-content">
+          <div class="banner-title">Full Month Mode Active</div>
+          <div class="banner-text">
+            Attendance logs are bypassed with zero loss-of-pay deductions. Untick <em>"Full month (ignore attendance)"</em> in the controls above to compute actual attendance once the monthly cycle concludes.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI Summary Metrics Grid (4 Executive Cards) -->
+    <div class="dr-kpi-grid">
+      <!-- Card 1: Generated Payslips -->
+      <div class="dr-kpi-card kpi-indigo">
+        <div class="kpi-top">
+          <span class="kpi-label">Generated Payslips</span>
+          <div class="kpi-icon icon-indigo">
+            <svg lucideFileText [size]="18"></svg>
+          </div>
+        </div>
+        <div class="kpi-value-row">
+          <span class="kpi-val">{{ r.summary.payslips }}</span>
+          <span class="kpi-denom">/ {{ r.summary.employees }} total</span>
+        </div>
+        <div class="kpi-chips-row">
+          <span class="micro-chip ok" title="Ready to disburse">
+            <svg lucideCheckCircle2 [size]="11"></svg>
+            {{ r.summary.payslips - r.summary.toCheck }} Ready
+          </span>
+          <span class="micro-chip warn" *ngIf="r.summary.toCheck > 0" title="Warnings detected">
+            <svg lucideAlertCircle [size]="11"></svg>
+            {{ r.summary.toCheck }} To Check
+          </span>
+          <span class="micro-chip red" *ngIf="r.summary.blocked > 0" title="Missing configuration">
+            <svg lucideAlertTriangle [size]="11"></svg>
+            {{ r.summary.blocked }} Can't Pay
+          </span>
+        </div>
+      </div>
+
+      <!-- Card 2: Simulated Gross Earnings -->
+      <div class="dr-kpi-card kpi-purple">
+        <div class="kpi-top">
+          <span class="kpi-label">Simulated Gross Earnings</span>
+          <div class="kpi-icon icon-purple">
+            <svg lucideCoins [size]="18"></svg>
+          </div>
+        </div>
+        <div class="kpi-val text-purple">{{ money(r.summary.grossPaid) }}</div>
+        <div class="kpi-sub-row">
+          <span class="sub-muted">Full: {{ money(r.summary.grossFull) }}</span>
+          <span class="sub-dot" *ngIf="r.summary.lossOfPay > 0">·</span>
+          <span class="sub-lop" *ngIf="r.summary.lossOfPay > 0" title="Loss of pay deduction">
+            −{{ money(r.summary.lossOfPay) }} LOP
+          </span>
+          <span class="sub-lop ok" *ngIf="!r.summary.lossOfPay">Zero LOP</span>
+        </div>
+      </div>
+
+      <!-- Card 3: Total Deductions -->
+      <div class="dr-kpi-card kpi-rose">
+        <div class="kpi-top">
+          <span class="kpi-label">Total Deductions</span>
+          <div class="kpi-icon icon-rose">
+            <svg lucideReceipt [size]="18"></svg>
+          </div>
+        </div>
+        <div class="kpi-val text-rose">{{ money(r.summary.deductions) }}</div>
+        <div class="kpi-sub-row">
+          <span class="sub-muted">PF, ESI, Professional Tax &amp; TDS</span>
+        </div>
+      </div>
+
+      <!-- Card 4: Total Net Disbursal -->
+      <div class="dr-kpi-card kpi-emerald">
+        <div class="kpi-top">
+          <span class="kpi-label">Total Net Disbursal</span>
+          <div class="kpi-icon icon-emerald">
+            <svg lucideWallet [size]="18"></svg>
+          </div>
+        </div>
+        <div class="kpi-val text-emerald">{{ money(r.summary.net) }}</div>
+        <div class="kpi-sub-row">
+          <span class="sub-muted">Employer PF/ESI: {{ money(r.summary.employerContributions) }} · {{ r.regimeCode }} regime</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar: Filter Tabs, Expand Toggle & Search -->
+    <div class="dr-toolbar">
+      <div class="dr-filter-tabs">
+        <button type="button" class="dr-tab-pill" [class.active]="filter() === 'ALL'" (click)="filter.set('ALL')">
+          <svg lucideUsers [size]="14"></svg>
+          <span>All Employees</span>
+          <span class="tab-chip">{{ r.summary.employees }}</span>
+        </button>
+        <button type="button" class="dr-tab-pill ok" [class.active]="filter() === 'OK'" (click)="filter.set('OK')">
+          <svg lucideCheckCircle2 [size]="14"></svg>
+          <span>Ready to Pay</span>
+          <span class="tab-chip ok">{{ r.summary.payslips - r.summary.toCheck }}</span>
+        </button>
+        <button type="button" class="dr-tab-pill warn" [class.active]="filter() === 'CHECK'" (click)="filter.set('CHECK')">
+          <svg lucideAlertCircle [size]="14"></svg>
+          <span>Needs Review</span>
+          <span class="tab-chip warn">{{ r.summary.toCheck }}</span>
+        </button>
+        <button type="button" class="dr-tab-pill red" [class.active]="filter() === 'BLOCKED'" (click)="filter.set('BLOCKED')">
+          <svg lucideAlertTriangle [size]="14"></svg>
+          <span>Can't Pay</span>
+          <span class="tab-chip red">{{ r.summary.blocked }}</span>
+        </button>
+      </div>
+
+      <div class="dr-toolbar-right">
+        <!-- Expand / Collapse All Toggle -->
+        <button type="button" class="dr-btn-toggle-all" (click)="toggleAll()" [disabled]="!rows().length">
+          <svg lucideChevronDown [size]="14" *ngIf="!isAllExpanded()"></svg>
+          <svg lucideChevronUp [size]="14" *ngIf="isAllExpanded()"></svg>
+          <span>{{ isAllExpanded() ? 'Collapse All' : 'Expand All' }}</span>
+        </button>
+
+        <!-- Search Input -->
+        <div class="dr-search-wrap">
+          <svg lucideSearch [size]="14" class="dr-search-icon"></svg>
+          <input
+            type="text"
+            class="dr-search-input"
+            placeholder="Search employee, code, group, dept…"
+            [ngModel]="search()"
+            (ngModelChange)="search.set($event)"
+          />
+          <button
+            type="button"
+            class="dr-search-clear"
+            *ngIf="search()"
+            (click)="search.set('')"
+            title="Clear search"
+          >
+            <svg lucideX [size]="13"></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Employee Payslip Table Card -->
+    <div class="dr-table-card">
+      <table class="dr-table">
+        <thead>
+          <tr>
+            <th>EMPLOYEE</th>
+            <th>SALARY GROUP</th>
+            <th class="num">ATTENDANCE</th>
+            <th class="num">SIMULATED GROSS</th>
+            <th class="num">DEDUCTIONS</th>
+            <th class="num">NET PAYOUT</th>
+            <th>STATUS</th>
+            <th class="text-center">BREAKDOWN</th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let x of rows()">
+            <tr
+              class="dr-row"
+              [class.expanded]="open().has(x.employeeId)"
+              (click)="x.status !== 'BLOCKED' && toggle(x.employeeId)"
+            >
+              <!-- Employee Column -->
+              <td>
+                <div class="dr-emp-cell">
+                  <div class="dr-avatar" [style.background]="getAvatarBg(x.name)">
+                    <img *ngIf="x.avatarUrl" [src]="x.avatarUrl" [alt]="x.name" (error)="x.avatarUrl = null">
+                    <ng-container *ngIf="!x.avatarUrl">{{ initials(x.name) }}</ng-container>
+                  </div>
+                  <div class="dr-emp-info">
+                    <div class="dr-name-row">
+                      <a
+                        class="dr-emp-name-link"
+                        [routerLink]="['/payroll/pay-profiles', x.employeeId]"
+                        (click)="$event.stopPropagation()"
+                        title="Open Pay Profile (Right click to open in new tab)"
+                      >
+                        <span>{{ x.name }}</span>
+                        <svg lucideExternalLink [size]="11" class="ext-icon"></svg>
+                      </a>
+                    </div>
+                    <div class="dr-emp-meta">
+                      <span class="emp-code" *ngIf="x.employeeCode">{{ x.employeeCode }}</span>
+                      <span class="meta-dot" *ngIf="x.employeeCode && (x.designation || x.department)">·</span>
+                      <span class="emp-desig" *ngIf="x.designation">{{ x.designation }}</span>
+                      <span class="meta-dot" *ngIf="x.designation && x.department">·</span>
+                      <span class="emp-dept" *ngIf="x.department">{{ x.department }}</span>
+                    </div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Salary Group Column -->
+              <td>
+                <span class="group-token" *ngIf="x.salaryGroupCode">{{ x.salaryGroupCode }}</span>
+                <span class="text-muted-dash" *ngIf="!x.salaryGroupCode">—</span>
+              </td>
+
+              <!-- Attendance Column -->
+              <td class="num">
+                <ng-container *ngIf="x.status === 'BLOCKED'">
+                  <span class="text-muted-dash">—</span>
+                </ng-container>
+                <ng-container *ngIf="x.status !== 'BLOCKED'">
+                  <span class="chip-exempt" *ngIf="x.lopExempt && !r.fullMonth" title="Exempt from loss of pay">
+                    Exempt
+                  </span>
+                  <span class="chip-full-month" *ngIf="r.fullMonth">
+                    Full month
+                  </span>
+                  <span
+                    class="chip-days"
+                    [class.has-lop]="(x.absences ?? 0) > 0"
+                    *ngIf="!r.fullMonth && !x.lopExempt"
+                    [title]="(x.absences ?? 0) > 0 ? (x.absences + ' day(s) absent') : 'Full attendance'"
+                  >
+                    <span class="days-dot"></span>
+                    {{ x.presentDays }}/{{ x.workingDays }} days
+                  </span>
+                </ng-container>
+              </td>
+
+              <!-- Gross Paid Column -->
+              <td class="num">
+                <div class="money-cell font-semibold text-slate-800">{{ money(x.grossPaid) }}</div>
+                <div class="money-sub text-muted" *ngIf="x.grossPaid !== x.grossFull && x.grossFull">
+                  of {{ money(x.grossFull) }}
+                </div>
+              </td>
+
+              <!-- Total Deductions Column -->
+              <td class="num">
+                <div class="money-cell font-semibold text-slate-700">{{ money(x.totalDeductions) }}</div>
+                <div class="money-sub text-muted" *ngIf="x.deductions?.length">
+                  {{ x.deductions.length }} line{{ x.deductions.length > 1 ? 's' : '' }}
+                </div>
+              </td>
+
+              <!-- Net Payout Column -->
+              <td class="num">
+                <div class="money-cell font-bold text-emerald">{{ money(x.net) }}</div>
+              </td>
+
+              <!-- Status Column -->
+              <td>
+                <div class="status-cell-wrap">
+                  <span class="dr-status-badge" [attr.data-s]="x.status">
+                    <span class="status-dot"></span>
+                    <span>{{ statusLabel(x.status) }}</span>
+                  </span>
+                  <div class="dr-row-warn" *ngIf="x.warnings?.length" [title]="x.warnings.join('\n')">
+                    <svg lucideAlertTriangle [size]="11"></svg>
+                    <span>{{ x.warnings[0] }}</span>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Action / Breakdown Column -->
+              <td class="text-center" (click)="$event.stopPropagation()">
+                <button
+                  type="button"
+                  class="dr-btn-breakdown"
+                  [class.active]="open().has(x.employeeId)"
+                  *ngIf="x.status !== 'BLOCKED'"
+                  (click)="toggle(x.employeeId)"
+                  title="Toggle payslip breakdown"
+                >
+                  <span>{{ open().has(x.employeeId) ? 'Hide' : 'Breakdown' }}</span>
+                  <svg lucideChevronUp [size]="13" *ngIf="open().has(x.employeeId)"></svg>
+                  <svg lucideChevronDown [size]="13" *ngIf="!open().has(x.employeeId)"></svg>
+                </button>
+                <button
+                  type="button"
+                  class="dr-btn-breakdown dr-btn-view"
+                  *ngIf="x.status !== 'BLOCKED'"
+                  (click)="viewPayslip(x)"
+                  title="Open the payslip as Salary Processing shows it"
+                >
+                  <svg lucideFileText [size]="13"></svg>
+                  <span>View payslip</span>
+                </button>
+                <span class="text-muted-dash" *ngIf="x.status === 'BLOCKED'">—</span>
+              </td>
+            </tr>
+
+            <!-- Expanded Payslip Drawer -->
+            <tr class="dr-expanded-row" *ngIf="open().has(x.employeeId)">
+              <td colspan="8">
+                <div class="dr-drawer-container">
+                  <!-- Drawer Top Bar -->
+                  <div class="drawer-header">
+                    <div class="drawer-header-left">
+                      <div class="drawer-icon-box">
+                        <svg lucideFileText [size]="16"></svg>
+                      </div>
+                      <div class="drawer-title-box">
+                        <span class="drawer-title">Simulated Payslip Breakdown for <strong>{{ x.name }}</strong></span>
+                        <span class="drawer-code-chip" *ngIf="x.employeeCode">{{ x.employeeCode }}</span>
+                        <span class="drawer-group-chip" *ngIf="x.salaryGroupCode">{{ x.salaryGroupCode }}</span>
+                      </div>
+                    </div>
+                    <div class="drawer-header-right">
+                      <a
+                        class="btn-profile-link"
+                        [routerLink]="['/payroll/pay-profiles', x.employeeId]"
+                        target="_blank"
+                        title="Open employee's pay profile in a new tab"
+                      >
+                        <span>Open Pay Profile</span>
+                        <svg lucideExternalLink [size]="12"></svg>
+                      </a>
+                    </div>
+                  </div>
+
+                  <!-- Dual Cards: Earnings & Deductions -->
+                  <div class="drawer-cards-grid">
+                    <!-- Earnings Card -->
+                    <div class="slip-card earnings-card">
+                      <div class="slip-card-head head-green">
+                        <div class="card-head-left">
+                          <svg lucideTrendingUp [size]="15"></svg>
+                          <span>Simulated Monthly Earnings</span>
+                        </div>
+                        <span class="card-sub-total">{{ money(x.grossPaid) }}</span>
+                      </div>
+
+                      <div class="slip-table-wrap">
+                        <table class="slip-sub-table">
+                          <thead>
+                            <tr>
+                              <th>COMPONENT</th>
+                              <th class="num">SIMULATED AMOUNT</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr *ngFor="let l of x.earnings">
+                              <td class="comp-col">
+                                <span class="comp-name">{{ l.name }}</span>
+                              </td>
+                              <td class="num">
+                                <span class="paid-val">{{ money(l.paid) }}</span>
+                                <span class="full-comp-note" *ngIf="l.paid !== l.full">
+                                  of {{ money(l.full) }}
+                                </span>
+                              </td>
+                            </tr>
+                            <tr class="tot-row">
+                              <td>Gross Earnings</td>
+                              <td class="num font-bold">{{ money(x.grossPaid) }}</td>
+                            </tr>
+                            <tr class="lop-row" *ngIf="x.lossOfPay">
+                              <td class="lop-label">
+                                <span class="lop-chip">
+                                  <svg lucideClock [size]="12"></svg>
+                                  Loss of pay ({{ x.absences }} day{{ (x.absences ?? 0) === 1 ? '' : 's' }})
+                                </span>
+                              </td>
+                              <td class="num lop-val">−{{ money(x.lossOfPay) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <!-- Deductions Card -->
+                    <div class="slip-card deductions-card">
+                      <div class="slip-card-head head-rose">
+                        <div class="card-head-left">
+                          <svg lucideReceipt [size]="15"></svg>
+                          <span>Statutory &amp; Tax Deductions</span>
+                        </div>
+                        <span class="card-sub-total">{{ money(x.totalDeductions) }}</span>
+                      </div>
+
+                      <div class="slip-table-wrap">
+                        <table class="slip-sub-table">
+                          <thead>
+                            <tr>
+                              <th>DEDUCTION</th>
+                              <th class="num">SIMULATED AMOUNT</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr *ngFor="let l of x.deductions">
+                              <td class="comp-col">
+                                <span class="comp-name">{{ l.name }}</span>
+                              </td>
+                              <td class="num font-medium">{{ money(l.paid) }}</td>
+                            </tr>
+                            <tr *ngIf="!x.deductions?.length">
+                              <td colspan="2" class="text-muted text-center py-2">No deductions recorded</td>
+                            </tr>
+                            <tr class="tot-row">
+                              <td>Total Deductions</td>
+                              <td class="num font-bold text-rose">{{ money(x.totalDeductions) }}</td>
+                            </tr>
+                            <tr class="net-row">
+                              <td class="net-label">Net Take-Home Pay</td>
+                              <td class="num font-extrabold text-emerald">{{ money(x.net) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <!-- Employer Statutory & CTC Footer -->
+                      <div class="slip-card-footer">
+                        <div class="statutory-note">
+                          <svg lucideShieldCheck [size]="13"></svg>
+                          <span>Employer PF/ESI contribution: <strong>{{ money(x.employerContributions) }}</strong> (Part of CTC, excluded from payslip deductions)</span>
+                        </div>
+                        <div class="ctc-note">
+                          <span>Annual CTC: <strong>{{ money(x.annualCtc) }}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Net Equation Ribbon -->
+                  <div class="drawer-equation-ribbon">
+                    <div class="eq-item">
+                      <span class="eq-lbl">Simulated Gross</span>
+                      <span class="eq-val text-slate-900">{{ money(x.grossPaid) }}</span>
+                    </div>
+                    <div class="eq-op">−</div>
+                    <div class="eq-item">
+                      <span class="eq-lbl">Total Deductions</span>
+                      <span class="eq-val text-rose">{{ money(x.totalDeductions) }}</span>
+                    </div>
+                    <div class="eq-op">=</div>
+                    <div class="eq-item highlight">
+                      <span class="eq-lbl">Net Take-Home Payout</span>
+                      <span class="eq-val text-emerald">{{ money(x.net) }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Drawer Warnings & Notes -->
+                  <div class="drawer-notices" *ngIf="x.warnings?.length || x.notes?.length">
+                    <!-- Warnings -->
+                    <div class="notice-card warn" *ngIf="x.warnings?.length">
+                      <div class="notice-icon">
+                        <svg lucideAlertTriangle [size]="16"></svg>
+                      </div>
+                      <div class="notice-body">
+                        <div class="notice-title">Engine Warnings &amp; Missing Data</div>
+                        <ul class="notice-list">
+                          <li *ngFor="let w of x.warnings">{{ w }}</li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="notice-card info" *ngIf="x.notes?.length">
+                      <div class="notice-icon">
+                        <svg lucideInfo [size]="16"></svg>
+                      </div>
+                      <div class="notice-body">
+                        <div class="notice-title">Simulation Explanations</div>
+                        <ul class="notice-list">
+                          <li *ngFor="let n of x.notes">{{ n }}</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+
+          <!-- Empty State -->
+          <tr *ngIf="!rows().length">
+            <td colspan="8" class="dr-empty-cell">
+              <div class="dr-empty-card">
+                <div class="empty-icon-wrap">
+                  <svg lucideUsers [size]="28" *ngIf="!search()"></svg>
+                  <svg lucideSearch [size]="28" *ngIf="search()"></svg>
+                </div>
+                <h3 class="empty-title">{{ search() ? 'No employees matching "' + search() + '"' : 'No employees in this view' }}</h3>
+                <p class="empty-desc">
+                  {{ search() ? 'Try checking your search terms or clear the filter to see more employees.' : 'No records match the active filter criteria for this period.' }}
+                </p>
+                <button type="button" class="btn-clear-filter" *ngIf="search()" (click)="search.set('')">
+                  Clear Search
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </ng-container>
+
+  <app-payslip-view *ngIf="viewing() as v" [payslip]="v" statusLabel="DRY RUN — NOT SAVED" (closed)="viewing.set(null)">
+    <button class="btn btn-outline" (click)="viewing.set(null)">Close</button>
+  </app-payslip-view>
+</div>

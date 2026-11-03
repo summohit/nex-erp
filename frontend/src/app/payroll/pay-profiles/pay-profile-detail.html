@@ -4,186 +4,549 @@
   </div>
 
   <ng-container *ngIf="data() as d">
-    <header class="pp-header">
-      <div>
-        <button type="button" class="pp-back" (click)="back()">← Pay Profiles</button>
-        <h1>{{ d.employee.firstName }} {{ d.employee.lastName }}</h1>
-        <p>
-          {{ d.employee.employmentType || '—' }} · {{ d.employee.payType === 'CONSULTANT' ? 'Consultant' : 'Employee' }}
-          <span *ngIf="d.employee.joiningDate"> · joined {{ d.employee.joiningDate | date: 'd MMM y' }}</span>
-        </p>
-      </div>
-      <button type="button" class="pp-btn pp-btn-primary" *ngIf="canEdit() && !formOpen()" (click)="openNewVersion()">
-        {{ d.versions.length ? 'New version (revision)' : 'Create pay profile' }}
-      </button>
-    </header>
-
-    <div class="pp-banner" *ngIf="!current() && !formOpen()">
-      No pay profile yet. {{ canEdit() ? 'Create one here, or use Import on the Pay Profiles page.' : 'Finance creates it.' }}
-    </div>
-
-    <!-- New version form -->
-    <div class="pp-card" *ngIf="formOpen() && form">
-      <h3>{{ d.versions.length ? 'New version' : 'Create pay profile' }}</h3>
-      <div class="pp-grid">
-        <div class="pp-form">
-          <label class="pp-field">
-            <span>Worker type</span>
-            <select class="pp-input" [ngModel]="form.workerType" (ngModelChange)="onWorkerTypeChange($event)">
-              <option [ngValue]="null">— not set —</option>
-              <option *ngFor="let w of workerTypes()" [ngValue]="w.value">{{ w.label }}</option>
-            </select>
-            <span class="pp-hint">Narrows the salary groups to the ones that pay this way.</span>
-          </label>
-          <label class="pp-field">
-            <span>Salary group *</span>
-            <select class="pp-input" [ngModel]="form.salaryGroupCode" (ngModelChange)="onGroupChange($event)">
-              <option [ngValue]="null">— pick —</option>
-              <option *ngFor="let g of groupChoices()" [ngValue]="g.code">{{ g.name }} · {{ g.code }}</option>
-            </select>
-          </label>
-          <label class="pp-field">
-            <span>Annual CTC (₹) *</span>
-            <input class="pp-input" type="number" min="0" step="1000" [(ngModel)]="form.annualCtc" (change)="runPreview()">
-          </label>
-          <label class="pp-field">
-            <span>Takes effect from *</span>
-            <input class="pp-input" type="date" [(ngModel)]="form.effectiveFrom">
-            <span class="pp-hint">A past date is allowed; arrears come with revisions (Phase 5).</span>
-          </label>
-          <label class="pp-field">
-            <span>Payment method</span>
-            <select class="pp-input" [(ngModel)]="form.paymentMethod">
-              <option [ngValue]="null">— not set —</option>
-              <option *ngFor="let m of paymentMethods()" [ngValue]="m.value">{{ m.label }}</option>
-            </select>
-          </label>
-
-          <ng-container *ngIf="overridableLines().length">
-            <div class="pp-field wide"><span>Component overrides <span class="pp-hint">— leave empty to use the group's rule</span></span></div>
-            <label class="pp-field" *ngFor="let l of overridableLines()">
-              <span>{{ l.component?.name || l.componentId }} (₹ / month)</span>
-              <input class="pp-input" type="number" min="0" [(ngModel)]="form.overrides[l.component?.code || '']" (change)="runPreview()" placeholder="Group rule">
-            </label>
-          </ng-container>
-
-          <label class="pp-field wide">
-            <span>Reason {{ form.overrides && (form.overrides | keyvalue).length ? '*' : '' }}</span>
-            <input class="pp-input" [(ngModel)]="form.reason" placeholder="e.g. Annual appraisal, promotion, correction…" maxlength="500">
-          </label>
-        </div>
-
-        <div>
-          <p class="pp-muted" *ngIf="!preview() && !previewing()">Pick a group and CTC to see the breakup.</p>
-          <p class="pp-muted" *ngIf="previewing()">Calculating…</p>
-          <ng-container *ngTemplateOutlet="breakupTpl; context: { $implicit: preview() }"></ng-container>
-        </div>
-      </div>
-      <div class="pp-actions">
-        <button type="button" class="pp-btn" (click)="formOpen.set(false)">Cancel</button>
-        <button type="button" class="pp-btn pp-btn-primary" (click)="saveVersion()" [disabled]="saving()">
-          {{ saving() ? 'Saving…' : 'Save version' }}
+    <!-- Breadcrumb & Employee Hero Header -->
+    <header class="pp-detail-header">
+      <div class="pp-breadcrumb-row">
+        <button type="button" class="pp-back-pill" (click)="back()">
+          <svg lucideArrowLeft [size]="14"></svg>
+          <span>Back to Pay Profiles</span>
         </button>
       </div>
+      <div class="pp-employee-hero">
+        <div class="pp-hero-avatar" [style.background]="getAvatarBg(d.employee.firstName + ' ' + d.employee.lastName)">
+          <img *ngIf="d.employee.avatarUrl" class="pp-avatar-img" [src]="d.employee.avatarUrl" [alt]="d.employee.firstName" (error)="d.employee.avatarUrl = null">
+          <ng-container *ngIf="!d.employee.avatarUrl">{{ getInitials(d.employee.firstName + ' ' + d.employee.lastName) }}</ng-container>
+        </div>
+        <div class="pp-hero-info">
+          <div class="pp-hero-name-row">
+            <h1 class="pp-hero-name">{{ d.employee.firstName }} {{ d.employee.lastName }}</h1>
+            <a class="pp-profile-link" [routerLink]="['/employees', d.employee.id, 'profile']">
+              {{ d.employee.employeeCode ? d.employee.employeeCode + ' · ' : '' }}View employee profile ↗
+            </a>
+            <span class="pp-badge-type" [class.consultant]="d.employee.payType === 'CONSULTANT'">
+              {{ d.employee.payType === 'CONSULTANT' ? 'Consultant' : 'Regular Employee' }}
+            </span>
+            <span class="pp-status-pill verified" *ngIf="current()">
+              <svg lucideCheckCircle2 [size]="12"></svg>
+              <span>Enrolled (v{{ current()?.version }})</span>
+            </span>
+            <span class="pp-status-pill warning" *ngIf="!current()">
+              <svg lucideAlertCircle [size]="12"></svg>
+              <span>Setup Required</span>
+            </span>
+          </div>
+          <div class="pp-hero-meta">
+            <span *ngIf="d.employee.designation?.name || d.employee.employmentType">
+              {{ d.employee.designation?.name || d.employee.employmentType }}
+            </span>
+            <span class="dot-sep" *ngIf="d.employee.department?.name">·</span>
+            <span *ngIf="d.employee.department?.name">{{ d.employee.department?.name }}</span>
+            <span class="dot-sep" *ngIf="d.employee.joiningDate">·</span>
+            <span *ngIf="d.employee.joiningDate" class="pp-join-date">
+              <svg lucideCalendarDays [size]="13"></svg>
+              Joined {{ d.employee.joiningDate | date: 'd MMM y' }}
+            </span>
+          </div>
+        </div>
+        <div class="pp-hero-action">
+          <button type="button" class="btn-primary" *ngIf="canEdit() && !formOpen()" (click)="openNewVersion()">
+            <svg lucidePlus [size]="15"></svg>
+            <span>{{ d.versions.length ? 'New Version (Revision)' : 'Create Pay Profile' }}</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notice banner when no profile exists yet -->
+    <div class="pp-notice-banner" *ngIf="!current() && !formOpen()">
+      <div class="pp-notice-icon">
+        <svg lucideAlertCircle [size]="20"></svg>
+      </div>
+      <div class="pp-notice-text">
+        <div class="pp-notice-title">No Active Compensation Profile</div>
+        <div class="pp-notice-desc">
+          No pay profile yet. Create one here, or use Import on the Pay Profiles page.
+        </div>
+      </div>
+      <button type="button" class="btn-sm btn-primary pp-notice-btn" *ngIf="canEdit()" (click)="openNewVersion()">
+        <svg lucidePlus [size]="14"></svg>
+        <span>Create Pay Profile</span>
+      </button>
     </div>
 
-    <div class="pp-grid">
-      <!-- Today's breakup -->
-      <div class="pp-card" *ngIf="current() as c">
-        <h3>In force today · version {{ c.version }}</h3>
-        <div class="pp-kv">
-          <div><span>Salary group</span><strong>{{ c.salaryGroupCode }}</strong></div>
-          <div><span>Annual CTC</span><strong>{{ money(c.annualCtc) }}</strong></div>
-          <div><span>Since</span><strong>{{ c.effectiveFrom | date: 'd MMM y' }}</strong></div>
-          <div><span>Worker type</span><strong>{{ optionLabel(workerTypes(), c.workerType) }}</strong></div>
-          <div><span>Payment</span><strong>{{ optionLabel(paymentMethods(), c.paymentMethod) }}</strong></div>
+    <!-- Create Pay Profile / New Version — modal -->
+    <div class="pp-modal-overlay" *ngIf="formOpen() && form" (click)="closeForm()">
+    <div class="pp-card pp-form-card pp-modal animate-fade" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+      <div class="pp-card-header">
+        <div class="pp-card-header-left">
+          <div class="pp-header-icon-badge">
+            <svg lucideCalculator [size]="20"></svg>
+          </div>
+          <div>
+            <h3 class="pp-card-title">{{ d.versions.length ? 'New Version' : 'Create Pay Profile' }}</h3>
+            <p class="pp-card-subtitle">Configure compensation parameters and salary group. Every change is tracked as a new version.</p>
+          </div>
         </div>
-        <div style="margin-top: 14px;">
+        <button type="button" class="pp-modal-close" (click)="closeForm()" aria-label="Close">✕</button>
+      </div>
+
+      <div class="pp-form-error" *ngIf="serverError()" role="alert">
+        <svg lucideAlertCircle [size]="16"></svg>
+        <span>{{ serverError() }}</span>
+      </div>
+
+      <div class="pp-version-grid">
+        <!-- Left: Form inputs -->
+        <div class="pp-form-pane">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Worker Type</label>
+              <select class="form-control" [ngModel]="form.workerType" (ngModelChange)="onWorkerTypeChange($event)">
+                <option [ngValue]="null">— not set —</option>
+                <option *ngFor="let w of workerTypes()" [ngValue]="w.value">{{ w.label }}</option>
+              </select>
+              <span class="field-hint-text">Narrows the salary groups to the ones that pay this way.</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Salary Group <span class="text-rose-500">*</span></label>
+              <select class="form-control" [class.is-invalid]="err('salaryGroupCode')" [ngModel]="form.salaryGroupCode" (ngModelChange)="onGroupChange($event)">
+                <option [ngValue]="null">— pick —</option>
+                <option *ngFor="let g of groupChoices()" [ngValue]="g.code">{{ g.name }} ({{ g.code }})</option>
+              </select>
+              <span class="field-error" *ngIf="err('salaryGroupCode') as m">{{ m }}</span>
+              <span class="field-hint-text" *ngIf="!err('salaryGroupCode')">Determines calculation rules and allowances.</span>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Annual CTC (₹) <span class="text-rose-500">*</span></label>
+              <div class="input-currency-wrapper">
+                <span class="currency-prefix">₹</span>
+                <input class="form-control currency-input" [class.is-invalid]="err('annualCtc')" type="number" min="0" step="1000" [(ngModel)]="form.annualCtc" (change)="runPreview()" placeholder="e.g. 600000">
+              </div>
+              <span class="field-error" *ngIf="err('annualCtc') as m">{{ m }}</span>
+              <span class="field-warn" *ngIf="!err('annualCtc') && ctcWarning() as w">{{ w }}</span>
+              <span class="field-hint-text" *ngIf="form.annualCtc > 0">
+                Monthly equivalent: {{ getMonthlyEquivalent(form.annualCtc) }}
+              </span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Takes Effect From <span class="text-rose-500">*</span></label>
+              <input class="form-control" [class.is-invalid]="err('effectiveFrom')" type="date" [(ngModel)]="form.effectiveFrom">
+              <span class="field-error" *ngIf="err('effectiveFrom') as m">{{ m }}</span>
+              <span class="field-hint-text" *ngIf="!err('effectiveFrom')">A past date is allowed; arrears come with revisions.</span>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Payment Method</label>
+              <select class="form-control" [(ngModel)]="form.paymentMethod">
+                <option [ngValue]="null">— not set —</option>
+                <option *ngFor="let m of paymentMethods()" [ngValue]="m.value">{{ m.label }}</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Reason {{ form.overrides && (form.overrides | keyvalue).length ? '*' : '' }}</label>
+              <input class="form-control" [class.is-invalid]="err('reason')" [(ngModel)]="form.reason" placeholder="e.g. Annual appraisal, promotion, correction…" maxlength="500">
+              <span class="field-error" *ngIf="err('reason') as m">{{ m }}</span>
+            </div>
+          </div>
+
+          <!-- Component Overrides -->
+          <div class="pp-overrides-card" *ngIf="overridableLines().length">
+            <div class="pp-overrides-header">
+              <span class="font-semibold text-slate-800">Component Overrides</span>
+              <span class="text-xs text-muted">Leave empty to use group's default rule</span>
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group" *ngFor="let l of overridableLines()">
+                <label class="form-label">{{ l.component?.name || l.componentId }} (₹ / month)</label>
+                <div class="input-currency-wrapper">
+                  <span class="currency-prefix">₹</span>
+                  <input class="form-control currency-input" [class.is-invalid]="err('override:' + (l.component?.code || ''))" type="number" min="0" [(ngModel)]="form.overrides[l.component?.code || '']" (change)="runPreview()" placeholder="Group rule">
+                </div>
+                <span class="field-error" *ngIf="err('override:' + (l.component?.code || '')) as m">{{ m }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pp-form-actions">
+            <button type="button" class="btn-outline-modern" (click)="closeForm()">Cancel</button>
+            <button type="button" class="btn-primary" (click)="saveVersion()" [disabled]="saving()">
+              <svg lucideSave [size]="15"></svg>
+              <span>{{ saving() ? 'Saving…' : 'Save Version' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Live breakup preview -->
+        <div class="pp-preview-pane">
+          <div class="pp-preview-empty" *ngIf="!preview() && !previewing()">
+            <div class="pp-calc-icon">
+              <svg lucideCalculator [size]="32"></svg>
+            </div>
+            <div class="empty-calc-title">Pick a group and CTC to see the breakup</div>
+            <div class="empty-calc-desc">Real-time simulation will calculate gross earnings, statutory deductions, net take-home, and employer liabilities.</div>
+          </div>
+
+          <div class="pp-preview-loading" *ngIf="previewing()">
+            <svg lucideRefreshCw class="animate-spin" [size]="24"></svg>
+            <span>Calculating breakdown…</span>
+          </div>
+
+          <div class="pp-preview-result animate-fade" *ngIf="preview() as b">
+            <!-- Fintech Summary Metric Tiles -->
+            <div class="fintech-summary-grid">
+              <div class="fintech-tile take-home">
+                <div class="tile-label">Net Take-Home</div>
+                <div class="tile-val">{{ money(b.netPayMonthly) }} <span class="tile-unit">/ mo</span></div>
+                <div class="tile-sub">Estimated Monthly Payout</div>
+              </div>
+              <div class="fintech-tile gross">
+                <div class="tile-label">Gross Earnings</div>
+                <div class="tile-val">{{ money(b.grossMonthly) }} <span class="tile-unit">/ mo</span></div>
+                <div class="tile-sub">Total Earnings</div>
+              </div>
+              <div class="fintech-tile deductions">
+                <div class="tile-label">Deductions</div>
+                <div class="tile-val">{{ money(b.totalDeductionsMonthly) }} <span class="tile-unit">/ mo</span></div>
+                <div class="tile-sub">Employee Statutory</div>
+              </div>
+              <div class="fintech-tile ctc">
+                <div class="tile-label">Monthly CTC</div>
+                <div class="tile-val">{{ money(b.ctcMonthly) }} <span class="tile-unit">/ mo</span></div>
+                <div class="tile-sub">Total Company Cost</div>
+              </div>
+            </div>
+
+            <!-- Itemized Table -->
+            <div class="pp-itemized-wrap">
+              <ng-container *ngTemplateOutlet="breakupTpl; context: { $implicit: b }"></ng-container>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <!-- Active Profile & Details Grid -->
+    <div class="pp-main-grid">
+      <!-- In Force Today (if exists) -->
+      <div class="pp-card pp-active-profile-card" *ngIf="current() as c">
+        <div class="pp-card-header">
+          <div class="pp-card-header-left">
+            <div class="pp-header-icon-badge badge-active">
+              <svg lucideCheckCircle2 [size]="20"></svg>
+            </div>
+            <div>
+              <div class="pp-title-with-badge">
+                <h3 class="pp-card-title">In force today · version {{ c.version }}</h3>
+              </div>
+              <p class="pp-card-subtitle">Active compensation structure governing monthly payroll runs.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Compensation Overview Card -->
+        <div class="pp-comp-overview">
+          <!-- 3 Fintech Metric Tiles -->
+          <div class="pp-comp-tiles-grid">
+            <!-- Tile 1: Annual CTC -->
+            <div class="pp-comp-tile ctc-tile">
+              <div class="comp-tile-top">
+                <span class="comp-tile-label">Annual CTC</span>
+                <div class="comp-tile-icon icon-blue">
+                  <svg lucideCalculator [size]="15"></svg>
+                </div>
+              </div>
+              <div class="comp-tile-main-val">{{ money(c.annualCtc) }}</div>
+              <div class="comp-tile-sub">
+                <span class="comp-pill-sub">{{ money(c.annualCtc ? c.annualCtc / 12 : 0) }}/mo</span>
+                <span class="comp-text-muted">Total Company Cost</span>
+              </div>
+            </div>
+
+            <!-- Tile 2: Salary Group -->
+            <div class="pp-comp-tile group-tile">
+              <div class="comp-tile-top">
+                <span class="comp-tile-label">Salary Group &amp; Rules</span>
+                <div class="comp-tile-icon icon-indigo">
+                  <svg lucideBuilding [size]="15"></svg>
+                </div>
+              </div>
+              <div class="comp-group-name" [title]="getSalaryGroupName(c.salaryGroupCode)">
+                {{ getSalaryGroupName(c.salaryGroupCode) }}
+              </div>
+              <div class="comp-tile-sub">
+                <span class="comp-code-badge">{{ c.salaryGroupCode }}</span>
+                <span class="comp-version-pill">Version {{ c.version }}</span>
+              </div>
+            </div>
+
+            <!-- Tile 3: Effective Schedule -->
+            <div class="pp-comp-tile schedule-tile">
+              <div class="comp-tile-top">
+                <span class="comp-tile-label">Effective Schedule</span>
+                <div class="comp-tile-icon icon-emerald">
+                  <svg lucideCalendarDays [size]="15"></svg>
+                </div>
+              </div>
+              <div class="comp-schedule-main">
+                <span class="since-prefix">In force since</span>
+                <strong class="since-date">{{ c.effectiveFrom | date: 'd MMM y' }}</strong>
+              </div>
+              <div class="comp-tile-sub">
+                <span class="comp-status-chip active">
+                  <span class="pulse-dot"></span>
+                  Active Version (v{{ c.version }})
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Meta Strip -->
+          <div class="pp-comp-meta-strip">
+            <div class="meta-strip-left">
+              <div class="meta-item">
+                <span class="meta-k">Worker Type:</span>
+                <span class="meta-v-pill">
+                  {{ optionLabel(workerTypes(), c.workerType) !== '—' ? optionLabel(workerTypes(), c.workerType) : 'Regular Employee' }}
+                </span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-k">Payment:</span>
+                <span class="meta-v-pill payment">
+                  <svg lucideCreditCard [size]="12"></svg>
+                  {{ optionLabel(paymentMethods(), c.paymentMethod) !== '—' ? optionLabel(paymentMethods(), c.paymentMethod) : 'Direct Bank Remittance' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="meta-strip-right" *ngIf="d.breakup as b">
+              <div class="meta-metric-chip gross">
+                <span class="chip-label">Gross:</span>
+                <strong>{{ money(b.grossMonthly) }}</strong><span class="chip-unit">/mo</span>
+              </div>
+              <div class="meta-metric-chip net">
+                <span class="chip-label">Take-Home:</span>
+                <strong>{{ money(b.netPayMonthly) }}</strong><span class="chip-unit">/mo</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pp-breakup-container" *ngIf="d.breakup">
           <ng-container *ngTemplateOutlet="breakupTpl; context: { $implicit: d.breakup }"></ng-container>
         </div>
       </div>
 
-      <!-- Verify PAN / UAN / bank against the uploaded documents -->
-      <div class="pp-card">
-        <h3>Verify against documents</h3>
-        <p class="pp-muted pp-note">Open the document, check the number, then Verify. AI-read values are only suggestions until you do.</p>
+      <!-- Statutory, Compliance & Banking Details Card -->
+      <div class="pp-card pp-statutory-card">
+        <div class="pp-card-header">
+          <div class="pp-card-header-left">
+            <div class="pp-header-icon-badge badge-statutory">
+              <svg lucideShieldCheck [size]="20"></svg>
+            </div>
+            <div>
+              <h3 class="pp-card-title">Tax, PF and bank details</h3>
+              <p class="pp-card-subtitle">Statutory identification numbers, EPFO/ESIC registrations, and bank remittance account.</p>
+            </div>
+          </div>
+          <button type="button" class="btn-primary" (click)="saveDetails()" [disabled]="savingDetails()">
+            <svg lucideSave [size]="15"></svg>
+            <span>{{ savingDetails() ? 'Saving…' : 'Save details' }}</span>
+          </button>
+        </div>
 
-        <div class="pp-verify" *ngFor="let v of verifyBlocks(d)">
-          <div class="pp-verify-head">
-            <strong>{{ v.title }}</strong>
-            <span class="pp-state" [attr.data-s]="v.state">{{ stateLabel(v.state) }}</span>
-            <span class="pp-muted" *ngIf="v.verifiedAt">· verified {{ v.verifiedAt | date: 'd MMM y' }}</span>
+        <!-- Section 1: Tax & Identity (PAN & UAN) -->
+        <div class="pp-detail-section">
+          <div class="section-badge-header">
+            <div class="section-badge-title">
+              <svg lucideFileText [size]="15"></svg>
+              <span>Tax &amp; Identity</span>
+            </div>
           </div>
 
-          <div class="pp-docs" *ngIf="v.documents.length; else noDoc">
-            <a *ngFor="let doc of v.documents" [href]="doc.fileUrl" target="_blank" rel="noopener noreferrer" class="pp-doc">
-              📄 {{ doc.fileName || doc.documentType }} <span class="pp-muted">· {{ doc.createdAt | date: 'd MMM y' }}</span>
-            </a>
-          </div>
-          <ng-template #noDoc><p class="pp-muted pp-note">No {{ v.title }} document uploaded.</p></ng-template>
+          <div class="detail-inputs-grid">
+            <!-- PAN -->
+            <div class="form-group">
+              <div class="label-with-meta">
+                <label class="form-label">PAN</label>
+                <span class="verify-pill verified" *ngIf="d.employee.panVerifiedAt">
+                  <svg lucideCheckCircle2 [size]="11"></svg> Verified
+                </span>
+                <span class="verify-pill pending" *ngIf="!d.employee.panVerifiedAt && details['panNumber']">
+                  Unverified
+                </span>
+              </div>
+              <input class="form-control" [(ngModel)]="details['panNumber']" placeholder="ABCDE1234F" maxlength="10" [disabled]="!canEdit()">
+              
+              <!-- Documents & AI Suggestions for PAN -->
+              <div class="pp-doc-meta" *ngFor="let doc of d.employee.documents">
+                <a *ngIf="doc.documentType === 'PAN Card'" [href]="doc.fileUrl" target="_blank" rel="noopener noreferrer" class="pp-doc-pill">
+                  <svg lucideEye [size]="12"></svg>
+                  <span>{{ doc.fileName || 'PAN Card' }}</span>
+                </a>
+              </div>
+            </div>
 
-          <div class="pp-sugg" *ngFor="let sg of v.suggestions">
-            <span>🤖 AI read <code>{{ sg.value }}</code> <span class="pp-muted">({{ fieldLabel(sg.field) }}){{ sg.note ? ' · ' + sg.note : '' }}</span></span>
-            <span class="pp-sugg-actions" *ngIf="canEdit()">
-              <button type="button" class="pp-link" (click)="useSuggestion(sg)">Use this</button>
-              <button type="button" class="pp-link pp-danger" (click)="rejectSuggestion(sg)">Wrong</button>
-            </span>
-          </div>
-          <p class="pp-muted pp-note" *ngFor="let u of v.unreadable">⚠ {{ u.note }}</p>
-
-          <div class="pp-form">
-            <label class="pp-field" *ngFor="let f of v.fields">
-              <span>{{ f.label }}</span>
-              <input class="pp-input" [(ngModel)]="details[f.key]" [placeholder]="f.placeholder" [attr.maxlength]="f.max" [disabled]="!canEdit()">
-            </label>
-          </div>
-          <div class="pp-actions" *ngIf="canEdit()">
-            <button type="button" class="pp-btn pp-btn-primary" (click)="verify(v.detail)" [disabled]="verifying() === v.detail">
-              {{ verifying() === v.detail ? 'Saving…' : (v.state === 'VERIFIED' ? 'Save & verify again' : 'Verify') }}
-            </button>
+            <!-- UAN (not shown for consultants) -->
+            <div class="form-group" *ngIf="d.employee.payType !== 'CONSULTANT'">
+              <div class="label-with-meta">
+                <label class="form-label">UAN</label>
+                <span class="verify-pill verified" *ngIf="d.employee.uanVerifiedAt">
+                  <svg lucideCheckCircle2 [size]="11"></svg> Verified
+                </span>
+                <span class="verify-pill pending" *ngIf="!d.employee.uanVerifiedAt && details['uanNumber']">
+                  Unverified
+                </span>
+              </div>
+              <input class="form-control" [(ngModel)]="details['uanNumber']" placeholder="12 digits" maxlength="12" [disabled]="!canEdit()">
+              
+              <!-- Documents for UAN -->
+              <div class="pp-doc-meta" *ngFor="let doc of d.employee.documents">
+                <a *ngIf="doc.documentType === 'UAN'" [href]="doc.fileUrl" target="_blank" rel="noopener noreferrer" class="pp-doc-pill">
+                  <svg lucideEye [size]="12"></svg>
+                  <span>{{ doc.fileName || 'UAN Document' }}</span>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- PF / ESI numbers: no document to check against -->
-        <div class="pp-verify" *ngIf="d.employee.payType !== 'CONSULTANT'">
-          <div class="pp-verify-head"><strong>PF and ESI numbers</strong></div>
-          <div class="pp-form">
-            <label class="pp-field"><span>PF number</span><input class="pp-input" [(ngModel)]="details['pfNumber']" [disabled]="!canEdit()"></label>
-            <label class="pp-field"><span>ESI number</span><input class="pp-input" [(ngModel)]="details['esiNumber']" [disabled]="!canEdit()"></label>
+        <!-- Section 2: Statutory Numbers (PF & ESI) -->
+        <div class="pp-detail-section" *ngIf="d.employee.payType !== 'CONSULTANT'">
+          <div class="section-badge-header">
+            <div class="section-badge-title">
+              <svg lucideReceipt [size]="15"></svg>
+              <span>Statutory Compliance</span>
+            </div>
           </div>
-          <div class="pp-actions" *ngIf="canEdit()">
-            <button type="button" class="pp-btn" (click)="saveDetails()" [disabled]="savingDetails()">
-              {{ savingDetails() ? 'Saving…' : 'Save' }}
-            </button>
+          <div class="detail-inputs-grid">
+            <div class="form-group">
+              <label class="form-label">PF number</label>
+              <input class="form-control" [(ngModel)]="details['pfNumber']" placeholder="e.g. 100462538717" [disabled]="!canEdit()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">ESI number</label>
+              <input class="form-control" [(ngModel)]="details['esiNumber']" placeholder="e.g. 3100012345" [disabled]="!canEdit()">
+            </div>
           </div>
+        </div>
+
+        <!-- Section 3: Bank Remittance Details -->
+        <div class="pp-detail-section">
+          <div class="section-badge-header">
+            <div class="section-badge-title">
+              <svg lucideBuilding [size]="15"></svg>
+              <span>Bank Details</span>
+            </div>
+            <span class="verify-pill verified" *ngIf="d.employee.bankVerifiedAt">
+              <svg lucideCheckCircle2 [size]="11"></svg> Verified
+            </span>
+          </div>
+
+          <div class="detail-inputs-grid-3">
+            <div class="form-group">
+              <label class="form-label">Bank name</label>
+              <input class="form-control" [(ngModel)]="details['bankName']" placeholder="e.g. HDFC Bank" [disabled]="!canEdit()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Account number</label>
+              <input class="form-control" [(ngModel)]="details['bankAccountNumber']" placeholder="Digits only" [disabled]="!canEdit()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">IFSC</label>
+              <input class="form-control" [(ngModel)]="details['ifscCode']" placeholder="HDFC0001234" maxlength="11" [disabled]="!canEdit()">
+            </div>
+          </div>
+
+          <div class="pp-doc-meta" *ngFor="let doc of d.employee.documents">
+            <a *ngIf="doc.documentType === 'Bank Proof / Cancelled Cheque'" [href]="doc.fileUrl" target="_blank" rel="noopener noreferrer" class="pp-doc-pill">
+              <svg lucideEye [size]="12"></svg>
+              <span>{{ doc.fileName || 'Cancelled Cheque' }}</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- AI Suggestions Box if any found -->
+        <div class="pp-ai-suggestions-box" *ngIf="d.suggestions.length">
+          <div class="ai-box-header">
+            <svg lucideSparkles [size]="15"></svg>
+            <span class="font-semibold">Suggested values to check against the documents</span>
+          </div>
+          <div class="ai-suggestion-item" *ngFor="let sg of d.suggestions">
+            <div class="ai-sugg-left">
+              <span class="ai-field-tag">{{ fieldLabel(sg.field) }}</span>
+              <code>{{ sg.value }}</code>
+              <span class="text-xs text-muted" *ngIf="sg.note">({{ sg.note }})</span>
+            </div>
+            <div class="ai-sugg-actions" *ngIf="canEdit()">
+              <button type="button" class="btn-xs btn-primary" (click)="useSuggestion(sg)">Use this</button>
+              <button type="button" class="btn-xs btn-outline-danger" (click)="rejectSuggestion(sg)">Wrong</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pp-card-footer">
+          <button type="button" class="btn-primary" (click)="saveDetails()" [disabled]="savingDetails()">
+            <svg lucideSave [size]="15"></svg>
+            <span>{{ savingDetails() ? 'Saving…' : 'Save details' }}</span>
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Versions -->
-    <div class="pp-card" *ngIf="d.versions.length">
-      <h3>Versions</h3>
+    <!-- Versions History -->
+    <div class="pp-card pp-history-card" *ngIf="d.versions.length">
+      <div class="pp-card-header">
+        <div class="pp-card-header-left">
+          <div class="pp-header-icon-badge badge-history">
+            <svg lucideHistory [size]="20"></svg>
+          </div>
+          <div>
+            <h3 class="pp-card-title">Versions</h3>
+            <p class="pp-card-subtitle">Every salary profile revision and adjustment made over time.</p>
+          </div>
+        </div>
+      </div>
+
       <div class="pp-table-wrap">
         <table class="pp-table">
           <thead>
-            <tr><th>Version</th><th>From</th><th>Salary group</th><th class="num">Annual CTC</th><th>Reason</th><th>Source</th><th>Saved</th></tr>
+            <tr>
+              <th style="width: 130px;">Version</th>
+              <th style="width: 140px;">From</th>
+              <th style="width: 160px;">Salary group</th>
+              <th class="num" style="width: 160px;">Annual CTC</th>
+              <th>Reason</th>
+              <th style="width: 110px;">Source</th>
+              <th style="width: 180px;">Saved</th>
+            </tr>
           </thead>
           <tbody>
             <tr *ngFor="let v of d.versions">
               <td>
-                v{{ v.version }}
+                <span class="pp-version-pill">v{{ v.version }}</span>
                 <span class="pp-version-now" *ngIf="v.version === d.currentVersion">In force</span>
                 <span class="pp-version-later" *ngIf="isUpcoming(v)">Upcoming</span>
               </td>
-              <td>{{ v.effectiveFrom | date: 'd MMM y' }}</td>
-              <td><code>{{ v.salaryGroupCode }}</code></td>
-              <td class="num">{{ money(v.annualCtc) }}</td>
+              <td class="font-medium text-slate-800">{{ v.effectiveFrom | date: 'd MMM y' }}</td>
+              <td><span class="pp-group-code">{{ v.salaryGroupCode }}</span></td>
+              <td class="num font-semibold text-slate-900">{{ money(v.annualCtc) }}</td>
               <td>
-                {{ v.reason || '—' }}
-                <span class="pp-sub" *ngIf="v.overrides">Overrides: <span *ngFor="let o of v.overrides | keyvalue; let last = last">{{ o.key }} {{ money($any(o.value)) }}{{ last ? '' : ', ' }}</span></span>
+                <span>{{ v.reason || '—' }}</span>
+                <div class="pp-sub-overrides" *ngIf="v.overrides">
+                  Overrides: <span *ngFor="let o of v.overrides | keyvalue; let last = last">{{ o.key }} {{ money($any(o.value)) }}{{ last ? '' : ', ' }}</span>
+                </div>
               </td>
               <td><span class="pp-version-src">{{ v.source }}</span></td>
-              <td class="pp-muted">{{ v.createdAt | date: 'd MMM y, HH:mm' }}</td>
+              <td class="text-xs text-muted">{{ v.createdAt | date: 'd MMM y, HH:mm' }}</td>
             </tr>
           </tbody>
         </table>
@@ -192,20 +555,42 @@
   </ng-container>
 </div>
 
-<!-- Monthly breakup, payslip-style -->
+<!-- Monthly breakup template -->
 <ng-template #breakupTpl let-b>
-  <table class="pp-table pp-breakup" *ngIf="b">
-    <tbody>
-      <ng-container *ngFor="let s of sections(b)">
-        <tr><td class="cat" colspan="2">{{ s.title }}</td></tr>
-        <tr *ngFor="let l of s.lines"><td>{{ l.name }}</td><td class="num">{{ money(l.monthly) }}</td></tr>
-        <tr class="total"><td>{{ s.totalLabel }}</td><td class="num">{{ money(s.total) }}</td></tr>
-      </ng-container>
-      <tr class="total"><td>Net pay / month</td><td class="num">{{ money(b.netPayMonthly) }}</td></tr>
-      <tr><td class="pp-muted">CTC / month</td><td class="num pp-muted">{{ money(b.ctcMonthly) }}</td></tr>
-    </tbody>
-  </table>
-  <ul class="pp-warn-list" *ngIf="b?.warnings?.length">
-    <li *ngFor="let w of b.warnings">⚠ {{ w }}</li>
-  </ul>
+  <div class="breakup-table-wrap" *ngIf="b">
+    <table class="modern-table pp-breakup-table">
+      <tbody>
+        <ng-container *ngFor="let s of sections(b)">
+          <tr class="section-cat-row">
+            <td colspan="2">{{ s.title }}</td>
+          </tr>
+          <tr *ngFor="let l of s.lines" class="breakup-line-row">
+            <td>{{ l.name }}</td>
+            <td class="num font-medium">{{ money(l.monthly) }}</td>
+          </tr>
+          <tr class="section-subtotal-row">
+            <td>{{ s.totalLabel }}</td>
+            <td class="num">{{ money(s.total) }}</td>
+          </tr>
+        </ng-container>
+        <tr class="takehome-summary-row">
+          <td><strong>Net pay / month</strong></td>
+          <td class="num"><strong>{{ money(b.netPayMonthly) }}</strong></td>
+        </tr>
+        <tr class="ctc-summary-row">
+          <td>CTC / month</td>
+          <td class="num">{{ money(b.ctcMonthly) }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="pp-warnings-box" *ngIf="b?.warnings?.length">
+    <div class="warn-head">
+      <svg lucideAlertCircle [size]="14"></svg>
+      <span>Engine Warnings</span>
+    </div>
+    <ul class="warn-items">
+      <li *ngFor="let w of b.warnings">{{ w }}</li>
+    </ul>
+  </div>
 </ng-template>
