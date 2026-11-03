@@ -705,6 +705,7 @@ export interface PayProfileDetail {
 export interface PayProfileImportRow {
   employeeId: number;
   name: string;
+  avatarUrl?: string | null;
   payType: string;
   employmentType: string | null;
   status: 'MATCH' | 'REVIEW' | 'NO_SALARY' | 'NO_GROUP';

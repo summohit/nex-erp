@@ -394,8 +394,9 @@ export class PayProfilesService {
           offboardingStatus: { not: 'SEPARATED' },
         },
         select: {
-          id: true, firstName: true, lastName: true, payType: true, employmentType: true,
+          id: true, firstName: true, lastName: true, payType: true, employmentType: true, avatarUrl: true,
           designation: { select: { name: true } },
+          user: { select: { email: true } },
           salaryStructures: { select: { amount: true, component: { select: { name: true, type: true } } } },
         },
         orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
@@ -405,6 +406,18 @@ export class PayProfilesService {
     const withProfile = new Set(
       (await this.prisma.employeePayProfile.findMany({ where: { companyId }, select: { employeeId: true }, distinct: ['employeeId'] })).map((p) => p.employeeId),
     );
+
+    // Offer letters by candidate email: onboarded/hired before merely offered, newest first.
+    const apps = await this.prisma.jobApplication.findMany({
+      where: { companyId, offeredSalary: { gt: 0 }, status: { in: ['ONBOARDED', 'HIRED', 'OFFERED'] }, email: { in: employees.map((e) => e.user?.email).filter((x): x is string => !!x) } },
+      select: { email: true, offeredSalary: true, status: true, updatedAt: true },
+    });
+    const rank = (st: string) => (st === 'ONBOARDED' ? 0 : st === 'HIRED' ? 1 : 2);
+    const offers = new Map<string, { ctc: number; status: string }>();
+    for (const a of apps.sort((x, y) => rank(x.status) - rank(y.status) || +y.updatedAt - +x.updatedAt)) {
+      const k = a.email.toLowerCase();
+      if (!offers.has(k)) offers.set(k, { ctc: a.offeredSalary!, status: a.status });
+    }
 
     const calculators = new Map<string, Awaited<ReturnType<PayrollMastersService['prepareCalculator']>>>();
     const calcFor = async (code: string) => {
@@ -427,8 +440,31 @@ export class PayProfilesService {
         if (code) current.set(code, (current.get(code) ?? 0) + s.amount);
       }
       const group = this.proposeGroup(e, groups);
-      const base = { employeeId: e.id, name, payType: e.payType, employmentType: e.employmentType, currentGrossMonthly: round(currentGross) };
-      if (!(currentGross > 0)) { rows.push({ ...base, status: 'NO_SALARY' as ImportStatus, salaryGroupCode: group?.code ?? null }); continue; }
+      const base = { employeeId: e.id, name, avatarUrl: e.avatarUrl, payType: e.payType, employmentType: e.employmentType, currentGrossMonthly: round(currentGross) };
+      if (!(currentGross > 0)) {
+        // No salary was ever set up in MIRA. If they joined through an offer, its CTC is the next best thing.
+        const offer = offers.get((e.user?.email || '').toLowerCase());
+        if (offer && group) {
+          const calcOffer = await calcFor(group.code);
+          if (calcOffer) {
+            const out = calcOffer.run(offer.ctc);
+            rows.push({
+              ...base,
+              status: 'REVIEW' as ImportStatus,
+              salaryGroupCode: group.code,
+              salaryGroupName: group.name,
+              annualCtc: offer.ctc,
+              proposedGrossMonthly: out.grossMonthly,
+              proposedNetMonthly: out.netPayMonthly,
+              differences: [],
+              warnings: [`No salary set up in MIRA — CTC taken from their offer letter (₹${Math.round(offer.ctc).toLocaleString('en-IN')}, ${offer.status.toLowerCase()}). Confirm before saving.`, ...out.warnings],
+            });
+            continue;
+          }
+        }
+        rows.push({ ...base, status: 'NO_SALARY' as ImportStatus, salaryGroupCode: group?.code ?? null });
+        continue;
+      }
       if (!group) { rows.push({ ...base, status: 'NO_GROUP' as ImportStatus, salaryGroupCode: null }); continue; }
 
       const calc = await calcFor(group.code);
