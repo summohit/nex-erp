@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '../../auth/auth.guard';
 import { PayrollMastersService } from './payroll-masters.service';
+import { assertPayrollEditor, assertPayrollViewer } from '../pay-profiles/pay-profiles.service';
 import type { Request } from 'express';
 
 @Controller('payroll/masters')
@@ -26,20 +27,23 @@ export class PayrollMastersController {
 
   @Get('components')
   getComponents(@Req() req: Request) {
+    assertPayrollViewer((req.user as any).role);
     const companyId = (req.user as any).companyId;
     return this.mastersService.getComponents(companyId);
   }
 
   @Get('components/:code')
   getComponentByCode(@Req() req: Request, @Param('code') code: string) {
+    assertPayrollViewer((req.user as any).role);
     const companyId = (req.user as any).companyId;
     return this.mastersService.getComponentByCode(companyId, code);
   }
 
   @Post('components')
   createComponent(@Req() req: Request, @Body() body: any) {
+    assertPayrollEditor((req.user as any).role);
     const companyId = (req.user as any).companyId;
-    const userId = (req.user as any).id;
+    const userId = (req.user as any).sub;
     return this.mastersService.createComponent(companyId, body, userId);
   }
 
@@ -49,8 +53,9 @@ export class PayrollMastersController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: any,
   ) {
+    assertPayrollEditor((req.user as any).role);
     const companyId = (req.user as any).companyId;
-    const userId = (req.user as any).id;
+    const userId = (req.user as any).sub;
     return this.mastersService.updateComponent(companyId, id, body, userId);
   }
 
@@ -59,8 +64,9 @@ export class PayrollMastersController {
     @Req() req: Request,
     @Param('id', ParseIntPipe) id: number,
   ) {
+    assertPayrollEditor((req.user as any).role);
     const companyId = (req.user as any).companyId;
-    const userId = (req.user as any).id;
+    const userId = (req.user as any).sub;
     return this.mastersService.deleteComponent(companyId, id, userId);
   }
 
@@ -73,6 +79,7 @@ export class PayrollMastersController {
     @Req() req: Request,
     @Query('includeRetired') includeRetired?: string,
   ) {
+    assertPayrollViewer((req.user as any).role);
     const companyId = (req.user as any).companyId;
     return this.mastersService.getSalaryGroups(companyId, includeRetired === 'true');
   }
@@ -82,14 +89,16 @@ export class PayrollMastersController {
     @Req() req: Request,
     @Param('id', ParseIntPipe) id: number,
   ) {
+    assertPayrollViewer((req.user as any).role);
     const companyId = (req.user as any).companyId;
     return this.mastersService.getSalaryGroupById(companyId, id);
   }
 
   @Post('groups')
   saveSalaryGroup(@Req() req: Request, @Body() body: any) {
+    assertPayrollEditor((req.user as any).role);
     const companyId = (req.user as any).companyId;
-    const userId = (req.user as any).id;
+    const userId = (req.user as any).sub;
     return this.mastersService.saveSalaryGroupVersion(companyId, body, userId);
   }
 
@@ -99,14 +108,16 @@ export class PayrollMastersController {
 
   @Get('statutory-rates')
   getStatutoryRates(@Req() req: Request) {
+    assertPayrollViewer((req.user as any).role);
     const companyId = (req.user as any).companyId;
     return this.mastersService.getStatutoryRates(companyId);
   }
 
   @Post('statutory-rates')
   saveStatutoryRate(@Req() req: Request, @Body() body: any) {
+    assertPayrollEditor((req.user as any).role);
     const companyId = (req.user as any).companyId;
-    const userId = (req.user as any).id;
+    const userId = (req.user as any).sub;
     return this.mastersService.saveStatutoryRate(companyId, body, userId);
   }
 
@@ -116,8 +127,9 @@ export class PayrollMastersController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: any,
   ) {
+    assertPayrollEditor((req.user as any).role);
     const companyId = (req.user as any).companyId;
-    const userId = (req.user as any).id;
+    const userId = (req.user as any).sub;
     return this.mastersService.updateStatutoryRate(companyId, id, body, userId);
   }
 
@@ -130,6 +142,7 @@ export class PayrollMastersController {
     @Req() req: Request,
     @Query('financialYear') financialYear = '2026-27',
   ) {
+    assertPayrollViewer((req.user as any).role);
     const companyId = (req.user as any).companyId;
     return this.mastersService.getTaxRegimes(companyId, financialYear);
   }
@@ -140,8 +153,9 @@ export class PayrollMastersController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: any,
   ) {
+    assertPayrollEditor((req.user as any).role);
     const companyId = (req.user as any).companyId;
-    const userId = (req.user as any).id;
+    const userId = (req.user as any).sub;
     return this.mastersService.updateTaxRegime(companyId, id, body, userId);
   }
 
@@ -151,12 +165,14 @@ export class PayrollMastersController {
 
   @Post('validate-formula')
   validateFormula(@Req() req: Request, @Body('formula') formula: string) {
+    assertPayrollViewer((req.user as any).role);
     const companyId = (req.user as any).companyId;
     return this.mastersService.validateFormula(companyId, formula);
   }
 
   @Post('calculate')
   calculateSalary(@Req() req: Request, @Body() body: any) {
+    assertPayrollViewer((req.user as any).role);
     const companyId = (req.user as any).companyId;
     return this.mastersService.calculateSalary(companyId, body);
   }
@@ -172,6 +188,7 @@ export class PayrollMastersController {
     @Query('entity') entity?: string,
     @Query('entityId') entityId?: string,
   ) {
+    assertPayrollViewer((req.user as any).role);
     const companyId = (req.user as any).companyId;
     return this.mastersService.getAuditLog(
       companyId,
@@ -187,36 +204,43 @@ export class PayrollMastersController {
 
   @Get('formula-help')
   getFormulaHelp(@Req() req: Request) {
+    assertPayrollViewer((req.user as any).role);
     return this.mastersService.getFormulaHelp((req.user as any).companyId);
   }
 
   @Get('year-settings')
   getYearSetting(@Req() req: Request, @Query('financialYear') financialYear = '2026-27') {
+    assertPayrollViewer((req.user as any).role);
     return this.mastersService.getYearSetting((req.user as any).companyId, financialYear);
   }
 
   @Put('year-settings')
   saveYearSetting(@Req() req: Request, @Query('financialYear') financialYear = '2026-27', @Body() body: any) {
-    return this.mastersService.saveYearSetting((req.user as any).companyId, financialYear, body ?? {}, (req.user as any).id);
+    assertPayrollEditor((req.user as any).role);
+    return this.mastersService.saveYearSetting((req.user as any).companyId, financialYear, body ?? {}, (req.user as any).sub);
   }
 
   @Get('config')
   getCompanyConfig(@Req() req: Request) {
+    assertPayrollViewer((req.user as any).role);
     return this.mastersService.getCompanyConfig((req.user as any).companyId);
   }
 
   @Put('config')
   saveCompanyConfig(@Req() req: Request, @Body() body: any) {
-    return this.mastersService.saveCompanyConfig((req.user as any).companyId, body ?? {}, (req.user as any).id);
+    assertPayrollEditor((req.user as any).role);
+    return this.mastersService.saveCompanyConfig((req.user as any).companyId, body ?? {}, (req.user as any).sub);
   }
 
   @Get('dropdowns')
   getDropdowns(@Req() req: Request) {
+    assertPayrollViewer((req.user as any).role);
     return this.mastersService.getDropdowns((req.user as any).companyId);
   }
 
   @Put('dropdowns/:listKey')
-  saveDropdown(@Req() req: Request, @Param('listKey') listKey: string, @Body('options') options: string[]) {
-    return this.mastersService.saveDropdown((req.user as any).companyId, listKey, options, (req.user as any).id);
+  saveDropdown(@Req() req: Request, @Param('listKey') listKey: string, @Body('options') options: any[]) {
+    assertPayrollEditor((req.user as any).role);
+    return this.mastersService.saveDropdown((req.user as any).companyId, listKey, options, (req.user as any).sub);
   }
 }

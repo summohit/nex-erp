@@ -22,6 +22,15 @@ const DROPDOWN_DEFAULTS: Record<string, { name: string; options: string[] }> = {
   WORKER_TYPE: { name: 'Worker types', options: ['Employee', 'Trainee', 'Technical consultant', 'Non-technical consultant'] },
 };
 
+/** Starting "pays as" for the default worker types; new ones default to EMPLOYEE. */
+const DEFAULT_PAYS_AS: Record<string, string> = {
+  EMPLOYEE: 'EMPLOYEE',
+  TRAINEE: 'TRAINEE',
+  TECHNICAL_CONSULTANT: 'CONSULTANT',
+  NON_TECHNICAL_CONSULTANT: 'CONSULTANT',
+};
+const PAYS_AS = ['EMPLOYEE', 'CONSULTANT', 'TRAINEE'];
+
 function dropdownValue(label: string): string {
   return label.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'OPTION';
 }
@@ -605,7 +614,23 @@ export class PayrollMastersService {
       });
     }
 
-    // 4. Adapt DB models to Calculation Engine format
+    return PayrollCalculator.calculate(this.buildCalcInput(group, statutoryRates, components, taxRegime, params));
+  }
+
+
+  /** DB rows → engine input. Shared by the calculator and by pay-profile work that runs the engine many times. */
+  private buildCalcInput(
+    group: any,
+    statutoryRates: any[],
+    components: any[],
+    taxRegime: any,
+    params: {
+      annualCtc?: number;
+      monthlyCtc?: number;
+      declarations?: { [sectionCode: string]: number };
+      overrides?: { [componentCode: string]: number };
+    },
+  ): CalculationInput {
     const calcInput: CalculationInput = {
       annualCtc: params.annualCtc,
       monthlyCtc: params.monthlyCtc,
@@ -675,7 +700,26 @@ export class PayrollMastersService {
       componentOverrides: params.overrides,
     };
 
-    return PayrollCalculator.calculate(calcInput);
+    return calcInput;
+  }
+
+  /**
+   * Load a salary group (the version in force on `onDate`), the rates and the
+   * components once, and return a function that runs the engine for any CTC.
+   */
+  async prepareCalculator(companyId: number, groupCode: string, onDate = new Date()) {
+    const group = await this.prisma.payrollSalaryGroup.findFirst({
+      where: { companyId, code: groupCode, effectiveFrom: { lte: onDate }, OR: [{ retiredAt: null }, { retiredAt: { gt: onDate } }] },
+      orderBy: { version: 'desc' },
+      include: { lines: { include: { component: true }, orderBy: { displayOrder: 'asc' } } },
+    });
+    if (!group) return null;
+    const [statutoryRates, components] = await Promise.all([this.getStatutoryRates(companyId), this.getComponents(companyId)]);
+    return {
+      group,
+      run: (annualCtc: number, overrides?: { [componentCode: string]: number }) =>
+        PayrollCalculator.calculate(this.buildCalcInput(group, statutoryRates, components, undefined, { annualCtc, overrides })),
+    };
   }
 
   // ═══════════════════════════════════════════
@@ -860,16 +904,31 @@ export class PayrollMastersService {
         name: meta.name,
         saved: options.length > 0,
         options: options.length
-          ? options.map((o) => ({ value: o.value, label: o.label }))
-          : meta.options.map((label) => ({ value: dropdownValue(label), label })),
+          ? options.map((o) => ({ value: o.value, label: o.label, ...(listKey === 'WORKER_TYPE' && { paysAs: o.paysAs ?? 'EMPLOYEE' }) }))
+          : meta.options.map((label) => ({
+              value: dropdownValue(label),
+              label,
+              ...(listKey === 'WORKER_TYPE' && { paysAs: DEFAULT_PAYS_AS[dropdownValue(label)] ?? 'EMPLOYEE' }),
+            })),
       };
     });
   }
 
   /** Replace one list. Removed options are switched off, not deleted — payslips may refer to them. */
-  async saveDropdown(companyId: number, listKey: string, labels: string[], actorUserId?: number) {
+  /** Options arrive as plain labels, or { label, paysAs } for worker types. */
+  async saveDropdown(companyId: number, listKey: string, raw: (string | { label: string; paysAs?: string })[], actorUserId?: number) {
     if (!(listKey in DROPDOWN_DEFAULTS)) throw new BadRequestException('Unknown dropdown list');
-    const clean = [...new Set((labels || []).map((l) => String(l || '').trim()).filter(Boolean))];
+    const paysAsByLabel = new Map<string, string>();
+    const labels = (raw || []).map((o) => {
+      const label = String(typeof o === 'string' ? o : o?.label || '').trim();
+      if (listKey === 'WORKER_TYPE' && label) {
+        const p = typeof o === 'string' ? DEFAULT_PAYS_AS[dropdownValue(label)] ?? 'EMPLOYEE' : String(o.paysAs || 'EMPLOYEE');
+        if (!PAYS_AS.includes(p)) throw new BadRequestException(`${label}: "pays as" must be Employee, Consultant or Trainee`);
+        paysAsByLabel.set(label, p);
+      }
+      return label;
+    });
+    const clean = [...new Set(labels.filter(Boolean))];
     if (!clean.length) throw new BadRequestException('A list needs at least one option');
     if (clean.some((l) => l.length > 80)) throw new BadRequestException('Options must be 80 characters or fewer');
     const before = (await this.getDropdowns(companyId)).find((d) => d.listKey === listKey);
@@ -880,8 +939,8 @@ export class PayrollMastersService {
         const value = dropdownValue(label);
         await tx.payrollDropdownOption.upsert({
           where: { companyId_listKey_value: { companyId, listKey, value } },
-          create: { companyId, listKey, value, label, position: i, isActive: true },
-          update: { label, position: i, isActive: true },
+          create: { companyId, listKey, value, label, position: i, isActive: true, paysAs: paysAsByLabel.get(label) ?? null },
+          update: { label, position: i, isActive: true, paysAs: paysAsByLabel.get(label) ?? null },
         });
       }
     });

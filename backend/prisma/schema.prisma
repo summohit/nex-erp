@@ -501,6 +501,10 @@ model Employee {
   // Statutory Details
   pfNumber          String?
   esiNumber         String?
+  /// Universal Account Number (EPFO) — not the same as the PF member number above.
+  uanNumber         String?
+  /// Income-tax PAN; needed for TDS and Form 16.
+  panNumber         String?
   workNotes         String?
   nextAppraisalDate DateTime?
   offboardingStatus String    @default("NONE") // NONE, IN_PROGRESS, SEPARATED
@@ -5261,6 +5265,8 @@ model PayrollDropdownOption {
   listKey   String
   value     String
   label     String
+  /// WORKER_TYPE only: how this kind of worker is paid — EMPLOYEE | CONSULTANT | TRAINEE.
+  paysAs    String?
   position  Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -5268,5 +5274,33 @@ model PayrollDropdownOption {
 
   @@unique([companyId, listKey, value])
   @@index([companyId, listKey])
+}
+
+/// One employee's pay set-up (Payroll plan, Phase 2 / W9). Never edited in
+/// place: every change is a new version with the date it takes effect from.
+/// Bank details, PAN, UAN, PF and ESI numbers stay on Employee — one source.
+model EmployeePayProfile {
+  id               Int       @id @default(autoincrement())
+  companyId        Int
+  employeeId       Int
+  version          Int
+  effectiveFrom    DateTime
+  /// Salary group by code: the group version in force on a date is used.
+  salaryGroupCode  String
+  annualCtc        Float
+  /// PayrollDropdownOption value in WORKER_TYPE
+  workerType       String?
+  /// PayrollDropdownOption value in PAYMENT_METHOD
+  paymentMethod    String?
+  /// { COMPONENT_CODE: monthly amount } — each needs a reason.
+  overrides        Json?
+  reason           String?
+  /// IMPORT | MANUAL | REVISION | OFFER
+  source           String    @default("MANUAL")
+  createdByUserId  Int?
+  createdAt        DateTime  @default(now())
+
+  @@unique([employeeId, version])
+  @@index([companyId, employeeId])
 }
 
