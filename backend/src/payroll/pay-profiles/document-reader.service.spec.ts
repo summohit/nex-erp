@@ -1,4 +1,4 @@
-import { DocumentReaderService } from './document-reader.service';
+import { DocumentReaderService, isBusyError, isSetupError } from './document-reader.service';
 import { detailState } from './pay-profiles.service';
 
 describe('DocumentReaderService.extract — only well-formed values become suggestions', () => {
@@ -40,5 +40,25 @@ describe('detailState', () => {
     expect(detailState(true, null, false, true)).toBe('UNVERIFIED');
     expect(detailState(false, null, false, true)).toBe('DOCUMENT');
     expect(detailState(false, null, false, false)).toBe('MISSING');
+  });
+});
+
+describe('isSetupError — stop the whole run, not just one file', () => {
+  it('stops on a retired model or a refused key', () => {
+    expect(isSetupError(new Error('{"error":{"code":404,"message":"This model models/gemini-2.5-flash is no longer available to new users."}}'))).toBe(true);
+    expect(isSetupError({ status: 403, message: 'Permission denied' })).toBe(true);
+    expect(isSetupError(new Error('API key not valid'))).toBe(true);
+  });
+  it('carries on after one bad file', () => {
+    expect(isSetupError(new Error('timeout of 20000ms exceeded'))).toBe(false);
+    expect(isSetupError({ status: 500, message: 'Internal error' })).toBe(false);
+  });
+});
+
+describe('isBusyError — wait and retry', () => {
+  it('retries on high demand and rate limits only', () => {
+    expect(isBusyError({ status: 503, message: 'This model is currently experiencing high demand.' })).toBe(true);
+    expect(isBusyError({ status: 429, message: 'RESOURCE_EXHAUSTED' })).toBe(true);
+    expect(isBusyError({ status: 404, message: 'not found' })).toBe(false);
   });
 });

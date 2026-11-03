@@ -29,6 +29,20 @@ Return JSON only: {"accountNumber": "digits only, or null", "ifsc": "11-characte
 Never guess a digit you can't read — return null instead.`,
 };
 
+/** Errors that will repeat for every document (model gone, key refused), as opposed to one bad file. */
+export function isSetupError(err: any): boolean {
+  const text = String(err?.message || err || '');
+  const status = Number(err?.status ?? err?.code ?? (text.match(/"code":\s*(\d{3})/)?.[1] || 0));
+  return [401, 403, 404].includes(status) || /model .* (is no longer available|not found)|API key/i.test(text);
+}
+
+/** Temporary: the model is overloaded or we're over the rate limit — worth a retry. */
+export function isBusyError(err: any): boolean {
+  const text = String(err?.message || err || '');
+  const status = Number(err?.status ?? err?.code ?? (text.match(/"code":\s*(\d{3})/)?.[1] || 0));
+  return [429, 503].includes(status) || /high demand|overloaded|rate limit|RESOURCE_EXHAUSTED|UNAVAILABLE/i.test(text);
+}
+
 export interface ReadProgress {
   running: boolean;
   total: number;
@@ -53,7 +67,9 @@ export class DocumentReaderService {
   private readonly logger = new Logger(DocumentReaderService.name);
   private readonly progress = new Map<number, ReadProgress>();
   private ai: GoogleGenAI | null = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
-  private readonly model = process.env.DOC_READER_MODEL || 'gemini-2.5-flash';
+  // An alias Google moves to the current Flash model: pinned versions get
+  // retired for new keys (gemini-2.5-flash did, Nov 2026). Override with DOC_READER_MODEL.
+  private readonly model = process.env.DOC_READER_MODEL || 'gemini-flash-latest';
 
   constructor(private prisma: PrismaService) {}
 
@@ -122,6 +138,11 @@ export class DocumentReaderService {
           p.failed++;
           p.lastError = err?.message?.slice(0, 200) || 'Failed to read a document';
           this.logger.warn(`Reading document ${doc.id} failed: ${p.lastError}`);
+          // A wrong model or key fails every file the same way — stop instead of burning through the queue.
+          if (isSetupError(err)) {
+            p.lastError = `Stopped: ${p.lastError}`;
+            queue.length = 0;
+          }
         } finally {
           p.done++;
         }
@@ -142,11 +163,22 @@ export class DocumentReaderService {
       return 0;
     }
 
-    const res = await this.ai!.models.generateContent({
+    const request = {
       model: this.model,
       contents: [{ role: 'user', parts: [{ inlineData: { mimeType, data: Buffer.from(file.data).toString('base64') } }, { text: PROMPTS[kind] }] }],
       config: { responseMimeType: 'application/json', temperature: 0 },
-    });
+    };
+    // "High demand" (503) and rate limits (429) pass: wait and try again, up to 3 more times.
+    let res: Awaited<ReturnType<GoogleGenAI['models']['generateContent']>> | undefined;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        res = await this.ai!.models.generateContent(request);
+        break;
+      } catch (err: any) {
+        if (!isBusyError(err) || attempt >= 3) throw err;
+        await new Promise((r) => setTimeout(r, 4000 * (attempt + 1)));
+      }
+    }
     let out: any = {};
     try {
       out = JSON.parse(res.text || '{}');
