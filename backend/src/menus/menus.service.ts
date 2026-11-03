@@ -375,6 +375,20 @@ export class MenusService implements OnModuleInit {
           this.logger.log('Website Chat menu auto-seeded successfully.');
         }
       }
+
+      // ── Payroll → Pay Profiles (Payroll plan Phase 2) ──────────────
+      // After Salary Structure, under the existing Payroll & Expenses group.
+      const payrollGroup = await this.prisma.menu.findFirst({ where: { route: '/payroll', parentId: { not: null } } });
+      if (payrollGroup) {
+        const payProfiles = await this.prisma.menu.findFirst({ where: { route: '/payroll/pay-profiles' } });
+        if (!payProfiles) {
+          const last = await this.prisma.menu.findFirst({ where: { parentId: payrollGroup.id }, orderBy: { displayOrder: 'desc' } });
+          await this.prisma.menu.create({
+            data: { title: 'Pay Profiles', route: '/payroll/pay-profiles', displayOrder: (last?.displayOrder ?? 0) + 1, parentId: payrollGroup.id, isActive: true },
+          });
+          this.logger.log('Pay Profiles menu auto-seeded successfully.');
+        }
+      }
     } catch (err) {
       this.logger.error('Failed to auto-seed menus:', err);
     }
@@ -473,6 +487,8 @@ export class MenusService implements OnModuleInit {
     // Who has documents or details missing: the report HR and admins follow
     // up with (the endpoint allows the same roles).
     if (['ADMIN', 'HR'].includes(roleName)) allowedModules.add('employees/profile-completion');
+    // Pay profiles: Finance and admins change them, HR looks (the API enforces which).
+    if (['ADMIN', 'HR', 'FINANCE'].includes(roleName)) allowedModules.add('payroll/pay-profiles');
 
     // Live journeys map: finance (the super admin sees every module anyway).
     // The endpoint enforces the same rule.
