@@ -62,3 +62,11 @@ describe('isBusyError — wait and retry', () => {
     expect(isBusyError({ status: 404, message: 'not found' })).toBe(false);
   });
 });
+
+describe('quota exhausted', () => {
+  const err = { status: 429, message: 'You exceeded your current quota, please check your plan and billing details.' };
+  it('stops the run instead of retrying', () => {
+    expect(isSetupError(err)).toBe(true);
+    expect(isBusyError(err)).toBe(false);
+  });
+});

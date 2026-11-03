@@ -33,13 +33,15 @@ Never guess a digit you can't read — return null instead.`,
 export function isSetupError(err: any): boolean {
   const text = String(err?.message || err || '');
   const status = Number(err?.status ?? err?.code ?? (text.match(/"code":\s*(\d{3})/)?.[1] || 0));
-  return [401, 403, 404].includes(status) || /model .* (is no longer available|not found)|API key/i.test(text);
+  // An exhausted quota (429 "exceeded your current quota") won't recover by retrying this run.
+  return [401, 403, 404].includes(status) || /model .* (is no longer available|not found)|API key|exceeded your current quota/i.test(text);
 }
 
 /** Temporary: the model is overloaded or we're over the rate limit — worth a retry. */
 export function isBusyError(err: any): boolean {
   const text = String(err?.message || err || '');
   const status = Number(err?.status ?? err?.code ?? (text.match(/"code":\s*(\d{3})/)?.[1] || 0));
+  if (/exceeded your current quota/i.test(text)) return false;
   return [429, 503].includes(status) || /high demand|overloaded|rate limit|RESOURCE_EXHAUSTED|UNAVAILABLE/i.test(text);
 }
 
