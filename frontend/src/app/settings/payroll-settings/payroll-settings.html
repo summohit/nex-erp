@@ -569,7 +569,6 @@
           <div class="pane-card">
             <div class="card-header-simple">
               <h3 class="pane-title">Chapter VI-A Allowed Deductions</h3>
-              <p class="pane-subtitle">Exemptions and deductions available in this regime</p>
             </div>
 
             <div *ngIf="regime.sections.length > 0" class="sections-list" style="margin-top: 14px;">
@@ -1480,13 +1479,17 @@
                     </select>
                   </td>
                   <td style="min-width: 220px;">
-                    <input *ngIf="line.calcType === 'FORMULA'" type="text" class="form-control font-mono" [(ngModel)]="line.formula" placeholder="e.g. BASIC * 0.4">
+                    <input *ngIf="line.calcType === 'FORMULA'" type="text" class="form-control font-mono" [(ngModel)]="line.formula" placeholder="e.g. BASIC * 0.4"
+                      autocomplete="off" spellcheck="false"
+                      (input)="onFormulaInput($event, line, 'formula')" (keydown)="onFormulaKey($event)" (blur)="closeSuggestSoon()">
                     <input *ngIf="line.calcType === 'FIXED'" type="number" class="form-control" [(ngModel)]="line.amount" placeholder="Fixed ₹ amount">
                     <span *ngIf="line.calcType === 'BALANCING'" class="text-xs text-muted">Auto-balances to remaining gross</span>
                     <span *ngIf="line.calcType === 'STATUTORY'" class="text-xs text-muted">From statutory rates</span>
                   </td>
                   <td style="min-width: 140px;">
-                    <input type="text" class="form-control font-mono text-xs" [(ngModel)]="line.condition" placeholder="e.g. BASIC <= 21000">
+                    <input type="text" class="form-control font-mono text-xs" [(ngModel)]="line.condition" placeholder="e.g. GROSS <= ESI_LIMIT"
+                      autocomplete="off" spellcheck="false"
+                      (input)="onFormulaInput($event, line, 'condition')" (keydown)="onFormulaKey($event)" (blur)="closeSuggestSoon()">
                   </td>
                   <td style="text-align: center;">
                     <input type="checkbox" [(ngModel)]="line.overrideAllowed" title="Allow HR to override amount on hire">
@@ -1697,6 +1700,18 @@
       </div>
     </div>
   </div>
+  <!-- Formula / condition autocomplete -->
+  <div *ngIf="suggest() as sg" class="fx-suggest" role="listbox"
+    [style.top.px]="sg.top" [style.left.px]="sg.left" [style.width.px]="sg.width">
+    <button type="button" *ngFor="let it of sg.items; let i = index" class="fx-suggest-item" [class.active]="i === sg.index"
+      role="option" [attr.aria-selected]="i === sg.index"
+      (mousedown)="$event.preventDefault(); applySuggestion(it)">
+      <span class="fx-suggest-top"><code>{{ it.name }}</code><span class="fx-kind" [attr.data-k]="it.kind">{{ it.kind }}</span></span>
+      <span class="fx-suggest-meaning">{{ it.meaning }}</span>
+    </button>
+    <div class="fx-suggest-foot">↑ ↓ to move · Enter or Tab to insert · Esc to close</div>
+  </div>
+
   <!-- Component history -->
   <div *ngIf="historyFor() as comp" class="modal-backdrop animate-fade" (click)="closeComponentHistory()">
     <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">

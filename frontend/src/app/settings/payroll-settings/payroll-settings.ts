@@ -289,6 +289,97 @@ export class PayrollSettingsComponent implements OnInit {
     this.isHelpDrawerOpen.set(true);
   }
 
+  // ── Autocomplete for formula / condition boxes ──
+  /** Open suggestion list: which box, where to draw it, and the matches. */
+  suggest = signal<{
+    items: { name: string; insert: string; meaning: string; kind: string }[];
+    index: number;
+    top: number;
+    left: number;
+    width: number;
+    target: HTMLInputElement;
+    model: any;
+    field: string;
+  } | null>(null);
+  private suggestCloseTimer: any = null;
+
+  /** Everything a formula can name, from the help catalog (falls back to components until it loads). */
+  private suggestionPool(): { name: string; insert: string; meaning: string; kind: string }[] {
+    const h = this.formulaHelp();
+    const pool: { name: string; insert: string; meaning: string; kind: string }[] = [];
+    if (h) {
+      for (const v of h.salary) pool.push({ name: v.name, insert: v.name, meaning: `${v.meaning} · ${v.when}`, kind: 'Salary' });
+      for (const v of h.rates) pool.push({ name: v.name, insert: v.name, meaning: `${v.meaning}${v.value != null ? ` · today ${v.value}` : ''}`, kind: 'Rate' });
+      for (const c of h.components) pool.push({ name: c.name, insert: c.name, meaning: `${c.meaning} · ${this.categoryLabel(c.category)}`, kind: 'Component' });
+      for (const f of h.functions) {
+        for (const fn of String(f.name).split('/').map((x: string) => x.trim().split('(')[0])) {
+          pool.push({ name: fn, insert: `${fn}(`, meaning: `${f.meaning} — e.g. ${f.example}`, kind: 'Function' });
+        }
+      }
+    } else {
+      for (const c of this.components()) pool.push({ name: c.code, insert: c.code, meaning: c.name, kind: 'Component' });
+    }
+    for (const op of ['AND', 'OR', 'NOT']) pool.push({ name: op, insert: `${op} `, meaning: 'Combine tests in a condition', kind: 'Operator' });
+    return pool;
+  }
+
+  /** The word being typed just before the caret. */
+  private wordBeforeCaret(input: HTMLInputElement): { word: string; start: number } {
+    const caret = input.selectionStart ?? input.value.length;
+    const m = input.value.slice(0, caret).match(/[A-Za-z_][A-Za-z0-9_]*$/);
+    return m ? { word: m[0], start: caret - m[0].length } : { word: '', start: caret };
+  }
+
+  onFormulaInput(event: Event, model: any, field: string) {
+    const input = event.target as HTMLInputElement;
+    const { word } = this.wordBeforeCaret(input);
+    if (!word) { this.suggest.set(null); return; }
+    const q = word.toUpperCase();
+    const pool = this.suggestionPool();
+    const starts = pool.filter((p) => p.name.toUpperCase().startsWith(q));
+    const contains = pool.filter((p) => !p.name.toUpperCase().startsWith(q) && (p.name.toUpperCase().includes(q) || p.meaning.toUpperCase().includes(q)));
+    const items = [...starts, ...contains].filter((p) => p.name.toUpperCase() !== q).slice(0, 8);
+    if (!items.length) { this.suggest.set(null); return; }
+    const r = input.getBoundingClientRect();
+    this.suggest.set({ items, index: 0, top: r.bottom + 4, left: r.left, width: Math.max(r.width, 340), target: input, model, field });
+  }
+
+  onFormulaKey(event: KeyboardEvent) {
+    const s = this.suggest();
+    if (!s) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const n = s.items.length;
+      this.suggest.set({ ...s, index: (s.index + (event.key === 'ArrowDown' ? 1 : n - 1)) % n });
+    } else if (event.key === 'Enter' || event.key === 'Tab') {
+      event.preventDefault();
+      this.applySuggestion(s.items[s.index]);
+    } else if (event.key === 'Escape') {
+      this.suggest.set(null);
+    }
+  }
+
+  applySuggestion(item: { insert: string }) {
+    const s = this.suggest();
+    if (!s) return;
+    clearTimeout(this.suggestCloseTimer);
+    const input = s.target;
+    const { start } = this.wordBeforeCaret(input);
+    const caret = input.selectionStart ?? input.value.length;
+    const value = input.value.slice(0, start) + item.insert + input.value.slice(caret);
+    s.model[s.field] = value;
+    input.value = value;
+    const pos = start + item.insert.length;
+    this.suggest.set(null);
+    setTimeout(() => { input.focus(); input.setSelectionRange(pos, pos); });
+  }
+
+  /** Blur fires before a click on a suggestion lands — wait a moment before closing. */
+  closeSuggestSoon() {
+    clearTimeout(this.suggestCloseTimer);
+    this.suggestCloseTimer = setTimeout(() => this.suggest.set(null), 150);
+  }
+
   categoryLabel(cat: string): string {
     return ({ EARNING: 'Earning', EMPLOYEE_DEDUCTION: 'Deduction', EMPLOYER_CONTRIBUTION: 'Employer share', REIMBURSEMENT: 'Reimbursement' } as any)[cat] || cat;
   }
@@ -608,6 +699,7 @@ export class PayrollSettingsComponent implements OnInit {
   // ═══════════════════════════════════════════
 
   openCreateGroupModal() {
+    if (!this.formulaHelp()) this.loadFormulaHelp();
     this.groupErrors.set({});
     this.groupForm = {
       code: '',
@@ -633,6 +725,7 @@ export class PayrollSettingsComponent implements OnInit {
   }
 
   openEditGroupModal(group: MasterSalaryGroup) {
+    if (!this.formulaHelp()) this.loadFormulaHelp();
     this.groupErrors.set({});
     this.groupForm = {
       code: group.code,
