@@ -679,6 +679,72 @@ export class PayrollMastersService {
   }
 
   // ═══════════════════════════════════════════
+  // 5a. FORMULA HELP — every name a formula or condition may use
+  // ═══════════════════════════════════════════
+
+  /**
+   * The names Finance can type into a formula or condition, what each means,
+   * where its value comes from, and its value today. Built from RATE_VARIABLES
+   * and the live rates/components, so it always matches what the engine reads.
+   */
+  async getFormulaHelp(companyId: number) {
+    const [rates, components] = await Promise.all([this.getStatutoryRates(companyId), this.getComponents(companyId)]);
+    const fieldLabel: Record<string, string> = {
+      ratePct: 'Rate %',
+      wageCeiling: 'Wage ceiling',
+      eligibilityLimit: 'Eligibility limit',
+      fixedAmount: 'Fixed amount',
+    };
+    const rateMeaning: Record<string, string> = {
+      PF_EMPLOYEE_PCT: 'Employee PF rate, in %',
+      PF_EMPLOYER_PCT: 'Employer PF rate, in %',
+      PF_WAGE_CEILING: 'PF wage ceiling (₹ per month) — PF is capped at this wage',
+      ESI_EMPLOYEE_PCT: 'Employee ESI rate, in %',
+      ESI_EMPLOYER_PCT: 'Employer ESI rate, in %',
+      ESI_LIMIT: 'ESI applies only at or below this monthly wage (₹)',
+      PT_AMOUNT: 'Professional Tax amount for the state (₹ per month)',
+      BASIC_FLOOR: 'Minimum monthly Basic (₹)',
+      GST_PCT: 'GST rate added to a consultant fee, in %',
+    };
+
+    const salary = [
+      { name: 'CTC_MONTHLY', meaning: 'The employee\'s CTC for one month (annual CTC ÷ 12)', source: 'The CTC entered for the employee (or in the calculator)', when: 'Any line' },
+      { name: 'CTC_ANNUAL', meaning: 'The employee\'s yearly CTC', source: 'The CTC entered for the employee (or in the calculator)', when: 'Any line' },
+      { name: 'GROSS', meaning: 'Monthly gross salary = CTC_MONTHLY − employer contributions (employer PF, employer ESI…)', source: 'Worked out by the engine just before the Balancing line', when: 'Only lines below the Balancing line, and the Balancing line itself' },
+      { name: 'PF_BASE', meaning: 'Wage PF is charged on: Basic capped at PF_WAGE_CEILING, or full Basic', source: 'The salary group\'s "PF wage base" setting + BASIC', when: 'Any line below BASIC' },
+    ];
+
+    const rateVars = Object.entries(RATE_VARIABLES).map(([name, { code, field }]) => {
+      const r = rates.find((x) => x.code === code && x.isActive !== false);
+      const value = r ? (r as any)[field] : null;
+      return {
+        name,
+        meaning: rateMeaning[name] || '',
+        source: `Statutory Rates → ${code} → ${fieldLabel[field]}`,
+        value: value ?? null,
+      };
+    });
+
+    const componentVars = components
+      .filter((c) => c.isActive !== false)
+      .map((c) => ({ name: c.code, meaning: c.name, category: c.category }));
+
+    return {
+      salary,
+      rates: rateVars,
+      components: componentVars,
+      functions: [
+        { name: 'MIN(a, b, …)', meaning: 'The smallest value', example: 'MIN(BASIC, 15000)' },
+        { name: 'MAX(a, b, …)', meaning: 'The largest value', example: 'MAX(CTC_MONTHLY * 0.5, BASIC_FLOOR)' },
+        { name: 'ROUND(x, d)', meaning: 'Round to d decimals (default 0)', example: 'ROUND(BASIC * 0.4)' },
+        { name: 'FLOOR(x) / CEIL(x)', meaning: 'Round down / up to a whole rupee', example: 'FLOOR(GROSS * 0.0075)' },
+        { name: 'IF(test, then, else)', meaning: 'Pick a value based on a test', example: 'IF(GROSS <= ESI_LIMIT, GROSS * ESI_EMPLOYEE_PCT / 100, 0)' },
+      ],
+      operators: ['+  −  *  /', '( ) for grouping', '<  <=  >  >=  ==  !=', 'AND  OR  NOT'],
+    };
+  }
+
+  // ═══════════════════════════════════════════
   // 5b. YEAR SETTINGS, COMPANY CONFIG, DROPDOWNS (Phase 1)
   // ═══════════════════════════════════════════
 

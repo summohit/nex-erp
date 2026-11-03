@@ -1977,3 +1977,24 @@
 .history-old { color: #b91c1c; text-decoration: line-through; }
 .history-new { color: #15803d; font-weight: 600; }
 .history-note { margin: 6px 0 0; font-size: 12.5px; }
+
+/* ─── Formula help ─── */
+.fh { display: flex; flex-direction: column; gap: 14px; }
+.fh-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 18px; }
+.fh-card h4 { margin: 0 0 10px; font-size: 15px; color: #0f172a; }
+.fh-card p { margin: 6px 0; font-size: 13.5px; color: #334155; line-height: 1.55; }
+.fh-steps { margin: 0; padding-left: 20px; font-size: 13.5px; color: #334155; line-height: 1.6; }
+.fh-card code, .fh-table code { background: #f1f5f9; padding: 1px 6px; border-radius: 5px; font-size: 12.5px; color: #1e3a8a; }
+.fh-table td { font-size: 13px; vertical-align: top; }
+.fh-code { border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-family: ui-monospace, monospace; font-size: 12.5px; font-weight: 600; padding: 3px 8px; border-radius: 6px; cursor: copy; }
+.fh-code:hover { background: #e0e7ff; }
+.fh-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fh-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 8px; padding: 4px 9px; cursor: copy; font-size: 12.5px; color: #475569; }
+.fh-chip:hover { border-color: #93c5fd; }
+.fh-note { font-size: 12.5px !important; color: #64748b !important; }
+.help-link { border: 0; background: none; padding: 0; color: #2563eb; font-weight: 600; cursor: pointer; text-decoration: underline; font-size: inherit; }
+.fh-drawer-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35); z-index: 1100; display: flex; justify-content: flex-end; }
+.fh-drawer { width: min(760px, 100%); height: 100%; overflow-y: auto; background: #f8fafc; padding: 18px; box-shadow: -12px 0 30px rgba(15, 23, 42, 0.18); animation: fhSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+.fh-drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.fh-drawer-head h3 { margin: 0; font-size: 16px; color: #0f172a; }
+@keyframes fhSlide { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

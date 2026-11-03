@@ -46,7 +46,7 @@ import {
   PayrollDropdownList,
 } from '../../services/payroll.service';
 
-type ActiveSettingsTab = 'components' | 'groups' | 'statutory' | 'tax' | 'setup' | 'calculator' | 'audit';
+type ActiveSettingsTab = 'components' | 'groups' | 'statutory' | 'tax' | 'setup' | 'calculator' | 'audit' | 'help';
 
 @Component({
   selector: 'app-payroll-settings',
@@ -273,6 +273,26 @@ export class PayrollSettingsComponent implements OnInit {
     });
   });
 
+  // Formula help: every name a formula/condition can use (tab + drawer in the editors)
+  formulaHelp = signal<any | null>(null);
+  isHelpDrawerOpen = signal<boolean>(false);
+
+  loadFormulaHelp() {
+    this.payrollService.getPayrollFormulaHelp().subscribe({
+      next: (h) => this.formulaHelp.set(h),
+      error: () => this.toast.error('Failed to load formula help'),
+    });
+  }
+
+  openHelpDrawer() {
+    if (!this.formulaHelp()) this.loadFormulaHelp();
+    this.isHelpDrawerOpen.set(true);
+  }
+
+  categoryLabel(cat: string): string {
+    return ({ EARNING: 'Earning', EMPLOYEE_DEDUCTION: 'Deduction', EMPLOYER_CONTRIBUTION: 'Employer share', REIMBURSEMENT: 'Reimbursement' } as any)[cat] || cat;
+  }
+
   // Component history (one component's audit entries)
   historyFor = signal<MasterComponent | null>(null);
   historyEntries = signal<any[]>([]);
@@ -402,6 +422,8 @@ export class PayrollSettingsComponent implements OnInit {
       this.loadAuditLogs();
     } else if (tab === 'setup' && !this.yearForm) {
       this.loadSetup();
+    } else if (tab === 'help' && !this.formulaHelp()) {
+      this.loadFormulaHelp();
     }
   }
 

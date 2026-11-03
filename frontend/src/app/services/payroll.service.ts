@@ -435,6 +435,10 @@ export class PayrollService {
     return this.http.get<any[]>(`${this.apiUrl}/masters/audit-log?limit=${limit}${extra}`);
   }
 
+  getPayrollFormulaHelp(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/masters/formula-help`);
+  }
+
   getPayrollYearSetting(financialYear = '2026-27'): Observable<PayrollYearSetting> {
     return this.http.get<PayrollYearSetting>(`${this.apiUrl}/masters/year-settings?financialYear=${financialYear}`);
   }

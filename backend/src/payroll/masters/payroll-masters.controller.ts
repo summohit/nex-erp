@@ -185,6 +185,11 @@ export class PayrollMastersController {
   // 7. YEAR SETTINGS, COMPANY CONFIG, DROPDOWNS (Phase 1)
   // ═══════════════════════════════════════════
 
+  @Get('formula-help')
+  getFormulaHelp(@Req() req: Request) {
+    return this.mastersService.getFormulaHelp((req.user as any).companyId);
+  }
+
   @Get('year-settings')
   getYearSetting(@Req() req: Request, @Query('financialYear') financialYear = '2026-27') {
     return this.mastersService.getYearSetting((req.user as any).companyId, financialYear);

@@ -60,6 +60,11 @@
       <span>⚡ Salary Calculator</span>
     </button>
 
+    <button class="tab-button" [class.active]="activeTab() === 'help'" (click)="setTab('help')">
+      <svg lucideInfo [size]="16"></svg>
+      <span>Formula Help</span>
+    </button>
+
     <button class="tab-button" [class.active]="activeTab() === 'audit'" (click)="setTab('audit')">
       <svg lucideHistory [size]="16"></svg>
       <span>Audit Trail</span>
@@ -708,6 +713,120 @@
   <!-- ══════════════════════════════════════════════════════════ -->
   <!-- TAB 5: ⚡ SALARY CALCULATOR & SIMULATOR (W7) -->
   <!-- ══════════════════════════════════════════════════════════ -->
+
+  <!-- Formula help content: used by the Formula Help tab and the drawer in the editors -->
+  <ng-template #formulaHelpContent>
+    <div class="fh">
+      <div class="fh-card">
+        <h4>How a salary is worked out</h4>
+        <ol class="fh-steps">
+          <li>Lines are calculated <strong>top to bottom</strong>, in the order shown in the salary group. A line can use any component <strong>above</strong> it.</li>
+          <li>Just before the <strong>Balancing</strong> line, the engine works out <code>GROSS</code> = <code>CTC_MONTHLY</code> − employer contributions (employer PF, employer ESI…).</li>
+          <li>The <strong>Balancing</strong> line takes whatever is left so earnings add up to gross (for trainees and consultants: to CTC).</li>
+          <li>Lines <strong>below</strong> the Balancing line are calculated last — put anything that needs <code>GROSS</code> (like ESI) there.</li>
+        </ol>
+      </div>
+
+      <div class="fh-card">
+        <h4>Formula vs Condition</h4>
+        <p><strong>Formula</strong> — how much the component is. Example: <code>BASIC * 0.4</code> (HRA = 40% of Basic).</p>
+        <p><strong>Condition</strong> — whether the line applies at all. Empty = always. If it's false, the component is ₹0.
+          Example: <code>GROSS &lt;= ESI_LIMIT</code> (ESI only up to ₹21,000).</p>
+      </div>
+
+      <ng-container *ngIf="formulaHelp() as h; else helpLoading">
+        <div class="fh-card">
+          <h4>Salary values</h4>
+          <table class="modern-table fh-table">
+            <thead><tr><th>Name</th><th>What it is</th><th>Comes from</th><th>Can be used</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let v of h.salary">
+                <td><button type="button" class="fh-code" (click)="copyCode(v.name)" title="Copy">{{ v.name }}</button></td>
+                <td>{{ v.meaning }}</td>
+                <td class="text-muted">{{ v.source }}</td>
+                <td class="text-muted">{{ v.when }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="fh-card">
+          <h4>Rates (change them in Statutory Rates)</h4>
+          <table class="modern-table fh-table">
+            <thead><tr><th>Name</th><th>What it is</th><th>Today</th><th>Comes from</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let v of h.rates">
+                <td><button type="button" class="fh-code" (click)="copyCode(v.name)" title="Copy">{{ v.name }}</button></td>
+                <td>{{ v.meaning }}</td>
+                <td class="font-semibold">{{ v.value ?? '—' }}</td>
+                <td class="text-muted">{{ v.source }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="fh-card">
+          <h4>Components (their value in this salary)</h4>
+          <p class="text-muted fh-note">Use a component's code to use its amount — only from lines above.</p>
+          <div class="fh-chips">
+            <button type="button" class="fh-chip" *ngFor="let c of h.components" (click)="copyCode(c.name)" [title]="c.meaning + ' · ' + categoryLabel(c.category)">
+              <code>{{ c.name }}</code><span>{{ c.meaning }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="fh-card">
+          <h4>Functions and operators</h4>
+          <table class="modern-table fh-table">
+            <thead><tr><th>Function</th><th>What it does</th><th>Example</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let f of h.functions">
+                <td><code>{{ f.name }}</code></td>
+                <td>{{ f.meaning }}</td>
+                <td><code>{{ f.example }}</code></td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="fh-note">Operators: <span *ngFor="let o of h.operators; let last = last"><code>{{ o }}</code>{{ last ? '' : ' · ' }}</span></p>
+        </div>
+
+        <div class="fh-card">
+          <h4>Common examples</h4>
+          <table class="modern-table fh-table">
+            <thead><tr><th>Component</th><th>Formula</th><th>Condition</th></tr></thead>
+            <tbody>
+              <tr><td>Basic (50% of CTC, minimum floor)</td><td><code>MAX(CTC_MONTHLY * 0.5, BASIC_FLOOR)</code></td><td>—</td></tr>
+              <tr><td>HRA (40% of Basic)</td><td><code>BASIC * 0.4</code></td><td>—</td></tr>
+              <tr><td>Employee PF</td><td><code>PF_BASE * PF_EMPLOYEE_PCT / 100</code></td><td>—</td></tr>
+              <tr><td>Employer PF</td><td><code>PF_BASE * PF_EMPLOYER_PCT / 100</code></td><td>—</td></tr>
+              <tr><td>Employee ESI <em>(below Balancing)</em></td><td><code>GROSS * ESI_EMPLOYEE_PCT / 100</code></td><td><code>GROSS &lt;= ESI_LIMIT</code></td></tr>
+              <tr><td>Employer ESI <em>(below Balancing)</em></td><td><code>GROSS * ESI_EMPLOYER_PCT / 100</code></td><td><code>GROSS &lt;= ESI_LIMIT</code></td></tr>
+              <tr><td>Professional Tax</td><td><code>PT_AMOUNT</code></td><td><code>GROSS &gt; 15000</code></td></tr>
+            </tbody>
+          </table>
+          <p class="fh-note">Tip: in a component's editor, <strong>Test</strong> checks a formula and shows its result for a sample CTC before you save.</p>
+        </div>
+      </ng-container>
+      <ng-template #helpLoading><p class="text-muted">Loading the list of names…</p></ng-template>
+    </div>
+  </ng-template>
+
+  <!-- TAB: FORMULA HELP -->
+  <div *ngIf="!isLoading() && activeTab() === 'help'" class="tab-pane animate-fade">
+    <ng-container *ngTemplateOutlet="formulaHelpContent"></ng-container>
+  </div>
+
+  <!-- Drawer: the same help, opened from the salary group editor -->
+  <div *ngIf="isHelpDrawerOpen()" class="fh-drawer-backdrop" (click)="isHelpDrawerOpen.set(false)">
+    <aside class="fh-drawer" (click)="$event.stopPropagation()">
+      <div class="fh-drawer-head">
+        <h3>What you can use in formulas and conditions</h3>
+        <button class="modal-close" (click)="isHelpDrawerOpen.set(false)">✕</button>
+      </div>
+      <ng-container *ngTemplateOutlet="formulaHelpContent"></ng-container>
+    </aside>
+  </div>
+
   <!-- ══════════════════════════════════════════════════════════ -->
   <!-- TAB: YEAR & LISTS (Phase 1 — year settings, grades & costing, dropdowns) -->
   <!-- ══════════════════════════════════════════════════════════ -->
@@ -1319,7 +1438,10 @@
           <div class="table-toolbar" style="padding: 0; margin-bottom: 8px;">
             <div>
               <h4 class="subhead-title">Component Formulas ({{ groupForm.lines?.length || 0 }})</h4>
-              <p class="subhead-desc">Configure order, calculation rules, formulas, and conditions</p>
+              <p class="subhead-desc">
+                Configure order, calculation rules, formulas, and conditions ·
+                <button type="button" class="help-link" (click)="openHelpDrawer()">What can I use in a formula or condition?</button>
+              </p>
             </div>
             <button class="btn-sm btn-outline-modern" (click)="addGroupLine()">
               <svg lucidePlus [size]="14"></svg>
