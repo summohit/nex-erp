@@ -82,7 +82,7 @@ export class PayProfilesService {
     const employees = await this.prisma.employee.findMany({
       where: { companyId, user: { status: { notIn: INACTIVE_USER_STATUSES } }, offboardingStatus: { not: 'SEPARATED' } },
       select: {
-        id: true, firstName: true, lastName: true, payType: true, employmentType: true, avatarUrl: true, employeeCode: true,
+        id: true, firstName: true, lastName: true, payType: true, employmentType: true, avatarUrl: true, employeeCode: true, firstJob: true,
         bankAccountNumber: true, ifscCode: true, panNumber: true, uanNumber: true,
         panVerifiedAt: true, uanVerifiedAt: true, bankVerifiedAt: true,
         department: { select: { name: true } },
@@ -108,12 +108,14 @@ export class PayProfilesService {
       if (!cur) missing.push('Pay profile');
       if (!e.bankAccountNumber || !e.ifscCode) missing.push('Bank details');
       if (!e.panNumber) missing.push('PAN');
-      if (!consultant && !e.uanNumber) missing.push('UAN');
+      // No UAN for consultants, or for someone whose first job this is (they said so in their profile).
+      const noUanExpected = consultant || e.firstJob;
+      if (!noUanExpected && !e.uanNumber) missing.push('UAN');
       const docs = new Set(e.documents.map((d) => READABLE_DOCUMENTS[d.documentType || '']));
       const sugg = (kind: 'PAN' | 'UAN' | 'BANK') => pending.some((s) => s.employeeId === e.id && DETAIL_FIELDS[kind].includes(s.field));
       const details = {
         PAN: detailState(!!e.panNumber, e.panVerifiedAt, sugg('PAN'), docs.has('PAN')),
-        UAN: consultant ? null : detailState(!!e.uanNumber, e.uanVerifiedAt, sugg('UAN'), docs.has('UAN')),
+        UAN: noUanExpected && !e.uanNumber ? null : detailState(!!e.uanNumber, e.uanVerifiedAt, sugg('UAN'), docs.has('UAN')),
         BANK: detailState(!!(e.bankAccountNumber && e.ifscCode), e.bankVerifiedAt, sugg('BANK'), docs.has('BANK')),
       };
       return {
