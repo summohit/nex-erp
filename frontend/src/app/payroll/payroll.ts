@@ -1,5 +1,6 @@
 import { TravelAllowanceService, ClaimRoute } from '../services/travel-allowance';
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { PayProfilesComponent } from './pay-profiles/pay-profiles';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -31,6 +32,7 @@ import { ExpenseReceiptCellRendererComponent } from '../shared/components/expens
   standalone: true,
   imports: [
     CommonModule,
+    PayProfilesComponent,
     FormsModule,
     AgGridModule,
     LucideFilter,

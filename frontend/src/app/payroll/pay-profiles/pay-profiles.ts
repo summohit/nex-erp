@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, Input, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -35,6 +35,9 @@ export class PayProfilesComponent implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
   private toast = inject(HotToastService);
+
+  /** Shown as a tab inside the Payroll page: that page supplies the title and tabs. */
+  @Input() embedded = false;
 
   rows = signal<PayProfileRow[]>([]);
   loading = signal(true);

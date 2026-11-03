@@ -202,6 +202,7 @@
       <button 
         *ngIf="isAdmin()" 
         class="tab-btn"
+        [class.active]="activeTab() === 'pay-profiles'" 
         (click)="setTab('pay-profiles')">
         Pay Profiles
       </button>
@@ -1655,6 +1656,11 @@
         </div>
       </ng-template>
     </div>
+  </div>
+
+  <!-- ==================== TAB: PAY PROFILES ==================== -->
+  <div class="tab-content" *ngIf="activeTab() === 'pay-profiles' && isAdmin()">
+    <app-pay-profiles [embedded]="true"></app-pay-profiles>
   </div>
 
   <!-- ==================== TAB 4: SALARY STRUCTURE ==================== -->

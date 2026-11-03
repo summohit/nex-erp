@@ -247,13 +247,7 @@ export const routes: Routes = [
         pathMatch: 'full'
       },
       {
-        // Before 'payroll/:tab', which would otherwise read "pay-profiles" as a tab.
-        path: 'payroll/pay-profiles',
-        canActivate: [permissionGuard],
-        data: { module: 'payroll' },
-        loadComponent: () => import('./payroll/pay-profiles/pay-profiles').then(m => m.PayProfilesComponent)
-      },
-      {
+        // The list is a tab of the Payroll page (payroll/:tab); this is one employee's profile.
         path: 'payroll/pay-profiles/:employeeId',
         canActivate: [permissionGuard],
         data: { module: 'payroll' },

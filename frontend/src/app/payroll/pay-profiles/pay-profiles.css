@@ -112,3 +112,7 @@
 @media (prefers-reduced-motion: reduce) {
   .pp-skel { animation: none; }
 }
+
+/* Inside the Payroll page's tab: no page padding, the host page has its own. */
+.pp-page.pp-embedded { padding: 0; max-width: none; }
+.pp-tab-title { margin: 0 0 4px; font-size: 20px; color: #0f172a; }

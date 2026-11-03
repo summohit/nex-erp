@@ -1,8 +1,9 @@
-<div class="pp-page">
+<div class="pp-page" [class.pp-embedded]="embedded">
   <header class="pp-header">
     <div>
-      <button type="button" class="pp-back" (click)="backToPayroll()">← Payroll</button>
-      <h1>Pay Profiles</h1>
+      <button type="button" class="pp-back" *ngIf="!embedded" (click)="backToPayroll()">← Payroll</button>
+      <h1 *ngIf="!embedded">Pay Profiles</h1>
+      <h2 class="pp-tab-title" *ngIf="embedded">Pay Profiles</h2>
       <p>Each employee's salary group, CTC and statutory details. Every change is a new version — nothing is overwritten.</p>
     </div>
     <button type="button" class="pp-btn pp-btn-primary" *ngIf="canEdit()" (click)="openImport()">
