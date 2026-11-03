@@ -707,18 +707,28 @@ export class PayrollMastersService {
    * Load a salary group (the version in force on `onDate`), the rates and the
    * components once, and return a function that runs the engine for any CTC.
    */
-  async prepareCalculator(companyId: number, groupCode: string, onDate = new Date()) {
+  async prepareCalculator(companyId: number, groupCode: string, onDate = new Date(), withTax?: { regimeCode: 'NEW' | 'OLD'; financialYear: string }) {
     const group = await this.prisma.payrollSalaryGroup.findFirst({
       where: { companyId, code: groupCode, effectiveFrom: { lte: onDate }, OR: [{ retiredAt: null }, { retiredAt: { gt: onDate } }] },
       orderBy: { version: 'desc' },
       include: { lines: { include: { component: true }, orderBy: { displayOrder: 'asc' } } },
     });
     if (!group) return null;
-    const [statutoryRates, components] = await Promise.all([this.getStatutoryRates(companyId), this.getComponents(companyId)]);
+    const [statutoryRates, components, taxRegime] = await Promise.all([
+      this.getStatutoryRates(companyId),
+      this.getComponents(companyId),
+      withTax
+        ? this.prisma.payrollTaxRegime.findUnique({
+            where: { companyId_code_financialYear: { companyId, code: withTax.regimeCode, financialYear: withTax.financialYear } },
+            include: { slabs: { orderBy: { position: 'asc' } }, sections: { where: { isActive: true }, orderBy: { position: 'asc' } } },
+          })
+        : Promise.resolve(null),
+    ]);
     return {
       group,
+      hasTax: !!taxRegime,
       run: (annualCtc: number, overrides?: { [componentCode: string]: number }) =>
-        PayrollCalculator.calculate(this.buildCalcInput(group, statutoryRates, components, undefined, { annualCtc, overrides })),
+        PayrollCalculator.calculate(this.buildCalcInput(group, statutoryRates, components, taxRegime ?? undefined, { annualCtc, overrides })),
     };
   }
 

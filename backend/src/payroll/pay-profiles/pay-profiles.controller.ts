@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../../auth/auth.guard';
 import { PayProfilesService, assertPayrollEditor, assertPayrollViewer } from './pay-profiles.service';
 import { DocumentReaderService } from './document-reader.service';
+import { PayrollCompareService } from './payroll-compare.service';
 
 /** Pay profiles (Payroll plan Phase 2). Finance and admins change them; HR can look. */
 @Controller('payroll/pay-profiles')
@@ -10,6 +11,7 @@ export class PayProfilesController {
   constructor(
     private readonly profiles: PayProfilesService,
     private readonly reader: DocumentReaderService,
+    private readonly comparer: PayrollCompareService,
   ) {}
 
   @Get()
@@ -29,6 +31,13 @@ export class PayProfilesController {
   applyImport(@Req() req: any, @Body() body: any) {
     assertPayrollEditor(req.user.role);
     return this.profiles.applyImport(req.user.companyId, body ?? {}, req.user.sub);
+  }
+
+  /** Old monthly run vs the engine for a month, per employee. Read-only. */
+  @Get('compare')
+  compare(@Req() req: any, @Query('month') month: string, @Query('year') year: string) {
+    assertPayrollViewer(req.user.role);
+    return this.comparer.compare(req.user.companyId, Number(month), Number(year));
   }
 
   /** Send uploaded PAN / UAN / bank documents to Gemini; results are suggestions only. */

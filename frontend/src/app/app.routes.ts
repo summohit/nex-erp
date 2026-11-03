@@ -247,6 +247,13 @@ export const routes: Routes = [
         pathMatch: 'full'
       },
       {
+        // Phase 3: old run vs the engine. Before 'payroll/:tab', which would read "compare" as a tab.
+        path: 'payroll/compare',
+        canActivate: [permissionGuard],
+        data: { module: 'payroll' },
+        loadComponent: () => import('./payroll/payroll-compare/payroll-compare').then(m => m.PayrollCompareComponent)
+      },
+      {
         // The list is a tab of the Payroll page (payroll/:tab); this is one employee's profile.
         path: 'payroll/pay-profiles/:employeeId',
         canActivate: [permissionGuard],

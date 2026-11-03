@@ -452,6 +452,10 @@ export class PayrollService {
     return this.http.put<any>(`${this.apiUrl}/pay-profiles/${employeeId}/details`, data);
   }
 
+  comparePayroll(month: number, year: number): Observable<PayrollCompareResult> {
+    return this.http.get<PayrollCompareResult>(`${this.apiUrl}/pay-profiles/compare?month=${month}&year=${year}`);
+  }
+
   startReadingDocuments(employeeIds?: number[]): Observable<DocumentReadProgress> {
     return this.http.post<DocumentReadProgress>(`${this.apiUrl}/pay-profiles/read-documents`, { employeeIds });
   }
@@ -649,6 +653,35 @@ export interface PayProfileRow {
 }
 
 export type DetailState = 'VERIFIED' | 'UNVERIFIED' | 'SUGGESTED' | 'DOCUMENT' | 'MISSING';
+
+export interface PayBreakdown { gross: number; pf: number; esi: number; pt: number; tds: number; other: number; net: number; }
+
+export interface PayrollCompareRow {
+  employeeId: number;
+  name: string;
+  avatarUrl: string | null;
+  employeeCode: string | null;
+  department: string | null;
+  status: 'SAME' | 'DIFFERENT' | 'NO_PROFILE' | 'NO_SALARY' | 'NEW_ONLY' | 'NO_GROUP' | 'ERROR';
+  salaryGroupCode?: string;
+  annualCtc?: number;
+  old: PayBreakdown | null;
+  new: PayBreakdown | null;
+  diffNet: number | null;
+  reasons: string[];
+}
+
+export interface PayrollCompareResult {
+  month: number;
+  year: number;
+  financialYear: string;
+  regimeCode: 'NEW' | 'OLD';
+  summary: {
+    employees: number; compared: number; same: number; different: number; noProfile: number; noSalary: number; newOnly: number; errors: number;
+    oldGross: number; newGross: number; oldNet: number; newNet: number; oldTds: number; newTds: number; totalNetChange: number;
+  };
+  rows: PayrollCompareRow[];
+}
 
 export interface DocumentReadProgress {
   running: boolean;

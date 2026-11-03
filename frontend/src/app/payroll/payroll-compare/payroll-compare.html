@@ -1,0 +1,335 @@
+<div class="pc-page">
+  <!-- Header with Breadcrumb and Period Selector -->
+  <header class="pc-header">
+    <div class="pc-header-left">
+      <div class="pc-breadcrumb-row">
+        <button type="button" class="pc-back-pill" (click)="back()">
+          <svg lucideArrowLeft [size]="14"></svg>
+          <span>Back to Pay Profiles</span>
+        </button>
+      </div>
+      <div class="pc-title-row">
+        <h1>Old Payroll vs New Engine</h1>
+        <span class="pc-badge-engine">
+          <svg lucideGitCompare [size]="13"></svg>
+          <span>Engine Simulation Sandbox</span>
+        </span>
+      </div>
+      <p class="pc-header-desc">
+        Side-by-side comparative simulation of employee take-home pay: legacy monthly run (hardcoded statutory rates) versus the Phase 2 formula engine.
+        <strong>Nothing is saved or overwritten.</strong>
+      </p>
+    </div>
+
+    <!-- Period Controller -->
+    <div class="pc-period-card">
+      <div class="pc-period-label">
+        <svg lucideCalendar [size]="14"></svg>
+        <span>Comparison Period:</span>
+      </div>
+      <div class="pc-period-controls">
+        <div class="pc-select-wrap">
+          <select class="pc-select" [(ngModel)]="month">
+            <option *ngFor="let m of months; let i = index" [ngValue]="i + 1">{{ m }}</option>
+          </select>
+          <svg lucideChevronDown [size]="14" class="pc-select-arrow"></svg>
+        </div>
+        <div class="pc-select-wrap pc-year-wrap">
+          <select class="pc-select" [(ngModel)]="year">
+            <option *ngFor="let y of years" [ngValue]="y">{{ y }}</option>
+          </select>
+          <svg lucideChevronDown [size]="14" class="pc-select-arrow"></svg>
+        </div>
+        <button type="button" class="pc-btn-run" (click)="run()" [disabled]="loading()">
+          <svg lucideRefreshCw [size]="14" [class.animate-spin]="loading()"></svg>
+          <span>{{ loading() ? 'Comparing…' : 'Run Simulation' }}</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Shimmer Skeleton -->
+  <div class="pc-skel-wrap" *ngIf="loading() && !result()">
+    <div class="pc-skel-head">
+      <div class="pc-skel" style="height: 110px; border-radius: 16px;" *ngFor="let i of [1,2,3,4]"></div>
+    </div>
+    <div class="pc-skel" style="height: 52px; border-radius: 12px;" *ngFor="let i of [1,2,3,4,5]"></div>
+  </div>
+
+  <ng-container *ngIf="result() as r">
+    <!-- Informational Note for Inactive Period -->
+    <div class="pc-note-card" *ngIf="r.summary.compared === 0 && r.summary.noProfile > 0">
+      <div class="pc-note-icon">
+        <svg lucideAlertCircle [size]="18"></svg>
+      </div>
+      <div class="pc-note-text">
+        Nobody can be compared for <strong>{{ months[r.month - 1] }} {{ r.year }}</strong>: no pay profile is in force yet for that month.
+        Profiles imported to start later only take effect from their scheduled start date.
+      </div>
+    </div>
+
+    <!-- KPI Summary Metrics Grid (4 Cards) -->
+    <div class="pc-cards-grid">
+      <!-- Card 1: Total Compared -->
+      <div class="pc-kpi-card kpi-blue">
+        <div class="pc-kpi-top">
+          <span class="pc-kpi-label">Compared Employees</span>
+          <div class="pc-kpi-icon icon-blue">
+            <svg lucideUsers [size]="18"></svg>
+          </div>
+        </div>
+        <div class="pc-kpi-val">{{ r.summary.compared }}</div>
+        <div class="pc-kpi-sub">
+          <span class="sub-chip ok">
+            <svg lucideCheckCircle2 [size]="11"></svg>
+            {{ r.summary.same }} Identical
+          </span>
+          <span class="sub-chip diff" *ngIf="r.summary.different > 0">
+            <svg lucideAlertCircle [size]="11"></svg>
+            {{ r.summary.different }} Variances
+          </span>
+        </div>
+      </div>
+
+      <!-- Card 2: Old Legacy Net -->
+      <div class="pc-kpi-card kpi-slate">
+        <div class="pc-kpi-top">
+          <span class="pc-kpi-label">Legacy Net Payout</span>
+          <div class="pc-kpi-icon icon-slate">
+            <svg lucideScale [size]="18"></svg>
+          </div>
+        </div>
+        <div class="pc-kpi-val">{{ money(r.summary.oldNet) }}</div>
+        <div class="pc-kpi-sub">
+          <span class="text-slate-500">Gross: {{ money(r.summary.oldGross) }}</span>
+        </div>
+      </div>
+
+      <!-- Card 3: New Engine Net -->
+      <div class="pc-kpi-card kpi-indigo">
+        <div class="pc-kpi-top">
+          <span class="pc-kpi-label">New Engine Net Payout</span>
+          <div class="pc-kpi-icon icon-indigo">
+            <svg lucideSparkles [size]="18"></svg>
+          </div>
+        </div>
+        <div class="pc-kpi-val text-indigo-700">{{ money(r.summary.newNet) }}</div>
+        <div class="pc-kpi-sub">
+          <span class="text-slate-500">Gross: {{ money(r.summary.newGross) }}</span>
+        </div>
+      </div>
+
+      <!-- Card 4: Net Change / Delta -->
+      <div class="pc-kpi-card kpi-delta" [class.up]="r.summary.totalNetChange > 0" [class.down]="r.summary.totalNetChange < 0">
+        <div class="pc-kpi-top">
+          <span class="pc-kpi-label">Total Net Variance</span>
+          <div class="pc-kpi-icon" [class.icon-emerald]="r.summary.totalNetChange >= 0" [class.icon-rose]="r.summary.totalNetChange < 0">
+            <svg lucideTrendingUp [size]="18" *ngIf="r.summary.totalNetChange >= 0"></svg>
+            <svg lucideTrendingDown [size]="18" *ngIf="r.summary.totalNetChange < 0"></svg>
+          </div>
+        </div>
+        <div class="pc-kpi-val" [class.text-emerald]="r.summary.totalNetChange >= 0" [class.text-rose]="r.summary.totalNetChange < 0">
+          {{ signed(r.summary.totalNetChange) }}
+        </div>
+        <div class="pc-kpi-sub">
+          <span class="pc-tds-note">
+            TDS: {{ money(r.summary.oldTds) }} → {{ money(r.summary.newTds) }} · {{ r.regimeCode }} regime (FY {{ r.financialYear }})
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Segmented Filter Toolbar -->
+    <div class="pc-toolbar">
+      <div class="pc-filter-tabs">
+        <button type="button" class="pc-tab-pill" [class.active]="filter() === 'DIFFERENT'" (click)="filter.set('DIFFERENT')">
+          <svg lucideGitCompare [size]="14"></svg>
+          <span>Compared</span>
+          <span class="tab-chip">{{ r.summary.compared }}</span>
+        </button>
+        <button type="button" class="pc-tab-pill warn" [class.active]="filter() === 'NO_PROFILE'" (click)="filter.set('NO_PROFILE')">
+          <svg lucideAlertCircle [size]="14"></svg>
+          <span>No Pay Profile</span>
+          <span class="tab-chip warn">{{ r.summary.noProfile }}</span>
+        </button>
+        <button type="button" class="pc-tab-pill red" [class.active]="filter() === 'NO_SALARY'" (click)="filter.set('NO_SALARY')">
+          <svg lucideAlertTriangle [size]="14"></svg>
+          <span>No Salary Anywhere</span>
+          <span class="tab-chip red">{{ r.summary.noSalary }}</span>
+        </button>
+        <button type="button" class="pc-tab-pill" [class.active]="filter() === 'ALL'" (click)="filter.set('ALL')">
+          <svg lucideUsers [size]="14"></svg>
+          <span>All Employees</span>
+          <span class="tab-chip">{{ r.summary.employees }}</span>
+        </button>
+      </div>
+
+      <!-- Search by Username / Name / Code / Dept -->
+      <div class="pc-search-wrap">
+        <svg lucideSearch [size]="15" class="pc-search-icon"></svg>
+        <input
+          type="text"
+          class="pc-search-input"
+          placeholder="Search by name, code or department…"
+          [ngModel]="search()"
+          (ngModelChange)="search.set($event)"
+        />
+        <button
+          type="button"
+          class="pc-search-clear"
+          *ngIf="search()"
+          (click)="search.set('')"
+          title="Clear search"
+        >
+          <svg lucideX [size]="13"></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="pc-table-card">
+      <table class="pc-table">
+        <thead>
+          <tr>
+            <th>EMPLOYEE</th>
+            <th>SALARY GROUP</th>
+            <th class="num">OLD NET PAY</th>
+            <th class="num">NEW ENGINE NET</th>
+            <th class="num">NET VARIANCE</th>
+            <th class="text-center">ANALYSIS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let x of rows()">
+            <tr class="pc-row" [class.pc-row-expanded]="open().has(x.employeeId)" (click)="x.reasons.length && toggle(x.employeeId)">
+              <td>
+                <div class="pc-emp-cell">
+                  <div class="pc-avatar" [style.background]="getAvatarBg(x.name)">
+                    <img *ngIf="x.avatarUrl" [src]="x.avatarUrl" [alt]="x.name" (error)="x.avatarUrl = null">
+                    <ng-container *ngIf="!x.avatarUrl">{{ initials(x.name) }}</ng-container>
+                  </div>
+                  <div class="pc-emp-info">
+                    <div class="pc-emp-name">{{ x.name }}</div>
+                    <div class="pc-emp-sub">
+                      <span class="emp-code" *ngIf="x.employeeCode">{{ x.employeeCode }}</span>
+                      <span class="dot-sep" *ngIf="x.employeeCode && x.department">·</span>
+                      <span class="emp-dept" *ngIf="x.department">{{ x.department }}</span>
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="pc-group-pill" *ngIf="x.salaryGroupCode">{{ x.salaryGroupCode }}</span>
+                <span class="pc-status-badge" [attr.data-s]="x.status" *ngIf="!x.salaryGroupCode">
+                  <span class="status-dot"></span>
+                  <span>{{ statusLabel(x.status) }}</span>
+                </span>
+              </td>
+              <td class="num font-semibold text-slate-700">
+                {{ money(x.old?.net) }}
+              </td>
+              <td class="num font-bold text-slate-900">
+                {{ money(x.new?.net) }}
+              </td>
+              <td class="num">
+                <span class="pc-delta-chip" [class.up]="(x.diffNet ?? 0) > 1" [class.down]="(x.diffNet ?? 0) < -1" [class.same]="isSame(x.diffNet)">
+                  <svg lucideTrendingUp [size]="12" *ngIf="(x.diffNet ?? 0) > 1"></svg>
+                  <svg lucideTrendingDown [size]="12" *ngIf="(x.diffNet ?? 0) < -1"></svg>
+                  <span>{{ signed(x.diffNet) }}</span>
+                </span>
+              </td>
+              <td class="text-center" (click)="$event.stopPropagation()">
+                <button type="button" class="pc-btn-why" [class.active]="open().has(x.employeeId)" *ngIf="x.reasons.length" (click)="toggle(x.employeeId)">
+                  <span>{{ open().has(x.employeeId) ? 'Hide' : 'Why?' }}</span>
+                  <svg lucideChevronUp [size]="13" *ngIf="open().has(x.employeeId)"></svg>
+                  <svg lucideChevronDown [size]="13" *ngIf="!open().has(x.employeeId)"></svg>
+                </button>
+                <span class="text-muted-dash" *ngIf="!x.reasons.length">—</span>
+              </td>
+            </tr>
+
+            <!-- Expanded Discrepancy Breakdown Card -->
+            <tr class="pc-expanded-row" *ngIf="open().has(x.employeeId)">
+              <td colspan="6">
+                <div class="pc-discrepancy-card">
+                  <div class="pc-disc-header">
+                    <div class="disc-title">
+                      <svg lucideGitCompare [size]="16"></svg>
+                      <span>Detailed Line-by-Line Variance Breakdown</span>
+                    </div>
+                    <span class="disc-emp-badge">{{ x.name }} ({{ x.salaryGroupCode || 'No Group' }})</span>
+                  </div>
+
+                  <div class="pc-disc-content">
+                    <!-- Left: Sub-table -->
+                    <div class="pc-breakdown-table-wrap" *ngIf="x.old && x.new">
+                      <table class="pc-breakdown-table">
+                        <thead>
+                          <tr>
+                            <th>LINE COMPONENT</th>
+                            <th class="num">LEGACY RUN</th>
+                            <th class="num">NEW ENGINE</th>
+                            <th class="num">DELTA</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr *ngFor="let p of pieces" [class.total-row]="p.key === 'net'">
+                            <td class="comp-col">
+                              <span class="comp-name">{{ p.label }}</span>
+                            </td>
+                            <td class="num">{{ money(x.old[p.key]) }}</td>
+                            <td class="num font-semibold">{{ money(x.new[p.key]) }}</td>
+                            <td class="num">
+                              <span class="pc-diff-pill" [class.up]="x.new[p.key] - x.old[p.key] > 1" [class.down]="x.new[p.key] - x.old[p.key] < -1" [class.same]="x.new[p.key] === x.old[p.key]">
+                                {{ signed(x.new[p.key] - x.old[p.key]) }}
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <!-- Right: Reasons & Rule Explanations -->
+                    <div class="pc-reasons-card" *ngIf="x.reasons.length">
+                      <div class="reasons-header">
+                        <svg lucideInfo [size]="15"></svg>
+                        <span>Root Causes &amp; Engine Explanations</span>
+                      </div>
+                      <div class="reasons-list">
+                        <div class="reason-item" *ngFor="let why of x.reasons">
+                          <ng-container *ngIf="parseReason(why) as pr">
+                            <div class="reason-top" *ngIf="pr.component">
+                              <span class="reason-comp-badge">{{ pr.component }}</span>
+                              <span class="reason-delta-badge">{{ pr.delta }}</span>
+                            </div>
+                            <div class="reason-text">{{ pr.explanation }}</div>
+                          </ng-container>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+
+          <tr *ngIf="!rows().length">
+            <td colspan="6" class="pc-empty-cell">
+              <div class="pc-empty-state">
+                <svg lucideUsers [size]="32" *ngIf="!search()"></svg>
+                <svg lucideSearch [size]="32" *ngIf="search()"></svg>
+                <div class="empty-title">{{ search() ? 'No matches found for "' + search() + '"' : 'No employees found' }}</div>
+                <div class="empty-desc">
+                  {{ search() ? 'Try checking your search term or clear the filter.' : 'No records match the current filter criteria for this period.' }}
+                </div>
+                <button type="button" class="pc-btn-clear-search" *ngIf="search()" (click)="search.set('')">
+                  Clear search
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </ng-container>
+</div>
