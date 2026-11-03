@@ -1,10 +1,12 @@
-import { Component, Input, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AuthService } from '../../services/auth.service';
 import {
+  DetailState,
+  DocumentReadProgress,
   PayrollService,
   PayProfileImportPreview,
   PayProfileImportRow,
@@ -30,7 +32,7 @@ interface ImportDraft extends PayProfileImportRow {
   templateUrl: './pay-profiles.html',
   styleUrls: ['./pay-profiles.css'],
 })
-export class PayProfilesComponent implements OnInit {
+export class PayProfilesComponent implements OnInit, OnDestroy {
   private payroll = inject(PayrollService);
   private auth = inject(AuthService);
   private router = inject(Router);
@@ -53,7 +55,7 @@ export class PayProfilesComponent implements OnInit {
       all: r.length,
       withProfile: r.filter((x) => x.current).length,
       noProfile: r.filter((x) => !x.current).length,
-      missingDetails: r.filter((x) => x.missing.some((m) => m !== 'Pay profile')).length,
+      missingDetails: r.filter((x) => Object.values(x.details || {}).some((s) => s && s !== 'VERIFIED')).length,
       upcoming: r.filter((x) => x.upcoming).length,
     };
   });
@@ -63,7 +65,7 @@ export class PayProfilesComponent implements OnInit {
     const f = this.filter();
     return this.rows().filter((r) => {
       if (f === 'NO_PROFILE' && r.current) return false;
-      if (f === 'MISSING_DETAILS' && !r.missing.some((m) => m !== 'Pay profile')) return false;
+      if (f === 'MISSING_DETAILS' && !Object.values(r.details || {}).some((s) => s && s !== 'VERIFIED')) return false;
       if (f === 'UPCOMING' && !r.upcoming) return false;
       if (!q) return true;
       return [r.name, r.department, r.designation, r.current?.salaryGroupCode].some((v) => (v || '').toLowerCase().includes(q));
@@ -85,8 +87,65 @@ export class PayProfilesComponent implements OnInit {
   });
   selectedCount = computed(() => this.drafts().filter((d) => d.selected).length);
 
+  // ── Reading PAN / UAN / bank documents with AI ──
+  reading = signal<DocumentReadProgress | null>(null);
+  private readTimer: any = null;
+
+  /** Employees whose details still need Finance to look: suggested, only a document, or typed but unchecked. */
+  toCheck = computed(() => this.rows().filter((r) => Object.values(r.details || {}).some((s) => s === 'SUGGESTED' || s === 'UNVERIFIED')).length);
+
   ngOnInit() {
     this.load();
+    this.payroll.getReadingStatus().subscribe({ next: (p) => { this.reading.set(p); if (p.running) this.pollReading(); }, error: () => {} });
+  }
+
+  ngOnDestroy() {
+    clearTimeout(this.readTimer);
+  }
+
+  startReading() {
+    const ok = confirm(
+      'Read PAN cards, UAN documents and cancelled cheques with AI?\n\n' +
+      'The uploaded files are sent to Google Gemini to read the numbers. Nothing is saved to anyone\'s record — ' +
+      'each value shows as a suggestion that Finance verifies against the document.',
+    );
+    if (!ok) return;
+    this.payroll.startReadingDocuments().subscribe({
+      next: (p) => {
+        this.reading.set(p);
+        if (p.total === 0) this.toast.success('Nothing new to read — every document was read already or its detail is verified.');
+        else this.pollReading();
+      },
+      error: (e) => this.toast.error(e?.error?.message || 'Could not start reading documents'),
+    });
+  }
+
+  private pollReading() {
+    clearTimeout(this.readTimer);
+    this.readTimer = setTimeout(() => {
+      this.payroll.getReadingStatus().subscribe({
+        next: (p) => {
+          this.reading.set(p);
+          if (p.running) this.pollReading();
+          else {
+            this.toast.success(`Done: ${p.suggested} value${p.suggested === 1 ? '' : 's'} to check, ${p.unreadable} unreadable${p.failed ? `, ${p.failed} failed` : ''}.`);
+            this.load();
+          }
+        },
+        error: () => this.pollReading(),
+      });
+    }, 2500);
+  }
+
+  stateLabel(kind: string, s: DetailState) {
+    const what = kind === 'BANK' ? 'Bank' : kind;
+    return ({
+      VERIFIED: `${what} ✓`,
+      UNVERIFIED: `${what}: check`,
+      SUGGESTED: `${what}: AI read`,
+      DOCUMENT: `${what}: document only`,
+      MISSING: `${what}: missing`,
+    } as any)[s];
   }
 
   load() {

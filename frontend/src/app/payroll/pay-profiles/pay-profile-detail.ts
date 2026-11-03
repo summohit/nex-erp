@@ -5,7 +5,9 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AuthService } from '../../services/auth.service';
 import {
+  DetailState,
   MasterSalaryGroup,
+  PayDetailSuggestion,
   PayProfileDetail,
   PayProfileVersion,
   PayrollDropdownList,
@@ -50,6 +52,78 @@ export class PayProfileDetailComponent implements OnInit {
   // ── Statutory & bank details ──
   details: Record<string, string | null> = {};
   savingDetails = signal(false);
+
+  // ── Verifying PAN / UAN / bank ──
+  verifying = signal<string | null>(null);
+
+  /** One block per detail: its documents, AI suggestions and input fields. */
+  verifyBlocks(d: PayProfileDetail) {
+    const e = d.employee;
+    const docs = (type: string) => e.documents.filter((x) => x.documentType === type);
+    const sugg = (fields: string[]) => d.suggestions.filter((s) => s.status === 'SUGGESTED' && fields.includes(s.field));
+    const unreadable = (type: string) => d.suggestions.filter((s) => s.field === 'UNREADABLE' && docs(type).some((x) => x.id === s.documentId));
+    const state = (has: boolean, at: string | null, fields: string[], type: string): DetailState =>
+      has && at ? 'VERIFIED' : sugg(fields).length ? 'SUGGESTED' : has ? 'UNVERIFIED' : docs(type).length ? 'DOCUMENT' : 'MISSING';
+    const blocks = [
+      {
+        detail: 'PAN' as const, title: 'PAN', verifiedAt: e.panVerifiedAt,
+        state: state(!!e.panNumber, e.panVerifiedAt, ['PAN'], 'PAN Card'),
+        documents: docs('PAN Card'), suggestions: sugg(['PAN']), unreadable: unreadable('PAN Card'),
+        fields: [{ key: 'panNumber', label: 'PAN number', placeholder: 'ABCDE1234F', max: 10 }],
+      },
+      {
+        detail: 'UAN' as const, title: 'UAN', verifiedAt: e.uanVerifiedAt,
+        state: state(!!e.uanNumber, e.uanVerifiedAt, ['UAN'], 'UAN'),
+        documents: docs('UAN'), suggestions: sugg(['UAN']), unreadable: unreadable('UAN'),
+        fields: [{ key: 'uanNumber', label: 'UAN (12 digits)', placeholder: '100200300400', max: 12 }],
+      },
+      {
+        detail: 'BANK' as const, title: 'Bank account', verifiedAt: e.bankVerifiedAt,
+        state: state(!!(e.bankAccountNumber && e.ifscCode), e.bankVerifiedAt, ['BANK_ACCOUNT', 'IFSC', 'BANK_NAME'], 'Bank Proof / Cancelled Cheque'),
+        documents: docs('Bank Proof / Cancelled Cheque'), suggestions: sugg(['BANK_ACCOUNT', 'IFSC', 'BANK_NAME']), unreadable: unreadable('Bank Proof / Cancelled Cheque'),
+        fields: [
+          { key: 'bankAccountNumber', label: 'Account number', placeholder: 'Digits only', max: 18 },
+          { key: 'ifscCode', label: 'IFSC', placeholder: 'HDFC0001234', max: 11 },
+          { key: 'bankName', label: 'Bank name', placeholder: 'e.g. HDFC Bank', max: 80 },
+        ],
+      },
+    ];
+    return d.employee.payType === 'CONSULTANT' ? blocks.filter((b) => b.detail !== 'UAN') : blocks;
+  }
+
+  stateLabel(s: DetailState) {
+    return ({ VERIFIED: '✓ Verified', UNVERIFIED: 'Entered, not verified', SUGGESTED: 'AI suggestion to check', DOCUMENT: 'Document only', MISSING: 'Missing' } as any)[s];
+  }
+
+  fieldLabel(f: string) {
+    return ({ PAN: 'PAN', UAN: 'UAN', BANK_ACCOUNT: 'account', IFSC: 'IFSC', BANK_NAME: 'bank' } as any)[f] || f;
+  }
+
+  /** Put the AI's value in the box — Finance still presses Verify after checking the document. */
+  useSuggestion(sg: PayDetailSuggestion) {
+    const key = ({ PAN: 'panNumber', UAN: 'uanNumber', BANK_ACCOUNT: 'bankAccountNumber', IFSC: 'ifscCode', BANK_NAME: 'bankName' } as any)[sg.field];
+    if (key) this.details[key] = sg.value;
+  }
+
+  rejectSuggestion(sg: PayDetailSuggestion) {
+    this.payroll.rejectPaySuggestion(sg.id).subscribe({
+      next: () => { this.toast.success('Suggestion removed'); this.load(); },
+      error: (e) => this.toast.error(e?.error?.message || 'Failed'),
+    });
+  }
+
+  verify(detail: 'PAN' | 'UAN' | 'BANK') {
+    const pick = (k: string) => this.details[k] ?? null;
+    const body =
+      detail === 'PAN' ? { detail, panNumber: pick('panNumber') }
+      : detail === 'UAN' ? { detail, uanNumber: pick('uanNumber') }
+      : { detail, bankAccountNumber: pick('bankAccountNumber'), ifscCode: pick('ifscCode'), bankName: pick('bankName') };
+    this.verifying.set(detail);
+    this.payroll.verifyPayDetail(this.employeeId, body).subscribe({
+      next: () => { this.verifying.set(null); this.toast.success(`${detail === 'BANK' ? 'Bank account' : detail} verified`); this.load(); },
+      error: (e) => { this.verifying.set(null); this.toast.error(e?.error?.message || 'Failed to verify'); },
+    });
+  }
 
   // ── New version ──
   formOpen = signal(false);

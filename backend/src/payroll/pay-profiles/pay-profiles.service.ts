@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../../prisma/prisma.service';
 import { PayrollMastersService } from '../masters/payroll-masters.service';
 import { isCompanyAdmin, isPayrollRole, normaliseRole } from '../../common/company-roles';
+import { READABLE_DOCUMENTS } from './document-reader.service';
 
 /** Finance and company admins change pay; HR may look (Payroll plan: "who does what"). */
 export function isPayrollEditor(role?: string | null): boolean {
@@ -49,6 +50,18 @@ const IFSC = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
 type ImportStatus = 'MATCH' | 'REVIEW' | 'NO_SALARY' | 'NO_GROUP';
 
+/** Where a detail stands: checked by Finance, typed but unchecked, read by AI, only a file, or nothing. */
+export type DetailState = 'VERIFIED' | 'UNVERIFIED' | 'SUGGESTED' | 'DOCUMENT' | 'MISSING';
+const DETAIL_FIELDS: Record<'PAN' | 'UAN' | 'BANK', string[]> = { PAN: ['PAN'], UAN: ['UAN'], BANK: ['BANK_ACCOUNT', 'IFSC', 'BANK_NAME'] };
+
+export function detailState(has: boolean, verifiedAt: Date | null, suggested: boolean, document: boolean): DetailState {
+  if (has && verifiedAt) return 'VERIFIED';
+  if (suggested) return 'SUGGESTED';
+  if (has) return 'UNVERIFIED';
+  if (document) return 'DOCUMENT';
+  return 'MISSING';
+}
+
 @Injectable()
 export class PayProfilesService {
   constructor(
@@ -70,10 +83,16 @@ export class PayProfilesService {
       select: {
         id: true, firstName: true, lastName: true, payType: true, employmentType: true,
         bankAccountNumber: true, ifscCode: true, panNumber: true, uanNumber: true,
+        panVerifiedAt: true, uanVerifiedAt: true, bankVerifiedAt: true,
         department: { select: { name: true } },
         designation: { select: { name: true } },
+        documents: { where: { documentType: { in: Object.keys(READABLE_DOCUMENTS) } }, select: { documentType: true } },
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+    const pending = await this.prisma.employeeDetailSuggestion.findMany({
+      where: { companyId, status: 'SUGGESTED', employeeId: { in: employees.map((e) => e.id) } },
+      select: { employeeId: true, field: true },
     });
     const profiles = await this.prisma.employeePayProfile.findMany({
       where: { companyId, employeeId: { in: employees.map((e) => e.id) } },
@@ -89,7 +108,15 @@ export class PayProfilesService {
       if (!e.bankAccountNumber || !e.ifscCode) missing.push('Bank details');
       if (!e.panNumber) missing.push('PAN');
       if (!consultant && !e.uanNumber) missing.push('UAN');
+      const docs = new Set(e.documents.map((d) => READABLE_DOCUMENTS[d.documentType || '']));
+      const sugg = (kind: 'PAN' | 'UAN' | 'BANK') => pending.some((s) => s.employeeId === e.id && DETAIL_FIELDS[kind].includes(s.field));
+      const details = {
+        PAN: detailState(!!e.panNumber, e.panVerifiedAt, sugg('PAN'), docs.has('PAN')),
+        UAN: consultant ? null : detailState(!!e.uanNumber, e.uanVerifiedAt, sugg('UAN'), docs.has('UAN')),
+        BANK: detailState(!!(e.bankAccountNumber && e.ifscCode), e.bankVerifiedAt, sugg('BANK'), docs.has('BANK')),
+      };
       return {
+        details,
         employeeId: e.id,
         name: `${e.firstName} ${e.lastName}`.trim(),
         department: e.department?.name ?? null,
@@ -110,9 +137,19 @@ export class PayProfilesService {
         id: true, firstName: true, lastName: true, payType: true, employmentType: true, joiningDate: true,
         bankName: true, bankAccountNumber: true, ifscCode: true,
         panNumber: true, uanNumber: true, pfNumber: true, esiNumber: true,
+        panVerifiedAt: true, uanVerifiedAt: true, bankVerifiedAt: true,
+        documents: {
+          where: { documentType: { in: Object.keys(READABLE_DOCUMENTS) } },
+          select: { id: true, documentType: true, fileName: true, fileUrl: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
     if (!employee) throw new NotFoundException('Employee not found');
+    const suggestions = await this.prisma.employeeDetailSuggestion.findMany({
+      where: { companyId, employeeId, OR: [{ status: 'SUGGESTED' }, { field: 'UNREADABLE' }] },
+      orderBy: { createdAt: 'desc' },
+    });
     const versions = await this.prisma.employeePayProfile.findMany({ where: { companyId, employeeId }, orderBy: { version: 'desc' } });
     const cur = this.current(versions);
     let breakup: any = null;
@@ -120,7 +157,7 @@ export class PayProfilesService {
       const calc = await this.masters.prepareCalculator(companyId, cur.salaryGroupCode);
       breakup = calc ? calc.run(cur.annualCtc, (cur.overrides as any) ?? undefined) : null;
     }
-    return { employee, versions, currentVersion: cur?.version ?? null, breakup };
+    return { employee, versions, currentVersion: cur?.version ?? null, breakup, suggestions };
   }
 
   // ═══ Changing ════════════════════════════════════════════════════════════
@@ -208,8 +245,14 @@ export class PayProfilesService {
       select: { panNumber: true, uanNumber: true, pfNumber: true, esiNumber: true, bankName: true, bankAccountNumber: true, ifscCode: true },
     });
     if (!before) throw new NotFoundException('Employee not found');
-    const data = this.cleanStatutory(body);
-    if (!data) return before;
+    const data: Record<string, any> = this.cleanStatutory(body) ?? {};
+    if (!Object.keys(data).length) return before;
+    // A changed number hasn't been checked against its document yet.
+    if ('panNumber' in data && data.panNumber !== before.panNumber) data.panVerifiedAt = null;
+    if ('uanNumber' in data && data.uanNumber !== before.uanNumber) data.uanVerifiedAt = null;
+    if (('bankAccountNumber' in data && data.bankAccountNumber !== before.bankAccountNumber) || ('ifscCode' in data && data.ifscCode !== before.ifscCode)) {
+      data.bankVerifiedAt = null;
+    }
     const after = await this.prisma.employee.update({
       where: { id: employeeId },
       data,
@@ -217,6 +260,66 @@ export class PayProfilesService {
     });
     await this.audit(companyId, 'EmployeePayDetails', employeeId, 'UPDATE', before, after, actorUserId);
     return after;
+  }
+
+  /**
+   * Finance has compared a detail with the document: save the value they
+   * confirmed (AI suggestion or their own typing), stamp it verified, and
+   * close the pending suggestions for it.
+   */
+  async verifyDetail(
+    companyId: number,
+    employeeId: number,
+    body: { detail: 'PAN' | 'UAN' | 'BANK'; panNumber?: string; uanNumber?: string; bankAccountNumber?: string; ifscCode?: string; bankName?: string },
+    actorUserId?: number,
+  ) {
+    const detail = body.detail;
+    if (!['PAN', 'UAN', 'BANK'].includes(detail)) throw new BadRequestException('Pick PAN, UAN or BANK to verify.');
+    const before = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      select: { panNumber: true, uanNumber: true, bankName: true, bankAccountNumber: true, ifscCode: true },
+    });
+    if (!before) throw new NotFoundException('Employee not found');
+
+    const input =
+      detail === 'PAN' ? { panNumber: body.panNumber ?? before.panNumber }
+      : detail === 'UAN' ? { uanNumber: body.uanNumber ?? before.uanNumber }
+      : { bankAccountNumber: body.bankAccountNumber ?? before.bankAccountNumber, ifscCode: body.ifscCode ?? before.ifscCode, bankName: body.bankName ?? before.bankName };
+    const data: Record<string, any> = this.cleanStatutory(input as any) ?? {};
+    if (detail === 'PAN' && !data.panNumber) throw new BadRequestException('Enter the PAN to verify.');
+    if (detail === 'UAN' && !data.uanNumber) throw new BadRequestException('Enter the UAN to verify.');
+    if (detail === 'BANK' && !(data.bankAccountNumber && data.ifscCode)) throw new BadRequestException('Enter the account number and IFSC to verify.');
+    const stamp = new Date();
+    data[detail === 'PAN' ? 'panVerifiedAt' : detail === 'UAN' ? 'uanVerifiedAt' : 'bankVerifiedAt'] = stamp;
+
+    const confirmed: Record<string, string | null> = { PAN: data.panNumber ?? null, UAN: data.uanNumber ?? null, BANK_ACCOUNT: data.bankAccountNumber ?? null, IFSC: data.ifscCode ?? null, BANK_NAME: data.bankName ?? null };
+    await this.prisma.$transaction(async (tx) => {
+      await tx.employee.update({ where: { id: employeeId }, data });
+      const open = await tx.employeeDetailSuggestion.findMany({
+        where: { companyId, employeeId, status: 'SUGGESTED', field: { in: DETAIL_FIELDS[detail] } },
+      });
+      for (const sug of open) {
+        // A suggestion is "verified" only if Finance kept exactly that value.
+        const kept = (confirmed[sug.field] || '').toUpperCase().replace(/\s+/g, ' ') === sug.value.toUpperCase();
+        await tx.employeeDetailSuggestion.update({
+          where: { id: sug.id },
+          data: { status: kept ? 'VERIFIED' : 'REJECTED', decidedByUserId: actorUserId ?? null, decidedAt: stamp },
+        });
+      }
+    });
+    await this.audit(companyId, 'EmployeePayDetails', employeeId, 'VERIFY', before, { detail, ...data }, actorUserId);
+    return this.get(companyId, employeeId);
+  }
+
+  /** Throw away an AI suggestion that's wrong. */
+  async rejectSuggestion(companyId: number, suggestionId: number, actorUserId?: number) {
+    const sug = await this.prisma.employeeDetailSuggestion.findFirst({ where: { id: suggestionId, companyId } });
+    if (!sug) throw new NotFoundException('Suggestion not found');
+    await this.prisma.employeeDetailSuggestion.update({
+      where: { id: suggestionId },
+      data: { status: 'REJECTED', decidedByUserId: actorUserId ?? null, decidedAt: new Date() },
+    });
+    return { ok: true };
   }
 
   private async checkOption(companyId: number, listKey: string, value?: string | null) {

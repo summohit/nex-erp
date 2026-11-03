@@ -452,6 +452,22 @@ export class PayrollService {
     return this.http.put<any>(`${this.apiUrl}/pay-profiles/${employeeId}/details`, data);
   }
 
+  startReadingDocuments(employeeIds?: number[]): Observable<DocumentReadProgress> {
+    return this.http.post<DocumentReadProgress>(`${this.apiUrl}/pay-profiles/read-documents`, { employeeIds });
+  }
+
+  getReadingStatus(): Observable<DocumentReadProgress> {
+    return this.http.get<DocumentReadProgress>(`${this.apiUrl}/pay-profiles/read-documents/status`);
+  }
+
+  verifyPayDetail(employeeId: number, data: { detail: 'PAN' | 'UAN' | 'BANK'; [field: string]: string | null | undefined }): Observable<PayProfileDetail> {
+    return this.http.post<PayProfileDetail>(`${this.apiUrl}/pay-profiles/${employeeId}/verify`, data);
+  }
+
+  rejectPaySuggestion(id: number): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${this.apiUrl}/pay-profiles/suggestions/${id}/reject`, {});
+  }
+
   previewPayProfileImport(): Observable<PayProfileImportPreview> {
     return this.http.get<PayProfileImportPreview>(`${this.apiUrl}/pay-profiles/import/preview`);
   }
@@ -626,6 +642,32 @@ export interface PayProfileRow {
   current: { version: number; salaryGroupCode: string; annualCtc: number; effectiveFrom: string } | null;
   upcoming: { version: number; annualCtc: number; effectiveFrom: string } | null;
   missing: string[];
+  /** PAN / UAN / bank: verified, typed but unchecked, AI-suggested, only a document, or missing. UAN is null for consultants. */
+  details: { PAN: DetailState; UAN: DetailState | null; BANK: DetailState };
+}
+
+export type DetailState = 'VERIFIED' | 'UNVERIFIED' | 'SUGGESTED' | 'DOCUMENT' | 'MISSING';
+
+export interface DocumentReadProgress {
+  running: boolean;
+  total: number;
+  done: number;
+  suggested: number;
+  unreadable: number;
+  failed: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastError: string | null;
+}
+
+export interface PayDetailSuggestion {
+  id: number;
+  field: 'PAN' | 'UAN' | 'BANK_ACCOUNT' | 'IFSC' | 'BANK_NAME' | 'UNREADABLE';
+  value: string;
+  documentId: number | null;
+  status: string;
+  note: string | null;
+  createdAt: string;
 }
 
 export interface PayProfileVersion {
@@ -647,10 +689,13 @@ export interface PayProfileDetail {
     id: number; firstName: string; lastName: string; payType: string; employmentType: string | null; joiningDate: string | null;
     bankName: string | null; bankAccountNumber: string | null; ifscCode: string | null;
     panNumber: string | null; uanNumber: string | null; pfNumber: string | null; esiNumber: string | null;
+    panVerifiedAt: string | null; uanVerifiedAt: string | null; bankVerifiedAt: string | null;
+    documents: { id: number; documentType: string; fileName: string; fileUrl: string; createdAt: string }[];
   };
   versions: PayProfileVersion[];
   currentVersion: number | null;
   breakup: SalaryCalculationResult | null;
+  suggestions: PayDetailSuggestion[];
 }
 
 export interface PayProfileImportRow {

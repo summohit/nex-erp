@@ -6,10 +6,27 @@
       <h2 class="pp-tab-title" *ngIf="embedded">Pay Profiles</h2>
       <p>Each employee's salary group, CTC and statutory details. Every change is a new version — nothing is overwritten.</p>
     </div>
-    <button type="button" class="pp-btn pp-btn-primary" *ngIf="canEdit()" (click)="openImport()">
-      Import from current salaries
-    </button>
+    <div class="pp-header-actions" *ngIf="canEdit()">
+      <button type="button" class="pp-btn" (click)="startReading()" [disabled]="reading()?.running"
+        title="Read PAN, UAN and bank numbers from uploaded documents — you verify each one">
+        {{ reading()?.running ? 'Reading documents…' : 'Read documents with AI' }}
+      </button>
+      <button type="button" class="pp-btn pp-btn-primary" (click)="openImport()">
+        Import from current salaries
+      </button>
+    </div>
   </header>
+
+  <div class="pp-reading" *ngIf="reading() as rd">
+    <ng-container *ngIf="rd.running">
+      <div class="pp-reading-bar"><span [style.width.%]="rd.total ? (rd.done / rd.total) * 100 : 0"></span></div>
+      <span>Reading documents: {{ rd.done }} of {{ rd.total }} · {{ rd.suggested }} values found so far</span>
+    </ng-container>
+    <span *ngIf="!rd.running && rd.finishedAt && rd.total">
+      Last read {{ rd.finishedAt | date: 'd MMM, HH:mm' }}: {{ rd.suggested }} values to check, {{ rd.unreadable }} unreadable{{ rd.failed ? ', ' + rd.failed + ' failed' : '' }}.
+      <span *ngIf="rd.lastError" class="pp-muted">({{ rd.lastError }})</span>
+    </span>
+  </div>
 
   <div class="pp-stats">
     <button type="button" class="pp-stat" [class.on]="filter() === 'ALL'" (click)="filter.set('ALL')">
@@ -19,7 +36,7 @@
       <span>No pay profile</span><strong>{{ counts().noProfile }}</strong><small>not ready for the new payroll</small>
     </button>
     <button type="button" class="pp-stat warn" [class.on]="filter() === 'MISSING_DETAILS'" (click)="filter.set('MISSING_DETAILS')">
-      <span>Missing details</span><strong>{{ counts().missingDetails }}</strong><small>bank, PAN or UAN</small>
+      <span>Details to verify</span><strong>{{ counts().missingDetails }}</strong><small>PAN, UAN or bank not verified</small>
     </button>
     <button type="button" class="pp-stat" [class.on]="filter() === 'UPCOMING'" (click)="filter.set('UPCOMING')">
       <span>Upcoming changes</span><strong>{{ counts().upcoming }}</strong><small>a version that starts later</small>
@@ -66,8 +83,10 @@
             </td>
             <td>{{ r.current ? (r.current.effectiveFrom | date: 'd MMM y') : '—' }}</td>
             <td>
-              <span class="pp-chip" *ngFor="let m of r.missing" [class.red]="m === 'Pay profile'">{{ m }}</span>
-              <span class="pp-ok" *ngIf="!r.missing.length">✓ Complete</span>
+              <span class="pp-chip red" *ngIf="!r.current">Pay profile</span>
+              <ng-container *ngFor="let k of ['PAN', 'UAN', 'BANK']">
+                <span class="pp-state" *ngIf="$any(r.details)[k] as st" [attr.data-s]="st">{{ stateLabel(k, st) }}</span>
+              </ng-container>
             </td>
             <td class="pp-go">›</td>
           </tr>

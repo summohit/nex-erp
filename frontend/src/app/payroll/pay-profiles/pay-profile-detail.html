@@ -103,22 +103,59 @@
         </div>
       </div>
 
-      <!-- Statutory & bank -->
+      <!-- Verify PAN / UAN / bank against the uploaded documents -->
       <div class="pp-card">
-        <h3>Tax, PF and bank details</h3>
-        <div class="pp-form">
-          <label class="pp-field"><span>PAN</span><input class="pp-input" [(ngModel)]="details['panNumber']" placeholder="ABCDE1234F" maxlength="10" [disabled]="!canEdit()"></label>
-          <label class="pp-field" *ngIf="d.employee.payType !== 'CONSULTANT'"><span>UAN</span><input class="pp-input" [(ngModel)]="details['uanNumber']" placeholder="12 digits" maxlength="12" [disabled]="!canEdit()"></label>
-          <label class="pp-field" *ngIf="d.employee.payType !== 'CONSULTANT'"><span>PF number</span><input class="pp-input" [(ngModel)]="details['pfNumber']" [disabled]="!canEdit()"></label>
-          <label class="pp-field" *ngIf="d.employee.payType !== 'CONSULTANT'"><span>ESI number</span><input class="pp-input" [(ngModel)]="details['esiNumber']" [disabled]="!canEdit()"></label>
-          <label class="pp-field"><span>Bank name</span><input class="pp-input" [(ngModel)]="details['bankName']" [disabled]="!canEdit()"></label>
-          <label class="pp-field"><span>Account number</span><input class="pp-input" [(ngModel)]="details['bankAccountNumber']" [disabled]="!canEdit()"></label>
-          <label class="pp-field"><span>IFSC</span><input class="pp-input" [(ngModel)]="details['ifscCode']" placeholder="HDFC0001234" maxlength="11" [disabled]="!canEdit()"></label>
+        <h3>Verify against documents</h3>
+        <p class="pp-muted pp-note">Open the document, check the number, then Verify. AI-read values are only suggestions until you do.</p>
+
+        <div class="pp-verify" *ngFor="let v of verifyBlocks(d)">
+          <div class="pp-verify-head">
+            <strong>{{ v.title }}</strong>
+            <span class="pp-state" [attr.data-s]="v.state">{{ stateLabel(v.state) }}</span>
+            <span class="pp-muted" *ngIf="v.verifiedAt">· verified {{ v.verifiedAt | date: 'd MMM y' }}</span>
+          </div>
+
+          <div class="pp-docs" *ngIf="v.documents.length; else noDoc">
+            <a *ngFor="let doc of v.documents" [href]="doc.fileUrl" target="_blank" rel="noopener noreferrer" class="pp-doc">
+              📄 {{ doc.fileName || doc.documentType }} <span class="pp-muted">· {{ doc.createdAt | date: 'd MMM y' }}</span>
+            </a>
+          </div>
+          <ng-template #noDoc><p class="pp-muted pp-note">No {{ v.title }} document uploaded.</p></ng-template>
+
+          <div class="pp-sugg" *ngFor="let sg of v.suggestions">
+            <span>🤖 AI read <code>{{ sg.value }}</code> <span class="pp-muted">({{ fieldLabel(sg.field) }}){{ sg.note ? ' · ' + sg.note : '' }}</span></span>
+            <span class="pp-sugg-actions" *ngIf="canEdit()">
+              <button type="button" class="pp-link" (click)="useSuggestion(sg)">Use this</button>
+              <button type="button" class="pp-link pp-danger" (click)="rejectSuggestion(sg)">Wrong</button>
+            </span>
+          </div>
+          <p class="pp-muted pp-note" *ngFor="let u of v.unreadable">⚠ {{ u.note }}</p>
+
+          <div class="pp-form">
+            <label class="pp-field" *ngFor="let f of v.fields">
+              <span>{{ f.label }}</span>
+              <input class="pp-input" [(ngModel)]="details[f.key]" [placeholder]="f.placeholder" [attr.maxlength]="f.max" [disabled]="!canEdit()">
+            </label>
+          </div>
+          <div class="pp-actions" *ngIf="canEdit()">
+            <button type="button" class="pp-btn pp-btn-primary" (click)="verify(v.detail)" [disabled]="verifying() === v.detail">
+              {{ verifying() === v.detail ? 'Saving…' : (v.state === 'VERIFIED' ? 'Save & verify again' : 'Verify') }}
+            </button>
+          </div>
         </div>
-        <div class="pp-actions" *ngIf="canEdit()">
-          <button type="button" class="pp-btn pp-btn-primary" (click)="saveDetails()" [disabled]="savingDetails()">
-            {{ savingDetails() ? 'Saving…' : 'Save details' }}
-          </button>
+
+        <!-- PF / ESI numbers: no document to check against -->
+        <div class="pp-verify" *ngIf="d.employee.payType !== 'CONSULTANT'">
+          <div class="pp-verify-head"><strong>PF and ESI numbers</strong></div>
+          <div class="pp-form">
+            <label class="pp-field"><span>PF number</span><input class="pp-input" [(ngModel)]="details['pfNumber']" [disabled]="!canEdit()"></label>
+            <label class="pp-field"><span>ESI number</span><input class="pp-input" [(ngModel)]="details['esiNumber']" [disabled]="!canEdit()"></label>
+          </div>
+          <div class="pp-actions" *ngIf="canEdit()">
+            <button type="button" class="pp-btn" (click)="saveDetails()" [disabled]="savingDetails()">
+              {{ savingDetails() ? 'Saving…' : 'Save' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

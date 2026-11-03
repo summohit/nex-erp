@@ -116,3 +116,28 @@
 /* Inside the Payroll page's tab: no page padding, the host page has its own. */
 .pp-page.pp-embedded { padding: 0; max-width: none; }
 .pp-tab-title { margin: 0 0 4px; font-size: 20px; color: #0f172a; }
+
+/* Verify against documents */
+.pp-verify { border-top: 1px solid #f1f5f9; padding: 14px 0 6px; }
+.pp-verify:first-of-type { border-top: 0; }
+.pp-verify-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.pp-state { font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.pp-state[data-s="VERIFIED"] { background: #dcfce7; color: #166534; }
+.pp-state[data-s="UNVERIFIED"] { background: #e0f2fe; color: #075985; }
+.pp-state[data-s="SUGGESTED"] { background: #ede9fe; color: #5b21b6; }
+.pp-state[data-s="DOCUMENT"] { background: #fef3c7; color: #92400e; }
+.pp-state[data-s="MISSING"] { background: #fee2e2; color: #b91c1c; }
+.pp-docs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.pp-doc { font-size: 12.5px; color: #1d4ed8; text-decoration: none; border: 1px solid #dbeafe; background: #eff6ff; border-radius: 8px; padding: 4px 10px; }
+.pp-doc:hover { border-color: #93c5fd; }
+.pp-sugg { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 10px; padding: 7px 10px; margin-bottom: 8px; font-size: 13px; }
+.pp-sugg code { background: #ffffff; color: #4c1d95; padding: 1px 6px; border-radius: 5px; font-weight: 700; }
+.pp-sugg-actions { display: flex; gap: 10px; }
+.pp-danger { color: #b91c1c !important; }
+
+.pp-header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.pp-reading { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #475569; }
+.pp-reading:empty { display: none; }
+.pp-reading-bar { width: 220px; height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; flex: none; }
+.pp-reading-bar span { display: block; height: 100%; background: #7c3aed; transition: width 0.4s ease; }
+td .pp-state { display: inline-block; margin: 2px 4px 2px 0; }

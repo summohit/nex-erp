@@ -505,6 +505,10 @@ model Employee {
   uanNumber         String?
   /// Income-tax PAN; needed for TDS and Form 16.
   panNumber         String?
+  /// When Finance checked each detail against its document (cleared when the value changes).
+  panVerifiedAt     DateTime?
+  uanVerifiedAt     DateTime?
+  bankVerifiedAt    DateTime?
   workNotes         String?
   nextAppraisalDate DateTime?
   offboardingStatus String    @default("NONE") // NONE, IN_PROGRESS, SEPARATED
@@ -5302,5 +5306,26 @@ model EmployeePayProfile {
 
   @@unique([employeeId, version])
   @@index([companyId, employeeId])
+}
+
+/// A PAN / UAN / bank detail read from an uploaded document (AI), waiting for
+/// Finance to confirm against the document. Nothing reaches Employee until then.
+model EmployeeDetailSuggestion {
+  id              Int       @id @default(autoincrement())
+  companyId       Int
+  employeeId      Int
+  /// PAN | UAN | BANK_ACCOUNT | IFSC | BANK_NAME
+  field           String
+  value           String
+  documentId      Int?
+  /// SUGGESTED | VERIFIED | REJECTED
+  status          String    @default("SUGGESTED")
+  note            String?
+  decidedByUserId Int?
+  decidedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([companyId, employeeId])
+  @@index([employeeId, field, status])
 }
 
