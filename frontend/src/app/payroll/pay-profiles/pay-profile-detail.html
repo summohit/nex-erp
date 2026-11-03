@@ -1,0 +1,174 @@
+<div class="pp-page">
+  <div class="pp-loading" *ngIf="loading() && !data()">
+    <div class="pp-skel" *ngFor="let i of [1,2,3]"></div>
+  </div>
+
+  <ng-container *ngIf="data() as d">
+    <header class="pp-header">
+      <div>
+        <button type="button" class="pp-back" (click)="back()">← Pay Profiles</button>
+        <h1>{{ d.employee.firstName }} {{ d.employee.lastName }}</h1>
+        <p>
+          {{ d.employee.employmentType || '—' }} · {{ d.employee.payType === 'CONSULTANT' ? 'Consultant' : 'Employee' }}
+          <span *ngIf="d.employee.joiningDate"> · joined {{ d.employee.joiningDate | date: 'd MMM y' }}</span>
+        </p>
+      </div>
+      <button type="button" class="pp-btn pp-btn-primary" *ngIf="canEdit() && !formOpen()" (click)="openNewVersion()">
+        {{ d.versions.length ? 'New version (revision)' : 'Create pay profile' }}
+      </button>
+    </header>
+
+    <div class="pp-banner" *ngIf="!current() && !formOpen()">
+      No pay profile yet. {{ canEdit() ? 'Create one here, or use Import on the Pay Profiles page.' : 'Finance creates it.' }}
+    </div>
+
+    <!-- New version form -->
+    <div class="pp-card" *ngIf="formOpen() && form">
+      <h3>{{ d.versions.length ? 'New version' : 'Create pay profile' }}</h3>
+      <div class="pp-grid">
+        <div class="pp-form">
+          <label class="pp-field">
+            <span>Worker type</span>
+            <select class="pp-input" [ngModel]="form.workerType" (ngModelChange)="onWorkerTypeChange($event)">
+              <option [ngValue]="null">— not set —</option>
+              <option *ngFor="let w of workerTypes()" [ngValue]="w.value">{{ w.label }}</option>
+            </select>
+            <span class="pp-hint">Narrows the salary groups to the ones that pay this way.</span>
+          </label>
+          <label class="pp-field">
+            <span>Salary group *</span>
+            <select class="pp-input" [ngModel]="form.salaryGroupCode" (ngModelChange)="onGroupChange($event)">
+              <option [ngValue]="null">— pick —</option>
+              <option *ngFor="let g of groupChoices()" [ngValue]="g.code">{{ g.name }} · {{ g.code }}</option>
+            </select>
+          </label>
+          <label class="pp-field">
+            <span>Annual CTC (₹) *</span>
+            <input class="pp-input" type="number" min="0" step="1000" [(ngModel)]="form.annualCtc" (change)="runPreview()">
+          </label>
+          <label class="pp-field">
+            <span>Takes effect from *</span>
+            <input class="pp-input" type="date" [(ngModel)]="form.effectiveFrom">
+            <span class="pp-hint">A past date is allowed; arrears come with revisions (Phase 5).</span>
+          </label>
+          <label class="pp-field">
+            <span>Payment method</span>
+            <select class="pp-input" [(ngModel)]="form.paymentMethod">
+              <option [ngValue]="null">— not set —</option>
+              <option *ngFor="let m of paymentMethods()" [ngValue]="m.value">{{ m.label }}</option>
+            </select>
+          </label>
+
+          <ng-container *ngIf="overridableLines().length">
+            <div class="pp-field wide"><span>Component overrides <span class="pp-hint">— leave empty to use the group's rule</span></span></div>
+            <label class="pp-field" *ngFor="let l of overridableLines()">
+              <span>{{ l.component?.name || l.componentId }} (₹ / month)</span>
+              <input class="pp-input" type="number" min="0" [(ngModel)]="form.overrides[l.component?.code || '']" (change)="runPreview()" placeholder="Group rule">
+            </label>
+          </ng-container>
+
+          <label class="pp-field wide">
+            <span>Reason {{ form.overrides && (form.overrides | keyvalue).length ? '*' : '' }}</span>
+            <input class="pp-input" [(ngModel)]="form.reason" placeholder="e.g. Annual appraisal, promotion, correction…" maxlength="500">
+          </label>
+        </div>
+
+        <div>
+          <p class="pp-muted" *ngIf="!preview() && !previewing()">Pick a group and CTC to see the breakup.</p>
+          <p class="pp-muted" *ngIf="previewing()">Calculating…</p>
+          <ng-container *ngTemplateOutlet="breakupTpl; context: { $implicit: preview() }"></ng-container>
+        </div>
+      </div>
+      <div class="pp-actions">
+        <button type="button" class="pp-btn" (click)="formOpen.set(false)">Cancel</button>
+        <button type="button" class="pp-btn pp-btn-primary" (click)="saveVersion()" [disabled]="saving()">
+          {{ saving() ? 'Saving…' : 'Save version' }}
+        </button>
+      </div>
+    </div>
+
+    <div class="pp-grid">
+      <!-- Today's breakup -->
+      <div class="pp-card" *ngIf="current() as c">
+        <h3>In force today · version {{ c.version }}</h3>
+        <div class="pp-kv">
+          <div><span>Salary group</span><strong>{{ c.salaryGroupCode }}</strong></div>
+          <div><span>Annual CTC</span><strong>{{ money(c.annualCtc) }}</strong></div>
+          <div><span>Since</span><strong>{{ c.effectiveFrom | date: 'd MMM y' }}</strong></div>
+          <div><span>Worker type</span><strong>{{ optionLabel(workerTypes(), c.workerType) }}</strong></div>
+          <div><span>Payment</span><strong>{{ optionLabel(paymentMethods(), c.paymentMethod) }}</strong></div>
+        </div>
+        <div style="margin-top: 14px;">
+          <ng-container *ngTemplateOutlet="breakupTpl; context: { $implicit: d.breakup }"></ng-container>
+        </div>
+      </div>
+
+      <!-- Statutory & bank -->
+      <div class="pp-card">
+        <h3>Tax, PF and bank details</h3>
+        <div class="pp-form">
+          <label class="pp-field"><span>PAN</span><input class="pp-input" [(ngModel)]="details['panNumber']" placeholder="ABCDE1234F" maxlength="10" [disabled]="!canEdit()"></label>
+          <label class="pp-field" *ngIf="d.employee.payType !== 'CONSULTANT'"><span>UAN</span><input class="pp-input" [(ngModel)]="details['uanNumber']" placeholder="12 digits" maxlength="12" [disabled]="!canEdit()"></label>
+          <label class="pp-field" *ngIf="d.employee.payType !== 'CONSULTANT'"><span>PF number</span><input class="pp-input" [(ngModel)]="details['pfNumber']" [disabled]="!canEdit()"></label>
+          <label class="pp-field" *ngIf="d.employee.payType !== 'CONSULTANT'"><span>ESI number</span><input class="pp-input" [(ngModel)]="details['esiNumber']" [disabled]="!canEdit()"></label>
+          <label class="pp-field"><span>Bank name</span><input class="pp-input" [(ngModel)]="details['bankName']" [disabled]="!canEdit()"></label>
+          <label class="pp-field"><span>Account number</span><input class="pp-input" [(ngModel)]="details['bankAccountNumber']" [disabled]="!canEdit()"></label>
+          <label class="pp-field"><span>IFSC</span><input class="pp-input" [(ngModel)]="details['ifscCode']" placeholder="HDFC0001234" maxlength="11" [disabled]="!canEdit()"></label>
+        </div>
+        <div class="pp-actions" *ngIf="canEdit()">
+          <button type="button" class="pp-btn pp-btn-primary" (click)="saveDetails()" [disabled]="savingDetails()">
+            {{ savingDetails() ? 'Saving…' : 'Save details' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Versions -->
+    <div class="pp-card" *ngIf="d.versions.length">
+      <h3>Versions</h3>
+      <div class="pp-table-wrap">
+        <table class="pp-table">
+          <thead>
+            <tr><th>Version</th><th>From</th><th>Salary group</th><th class="num">Annual CTC</th><th>Reason</th><th>Source</th><th>Saved</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let v of d.versions">
+              <td>
+                v{{ v.version }}
+                <span class="pp-version-now" *ngIf="v.version === d.currentVersion">In force</span>
+                <span class="pp-version-later" *ngIf="isUpcoming(v)">Upcoming</span>
+              </td>
+              <td>{{ v.effectiveFrom | date: 'd MMM y' }}</td>
+              <td><code>{{ v.salaryGroupCode }}</code></td>
+              <td class="num">{{ money(v.annualCtc) }}</td>
+              <td>
+                {{ v.reason || '—' }}
+                <span class="pp-sub" *ngIf="v.overrides">Overrides: <span *ngFor="let o of v.overrides | keyvalue; let last = last">{{ o.key }} {{ money($any(o.value)) }}{{ last ? '' : ', ' }}</span></span>
+              </td>
+              <td><span class="pp-version-src">{{ v.source }}</span></td>
+              <td class="pp-muted">{{ v.createdAt | date: 'd MMM y, HH:mm' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </ng-container>
+</div>
+
+<!-- Monthly breakup, payslip-style -->
+<ng-template #breakupTpl let-b>
+  <table class="pp-table pp-breakup" *ngIf="b">
+    <tbody>
+      <ng-container *ngFor="let s of sections(b)">
+        <tr><td class="cat" colspan="2">{{ s.title }}</td></tr>
+        <tr *ngFor="let l of s.lines"><td>{{ l.name }}</td><td class="num">{{ money(l.monthly) }}</td></tr>
+        <tr class="total"><td>{{ s.totalLabel }}</td><td class="num">{{ money(s.total) }}</td></tr>
+      </ng-container>
+      <tr class="total"><td>Net pay / month</td><td class="num">{{ money(b.netPayMonthly) }}</td></tr>
+      <tr><td class="pp-muted">CTC / month</td><td class="num pp-muted">{{ money(b.ctcMonthly) }}</td></tr>
+    </tbody>
+  </table>
+  <ul class="pp-warn-list" *ngIf="b?.warnings?.length">
+    <li *ngFor="let w of b.warnings">⚠ {{ w }}</li>
+  </ul>
+</ng-template>

@@ -201,6 +201,24 @@ export class PayProfilesService {
     return { profile: saved, breakup: result };
   }
 
+  /** PAN, UAN, PF / ESI numbers and bank details — no new salary version needed. */
+  async updateDetails(companyId: number, employeeId: number, body: Record<string, string | null>, actorUserId?: number) {
+    const before = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      select: { panNumber: true, uanNumber: true, pfNumber: true, esiNumber: true, bankName: true, bankAccountNumber: true, ifscCode: true },
+    });
+    if (!before) throw new NotFoundException('Employee not found');
+    const data = this.cleanStatutory(body);
+    if (!data) return before;
+    const after = await this.prisma.employee.update({
+      where: { id: employeeId },
+      data,
+      select: { panNumber: true, uanNumber: true, pfNumber: true, esiNumber: true, bankName: true, bankAccountNumber: true, ifscCode: true },
+    });
+    await this.audit(companyId, 'EmployeePayDetails', employeeId, 'UPDATE', before, after, actorUserId);
+    return after;
+  }
+
   private async checkOption(companyId: number, listKey: string, value?: string | null) {
     if (!value) return null;
     const opt = await this.prisma.payrollDropdownOption.findFirst({ where: { companyId, listKey, value, isActive: true } });

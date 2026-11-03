@@ -247,6 +247,19 @@ export const routes: Routes = [
         pathMatch: 'full'
       },
       {
+        // Before 'payroll/:tab', which would otherwise read "pay-profiles" as a tab.
+        path: 'payroll/pay-profiles',
+        canActivate: [permissionGuard],
+        data: { module: 'payroll' },
+        loadComponent: () => import('./payroll/pay-profiles/pay-profiles').then(m => m.PayProfilesComponent)
+      },
+      {
+        path: 'payroll/pay-profiles/:employeeId',
+        canActivate: [permissionGuard],
+        data: { module: 'payroll' },
+        loadComponent: () => import('./payroll/pay-profiles/pay-profile-detail').then(m => m.PayProfileDetailComponent)
+      },
+      {
         path: 'payroll/:tab',
         canActivate: [permissionGuard],
         data: { module: 'payroll' },

@@ -435,6 +435,31 @@ export class PayrollService {
     return this.http.get<any[]>(`${this.apiUrl}/masters/audit-log?limit=${limit}${extra}`);
   }
 
+  // ── Pay profiles (Phase 2) ──
+  getPayProfiles(): Observable<PayProfileRow[]> {
+    return this.http.get<PayProfileRow[]>(`${this.apiUrl}/pay-profiles`);
+  }
+
+  getPayProfile(employeeId: number): Observable<PayProfileDetail> {
+    return this.http.get<PayProfileDetail>(`${this.apiUrl}/pay-profiles/${employeeId}`);
+  }
+
+  addPayProfileVersion(employeeId: number, data: any): Observable<{ profile: PayProfileVersion; breakup: SalaryCalculationResult }> {
+    return this.http.post<{ profile: PayProfileVersion; breakup: SalaryCalculationResult }>(`${this.apiUrl}/pay-profiles/${employeeId}/versions`, data);
+  }
+
+  updatePayDetails(employeeId: number, data: Record<string, string | null>): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/pay-profiles/${employeeId}/details`, data);
+  }
+
+  previewPayProfileImport(): Observable<PayProfileImportPreview> {
+    return this.http.get<PayProfileImportPreview>(`${this.apiUrl}/pay-profiles/import/preview`);
+  }
+
+  applyPayProfileImport(effectiveFrom: string, rows: { employeeId: number; salaryGroupCode: string; annualCtc: number }[]): Observable<{ saved: number; failed: { employeeId: number; error?: string }[] }> {
+    return this.http.post<any>(`${this.apiUrl}/pay-profiles/import/apply`, { effectiveFrom, rows });
+  }
+
   getPayrollFormulaHelp(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/masters/formula-help`);
   }
@@ -488,7 +513,7 @@ export interface PayrollDropdownList {
   listKey: string;
   name: string;
   saved: boolean;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; paysAs?: 'EMPLOYEE' | 'CONSULTANT' | 'TRAINEE' }[];
 }
 
 export interface MasterComponent {
@@ -591,3 +616,62 @@ export interface SalaryCalculationResult {
   tax?: any;
   warnings: string[];
 }
+
+export interface PayProfileRow {
+  employeeId: number;
+  name: string;
+  department: string | null;
+  designation: string | null;
+  payType: string;
+  current: { version: number; salaryGroupCode: string; annualCtc: number; effectiveFrom: string } | null;
+  upcoming: { version: number; annualCtc: number; effectiveFrom: string } | null;
+  missing: string[];
+}
+
+export interface PayProfileVersion {
+  id: number;
+  version: number;
+  effectiveFrom: string;
+  salaryGroupCode: string;
+  annualCtc: number;
+  workerType: string | null;
+  paymentMethod: string | null;
+  overrides: Record<string, number> | null;
+  reason: string | null;
+  source: string;
+  createdAt: string;
+}
+
+export interface PayProfileDetail {
+  employee: {
+    id: number; firstName: string; lastName: string; payType: string; employmentType: string | null; joiningDate: string | null;
+    bankName: string | null; bankAccountNumber: string | null; ifscCode: string | null;
+    panNumber: string | null; uanNumber: string | null; pfNumber: string | null; esiNumber: string | null;
+  };
+  versions: PayProfileVersion[];
+  currentVersion: number | null;
+  breakup: SalaryCalculationResult | null;
+}
+
+export interface PayProfileImportRow {
+  employeeId: number;
+  name: string;
+  payType: string;
+  employmentType: string | null;
+  status: 'MATCH' | 'REVIEW' | 'NO_SALARY' | 'NO_GROUP';
+  currentGrossMonthly: number;
+  salaryGroupCode: string | null;
+  salaryGroupName?: string;
+  annualCtc?: number;
+  proposedGrossMonthly?: number;
+  proposedNetMonthly?: number;
+  differences?: { code: string; current: number; proposed: number }[];
+  warnings?: string[];
+}
+
+export interface PayProfileImportPreview {
+  summary: { total: number; match: number; review: number; noSalary: number; noGroup: number; alreadyHaveProfile: number };
+  groups: { code: string; name: string; payeeType: string }[];
+  rows: PayProfileImportRow[];
+}
+

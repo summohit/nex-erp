@@ -1,0 +1,114 @@
+/* Pay profiles: list, import review and the employee detail page share these. */
+.pp-page { padding: 24px 28px 40px; display: flex; flex-direction: column; gap: 18px; max-width: 1400px; }
+.pp-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.pp-header h1 { margin: 4px 0 4px; font-size: 24px; color: #0f172a; }
+.pp-header p { margin: 0; color: #64748b; font-size: 14px; max-width: 720px; }
+.pp-back { border: 0; background: none; color: #2563eb; font-weight: 600; cursor: pointer; padding: 0; font-size: 13px; }
+
+.pp-btn { border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; border-radius: 10px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.pp-btn:hover:not(:disabled) { border-color: #94a3b8; }
+.pp-btn:disabled { opacity: 0.55; cursor: default; }
+.pp-btn-primary { background: #2563eb; border-color: #2563eb; color: #ffffff; }
+.pp-btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+.pp-link { border: 0; background: none; color: #2563eb; font-weight: 600; cursor: pointer; font-size: 12.5px; }
+
+.pp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.pp-stat { text-align: left; border: 1px solid #e2e8f0; background: #ffffff; border-radius: 14px; padding: 14px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; transition: border-color 0.15s, box-shadow 0.15s; }
+.pp-stat span { font-size: 12.5px; color: #64748b; font-weight: 600; }
+.pp-stat strong { font-size: 26px; color: #0f172a; line-height: 1.2; }
+.pp-stat small { font-size: 11.5px; color: #94a3b8; }
+.pp-stat.warn strong { color: #b45309; }
+.pp-stat.on { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+
+.pp-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px 16px; }
+.pp-card h3 { margin: 0 0 10px; font-size: 15px; color: #0f172a; }
+.pp-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.pp-input { border: 1px solid #cbd5e1; border-radius: 9px; padding: 8px 11px; font-size: 13.5px; color: #0f172a; background: #ffffff; outline: none; }
+.pp-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+.pp-search { flex: 1; max-width: 460px; }
+.pp-sm { padding: 5px 8px; font-size: 12.5px; }
+.pp-num { width: 120px; text-align: right; }
+.pp-muted { color: #94a3b8; font-size: 12.5px; }
+
+.pp-table-wrap { overflow-x: auto; }
+.pp-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.pp-table th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; padding: 9px 10px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+.pp-table td { padding: 10px; border-bottom: 1px solid #f1f5f9; color: #0f172a; vertical-align: middle; }
+.pp-table .num { text-align: right; white-space: nowrap; }
+.pp-table code { background: #eef2ff; color: #3730a3; padding: 2px 7px; border-radius: 6px; font-size: 12px; }
+.pp-row { cursor: pointer; }
+.pp-row:hover td { background: #f8fafc; }
+.pp-sub { display: block; font-size: 12px; color: #64748b; margin-top: 2px; }
+.pp-upcoming { color: #2563eb; }
+.pp-tag { font-style: normal; margin-left: 6px; padding: 1px 6px; border-radius: 5px; background: #fae8ff; color: #86198f; font-size: 11px; font-weight: 600; }
+.pp-chip { display: inline-block; margin: 2px 4px 2px 0; padding: 2px 8px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 11.5px; font-weight: 600; }
+.pp-chip.red { background: #fee2e2; color: #b91c1c; }
+.pp-ok { color: #15803d; font-size: 12.5px; font-weight: 600; }
+.pp-go { color: #94a3b8; font-size: 20px; width: 24px; }
+.pp-empty { text-align: center; color: #94a3b8; padding: 28px !important; }
+
+.pp-loading { display: flex; flex-direction: column; gap: 10px; padding: 8px 0; }
+.pp-skel { height: 40px; border-radius: 10px; background: linear-gradient(90deg, #eef2f6 25%, #f8fafc 50%, #eef2f6 75%); background-size: 200% 100%; animation: ppShimmer 1.3s ease-in-out infinite; }
+@keyframes ppShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* Import review modal */
+.pp-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.pp-modal { width: min(1240px, 100%); max-height: calc(100vh - 40px); background: #ffffff; border-radius: 18px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.35); }
+.pp-modal-head { display: flex; justify-content: space-between; gap: 16px; padding: 18px 22px 12px; border-bottom: 1px solid #f1f5f9; }
+.pp-modal-head h2 { margin: 0 0 4px; font-size: 18px; color: #0f172a; }
+.pp-modal-head p { margin: 0; font-size: 13.5px; color: #475569; max-width: 900px; }
+.pp-x { border: 0; background: #f1f5f9; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #475569; flex: none; }
+.pp-import-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 22px 0; }
+.pp-pill { border: 1px solid #e2e8f0; background: #ffffff; border-radius: 999px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: #334155; }
+.pp-pill.on { border-color: #2563eb; color: #1d4ed8; background: #eff6ff; }
+.pp-pill.ok { color: #15803d; }
+.pp-pill.warn { color: #b45309; }
+.pp-pill.red { color: #b91c1c; }
+.pp-help { margin: 10px 22px 0; padding: 10px 12px; border-radius: 10px; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 12.5px; color: #475569; line-height: 1.5; }
+.pp-import-table { flex: 1; overflow: auto; padding: 4px 22px; }
+.pp-import-table thead th { position: sticky; top: 0; background: #ffffff; z-index: 1; }
+.pp-selected td { background: #f0f9ff; }
+.chk { width: 34px; text-align: center; }
+.pp-status { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.pp-status[data-s="MATCH"] { background: #dcfce7; color: #166534; }
+.pp-status[data-s="REVIEW"] { background: #fef3c7; color: #92400e; }
+.pp-status[data-s="NO_SALARY"], .pp-status[data-s="NO_GROUP"] { background: #fee2e2; color: #b91c1c; }
+.pp-detail td { background: #fffdf5; }
+.pp-warn-list { margin: 4px 0 8px; padding-left: 18px; color: #92400e; font-size: 12.5px; }
+.pp-diff { border-collapse: collapse; font-size: 12.5px; min-width: 460px; }
+.pp-diff th { font-size: 11px; color: #64748b; text-align: left; padding: 4px 10px; }
+.pp-diff td { padding: 4px 10px; border-top: 1px solid #f1f5f9; }
+.pp-diff .num { text-align: right; }
+.pp-diff .up { color: #15803d; }
+.pp-diff .down { color: #b91c1c; }
+.pp-note { margin: 6px 0 2px; }
+.pp-modal-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding: 12px 22px 16px; border-top: 1px solid #f1f5f9; flex-wrap: wrap; }
+.pp-foot-actions { display: flex; align-items: center; gap: 10px; }
+.pp-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: #475569; font-weight: 600; }
+
+/* Employee pay profile page */
+.pp-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.pp-kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.pp-kv div span { display: block; font-size: 11.5px; color: #64748b; font-weight: 600; }
+.pp-kv div strong { font-size: 15px; color: #0f172a; }
+.pp-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.pp-form .wide { grid-column: 1 / -1; }
+.pp-form .pp-field .pp-input { width: 100%; box-sizing: border-box; }
+.pp-hint { font-size: 11.5px; color: #64748b; font-weight: 400; }
+.pp-err { font-size: 11.5px; color: #b91c1c; font-weight: 600; }
+.pp-breakup td.cat { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; padding-top: 14px; border-bottom: 0; }
+.pp-breakup tr.total td { font-weight: 700; border-top: 1px solid #e2e8f0; }
+.pp-version-src { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 5px; background: #f1f5f9; color: #475569; }
+.pp-version-now { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 5px; background: #dcfce7; color: #166534; margin-left: 6px; }
+.pp-version-later { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 5px; background: #dbeafe; color: #1d4ed8; margin-left: 6px; }
+.pp-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.pp-banner { padding: 12px 14px; border-radius: 12px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: 13.5px; }
+
+@media (max-width: 960px) {
+  .pp-page { padding: 16px; }
+  .pp-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-skel { animation: none; }
+}

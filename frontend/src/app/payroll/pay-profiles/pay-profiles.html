@@ -1,0 +1,191 @@
+<div class="pp-page">
+  <header class="pp-header">
+    <div>
+      <button type="button" class="pp-back" (click)="backToPayroll()">← Payroll</button>
+      <h1>Pay Profiles</h1>
+      <p>Each employee's salary group, CTC and statutory details. Every change is a new version — nothing is overwritten.</p>
+    </div>
+    <button type="button" class="pp-btn pp-btn-primary" *ngIf="canEdit()" (click)="openImport()">
+      Import from current salaries
+    </button>
+  </header>
+
+  <div class="pp-stats">
+    <button type="button" class="pp-stat" [class.on]="filter() === 'ALL'" (click)="filter.set('ALL')">
+      <span>Employees</span><strong>{{ counts().all }}</strong><small>{{ counts().withProfile }} with a profile</small>
+    </button>
+    <button type="button" class="pp-stat warn" [class.on]="filter() === 'NO_PROFILE'" (click)="filter.set('NO_PROFILE')">
+      <span>No pay profile</span><strong>{{ counts().noProfile }}</strong><small>not ready for the new payroll</small>
+    </button>
+    <button type="button" class="pp-stat warn" [class.on]="filter() === 'MISSING_DETAILS'" (click)="filter.set('MISSING_DETAILS')">
+      <span>Missing details</span><strong>{{ counts().missingDetails }}</strong><small>bank, PAN or UAN</small>
+    </button>
+    <button type="button" class="pp-stat" [class.on]="filter() === 'UPCOMING'" (click)="filter.set('UPCOMING')">
+      <span>Upcoming changes</span><strong>{{ counts().upcoming }}</strong><small>a version that starts later</small>
+    </button>
+  </div>
+
+  <div class="pp-card">
+    <div class="pp-toolbar">
+      <input class="pp-input pp-search" type="search" placeholder="Search name, department, designation or group…"
+        [ngModel]="search()" (ngModelChange)="search.set($event)">
+      <span class="pp-muted">{{ filtered().length }} shown</span>
+    </div>
+
+    <div class="pp-loading" *ngIf="loading()">
+      <div class="pp-skel" *ngFor="let i of [1,2,3,4,5]"></div>
+    </div>
+
+    <div class="pp-table-wrap" *ngIf="!loading()">
+      <table class="pp-table">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Salary group</th>
+            <th class="num">Annual CTC</th>
+            <th>From</th>
+            <th>Needs</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of filtered()" (click)="open(r)" class="pp-row">
+            <td>
+              <strong>{{ r.name }}</strong>
+              <span class="pp-sub">{{ r.designation || '—' }}{{ r.department ? ' · ' + r.department : '' }}
+                <em class="pp-tag" *ngIf="r.payType === 'CONSULTANT'">Consultant</em></span>
+            </td>
+            <td>
+              <code *ngIf="r.current">{{ r.current.salaryGroupCode }}</code>
+              <span class="pp-muted" *ngIf="!r.current">—</span>
+            </td>
+            <td class="num">
+              {{ r.current ? money(r.current.annualCtc) : '—' }}
+              <span class="pp-sub pp-upcoming" *ngIf="r.upcoming">→ {{ money(r.upcoming.annualCtc) }} from {{ r.upcoming.effectiveFrom | date: 'd MMM y' }}</span>
+            </td>
+            <td>{{ r.current ? (r.current.effectiveFrom | date: 'd MMM y') : '—' }}</td>
+            <td>
+              <span class="pp-chip" *ngFor="let m of r.missing" [class.red]="m === 'Pay profile'">{{ m }}</span>
+              <span class="pp-ok" *ngIf="!r.missing.length">✓ Complete</span>
+            </td>
+            <td class="pp-go">›</td>
+          </tr>
+          <tr *ngIf="!filtered().length">
+            <td colspan="6" class="pp-empty">Nobody matches this filter.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Import review -->
+<div class="pp-backdrop" *ngIf="importOpen()" (click)="closeImport()">
+  <div class="pp-modal" (click)="$event.stopPropagation()">
+    <div class="pp-modal-head">
+      <div>
+        <h2>Import from current salaries</h2>
+        <p>For each employee without a profile: the salary group they'd go on and the CTC that gives the gross they're paid today.
+          <strong>Nothing is saved until you tick rows and press Save.</strong> Salaries paid today don't change.</p>
+      </div>
+      <button type="button" class="pp-x" (click)="closeImport()">✕</button>
+    </div>
+
+    <div class="pp-loading" *ngIf="importLoading()">
+      <p class="pp-muted">Working out each employee's breakup…</p>
+      <div class="pp-skel" *ngFor="let i of [1,2,3,4]"></div>
+    </div>
+
+    <ng-container *ngIf="!importLoading() && preview() as p">
+      <div class="pp-import-stats">
+        <button type="button" class="pp-pill" [class.on]="importStatusFilter() === 'ALL'" (click)="importStatusFilter.set('ALL')">All {{ p.summary.total }}</button>
+        <button type="button" class="pp-pill ok" [class.on]="importStatusFilter() === 'MATCH'" (click)="importStatusFilter.set('MATCH')">Matches {{ p.summary.match }}</button>
+        <button type="button" class="pp-pill warn" [class.on]="importStatusFilter() === 'REVIEW'" (click)="importStatusFilter.set('REVIEW')">Review {{ p.summary.review }}</button>
+        <button type="button" class="pp-pill red" [class.on]="importStatusFilter() === 'NO_SALARY'" (click)="importStatusFilter.set('NO_SALARY')">No salary / group {{ p.summary.noSalary + p.summary.noGroup }}</button>
+        <span class="pp-muted" *ngIf="p.summary.alreadyHaveProfile">{{ p.summary.alreadyHaveProfile }} already have a profile and aren't listed.</span>
+      </div>
+
+      <div class="pp-help">
+        <strong>Review</strong> means gross is the same but some components come out different (for example Basic is 50% of CTC in the
+        salary group but 50% of gross today), or there's a warning. Open a row to see why, change the group or CTC if needed, then tick it.
+      </div>
+
+      <div class="pp-table-wrap pp-import-table">
+        <table class="pp-table">
+          <thead>
+            <tr>
+              <th class="chk"><input type="checkbox" (change)="toggleAll($any($event.target).checked)" title="Tick / untick everyone shown"></th>
+              <th>Employee</th>
+              <th>Status</th>
+              <th class="num">Gross today</th>
+              <th>Salary group</th>
+              <th class="num">Annual CTC</th>
+              <th class="num">New gross</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <ng-container *ngFor="let d of visibleDrafts()">
+              <tr [class.pp-selected]="d.selected">
+                <td class="chk"><input type="checkbox" [(ngModel)]="d.selected" (ngModelChange)="touch()" [disabled]="!canSelect(d)"></td>
+                <td><strong>{{ d.name }}</strong><span class="pp-sub">{{ d.employmentType || '—' }}{{ d.payType === 'CONSULTANT' ? ' · Consultant' : '' }}</span></td>
+                <td><span class="pp-status" [attr.data-s]="d.status">{{ statusLabel(d.status) }}</span></td>
+                <td class="num">{{ money(d.currentGrossMonthly) }}</td>
+                <td>
+                  <select class="pp-input pp-sm" [(ngModel)]="d.salaryGroupCode" (ngModelChange)="touch()">
+                    <option [ngValue]="null">— pick —</option>
+                    <option *ngFor="let g of p.groups" [ngValue]="g.code">{{ g.name }} ({{ g.payeeType | titlecase }})</option>
+                  </select>
+                </td>
+                <td class="num"><input class="pp-input pp-sm pp-num" type="number" min="0" step="1000" [(ngModel)]="d.annualCtc" (ngModelChange)="touch()"></td>
+                <td class="num">{{ money(d.proposedGrossMonthly) }}</td>
+                <td>
+                  <button type="button" class="pp-link" *ngIf="d.differences?.length || d.warnings?.length" (click)="d.open = !d.open; touch()">
+                    {{ d.open ? 'Hide' : 'Why?' }}
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="d.open" class="pp-detail">
+                <td></td>
+                <td colspan="7">
+                  <ul class="pp-warn-list" *ngIf="d.warnings?.length">
+                    <li *ngFor="let w of d.warnings">⚠ {{ w }}</li>
+                  </ul>
+                  <table class="pp-diff" *ngIf="d.differences?.length">
+                    <thead><tr><th>Component</th><th class="num">Today</th><th class="num">Salary group</th><th class="num">Change</th></tr></thead>
+                    <tbody>
+                      <tr *ngFor="let x of d.differences">
+                        <td><code>{{ x.code }}</code></td>
+                        <td class="num">{{ money(x.current) }}</td>
+                        <td class="num">{{ money(x.proposed) }}</td>
+                        <td class="num" [class.up]="x.proposed > x.current" [class.down]="x.proposed < x.current">
+                          {{ x.proposed > x.current ? '+' : '' }}{{ money(x.proposed - x.current) }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p class="pp-muted pp-note">Changing the group or CTC here only affects what gets saved; re-open the import to recalculate the breakup.</p>
+                </td>
+              </tr>
+            </ng-container>
+            <tr *ngIf="!visibleDrafts().length"><td colspan="8" class="pp-empty">Nobody in this group.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pp-modal-foot">
+        <label class="pp-field">
+          <span>Profiles start from</span>
+          <input class="pp-input" type="date" [(ngModel)]="importEffectiveFrom">
+        </label>
+        <div class="pp-foot-actions">
+          <span class="pp-muted">{{ selectedCount() }} ticked</span>
+          <button type="button" class="pp-btn" (click)="closeImport()">Cancel</button>
+          <button type="button" class="pp-btn pp-btn-primary" (click)="saveImport()" [disabled]="importSaving() || !selectedCount()">
+            {{ importSaving() ? 'Saving…' : 'Save ' + selectedCount() + ' profile' + (selectedCount() === 1 ? '' : 's') }}
+          </button>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+</div>

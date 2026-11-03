@@ -198,6 +198,13 @@
         (click)="setTab('structure')">
         Salary Structure
       </button>
+
+      <button 
+        *ngIf="isAdmin()" 
+        class="tab-btn"
+        (click)="setTab('pay-profiles')">
+        Pay Profiles
+      </button>
     </div>
   </div>
 
