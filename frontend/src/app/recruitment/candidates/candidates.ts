@@ -9,6 +9,7 @@ import { CandidatesService, JobApplication, CandidateFollowUp } from '../../serv
 import { JobsService, Job } from '../../services/jobs.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { AuthService } from '../../services/auth.service';
+import { PayrollService } from '../../services/payroll.service';
 import { 
   LucideX, LucideLayoutGrid, LucideTable, LucideFileText, 
   LucideMail, LucidePhone, LucideLink, LucideGlobe, LucideBriefcase,
@@ -60,6 +61,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 })
 export class CandidatesComponent implements OnInit {
   private candidatesService = inject(CandidatesService);
+  private payrollService = inject(PayrollService);
   private jobsService = inject(JobsService);
   private toast = inject(HotToastService);
   private authService = inject(AuthService);
@@ -448,6 +450,10 @@ export class CandidatesComponent implements OnInit {
   // Editable CTC structure state — mirrors the breakdown from the backend but
   // lets the recruiter tweak amounts and add/remove components live.
   annexureEditing = signal(false);
+  /** Payroll salary groups, so the offer is split by the same rules as the payslip. */
+  annexureGroups = signal<{ code: string; name: string; payeeType: string }[]>([]);
+  annexureGroupCode = signal<string>('');
+  isFillingFromGroup = signal(false);
   isSavingAnnexure = signal(false);
   annexureComponents = signal<any[]>([]);
   annexureCatId = signal('');
@@ -1188,9 +1194,16 @@ export class CandidatesComponent implements OnInit {
     this.annexureCatId.set('');
     this.isLoadingAnnexure.set(true);
     this.showAnnexureModal.set(true);
+    if (!this.annexureGroups().length) {
+      this.payrollService.getPayrollSalaryGroups().subscribe({
+        next: (g: any[]) => this.annexureGroups.set(g.map((x) => ({ code: x.code, name: x.name, payeeType: x.payeeType }))),
+        error: () => {},
+      });
+    }
     this.candidatesService.getAnnexure(applicationId).subscribe({
       next: (data) => {
         this.annexureData.set(data);
+        this.annexureGroupCode.set(data?.salaryGroupCode || '');
         this.isLoadingAnnexure.set(false);
       },
       error: (err) => {
@@ -1198,6 +1211,29 @@ export class CandidatesComponent implements OnInit {
         this.toast.error(err.error?.message || 'Failed to load annexure');
         this.closeAnnexureModal();
       }
+    });
+  }
+
+  /** Replace the table with the salary group's breakup for the offered CTC. */
+  fillAnnexureFromGroup() {
+    const id = this.annexureAppId();
+    const code = this.annexureGroupCode();
+    if (!id) return;
+    if (!code) { this.toast.error('Pick a salary group'); return; }
+    const d = this.annexureData();
+    if (d?.isCustomized && !d?.salaryGroupCode && !confirm('This replaces the edited salary table with the salary group\'s breakup. Continue?')) return;
+    this.isFillingFromGroup.set(true);
+    this.candidatesService.annexureFromGroup(id, code).subscribe({
+      next: (data) => {
+        this.annexureData.set(data);
+        this.annexureEditing.set(false);
+        this.isFillingFromGroup.set(false);
+        this.toast.success(`Salary table filled from ${code} — same rules as payroll`);
+      },
+      error: (err) => {
+        this.isFillingFromGroup.set(false);
+        this.toast.error(err?.error?.message || 'Could not fill from the salary group');
+      },
     });
   }
 

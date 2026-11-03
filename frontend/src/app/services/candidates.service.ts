@@ -144,6 +144,11 @@ export class CandidatesService {
   }
 
   /** Discard the customised structure and rebuild from the company standard. */
+  /** Fill the annexure from a payroll salary group — same engine as payslips. */
+  annexureFromGroup(applicationId: number, groupCode: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/${applicationId}/annexure/from-group`, { groupCode });
+  }
+
   resetAnnexure(applicationId: number): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/${applicationId}/annexure`);
   }

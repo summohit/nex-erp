@@ -1712,6 +1712,24 @@
 
     <!-- Body Content -->
     <div class="annexure-modal-body" *ngIf="!isLoadingAnnexure() && annexureData() as d">
+
+      <!-- Split by a payroll salary group: same formulas as the payslip; becomes the pay profile at onboarding -->
+      <div class="annexure-group-bar" *ngIf="!annexureEditing()">
+        <div class="annexure-group-text">
+          <b>Salary group</b>
+          <span *ngIf="d.salaryGroupCode">Filled from <code>{{ d.salaryGroupCode }}</code> — matches the payslip. Becomes their pay profile at onboarding.</span>
+          <span *ngIf="!d.salaryGroupCode">Pick the group they'll be paid under so this table matches their payslip.</span>
+        </div>
+        <div class="annexure-group-actions">
+          <select class="annexure-group-select" [ngModel]="annexureGroupCode()" (ngModelChange)="annexureGroupCode.set($event)">
+            <option value="">— pick salary group —</option>
+            <option *ngFor="let g of annexureGroups()" [value]="g.code">{{ g.name }} ({{ g.code }})</option>
+          </select>
+          <button type="button" class="annexure-group-btn" (click)="fillAnnexureFromGroup()" [disabled]="isFillingFromGroup() || !annexureGroupCode()">
+            {{ isFillingFromGroup() ? 'Filling…' : (d.salaryGroupCode ? 'Refill' : 'Fill from group') }}
+          </button>
+        </div>
+      </div>
       
       <!-- Top Summary Metric Cards -->
       <div class="annexure-metrics-grid">

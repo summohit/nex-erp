@@ -1,3 +1,5 @@
+import { PayrollMastersService } from '../payroll/masters/payroll-masters.service';
+import { PayProfilesService } from '../payroll/pay-profiles/pay-profiles.service';
 import { lockJobCapacity, closeFilledJobs } from './job-capacity';
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -46,6 +48,8 @@ export class ApplicationsService {
     private offerLettersService: OfferLettersService,
     private mailService: MailService,
     private employeesService: EmployeesService,
+    private payrollMasters: PayrollMastersService,
+    private payProfiles: PayProfilesService,
   ) {}
 
   /**
@@ -651,6 +655,25 @@ export class ApplicationsService {
       return employee;
     });
 
+    // The offer's salary group and CTC become the new employee's pay profile, from
+    // the joining date, so payroll needs no import step. Outside the
+    // transaction: a profile that can't be created must not undo the hire.
+    const groupCode = application.compensationStructure?.salaryGroupCode;
+    if (groupCode && Number(application.offeredSalary) > 0) {
+      try {
+        const from = application.joiningDate ? new Date(application.joiningDate) : new Date();
+        await this.payProfiles.addVersion(companyId, newEmployee.id, {
+          salaryGroupCode: groupCode,
+          annualCtc: Number(application.offeredSalary),
+          effectiveFrom: from.toISOString().slice(0, 10),
+          reason: 'From the offer letter at onboarding',
+          source: 'OFFER',
+        }, actorUserId);
+      } catch (err) {
+        this.logger.error(`Pay profile from offer failed for employee ${newEmployee.id}: ${err}`);
+      }
+    }
+
     // Now that the employee exists, issue whatever letters are flagged to go out
     // at onboarding (Joining Letter, Welcome Letter, …). Kept outside the
     // transaction: a letter that fails to render must not undo the hire.
@@ -767,6 +790,8 @@ export class ApplicationsService {
       candidateName: application.fullName,
       jobTitle: application.job?.title || 'Position',
       isCustomized: !!application.compensationStructure,
+      /** Set when the table was filled from a payroll salary group (the same engine payslips use). */
+      salaryGroupCode: application.compensationStructure?.salaryGroupCode ?? null,
       totalCTC: totalMonthly * 12,
       monthlyCTC: totalMonthly,
       components: visible,
@@ -860,6 +885,38 @@ export class ApplicationsService {
     });
 
     (application as any).compensationStructure = { version: 1, components: persisted };
+    return this.renderAnnexure(application, components);
+  }
+
+  /**
+   * Fill the annexure from a payroll salary group — the same engine, formulas,
+   * PF/ESI/PT rules and statutory rates the monthly payslip uses — so the offer
+   * letter and the first payslip agree. At onboarding the group and CTC become
+   * the employee's pay profile.
+   */
+  async annexureFromSalaryGroup(id: number, companyId: number, groupCode: string) {
+    const application = await this.findOne(id, companyId);
+    const ctc = Number(application.offeredSalary) || 0;
+    if (!(ctc > 0)) throw new BadRequestException('Set the offered salary (annual CTC) first.');
+    const code = String(groupCode || '').trim().toUpperCase();
+    const onDate = (application as any).joiningDate ? new Date((application as any).joiningDate) : new Date();
+    const calc = await this.payrollMasters.prepareCalculator(companyId, code, onDate);
+    if (!calc) throw new BadRequestException(`No salary group "${code}" in force on ${onDate.toISOString().slice(0, 10)}.`);
+    const out = calc.run(ctc);
+
+    const group = (cat: string): AnnexureGroup | null =>
+      cat === 'EARNING' ? 'EARNINGS' : cat === 'EMPLOYER_CONTRIBUTION' ? 'DEDUCTIONS' : cat === 'EMPLOYEE_DEDUCTION' ? 'EMPLOYEE_DEDUCTIONS' : null;
+    const raw = out.lines
+      // TDS depends on the whole year's tax position, not the structure — left off the letter.
+      .filter((l: any) => group(l.category) && l.code !== 'TDS' && Math.round(l.monthly) > 0)
+      .map((l: any) => ({ id: `pg_${l.code}`.toLowerCase(), name: l.name, group: group(l.category), kind: 'FIXED', monthly: Math.round(l.monthly), included: true }));
+    if (!raw.length) throw new BadRequestException(`Salary group ${code} gives no lines for this CTC.`);
+
+    const components = this.normalizeComponents(raw, Math.round(ctc / 12));
+    const persisted = components.filter((c: any) => c.kind !== 'BALANCER').map(({ annual, ...c }: any) => c);
+    const structure = { version: 1, salaryGroupCode: code, components: persisted };
+    await this.prisma.jobApplication.update({ where: { id }, data: { compensationStructure: structure } });
+    (application as any).compensationStructure = structure;
     return this.renderAnnexure(application, components);
   }
 

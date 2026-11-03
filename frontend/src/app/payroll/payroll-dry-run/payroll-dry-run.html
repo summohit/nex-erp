@@ -360,7 +360,7 @@
               <td class="num">
                 <div class="money-cell font-semibold text-slate-700">{{ money(x.totalDeductions) }}</div>
                 <div class="money-sub text-muted" *ngIf="x.deductions?.length">
-                  {{ x.deductions.length }} line{{ x.deductions.length > 1 ? 's' : '' }}
+                  {{ x.deductions?.length }} line{{ (x.deductions?.length ?? 0) > 1 ? 's' : '' }}
                 </div>
               </td>
 
