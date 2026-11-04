@@ -33,8 +33,87 @@
   </div>
 
   <ng-container *ngIf="!loading() && canSee() && data() as d">
-    <!-- Top KPI Stat Metric Cards (not on the Probation tab, which is one list) -->
-    <div class="pw-stats" *ngIf="mode !== 'probation'">
+    <!-- Top KPI Stat Metric Cards for Probation Mode -->
+    <div class="pw-stats pw-probation-stats" *ngIf="mode === 'probation'">
+      <!-- 1. All Active Probation -->
+      <button 
+        type="button" 
+        class="pw-stat" 
+        [class.on]="probationFilter() === 'all'" 
+        (click)="probationFilter.set('all')">
+        <div class="pw-stat-top">
+          <div class="pw-stat-icon-bubble probation-bubble">
+            <svg lucideUserCheck size="20"></svg>
+          </div>
+          <span class="pw-stat-badge probation-badge">All</span>
+        </div>
+        <div class="pw-stat-num">{{ probationStats().total }}</div>
+        <div class="pw-stat-label">On probation</div>
+        <div class="pw-stat-meta">
+          <span>{{ probationStats().total === 1 ? '1 team member' : probationStats().total + ' team members' }}</span>
+        </div>
+      </button>
+
+      <!-- 2. Overdue Action Required -->
+      <button 
+        type="button" 
+        class="pw-stat stat-overdue" 
+        [class.on]="probationFilter() === 'overdue'" 
+        (click)="probationFilter.set('overdue')">
+        <div class="pw-stat-top">
+          <div class="pw-stat-icon-bubble overdue-bubble">
+            <svg lucideAlertTriangle size="20"></svg>
+          </div>
+          <span class="pw-stat-badge overdue-badge">Overdue</span>
+        </div>
+        <div class="pw-stat-num text-danger">{{ probationStats().overdue }}</div>
+        <div class="pw-stat-label">Action required</div>
+        <div class="pw-stat-meta">
+          <span>{{ probationStats().overdue === 1 ? '1 past end date' : probationStats().overdue + ' past end date' }}</span>
+        </div>
+      </button>
+
+      <!-- 3. Ending Soon -->
+      <button 
+        type="button" 
+        class="pw-stat stat-soon" 
+        [class.on]="probationFilter() === 'ending_soon'" 
+        (click)="probationFilter.set('ending_soon')">
+        <div class="pw-stat-top">
+          <div class="pw-stat-icon-bubble soon-bubble">
+            <svg lucideClock size="20"></svg>
+          </div>
+          <span class="pw-stat-badge soon-badge">&le; 30 Days</span>
+        </div>
+        <div class="pw-stat-num text-warning">{{ probationStats().endingSoon }}</div>
+        <div class="pw-stat-label">Ending soon</div>
+        <div class="pw-stat-meta">
+          <span>{{ probationStats().endingSoon === 1 ? '1 due within month' : probationStats().endingSoon + ' due within month' }}</span>
+        </div>
+      </button>
+
+      <!-- 4. Pending Review -->
+      <button 
+        type="button" 
+        class="pw-stat stat-pending" 
+        [class.on]="probationFilter() === 'pending_review'" 
+        (click)="probationFilter.set('pending_review')">
+        <div class="pw-stat-top">
+          <div class="pw-stat-icon-bubble pending-bubble">
+            <svg lucideFileText size="20"></svg>
+          </div>
+          <span class="pw-stat-badge pending-badge">Appraisal</span>
+        </div>
+        <div class="pw-stat-num text-purple">{{ probationStats().pendingReview }}</div>
+        <div class="pw-stat-label">Pending review</div>
+        <div class="pw-stat-meta">
+          <span>{{ probationStats().pendingReview === 1 ? '1 review pending' : probationStats().pendingReview + ' reviews pending' }}</span>
+        </div>
+      </button>
+    </div>
+
+    <!-- Top KPI Stat Metric Cards (Notice & PIP mode) -->
+    <div class="pw-stats pw-notice-pip-stats" *ngIf="mode !== 'probation'">
       <!-- 1. Probation Card -->
       <!-- Probation hidden for now (19 Oct 2026): it gets its own flow later. -->
       <button 
@@ -103,18 +182,18 @@
             <svg lucideUserCheck size="18"></svg>
           </div>
           <div>
-            <h3>Probation</h3>
+            <h3>Probation Directory</h3>
             <p>People still on probation, ending soonest first.</p>
           </div>
         </div>
 
         <div class="pw-head-actions">
-          <!-- Search input inside section if records exist -->
-          <div class="pw-table-search" *ngIf="d.probation.length > 2">
+          <!-- Search input -->
+          <div class="pw-table-search">
             <svg lucideSearch size="14" class="search-icon"></svg>
             <input 
               type="text" 
-              placeholder="Search probation..." 
+              placeholder="Search by name, role or ID..." 
               [ngModel]="probationSearch()" 
               (ngModelChange)="probationSearch.set($event)" />
             <button 
@@ -126,7 +205,7 @@
             </button>
           </div>
 
-          <button type="button" class="pw-btn" *ngIf="d.canManageProbation" (click)="openPolicy()" title="Probation length, extensions, reminders, leave rounding">
+          <button type="button" class="pw-btn btn-policy" *ngIf="d.canManageProbation" (click)="openPolicy()" title="Probation length, extensions, reminders, leave rounding">
             <svg lucideCalendar size="15"></svg>
             <span>Policy</span>
           </button>
@@ -140,7 +219,53 @@
           </button>
         </div>
       </div>
-      <p class="pw-policy-note">On probation: no paid leave (absences are loss of pay). On confirmation, leave for the rest of the year is credited pro-rata. Overdue probations stay open until HR decides.</p>
+
+      <!-- Quick Filter Bar -->
+      <div class="pw-filter-bar">
+        <div class="pw-filter-chips">
+          <button type="button" class="pw-chip" [class.active]="probationFilter() === 'all'" (click)="probationFilter.set('all')">
+            All ({{ probationStats().total }})
+          </button>
+          <button type="button" class="pw-chip chip-overdue" [class.active]="probationFilter() === 'overdue'" (click)="probationFilter.set('overdue')">
+            <span class="chip-dot red"></span> Overdue ({{ probationStats().overdue }})
+          </button>
+          <button type="button" class="pw-chip chip-soon" [class.active]="probationFilter() === 'ending_soon'" (click)="probationFilter.set('ending_soon')">
+            <span class="chip-dot amber"></span> Soon ({{ probationStats().endingSoon }})
+          </button>
+          <button type="button" class="pw-chip chip-track" [class.active]="probationFilter() === 'on_track'" (click)="probationFilter.set('on_track')">
+            <span class="chip-dot green"></span> On Track ({{ probationStats().onTrack }})
+          </button>
+          <button type="button" class="pw-chip chip-pending" [class.active]="probationFilter() === 'pending_review'" (click)="probationFilter.set('pending_review')">
+            <span class="chip-dot purple"></span> Review Pending ({{ probationStats().pendingReview }})
+          </button>
+        </div>
+      </div>
+
+      <!-- Modern Policy Callout Banner -->
+      <div class="pw-policy-banner">
+        <div class="pw-policy-banner-content">
+          <div class="pw-policy-icon">
+            <svg lucideInfo size="18"></svg>
+          </div>
+          <div class="pw-policy-text-wrap">
+            <div class="pw-policy-heading">Probation & Confirmation Policy</div>
+            <div class="pw-policy-pills">
+              <span class="pw-policy-pill warning">
+                <span class="pill-dot"></span>
+                <strong>Leave:</strong> No paid leave during probation (absences are loss of pay)
+              </span>
+              <span class="pw-policy-pill success">
+                <span class="pill-dot"></span>
+                <strong>Confirmation:</strong> Leave for rest of the year credited pro-rata
+              </span>
+              <span class="pw-policy-pill info">
+                <span class="pill-dot"></span>
+                <strong>Overdue:</strong> Records stay open until HR formal decision
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Empty State -->
       <div class="pw-empty-state" *ngIf="!d.probation.length">
@@ -162,21 +287,21 @@
       <!-- No search results -->
       <div class="pw-empty-state small" *ngIf="d.probation.length > 0 && !filteredProbation().length">
         <svg lucideSearch size="22" class="empty-sub-icon"></svg>
-        <p>No probation records found matching "<strong>{{ probationSearch() }}</strong>"</p>
-        <button type="button" class="pw-btn" (click)="probationSearch.set('')">Clear search</button>
+        <p>No probation records found matching your filters</p>
+        <button type="button" class="pw-btn" (click)="probationSearch.set(''); probationFilter.set('all')">Reset filters</button>
       </div>
 
       <!-- Table Header & Rows -->
       <div class="pw-table" *ngIf="filteredProbation().length > 0">
-        <div class="pw-table-head">
+        <div class="pw-table-head probation-table-head">
           <div class="col-person">Employee</div>
           <div class="col-date">Joined</div>
           <div class="col-date">Ends</div>
-          <div class="col-badge">Time Left</div>
+          <div class="col-timeline">Time Left & Progress</div>
           <div class="col-actions" *ngIf="d.canManageProbation || d.isManager">Actions</div>
         </div>
 
-        <div class="pw-row" *ngFor="let r of filteredProbation()">
+        <div class="pw-row probation-row" *ngFor="let r of filteredProbation()" [class.row-overdue]="r.daysLeft !== null && r.daysLeft < 0" [class.row-soon]="r.daysLeft !== null && r.daysLeft >= 0 && r.daysLeft <= 30">
           <div class="pw-person" (click)="profile.open(r.employeeId)">
             <span class="pw-av" [style.background]="r.avatarUrl ? 'transparent' : getAvatarColor(r.employeeId)">
               <img *ngIf="r.avatarUrl" [src]="r.avatarUrl" [alt]="r.name">
@@ -187,6 +312,7 @@
               <small class="person-meta">
                 <span>{{ r.designation || 'Staff Member' }}</span>
                 <span class="code-badge" *ngIf="r.employeeCode">#{{ r.employeeCode }}</span>
+                <span class="cat-badge" *ngIf="r.employmentCategory && r.employmentCategory !== 'PERMANENT'">{{ r.employmentCategory }}</span>
               </small>
             </div>
           </div>
@@ -199,72 +325,103 @@
           <div class="pw-col">
             <small>Ends</small>
             <span class="col-val bold">{{ r.endDate | date:'d MMM y' }}</span>
+            <span class="ext-badge" *ngIf="r.extensions && r.extensions > 0">Ext &times;{{ r.extensions }}</span>
           </div>
 
-          <div class="pw-col-badge">
-            <span class="pw-due {{ dueClass(r.daysLeft) }}">
-              <span class="due-dot"></span>
-              {{ dueText(r.daysLeft) }}
-            </span>
-            <span class="pw-review-chip" *ngIf="r.review as rv" [attr.data-rec]="rv.recommendation"
-                  [title]="rv.reviewerName + ': ' + rv.comments">
-              {{ ratingLabel(rv.rating) }} · {{ recLabel(rv) }}
-            </span>
-            <span class="pw-review-chip pending" *ngIf="!r.review">Review pending</span>
+          <div class="pw-col-timeline">
+            <div class="timeline-status-row">
+              <span class="pw-due {{ dueClass(r.daysLeft) }}">
+                <span class="due-dot"></span>
+                {{ dueText(r.daysLeft) }}
+              </span>
+              <span class="pw-review-chip reviewed" *ngIf="r.review as rv" [attr.data-rec]="rv.recommendation"
+                    [title]="rv.reviewerName + ': ' + rv.comments">
+                <svg lucideCheckCircle2 size="12"></svg>
+                {{ ratingLabel(rv.rating) }} · {{ recLabel(rv) }}
+              </span>
+              <span class="pw-review-chip pending" *ngIf="!r.review">
+                <svg lucideClock size="12"></svg>
+                Review pending
+              </span>
+            </div>
+            <!-- Mini probation progress bar -->
+            <div class="pw-progress-track" [title]="'Probation elapsed: ' + getProbationProgress(r.joiningDate, r.endDate) + '%'">
+              <div class="pw-progress-fill {{ dueClass(r.daysLeft) }}" [style.width.%]="getProbationProgress(r.joiningDate, r.endDate)"></div>
+            </div>
           </div>
 
           <div class="pw-actions" *ngIf="d.canManageProbation || r.canReview">
-            <button type="button" class="pw-btn btn-sm" *ngIf="r.canReview" (click)="openReview(r)" title="Manager's probation review">
+            <!-- Review button (for manager or HR) -->
+            <button type="button" class="pw-btn btn-sm btn-review" *ngIf="r.canReview" (click)="openReview(r)" [title]="r.review ? 'Edit probation review' : 'Submit manager review'">
               <svg lucideFileText size="13"></svg>
               <span>{{ r.review ? 'Edit review' : 'Review' }}</span>
             </button>
-            <ng-container *ngIf="d.canManageProbation">
+
+            <!-- Confirm button (Primary for HR) -->
             <button 
               type="button" 
-              class="pw-btn ok btn-sm" 
-              (click)="confirmProbation(r)" 
-              title="Confirm employee">
-              <svg lucideCheck size="13"></svg>
-              <span>Confirm</span>
-            </button>
-            <!-- Confirm and make permanent in one step (19 Oct 2026) -->
-            <button
-              type="button"
-              class="pw-btn perm btn-sm"
-              *ngIf="r.employmentCategory !== 'PERMANENT'"
-              (click)="confirmProbation(r, true)"
-              title="Confirm and make permanent">
-              <svg lucideCheck size="13"></svg>
-              <span>Make permanent</span>
-            </button>
-              <button type="button" class="pw-btn btn-sm danger" (click)="openNotConfirm(r)" title="Not confirmed: start separation with probation notice">
-                <span>Not confirm</span>
-              </button>
-            </ng-container>
-            <button 
-              type="button" 
-              class="pw-btn btn-sm" 
+              class="pw-btn ok btn-sm btn-confirm" 
               *ngIf="d.canManageProbation"
-              (click)="openProbation(r)" 
-              title="Change probation end date">
-              <svg lucideCalendar size="13"></svg>
-              <span>Change date</span>
+              (click)="confirmProbation(r)" 
+              [disabled]="rowBusy() === r.employeeId"
+              title="Confirm employee">
+              <svg *ngIf="rowBusy() !== r.employeeId" lucideCheck size="13"></svg>
+              <span class="pw-spin" *ngIf="rowBusy() === r.employeeId"></span>
+              <span>{{ rowBusy() === r.employeeId ? 'Confirming…' : 'Confirm' }}</span>
             </button>
-            <button 
-              type="button" 
-              class="pw-btn ghost btn-icon" 
-              (click)="clearProbation(r)" 
-              title="Remove from probation">
-              <svg lucideTrash2 size="14"></svg>
-            </button>
+
+            <!-- More Actions Dropdown Menu Trigger -->
+            <div class="pw-more-wrap" *ngIf="d.canManageProbation">
+              <button 
+                type="button" 
+                class="pw-btn btn-icon btn-more" 
+                (click)="toggleActionMenu(r.employeeId, $event)" 
+                title="More actions">
+                <svg lucideMoreVertical size="15"></svg>
+              </button>
+
+              <!-- Dropdown Menu -->
+              <div class="pw-dropdown-menu" *ngIf="activeActionMenuId() === r.employeeId" (click)="$event.stopPropagation()">
+                <button 
+                  type="button" 
+                  class="dropdown-item" 
+                  *ngIf="r.employmentCategory !== 'PERMANENT'"
+                  (click)="confirmProbation(r, true); closeActionMenu()">
+                  <svg lucideShieldCheck size="14"></svg>
+                  <span>Confirm & make permanent</span>
+                </button>
+                <button 
+                  type="button" 
+                  class="dropdown-item" 
+                  (click)="openProbation(r); closeActionMenu()">
+                  <svg lucideCalendar size="14"></svg>
+                  <span>Extend / Change date</span>
+                </button>
+                <div class="dropdown-divider"></div>
+                <button 
+                  type="button" 
+                  class="dropdown-item text-danger" 
+                  (click)="openNotConfirm(r); closeActionMenu()">
+                  <svg lucideUserMinus size="14"></svg>
+                  <span>Not confirm & separate</span>
+                </button>
+                <button 
+                  type="button" 
+                  class="dropdown-item text-danger" 
+                  (click)="clearProbation(r); closeActionMenu()">
+                  <svg lucideTrash2 size="14"></svg>
+                  <span>Remove from probation</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- Section 2: Notice period -->
-    <section class="pw-card" *ngIf="mode !== 'probation' && section() === 'notice'">
-      <div class="pw-card-head">
+    <section class="pw-card compact-card" *ngIf="mode !== 'probation' && section() === 'notice'">
+      <div class="pw-card-head compact-head">
         <div class="pw-card-title-group">
           <div class="pw-card-icon-tag notice-tag">
             <svg lucideClock size="18"></svg>
@@ -295,9 +452,9 @@
       </div>
 
       <!-- Empty State -->
-      <div class="pw-empty-state" *ngIf="!d.notice.length">
-        <div class="empty-icon-circle notice-circle">
-          <svg lucideClock size="28"></svg>
+      <div class="pw-empty-state compact-empty" *ngIf="!d.notice.length">
+        <div class="empty-icon-circle notice-circle small-circle">
+          <svg lucideClock size="22"></svg>
         </div>
         <h4>No one is serving notice</h4>
         <p>There are currently no active or pending resignation notices recorded.</p>
@@ -353,8 +510,8 @@
     </section>
 
     <!-- Section 3: Performance Improvement Plans -->
-    <section class="pw-card" *ngIf="mode !== 'probation' && section() === 'pip'">
-      <div class="pw-card-head">
+    <section class="pw-card compact-card" *ngIf="mode !== 'probation' && section() === 'pip'">
+      <div class="pw-card-head compact-head">
         <div class="pw-card-title-group">
           <div class="pw-card-icon-tag pip-tag">
             <svg lucideTarget size="18"></svg>
@@ -366,26 +523,26 @@
         </div>
 
         <div class="pw-head-actions">
-          <button type="button" class="pw-btn" (click)="loadHistory()">
-            <svg lucideClock size="14"></svg>
+          <button type="button" class="pw-btn btn-sm" (click)="loadHistory()">
+            <svg lucideClock size="13"></svg>
             <span>{{ showHistory() ? 'Hide closed' : 'Show closed history' }}</span>
           </button>
-          <button type="button" class="pw-btn primary" (click)="openPipForm()">
-            <svg lucidePlus size="15"></svg>
+          <button type="button" class="pw-btn primary btn-sm" (click)="openPipForm()">
+            <svg lucidePlus size="14"></svg>
             <span>Start a PIP</span>
           </button>
         </div>
       </div>
 
       <!-- Empty State -->
-      <div class="pw-empty-state" *ngIf="!d.pips.length">
-        <div class="empty-icon-circle pip-circle">
-          <svg lucideTarget size="28"></svg>
+      <div class="pw-empty-state compact-empty" *ngIf="!d.pips.length">
+        <div class="empty-icon-circle pip-circle small-circle">
+          <svg lucideTarget size="22"></svg>
         </div>
         <h4>No open PIPs</h4>
         <p>All team members are meeting expectations. If an employee requires structured support, you can start a PIP.</p>
-        <button type="button" class="pw-btn primary" (click)="openPipForm()">
-          <svg lucidePlus size="15"></svg>
+        <button type="button" class="pw-btn primary btn-sm" (click)="openPipForm()">
+          <svg lucidePlus size="14"></svg>
           <span>Start a PIP</span>
         </button>
       </div>
@@ -669,8 +826,10 @@
       <!-- 5. Calculated End Date Preview Banner -->
       <!-- Moving an open probation later is an extension: a letter goes out with this reason -->
       <div class="pw-field-group" *ngIf="probEditingEnd">
-        <label class="pw-field-label">Reason for the change (printed on the extension letter)</label>
-        <textarea class="pw-input" rows="2" maxlength="500" [(ngModel)]="probReason" placeholder="e.g. Needs more time on client delivery and documentation."></textarea>
+        <label class="pw-field-label">
+          <span>Reason for the change (printed on the extension letter)</span>
+        </label>
+        <textarea class="pw-textarea" rows="2" maxlength="500" [(ngModel)]="probReason" placeholder="e.g. Needs more time on client delivery and documentation."></textarea>
       </div>
 
       <div class="pw-preview-banner" *ngIf="probPreview()">
@@ -700,7 +859,7 @@
         class="pw-btn primary btn-save" 
         (click)="saveProbation()" 
         [disabled]="busy() || !probEmployeeId">
-        <svg *ngIf="!busy()" lucideCheck size="15"></svg>
+        <svg *ngIf="!busy()" lucideCheck size="15"></svg><span class="pw-spin" *ngIf="busy()"></span>
         <span>{{ busy() ? 'Saving probation...' : 'Save probation' }}</span>
       </button>
     </div>
@@ -865,7 +1024,7 @@
     <div class="pw-dialog-actions">
       <button type="button" class="pw-btn btn-cancel" (click)="pipOpen.set(false)">Cancel</button>
       <button type="button" class="pw-btn primary btn-save" (click)="savePip()" [disabled]="busy() || !pipForm.employeeId">
-        <svg *ngIf="!busy()" lucideCheck size="15"></svg>
+        <svg *ngIf="!busy()" lucideCheck size="15"></svg><span class="pw-spin" *ngIf="busy()"></span>
         <span>{{ busy() ? 'Starting PIP...' : 'Start PIP' }}</span>
       </button>
     </div>
@@ -1057,8 +1216,8 @@
               class="pw-btn primary pip-composer-submit" 
               (click)="addCheckIn()" 
               [disabled]="busy() || !checkInNote.trim()">
-              <svg lucidePlus size="14"></svg>
-              <span>Add Check-in</span>
+              <svg *ngIf="!busy()" lucidePlus size="14"></svg><span class="pw-spin" *ngIf="busy()"></span>
+              <span>{{ busy() ? 'Adding…' : 'Add Check-in' }}</span>
             </button>
           </div>
         </div>
@@ -1207,77 +1366,337 @@
 </div>
 
 
-<!-- Probation policy (4 Nov 2026) -->
+<!-- ======================================================= -->
+<!-- ✨ PROBATION POLICY MODAL (ENHANCED)                    -->
+<!-- ======================================================= -->
 <div class="pw-overlay" *ngIf="policyOpen() && policy as p" (click)="policyOpen.set(false)">
-  <div class="pw-dialog" (click)="$event.stopPropagation()">
+  <div class="pw-dialog wide policy-dialog" (click)="$event.stopPropagation()">
+    <!-- Modal Header -->
     <div class="pw-dialog-header">
       <div class="pw-dialog-title-wrap">
-        <div class="pw-dialog-icon-bubble probation-bubble"><svg lucideCalendar size="20"></svg></div>
+        <div class="pw-dialog-icon-bubble probation-bubble">
+          <svg lucideCalendar size="20"></svg>
+        </div>
         <div>
           <h3>Probation policy</h3>
-          <p class="pw-dialog-subtitle">Applies to new joiners and to probations set from now on.</p>
+          <p class="pw-dialog-subtitle">Configure default duration rules, extension limits, and automated reminders.</p>
         </div>
       </div>
-      <button type="button" class="pw-btn ghost btn-icon" (click)="policyOpen.set(false)" aria-label="Close">✕</button>
+      <button 
+        type="button" 
+        class="pw-dialog-close" 
+        (click)="policyOpen.set(false)" 
+        title="Close dialog (Esc)">
+        <svg lucideX size="18"></svg>
+      </button>
     </div>
-    <div class="pw-policy-grid">
-      <label>Permanent employees (months)<input type="number" min="0" max="24" [(ngModel)]="p.monthsByCategory['PERMANENT']"></label>
-      <label>Trainees (months)<input type="number" min="0" max="24" [(ngModel)]="p.monthsByCategory['TRAINEE']"></label>
-      <label>Contract (months, 0 = none)<input type="number" min="0" max="24" [(ngModel)]="p.monthsByCategory['CONTRACT']"></label>
-      <label>Anyone else (months)<input type="number" min="0" max="24" [(ngModel)]="p.defaultMonths"></label>
-      <label>Extensions allowed<input type="number" min="0" max="5" [(ngModel)]="p.maxExtensions"></label>
-      <label>Max months per extension<input type="number" min="1" max="12" [(ngModel)]="p.maxExtensionMonths"></label>
-      <label>Remind HR &amp; manager (days before end)<input type="text" [(ngModel)]="policyReminders" placeholder="30, 7"></label>
-      <label>Leave on confirmation, rounding
-        <select [(ngModel)]="p.proRataRounding">
-          <option value="DOWN">Always round down (half day)</option>
-          <option value="NEAREST">Nearest half day</option>
-        </select>
-      </label>
+
+    <!-- Modal Body -->
+    <div class="pw-dialog-body pw-policy-body">
+      <!-- Section 1: Standard Durations -->
+      <div class="pw-policy-section">
+        <div class="pw-section-head">
+          <span class="pw-section-tag">Standard Durations</span>
+          <span class="pw-section-desc">Default period assigned to new joiners by contract category</span>
+        </div>
+        <div class="pw-policy-fields-grid">
+          <!-- Permanent -->
+          <div class="pw-field-group">
+            <label class="pw-field-label">Permanent employees</label>
+            <div class="pw-input-affix-wrap">
+              <input 
+                type="number" 
+                min="0" 
+                max="24" 
+                class="pw-affix-input" 
+                [(ngModel)]="p.monthsByCategory['PERMANENT']" />
+              <span class="pw-input-suffix">months</span>
+            </div>
+          </div>
+          <!-- Trainees -->
+          <div class="pw-field-group">
+            <label class="pw-field-label">Trainees &amp; interns</label>
+            <div class="pw-input-affix-wrap">
+              <input 
+                type="number" 
+                min="0" 
+                max="24" 
+                class="pw-affix-input" 
+                [(ngModel)]="p.monthsByCategory['TRAINEE']" />
+              <span class="pw-input-suffix">months</span>
+            </div>
+          </div>
+          <!-- Contract -->
+          <div class="pw-field-group">
+            <label class="pw-field-label">Contract employees (0 = none)</label>
+            <div class="pw-input-affix-wrap">
+              <input 
+                type="number" 
+                min="0" 
+                max="24" 
+                class="pw-affix-input" 
+                [(ngModel)]="p.monthsByCategory['CONTRACT']" />
+              <span class="pw-input-suffix">months</span>
+            </div>
+          </div>
+          <!-- Others -->
+          <div class="pw-field-group">
+            <label class="pw-field-label">Anyone else (fallback)</label>
+            <div class="pw-input-affix-wrap">
+              <input 
+                type="number" 
+                min="0" 
+                max="24" 
+                class="pw-affix-input" 
+                [(ngModel)]="p.defaultMonths" />
+              <span class="pw-input-suffix">months</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: Extension Rules -->
+      <div class="pw-policy-section">
+        <div class="pw-section-head">
+          <span class="pw-section-tag">Extension Limits</span>
+          <span class="pw-section-desc">Guardrails for extending an active probation period</span>
+        </div>
+        <div class="pw-policy-fields-grid">
+          <!-- Max Extensions -->
+          <div class="pw-field-group">
+            <label class="pw-field-label">Extensions allowed</label>
+            <div class="pw-input-affix-wrap">
+              <input 
+                type="number" 
+                min="0" 
+                max="5" 
+                class="pw-affix-input" 
+                [(ngModel)]="p.maxExtensions" />
+              <span class="pw-input-suffix">times max</span>
+            </div>
+          </div>
+          <!-- Max Months per Extension -->
+          <div class="pw-field-group">
+            <label class="pw-field-label">Max months per extension</label>
+            <div class="pw-input-affix-wrap">
+              <input 
+                type="number" 
+                min="1" 
+                max="12" 
+                class="pw-affix-input" 
+                [(ngModel)]="p.maxExtensionMonths" />
+              <span class="pw-input-suffix">months</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Reminders & Rounding -->
+      <div class="pw-policy-section">
+        <div class="pw-section-head">
+          <span class="pw-section-tag">Automation &amp; Leave Accrual</span>
+          <span class="pw-section-desc">Notification timing and post-confirmation leave rounding</span>
+        </div>
+        <div class="pw-policy-fields-grid">
+          <!-- Reminders -->
+          <div class="pw-field-group">
+            <label class="pw-field-label">Remind HR &amp; manager</label>
+            <div class="pw-input-affix-wrap">
+              <input 
+                type="text" 
+                class="pw-affix-input" 
+                [(ngModel)]="policyReminders" 
+                placeholder="30, 7" />
+              <span class="pw-input-suffix">days before</span>
+            </div>
+            <span class="pw-field-subtext">Comma-separated days before expiry (e.g. 30, 7)</span>
+          </div>
+          <!-- Pro Rata Rounding -->
+          <div class="pw-field-group">
+            <label class="pw-field-label">Leave on confirmation rounding</label>
+            <div class="pw-select-wrap">
+              <select class="pw-select" [(ngModel)]="p.proRataRounding">
+                <option value="DOWN">Always round down (half day)</option>
+                <option value="NEAREST">Nearest half day</option>
+              </select>
+              <svg lucideChevronDown size="15" class="select-chevron"></svg>
+            </div>
+            <span class="pw-field-subtext">Rounds pro-rata allocation upon confirmation</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Callout -->
+      <div class="pw-policy-callout">
+        <div class="callout-icon">
+          <svg lucideInfo size="16"></svg>
+        </div>
+        <div class="callout-body">
+          <b>Leave Pro-Rata Policy</b>
+          <span>Leave on confirmation = each yearly leave type × share of the year left (e.g. confirmed 22 Sep: Casual 8 → 2, Sick 7 → 1.5). No paid leave is credited while on probation.</span>
+        </div>
+      </div>
     </div>
-    <p class="pw-policy-note">Leave on confirmation = each yearly leave type × share of the year left (e.g. confirmed 22 Sep: Casual 8 → 2, Sick 7 → 1.5). No paid leave while on probation.</p>
-    <div class="pw-dialog-footer" style="display:flex;gap:8px;justify-content:flex-end;">
-      <button type="button" class="pw-btn" (click)="policyOpen.set(false)">Cancel</button>
-      <button type="button" class="pw-btn primary" (click)="savePolicy()" [disabled]="busy()">Save policy</button>
+
+    <!-- Modal Actions -->
+    <div class="pw-dialog-actions">
+      <button 
+        type="button" 
+        class="pw-btn btn-cancel" 
+        (click)="policyOpen.set(false)">
+        Cancel
+      </button>
+      <button 
+        type="button" 
+        class="pw-btn primary btn-save" 
+        (click)="savePolicy()" 
+        [disabled]="busy()">
+        <svg *ngIf="!busy()" lucideCheck size="15"></svg><span class="pw-spin" *ngIf="busy()"></span>
+        <span>{{ busy() ? 'Saving policy...' : 'Save policy' }}</span>
+      </button>
     </div>
   </div>
 </div>
 
 <!-- Manager's probation review (4 Nov 2026) -->
 <div class="pw-overlay" *ngIf="reviewRow() as r" (click)="reviewRow.set(null)">
-  <div class="pw-dialog" (click)="$event.stopPropagation()">
+  <div class="pw-dialog review-dialog" (click)="$event.stopPropagation()">
+    <!-- Modal Header -->
     <div class="pw-dialog-header">
       <div class="pw-dialog-title-wrap">
-        <div class="pw-dialog-icon-bubble probation-bubble"><svg lucideFileText size="20"></svg></div>
+        <div class="pw-dialog-icon-bubble probation-bubble">
+          <svg lucideFileText size="20"></svg>
+        </div>
         <div>
           <h3>Probation review: {{ r.name }}</h3>
           <p class="pw-dialog-subtitle">Ends {{ r.endDate | date:'d MMM y' }} · HR decides after your review.</p>
         </div>
       </div>
-      <button type="button" class="pw-btn ghost btn-icon" (click)="reviewRow.set(null)" aria-label="Close">✕</button>
+      <button 
+        type="button" 
+        class="pw-dialog-close" 
+        (click)="reviewRow.set(null)" 
+        title="Close dialog (Esc)">
+        <svg lucideX size="18"></svg>
+      </button>
     </div>
-    <div class="pw-review-form">
-      <div class="pw-review-label">Performance during probation</div>
-      <div class="pw-choice-row">
-        <label *ngFor="let o of ratingOptions" class="pw-choice" [class.on]="reviewForm.rating === o.v">
-          <input type="radio" name="pwRating" [value]="o.v" [(ngModel)]="reviewForm.rating"> {{ o.l }}
+
+    <!-- Modal Body -->
+    <div class="pw-dialog-body">
+      <!-- 1. Performance during probation -->
+      <div class="pw-field-group">
+        <label class="pw-field-label">
+          <span>Performance during probation</span>
+          <span class="required-star">*</span>
         </label>
+        <div class="pw-choice-grid">
+          <label 
+            *ngFor="let o of ratingOptions" 
+            class="pw-choice-card rating-choice" 
+            [class.on]="reviewForm.rating === o.v" 
+            [attr.data-rating]="o.v">
+            <input 
+              type="radio" 
+              name="pwRating" 
+              [value]="o.v" 
+              [(ngModel)]="reviewForm.rating" 
+              class="sr-only">
+            <span class="pw-choice-radio-circle">
+              <span class="pw-choice-radio-dot"></span>
+            </span>
+            <div class="pw-choice-text">
+              <span class="pw-choice-title">{{ o.l }}</span>
+            </div>
+          </label>
+        </div>
       </div>
-      <div class="pw-review-label">Recommendation</div>
-      <div class="pw-choice-row">
-        <label *ngFor="let o of recOptions" class="pw-choice" [class.on]="reviewForm.recommendation === o.v" [attr.data-rec]="o.v">
-          <input type="radio" name="pwRec" [value]="o.v" [(ngModel)]="reviewForm.recommendation"> {{ o.l }}
+
+      <!-- 2. Recommendation -->
+      <div class="pw-field-group">
+        <label class="pw-field-label">
+          <span>Recommendation</span>
+          <span class="required-star">*</span>
         </label>
+        <div class="pw-choice-grid">
+          <label 
+            *ngFor="let o of recOptions" 
+            class="pw-choice-card rec-choice" 
+            [class.on]="reviewForm.recommendation === o.v" 
+            [attr.data-rec]="o.v">
+            <input 
+              type="radio" 
+              name="pwRec" 
+              [value]="o.v" 
+              [(ngModel)]="reviewForm.recommendation" 
+              class="sr-only">
+            <span class="pw-choice-radio-circle">
+              <span class="pw-choice-radio-dot"></span>
+            </span>
+            <div class="pw-choice-text">
+              <span class="pw-choice-title">{{ o.l }}</span>
+            </div>
+          </label>
+        </div>
       </div>
-      <label class="pw-review-label" *ngIf="reviewForm.recommendation === 'EXTEND'">Extend by (months)
-        <input type="number" min="1" max="12" class="pw-input" [(ngModel)]="reviewForm.extendMonths">
-      </label>
-      <div class="pw-review-label">Comments <span style="color:#dc2626">*</span></div>
-      <textarea class="pw-input" rows="4" maxlength="2000" [(ngModel)]="reviewForm.comments" placeholder="Strengths, gaps, attendance, conduct — what HR should know."></textarea>
+
+      <!-- 2B. Extension Duration (shown if EXTEND) -->
+      <div class="pw-field-group pw-extend-group" *ngIf="reviewForm.recommendation === 'EXTEND'">
+        <label class="pw-field-label">
+          <span>Extend duration by (months)</span>
+          <span class="required-star">*</span>
+        </label>
+        <div class="pw-month-picker-wrap">
+          <div class="pw-month-picks">
+            <button 
+              type="button" 
+              *ngFor="let m of [1, 2, 3, 6]" 
+              [class.on]="reviewForm.extendMonths === m" 
+              (click)="reviewForm.extendMonths = m">
+              <span>{{ m }} mo</span>
+              <span class="std-badge" *ngIf="m === 3">Std</span>
+            </button>
+          </div>
+          <div class="pw-custom-month-input">
+            <span class="custom-label">Custom:</span>
+            <input type="number" min="1" max="12" [(ngModel)]="reviewForm.extendMonths" />
+            <span class="unit-label">months</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Comments -->
+      <div class="pw-field-group">
+        <label class="pw-field-label" for="review-comments-input">
+          <span>Comments</span>
+          <span class="required-star">*</span>
+        </label>
+        <textarea 
+          id="review-comments-input"
+          class="pw-textarea" 
+          rows="4" 
+          maxlength="2000" 
+          [(ngModel)]="reviewForm.comments" 
+          placeholder="Strengths, gaps, attendance, conduct — what HR should know."></textarea>
+        <span class="pw-field-subtext">HR will review these comments alongside attendance and policy records.</span>
+      </div>
     </div>
-    <div class="pw-dialog-footer" style="display:flex;gap:8px;justify-content:flex-end;">
-      <button type="button" class="pw-btn" (click)="reviewRow.set(null)">Cancel</button>
-      <button type="button" class="pw-btn primary" (click)="saveReview()" [disabled]="busy()">Submit review</button>
+
+    <!-- Modal Actions -->
+    <div class="pw-dialog-actions">
+      <button 
+        type="button" 
+        class="pw-btn btn-cancel" 
+        (click)="reviewRow.set(null)">
+        Cancel
+      </button>
+      <button 
+        type="button" 
+        class="pw-btn primary btn-save" 
+        (click)="saveReview()" 
+        [disabled]="busy()">
+        <svg *ngIf="!busy()" lucideCheck size="15"></svg><span class="pw-spin" *ngIf="busy()"></span>
+        <span>{{ busy() ? 'Submitting review...' : 'Submit review' }}</span>
+      </button>
     </div>
   </div>
 </div>
@@ -1287,25 +1706,50 @@
   <div class="pw-dialog" (click)="$event.stopPropagation()">
     <div class="pw-dialog-header">
       <div class="pw-dialog-title-wrap">
-        <div class="pw-dialog-icon-bubble probation-bubble"><svg lucideFileText size="20"></svg></div>
+        <div class="pw-dialog-icon-bubble danger-bubble" style="background:#fef2f2;color:#ef4444;border:1px solid #fecaca;">
+          <svg lucideAlertTriangle size="20"></svg>
+        </div>
         <div>
           <h3>Not confirm: {{ r.name }}</h3>
           <p class="pw-dialog-subtitle">Starts separation with the probation notice period and issues the non-confirmation letter.</p>
         </div>
       </div>
-      <button type="button" class="pw-btn ghost btn-icon" (click)="notConfirmRow.set(null)" aria-label="Close">✕</button>
+      <button 
+        type="button" 
+        class="pw-dialog-close" 
+        (click)="notConfirmRow.set(null)" 
+        title="Close dialog (Esc)">
+        <svg lucideX size="18"></svg>
+      </button>
     </div>
-    <div class="pw-review-form">
-      <div class="pw-review-label">Reason <span style="color:#dc2626">*</span></div>
-      <textarea class="pw-input" rows="3" maxlength="1000" [(ngModel)]="notConfirmReason" placeholder="Why the probation is not being confirmed."></textarea>
-      <label class="pw-review-label">Last working day (leave empty for the probation notice period, default 2 months)
-        <input type="date" class="pw-input" [(ngModel)]="notConfirmLwd">
-      </label>
-      <p class="pw-policy-note" style="padding:0" *ngIf="!r.review && data()?.canOverrideReview">No manager review yet — you are deciding as Super Admin.</p>
+    <div class="pw-dialog-body">
+      <div class="pw-field-group">
+        <label class="pw-field-label">
+          <span>Reason</span>
+          <span class="required-star">*</span>
+        </label>
+        <textarea 
+          class="pw-textarea" 
+          rows="3" 
+          maxlength="1000" 
+          [(ngModel)]="notConfirmReason" 
+          placeholder="Why the probation is not being confirmed."></textarea>
+      </div>
+      <div class="pw-field-group">
+        <label class="pw-field-label">
+          <span>Last working day</span>
+        </label>
+        <input type="date" class="pw-input-date" [(ngModel)]="notConfirmLwd">
+        <span class="pw-field-subtext">Leave empty for the standard probation notice period (default 2 months).</span>
+      </div>
+      <div class="pw-policy-warning-box" *ngIf="!r.review && data()?.canOverrideReview">
+        <svg lucideInfo size="15"></svg>
+        <span>No manager review yet — you are deciding as Super Admin.</span>
+      </div>
     </div>
-    <div class="pw-dialog-footer" style="display:flex;gap:8px;justify-content:flex-end;">
-      <button type="button" class="pw-btn" (click)="notConfirmRow.set(null)">Cancel</button>
-      <button type="button" class="pw-btn danger" (click)="saveNotConfirm()" [disabled]="busy()">Not confirm &amp; start separation</button>
+    <div class="pw-dialog-actions">
+      <button type="button" class="pw-btn btn-cancel" (click)="notConfirmRow.set(null)">Cancel</button>
+      <button type="button" class="pw-btn danger btn-save" (click)="saveNotConfirm()" [disabled]="busy()"><span class="pw-spin" *ngIf="busy()"></span><span>{{ busy() ? 'Starting separation…' : 'Not confirm &amp; start separation' }}</span></button>
     </div>
   </div>
 </div>

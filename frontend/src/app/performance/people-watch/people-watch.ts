@@ -27,7 +27,11 @@ import {
   LucideBuilding,
   LucideChevronRight,
   LucideMessageSquare,
-  LucideAlertCircle
+  LucideAlertCircle,
+  LucideMoreVertical,
+  LucideFilter,
+  LucideFileText,
+  LucideChevronDown
 } from '@lucide/angular';
 import { ProbationPolicy, LifecycleService, LcOverview, LcPip, LcPipDetail, LcPerson, LcProbation, LcNotice } from '../../services/lifecycle.service';
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
@@ -67,7 +71,11 @@ import { ProfileModalService } from '../../shared/profile-modal/profile-modal.se
     LucideBuilding,
     LucideChevronRight,
     LucideMessageSquare,
-    LucideAlertCircle
+    LucideAlertCircle,
+    LucideMoreVertical,
+    LucideFilter,
+    LucideFileText,
+    LucideChevronDown
   ],
   templateUrl: './people-watch.html',
   styleUrls: ['./people-watch.css'],
@@ -137,14 +145,53 @@ export class PeopleWatchComponent implements OnInit {
   section = signal<'probation' | 'notice' | 'pip'>('pip');
   showHistory = signal(false);
   busy = signal(false);
+  /** The row whose action (confirm / make permanent / remove) is in flight. */
+  rowBusy = signal<number | null>(null);
 
   // Search filters for tables
   probationSearch = signal('');
+  probationFilter = signal<'all' | 'overdue' | 'ending_soon' | 'pending_review' | 'on_track'>('all');
   noticeSearch = signal('');
   pipSearch = signal('');
 
-  filteredProbation = computed(() => {
+  probationStats = computed(() => {
     const list = this.data()?.probation || [];
+    let overdue = 0;
+    let endingSoon = 0;
+    let onTrack = 0;
+    let pendingReview = 0;
+
+    for (const p of list) {
+      if (p.daysLeft !== null) {
+        if (p.daysLeft < 0) overdue++;
+        else if (p.daysLeft <= 30) endingSoon++;
+        else onTrack++;
+      }
+      if (!p.review) pendingReview++;
+    }
+
+    return {
+      total: list.length,
+      overdue,
+      endingSoon,
+      onTrack,
+      pendingReview
+    };
+  });
+
+  filteredProbation = computed(() => {
+    let list = this.data()?.probation || [];
+    const filter = this.probationFilter();
+    if (filter === 'overdue') {
+      list = list.filter((p) => p.daysLeft !== null && p.daysLeft < 0);
+    } else if (filter === 'ending_soon') {
+      list = list.filter((p) => p.daysLeft !== null && p.daysLeft >= 0 && p.daysLeft <= 30);
+    } else if (filter === 'pending_review') {
+      list = list.filter((p) => !p.review);
+    } else if (filter === 'on_track') {
+      list = list.filter((p) => p.daysLeft !== null && p.daysLeft > 30);
+    }
+
     const q = this.probationSearch().trim().toLowerCase();
     if (!q) return list;
     return list.filter((p) =>
@@ -269,11 +316,44 @@ export class PeopleWatchComponent implements OnInit {
   closeNote = '';
   extendDate = '';
 
+  activeActionMenuId = signal<number | null>(null);
+
+  toggleActionMenu(employeeId: number, event: MouseEvent) {
+    event.stopPropagation();
+    if (this.activeActionMenuId() === employeeId) {
+      this.activeActionMenuId.set(null);
+    } else {
+      this.activeActionMenuId.set(employeeId);
+    }
+  }
+
+  closeActionMenu() {
+    this.activeActionMenuId.set(null);
+  }
+
+  getProbationProgress(joiningDate: string | null, endDate: string): number {
+    if (!joiningDate) return 100;
+    const start = new Date(joiningDate).getTime();
+    const end = new Date(endDate).getTime();
+    const now = Date.now();
+    if (end <= start) return 100;
+    const pct = Math.round(((now - start) / (end - start)) * 100);
+    return Math.min(Math.max(pct, 0), 100);
+  }
+
+  @HostListener('document:click')
+  onDocClick() {
+    if (this.activeActionMenuId()) {
+      this.activeActionMenuId.set(null);
+    }
+  }
+
   @HostListener('document:keydown.escape')
   onEscape() {
     if (this.probOpen()) this.probOpen.set(false);
     if (this.pipOpen()) this.pipOpen.set(false);
     if (this.detail()) this.detail.set(null);
+    if (this.activeActionMenuId()) this.activeActionMenuId.set(null);
   }
 
   getAvatarColor(id: number | string): string {
@@ -397,13 +477,15 @@ export class PeopleWatchComponent implements OnInit {
       ? `Confirm ${row.name} and make them PERMANENT? Their probation ends, their category becomes Permanent, leave for the rest of the year is credited pro-rata, and they and their manager are notified.`
       : `Confirm ${row.name}? Their probation ends (category stays ${this.categoryLabel(row.employmentCategory)}), leave for the rest of the year is credited pro-rata, and they and their manager are notified.`;
     if (!confirm(msg)) return;
+    this.rowBusy.set(row.employeeId);
     this.api.confirmProbation(row.employeeId, makePermanent).subscribe({
       next: (r: any) => {
+        this.rowBusy.set(null);
         const leave = (r?.leaveCredited || []).map((c: any) => `${c.leaveType} ${c.days}`).join(', ');
         this.toast.success(`${row.name} confirmed${r?.madePermanent ? ' and made permanent' : ''}${leave ? ' · leave credited: ' + leave : ''}${r?.letterId ? ' · confirmation letter issued' : ''}`);
         this.load();
       },
-      error: (e) => this.toast.error(e.error?.message || 'Could not confirm'),
+      error: (e) => { this.rowBusy.set(null); this.toast.error(e.error?.message || 'Could not confirm'); },
     });
   }
   categoryLabel(c?: string) {
@@ -412,9 +494,10 @@ export class PeopleWatchComponent implements OnInit {
 
   clearProbation(row: { employeeId: number; name: string }) {
     if (!confirm(`Take ${row.name} off probation? Use this only if they were added by mistake.`)) return;
+    this.rowBusy.set(row.employeeId);
     this.api.clearProbation(row.employeeId).subscribe({
-      next: () => { this.toast.success('Removed from probation'); this.load(); },
-      error: (e) => this.toast.error(e.error?.message || 'Could not change probation'),
+      next: () => { this.rowBusy.set(null); this.toast.success('Removed from probation'); this.load(); },
+      error: (e) => { this.rowBusy.set(null); this.toast.error(e.error?.message || 'Could not change probation'); },
     });
   }
 

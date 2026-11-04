@@ -4536,6 +4536,7 @@ export class AttendanceLeaveComponent implements OnInit {
 
   /** The drawer's "today it is…" card. */
   rescheduleCurrent = signal<{ type: string; label: string } | null>(null);
+  overrideSaving = signal(false);
   isSuperAdminUser = () => ['SUPERADMIN', 'SUPER_ADMIN'].includes(this.authService.currentUser()?.role);
 
   timelineDays = computed(() => {
@@ -4582,6 +4583,7 @@ export class AttendanceLeaveComponent implements OnInit {
     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const note = String(this.rescheduleForm.note || '').trim();
     if (!note) { this.toast.error('Give a reason for the override'); return; }
+    this.overrideSaving.set(true);
     this.leavesService.overrideDay({
       employeeId: this.selectedTimelineEmp().id,
       date: dateStr,
@@ -4589,11 +4591,12 @@ export class AttendanceLeaveComponent implements OnInit {
       note,
     }).subscribe({
       next: (r) => {
+        this.overrideSaving.set(false);
         this.toast.success(r.leavesChanged ? 'Leave cancelled for that day and attendance updated' : 'Attendance updated');
         this.closeRescheduleModal();
         this.loadTeamTimeline();
       },
-      error: (e) => this.toast.error(e?.error?.message || 'Could not override this day'),
+      error: (e) => { this.overrideSaving.set(false); this.toast.error(e?.error?.message || 'Could not override this day'); },
     });
   }
 

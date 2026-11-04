@@ -5334,3 +5334,5 @@
 .tl-drawer-foot .btn[disabled] { opacity: .5; cursor: not-allowed; }
 
 .probation-leave-note { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 13px; }
+.tl-spin { display: inline-block; width: 13px; height: 13px; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: tl-spin .7s linear infinite; vertical-align: -2px; }
+@keyframes tl-spin { to { transform: rotate(360deg); } }

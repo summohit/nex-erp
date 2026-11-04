@@ -59,7 +59,7 @@ import { LifecycleService, LcOverview, LcProbation } from '../../services/lifecy
           <div class="pwc-actions">
             <button type="button" class="pwc-btn" *ngIf="r.canReview && !r.review" (click)="openAll()">Review</button>
             <button type="button" class="pwc-btn ok" *ngIf="d()!.canManageProbation && (r.review?.recommendation === 'CONFIRM' || (!r.review && d()!.canOverrideReview))"
-                    [disabled]="busy()" (click)="confirm(r)">Confirm</button>
+                    [disabled]="busyId() !== null" (click)="confirm(r)"><span class="pwc-spin" *ngIf="busyId() === r.employeeId"></span>{{ busyId() === r.employeeId ? 'Confirming…' : 'Confirm' }}</button>
             <button type="button" class="pwc-btn" (click)="openAll()">Open</button>
           </div>
         </div>
@@ -97,7 +97,10 @@ import { LifecycleService, LcOverview, LcProbation } from '../../services/lifecy
     .pwc-actions { display: flex; gap: 6px; }
     .pwc-btn { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; }
     .pwc-btn.ok { border-color: #6ee7b7; background: #ecfdf5; color: #047857; }
-    .pwc-btn[disabled] { opacity: .5; }
+    .pwc-btn[disabled] { opacity: .6; cursor: progress; }
+    .pwc-btn { display: inline-flex; align-items: center; gap: 6px; }
+    .pwc-spin { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: pwc-spin .7s linear infinite; }
+    @keyframes pwc-spin { to { transform: rotate(360deg); } }
     .pwc-empty { padding: 14px 4px; color: #94a3b8; font-size: 13px; border-top: 1px solid #f1f5f9; }
     .pwc-more { margin-top: 6px; border: 0; background: none; color: #2563eb; font-weight: 600; cursor: pointer; text-align: left; }
     @media (max-width: 760px) { .pwc-stats { grid-template-columns: 1fr 1fr; } }
@@ -108,7 +111,9 @@ export class ProbationWatchCardComponent implements OnInit {
   private router = inject(Router);
   private toast = inject(HotToastService);
   d = signal<LcOverview | null>(null);
-  busy = signal(false);
+  /** The row being confirmed (button shows a loader; others wait). */
+  busyId = signal<number | null>(null);
+  loading = signal(true);
   filter = signal<'overdue' | 'soon' | 'reviewed' | 'pending'>('overdue');
 
   private list = computed(() => this.d()?.probation ?? []);
@@ -140,15 +145,15 @@ export class ProbationWatchCardComponent implements OnInit {
   confirm(r: LcProbation) {
     const override = !r.review;
     if (!confirm(`${override ? 'No manager review yet. Confirm as Super Admin? ' : ''}Confirm ${r.name}? Leave for the rest of the year is credited and the confirmation letter is issued.`)) return;
-    this.busy.set(true);
+    this.busyId.set(r.employeeId);
     this.api.confirmProbation(r.employeeId).subscribe({
       next: (x: any) => {
-        this.busy.set(false);
+        this.busyId.set(null);
         const leave = (x?.leaveCredited || []).map((c: any) => `${c.leaveType} ${c.days}`).join(', ');
         this.toast.success(`${r.name} confirmed${leave ? ' · leave credited: ' + leave : ''}`);
         this.load();
       },
-      error: (e) => { this.busy.set(false); this.toast.error(e.error?.message || 'Could not confirm'); },
+      error: (e) => { this.busyId.set(null); this.toast.error(e.error?.message || 'Could not confirm'); },
     });
   }
 }

@@ -2291,7 +2291,9 @@
 
       <div class="tl-drawer-foot">
         <button class="btn btn-outline" (click)="closeRescheduleModal()">Cancel</button>
-        <button class="btn btn-primary" (click)="submitReschedule()" [disabled]="!(rescheduleForm.note || '').trim()">Apply change</button>
+        <button class="btn btn-primary" (click)="submitReschedule()" [disabled]="overrideSaving() || !(rescheduleForm.note || '').trim()">
+          <span class="tl-spin" *ngIf="overrideSaving()"></span>{{ overrideSaving() ? 'Applying…' : 'Apply change' }}
+        </button>
       </div>
     </div>
   </div>
