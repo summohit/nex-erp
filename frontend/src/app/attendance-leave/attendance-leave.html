@@ -1572,12 +1572,18 @@
         </div>
       </div>
 
+      <div class="tl-legend">
+        <span class="tl-legend-item" *ngFor="let l of timelineLegend"><span class="tl-dot {{ l.type }}"></span>{{ l.label }}</span>
+        <span class="tl-legend-item"><span class="tl-dot empty"></span>No record / day off</span>
+        <span class="tl-legend-hint" *ngIf="isSuperAdminUser()">Click a day to override it</span>
+      </div>
+
       <div class="timeline-container">
         <div class="timeline-grid">
           <div class="timeline-header">
             <div class="timeline-employee-col" style="font-weight: 600; color: #64748b; font-size: 13px;">Employee</div>
             <div class="timeline-days">
-              <div class="timeline-day-header" *ngFor="let day of timelineDays()" [class.weekend]="day.isWeekend"
+              <div class="timeline-day-header" *ngFor="let day of timelineDays()" [class.weekend]="day.isWeekend" [class.tl-today]="isTodayCol(day.date)"
                    [class.holiday-col]="day.holidayName" [title]="day.holidayName || ''">
                 <span class="day-num">{{ day.date | date:'dd' }}</span>
                 <span class="day-name">{{ day.date | date:'EEE' }}</span>
@@ -1588,13 +1594,19 @@
           <div class="timeline-body">
             <div class="timeline-row" *ngFor="let emp of timelineVisibleEmployees()">
               <div class="timeline-employee-col">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <div class="emp-avatar-circle" style="width: 32px; height: 32px; font-size: 12px; background: #f1f5f9; color: #1e293b; border: 1px solid #e2e8f0;">
-                    {{ emp.firstName?.charAt(0) }}{{ emp.lastName?.charAt(0) || '' }}
-                  </div>
-                  <div>
-                    <div class="emp-name">{{ emp.firstName }} {{ emp.lastName }}</div>
-                    <div class="emp-dept">{{ emp.department?.name || 'General' }}</div>
+                <div class="tl-emp">
+                  <img *ngIf="emp.avatarUrl" class="tl-avatar" [src]="emp.avatarUrl" alt="">
+                  <div *ngIf="!emp.avatarUrl" class="tl-avatar tl-avatar-initials">{{ emp.firstName?.charAt(0) }}{{ emp.lastName?.charAt(0) || '' }}</div>
+                  <div class="tl-emp-text">
+                    <div class="tl-emp-name" [title]="emp.firstName + ' ' + (emp.lastName || '')">{{ emp.firstName }} {{ emp.lastName }}</div>
+                    <div class="tl-emp-meta" [title]="emp.designation?.name || ''">{{ emp.designation?.name || '—' }}<ng-container *ngIf="emp.department?.name"> · {{ emp.department?.name }}</ng-container></div>
+                    <div class="tl-emp-mail" *ngIf="emp.user?.email" [title]="emp.user.email">{{ emp.user.email }}</div>
+                    <div class="tl-emp-sum" *ngIf="timelineSummary(emp) as c">
+                      <span class="tl-dot present"></span>{{ c['present'] + c['late'] }}
+                      <span class="tl-dot leave"></span>{{ c['leave'] }}
+                      <span class="tl-dot half-day"></span>{{ c['half-day'] }}
+                      <span class="tl-dot absent"></span>{{ c['absent'] }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1603,6 +1615,8 @@
                      *ngFor="let day of timelineDays()" 
                      [class.weekend]="day.isWeekend"
                      [class.holiday-col]="day.holidayName"
+                     [class.tl-today]="isTodayCol(day.date)"
+                     [class.tl-clickable]="isSuperAdminUser()"
                      (click)="openRescheduleModal(emp, day.date, getTimelineStatus(emp, day.date))">
                   <ng-container *ngIf="getTimelineStatus(emp, day.date) as status">
                     <div class="timeline-status-block {{status.type}}" [title]="status.label"></div>
@@ -2214,43 +2228,69 @@
 
   <!-- Timeline Reschedule Modal -->
   <div class="drawer-overlay" *ngIf="showTimelineRescheduleModal()" (click)="closeRescheduleModal()">
-    <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 500px;">
-      <div class="drawer-header">
-        <h2>Reschedule Timeline / Override</h2>
-        <button class="btn-icon" (click)="closeRescheduleModal()">
-          <svg lucideX size="20"></svg>
-        </button>
+    <div class="drawer-content tl-drawer" (click)="$event.stopPropagation()">
+      <div class="tl-drawer-head">
+        <div>
+          <div class="tl-drawer-kicker">Attendance override</div>
+          <h3>Change this day</h3>
+        </div>
+        <button class="btn-icon" (click)="closeRescheduleModal()" aria-label="Close"><svg lucideX [size]="18"></svg></button>
       </div>
-      <div class="drawer-body">
-        <div style="margin-bottom: 16px; font-weight: 500;">
-          {{ selectedTimelineEmp()?.firstName }} {{ selectedTimelineEmp()?.lastName }} - {{ selectedTimelineDate() | date:'dd-MM-yyyy' }}
+
+      <div class="tl-drawer-body" *ngIf="selectedTimelineEmp() as emp">
+        <div class="tl-person">
+          <img *ngIf="emp.avatarUrl" class="tl-person-avatar" [src]="emp.avatarUrl" alt="">
+          <div *ngIf="!emp.avatarUrl" class="tl-person-avatar tl-avatar-initials">{{ emp.firstName?.charAt(0) }}{{ emp.lastName?.charAt(0) || '' }}</div>
+          <div class="tl-person-text">
+            <div class="tl-person-name">{{ emp.firstName }} {{ emp.lastName }}</div>
+            <div class="tl-person-meta">{{ emp.designation?.name || '—' }}<ng-container *ngIf="emp.department?.name"> · {{ emp.department?.name }}</ng-container></div>
+            <div class="tl-person-mail" *ngIf="emp.user?.email">{{ emp.user.email }}</div>
+          </div>
+          <div class="tl-date-pill">{{ selectedTimelineDate() | date:'EEE, d MMM y' }}</div>
         </div>
-        <div class="form-group mb-4">
-          <label>Override Status</label>
-          <select class="form-control" [(ngModel)]="rescheduleForm.status">
-            <option value="PRESENT">Present (office timing)</option>
-            <option value="ABSENT">Absent (loss of pay)</option>
-            <option value="HALF_DAY">Half Day</option>
-          </select>
-          <small *ngIf="$any(rescheduleForm).onLeave" style="display:block;margin-top:6px;color:#b45309;">
-            This day is on approved leave. Applying cancels the leave for this day only and gives the day back to their balance.
-          </small>
+
+        <div class="tl-current">
+          <span class="tl-current-label">Right now</span>
+          <span class="tl-dot {{ rescheduleCurrent()?.type || 'empty' }}"></span>
+          <span>{{ rescheduleCurrent()?.label || 'No record for this day' }}</span>
         </div>
-        <div class="form-group mb-4">
-          <label>Reason / Note</label>
-          <textarea class="form-control" [(ngModel)]="rescheduleForm.note" rows="2" placeholder="Reason for schedule change..."></textarea>
+
+        <div class="tl-field-label">Set the day to</div>
+        <div class="tl-options">
+          <label class="tl-option" [class.selected]="rescheduleForm.status === 'PRESENT'">
+            <input type="radio" name="tlStatus" value="PRESENT" [(ngModel)]="rescheduleForm.status">
+            <span class="tl-dot present"></span>
+            <span><b>Present</b><small>Full day at office timing (shift start to end)</small></span>
+          </label>
+          <label class="tl-option" [class.selected]="rescheduleForm.status === 'HALF_DAY'">
+            <input type="radio" name="tlStatus" value="HALF_DAY" [(ngModel)]="rescheduleForm.status">
+            <span class="tl-dot half-day"></span>
+            <span><b>Half Day</b><small>First half of the shift; half a day's pay</small></span>
+          </label>
+          <label class="tl-option" [class.selected]="rescheduleForm.status === 'ABSENT'">
+            <input type="radio" name="tlStatus" value="ABSENT" [(ngModel)]="rescheduleForm.status">
+            <span class="tl-dot absent"></span>
+            <span><b>Absent</b><small>No attendance; counted as loss of pay</small></span>
+          </label>
         </div>
+
+        <div class="tl-warn" *ngIf="$any(rescheduleForm).onLeave">
+          <svg lucideAlertTriangle [size]="16"></svg>
+          <span>This day is on <b>approved leave</b>. Applying cancels the leave for this day only, overrides the approval and returns the day to their balance.</span>
+        </div>
+
+        <div class="tl-field-label">Reason <span style="color:#dc2626">*</span></div>
+        <textarea class="form-control tl-reason" [(ngModel)]="rescheduleForm.note" rows="3" maxlength="500" placeholder="e.g. Was in office — biometric missed; leave withdrawn by employee…"></textarea>
+        <div class="tl-reason-foot">Visible to the employee in their notification · {{ (rescheduleForm.note || '').length }}/500</div>
       </div>
-      <div class="drawer-footer">
-        <button class="btn btn-primary" (click)="submitReschedule()" style="width: 100%;">
-          Apply Change
-        </button>
-        <button class="btn btn-outline" (click)="closeRescheduleModal()" style="width: 100%; margin-top: 8px;">Cancel</button>
+
+      <div class="tl-drawer-foot">
+        <button class="btn btn-outline" (click)="closeRescheduleModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="submitReschedule()" [disabled]="!(rescheduleForm.note || '').trim()">Apply change</button>
       </div>
     </div>
   </div>
 
-  <!-- REGULARIZATION DETAIL MODAL -->
   <div class="drawer-overlay" *ngIf="isRegularizationDetailOpen()" (click)="closeRegularizationDetail()" style="display: flex; align-items: center; justify-content: center;">
     <div class="widget-card reg-detail-modal" (click)="$event.stopPropagation()" *ngIf="selectedRegularization() as reg">
       <div class="widget-header reg-detail-header">

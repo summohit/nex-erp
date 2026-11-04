@@ -1916,6 +1916,8 @@ export class AttendanceService {
       include: {
         department: true,
         designation: true,
+        // Team Timeline shows each person's email beside their photo.
+        user: { select: { email: true } },
         attendances: {
           where: {
             date: {
@@ -1925,8 +1927,10 @@ export class AttendanceService {
           }
         },
         leaveRequests: {
+          include: { leaveType: { select: { name: true } } },
           where: {
             status: 'APPROVED',
+            deletedAt: null,
             OR: [
               { startDate: { lte: endDate }, endDate: { gte: startDate } }
             ]

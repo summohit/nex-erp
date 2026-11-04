@@ -23,7 +23,7 @@ import {
   LucideCheck, 
   LucideStarHalf, 
   LucideAlertCircle, 
-  LucideX, 
+  LucideX, LucideAlertTriangle, 
   LucidePlane, 
   LucideStar, 
   LucideCalendar,
@@ -89,7 +89,7 @@ import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDateP
     LucideCheck,
     LucideStarHalf,
     LucideAlertCircle,
-    LucideX,
+    LucideX, LucideAlertTriangle,
     LucidePlane,
     LucideStar,
     LucideCalendar,
@@ -4479,7 +4479,7 @@ export class AttendanceLeaveComponent implements OnInit {
               const from = new Date(l.startDate);
               const to = new Date(l.endDate);
               for (let d = new Date(from); d <= to; d.setUTCDate(d.getUTCDate() + 1)) {
-                records.push({ date: new Date(d), status: 'LEAVE', employee: emp });
+                records.push({ date: new Date(d), status: 'LEAVE', employee: emp, leaveType: l.leaveType?.name, isHalfDay: l.isHalfDay });
               }
             }
             if (e.employee && !e.attendances) records.push(e); // already a day record
@@ -4496,6 +4496,35 @@ export class AttendanceLeaveComponent implements OnInit {
         }
       });
   }
+
+  /** What each colour on the Team Timeline means. */
+  readonly timelineLegend = [
+    { type: 'present', label: 'Present' },
+    { type: 'late', label: 'Late' },
+    { type: 'half-day', label: 'Half Day' },
+    { type: 'absent', label: 'Absent' },
+    { type: 'leave', label: 'On Leave' },
+    { type: 'holiday', label: 'Holiday' },
+  ];
+
+  /** Per-person counts for the period, shown under their name. */
+  timelineSummary(emp: any) {
+    const c = { present: 0, late: 0, 'half-day': 0, absent: 0, leave: 0 } as Record<string, number>;
+    for (const day of this.timelineDays()) {
+      const s = this.getTimelineStatus(emp, day.date);
+      if (s && s.type in c) c[s.type]++;
+    }
+    return c;
+  }
+
+  isTodayCol(d: Date) {
+    const t = new Date();
+    return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+  }
+
+  /** The drawer's "today it is…" card. */
+  rescheduleCurrent = signal<{ type: string; label: string } | null>(null);
+  isSuperAdminUser = () => ['SUPERADMIN', 'SUPER_ADMIN'].includes(this.authService.currentUser()?.role);
 
   timelineDays = computed(() => {
     const start = new Date(this.timelineStartDate());
@@ -4517,6 +4546,7 @@ export class AttendanceLeaveComponent implements OnInit {
     if (date.getTime() > Date.now()) { this.toast.error("A future day can't be overridden yet"); return; }
     this.selectedTimelineEmp.set(emp);
     this.selectedTimelineDate.set(date);
+    this.rescheduleCurrent.set(currentStatus || null);
     const t = String(currentStatus?.type || '').toUpperCase();
     this.rescheduleForm = {
       status: t === 'ABSENT' ? 'ABSENT' : t === 'HALF-DAY' ? 'HALF_DAY' : 'PRESENT',
@@ -4569,7 +4599,7 @@ export class AttendanceLeaveComponent implements OnInit {
     }
 
     if (record) {
-      if (record.status === 'LEAVE') return { type: 'leave', label: 'On Leave' };
+      if (record.status === 'LEAVE') return { type: 'leave', label: `On Leave${record.leaveType ? ' — ' + record.leaveType : ''}${record.isHalfDay ? ' (half day)' : ''}` };
       if (record.isHoliday) return { type: 'holiday', label: 'Holiday' };
       if (holiday && record.clockIn) {
         return { type: 'present', label: `Worked on holiday (${holiday.name}) — In: ${new Date(record.clockIn).toLocaleTimeString()}` };
