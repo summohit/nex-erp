@@ -524,6 +524,10 @@ model Employee {
   probationConfirmedAt DateTime?
   /// Times this probation was extended (limit in the company's probation policy).
   probationExtensions  Int       @default(0)
+  /// The manager's review for the current probation period: { rating, comments,
+  /// recommendation CONFIRM|EXTEND|NOT_CONFIRM, extendMonths?, reviewerId,
+  /// reviewerName, at }. Cleared when probation is extended.
+  probationReview      Json?
   pips                 Pip[]        @relation("PipEmployee")
   wfhRequests          WfhRequest[] @relation("WfhRequester")
   wfhReviews           WfhRequest[] @relation("WfhReviewer")

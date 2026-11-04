@@ -1,7 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
-import { isHrAdmin } from '../common/company-roles';
+import { isHrAdmin, isSuperAdmin } from '../common/company-roles';
 import { normalisePolicy, ProbationPolicy, probationEndFrom, probationMonthsFor, proRataDays } from './probation-policy';
 
 type Viewer = { companyId: number; role: string; employeeId: number | null };
@@ -77,7 +78,7 @@ export class LifecycleService {
       this.prisma.employee.findMany({ where: { ...active, ...inScope }, select: { ...PERSON, joiningDate: true, employmentCategory: true }, orderBy: { firstName: 'asc' } }),
       this.prisma.employee.findMany({
         where: { ...active, ...inScope, probationEndDate: { not: null }, probationConfirmedAt: null },
-        select: { ...PERSON, joiningDate: true, probationEndDate: true, employmentCategory: true },
+        select: { ...PERSON, joiningDate: true, probationEndDate: true, employmentCategory: true, probationReview: true, probationExtensions: true },
         orderBy: { probationEndDate: 'asc' },
       }),
       this.prisma.resignation.findMany({
@@ -109,7 +110,11 @@ export class LifecycleService {
         designation: p.designation?.name ?? null, department: p.department?.name ?? null,
         employmentCategory: p.employmentCategory, joiningDate: p.joiningDate,
         endDate: p.probationEndDate, daysLeft: this.daysLeft(p.probationEndDate),
+        review: p.probationReview ?? null, extensions: p.probationExtensions,
+        // The reporting manager reviews; HR too when there is no manager.
+        canReview: (ids !== null && p.managerId === v.employeeId) || (isHrAdmin(v.role) && !p.managerId) || isSuperAdmin(v.role),
       })),
+      canOverrideReview: isSuperAdmin(v.role),
       notice: resignations
         .map((r) => {
           const lwd = r.approvedLastWorkingDay ?? r.intendedLastWorkingDay;
@@ -187,6 +192,48 @@ export class LifecycleService {
     return credited;
   }
 
+  /**
+   * The manager's probation review: rating, comments and a recommendation.
+   * HR decides after it; a Super Admin may decide without it.
+   */
+  async reviewProbation(v: Viewer, employeeId: number, body: { rating?: string; comments?: string; recommendation?: string; extendMonths?: number }) {
+    const e = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId: v.companyId, probationEndDate: { not: null }, probationConfirmedAt: null },
+      select: { id: true, firstName: true, lastName: true, managerId: true },
+    });
+    if (!e) throw new NotFoundException('This person is not on probation');
+    const isManager = !!v.employeeId && e.managerId === v.employeeId;
+    if (!isManager && !isSuperAdmin(v.role) && !(isHrAdmin(v.role) && !e.managerId)) {
+      throw new ForbiddenException("Only the reporting manager reviews a probation (HR when there is no manager).");
+    }
+    const rating = ['EXCEEDS', 'MEETS', 'BELOW'].includes(String(body?.rating)) ? String(body.rating) : null;
+    const recommendation = ['CONFIRM', 'EXTEND', 'NOT_CONFIRM'].includes(String(body?.recommendation)) ? String(body.recommendation) : null;
+    const comments = String(body?.comments || '').trim().slice(0, 2000);
+    if (!rating) throw new BadRequestException('Pick a rating: Exceeds, Meets or Below expectations.');
+    if (!recommendation) throw new BadRequestException('Pick a recommendation: Confirm, Extend or Not confirm.');
+    if (comments.length < 10) throw new BadRequestException('Add a few lines of comments (at least 10 characters).');
+    const extendMonths = recommendation === 'EXTEND' ? Math.max(1, Math.min(12, Number(body?.extendMonths) || 3)) : undefined;
+    const reviewer = v.employeeId
+      ? await this.prisma.employee.findUnique({ where: { id: v.employeeId }, select: { firstName: true, lastName: true } })
+      : null;
+    const review = { rating, recommendation, comments, extendMonths, reviewerId: v.employeeId, reviewerName: this.name(reviewer) || 'Admin', at: new Date().toISOString() };
+    await this.prisma.employee.update({ where: { id: e.id }, data: { probationReview: review } });
+
+    // HR and Super Admin decide next.
+    try {
+      const deciders = await this.prisma.user.findMany({
+        where: { companyId: v.companyId, role: { in: ['SUPERADMIN', 'SUPER_ADMIN', 'HR'] }, status: { notIn: ['SUSPENDED', 'INACTIVE', 'BLOCKED'] } },
+        select: { id: true },
+      });
+      const label = { CONFIRM: 'confirm', EXTEND: `extend by ${extendMonths} month(s)`, NOT_CONFIRM: 'not confirm' }[recommendation];
+      for (const d of deciders) {
+        await this.notifications.createNotification(d.id, 'Probation reviewed',
+          `${review.reviewerName} reviewed ${this.name(e)}'s probation and recommends: ${label}.`, 'GENERAL', '/performance?tab=probation', v.companyId);
+      }
+    } catch { /* the review stands */ }
+    return review;
+  }
+
   /** Put on probation, or change the end date: by months from joining (or today), or a date. */
   async setProbation(v: Viewer, employeeId: number, body: { months?: number; endDate?: string; reason?: string }) {
     if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can set probation');
@@ -216,7 +263,8 @@ export class LifecycleService {
     }
     await this.prisma.employee.update({
       where: { id: e.id },
-      data: { probationEndDate: end, probationConfirmedAt: null, ...(extending ? { probationExtensions: { increment: 1 } } : {}) },
+      // An extension starts a new review period.
+      data: { probationEndDate: end, probationConfirmedAt: null, ...(extending ? { probationExtensions: { increment: 1 }, probationReview: Prisma.DbNull } : {}) },
     });
     if (extending) {
       try {
@@ -239,9 +287,13 @@ export class LifecycleService {
     if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can confirm probation');
     const e = await this.prisma.employee.findFirst({
       where: { id: employeeId, companyId: v.companyId, probationEndDate: { not: null } },
-      select: { id: true, firstName: true, lastName: true, managerId: true, employmentCategory: true, employmentType: true },
+      select: { id: true, firstName: true, lastName: true, managerId: true, employmentCategory: true, employmentType: true, probationReview: true },
     });
     if (!e) throw new NotFoundException('This person is not on probation');
+    // HR waits for the manager's review; a Super Admin may confirm without it.
+    if (!e.probationReview && e.managerId && !isSuperAdmin(v.role)) {
+      throw new BadRequestException("Waiting for the manager's probation review. A Super Admin can confirm without it.");
+    }
     const permanent = !!body?.makePermanent && e.employmentCategory !== 'PERMANENT';
     const confirmedOn = this.todayUtc();
     await this.prisma.employee.update({

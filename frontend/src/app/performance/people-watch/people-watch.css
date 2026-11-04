@@ -2253,3 +2253,14 @@
 .pw-policy-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: #334155; }
 .pw-policy-grid input, .pw-policy-grid select { height: 38px; border: 1px solid #cbd5e1; border-radius: 9px; padding: 0 10px; font-size: 13.5px; font-weight: 500; }
 @media (max-width: 640px) { .pw-policy-grid { grid-template-columns: 1fr; } }
+
+.pw-review-chip { display: inline-block; margin-top: 4px; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+.pw-review-chip[data-rec="EXTEND"] { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.pw-review-chip[data-rec="NOT_CONFIRM"] { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.pw-review-chip.pending { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
+.pw-review-form { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 12px; }
+.pw-review-label { font-size: 12.5px; font-weight: 700; color: #334155; display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.pw-choice-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.pw-choice { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 13px; cursor: pointer; }
+.pw-choice.on { border-color: #2563eb; background: #eff6ff; }
+.pw-input { width: 100%; border: 1px solid #cbd5e1; border-radius: 9px; padding: 8px 10px; font-size: 13.5px; font-family: inherit; }

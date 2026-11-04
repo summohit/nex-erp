@@ -173,7 +173,7 @@
           <div class="col-date">Joined</div>
           <div class="col-date">Ends</div>
           <div class="col-badge">Time Left</div>
-          <div class="col-actions" *ngIf="d.canManageProbation">Actions</div>
+          <div class="col-actions" *ngIf="d.canManageProbation || d.isManager">Actions</div>
         </div>
 
         <div class="pw-row" *ngFor="let r of filteredProbation()">
@@ -206,9 +206,19 @@
               <span class="due-dot"></span>
               {{ dueText(r.daysLeft) }}
             </span>
+            <span class="pw-review-chip" *ngIf="r.review as rv" [attr.data-rec]="rv.recommendation"
+                  [title]="rv.reviewerName + ': ' + rv.comments">
+              {{ ratingLabel(rv.rating) }} · {{ recLabel(rv) }}
+            </span>
+            <span class="pw-review-chip pending" *ngIf="!r.review">Review pending</span>
           </div>
 
-          <div class="pw-actions" *ngIf="d.canManageProbation">
+          <div class="pw-actions" *ngIf="d.canManageProbation || r.canReview">
+            <button type="button" class="pw-btn btn-sm" *ngIf="r.canReview" (click)="openReview(r)" title="Manager's probation review">
+              <svg lucideFileText size="13"></svg>
+              <span>{{ r.review ? 'Edit review' : 'Review' }}</span>
+            </button>
+            <ng-container *ngIf="d.canManageProbation">
             <button 
               type="button" 
               class="pw-btn ok btn-sm" 
@@ -227,9 +237,11 @@
               <svg lucideCheck size="13"></svg>
               <span>Make permanent</span>
             </button>
+            </ng-container>
             <button 
               type="button" 
               class="pw-btn btn-sm" 
+              *ngIf="d.canManageProbation"
               (click)="openProbation(r)" 
               title="Change probation end date">
               <svg lucideCalendar size="13"></svg>
@@ -1218,6 +1230,45 @@
     <div class="pw-dialog-footer" style="display:flex;gap:8px;justify-content:flex-end;">
       <button type="button" class="pw-btn" (click)="policyOpen.set(false)">Cancel</button>
       <button type="button" class="pw-btn primary" (click)="savePolicy()" [disabled]="busy()">Save policy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manager's probation review (4 Nov 2026) -->
+<div class="pw-overlay" *ngIf="reviewRow() as r" (click)="reviewRow.set(null)">
+  <div class="pw-dialog" (click)="$event.stopPropagation()">
+    <div class="pw-dialog-header">
+      <div class="pw-dialog-title-wrap">
+        <div class="pw-dialog-icon-bubble probation-bubble"><svg lucideFileText size="20"></svg></div>
+        <div>
+          <h3>Probation review: {{ r.name }}</h3>
+          <p class="pw-dialog-subtitle">Ends {{ r.endDate | date:'d MMM y' }} · HR decides after your review.</p>
+        </div>
+      </div>
+      <button type="button" class="pw-btn ghost btn-icon" (click)="reviewRow.set(null)" aria-label="Close">✕</button>
+    </div>
+    <div class="pw-review-form">
+      <div class="pw-review-label">Performance during probation</div>
+      <div class="pw-choice-row">
+        <label *ngFor="let o of ratingOptions" class="pw-choice" [class.on]="reviewForm.rating === o.v">
+          <input type="radio" name="pwRating" [value]="o.v" [(ngModel)]="reviewForm.rating"> {{ o.l }}
+        </label>
+      </div>
+      <div class="pw-review-label">Recommendation</div>
+      <div class="pw-choice-row">
+        <label *ngFor="let o of recOptions" class="pw-choice" [class.on]="reviewForm.recommendation === o.v" [attr.data-rec]="o.v">
+          <input type="radio" name="pwRec" [value]="o.v" [(ngModel)]="reviewForm.recommendation"> {{ o.l }}
+        </label>
+      </div>
+      <label class="pw-review-label" *ngIf="reviewForm.recommendation === 'EXTEND'">Extend by (months)
+        <input type="number" min="1" max="12" class="pw-input" [(ngModel)]="reviewForm.extendMonths">
+      </label>
+      <div class="pw-review-label">Comments <span style="color:#dc2626">*</span></div>
+      <textarea class="pw-input" rows="4" maxlength="2000" [(ngModel)]="reviewForm.comments" placeholder="Strengths, gaps, attendance, conduct — what HR should know."></textarea>
+    </div>
+    <div class="pw-dialog-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="pw-btn" (click)="reviewRow.set(null)">Cancel</button>
+      <button type="button" class="pw-btn primary" (click)="saveReview()" [disabled]="busy()">Submit review</button>
     </div>
   </div>
 </div>

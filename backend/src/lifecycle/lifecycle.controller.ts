@@ -30,6 +30,11 @@ export class LifecycleController {
     return this.svc.setProbation(this.v(req), id, body);
   }
 
+  @Post('probation/:employeeId/review')
+  reviewProbation(@Request() req, @Param('employeeId', ParseIntPipe) id: number, @Body() body: any) {
+    return this.svc.reviewProbation(this.v(req), id, body ?? {});
+  }
+
   @Post('probation/:employeeId/confirm')
   confirmProbation(@Request() req, @Param('employeeId', ParseIntPipe) id: number, @Body() body: { makePermanent?: boolean }) {
     return this.svc.confirmProbation(this.v(req), id, body ?? {});

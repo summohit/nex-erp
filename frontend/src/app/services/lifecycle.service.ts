@@ -11,6 +11,11 @@ export interface LcPerson {
 export interface LcProbation {
   employeeId: number; name: string; employeeCode: string | null; avatarUrl: string | null; designation: string | null;
   department: string | null; employmentCategory: string; joiningDate: string | null; endDate: string; daysLeft: number | null;
+  review: ProbationReview | null; extensions: number; canReview: boolean;
+}
+export interface ProbationReview {
+  rating: 'EXCEEDS' | 'MEETS' | 'BELOW'; recommendation: 'CONFIRM' | 'EXTEND' | 'NOT_CONFIRM';
+  comments: string; extendMonths?: number; reviewerName: string; at: string;
 }
 export interface LcNotice {
   resignationId: number; employeeId: number; name: string; employeeCode: string | null; avatarUrl: string | null;
@@ -26,7 +31,7 @@ export interface LcPipDetail extends LcPip {
   checkIns: { id: number; note: string; createdAt: string; author: string | null; authorAvatar: string | null }[];
 }
 export interface LcOverview {
-  canManageProbation: boolean; isManager: boolean;
+  canManageProbation: boolean; isManager: boolean; canOverrideReview?: boolean;
   people: LcPerson[]; probation: LcProbation[]; notice: LcNotice[]; pips: LcPip[];
 }
 
@@ -49,6 +54,9 @@ export class LifecycleService {
   setProbation(employeeId: number, body: { months?: number; endDate?: string }) { return this.http.put(`${this.url}/probation/${employeeId}`, body); }
   getProbationPolicy(): Observable<ProbationPolicy> { return this.http.get<ProbationPolicy>(`${this.url}/probation-policy`); }
   saveProbationPolicy(p: ProbationPolicy): Observable<ProbationPolicy> { return this.http.put<ProbationPolicy>(`${this.url}/probation-policy`, p); }
+  reviewProbation(employeeId: number, body: { rating: string; recommendation: string; comments: string; extendMonths?: number }) {
+    return this.http.post<ProbationReview>(`${this.url}/probation/${employeeId}/review`, body);
+  }
   confirmProbation(employeeId: number, makePermanent = false) { return this.http.post(`${this.url}/probation/${employeeId}/confirm`, { makePermanent }); }
   makePermanent(employeeId: number) { return this.http.post(`${this.url}/employees/${employeeId}/make-permanent`, {}); }
   clearProbation(employeeId: number) { return this.http.delete(`${this.url}/probation/${employeeId}`); }

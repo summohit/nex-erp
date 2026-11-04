@@ -82,6 +82,33 @@ export class PeopleWatchComponent implements OnInit {
   // Probation flow (4 Nov 2026): policy in settings, no paid leave on probation, pro-rata leave on confirmation.
   readonly showProbation = true;
 
+  // ── Manager's probation review; HR decides after it, Super Admin may skip it ──
+  reviewRow = signal<LcProbation | null>(null);
+  reviewForm = { rating: '', recommendation: '', comments: '', extendMonths: 3 };
+  readonly ratingOptions = [{ v: 'EXCEEDS', l: 'Exceeds' }, { v: 'MEETS', l: 'Meets' }, { v: 'BELOW', l: 'Below expectations' }];
+  readonly recOptions = [{ v: 'CONFIRM', l: 'Confirm' }, { v: 'EXTEND', l: 'Extend' }, { v: 'NOT_CONFIRM', l: 'Not confirm' }];
+  ratingLabel(r: string) { return ({ EXCEEDS: 'Exceeds', MEETS: 'Meets', BELOW: 'Below' } as any)[r] ?? r; }
+  recLabel(rv: { recommendation: string; extendMonths?: number }) {
+    return rv.recommendation === 'EXTEND' ? `Extend ${rv.extendMonths ?? ''}m` : rv.recommendation === 'CONFIRM' ? 'Confirm' : 'Not confirm';
+  }
+  openReview(r: LcProbation) {
+    const rv = r.review;
+    this.reviewForm = { rating: rv?.rating ?? '', recommendation: rv?.recommendation ?? '', comments: rv?.comments ?? '', extendMonths: rv?.extendMonths ?? 3 };
+    this.reviewRow.set(r);
+  }
+  saveReview() {
+    const r = this.reviewRow();
+    if (!r) return;
+    const f = this.reviewForm;
+    if (!f.rating || !f.recommendation) { this.toast.error('Pick a rating and a recommendation'); return; }
+    if (f.comments.trim().length < 10) { this.toast.error('Add a few lines of comments'); return; }
+    this.busy.set(true);
+    this.api.reviewProbation(r.employeeId, { ...f, comments: f.comments.trim() }).subscribe({
+      next: () => { this.busy.set(false); this.reviewRow.set(null); this.toast.success('Review submitted — HR has been notified'); this.load(); },
+      error: (e) => { this.busy.set(false); this.toast.error(e.error?.message || 'Could not save the review'); },
+    });
+  }
+
   policyOpen = signal(false);
   policy: ProbationPolicy | null = null;
   policyReminders = '30, 7';
@@ -339,7 +366,9 @@ export class PeopleWatchComponent implements OnInit {
     });
   }
   /** Confirm, or (19 Oct 2026) confirm and make permanent in one step. Both notify. */
-  confirmProbation(row: { employeeId: number; name: string; employmentCategory?: string }, makePermanent = false) {
+  confirmProbation(row: { employeeId: number; name: string; employmentCategory?: string; review?: any }, makePermanent = false) {
+    const override = !row.review && this.data()?.canOverrideReview;
+    if (override && !confirm(`${row.name} has no manager review yet. Confirm anyway as Super Admin (override the review)?`)) return;
     const msg = makePermanent
       ? `Confirm ${row.name} and make them PERMANENT? Their probation ends, their category becomes Permanent, leave for the rest of the year is credited pro-rata, and they and their manager are notified.`
       : `Confirm ${row.name}? Their probation ends (category stays ${this.categoryLabel(row.employmentCategory)}), leave for the rest of the year is credited pro-rata, and they and their manager are notified.`;
