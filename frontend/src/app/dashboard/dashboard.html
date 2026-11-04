@@ -353,7 +353,9 @@
          TAB 1: MY WORKSPACE
          ==================================================================== -->
     <ng-container *ngIf="activeTab() === 'workspace'">
-      <!-- My PIP, for the employee it concerns (19 Oct 2026) -->
+      <!-- Probations needing action: HR, Super Admin and managers (hidden otherwise) -->
+      <app-probation-watch-card></app-probation-watch-card>
+      <!-- My probation and My PIP, for the employee they concern -->
       <app-my-probation-card></app-my-probation-card>
       <app-my-pip-card></app-my-pip-card>
       <!-- Who is on a PIP or serving notice: HR, super admin and reporting

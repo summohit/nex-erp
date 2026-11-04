@@ -1,5 +1,6 @@
 import { MyPipCardComponent } from './my-pip-card/my-pip-card';
 import { MyProbationCardComponent } from './my-probation-card/my-probation-card';
+import { ProbationWatchCardComponent } from './probation-watch-card/probation-watch-card';
 import { TaskHoursRequestsTabComponent } from '../projects/task-hours-requests/task-hours-requests-tab';
 import {
   ChangeDetectionStrategy,
@@ -114,6 +115,7 @@ export type TaskSortColumn = 'title' | 'priority' | 'status' | 'dueDate';
     PeopleWatchCardComponent,
     MyPipCardComponent,
     MyProbationCardComponent,
+    ProbationWatchCardComponent,
     TaskHoursRequestsTabComponent,
     ApexChartCardComponent,
     WorkHoursHeatmapWidgetComponent,
