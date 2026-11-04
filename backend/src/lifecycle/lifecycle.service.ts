@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { isHrAdmin } from '../common/company-roles';
+import { normalisePolicy, ProbationPolicy, probationEndFrom, probationMonthsFor, proRataDays } from './probation-policy';
 
 type Viewer = { companyId: number; role: string; employeeId: number | null };
 
@@ -137,10 +138,62 @@ export class LifecycleService {
 
   // ---------------- Probation (HR) ----------------
 
+  // ── Probation policy (Settings) ──
+  async getPolicy(companyId: number): Promise<ProbationPolicy> {
+    const s = await this.prisma.systemSetting.findUnique({ where: { companyId }, select: { probationPolicy: true } });
+    return normalisePolicy(s?.probationPolicy);
+  }
+
+  async savePolicy(v: Viewer, body: any): Promise<ProbationPolicy> {
+    if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can change the probation policy');
+    const policy = normalisePolicy(body);
+    await this.prisma.systemSetting.upsert({
+      where: { companyId: v.companyId },
+      update: { probationPolicy: policy as any },
+      create: { companyId: v.companyId, probationPolicy: policy as any },
+    });
+    return policy;
+  }
+
+  /** The probation end date a new joiner gets from the policy, or null if their category has none. */
+  async defaultProbationEnd(companyId: number, joining: Date, category?: string | null): Promise<Date | null> {
+    const months = probationMonthsFor(await this.getPolicy(companyId), category);
+    return months > 0 ? probationEndFrom(joining, months) : null;
+  }
+
+  /**
+   * Leave for the rest of the year once probation is passed (no paid leave on
+   * probation): each yearly paid type × the share of the year left, rounded as
+   * the policy says. A balance already larger is never reduced.
+   */
+  private async creditProRataLeave(companyId: number, employeeId: number, on: Date) {
+    const policy = await this.getPolicy(companyId);
+    const year = on.getUTCFullYear();
+    const types = await this.prisma.leaveType.findMany({
+      where: { companyId, isPaid: true, defaultDays: { gt: 0 }, NOT: { name: { contains: 'optional', mode: 'insensitive' } } },
+      select: { id: true, name: true, defaultDays: true },
+    });
+    const credited: { leaveType: string; days: number }[] = [];
+    for (const t of types) {
+      const days = proRataDays(t.defaultDays, on, policy.proRataRounding);
+      const existing = await this.prisma.leaveBalance.findFirst({ where: { employeeId, leaveTypeId: t.id, year } });
+      if (existing) {
+        if (existing.allocated < days) await this.prisma.leaveBalance.update({ where: { id: existing.id }, data: { allocated: days } });
+      } else {
+        await this.prisma.leaveBalance.create({ data: { employeeId, leaveTypeId: t.id, year, allocated: days } });
+      }
+      credited.push({ leaveType: t.name, days: Math.max(days, existing?.allocated ?? 0) });
+    }
+    return credited;
+  }
+
   /** Put on probation, or change the end date: by months from joining (or today), or a date. */
-  async setProbation(v: Viewer, employeeId: number, body: { months?: number; endDate?: string }) {
+  async setProbation(v: Viewer, employeeId: number, body: { months?: number; endDate?: string; reason?: string }) {
     if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can set probation');
-    const e = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId: v.companyId }, select: { id: true, joiningDate: true } });
+    const e = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId: v.companyId },
+      select: { id: true, joiningDate: true, probationEndDate: true, probationConfirmedAt: true, probationExtensions: true },
+    });
     if (!e) throw new NotFoundException('Employee not found');
     let end: Date;
     if (body?.endDate) {
@@ -151,8 +204,30 @@ export class LifecycleService {
       const base = e.joiningDate ?? this.todayUtc();
       end = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + months, base.getUTCDate()));
     }
-    await this.prisma.employee.update({ where: { id: e.id }, data: { probationEndDate: end, probationConfirmedAt: null } });
-    return { employeeId: e.id, endDate: end, daysLeft: this.daysLeft(end) };
+    // Moving an open probation later is an extension: limited in number and length.
+    const extending = !!e.probationEndDate && !e.probationConfirmedAt && end > e.probationEndDate;
+    if (extending) {
+      const policy = await this.getPolicy(v.companyId);
+      if (e.probationExtensions >= policy.maxExtensions) {
+        throw new BadRequestException(`Probation can be extended at most ${policy.maxExtensions} time(s). Confirm, or start separation.`);
+      }
+      const limit = new Date(Date.UTC(e.probationEndDate!.getUTCFullYear(), e.probationEndDate!.getUTCMonth() + policy.maxExtensionMonths, e.probationEndDate!.getUTCDate()));
+      if (end > limit) throw new BadRequestException(`An extension can be at most ${policy.maxExtensionMonths} month(s).`);
+    }
+    await this.prisma.employee.update({
+      where: { id: e.id },
+      data: { probationEndDate: end, probationConfirmedAt: null, ...(extending ? { probationExtensions: { increment: 1 } } : {}) },
+    });
+    if (extending) {
+      try {
+        await this.notifications.notifyEmployees([e.id], {
+          companyId: v.companyId, title: 'Probation extended',
+          message: `Your probation has been extended to ${end.toISOString().slice(0, 10)}.${body?.reason ? ' ' + body.reason : ''}`,
+          type: 'GENERAL', linkUrl: '/employees/me/profile', excludeEmployeeId: v.employeeId,
+        });
+      } catch { /* extension stands */ }
+    }
+    return { employeeId: e.id, endDate: end, daysLeft: this.daysLeft(end), extended: extending };
   }
 
   /**
@@ -164,20 +239,28 @@ export class LifecycleService {
     if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can confirm probation');
     const e = await this.prisma.employee.findFirst({
       where: { id: employeeId, companyId: v.companyId, probationEndDate: { not: null } },
-      select: { id: true, firstName: true, lastName: true, managerId: true, employmentCategory: true },
+      select: { id: true, firstName: true, lastName: true, managerId: true, employmentCategory: true, employmentType: true },
     });
     if (!e) throw new NotFoundException('This person is not on probation');
     const permanent = !!body?.makePermanent && e.employmentCategory !== 'PERMANENT';
+    const confirmedOn = this.todayUtc();
     await this.prisma.employee.update({
       where: { id: e.id },
-      data: { probationConfirmedAt: new Date(), ...(permanent ? { employmentCategory: 'PERMANENT' } : {}) },
+      data: {
+        probationConfirmedAt: new Date(),
+        // "On Probation…" types read wrong once confirmed.
+        ...(/probation/i.test(String(e.employmentType || '')) ? { employmentType: 'Full Time' } : {}),
+        ...(permanent ? { employmentCategory: 'PERMANENT' } : {}),
+      },
     });
+    const leaveCredited = await this.creditProRataLeave(v.companyId, e.id, confirmedOn);
     const name = `${e.firstName} ${e.lastName ?? ''}`.trim();
     try {
       await this.notifications.notifyEmployees([e.id], {
         companyId: v.companyId, title: 'Probation confirmed',
-        message: permanent ? 'Congratulations, your probation is complete and you are now a permanent employee.'
-          : 'Congratulations, your probation is complete and you are confirmed.',
+        message: (permanent ? 'Congratulations, your probation is complete and you are now a permanent employee.'
+          : 'Congratulations, your probation is complete and you are confirmed.')
+          + (leaveCredited.length ? ` Leave for the rest of the year: ${leaveCredited.map((c) => `${c.leaveType} ${c.days}`).join(', ')}.` : ''),
         type: 'GENERAL', linkUrl: '/employees/me/profile', excludeEmployeeId: v.employeeId,
       });
       if (e.managerId) {
@@ -188,7 +271,7 @@ export class LifecycleService {
         });
       }
     } catch { /* the confirmation stands even if a notification fails */ }
-    return { ok: true, madePermanent: permanent };
+    return { ok: true, madePermanent: permanent, leaveCredited };
   }
 
   /** Make someone permanent without a probation (Trainee or Contract today). */

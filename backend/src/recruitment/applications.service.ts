@@ -1,3 +1,4 @@
+import { normalisePolicy, probationEndFrom, probationMonthsFor } from '../lifecycle/probation-policy';
 import { PayrollMastersService } from '../payroll/masters/payroll-masters.service';
 import { PayProfilesService } from '../payroll/pay-profiles/pay-profiles.service';
 import { lockJobCapacity, closeFilledJobs } from './job-capacity';
@@ -591,6 +592,11 @@ export class ApplicationsService {
 
     const hashedPassword = await bcrypt.hash('nexerp2026', 10);
 
+    const joinedOn = application.joiningDate ? new Date(application.joiningDate) : new Date();
+    const policySetting = await this.prisma.systemSetting.findUnique({ where: { companyId }, select: { probationPolicy: true } });
+    const probationMonths = probationMonthsFor(normalisePolicy(policySetting?.probationPolicy), 'PERMANENT');
+    const probationEnd = probationMonths > 0 ? probationEndFrom(joinedOn, probationMonths) : null;
+
     const newEmployee = await this.prisma.$transaction(async (tx) => {
       await lockJobCapacity(tx, companyId);
       const user = await tx.user.create({
@@ -615,7 +621,10 @@ export class ApplicationsService {
           userId: user.id,
           companyId: companyId,
           branchId: application.job?.branchId || null,
-          onboardingStatus: 'PENDING'
+          onboardingStatus: 'PENDING',
+          joiningDate: joinedOn,
+          // Probation from the company policy (months by employment category).
+          ...(probationEnd ? { probationEndDate: probationEnd, employmentType: 'On Probation' } : {}),
         }
       });
 

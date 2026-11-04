@@ -126,6 +126,10 @@
             </button>
           </div>
 
+          <button type="button" class="pw-btn" *ngIf="d.canManageProbation" (click)="openPolicy()" title="Probation length, extensions, reminders, leave rounding">
+            <svg lucideCalendar size="15"></svg>
+            <span>Policy</span>
+          </button>
           <button 
             type="button" 
             class="pw-btn primary btn-add-main" 
@@ -136,6 +140,7 @@
           </button>
         </div>
       </div>
+      <p class="pw-policy-note">On probation: no paid leave (absences are loss of pay). On confirmation, leave for the rest of the year is credited pro-rata. Overdue probations stay open until HR decides.</p>
 
       <!-- Empty State -->
       <div class="pw-empty-state" *ngIf="!d.probation.length">
@@ -1180,3 +1185,39 @@
   </div>
 </div>
 
+
+<!-- Probation policy (4 Nov 2026) -->
+<div class="pw-overlay" *ngIf="policyOpen() && policy as p" (click)="policyOpen.set(false)">
+  <div class="pw-dialog" (click)="$event.stopPropagation()">
+    <div class="pw-dialog-header">
+      <div class="pw-dialog-title-wrap">
+        <div class="pw-dialog-icon-bubble probation-bubble"><svg lucideCalendar size="20"></svg></div>
+        <div>
+          <h3>Probation policy</h3>
+          <p class="pw-dialog-subtitle">Applies to new joiners and to probations set from now on.</p>
+        </div>
+      </div>
+      <button type="button" class="pw-btn ghost btn-icon" (click)="policyOpen.set(false)" aria-label="Close">✕</button>
+    </div>
+    <div class="pw-policy-grid">
+      <label>Permanent employees (months)<input type="number" min="0" max="24" [(ngModel)]="p.monthsByCategory['PERMANENT']"></label>
+      <label>Trainees (months)<input type="number" min="0" max="24" [(ngModel)]="p.monthsByCategory['TRAINEE']"></label>
+      <label>Contract (months, 0 = none)<input type="number" min="0" max="24" [(ngModel)]="p.monthsByCategory['CONTRACT']"></label>
+      <label>Anyone else (months)<input type="number" min="0" max="24" [(ngModel)]="p.defaultMonths"></label>
+      <label>Extensions allowed<input type="number" min="0" max="5" [(ngModel)]="p.maxExtensions"></label>
+      <label>Max months per extension<input type="number" min="1" max="12" [(ngModel)]="p.maxExtensionMonths"></label>
+      <label>Remind HR &amp; manager (days before end)<input type="text" [(ngModel)]="policyReminders" placeholder="30, 7"></label>
+      <label>Leave on confirmation, rounding
+        <select [(ngModel)]="p.proRataRounding">
+          <option value="DOWN">Always round down (half day)</option>
+          <option value="NEAREST">Nearest half day</option>
+        </select>
+      </label>
+    </div>
+    <p class="pw-policy-note">Leave on confirmation = each yearly leave type × share of the year left (e.g. confirmed 22 Sep: Casual 8 → 2, Sick 7 → 1.5). No paid leave while on probation.</p>
+    <div class="pw-dialog-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="pw-btn" (click)="policyOpen.set(false)">Cancel</button>
+      <button type="button" class="pw-btn primary" (click)="savePolicy()" [disabled]="busy()">Save policy</button>
+    </div>
+  </div>
+</div>

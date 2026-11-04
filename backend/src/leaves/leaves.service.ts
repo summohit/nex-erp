@@ -290,10 +290,16 @@ export class LeavesService {
     // Work From Home is asked for as a WFH request now (19 Oct 2026), with its
     // own approvals and monthly limit; the old leave type is history only.
     const chosenType = await this.prisma.leaveType?.findFirst?.({
-      where: { id: data.leaveTypeId, companyId: employee.companyId }, select: { name: true },
+      where: { id: data.leaveTypeId, companyId: employee.companyId }, select: { name: true, isPaid: true },
     });
     if (chosenType && /work\s*from\s*home|wfh|remote/i.test(chosenType.name)) {
       throw new BadRequestException('Work From Home is now a separate request: use "Request WFH" instead of leave.');
+    }
+    // No paid leave on probation (policy, 4 Nov 2026): absences are loss of pay.
+    if (chosenType?.isPaid && employee.probationEndDate && !employee.probationConfirmedAt
+        && startDate <= new Date(employee.probationEndDate)) {
+      const until = new Date(employee.probationEndDate).toISOString().slice(0, 10);
+      throw new BadRequestException(`On probation until ${until}: paid leave isn't available yet. Apply for Loss of Pay instead.`);
     }
 
     const isHalfDay = !!data.isHalfDay;

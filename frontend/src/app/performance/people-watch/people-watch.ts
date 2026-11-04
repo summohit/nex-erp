@@ -29,7 +29,7 @@ import {
   LucideMessageSquare,
   LucideAlertCircle
 } from '@lucide/angular';
-import { LifecycleService, LcOverview, LcPip, LcPipDetail, LcPerson, LcProbation, LcNotice } from '../../services/lifecycle.service';
+import { ProbationPolicy, LifecycleService, LcOverview, LcPip, LcPipDetail, LcPerson, LcProbation, LcNotice } from '../../services/lifecycle.service';
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
 
 /**
@@ -79,7 +79,27 @@ export class PeopleWatchComponent implements OnInit {
 
   @Input() initialSection: 'probation' | 'notice' | 'pip' = 'pip';
   /** Probation is hidden for now (19 Oct 2026); its own flow comes later. */
-  readonly showProbation = false;
+  // Probation flow (4 Nov 2026): policy in settings, no paid leave on probation, pro-rata leave on confirmation.
+  readonly showProbation = true;
+
+  policyOpen = signal(false);
+  policy: ProbationPolicy | null = null;
+  policyReminders = '30, 7';
+  openPolicy() {
+    this.api.getProbationPolicy().subscribe({
+      next: (p) => { this.policy = JSON.parse(JSON.stringify(p)); this.policyReminders = p.reminderDays.join(', '); this.policyOpen.set(true); },
+      error: (e) => this.toast.error(e.error?.message || 'Could not load the probation policy'),
+    });
+  }
+  savePolicy() {
+    if (!this.policy) return;
+    const reminderDays = this.policyReminders.split(',').map((x) => Number(x.trim())).filter((n) => n > 0);
+    this.busy.set(true);
+    this.api.saveProbationPolicy({ ...this.policy, reminderDays }).subscribe({
+      next: () => { this.busy.set(false); this.policyOpen.set(false); this.toast.success('Probation policy saved'); },
+      error: (e) => { this.busy.set(false); this.toast.error(e.error?.message || 'Could not save the policy'); },
+    });
+  }
 
   data = signal<LcOverview | null>(null);
   myPips = signal<LcPip[]>([]);
@@ -321,11 +341,15 @@ export class PeopleWatchComponent implements OnInit {
   /** Confirm, or (19 Oct 2026) confirm and make permanent in one step. Both notify. */
   confirmProbation(row: { employeeId: number; name: string; employmentCategory?: string }, makePermanent = false) {
     const msg = makePermanent
-      ? `Confirm ${row.name} and make them PERMANENT? Their probation ends, their category becomes Permanent, and they and their manager are notified.`
-      : `Confirm ${row.name}? Their probation ends (category stays ${this.categoryLabel(row.employmentCategory)}), and they and their manager are notified.`;
+      ? `Confirm ${row.name} and make them PERMANENT? Their probation ends, their category becomes Permanent, leave for the rest of the year is credited pro-rata, and they and their manager are notified.`
+      : `Confirm ${row.name}? Their probation ends (category stays ${this.categoryLabel(row.employmentCategory)}), leave for the rest of the year is credited pro-rata, and they and their manager are notified.`;
     if (!confirm(msg)) return;
     this.api.confirmProbation(row.employeeId, makePermanent).subscribe({
-      next: (r: any) => { this.toast.success(r?.madePermanent ? `${row.name} confirmed and made permanent` : `${row.name} confirmed`); this.load(); },
+      next: (r: any) => {
+        const leave = (r?.leaveCredited || []).map((c: any) => `${c.leaveType} ${c.days}`).join(', ');
+        this.toast.success(`${row.name} confirmed${r?.madePermanent ? ' and made permanent' : ''}${leave ? ' · leave credited: ' + leave : ''}`);
+        this.load();
+      },
       error: (e) => this.toast.error(e.error?.message || 'Could not confirm'),
     });
   }

@@ -522,6 +522,8 @@ model Employee {
   weeklyOffs           String?
   probationEndDate     DateTime?
   probationConfirmedAt DateTime?
+  /// Times this probation was extended (limit in the company's probation policy).
+  probationExtensions  Int       @default(0)
   pips                 Pip[]        @relation("PipEmployee")
   wfhRequests          WfhRequest[] @relation("WfhRequester")
   wfhReviews           WfhRequest[] @relation("WfhReviewer")
@@ -3170,6 +3172,8 @@ model SystemSetting {
   // used to render offer letters. Kept as JSON so adding a clause doesn't require a
   // migration — see OfferLetterConfig in offer-letters.service.ts for the shape.
   offerLetterConfig             Json?
+  /// Probation policy (lifecycle/probation-policy.ts); null = the defaults.
+  probationPolicy               Json?
   /// Field visit travel allowance (super admin): { ncrRadiusKm, rates:
   /// [{ vehicle, ratePerKm }] }. See field-visits/travel/travel-allowance.service.ts.
   travelAllowanceConfig         Json?

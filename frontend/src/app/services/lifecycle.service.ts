@@ -30,6 +30,16 @@ export interface LcOverview {
   people: LcPerson[]; probation: LcProbation[]; notice: LcNotice[]; pips: LcPip[];
 }
 
+/** Company probation policy (Settings), see backend lifecycle/probation-policy.ts. */
+export interface ProbationPolicy {
+  monthsByCategory: Record<string, number>;
+  defaultMonths: number;
+  maxExtensions: number;
+  maxExtensionMonths: number;
+  reminderDays: number[];
+  proRataRounding: 'DOWN' | 'NEAREST';
+}
+
 @Injectable({ providedIn: 'root' })
 export class LifecycleService {
   private http = inject(HttpClient);
@@ -37,6 +47,8 @@ export class LifecycleService {
 
   overview(): Observable<LcOverview> { return this.http.get<LcOverview>(`${this.url}/overview`); }
   setProbation(employeeId: number, body: { months?: number; endDate?: string }) { return this.http.put(`${this.url}/probation/${employeeId}`, body); }
+  getProbationPolicy(): Observable<ProbationPolicy> { return this.http.get<ProbationPolicy>(`${this.url}/probation-policy`); }
+  saveProbationPolicy(p: ProbationPolicy): Observable<ProbationPolicy> { return this.http.put<ProbationPolicy>(`${this.url}/probation-policy`, p); }
   confirmProbation(employeeId: number, makePermanent = false) { return this.http.post(`${this.url}/probation/${employeeId}/confirm`, { makePermanent }); }
   makePermanent(employeeId: number) { return this.http.post(`${this.url}/employees/${employeeId}/make-permanent`, {}); }
   clearProbation(employeeId: number) { return this.http.delete(`${this.url}/probation/${employeeId}`); }

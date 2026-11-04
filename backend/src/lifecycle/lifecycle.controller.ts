@@ -15,8 +15,18 @@ export class LifecycleController {
   @Get('overview')
   overview(@Request() req) { return this.svc.overview(this.v(req)); }
 
+  @Get('probation-policy')
+  getPolicy(@Request() req) {
+    return this.svc.getPolicy(req.user.companyId);
+  }
+
+  @Put('probation-policy')
+  savePolicy(@Request() req, @Body() body: any) {
+    return this.svc.savePolicy(this.v(req), body);
+  }
+
   @Put('probation/:employeeId')
-  setProbation(@Request() req, @Param('employeeId', ParseIntPipe) id: number, @Body() body: { months?: number; endDate?: string }) {
+  setProbation(@Request() req, @Param('employeeId', ParseIntPipe) id: number, @Body() body: { months?: number; endDate?: string; reason?: string }) {
     return this.svc.setProbation(this.v(req), id, body);
   }
 

@@ -141,7 +141,9 @@ export class LeaveAccrualCron implements OnModuleInit, OnModuleDestroy {
     // Suspended staff are off payroll and off the leave register — matching
     // payslip generation, which skips them too.
     const employees = await this.prisma.employee.findMany({
-      where: { user: { status: { not: 'SUSPENDED' } } },
+      // People still on probation get no leave; theirs is credited pro-rata
+      // when probation is confirmed (LifecycleService.confirmProbation).
+      where: { user: { status: { not: 'SUSPENDED' } }, NOT: { probationEndDate: { not: null }, probationConfirmedAt: null } },
       select: { id: true, companyId: true },
     });
     if (!employees.length) return 0;
