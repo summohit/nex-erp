@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PayProfilesService, assertPayrollEditor, assertPayrollViewer, isPayrollEditor, payeeKind } from './pay-profiles.service';
+import { ctcFromLetter } from './pay-profiles.service';
 
 describe('PayProfilesService helpers', () => {
   const svc = new PayProfilesService({} as any, {} as any) as any;
@@ -81,5 +82,16 @@ describe('PayProfilesService helpers', () => {
       expect(() => svc.cleanOverrides({ HRA: 1 }, group)).toThrow(BadRequestException);
     });
     it('treats an empty set as no overrides', () => expect(svc.cleanOverrides({ TRAVEL_ALLOWANCE: '' as any }, group)).toBeNull());
+  });
+});
+
+describe('ctcFromLetter', () => {
+  it('reads the CTC from a generated offer letter', () => {
+    expect(ctcFromLetter('<p>Your Total emoluments are <b>INR 12,00,000 /- CTC</b>. based on</p>')).toBe(1200000);
+    expect(ctcFromLetter('Your Total emoluments are&nbsp; INR 4,63,200 /- CTC .')).toBe(463200);
+  });
+  it('ignores letters without a plausible annual amount', () => {
+    expect(ctcFromLetter('<p>Welcome aboard</p>')).toBeNull();
+    expect(ctcFromLetter('INR 500 /- CTC')).toBeNull();
   });
 });

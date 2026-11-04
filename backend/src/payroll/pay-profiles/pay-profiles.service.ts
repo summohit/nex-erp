@@ -63,6 +63,28 @@ export function detailState(has: boolean, verifiedAt: Date | null, suggested: bo
   return 'MISSING';
 }
 
+/**
+ * The CTC written in an offer letter, e.g. "Your Total emoluments are INR
+ * 12,00,000 /- CTC" or "₹4,63,200 per annum". Null when no amount is found or
+ * it isn't a plausible annual CTC.
+ */
+export function ctcFromLetter(html: string | null | undefined): number | null {
+  if (!html) return null;
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+  const patterns = [
+    /(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d+)?)\s*\/?-?\s*(?:\(.*?\)\s*)?CTC/i,
+    /emoluments?[^.]{0,40}?(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d+)?)/i,
+    /CTC[^.]{0,30}?(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d+)?)/i,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (!m) continue;
+    const n = Number(m[1].replace(/,/g, ''));
+    if (n >= 60000 && n <= 50000000) return n;
+  }
+  return null;
+}
+
 @Injectable()
 export class PayProfilesService {
   constructor(
@@ -431,6 +453,20 @@ export class PayProfilesService {
       if (!offers.has(k)) offers.set(k, { ctc: a.offeredSalary!, status: a.status });
     }
 
+    // Offer letters generated from Employees → Letters (no candidate record):
+    // the CTC is read from the letter text, newest letter first.
+    const letters = await this.prisma.generatedLetter.findMany({
+      where: { companyId, employeeId: { in: employees.map((e) => e.id) }, title: { contains: 'offer', mode: 'insensitive' } },
+      select: { employeeId: true, body: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const letterOffers = new Map<number, { ctc: number; status: string }>();
+    for (const l of letters) {
+      if (letterOffers.has(l.employeeId)) continue;
+      const ctc = ctcFromLetter(l.body);
+      if (ctc) letterOffers.set(l.employeeId, { ctc, status: `letter of ${l.createdAt.toISOString().slice(0, 10)}` });
+    }
+
     const calculators = new Map<string, Awaited<ReturnType<PayrollMastersService['prepareCalculator']>>>();
     const calcFor = async (code: string) => {
       if (!calculators.has(code)) calculators.set(code, await this.masters.prepareCalculator(companyId, code));
@@ -471,7 +507,7 @@ export class PayProfilesService {
       const base = { employeeId: e.id, name, avatarUrl: e.avatarUrl, payType: e.payType, employmentType: e.employmentType, currentGrossMonthly: round(currentGross) };
       if (!(currentGross > 0)) {
         // No salary was ever set up in MIRA. If they joined through an offer, its CTC is the next best thing.
-        const offer = offers.get((e.user?.email || '').toLowerCase());
+        const offer = offers.get((e.user?.email || '').toLowerCase()) ?? letterOffers.get(e.id);
         if (offer && group) {
           const calcOffer = await calcFor(group.code);
           if (calcOffer) {
