@@ -5265,6 +5265,9 @@ model PayrollCompanyConfig {
   costingWorkingDays       Float    @default(26)
   costingHoursPerDay       Float    @default(8)
   costingIncludeEmployer   Boolean  @default(true)
+  /// Loss of pay per-day rate: monthly pay ÷ CALENDAR days in the month (default,
+  /// 4 Nov 2026) | WORKING days | FIXED_30 | FIXED_26.
+  lopDayBasis              String   @default("CALENDAR")
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 }

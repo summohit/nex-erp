@@ -50,6 +50,19 @@ function parseDate(v: any): Date | null {
   return d;
 }
 
+/** Loss of pay per-day basis (4 Nov 2026). */
+export const LOP_DAY_BASES = ['CALENDAR', 'WORKING', 'FIXED_30', 'FIXED_26'] as const;
+
+/** The days monthly pay is divided by to get one day's pay for loss of pay. */
+export function lopDivisor(basis: string | null | undefined, daysInMonth: number, workingDays: number): number {
+  switch (basis) {
+    case 'WORKING': return workingDays > 0 ? workingDays : daysInMonth;
+    case 'FIXED_30': return 30;
+    case 'FIXED_26': return 26;
+    default: return daysInMonth; // CALENDAR
+  }
+}
+
 @Injectable()
 export class PayrollMastersService {
   constructor(private prisma: PrismaService) {}
@@ -875,12 +888,12 @@ export class PayrollMastersService {
     const saved = await this.prisma.payrollCompanyConfig.findUnique({ where: { companyId } });
     return saved
       ? { ...saved, saved: true }
-      : { companyId, gradeBasis: 'MONTHLY_GROSS', costingWorkingDays: 26, costingHoursPerDay: 8, costingIncludeEmployer: true, saved: false };
+      : { companyId, gradeBasis: 'MONTHLY_GROSS', costingWorkingDays: 26, costingHoursPerDay: 8, costingIncludeEmployer: true, lopDayBasis: 'CALENDAR', saved: false };
   }
 
   async saveCompanyConfig(
     companyId: number,
-    data: { gradeBasis?: string; costingWorkingDays?: number; costingHoursPerDay?: number; costingIncludeEmployer?: boolean },
+    data: { gradeBasis?: string; costingWorkingDays?: number; costingHoursPerDay?: number; costingIncludeEmployer?: boolean; lopDayBasis?: string },
     actorUserId?: number,
   ) {
     const before = await this.getCompanyConfig(companyId);
@@ -890,8 +903,11 @@ export class PayrollMastersService {
     const hours = Number(data.costingHoursPerDay ?? before.costingHoursPerDay);
     if (!(workingDays > 0 && workingDays <= 31)) throw new BadRequestException('Working days per month must be 1–31');
     if (!(hours > 0 && hours <= 24)) throw new BadRequestException('Hours per day must be 1–24');
+    const lopDayBasis = String(data.lopDayBasis ?? (before as any).lopDayBasis ?? 'CALENDAR');
+    if (!LOP_DAY_BASES.includes(lopDayBasis as any)) throw new BadRequestException('Loss of pay basis must be CALENDAR, WORKING, FIXED_30 or FIXED_26');
     const values = {
       gradeBasis,
+      lopDayBasis,
       costingWorkingDays: workingDays,
       costingHoursPerDay: hours,
       costingIncludeEmployer: data.costingIncludeEmployer ?? before.costingIncludeEmployer,

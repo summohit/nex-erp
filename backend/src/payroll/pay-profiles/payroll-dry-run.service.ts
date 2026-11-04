@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { PayrollMastersService } from '../masters/payroll-masters.service';
+import { lopDivisor, PayrollMastersService } from '../masters/payroll-masters.service';
 import { PayrollService } from '../payroll.service';
 import { INACTIVE_USER_STATUSES } from './inactive-users';
 import { payeeKind } from './pay-profiles.service';
@@ -23,10 +23,11 @@ export interface DryRunLine {
  */
 export function applyLossOfPay(
   earnings: { code: string; name: string; monthly: number; reduceForLop: boolean }[],
-  workingDays: number,
+  /** Days one month's pay is divided by (calendar days by default — see lopDivisor). */
+  dayDivisor: number,
   absences: number,
 ): { lines: DryRunLine[]; lossOfPay: number } {
-  const share = workingDays > 0 ? Math.min(1, Math.max(0, absences / workingDays)) : 0;
+  const share = dayDivisor > 0 ? Math.min(1, Math.max(0, absences / dayDivisor)) : 0;
   let lossOfPay = 0;
   const lines = earnings.map((e) => {
     const cut = e.reduceForLop ? r2(e.monthly * share) : 0;
@@ -96,6 +97,9 @@ export class PayrollDryRunService {
 
     const attendance = fullMonth ? new Map() : await this.payroll.attendanceForMonth(companyId, month, year, [...inForce.keys()]);
 
+    const companyConfig = await this.masters.getCompanyConfig(companyId);
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
     // Statutory rates for recalculating PF / ESI on pay actually earned.
     const rates = await this.masters.getStatutoryRates(companyId);
     const rate = (code: string, field: 'ratePct' | 'wageCeiling' | 'eligibilityLimit') =>
@@ -149,7 +153,8 @@ export class PayrollDryRunService {
         : attendance.get(e.id) ?? { workingDays: 0, presentDays: 0, absences: 0, noAttendance: true };
 
       const earningLines = out.lines.filter((l) => l.category === 'EARNING' && l.monthly !== 0);
-      const { lines: earnings, lossOfPay } = applyLossOfPay(earningLines, att.workingDays, att.absences);
+      const divisor = lopDivisor((companyConfig as any).lopDayBasis, daysInMonth, att.workingDays);
+      const { lines: earnings, lossOfPay } = applyLossOfPay(earningLines, divisor, att.absences);
       const grossFull = r2(earnings.reduce((t, l) => t + l.full, 0));
       const grossPaid = r2(earnings.reduce((t, l) => t + l.paid, 0));
       const basicPaid = earnings.find((l) => l.code === 'BASIC')?.paid ?? 0;
@@ -216,6 +221,7 @@ export class PayrollDryRunService {
       financialYear,
       regimeCode,
       fullMonth,
+      lopDayBasis: (companyConfig as any).lopDayBasis ?? 'CALENDAR',
       currentProfiles,
       borrowedProfiles: borrowed.size,
       summary: {

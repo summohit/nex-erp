@@ -1301,6 +1301,16 @@
           <span class="field-hint-text">Annual CTC takes effect once employees have pay profiles.</span>
         </div>
         <div class="form-group">
+          <label class="form-label">Loss of Pay: One Day's Pay =</label>
+          <select class="form-control" [(ngModel)]="configForm.lopDayBasis">
+            <option value="CALENDAR">Monthly pay ÷ days in the month (28–31)</option>
+            <option value="WORKING">Monthly pay ÷ that person's working days</option>
+            <option value="FIXED_30">Monthly pay ÷ 30</option>
+            <option value="FIXED_26">Monthly pay ÷ 26</option>
+          </select>
+          <span class="field-hint-text">Used for absences in payslips and the dry run. Loss of pay = one day's pay × absent days.</span>
+        </div>
+        <div class="form-group">
           <label class="form-label">Costing: Working Days / Month</label>
           <div class="input-unit-wrapper">
             <input type="number" class="form-control" min="1" max="31" [(ngModel)]="configForm.costingWorkingDays">

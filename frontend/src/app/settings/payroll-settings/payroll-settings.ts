@@ -477,6 +477,7 @@ export class PayrollSettingsComponent implements OnInit {
       costingWorkingDays: Number(this.configForm.costingWorkingDays),
       costingHoursPerDay: Number(this.configForm.costingHoursPerDay),
       costingIncludeEmployer: !!this.configForm.costingIncludeEmployer,
+      lopDayBasis: this.configForm.lopDayBasis || 'CALENDAR',
     }).subscribe({
       next: () => { this.savingSetup.set(null); this.toast.success('Grades & costing saved'); this.loadSetup(); },
       error: (e) => { this.savingSetup.set(null); this.toast.error(e.error?.message || 'Failed to save'); },

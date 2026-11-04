@@ -530,6 +530,8 @@ export interface PayrollCompanyConfig {
   costingWorkingDays: number;
   costingHoursPerDay: number;
   costingIncludeEmployer: boolean;
+  /** Loss of pay per-day basis: CALENDAR (default) | WORKING | FIXED_30 | FIXED_26 */
+  lopDayBasis?: 'CALENDAR' | 'WORKING' | 'FIXED_30' | 'FIXED_26';
   saved: boolean;
 }
 

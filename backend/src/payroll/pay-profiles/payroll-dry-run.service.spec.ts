@@ -18,3 +18,16 @@ describe('applyLossOfPay', () => {
     expect(applyLossOfPay(earnings, 20, 30).lines.find((l) => l.code === 'BASIC')!.paid).toBe(0);
   });
 });
+
+describe('lopDivisor', () => {
+  const { lopDivisor } = require('../masters/payroll-masters.service');
+  it('divides by the days in the month by default', () => {
+    expect(lopDivisor('CALENDAR', 31, 23)).toBe(31);
+    expect(lopDivisor(undefined, 30, 22)).toBe(30);
+  });
+  it('supports working days and fixed 30 / 26', () => {
+    expect(lopDivisor('WORKING', 31, 23)).toBe(23);
+    expect(lopDivisor('FIXED_30', 31, 23)).toBe(30);
+    expect(lopDivisor('FIXED_26', 31, 23)).toBe(26);
+  });
+});

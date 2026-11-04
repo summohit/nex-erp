@@ -5,6 +5,7 @@ import { PdfService } from './pdf.service';
 import { EmailService } from './email.service';
 import { payableDayStatus } from '../attendance/clock-out-approval';
 import { isLopExempt } from './lop-exempt';
+import { lopDivisor } from './masters/payroll-masters.service';
 import { ModuleRef } from '@nestjs/core';
 import {
   DEFAULT_TEMPLATE, LINE_COMPONENT_NAMES, SalaryTemplateRules, TemplateLine,
@@ -62,6 +63,13 @@ export class PayrollService {
    * Employees with no pay profile aren't in the map and keep the old rules.
    * Loaded lazily: the dry run itself depends on this service.
    */
+  /** The company's loss-of-pay day basis; unit tests without the table get the working-day rule they were written for. */
+  private async lopBasis(companyId: number): Promise<string> {
+    if (!(this.prisma as any).payrollCompanyConfig?.findUnique) return 'WORKING';
+    const c = await this.prisma.payrollCompanyConfig.findUnique({ where: { companyId }, select: { lopDayBasis: true } });
+    return c?.lopDayBasis ?? 'CALENDAR';
+  }
+
   private async engineRows(companyId: number, month: number, year: number, fullMonth: boolean) {
     if (!this.moduleRef) return new Map<number, any>(); // unit tests build the service on its own
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -634,6 +642,7 @@ export class PayrollService {
     const endDate = this.payrollDate(year, month, totalDaysInMonth);
     const holidayKeys = await this.payrollHolidayKeys(companyId, startDate, endDate);
     const engine = await this.engineRows(companyId, month, year, false);
+    const basis = await this.lopBasis(companyId);
     const rows: any[] = [];
 
     for (const emp of employees) {
@@ -722,7 +731,7 @@ export class PayrollService {
       }
       if (isLopExempt(emp.user?.role)) absences = 0;
 
-      let lossOfPay = Math.round((gross / workingDays) * absences * 100) / 100;
+      let lossOfPay = Math.round((gross / lopDivisor(basis, totalDaysInMonth, workingDays)) * absences * 100) / 100;
       if (fromEngine) {
         gross = fromEngine.grossFull;
         deductions = fromEngine.totalDeductions;
@@ -819,6 +828,7 @@ export class PayrollService {
     const holidayKeys = await this.payrollHolidayKeys(companyId, startDate, endDate);
     // Skipping loss of pay = the engine's full month, so PF/ESI are on full pay too.
     const engine = await this.engineRows(companyId, month, year, !!opts.skipLossOfPay);
+    const basis = await this.lopBasis(companyId);
 
     for (const emp of employees) {
       // Rest days: the roster, else the shift, else the branch weekly offs.
@@ -974,7 +984,8 @@ export class PayrollService {
       if (!fromEngine && totalEarnings <= 0) continue;
 
       // Loss of Pay (LOP) calculation based on actual unexcused working day absences
-      const dailyRate = workingDaysInMonth > 0 ? (totalEarnings / workingDaysInMonth) : 0;
+      const divisor = lopDivisor(basis, totalDaysInMonth, workingDaysInMonth);
+      const dailyRate = divisor > 0 ? (totalEarnings / divisor) : 0;
       // Waived for the whole run when asked — see the note on this method.
       const lossOfPay = opts.skipLossOfPay
         ? 0
