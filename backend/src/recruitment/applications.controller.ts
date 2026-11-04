@@ -145,8 +145,8 @@ export class ApplicationsController {
 
   /** Fill the annexure from a payroll salary group (same engine as payslips). */
   @Post(':id/annexure/from-group')
-  annexureFromGroup(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('groupCode') groupCode: string) {
-    return this.applicationsService.annexureFromSalaryGroup(id, req.user.companyId, groupCode);
+  annexureFromGroup(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('groupCode') groupCode: string, @Body('taxRegime') taxRegime?: string) {
+    return this.applicationsService.annexureFromSalaryGroup(id, req.user.companyId, groupCode, taxRegime);
   }
 
   /** Whether newly generated offer letters include the salary annexure table. */

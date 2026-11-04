@@ -5296,6 +5296,8 @@ model EmployeePayProfile {
   workerType       String?
   /// PayrollDropdownOption value in PAYMENT_METHOD
   paymentMethod    String?
+  /// NEW | OLD income-tax regime; null = the financial year's default (NEW)
+  taxRegime        String?
   /// { COMPONENT_CODE: monthly amount } — each needs a reason.
   overrides        Json?
   reason           String?

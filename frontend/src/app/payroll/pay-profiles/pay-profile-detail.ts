@@ -239,6 +239,7 @@ export class PayProfileDetailComponent implements OnInit {
       effectiveFrom: this.firstOfNextMonth(),
       workerType: cur?.workerType ?? null,
       paymentMethod: cur?.paymentMethod ?? null,
+      taxRegime: cur?.taxRegime === 'OLD' ? 'OLD' : 'NEW',
       overrides: { ...(cur?.overrides || {}) } as Record<string, number | null>,
       reason: '',
     };
@@ -366,6 +367,7 @@ export class PayProfileDetailComponent implements OnInit {
       effectiveFrom: f.effectiveFrom,
       workerType: f.workerType || null,
       paymentMethod: f.paymentMethod || null,
+      taxRegime: f.taxRegime === 'OLD' ? 'OLD' : 'NEW',
       overrides: overrides ?? null,
       reason: f.reason.trim() || null,
       source: this.data()?.versions.length ? 'REVISION' : 'MANUAL',

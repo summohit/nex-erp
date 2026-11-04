@@ -760,6 +760,7 @@ export interface PayProfileVersion {
   annualCtc: number;
   workerType: string | null;
   paymentMethod: string | null;
+  taxRegime?: 'NEW' | 'OLD' | null;
   overrides: Record<string, number> | null;
   reason: string | null;
   source: string;

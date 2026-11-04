@@ -453,6 +453,8 @@ export class CandidatesComponent implements OnInit {
   /** Payroll salary groups, so the offer is split by the same rules as the payslip. */
   annexureGroups = signal<{ code: string; name: string; payeeType: string }[]>([]);
   annexureGroupCode = signal<string>('');
+  /** New regime by default; HR can switch to Old. Drives the TDS line and the pay profile. */
+  annexureRegime = signal<'NEW' | 'OLD'>('NEW');
   isFillingFromGroup = signal(false);
   isSavingAnnexure = signal(false);
   annexureComponents = signal<any[]>([]);
@@ -1204,6 +1206,7 @@ export class CandidatesComponent implements OnInit {
       next: (data) => {
         this.annexureData.set(data);
         this.annexureGroupCode.set(data?.salaryGroupCode || '');
+        this.annexureRegime.set(data?.taxRegime === 'OLD' ? 'OLD' : 'NEW');
         this.isLoadingAnnexure.set(false);
       },
       error: (err) => {
@@ -1223,7 +1226,7 @@ export class CandidatesComponent implements OnInit {
     const d = this.annexureData();
     if (d?.isCustomized && !d?.salaryGroupCode && !confirm('This replaces the edited salary table with the salary group\'s breakup. Continue?')) return;
     this.isFillingFromGroup.set(true);
-    this.candidatesService.annexureFromGroup(id, code).subscribe({
+    this.candidatesService.annexureFromGroup(id, code, this.annexureRegime()).subscribe({
       next: (data) => {
         this.annexureData.set(data);
         this.annexureEditing.set(false);

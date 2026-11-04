@@ -106,9 +106,9 @@ export class PayrollDryRunService {
     const esiLimit = Number(rate('ESI_EMPLOYER', 'eligibilityLimit') ?? 21000);
 
     const calcs = new Map<string, Awaited<ReturnType<PayrollMastersService['prepareCalculator']>>>();
-    const calcFor = async (code: string, onDate: Date) => {
-      const key = `${code}@${onDate.toISOString()}`;
-      if (!calcs.has(key)) calcs.set(key, await this.masters.prepareCalculator(companyId, code, onDate, { regimeCode, financialYear }));
+    const calcFor = async (code: string, onDate: Date, regime: 'NEW' | 'OLD') => {
+      const key = `${code}@${onDate.toISOString()}@${regime}`;
+      if (!calcs.has(key)) calcs.set(key, await this.masters.prepareCalculator(companyId, code, onDate, { regimeCode: regime, financialYear }));
       return calcs.get(key)!;
     };
 
@@ -128,7 +128,9 @@ export class PayrollDryRunService {
         continue;
       }
       // A borrowed profile uses the salary group as it stood when the profile starts.
-      const calc = await calcFor(profile.salaryGroupCode, borrowed.has(e.id) ? profile.effectiveFrom : monthEnd);
+      // The employee's own regime choice, else the year's default (NEW).
+      const regime = ((profile as any).taxRegime === 'OLD' || (profile as any).taxRegime === 'NEW' ? (profile as any).taxRegime : regimeCode) as 'NEW' | 'OLD';
+      const calc = await calcFor(profile.salaryGroupCode, borrowed.has(e.id) ? profile.effectiveFrom : monthEnd, regime);
       if (!calc) {
         rows.push({ ...base, status: 'BLOCKED', warnings: [`Salary group ${profile.salaryGroupCode} isn't in force for this month.`] });
         continue;
@@ -186,6 +188,7 @@ export class PayrollDryRunService {
         status: warnings.length ? 'CHECK' : 'OK',
         salaryGroupCode: profile.salaryGroupCode,
         annualCtc: profile.annualCtc,
+        taxRegime: regime,
         profileFrom: profile.effectiveFrom,
         borrowedProfile: borrowed.has(e.id),
         workingDays: att.workingDays,

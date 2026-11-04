@@ -666,6 +666,7 @@ export class ApplicationsService {
           salaryGroupCode: groupCode,
           annualCtc: Number(application.offeredSalary),
           effectiveFrom: from.toISOString().slice(0, 10),
+          taxRegime: application.compensationStructure?.taxRegime ?? null,
           reason: 'From the offer letter at onboarding',
           source: 'OFFER',
         }, actorUserId);
@@ -792,6 +793,7 @@ export class ApplicationsService {
       isCustomized: !!application.compensationStructure,
       /** Set when the table was filled from a payroll salary group (the same engine payslips use). */
       salaryGroupCode: application.compensationStructure?.salaryGroupCode ?? null,
+      taxRegime: application.compensationStructure?.taxRegime ?? null,
       totalCTC: totalMonthly * 12,
       monthlyCTC: totalMonthly,
       components: visible,
@@ -894,27 +896,35 @@ export class ApplicationsService {
    * letter and the first payslip agree. At onboarding the group and CTC become
    * the employee's pay profile.
    */
-  async annexureFromSalaryGroup(id: number, companyId: number, groupCode: string) {
+  async annexureFromSalaryGroup(id: number, companyId: number, groupCode: string, taxRegime?: string) {
     const application = await this.findOne(id, companyId);
     const ctc = Number(application.offeredSalary) || 0;
     if (!(ctc > 0)) throw new BadRequestException('Set the offered salary (annual CTC) first.');
     const code = String(groupCode || '').trim().toUpperCase();
     const onDate = (application as any).joiningDate ? new Date((application as any).joiningDate) : new Date();
-    const calc = await this.payrollMasters.prepareCalculator(companyId, code, onDate);
+    const regime: 'NEW' | 'OLD' = taxRegime === 'OLD' ? 'OLD' : 'NEW'; // New regime unless Old is chosen
+    const m = onDate.getMonth() + 1;
+    const fy = m >= 4 ? onDate.getFullYear() : onDate.getFullYear() - 1;
+    const financialYear = `${fy}-${String((fy + 1) % 100).padStart(2, '0')}`;
+    const calc = await this.payrollMasters.prepareCalculator(companyId, code, onDate, { regimeCode: regime, financialYear });
     if (!calc) throw new BadRequestException(`No salary group "${code}" in force on ${onDate.toISOString().slice(0, 10)}.`);
-    const out = calc.run(ctc);
+    const out: any = calc.run(ctc);
+    const isEmployee = !['CONSULTANT', 'CONTRACTOR'].includes(String(calc.group.payeeType));
 
     const group = (cat: string): AnnexureGroup | null =>
       cat === 'EARNING' ? 'EARNINGS' : cat === 'EMPLOYER_CONTRIBUTION' ? 'DEDUCTIONS' : cat === 'EMPLOYEE_DEDUCTION' ? 'EMPLOYEE_DEDUCTIONS' : null;
     const raw = out.lines
-      // TDS depends on the whole year's tax position, not the structure — left off the letter.
-      .filter((l: any) => group(l.category) && l.code !== 'TDS' && Math.round(l.monthly) > 0)
+      // Employees' TDS comes from the tax slabs of the chosen regime (added below), not a group line.
+      .filter((l: any) => group(l.category) && !(isEmployee && l.code === 'TDS') && Math.round(l.monthly) > 0)
       .map((l: any) => ({ id: `pg_${l.code}`.toLowerCase(), name: l.name, group: group(l.category), kind: 'FIXED', monthly: Math.round(l.monthly), included: true }));
+    if (isEmployee && out.tax && Math.round(out.tax.monthlyTds) > 0) {
+      raw.push({ id: 'pg_tds', name: `Income Tax (TDS) — ${regime === 'OLD' ? 'Old' : 'New'} regime, estimate`, group: 'EMPLOYEE_DEDUCTIONS', kind: 'FIXED', monthly: Math.round(out.tax.monthlyTds), included: true });
+    }
     if (!raw.length) throw new BadRequestException(`Salary group ${code} gives no lines for this CTC.`);
 
     const components = this.normalizeComponents(raw, Math.round(ctc / 12));
     const persisted = components.filter((c: any) => c.kind !== 'BALANCER').map(({ annual, ...c }: any) => c);
-    const structure = { version: 1, salaryGroupCode: code, components: persisted };
+    const structure = { version: 1, salaryGroupCode: code, taxRegime: regime, components: persisted };
     await this.prisma.jobApplication.update({ where: { id }, data: { compensationStructure: structure } });
     (application as any).compensationStructure = structure;
     return this.renderAnnexure(application, components);

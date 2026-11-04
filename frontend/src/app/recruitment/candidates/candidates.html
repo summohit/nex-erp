@@ -1717,13 +1717,18 @@
       <div class="annexure-group-bar" *ngIf="!annexureEditing()">
         <div class="annexure-group-text">
           <b>Salary group</b>
-          <span *ngIf="d.salaryGroupCode">Filled from <code>{{ d.salaryGroupCode }}</code> — matches the payslip. Becomes their pay profile at onboarding.</span>
+          <span>Step 1: CTC ₹{{ d.totalCTC | number }} (offered salary) → Step 2: salary group → Step 3: tax regime.</span>
+          <span *ngIf="d.salaryGroupCode">Filled from <code>{{ d.salaryGroupCode }}</code>, {{ d.taxRegime === 'OLD' ? 'Old' : 'New' }} regime — matches the payslip. Becomes their pay profile at onboarding.</span>
           <span *ngIf="!d.salaryGroupCode">Pick the group they'll be paid under so this table matches their payslip.</span>
         </div>
         <div class="annexure-group-actions">
           <select class="annexure-group-select" [ngModel]="annexureGroupCode()" (ngModelChange)="annexureGroupCode.set($event)">
             <option value="">— pick salary group —</option>
             <option *ngFor="let g of annexureGroups()" [value]="g.code">{{ g.name }} ({{ g.code }})</option>
+          </select>
+          <select class="annexure-group-select annexure-regime-select" [ngModel]="annexureRegime()" (ngModelChange)="annexureRegime.set($event)" title="Income-tax regime for the TDS estimate">
+            <option value="NEW">New regime (default)</option>
+            <option value="OLD">Old regime</option>
           </select>
           <button type="button" class="annexure-group-btn" (click)="fillAnnexureFromGroup()" [disabled]="isFillingFromGroup() || !annexureGroupCode()">
             {{ isFillingFromGroup() ? 'Filling…' : (d.salaryGroupCode ? 'Refill' : 'Fill from group') }}

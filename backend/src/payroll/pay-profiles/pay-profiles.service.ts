@@ -181,6 +181,8 @@ export class PayProfilesService {
       effectiveFrom: string;
       workerType?: string | null;
       paymentMethod?: string | null;
+      /** NEW | OLD; null = the financial year's default */
+      taxRegime?: string | null;
       overrides?: Record<string, number> | null;
       reason?: string | null;
       source?: string;
@@ -230,6 +232,7 @@ export class PayProfilesService {
           annualCtc,
           workerType: workerType?.value ?? null,
           paymentMethod: paymentMethod?.value ?? null,
+          taxRegime: body.taxRegime === 'OLD' || body.taxRegime === 'NEW' ? body.taxRegime : null,
           overrides: overrides ?? undefined,
           reason,
           source: ['IMPORT', 'REVISION', 'OFFER'].includes(String(body.source)) ? String(body.source) : 'MANUAL',
