@@ -940,3 +940,12 @@
   }
 }
 
+
+/* Employment status on cards (4 Nov 2026) */
+.employment-badge { font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.employment-badge.emp-probation { background: #dbeafe; color: #1d4ed8; }
+.employment-badge.emp-overdue { background: #fee2e2; color: #b91c1c; }
+.employment-badge.emp-confirmed { background: #d1fae5; color: #047857; }
+.employment-badge.emp-trainee { background: #ede9fe; color: #7c3aed; }
+.employment-badge.emp-contract { background: #fef3c7; color: #b45309; }
+.employment-badge.emp-permanent { background: #f1f5f9; color: #475569; }

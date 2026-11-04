@@ -1,4 +1,4 @@
-import { Component, inject, Input, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, Input, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -30,6 +30,22 @@ export class EmployeeProfileComponent implements OnInit {
 
   activeTab = signal<'work' | 'resume' | 'personal' | 'contacts' | 'documents' | 'history'>('work');
   employeeData = signal<any>(null);
+
+  /** Probation / confirmation line under the header. */
+  probationInfo = computed(() => {
+    const e = this.employeeData();
+    if (!e) return null;
+    const d = (v: any) => new Date(v).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    if (e.probationEndDate && !e.probationConfirmedAt) {
+      const end = new Date(e.probationEndDate); end.setHours(23, 59, 59);
+      const overdue = end.getTime() < Date.now();
+      return overdue
+        ? { cls: 'overdue', label: 'Probation overdue', text: `Ended ${d(e.probationEndDate)} — waiting for HR's decision. No paid leave until confirmed.` }
+        : { cls: 'on', label: 'On probation', text: `Until ${d(e.probationEndDate)}. No paid leave until confirmed (absences are loss of pay).` };
+    }
+    if (e.probationConfirmedAt) return { cls: 'done', label: 'Confirmed', text: `Probation confirmed on ${d(e.probationConfirmedAt)}.` };
+    return null;
+  });
   isLoading = signal(true);
   isOwner = signal(false);
   /** Server-resolved: the owner, HR, admins and designation-level profile editors. */

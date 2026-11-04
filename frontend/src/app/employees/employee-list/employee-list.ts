@@ -72,6 +72,39 @@ export class EmployeeListComponent implements OnInit {
     { id: 'IN_PROGRESS', name: 'In Progress' },
     { id: 'COMPLETED', name: 'Completed' }
   ];
+  /** Employment status (4 Nov 2026): probation, overdue probation, confirmed, trainee, contract. */
+  employmentStatusOptions = [
+    { id: 'PROBATION', name: 'On probation' },
+    { id: 'OVERDUE', name: 'Probation overdue' },
+    { id: 'CONFIRMED', name: 'Confirmed' },
+    { id: 'PERMANENT', name: 'Permanent' },
+    { id: 'TRAINEE', name: 'Trainee' },
+    { id: 'CONTRACT', name: 'Contract' },
+  ];
+  filterEmploymentStatus: string | null = null;
+
+  employmentStatus(e: any): string {
+    if (e?.probationEndDate && !e?.probationConfirmedAt) {
+      const end = new Date(e.probationEndDate); end.setHours(23, 59, 59);
+      return end.getTime() < Date.now() ? 'OVERDUE' : 'PROBATION';
+    }
+    if (e?.employmentCategory === 'TRAINEE') return 'TRAINEE';
+    if (e?.employmentCategory === 'CONTRACT') return 'CONTRACT';
+    return e?.probationConfirmedAt ? 'CONFIRMED' : 'PERMANENT';
+  }
+  employmentBadge(e: any): { label: string; cls: string; title: string } {
+    const s = this.employmentStatus(e);
+    const d = (v: any) => (v ? new Date(v).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '');
+    switch (s) {
+      case 'PROBATION': return { label: `Probation · ends ${d(e.probationEndDate).replace(/ \d{4}$/, '')}`, cls: 'emp-probation', title: `On probation until ${d(e.probationEndDate)}` };
+      case 'OVERDUE': return { label: 'Probation overdue', cls: 'emp-overdue', title: `Probation ended ${d(e.probationEndDate)} — not decided yet` };
+      case 'CONFIRMED': return { label: 'Confirmed', cls: 'emp-confirmed', title: `Confirmed on ${d(e.probationConfirmedAt)}` };
+      case 'TRAINEE': return { label: 'Trainee', cls: 'emp-trainee', title: 'Trainee' };
+      case 'CONTRACT': return { label: 'Contract', cls: 'emp-contract', title: 'Contract' };
+      default: return { label: 'Permanent', cls: 'emp-permanent', title: 'Permanent' };
+    }
+  }
+
   offboardingStatusOptions = [
     { id: 'NONE', name: 'Not started' },
     { id: 'IN_PROGRESS', name: 'In progress' },
@@ -323,6 +356,22 @@ export class EmployeeListComponent implements OnInit {
       }
     },
     {
+      colId: 'employment',
+      headerName: 'Employment',
+      width: 175,
+      filter: 'agTextColumnFilter',
+      valueGetter: (params: any) => this.employmentStatus(params.data),
+      cellRenderer: (params: any) => {
+        const b = this.employmentBadge(params.data);
+        const colours: Record<string, [string, string]> = {
+          'emp-probation': ['#1d4ed8', '#dbeafe'], 'emp-overdue': ['#b91c1c', '#fee2e2'], 'emp-confirmed': ['#047857', '#d1fae5'],
+          'emp-trainee': ['#7c3aed', '#ede9fe'], 'emp-contract': ['#b45309', '#fef3c7'], 'emp-permanent': ['#475569', '#f1f5f9'],
+        };
+        const [c, bg] = colours[b.cls];
+        return `<span title="${b.title}" style="background:${bg};color:${c};padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;">${b.label}</span>`;
+      }
+    },
+    {
       field: 'onboardingStatus',
       headerName: 'Onboarding',
       width: 150,
@@ -415,6 +464,9 @@ export class EmployeeListComponent implements OnInit {
     }
     if (this.filterOffboardingStatus) {
       list = list.filter(e => ((e as any).offboardingStatus || 'NONE') === this.filterOffboardingStatus);
+    }
+    if (this.filterEmploymentStatus) {
+      list = list.filter(e => this.employmentStatus(e) === this.filterEmploymentStatus);
     }
     if (this.searchText && this.searchText.trim()) {
       const q = this.searchText.toLowerCase().trim();
@@ -526,6 +578,10 @@ export class EmployeeListComponent implements OnInit {
       filterModel['offboardingStatus'] = { filterType: 'text', type: 'equals', filter: this.filterOffboardingStatus };
     }
 
+    if (this.filterEmploymentStatus) {
+      filterModel['employment'] = { filterType: 'text', type: 'equals', filter: this.filterEmploymentStatus };
+    }
+
     this.gridApi.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
   }
 
@@ -536,6 +592,7 @@ export class EmployeeListComponent implements OnInit {
     this.filterRole = null;
     this.filterOnboardingStatus = null;
     this.filterOffboardingStatus = null;
+    this.filterEmploymentStatus = null;
     this.onSearch();
     if (this.gridApi) {
       this.gridApi.setFilterModel(null);

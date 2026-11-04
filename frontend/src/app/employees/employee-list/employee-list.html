@@ -100,7 +100,16 @@
       </app-searchable-select>
     </div>
 
-    <button class="btn-clear-filters" (click)="clearFilters()" *ngIf="searchText || filterDepartmentId || filterDesignationId || filterRole || filterOnboardingStatus || filterOffboardingStatus">
+    <div class="filter-group">
+      <app-searchable-select
+        [options]="employmentStatusOptions"
+        placeholder="All Employment Statuses"
+        [value]="filterEmploymentStatus"
+        (valueChange)="filterEmploymentStatus = $event; applyFilters()">
+      </app-searchable-select>
+    </div>
+
+    <button class="btn-clear-filters" (click)="clearFilters()" *ngIf="searchText || filterDepartmentId || filterDesignationId || filterRole || filterOnboardingStatus || filterOffboardingStatus || filterEmploymentStatus">
       <svg lucideX size="14"></svg> Clear filters
     </button>
   </div>
@@ -148,6 +157,7 @@
           <span class="onboarding-badge" [ngClass]="'status-' + ((emp.onboardingStatus || 'active') | lowercase)">
             {{ emp.onboardingStatus || 'ACTIVE' }}
           </span>
+          <span class="employment-badge {{ employmentBadge(emp).cls }}" [title]="employmentBadge(emp).title">{{ employmentBadge(emp).label }}</span>
           <button type="button" class="btn-card-edit" (click)="$event.stopPropagation(); openDrawer(emp)">
             <span>View Profile</span>
             <svg lucideChevronRight size="13"></svg>

@@ -8,6 +8,11 @@
   </div>
 
   <div class="profile-layout" *ngIf="!isLoading()">
+    <!-- Employment / probation status (4 Nov 2026) -->
+    <div class="probation-strip" *ngIf="probationInfo() as p" [ngClass]="p.cls">
+      <span class="probation-strip-label">{{ p.label }}</span>
+      <span class="probation-strip-text">{{ p.text }}</span>
+    </div>
     <!-- Tabs Navigation -->
     <div class="tabs-container">
       <div class="tabs">
