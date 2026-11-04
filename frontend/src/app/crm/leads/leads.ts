@@ -957,6 +957,97 @@ isSubmitted = false;
 
 csvImporting = false;
 
+  /** Import/export apply to the active pipeline and its current filters, so
+   * the same controls work identically in Kanban and table view. */
+  leadCsvImporting = false;
+
+  onLeadCsvImportSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || this.leadCsvImporting) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const leads = this.parseLeadCsv(String(reader.result || ''));
+      if (!leads.length) {
+        this.toast.error('No valid lead rows found. Include a "Lead / Opportunity" or "Title" column.');
+        return;
+      }
+      if (!window.confirm(`Import ${leads.length} lead${leads.length === 1 ? '' : 's'} into the ${this.boardFlow === 'PRE_SALES' ? 'Pre-Sales' : 'Sales'} pipeline?`)) return;
+      this.leadCsvImporting = true;
+      this.http.post<any>(`${environment.apiUrl}/crm/leads/import`, { leads }).subscribe({
+        next: (result) => {
+          this.leadCsvImporting = false;
+          this.loadLeads();
+          if (result.skipped) {
+            this.toast.info(`Imported ${result.created}; skipped ${result.skipped}. ${result.errors?.[0]?.message || ''}`.trim());
+          } else {
+            this.toast.success(`Imported ${result.created} lead${result.created === 1 ? '' : 's'}.`);
+          }
+        },
+        error: (err) => {
+          this.leadCsvImporting = false;
+          this.toast.error(err?.error?.message || 'Failed to import leads.');
+        }
+      });
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  exportLeadsCsv() {
+    const leads = this.getFilteredLeads();
+    if (!leads.length) { this.toast.info('No leads to export.'); return; }
+    const columns: [string, (lead: Lead) => any][] = [
+      ['Lead ID', l => l.leadCode], ['Lead / Opportunity', l => l.title], ['Subject Line', l => l.subjectLine],
+      ['Category', l => l.dealCategory], ['Company', l => l.companyName], ['Contact Name', l => l.contactName],
+      ['Email', l => l.email], ['Phone', l => l.phone], ['Value', l => l.value], ['Currency', l => l.currency],
+      ['Stage', l => l.status], ['Source', l => l.source], ['Website', l => l.website], ['Address', l => l.address],
+      ['Expected Close Date', l => l.expectedCloseDate ? this.csvDate(l.expectedCloseDate) : ''],
+      ['Proposal Date', l => l.proposalDate ? this.csvDate(l.proposalDate) : ''], ['Description', l => l.description],
+      ['Qualification Reason', l => l.qualificationReason], ['Flow', () => this.boardFlow],
+      ['Assigned To ID', l => l.assignedTo?.id], ['Added By ID', l => l.addedBy?.id], ['Lead Contact ID', l => l.broughtByContact?.id],
+      ['Created At', l => l.createdAt ? this.csvDate(l.createdAt) : '']
+    ];
+    const csv = '\uFEFF' + [
+      columns.map(([header]) => this.escapeCsv(header)).join(','),
+      ...leads.map(lead => columns.map(([, get]) => this.escapeCsv(get(lead) ?? '')).join(','))
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `leads_${this.boardFlow.toLowerCase()}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  private parseLeadCsv(text: string): any[] {
+    const rows = this.parseCsvRows(text);
+    if (rows.length < 2) return [];
+    const headers = rows[0].map(h => h.replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ''));
+    const valueAt = (row: string[], ...names: string[]) => {
+      const index = names.map(name => headers.indexOf(name)).find(i => i >= 0) ?? -1;
+      return index >= 0 ? (row[index] || '').trim() : '';
+    };
+    return rows.slice(1).map(row => ({
+      leadCode: valueAt(row, 'leadid', 'leadcode'), title: valueAt(row, 'leadopportunity', 'title', 'lead'),
+      subjectLine: valueAt(row, 'subjectline'), dealCategory: valueAt(row, 'category', 'dealcategory'),
+      companyName: valueAt(row, 'company', 'companyname'), contactName: valueAt(row, 'contactname', 'contact'),
+      email: valueAt(row, 'email'), phone: valueAt(row, 'phone'), value: valueAt(row, 'value', 'dealvalue'),
+      currency: valueAt(row, 'currency'), status: valueAt(row, 'stage', 'status'), source: valueAt(row, 'source'),
+      website: valueAt(row, 'website'), address: valueAt(row, 'address'), expectedCloseDate: valueAt(row, 'expectedclosedate', 'closedate'),
+      proposalDate: valueAt(row, 'proposaldate'), description: valueAt(row, 'description'), qualificationReason: valueAt(row, 'qualificationreason'),
+      flow: valueAt(row, 'flow') || this.boardFlow, assignedToId: valueAt(row, 'assignedtoid', 'ownerid'),
+      addedById: valueAt(row, 'addedbyid'), broughtByContactId: valueAt(row, 'leadcontactid', 'broughtbycontactid'),
+      createdAt: valueAt(row, 'createdat', 'createddate')
+    })).filter(lead => !!lead.title);
+  }
+
+  private csvDate(value: string): string { return new Date(value).toISOString().slice(0, 10); }
+
   syncingContacts = false;
 
   onCsvImportSelected(event: any) {

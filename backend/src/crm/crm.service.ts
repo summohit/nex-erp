@@ -291,6 +291,87 @@ export class CrmService {
     return lead;
   }
 
+  /**
+   * Creates pipeline records from the CSV representation emitted by the board.
+   * Each row is isolated so one duplicate Lead ID or malformed row does not
+   * discard the rest of the import.  IDs are intentionally accepted only when
+   * they belong to this company, preventing a CSV from linking records across
+   * tenants.
+   */
+  async importLeads(companyId: number, creatorEmployeeId: number | null, leads: any[]) {
+    if (!Array.isArray(leads) || leads.length === 0) {
+      throw new BadRequestException('A non-empty leads array is required.');
+    }
+
+    const employeeIds = new Set((await this.prisma.employee.findMany({
+      where: { companyId }, select: { id: true },
+    })).map((employee) => employee.id));
+    const contactIds = new Set((await this.prisma.leadContact.findMany({
+      where: { companyId }, select: { id: true },
+    })).map((contact) => contact.id));
+
+    let created = 0;
+    const errors: { row: number; message: string }[] = [];
+    for (let index = 0; index < leads.length; index++) {
+      const raw = leads[index] || {};
+      const title = String(raw.title ?? '').trim();
+      if (!title) {
+        errors.push({ row: index + 2, message: 'Lead / Opportunity is required.' });
+        continue;
+      }
+
+      const idOrNull = (value: any, allowed: Set<number>) => {
+        const id = Number(value);
+        return Number.isInteger(id) && allowed.has(id) ? id : null;
+      };
+      const optionalDate = (value: any) => {
+        const text = String(value ?? '').trim();
+        if (!text) return undefined;
+        const date = new Date(text);
+        return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+      };
+      const value = String(raw.value ?? '').trim();
+      const numericValue = value === '' ? undefined : Number(value.replace(/,/g, ''));
+      if (numericValue !== undefined && !Number.isFinite(numericValue)) {
+        errors.push({ row: index + 2, message: 'Value must be a number.' });
+        continue;
+      }
+
+      try {
+        await this.createLead(companyId, {
+          leadCode: String(raw.leadCode ?? '').trim() || undefined,
+          title,
+          subjectLine: String(raw.subjectLine ?? '').trim() || undefined,
+          dealCategory: String(raw.dealCategory ?? '').trim() || undefined,
+          companyName: String(raw.companyName ?? '').trim() || undefined,
+          contactName: String(raw.contactName ?? '').trim() || undefined,
+          email: String(raw.email ?? '').trim() || undefined,
+          phone: String(raw.phone ?? '').trim() || undefined,
+          value: numericValue,
+          currency: String(raw.currency ?? '').trim() || undefined,
+          status: String(raw.status ?? '').trim() || 'New',
+          source: String(raw.source ?? '').trim() || undefined,
+          website: String(raw.website ?? '').trim() || undefined,
+          address: String(raw.address ?? '').trim() || undefined,
+          description: String(raw.description ?? '').trim() || undefined,
+          qualificationReason: String(raw.qualificationReason ?? '').trim() || undefined,
+          expectedCloseDate: optionalDate(raw.expectedCloseDate),
+          proposalDate: optionalDate(raw.proposalDate),
+          // Preserve original import/export chronology when it is supplied.
+          createdAt: optionalDate(raw.createdAt),
+          flow: raw.flow === 'PRE_SALES' ? 'PRE_SALES' : 'SALES',
+          assignedToId: idOrNull(raw.assignedToId, employeeIds),
+          addedById: idOrNull(raw.addedById, employeeIds) || creatorEmployeeId || null,
+          broughtByContactId: idOrNull(raw.broughtByContactId, contactIds),
+        }, creatorEmployeeId);
+        created++;
+      } catch (error: any) {
+        errors.push({ row: index + 2, message: error?.message || 'Unable to import this lead.' });
+      }
+    }
+    return { created, skipped: errors.length, total: leads.length, errors: errors.slice(0, 10) };
+  }
+
   async getLeads(
     companyId: number,
     user: { role?: string; employeeId?: number | null },

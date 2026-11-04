@@ -64,6 +64,11 @@ export class CrmController {
     return this.crmService.createLead(req.user.companyId, data, req.user.employeeId);
   }
 
+  @Post('leads/import')
+  importLeads(@Request() req, @Body() data: any) {
+    return this.crmService.importLeads(req.user.companyId, req.user.employeeId, data.leads);
+  }
+
   @Post('leads/sync-contacts')
   syncLeadContactLinks(@Request() req) {
     if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPERADMIN') {

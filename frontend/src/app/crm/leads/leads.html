@@ -49,6 +49,16 @@
         <span>Add Lead Contact</span>
       </button>
 
+      <input type="file" #leadCsvInput accept=".csv,text/csv" (change)="onLeadCsvImportSelected($event)" style="display:none" />
+      <button class="btn-header-secondary" (click)="leadCsvInput.click()" [disabled]="leadCsvImporting" title="Import lead records from CSV">
+        <svg lucideUpload size="15"></svg>
+        <span>{{ leadCsvImporting ? 'Importing...' : 'Import Leads' }}</span>
+      </button>
+      <button class="btn-header-secondary" (click)="exportLeadsCsv()" title="Export the leads currently shown by your filters">
+        <svg lucideDownload size="15"></svg>
+        <span>Export Leads</span>
+      </button>
+
       <!-- New Deal Button (Primary) -->
       <button class="btn-header-primary" (click)="openModal()" title="{{ boardFlow === 'PRE_SALES' ? 'Create New Pre-Sales Deal' : 'Create New Lead Opportunity' }}">
         <svg lucidePlus size="16"></svg>
