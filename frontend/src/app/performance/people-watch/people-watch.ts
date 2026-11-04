@@ -80,7 +80,9 @@ export class PeopleWatchComponent implements OnInit {
   @Input() initialSection: 'probation' | 'notice' | 'pip' = 'pip';
   /** Probation is hidden for now (19 Oct 2026); its own flow comes later. */
   // Probation flow (4 Nov 2026): policy in settings, no paid leave on probation, pro-rata leave on confirmation.
-  readonly showProbation = true;
+  /** Performance has its own Probation tab (4 Nov 2026): 'probation' shows only probation; 'others' shows notice and PIPs. */
+  @Input() mode: 'all' | 'probation' | 'others' = 'all';
+  get showProbation() { return this.mode !== 'others'; }
 
   // ── Manager's probation review; HR decides after it, Super Admin may skip it ──
   reviewRow = signal<LcProbation | null>(null);
@@ -282,7 +284,7 @@ export class PeopleWatchComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.section.set(this.initialSection);
+    this.section.set(this.mode === 'probation' ? 'probation' : this.initialSection);
     this.load();
   }
 

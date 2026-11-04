@@ -52,7 +52,7 @@ export class PerformanceComponent implements OnInit {
   private toast = inject(HotToastService);
   private datePipe = inject(DatePipe);
 
-  activeTab = signal<'goals' | 'reviews' | 'okrs' | 'cycles' | 'people'>('goals');
+  activeTab = signal<'goals' | 'reviews' | 'okrs' | 'cycles' | 'people' | 'probation'>('goals');
   private route = inject(ActivatedRoute);
   private lifecycle = inject(LifecycleService);
   /** Has a PIP of their own: sees the Probation & PIP tab for it. */
@@ -111,7 +111,9 @@ export class PerformanceComponent implements OnInit {
   }
 
   ngOnInit() {
-    if (this.route.snapshot.queryParamMap.get('tab') === 'people') this.activeTab.set('people');
+    const tab = this.route.snapshot.queryParamMap.get('tab');
+    if (tab === 'people') this.activeTab.set('people');
+    if (tab === 'probation') this.activeTab.set('probation');
     this.lifecycle.myPips().subscribe({ next: (l) => this.hasOwnPip.set(l.length > 0), error: () => {} });
     this.loadGoals();
     this.loadReviews();
@@ -121,7 +123,7 @@ export class PerformanceComponent implements OnInit {
     this.loadPeerRequests();
   }
 
-  setTab(tab: 'goals' | 'reviews' | 'okrs' | 'cycles' | 'people') {
+  setTab(tab: 'goals' | 'reviews' | 'okrs' | 'cycles' | 'people' | 'probation') {
     this.activeTab.set(tab);
   }
 

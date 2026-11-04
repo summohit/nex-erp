@@ -33,8 +33,8 @@
   </div>
 
   <ng-container *ngIf="!loading() && canSee() && data() as d">
-    <!-- Top KPI Stat Metric Cards -->
-    <div class="pw-stats">
+    <!-- Top KPI Stat Metric Cards (not on the Probation tab, which is one list) -->
+    <div class="pw-stats" *ngIf="mode !== 'probation'">
       <!-- 1. Probation Card -->
       <!-- Probation hidden for now (19 Oct 2026): it gets its own flow later. -->
       <button 
@@ -260,7 +260,7 @@
     </section>
 
     <!-- Section 2: Notice period -->
-    <section class="pw-card" *ngIf="section() === 'notice'">
+    <section class="pw-card" *ngIf="mode !== 'probation' && section() === 'notice'">
       <div class="pw-card-head">
         <div class="pw-card-title-group">
           <div class="pw-card-icon-tag notice-tag">
@@ -350,7 +350,7 @@
     </section>
 
     <!-- Section 3: Performance Improvement Plans -->
-    <section class="pw-card" *ngIf="section() === 'pip'">
+    <section class="pw-card" *ngIf="mode !== 'probation' && section() === 'pip'">
       <div class="pw-card-head">
         <div class="pw-card-title-group">
           <div class="pw-card-icon-tag pip-tag">
