@@ -1533,8 +1533,22 @@ export class OfferLettersService {
     // "Offer Letter" template is one. Same rule as an edited body
     // (applySalaryTable): a misplaced annexure beats a vanished one.
     if (withTable === merged && !omitAnnexure) {
-      this.logger.warn('Offer letter template has no salary-table placeholder; appending the annexure at the end.');
-      withTable = `${merged}${tableReplacement}`;
+      const section = `<section class="ol-annexure">
+        <div class="ol-annexure-title">Annexure – I</div>
+        <div class="ol-annexure-sub">Compensation Structure</div>
+        ${tableReplacement}
+        <p class="ol-annexure-note">All amounts in Indian Rupees. Income tax (TDS) and other statutory deductions are as per the law in force and the tax regime you choose.</p>
+      </section>`;
+      // A template that has its own "Annexure I" heading (e.g. "#Annexure I")
+      // gets the table there, in place of the heading and the blank lines under
+      // it. Otherwise it goes on its own page at the end.
+      const heading = /<(p|h[1-6]|div)[^>]*>(?:\s|&nbsp;|<\/?(?:strong|b|em|u|span)[^>]*>)*#?\s*Annexure\s*(?:[-–—]\s*)?(?:I|1)\b\s*[:.]?(?:\s|&nbsp;|<\/?(?:strong|b|em|u|span)[^>]*>)*<\/\1>(?:\s*<p[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>)*/i;
+      if (heading.test(merged)) {
+        withTable = merged.replace(heading, section);
+      } else {
+        this.logger.warn('Offer letter template has no salary-table placeholder; appending the annexure at the end.');
+        withTable = `${merged}${section}`;
+      }
     }
 
     return { html: withTable, header, footer, salaryTableHtml };
@@ -1921,6 +1935,59 @@ export class OfferLettersService {
     </table>`;
   }
 
+  /**
+   * The page the letter sits on: A4 sheet with margins and readable type, the
+   * company logo as a faint watermark on every page, and the annexure on its
+   * own page. For PDF the letterhead/footer come from Puppeteer's templates
+   * (pass inlineFooter null); for the HTML fallback they are put on the sheet.
+   */
+  private letterShell(body: string, header?: string, inlineFooter?: string | null): string {
+    if (/<html[\s>]/i.test(body)) return body;
+    // Blank paragraphs (<p>&nbsp;</p>, <p><br></p>, <p><strong>&nbsp;</strong></p>)
+    // become one short gap: runs of them were what left big holes in the page.
+    const blank = /<p[^>]*>(?:\s|&nbsp;|<br\s*\/?>|<\/?(?:strong|b|em|span)[^>]*>)*<\/p>/gi;
+    body = body.replace(blank, '<p class="ol-gap"></p>').replace(/(?:<p class="ol-gap"><\/p>\s*){2,}/g, '<p class="ol-gap ol-gap-lg"></p>');
+    const logo = (header || '').match(/<img[^>]+src="([^"]+)"/i)?.[1];
+    const forPdf = inlineFooter === null;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @page { size: A4; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-size: 10.5pt; line-height: 1.65; color: #1f2937; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @media screen { body { background: #eef2f7; padding: 28px 12px; } .ol-sheet { max-width: 210mm; margin: 0 auto; background: #fff; padding: 18mm 20mm; box-shadow: 0 10px 40px rgba(15, 23, 42, .12); border-radius: 4px; } }
+  @media print { .ol-sheet { padding: 0; } }
+  .ol-sheet { position: relative; }
+  .ol-content { position: relative; z-index: 1; }
+  .ol-watermark { position: fixed; top: 50%; left: 50%; width: 62%; max-width: 520px; transform: translate(-50%, -50%) rotate(-28deg); opacity: .045; z-index: 0; pointer-events: none; }
+  .ol-content p { margin: 0 0 9px; text-align: justify; }
+  /* Templates use blank lines for spacing; keep one short gap, drop the rest. */
+  .ol-content p:empty, .ol-content p:has(> br:only-child) { margin: 0; height: 10px; line-height: 0; overflow: hidden; }
+  .ol-content p:empty + p:empty, .ol-content p:has(> br:only-child) + p:has(> br:only-child) { display: none; }
+  .ol-content p.ol-gap { height: 6px; margin: 0; }
+  .ol-content p.ol-gap-lg { height: 30px; }
+  .ol-content h1, .ol-content h2, .ol-content h3, .ol-content h4 { color: #0f172a; margin: 18px 0 8px; line-height: 1.3; }
+  .ol-content p > strong:only-child, .ol-content p > b:only-child { display: inline-block; margin-top: 8px; color: #0f172a; }
+  .ol-content table { max-width: 100%; }
+  .ol-inline-head { border-bottom: 2px solid #ff5500; padding-bottom: 10px; margin-bottom: 22px; }
+  .ol-inline-foot { border-top: 1px solid #e5e7eb; padding-top: 10px; margin-top: 28px; font-size: 8.5pt; color: #6b7280; text-align: center; }
+  .ol-annexure { page-break-before: always; break-before: page; padding-top: 4px; }
+  @media screen { .ol-annexure { margin-top: 36px; padding-top: 28px; border-top: 1px dashed #cbd5e1; } }
+  .ol-annexure-title { font-size: 15pt; font-weight: 700; color: #0f172a; letter-spacing: .02em; }
+  .ol-annexure-sub { font-size: 9pt; text-transform: uppercase; letter-spacing: .12em; color: #ff5500; font-weight: 700; margin: 2px 0 10px; }
+  .ol-annexure-note { font-size: 8.5pt; color: #6b7280; margin-top: 10px; text-align: left; }
+</style></head><body>
+<div class="ol-sheet">
+  ${logo ? `<img class="ol-watermark" src="${logo}" alt="">` : ''}
+  <div class="ol-content">
+    ${forPdf ? '' : `<div class="ol-inline-head">${header || ''}</div>`}
+    ${body}
+    ${forPdf ? '' : `<div class="ol-inline-foot">${(inlineFooter || '').replace(/Page\s*<span class="pageNumber"><\/span>\s*of\s*<span class="totalPages"><\/span>/i, '')}</div>`}
+  </div>
+</div>
+</body></html>`;
+  }
+
   private async htmlToPdf(
     htmlContent: string,
     header?: string,
@@ -1929,12 +1996,23 @@ export class OfferLettersService {
     const hasChrome = !!(header || footer);
     try {
       const puppeteer = require('puppeteer');
-      const browser = await puppeteer.launch({
+      // Puppeteer's own Chrome may not be downloaded (local dev): use an
+      // installed Chrome when there is one, rather than falling back to HTML.
+      const systemChrome = [
+        process.env.PUPPETEER_EXECUTABLE_PATH,
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        '/usr/bin/google-chrome',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+      ].find((x) => x && fs.existsSync(x));
+      const launch = (executablePath?: string) => puppeteer.launch({
         headless: true,
+        executablePath,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
       });
+      const browser = await launch().catch((err: any) => (systemChrome ? launch(systemChrome) : Promise.reject(err)));
       const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      await page.setContent(this.letterShell(htmlContent, header, null), { waitUntil: 'networkidle0' });
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
@@ -1958,7 +2036,7 @@ export class OfferLettersService {
           'Install puppeteer to restore PDF output.',
         e instanceof Error ? e.stack : String(e),
       );
-      const inlined = `${header || ''}${htmlContent}${footer || ''}`;
+      const inlined = this.letterShell(htmlContent, header, footer);
       return { buffer: Buffer.from(inlined, 'utf-8'), isPdf: false };
     }
   }
