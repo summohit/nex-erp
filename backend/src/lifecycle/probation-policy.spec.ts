@@ -18,5 +18,9 @@ describe('probation policy', () => {
     expect(proRataDays(8, jul1)).toBe(4);    // 4.03
     expect(proRataDays(7, jul1)).toBe(3.5);  // 3.53
     expect(proRataDays(7, sep22, 'NEAREST')).toBe(2);
+    // Yash: probation ended 22 Sep, counted from 23 Sep (100 days left)
+    const sep23 = new Date('2026-09-23T00:00:00Z');
+    expect(proRataDays(10, sep23)).toBe(2.5); // 2.74
+    expect(proRataDays(7, sep23)).toBe(1.5);  // 1.92
   });
 });

@@ -357,7 +357,7 @@ export class LifecycleService {
     if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can confirm probation');
     const e = await this.prisma.employee.findFirst({
       where: { id: employeeId, companyId: v.companyId, probationEndDate: { not: null } },
-      select: { id: true, firstName: true, lastName: true, managerId: true, employmentCategory: true, employmentType: true, probationReview: true },
+      select: { id: true, firstName: true, lastName: true, managerId: true, employmentCategory: true, employmentType: true, probationReview: true, probationEndDate: true },
     });
     if (!e) throw new NotFoundException('This person is not on probation');
     // HR waits for the manager's review; a Super Admin may confirm without it.
@@ -375,7 +375,11 @@ export class LifecycleService {
         ...(permanent ? { employmentCategory: 'PERMANENT' } : {}),
       },
     });
-    const leaveCredited = await this.creditProRataLeave(v.companyId, e.id, confirmedOn);
+    // Leave counts from the day after probation ended (or the confirmation date,
+    // whichever is earlier), so a late decision by HR does not cost the employee leave.
+    const dayAfterEnd = e.probationEndDate ? new Date(e.probationEndDate.getTime() + 86400000) : confirmedOn;
+    const creditFrom = dayAfterEnd < confirmedOn ? dayAfterEnd : confirmedOn;
+    const leaveCredited = await this.creditProRataLeave(v.companyId, e.id, creditFrom);
     const letter = await this.letters.issueProbationLetter(v.companyId, e.id, 'CONFIRMATION', await this.actorUserId(v)).catch(() => null);
     const name = `${e.firstName} ${e.lastName ?? ''}`.trim();
     try {
