@@ -95,6 +95,12 @@ export class LeavesController {
     return this.leavesService.updateRequest(req.user.sub, req.user.role, id, data);
   }
 
+  /** Team Timeline override, Super Admin only (checked in the service). */
+  @Post('timeline-override')
+  overrideDay(@Request() req, @Body() body: { employeeId: number; date: string; status: string; note?: string }) {
+    return this.leavesService.overrideDay(req.user.sub, body);
+  }
+
   @Put('requests/:id/cancel')
   cancelRequest(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.leavesService.cancelRequest(req.user.sub, id);

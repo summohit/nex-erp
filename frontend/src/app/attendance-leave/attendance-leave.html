@@ -2228,12 +2228,13 @@
         <div class="form-group mb-4">
           <label>Override Status</label>
           <select class="form-control" [(ngModel)]="rescheduleForm.status">
-            <option value="PRESENT">Present</option>
-            <option value="ABSENT">Absent</option>
-            <option value="HALFDAY">Half Day</option>
-            <option value="ON_LEAVE">On Leave</option>
-            <option value="WEEKEND">Weekend / Off</option>
+            <option value="PRESENT">Present (office timing)</option>
+            <option value="ABSENT">Absent (loss of pay)</option>
+            <option value="HALF_DAY">Half Day</option>
           </select>
+          <small *ngIf="$any(rescheduleForm).onLeave" style="display:block;margin-top:6px;color:#b45309;">
+            This day is on approved leave. Applying cancels the leave for this day only and gives the day back to their balance.
+          </small>
         </div>
         <div class="form-group mb-4">
           <label>Reason / Note</label>

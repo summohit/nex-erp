@@ -4511,13 +4511,18 @@ export class AttendanceLeaveComponent implements OnInit {
   });
 
   openRescheduleModal(emp: any, date: Date, currentStatus: any) {
-    if (!this.isAdmin()) return; // only admins can reschedule/override
+    // Overriding a day (and cancelling leave on it) is the Super Admin's call.
+    const role = this.authService.currentUser()?.role;
+    if (role !== 'SUPERADMIN' && role !== 'SUPER_ADMIN') return;
+    if (date.getTime() > Date.now()) { this.toast.error("A future day can't be overridden yet"); return; }
     this.selectedTimelineEmp.set(emp);
     this.selectedTimelineDate.set(date);
+    const t = String(currentStatus?.type || '').toUpperCase();
     this.rescheduleForm = {
-      status: currentStatus && currentStatus.type ? currentStatus.type.toUpperCase() : 'PRESENT',
-      note: ''
-    };
+      status: t === 'ABSENT' ? 'ABSENT' : t === 'HALF-DAY' ? 'HALF_DAY' : 'PRESENT',
+      note: '',
+      onLeave: t === 'LEAVE',
+    } as any;
     this.showTimelineRescheduleModal.set(true);
   }
 
@@ -4530,19 +4535,24 @@ export class AttendanceLeaveComponent implements OnInit {
   submitReschedule() {
     if (!this.selectedTimelineEmp() || !this.selectedTimelineDate()) return;
     
-    const empId = this.selectedTimelineEmp().id;
-    const dateStr = this.selectedTimelineDate()!.toISOString().split('T')[0];
-    const payload = {
-      employeeId: empId,
+    const d = this.selectedTimelineDate()!;
+    // The local calendar day the cell shows (not UTC, which can be the day before in IST).
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const note = String(this.rescheduleForm.note || '').trim();
+    if (!note) { this.toast.error('Give a reason for the override'); return; }
+    this.leavesService.overrideDay({
+      employeeId: this.selectedTimelineEmp().id,
       date: dateStr,
       status: this.rescheduleForm.status,
-      note: this.rescheduleForm.note
-    };
-
-    // Assuming we had an override endpoint, simulate success for now
-    this.toast.success('Timeline rescheduled/overridden successfully');
-    this.closeRescheduleModal();
-    // this.loadTeamTimeline();
+      note,
+    }).subscribe({
+      next: (r) => {
+        this.toast.success(r.leavesChanged ? 'Leave cancelled for that day and attendance updated' : 'Attendance updated');
+        this.closeRescheduleModal();
+        this.loadTeamTimeline();
+      },
+      error: (e) => this.toast.error(e?.error?.message || 'Could not override this day'),
+    });
   }
 
   getTimelineStatus(emp: any, date: Date) {

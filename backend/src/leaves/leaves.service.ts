@@ -7,7 +7,7 @@ import { FieldVisitActivationService } from '../field-visits/requests/field-visi
 import { ApprovalsService } from '../approvals/approvals.service';
 import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
 import { isHrAdmin, isSuperAdmin } from '../common/company-roles';
-import { istDateKey } from '../common/timezone.util';
+import { istDateKey, istTimeInstant } from '../common/timezone.util';
 
 /** One employee's figures for a single leave type in the quota report. */
 export interface QuotaCell {
@@ -724,6 +724,105 @@ export class LeavesService {
 
       return updatedRequest;
     });
+  }
+
+  /**
+   * Team Timeline override (Super Admin): set one day to Present, Absent or
+   * Half Day. If an approved leave covers the day it is cancelled for that day
+   * only, past days included (the approval is overridden), and the day's
+   * balance is given back. Present = the shift's office start to end time.
+   */
+  async overrideDay(
+    actorUserId: number,
+    body: { employeeId: number; date: string; status: string; note?: string },
+  ) {
+    const actor = await this.prisma.user.findUnique({ where: { id: actorUserId }, select: { role: true, companyId: true } });
+    if (!actor || !isSuperAdmin(actor.role)) throw new ForbiddenException('Only a Super Admin can override attendance.');
+    const status = body.status === 'HALFDAY' ? 'HALF_DAY' : String(body.status || '').toUpperCase();
+    if (!['PRESENT', 'ABSENT', 'HALF_DAY'].includes(status)) throw new BadRequestException('Pick Present, Absent or Half Day.');
+    const note = String(body.note || '').trim().slice(0, 500);
+    if (!note) throw new BadRequestException('Give a reason for the override.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.date))) throw new BadRequestException('Pick a valid date.');
+    const day = new Date(`${body.date}T00:00:00.000Z`);
+    if (day > new Date(`${istDateKey(new Date())}T00:00:00.000Z`)) throw new BadRequestException("A day in the future can't be marked yet.");
+
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: Number(body.employeeId), companyId: actor.companyId },
+      include: { shift: { select: { id: true, startTime: true, endTime: true } } },
+    });
+    if (!employee) throw new BadRequestException('Employee not found');
+
+    const DAY = 86400000;
+    const prev = new Date(day.getTime() - DAY);
+    const next = new Date(day.getTime() + DAY);
+    const start = employee.shift?.startTime || '09:30';
+    const end = employee.shift?.endTime || '18:30';
+    const inAt = istTimeInstant(day, start);
+    let outAt = istTimeInstant(day, end);
+    if (outAt <= inAt) outAt = new Date(outAt.getTime() + DAY); // night shift
+    const halfOut = new Date(inAt.getTime() + (outAt.getTime() - inAt.getTime()) / 2);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const leaves = await tx.leaveRequest.findMany({
+        where: { employeeId: employee.id, status: 'APPROVED', deletedAt: null, startDate: { lte: day }, endDate: { gte: day } },
+      });
+      for (const l of leaves) {
+        const single = l.startDate.getTime() === l.endDate.getTime();
+        if (single) {
+          await tx.leaveRequest.update({ where: { id: l.id }, data: { status: 'CANCELLED', rejectionReason: `Overridden by Super Admin: ${note}` } });
+        } else if (l.startDate.getTime() === day.getTime()) {
+          await tx.leaveRequest.update({ where: { id: l.id }, data: { startDate: next } });
+        } else if (l.endDate.getTime() === day.getTime()) {
+          await tx.leaveRequest.update({ where: { id: l.id }, data: { endDate: prev } });
+        } else {
+          // The day is in the middle: keep both sides as approved leave.
+          await tx.leaveRequest.update({ where: { id: l.id }, data: { endDate: prev } });
+          const { id, createdAt, updatedAt, ...rest } = l as any;
+          await tx.leaveRequest.create({ data: { ...rest, startDate: next } });
+        }
+        await tx.leaveBalance.updateMany({
+          where: { employeeId: employee.id, leaveTypeId: l.leaveTypeId, year: day.getUTCFullYear() },
+          data: { used: { decrement: l.isHalfDay ? 0.5 : 1 } },
+        });
+      }
+      if (leaves.length) {
+        await this.fieldVisits.restoreStandingShiftAfterLeave(tx, { employeeId: employee.id, companyId: employee.companyId, from: day, to: day });
+      }
+
+      const record = {
+        status,
+        clockIn: status === 'ABSENT' ? null : inAt,
+        clockOut: status === 'ABSENT' ? null : status === 'HALF_DAY' ? halfOut : outAt,
+        isLate: false,
+        isEarlyLeave: false,
+        missedClockOut: false,
+        autoClockedOut: false,
+        clockOutApproval: 'APPROVED',
+        clockOutApprovedById: actorUserId,
+        clockOutApprovedAt: new Date(),
+        clockOutReason: `Override by Super Admin: ${note}`,
+        shiftId: employee.shift?.id ?? null,
+      };
+      const attendance = await tx.attendance.upsert({
+        where: { employeeId_date: { employeeId: employee.id, date: day } },
+        update: record,
+        create: { employeeId: employee.id, date: day, ...record },
+      });
+      return { attendance, leavesChanged: leaves.length };
+    });
+
+    if (employee.userId) {
+      const label = status === 'HALF_DAY' ? 'Half Day' : status === 'PRESENT' ? 'Present' : 'Absent';
+      await this.notificationsService.createNotification(
+        employee.userId,
+        'Attendance updated',
+        `${body.date} was set to ${label} by a Super Admin${result.leavesChanged ? ' (your leave for that day was cancelled)' : ''}. Reason: ${note}`,
+        'ATTENDANCE',
+        '/attendance',
+        employee.companyId,
+      ).catch(() => undefined);
+    }
+    return result;
   }
 
   /**

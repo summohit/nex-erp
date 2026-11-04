@@ -173,6 +173,11 @@ export class LeavesService {
     return this.http.put<LeaveRequest>(`${this.apiUrl}/requests/${id}`, data);
   }
 
+  /** Team Timeline override (Super Admin): Present / Absent / Half Day; cancels that day's approved leave. */
+  overrideDay(body: { employeeId: number; date: string; status: string; note: string }) {
+    return this.http.post<{ leavesChanged: number }>(`${this.apiUrl}/timeline-override`, body);
+  }
+
   cancelRequest(id: number) {
     return this.http.put<LeaveRequest>(`${this.apiUrl}/requests/${id}/cancel`, {});
   }
