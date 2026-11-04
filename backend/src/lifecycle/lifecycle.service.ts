@@ -2,10 +2,12 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { LettersService } from '../letters/letters.service';
+import { OffboardingService } from '../offboarding/offboarding.service';
 import { isHrAdmin, isSuperAdmin } from '../common/company-roles';
 import { normalisePolicy, ProbationPolicy, probationEndFrom, probationMonthsFor, proRataDays } from './probation-policy';
 
-type Viewer = { companyId: number; role: string; employeeId: number | null };
+type Viewer = { companyId: number; role: string; employeeId: number | null; userId?: number };
 
 const PERSON = {
   id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true, managerId: true,
@@ -28,7 +30,55 @@ export class LifecycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly letters: LettersService,
+    private readonly offboarding: OffboardingService,
   ) {}
+
+  /** The acting user's id, for "issued by" on letters. */
+  private async actorUserId(v: Viewer): Promise<number | undefined> {
+    if (v.userId) return v.userId;
+    if (!v.employeeId) return undefined;
+    const e = await this.prisma.employee.findUnique({ where: { id: v.employeeId }, select: { userId: true } });
+    return e?.userId ?? undefined;
+  }
+
+  /**
+   * Probation not confirmed: offboarding starts with the probation notice
+   * period (offer-letter settings, default 2 months), the separation is
+   * approved, and the non-confirmation letter is issued.
+   */
+  async notConfirmProbation(v: Viewer, employeeId: number, body: { reason?: string; lastWorkingDay?: string }) {
+    if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins decide a probation');
+    const e = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId: v.companyId, probationEndDate: { not: null }, probationConfirmedAt: null },
+      select: { id: true, managerId: true, probationReview: true },
+    });
+    if (!e) throw new NotFoundException('This person is not on probation');
+    if (!e.probationReview && e.managerId && !isSuperAdmin(v.role)) {
+      throw new BadRequestException("Waiting for the manager's probation review. A Super Admin can decide without it.");
+    }
+    const reason = String(body?.reason || '').trim();
+    if (reason.length < 10) throw new BadRequestException('Give the reason (at least 10 characters).');
+    let lwd: Date;
+    if (body?.lastWorkingDay) {
+      lwd = this.parseDate(body.lastWorkingDay, 'lastWorkingDay');
+    } else {
+      const s = await this.prisma.systemSetting.findUnique({ where: { companyId: v.companyId }, select: { offerLetterConfig: true } });
+      const months = Number((s?.offerLetterConfig as any)?.probationNoticeMonths) || 2;
+      const t = this.todayUtc();
+      lwd = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + months, t.getUTCDate()));
+    }
+    const resignation = await this.offboarding.submitResignation(v.companyId, e.id, {
+      reason: `Probation not confirmed: ${reason}`,
+      intendedLastWorkingDay: lwd,
+    });
+    const userId = await this.actorUserId(v);
+    await this.offboarding.updateResignationStatus(v.companyId, resignation.id, userId!, 'APPROVED', lwd, 'Probation not confirmed', { role: v.role, employeeId: v.employeeId });
+    // Off the probation list: decided.
+    await this.prisma.employee.update({ where: { id: e.id }, data: { probationEndDate: null, probationReview: Prisma.DbNull } });
+    const letter = await this.letters.issueProbationLetter(v.companyId, e.id, 'SEPARATION', userId).catch(() => null);
+    return { ok: true, lastWorkingDay: lwd, resignationId: resignation.id, letterId: letter?.id ?? null };
+  }
 
   private todayUtc(): Date {
     const ist = new Date(Date.now() + 330 * 60_000);
@@ -234,6 +284,20 @@ export class LifecycleService {
     return review;
   }
 
+  /** The signed-in employee's own probation, for the dashboard card and the leave form. */
+  async myProbation(v: Viewer) {
+    if (!v.employeeId) return { onProbation: false };
+    const e = await this.prisma.employee.findUnique({
+      where: { id: v.employeeId },
+      select: { probationEndDate: true, probationConfirmedAt: true, joiningDate: true, probationExtensions: true },
+    });
+    if (!e?.probationEndDate || e.probationConfirmedAt) return { onProbation: false, confirmedAt: e?.probationConfirmedAt ?? null };
+    return {
+      onProbation: true, endDate: e.probationEndDate, daysLeft: this.daysLeft(e.probationEndDate),
+      joiningDate: e.joiningDate, extensions: e.probationExtensions,
+    };
+  }
+
   /** Put on probation, or change the end date: by months from joining (or today), or a date. */
   async setProbation(v: Viewer, employeeId: number, body: { months?: number; endDate?: string; reason?: string }) {
     if (!isHrAdmin(v.role)) throw new ForbiddenException('Only HR and admins can set probation');
@@ -266,7 +330,13 @@ export class LifecycleService {
       // An extension starts a new review period.
       data: { probationEndDate: end, probationConfirmedAt: null, ...(extending ? { probationExtensions: { increment: 1 }, probationReview: Prisma.DbNull } : {}) },
     });
+    let letterId: number | null = null;
     if (extending) {
+      const reasonText = String(body?.reason || '').trim();
+      const letter = await this.letters.issueProbationLetter(v.companyId, e.id, 'EXTENSION', await this.actorUserId(v), {
+        '##EXTENSION_REASON##': reasonText ? `Reason: ${reasonText}` : '',
+      }).catch(() => null);
+      letterId = letter?.id ?? null;
       try {
         await this.notifications.notifyEmployees([e.id], {
           companyId: v.companyId, title: 'Probation extended',
@@ -275,7 +345,7 @@ export class LifecycleService {
         });
       } catch { /* extension stands */ }
     }
-    return { employeeId: e.id, endDate: end, daysLeft: this.daysLeft(end), extended: extending };
+    return { employeeId: e.id, endDate: end, daysLeft: this.daysLeft(end), extended: extending, letterId };
   }
 
   /**
@@ -306,6 +376,7 @@ export class LifecycleService {
       },
     });
     const leaveCredited = await this.creditProRataLeave(v.companyId, e.id, confirmedOn);
+    const letter = await this.letters.issueProbationLetter(v.companyId, e.id, 'CONFIRMATION', await this.actorUserId(v)).catch(() => null);
     const name = `${e.firstName} ${e.lastName ?? ''}`.trim();
     try {
       await this.notifications.notifyEmployees([e.id], {
@@ -323,7 +394,7 @@ export class LifecycleService {
         });
       }
     } catch { /* the confirmation stands even if a notification fails */ }
-    return { ok: true, madePermanent: permanent, leaveCredited };
+    return { ok: true, madePermanent: permanent, leaveCredited, letterId: letter?.id ?? null };
   }
 
   /** Make someone permanent without a probation (Trainee or Contract today). */

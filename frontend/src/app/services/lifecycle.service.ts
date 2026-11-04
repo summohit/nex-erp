@@ -51,11 +51,17 @@ export class LifecycleService {
   private url = `${environment.apiUrl}/lifecycle`;
 
   overview(): Observable<LcOverview> { return this.http.get<LcOverview>(`${this.url}/overview`); }
-  setProbation(employeeId: number, body: { months?: number; endDate?: string }) { return this.http.put(`${this.url}/probation/${employeeId}`, body); }
+  setProbation(employeeId: number, body: { months?: number; endDate?: string; reason?: string }) { return this.http.put(`${this.url}/probation/${employeeId}`, body); }
   getProbationPolicy(): Observable<ProbationPolicy> { return this.http.get<ProbationPolicy>(`${this.url}/probation-policy`); }
   saveProbationPolicy(p: ProbationPolicy): Observable<ProbationPolicy> { return this.http.put<ProbationPolicy>(`${this.url}/probation-policy`, p); }
   reviewProbation(employeeId: number, body: { rating: string; recommendation: string; comments: string; extendMonths?: number }) {
     return this.http.post<ProbationReview>(`${this.url}/probation/${employeeId}/review`, body);
+  }
+  myProbation(): Observable<{ onProbation: boolean; endDate?: string; daysLeft?: number | null; extensions?: number }> {
+    return this.http.get<any>(`${this.url}/probation/me`);
+  }
+  notConfirmProbation(employeeId: number, body: { reason: string; lastWorkingDay?: string }) {
+    return this.http.post<{ lastWorkingDay: string }>(`${this.url}/probation/${employeeId}/not-confirm`, body);
   }
   confirmProbation(employeeId: number, makePermanent = false) { return this.http.post(`${this.url}/probation/${employeeId}/confirm`, { makePermanent }); }
   makePermanent(employeeId: number) { return this.http.post(`${this.url}/employees/${employeeId}/make-permanent`, {}); }

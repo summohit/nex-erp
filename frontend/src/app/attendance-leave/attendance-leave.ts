@@ -9,6 +9,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { AttendanceService, AttendanceRecord, Shift } from '../services/attendance';
 import { LeavesService, LeaveBalance, LeaveRequest } from '../services/leaves';
+import { LifecycleService } from '../services/lifecycle.service';
 import { MasterDataService, Holiday, LeaveType } from '../services/master-data.service';
 import { EmployeeService, Employee } from '../services/employee.service';
 import { ShiftsService } from '../services/shifts.service';
@@ -132,6 +133,9 @@ export class AttendanceLeaveComponent implements OnInit {
   private router = inject(Router);
   private attendanceService = inject(AttendanceService);
   private leavesService = inject(LeavesService);
+  private lifecycleApi = inject(LifecycleService);
+  /** The signed-in person's probation, for the Request Leave notice (no paid leave on probation). */
+  myProbation = signal<{ onProbation: boolean; endDate?: string } | null>(null);
   private http = inject(HttpClient);
   private masterDataService = inject(MasterDataService);
   private employeeService = inject(EmployeeService);
@@ -535,6 +539,13 @@ export class AttendanceLeaveComponent implements OnInit {
   showTimelineRescheduleModal = signal(false);
   selectedTimelineEmp = signal<any>(null);
   selectedTimelineDate = signal<Date | null>(null);
+  private probationLoaded = false;
+  loadMyProbation() {
+    if (this.probationLoaded) return;
+    this.probationLoaded = true;
+    this.lifecycleApi.myProbation().subscribe({ next: (r) => this.myProbation.set(r), error: () => {} });
+  }
+
   rescheduleForm = {
     status: 'PRESENT',
     note: ''
@@ -3434,6 +3445,7 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.loadMyProbation();
     // Deep link from the ticket form: ?regularize=1 opens the request form.
     if (this.route.snapshot.queryParamMap.get('regularize')) {
       setTimeout(() => this.openRegularizationModal(), 300);

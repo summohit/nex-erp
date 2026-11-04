@@ -17,6 +17,8 @@ export const MERGE_TAGS: { tag: string; label: string; group: string }[] = [
   { tag: '##EMPLOYEE_EXIT_DATE##', label: 'Exit Date', group: 'Employee' },
   { tag: '##EMPLOYEE_NOTICE_PERIOD_START_DATE##', label: 'Notice Start', group: 'Employee' },
   { tag: '##EMPLOYEE_NOTICE_PERIOD_END_DATE##', label: 'Notice End', group: 'Employee' },
+  { tag: '##PROBATION_END_DATE##', label: 'Probation End Date', group: 'Employee' },
+  { tag: '##CONFIRMATION_DATE##', label: 'Confirmation Date', group: 'Employee' },
   { tag: '##COMPANY_NAME##', label: 'Company Name', group: 'Company' },
   { tag: '##CONTACT_ADDRESS##', label: 'Company Address', group: 'Company' },
   { tag: '##CURRENT_DATE##', label: "Today's Date", group: 'Company' },
@@ -62,6 +64,43 @@ export const CANDIDATE_MERGE_TAGS: { tag: string; label: string; group: string }
   { tag: '##CONTACT_ADDRESS##', label: 'Company Address', group: 'Company' },
   { tag: '##CURRENT_DATE##', label: 'Issue Date', group: 'Company' },
 ];
+
+/** Standard probation letters, created as templates the first time they are needed. */
+const PROBATION_LETTERS = {
+  CONFIRMATION: {
+    title: 'Probation Confirmation Letter',
+    description: 'Issued automatically when probation is confirmed.',
+    body: `<p>##CURRENT_DATE##</p><p><strong>##EMPLOYEE_NAME##</strong><br>##EMPLOYEE_DESIGNATION##, ##EMPLOYEE_DEPARTMENT##<br>Employee Code: ##EMPLOYEE_ID##</p>
+<p><strong>Subject: Confirmation of Employment</strong></p>
+<p>Dear ##EMPLOYEE_NAME##,</p>
+<p>We are pleased to inform you that, on successful completion of your probation period, your employment with ##COMPANY_NAME## is confirmed with effect from <strong>##CONFIRMATION_DATE##</strong>.</p>
+<p>All other terms and conditions of your appointment remain unchanged. From the date of confirmation you are entitled to leave as per company policy, and the notice period applicable to confirmed employees applies.</p>
+<p>We appreciate your contribution and look forward to your continued growth with us.</p>
+<p>Sincerely,</p><p><strong>##SIGNATORY##</strong><br>##SIGNATORY_DESIGNATION##<br>##COMPANY_NAME##</p>`,
+  },
+  EXTENSION: {
+    title: 'Probation Extension Letter',
+    description: 'Issued automatically when probation is extended.',
+    body: `<p>##CURRENT_DATE##</p><p><strong>##EMPLOYEE_NAME##</strong><br>##EMPLOYEE_DESIGNATION##, ##EMPLOYEE_DEPARTMENT##<br>Employee Code: ##EMPLOYEE_ID##</p>
+<p><strong>Subject: Extension of Probation Period</strong></p>
+<p>Dear ##EMPLOYEE_NAME##,</p>
+<p>Further to the review of your performance during the probation period, your probation has been extended until <strong>##PROBATION_END_DATE##</strong>.</p>
+<p>##EXTENSION_REASON##</p>
+<p>During the extended period your performance will be reviewed again. The terms of probation, including leave and notice period, continue to apply.</p>
+<p>Sincerely,</p><p><strong>##SIGNATORY##</strong><br>##SIGNATORY_DESIGNATION##<br>##COMPANY_NAME##</p>`,
+  },
+  SEPARATION: {
+    title: 'Probation Non-Confirmation Letter',
+    description: 'Issued automatically when probation is not confirmed.',
+    body: `<p>##CURRENT_DATE##</p><p><strong>##EMPLOYEE_NAME##</strong><br>##EMPLOYEE_DESIGNATION##, ##EMPLOYEE_DEPARTMENT##<br>Employee Code: ##EMPLOYEE_ID##</p>
+<p><strong>Subject: Non-Confirmation of Employment</strong></p>
+<p>Dear ##EMPLOYEE_NAME##,</p>
+<p>Following the review of your performance during the probation period, we regret to inform you that your employment will not be confirmed.</p>
+<p>As per the terms of your appointment, your last working day with ##COMPANY_NAME## will be <strong>##EMPLOYEE_EXIT_DATE##</strong>. Please complete the handover and exit formalities before this date. Your full and final settlement will be processed as per company policy.</p>
+<p>We thank you for your efforts and wish you the best for the future.</p>
+<p>Sincerely,</p><p><strong>##SIGNATORY##</strong><br>##SIGNATORY_DESIGNATION##<br>##COMPANY_NAME##</p>`,
+  },
+} as const;
 
 @Injectable()
 export class LettersService {
@@ -201,6 +240,8 @@ export class LettersService {
       '##EMPLOYEE_EXIT_DATE##': fmtDate(lastDay),
       '##EMPLOYEE_NOTICE_PERIOD_START_DATE##': fmtDate(resignation?.createdAt),
       '##EMPLOYEE_NOTICE_PERIOD_END_DATE##': fmtDate(lastDay),
+      '##PROBATION_END_DATE##': fmtDate(e.probationEndDate),
+      '##CONFIRMATION_DATE##': fmtDate(e.probationConfirmedAt),
       '##COMPANY_NAME##': (company as any)?.name || '',
       '##CONTACT_ADDRESS##': (company as any)?.address || '',
       '##CURRENT_DATE##': fmtDate(new Date()),
@@ -471,6 +512,29 @@ export class LettersService {
    * swallowed per template: a letter that cannot render must never roll back
    * or block the hire itself.
    */
+  /**
+   * Issue the letter for a probation decision (4 Nov 2026). Uses the company's
+   * template of that title (editable in Settings → Letter Templates); the
+   * first time, a standard template is created so the letter always goes out.
+   */
+  async issueProbationLetter(companyId: number, employeeId: number, kind: 'CONFIRMATION' | 'EXTENSION' | 'SEPARATION', issuedById?: number, extra?: Record<string, string>) {
+    const std = PROBATION_LETTERS[kind];
+    let template = await this.prisma.letterTemplate.findFirst({ where: { companyId, title: std.title } });
+    if (!template) {
+      template = await this.prisma.letterTemplate.create({
+        data: { companyId, title: std.title, body: std.body, description: std.description, isActive: true, autoOnOnboarding: false },
+      });
+    }
+    if (!template.isActive) return null; // HR switched this letter off
+    const signer = issuedById
+      ? await this.prisma.employee.findFirst({ where: { userId: issuedById, companyId }, select: { id: true } })
+      : null;
+    const values = { ...(await this.buildValues(companyId, employeeId, signer?.id)), ...(extra || {}) };
+    return this.prisma.generatedLetter.create({
+      data: { companyId, employeeId, templateId: template.id, title: template.title, body: this.render(template.body, values), issuedById: issuedById ?? null },
+    });
+  }
+
   async generateOnboardingLetters(companyId: number, employeeId: number, issuedById?: number) {
     const templates = await this.prisma.letterTemplate.findMany({
       where: { companyId, isActive: true, autoOnOnboarding: true },

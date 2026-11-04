@@ -9,11 +9,16 @@ export class LifecycleController {
   constructor(private readonly svc: LifecycleService) {}
 
   private v(req: any) {
-    return { companyId: req.user.companyId, role: req.user.role, employeeId: req.user.employeeId ?? null };
+    return { companyId: req.user.companyId, role: req.user.role, employeeId: req.user.employeeId ?? null, userId: req.user.sub };
   }
 
   @Get('overview')
   overview(@Request() req) { return this.svc.overview(this.v(req)); }
+
+  @Get('probation/me')
+  myProbation(@Request() req) {
+    return this.svc.myProbation(this.v(req));
+  }
 
   @Get('probation-policy')
   getPolicy(@Request() req) {
@@ -33,6 +38,11 @@ export class LifecycleController {
   @Post('probation/:employeeId/review')
   reviewProbation(@Request() req, @Param('employeeId', ParseIntPipe) id: number, @Body() body: any) {
     return this.svc.reviewProbation(this.v(req), id, body ?? {});
+  }
+
+  @Post('probation/:employeeId/not-confirm')
+  notConfirm(@Request() req, @Param('employeeId', ParseIntPipe) id: number, @Body() body: { reason?: string; lastWorkingDay?: string }) {
+    return this.svc.notConfirmProbation(this.v(req), id, body ?? {});
   }
 
   @Post('probation/:employeeId/confirm')

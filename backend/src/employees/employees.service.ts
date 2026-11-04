@@ -1,3 +1,4 @@
+import { normalisePolicy, probationEndFrom, probationMonthsFor } from '../lifecycle/probation-policy';
 import { lockJobCapacity, closeFilledJobs } from '../recruitment/job-capacity';
 import { ALL_DOCUMENT_TYPES } from './profile-completeness/profile-documents';
 import { Injectable, ConflictException, NotFoundException, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
@@ -251,6 +252,12 @@ export class EmployeesService {
 
     const employmentCategory = data.employmentCategory || 'PERMANENT';
 
+    // Probation from the company policy (4 Nov 2026), from the joining date.
+    const joinedOn = data.joiningDate ? new Date(data.joiningDate) : new Date();
+    const policySetting = await this.prisma.systemSetting.findUnique({ where: { companyId }, select: { probationPolicy: true } });
+    const probationMonths = probationMonthsFor(normalisePolicy(policySetting?.probationPolicy), employmentCategory);
+    const probationEnd = probationMonths > 0 && !isNaN(joinedOn.getTime()) ? probationEndFrom(joinedOn, probationMonths) : null;
+
     // 4. Create User and Employee in one transaction
     return this.prisma.$transaction(async (prisma) => {
       const newUser = await prisma.user.create({
@@ -278,7 +285,9 @@ export class EmployeesService {
           userId: newUser.id,
           onboardingStatus: 'PENDING',
           employeeCode,
-          employmentCategory
+          employmentCategory,
+          ...(!isNaN(joinedOn.getTime()) ? { joiningDate: joinedOn } : {}),
+          ...(probationEnd ? { probationEndDate: probationEnd, employmentType: 'On Probation' } : {}),
         },
         include: {
           user: { select: { email: true, role: true } },

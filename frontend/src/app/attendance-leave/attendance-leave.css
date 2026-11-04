@@ -5332,3 +5332,5 @@
 .tl-drawer-foot { display: flex; gap: 10px; padding: 16px 24px; border-top: 1px solid #eef2f7; background: #fff; }
 .tl-drawer-foot .btn { flex: 1; height: 44px; border-radius: 10px; font-weight: 600; }
 .tl-drawer-foot .btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+.probation-leave-note { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 13px; }

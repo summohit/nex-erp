@@ -7,6 +7,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 @Module({
   imports: [PrismaModule, NotificationsModule],
   controllers: [OffboardingController],
-  providers: [OffboardingService]
+  providers: [OffboardingService],
+  exports: [OffboardingService]
 })
 export class OffboardingModule {}

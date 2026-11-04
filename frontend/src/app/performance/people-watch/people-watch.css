@@ -2266,3 +2266,5 @@
 .pw-input { width: 100%; border: 1px solid #cbd5e1; border-radius: 9px; padding: 8px 10px; font-size: 13.5px; font-family: inherit; }
 .pw-policy-note { padding: 0 24px; }
 .pw-actions { flex-wrap: wrap; justify-content: flex-end; }
+.pw-btn.danger { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
+.pw-btn.danger:hover { background: #fee2e2; }

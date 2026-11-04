@@ -237,6 +237,9 @@
               <svg lucideCheck size="13"></svg>
               <span>Make permanent</span>
             </button>
+              <button type="button" class="pw-btn btn-sm danger" (click)="openNotConfirm(r)" title="Not confirmed: start separation with probation notice">
+                <span>Not confirm</span>
+              </button>
             </ng-container>
             <button 
               type="button" 
@@ -664,6 +667,12 @@
       </div>
 
       <!-- 5. Calculated End Date Preview Banner -->
+      <!-- Moving an open probation later is an extension: a letter goes out with this reason -->
+      <div class="pw-field-group" *ngIf="probEditingEnd">
+        <label class="pw-field-label">Reason for the change (printed on the extension letter)</label>
+        <textarea class="pw-input" rows="2" maxlength="500" [(ngModel)]="probReason" placeholder="e.g. Needs more time on client delivery and documentation."></textarea>
+      </div>
+
       <div class="pw-preview-banner" *ngIf="probPreview()">
         <div class="preview-banner-icon">
           <svg lucideCalendar size="18"></svg>
@@ -1269,6 +1278,34 @@
     <div class="pw-dialog-footer" style="display:flex;gap:8px;justify-content:flex-end;">
       <button type="button" class="pw-btn" (click)="reviewRow.set(null)">Cancel</button>
       <button type="button" class="pw-btn primary" (click)="saveReview()" [disabled]="busy()">Submit review</button>
+    </div>
+  </div>
+</div>
+
+<!-- Probation not confirmed (4 Nov 2026) -->
+<div class="pw-overlay" *ngIf="notConfirmRow() as r" (click)="notConfirmRow.set(null)">
+  <div class="pw-dialog" (click)="$event.stopPropagation()">
+    <div class="pw-dialog-header">
+      <div class="pw-dialog-title-wrap">
+        <div class="pw-dialog-icon-bubble probation-bubble"><svg lucideFileText size="20"></svg></div>
+        <div>
+          <h3>Not confirm: {{ r.name }}</h3>
+          <p class="pw-dialog-subtitle">Starts separation with the probation notice period and issues the non-confirmation letter.</p>
+        </div>
+      </div>
+      <button type="button" class="pw-btn ghost btn-icon" (click)="notConfirmRow.set(null)" aria-label="Close">✕</button>
+    </div>
+    <div class="pw-review-form">
+      <div class="pw-review-label">Reason <span style="color:#dc2626">*</span></div>
+      <textarea class="pw-input" rows="3" maxlength="1000" [(ngModel)]="notConfirmReason" placeholder="Why the probation is not being confirmed."></textarea>
+      <label class="pw-review-label">Last working day (leave empty for the probation notice period, default 2 months)
+        <input type="date" class="pw-input" [(ngModel)]="notConfirmLwd">
+      </label>
+      <p class="pw-policy-note" style="padding:0" *ngIf="!r.review && data()?.canOverrideReview">No manager review yet — you are deciding as Super Admin.</p>
+    </div>
+    <div class="pw-dialog-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="pw-btn" (click)="notConfirmRow.set(null)">Cancel</button>
+      <button type="button" class="pw-btn danger" (click)="saveNotConfirm()" [disabled]="busy()">Not confirm &amp; start separation</button>
     </div>
   </div>
 </div>

@@ -182,6 +182,25 @@ export class PeopleWatchComponent implements OnInit {
   probEmployeeName = '';
   probMonths = 6;
   probDate = '';
+  probReason = '';
+  /** Changing an existing probation's date (an extension if later). */
+  probEditingEnd = false;
+
+  notConfirmRow = signal<LcProbation | null>(null);
+  notConfirmReason = '';
+  notConfirmLwd = '';
+  openNotConfirm(r: LcProbation) { this.notConfirmReason = ''; this.notConfirmLwd = ''; this.notConfirmRow.set(r); }
+  saveNotConfirm() {
+    const r = this.notConfirmRow();
+    if (!r) return;
+    if (this.notConfirmReason.trim().length < 10) { this.toast.error('Give the reason (at least 10 characters)'); return; }
+    if (!confirm(`Not confirm ${r.name}? Separation starts and the non-confirmation letter is issued.`)) return;
+    this.busy.set(true);
+    this.api.notConfirmProbation(r.employeeId, { reason: this.notConfirmReason.trim(), lastWorkingDay: this.notConfirmLwd || undefined }).subscribe({
+      next: (x) => { this.busy.set(false); this.notConfirmRow.set(null); this.toast.success(`Separation started — last working day ${String(x.lastWorkingDay).slice(0, 10)}. Letter issued.`); this.load(); },
+      error: (e) => { this.busy.set(false); this.toast.error(e.error?.message || 'Could not record the decision'); },
+    });
+  }
   probQuery = signal('');
   probMatches = computed(() => {
     const q = this.probQuery().trim().toLowerCase();
@@ -345,6 +364,8 @@ export class PeopleWatchComponent implements OnInit {
     this.probMode = row ? 'date' : 'months';
     this.probMonths = 6;
     this.probDate = row ? row.endDate.slice(0, 10) : '';
+    this.probReason = '';
+    this.probEditingEnd = !!row;
     this.probOpen.set(true);
   }
   pickProbPerson(p: { id: number; name: string }) {
@@ -359,11 +380,12 @@ export class PeopleWatchComponent implements OnInit {
   }
   saveProbation() {
     if (!this.probEmployeeId) { this.toast.error('Choose the employee'); return; }
-    const body = this.probMode === 'date' ? { endDate: this.probDate } : { months: Number(this.probMonths) };
+    const body: any = this.probMode === 'date' ? { endDate: this.probDate } : { months: Number(this.probMonths) };
+    if (this.probReason.trim()) body.reason = this.probReason.trim();
     if (this.probMode === 'date' && !this.probDate) { this.toast.error('Choose the end date'); return; }
     this.busy.set(true);
     this.api.setProbation(this.probEmployeeId, body).subscribe({
-      next: () => { this.busy.set(false); this.probOpen.set(false); this.toast.success('Probation saved'); this.load(); },
+      next: (r: any) => { this.busy.set(false); this.probOpen.set(false); this.toast.success(r?.extended ? 'Probation extended — extension letter issued' : 'Probation saved'); this.load(); },
       error: (e) => { this.busy.set(false); this.toast.error(e.error?.message || 'Could not save probation'); },
     });
   }
@@ -378,7 +400,7 @@ export class PeopleWatchComponent implements OnInit {
     this.api.confirmProbation(row.employeeId, makePermanent).subscribe({
       next: (r: any) => {
         const leave = (r?.leaveCredited || []).map((c: any) => `${c.leaveType} ${c.days}`).join(', ');
-        this.toast.success(`${row.name} confirmed${r?.madePermanent ? ' and made permanent' : ''}${leave ? ' · leave credited: ' + leave : ''}`);
+        this.toast.success(`${row.name} confirmed${r?.madePermanent ? ' and made permanent' : ''}${leave ? ' · leave credited: ' + leave : ''}${r?.letterId ? ' · confirmation letter issued' : ''}`);
         this.load();
       },
       error: (e) => this.toast.error(e.error?.message || 'Could not confirm'),

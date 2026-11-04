@@ -683,6 +683,11 @@
         </div>
       </div>
 
+      <!-- No paid leave on probation (4 Nov 2026) -->
+      <div class="probation-leave-note" *ngIf="!onBehalfName() && myProbation()?.onProbation">
+        You are on probation until <strong>{{ myProbation()?.endDate | date:'d MMM y':'UTC' }}</strong>. Paid leave isn't available yet — choose <strong>Loss of Pay</strong> for any absence.
+      </div>
+
       <!-- Leave Type (Searchable Select, filtered by employee) -->
       <div class="leave-form-group">
         <label>
