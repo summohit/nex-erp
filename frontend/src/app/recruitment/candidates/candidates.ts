@@ -435,7 +435,25 @@ export class CandidatesComponent implements OnInit {
       this.joiningDateInput.set(d.toISOString().split('T')[0]);
     }
 
+    // Salary group + regime: what the annexure (and later the pay profile) is built from.
+    const saved = (app as any).compensationStructure;
+    this.annexureGroupCode.set(saved?.salaryGroupCode || '');
+    this.annexureRegime.set(saved?.taxRegime === 'OLD' ? 'OLD' : 'NEW');
+    this.offerSubmitted.set(false);
+    this.loadAnnexureGroups();
+
     this.showSalaryPrompt.set(true);
+  }
+
+  offerSubmitted = signal(false);
+  offerGroupMissing = computed(() => this.offerSubmitted() && !this.annexureGroupCode());
+
+  private loadAnnexureGroups() {
+    if (this.annexureGroups().length) return;
+    this.payrollService.getPayrollSalaryGroups().subscribe({
+      next: (g: any[]) => this.annexureGroups.set(g.map((x) => ({ code: x.code, name: x.name, payeeType: x.payeeType }))),
+      error: () => {},
+    });
   }
 
   showRejectPrompt = signal(false);
@@ -1023,7 +1041,11 @@ export class CandidatesComponent implements OnInit {
   submitSalaryPrompt() {
     const pending = this.pendingStatusChange();
     if (!pending) return;
-    
+    this.offerSubmitted.set(true);
+    if (!this.annexureGroupCode()) { this.toast.error('Pick a salary group'); return; }
+    const groupCode = this.annexureGroupCode();
+    const regime = this.annexureRegime();
+
     this.candidatesService.updateStatus(
       pending.id,
       pending.status,
@@ -1041,6 +1063,11 @@ export class CandidatesComponent implements OnInit {
         } else {
           this.toast.success(`Moved to ${this.stageLabel(updatedApp.status)}`);
         }
+        // Build the annexure from the chosen group and regime, so the letter matches the payslip.
+        this.candidatesService.annexureFromGroup(updatedApp.id, groupCode, regime).subscribe({
+          next: () => this.toast.success(`Annexure built from ${groupCode} (${regime === 'OLD' ? 'Old' : 'New'} regime)`),
+          error: (e) => this.toast.error(e?.error?.message || 'Offer saved, but the annexure could not be built — use View Offer Annexure'),
+        });
         this.closeSalaryPrompt();
         this.loadPendingApprovals();
         this.loadApplications(false);

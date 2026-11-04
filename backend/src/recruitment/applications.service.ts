@@ -925,7 +925,9 @@ export class ApplicationsService {
     const components = this.normalizeComponents(raw, Math.round(ctc / 12));
     const persisted = components.filter((c: any) => c.kind !== 'BALANCER').map(({ annual, ...c }: any) => c);
     const structure = { version: 1, salaryGroupCode: code, taxRegime: regime, components: persisted };
-    await this.prisma.jobApplication.update({ where: { id }, data: { compensationStructure: structure } });
+    // An offer built from a salary group always carries its annexure in the letter.
+    await this.prisma.jobApplication.update({ where: { id }, data: { compensationStructure: structure, includeSalaryAnnexure: true } });
+    (application as any).includeSalaryAnnexure = true;
     (application as any).compensationStructure = structure;
     return this.renderAnnexure(application, components);
   }

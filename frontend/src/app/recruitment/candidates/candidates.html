@@ -819,15 +819,6 @@
             </button>
           </div>
 
-          <!-- HR's switch for the auto-built salary table (Annexure); off by default -->
-          <label class="annexure-toggle" *ngIf="app.status === 'OFFERED' || app.status === 'HIRED' || app.status === 'ONBOARDED'">
-            <input type="checkbox" [checked]="!!app.includeSalaryAnnexure" (change)="toggleSalaryAnnexure(app, $any($event.target).checked)">
-            <span>
-              <b>Include salary annexure in offer letter</b>
-              <small>Applies to letters generated from now on. Click Regenerate Letter after changing it.</small>
-            </span>
-          </label>
-
           <!-- Revise CTC / joining date, then regenerate to print the new terms -->
           <button
             type="button"
@@ -1369,6 +1360,30 @@
         >
           Profile Budget (₹{{ pendingProfileBudget() | number }})
         </button>
+      </div>
+
+      <!-- Salary structure: CTC → salary group → tax regime; the annexure is built from these on submit -->
+      <div class="offer-letter-fields">
+        <div class="offer-fields-header">
+          <svg lucideFileText size="14"></svg>
+          <span>Salary Structure</span>
+          <small>Builds the annexure and, at onboarding, the pay profile</small>
+        </div>
+        <div class="offer-field-row">
+          <label>Salary Group <span style="color:#dc2626">*</span></label>
+          <select class="offer-group-select" [class.is-invalid]="offerGroupMissing()" [ngModel]="annexureGroupCode()" (ngModelChange)="annexureGroupCode.set($event)">
+            <option value="">— pick salary group —</option>
+            <option *ngFor="let g of annexureGroups()" [value]="g.code">{{ g.name }} ({{ g.code }})</option>
+          </select>
+          <small class="offer-field-error" *ngIf="offerGroupMissing()">Pick the salary group they'll be paid under.</small>
+        </div>
+        <div class="offer-field-row">
+          <label>Tax Regime</label>
+          <select class="offer-group-select" [ngModel]="annexureRegime()" (ngModelChange)="annexureRegime.set($event)">
+            <option value="NEW">New regime (default)</option>
+            <option value="OLD">Old regime</option>
+          </select>
+        </div>
       </div>
 
       <!-- Offer Letter Details -->

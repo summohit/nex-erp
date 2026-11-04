@@ -1504,10 +1504,10 @@ export class OfferLettersService {
     const templateHtml = chosen?.body || settings?.offerLetterTemplateHtml || DEFAULT_OFFER_LETTER_TEMPLATE;
     const merged = this.mergeTemplate(templateHtml, fields);
 
-    // HR decides per candidate (Application Details) whether the annexure goes
-    // in at all. `false` only: the template preview passes a sample with no
-    // such field and should still show the table.
-    const omitAnnexure = application?.includeSalaryAnnexure === false;
+    // The salary annexure is always part of the offer letter (4 Nov 2026: the
+    // per-candidate switch was removed — it was off by default and letters went
+    // out without their salary table).
+    const omitAnnexure = false;
     const salaryTableHtml = omitAnnexure
       ? ''
       : breakup.length
