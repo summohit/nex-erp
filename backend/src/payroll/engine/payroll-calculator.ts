@@ -236,9 +236,17 @@ export class PayrollCalculator {
         computedValues.set(compCode, balancingAmount);
         context[compCode] = balancingAmount;
       } else if (input.salaryGroup.payeeType === 'CONSULTANT') {
-        // In consultant structures, fee = CTC
-        computedValues.set(compCode, ctcMonthly);
-        context[compCode] = ctcMonthly;
+        // In consultant structures, fee = CTC less any other earnings in the
+        // group (per-person reimbursements, 5 Nov 2026), so the total stays the CTC.
+        let otherEarnings = 0;
+        for (const [code, val] of computedValues.entries()) {
+          const comp = componentMap.get(code);
+          if (comp?.category === 'EARNING' && code !== compCode) otherEarnings += val;
+        }
+        const fee = round2(ctcMonthly - otherEarnings);
+        if (fee < 0) warnings.push(`Reimbursements exceed the monthly CTC (₹${ctcMonthly}); the fee would be negative.`);
+        computedValues.set(compCode, fee);
+        context[compCode] = fee;
       } else {
         // Trainee: balance against CTC
         let otherSum = 0;
