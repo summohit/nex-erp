@@ -166,7 +166,26 @@
             </div>
           </div>
 
-          <!-- Component Overrides -->
+          <!-- Other reimbursement (5 Nov 2026): one amount, inside the CTC -->
+          <div class="pp-overrides-card" *ngIf="reimbursementLine()">
+            <div class="pp-overrides-header">
+              <span class="font-semibold text-slate-800">Other Reimbursement</span>
+              <span class="text-xs text-muted">Inside the CTC — the fee / Other Allowance goes down by this amount</span>
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Amount (₹ / month)</label>
+                <div class="input-currency-wrapper">
+                  <span class="currency-prefix">₹</span>
+                  <input class="form-control currency-input" [class.is-invalid]="err('override:OTHER_REIMB')" type="number" min="0" step="100"
+                         [(ngModel)]="form.overrides['OTHER_REIMB']" (change)="runPreview()" placeholder="0">
+                </div>
+                <span class="field-error" *ngIf="err('override:OTHER_REIMB') as m">{{ m }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Any other per-person amounts the group allows -->
           <div class="pp-overrides-card" *ngIf="overridableLines().length">
             <div class="pp-overrides-header">
               <span class="font-semibold text-slate-800">Component Overrides</span>
@@ -382,12 +401,22 @@
           </div>
 
           <div class="detail-inputs-grid">
-            <!-- GSTIN (consultants: GST is added on top of the fee) -->
-            <div class="form-group">
-              <div class="label-with-meta">
-                <label class="form-label">GSTIN <span class="field-hint-text" style="font-weight:400">(consultants only)</span></label>
+            <!-- GST (consultants): off by default; on = GSTIN + GST %, added on top of the fee -->
+            <div class="form-group pp-gst-group">
+              <label class="pp-gst-toggle">
+                <input type="checkbox" [(ngModel)]="gstOn" (ngModelChange)="onGstToggle($event)" [disabled]="!canEdit()">
+                <span><b>GST registered</b> <small>(consultants — GST is added on top of the fee)</small></span>
+              </label>
+              <div class="form-grid-2" *ngIf="gstOn" style="margin-top:8px">
+                <div>
+                  <label class="form-label">GSTIN</label>
+                  <input class="form-control" [(ngModel)]="details['gstin']" placeholder="07ABCDE1234F1Z5" maxlength="15" [disabled]="!canEdit()">
+                </div>
+                <div>
+                  <label class="form-label">GST %</label>
+                  <input class="form-control" type="number" min="0" max="28" step="0.5" [(ngModel)]="details['gstPct']" placeholder="18" [disabled]="!canEdit()">
+                </div>
               </div>
-              <input class="form-control" [(ngModel)]="details['gstin']" placeholder="07ABCDE1234F1Z5" maxlength="15" [disabled]="!canEdit()">
             </div>
 
             <!-- PAN -->

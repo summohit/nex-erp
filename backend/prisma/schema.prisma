@@ -526,6 +526,8 @@ model Employee {
   probationExtensions  Int       @default(0)
   /// Consultant's GSTIN (5 Nov 2026): GST is added on top of the fee when the salary group has GST on.
   gstin                String?
+  /// Their GST % (null = 18); set with the GST toggle on the pay profile.
+  gstPct               Float?
   /// The manager's review for the current probation period: { rating, comments,
   /// recommendation CONFIRM|EXTEND|NOT_CONFIRM, extendMonths?, reviewerId,
   /// reviewerName, at }. Cleared when probation is extended.

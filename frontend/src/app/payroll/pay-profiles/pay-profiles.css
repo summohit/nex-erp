@@ -2438,3 +2438,7 @@
 .field-error { display: block; margin-top: 5px; font-size: 12px; color: #dc2626; font-weight: 500; }
 .field-warn { display: block; margin-top: 5px; font-size: 12px; color: #b45309; font-weight: 500; }
 @media (max-width: 760px) { .pp-modal-overlay { padding: 12px 8px; } }
+
+.pp-gst-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #334155; }
+.pp-gst-toggle small { color: #64748b; font-weight: 400; }
+.pp-gst-toggle input { width: 16px; height: 16px; accent-color: #2563eb; }

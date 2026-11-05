@@ -96,7 +96,7 @@ export class PayProfileDetailComponent implements OnInit {
   paymentMethods = computed(() => this.dropdowns().find((l) => l.listKey === 'PAYMENT_METHOD')?.options ?? []);
 
   // ── Statutory & bank details ──
-  details: Record<string, string | null> = {};
+  details: Record<string, any> = {};
   savingDetails = signal(false);
 
   // ── Verifying PAN / UAN / bank ──
@@ -190,10 +190,23 @@ export class PayProfileDetailComponent implements OnInit {
   formWorkerType = signal<string | null>(null);
 
   /** Lines in the chosen group that may be overridden. */
+  /** Per-person amounts the group allows, except the reimbursements (Other Reimbursement has its own box). */
   overridableLines = computed(() => {
     const g = this.groups().find((x) => x.code === this.formGroupCode());
-    return (g?.lines || []).filter((l) => l.overrideAllowed);
+    return (g?.lines || []).filter((l) => l.overrideAllowed && !/_REIMB$/.test(l.component?.code || ''));
   });
+  /** The group's Other Reimbursement line, if it has one. */
+  reimbursementLine = computed(() => {
+    const g = this.groups().find((x) => x.code === this.formGroupCode());
+    return (g?.lines || []).find((l) => l.overrideAllowed && l.component?.code === 'OTHER_REIMB') ?? null;
+  });
+
+  /** GST toggle: on shows GSTIN + GST % (default 18); off clears both. */
+  gstOn = false;
+  onGstToggle(on: boolean) {
+    if (on) { if (this.details['gstPct'] == null || this.details['gstPct'] === '') this.details['gstPct'] = 18; }
+    else { this.details['gstin'] = null; this.details['gstPct'] = null; }
+  }
   formGroupCode = signal<string | null>(null);
 
   ngOnInit() {
@@ -211,9 +224,11 @@ export class PayProfileDetailComponent implements OnInit {
         const e = d.employee;
         this.details = {
           gstin: (e as any).gstin ?? null,
+          gstPct: (e as any).gstPct ?? null,
           panNumber: e.panNumber, uanNumber: e.uanNumber, pfNumber: e.pfNumber, esiNumber: e.esiNumber,
           bankName: e.bankName, bankAccountNumber: e.bankAccountNumber, ifscCode: e.ifscCode,
         };
+        this.gstOn = !!(e as any).gstin;
         this.loading.set(false);
       },
       error: (e) => { this.loading.set(false); this.toast.error(e?.error?.message || 'Failed to load the pay profile'); },

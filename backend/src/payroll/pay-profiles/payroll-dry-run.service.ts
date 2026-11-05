@@ -74,7 +74,7 @@ export class PayrollDryRunService {
       select: {
         id: true, firstName: true, lastName: true, avatarUrl: true, employeeCode: true,
         department: { select: { name: true } }, designation: { select: { name: true } },
-        bankAccountNumber: true, panNumber: true, gstin: true,
+        bankAccountNumber: true, panNumber: true, gstin: true, gstPct: true,
         user: { select: { role: true } },
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
@@ -183,7 +183,9 @@ export class PayrollDryRunService {
       // GST on top of a consultant's fee (5 Nov 2026), when the group has GST on
       // and the consultant has a GSTIN. Not part of CTC; TDS stays on the fee.
       const feePaid = earnings.find((l) => l.code === 'CONSULTANT_FEE')?.paid ?? 0;
-      const gst = payee === 'CONSULTANT' && calc.group.gstApplicable && (e as any).gstin && feePaid > 0 ? r2((feePaid * gstPct) / 100) : 0;
+      // Per person (pay profile GST toggle): GSTIN on file → GST at their % (default 18).
+      const personGstPct = (e as any).gstPct ?? gstPct;
+      const gst = payee === 'CONSULTANT' && (e as any).gstin && feePaid > 0 ? r2((feePaid * personGstPct) / 100) : 0;
       const net = r2(Math.max(0, grossPaid + gst - totalDeductions));
 
       const warnings: string[] = [];
@@ -192,7 +194,7 @@ export class PayrollDryRunService {
       else if (att.workingDays > 0 && att.absences / att.workingDays > 0.5) warnings.push(`Absent ${att.absences} of ${att.workingDays} working days — check attendance before paying.`);
       if (!e.bankAccountNumber) warnings.push('No bank account on file.');
       if (!e.panNumber && grossFull * 12 > 250000) warnings.push('No PAN on file — TDS may need to be higher (20%) without it.');
-      if (payee === 'CONSULTANT' && calc.group.gstApplicable && !(e as any).gstin) warnings.push('No GSTIN on file — GST is not added to this fee.');
+
 
       rows.push({
         ...base,
@@ -213,7 +215,7 @@ export class PayrollDryRunService {
         totalDeductions,
         net,
         gst,
-        gstPct: gst ? gstPct : null,
+        gstPct: gst ? personGstPct : null,
         lopExempt: exempt,
         notes,
         employerContributions: r2(out.lines.filter((l) => l.category === 'EMPLOYER_CONTRIBUTION').reduce((t, l) => t + l.monthly, 0)),

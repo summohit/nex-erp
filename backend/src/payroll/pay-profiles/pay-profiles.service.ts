@@ -273,7 +273,7 @@ export class PayProfilesService {
   async updateDetails(companyId: number, employeeId: number, body: Record<string, string | null>, actorUserId?: number) {
     const before = await this.prisma.employee.findFirst({
       where: { id: employeeId, companyId },
-      select: { panNumber: true, uanNumber: true, pfNumber: true, esiNumber: true, bankName: true, bankAccountNumber: true, ifscCode: true, gstin: true },
+      select: { panNumber: true, uanNumber: true, pfNumber: true, esiNumber: true, bankName: true, bankAccountNumber: true, ifscCode: true, gstin: true, gstPct: true },
     });
     if (!before) throw new NotFoundException('Employee not found');
     const data: Record<string, any> = this.cleanStatutory(body) ?? {};
@@ -376,7 +376,7 @@ export class PayProfilesService {
     return Object.keys(out).length ? out : null;
   }
 
-  private cleanStatutory(raw?: Record<string, string | null | undefined>) {
+  private cleanStatutory(raw?: Record<string, any>) {
     if (!raw) return null;
     const pick = (k: string) => (raw[k] === undefined ? undefined : String(raw[k] ?? '').trim().toUpperCase() || null);
     const data: Record<string, string | null> = {};
@@ -399,6 +399,11 @@ export class PayProfilesService {
     if (gstin !== undefined) {
       if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin)) throw new BadRequestException('GSTIN should look like 07ABCDE1234F1Z5.');
       data.gstin = gstin;
+    }
+    if (raw.gstPct !== undefined) {
+      const n = raw.gstPct === null || raw.gstPct === '' ? null : Number(raw.gstPct);
+      if (n !== null && !(n >= 0 && n <= 28)) throw new BadRequestException('GST % must be between 0 and 28.');
+      (data as any).gstPct = n;
     }
     for (const k of ['pfNumber', 'esiNumber', 'bankAccountNumber']) {
       const v = pick(k);
