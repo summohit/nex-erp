@@ -241,6 +241,11 @@ export class PayProfilesService {
     if (overrides && !reason) throw new BadRequestException('Give a reason for the component overrides.');
 
     const result = calc.run(annualCtc, overrides ?? undefined); // fails loudly on a broken formula
+    // A per-person amount (e.g. a higher Basic) must still fit inside the CTC.
+    const negative = (result.warnings || []).find((w: string) => /negative/i.test(w));
+    if (negative) {
+      throw new BadRequestException(`These amounts don't fit in the CTC: ${negative} Lower the Basic or reimbursement, or raise the CTC.`);
+    }
 
     const statutory = this.cleanStatutory(body.employee);
 
