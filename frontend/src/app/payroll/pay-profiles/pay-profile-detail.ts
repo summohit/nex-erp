@@ -220,10 +220,17 @@ export class PayProfileDetailComponent implements OnInit {
     const g = this.groups().find((x) => x.code === this.formGroupCode());
     return !!(g?.lines || []).find((l) => l.overrideAllowed && l.component?.code === 'BASIC');
   });
-  /** Basic the group's rule gives (shown as the placeholder). */
-  defaultBasic(): number | null {
-    const b = this.preview()?.lines.find((l) => l.code === 'BASIC');
-    return this.form?.overrides?.['BASIC'] ? null : b ? Math.round(b.monthly) : null;
+  /** Basic the group's rule gives: 50% of the monthly CTC. */
+  ruleBasic(): number | null {
+    const ctc = Number(this.form?.annualCtc);
+    return ctc > 0 ? Math.round(ctc / 12 / 2) : null;
+  }
+  defaultBasic(): number | null { return this.ruleBasic(); }
+
+  /** Custom Basic is off (hidden) by default; on shows the Basic field for this person. */
+  customBasic = false;
+  onCustomBasic(on: boolean) {
+    if (!on) { delete this.form.overrides['BASIC']; this.runPreview(); }
   }
   /** The group's Other Reimbursement line, if it has one. */
   reimbursementLine = computed(() => {
@@ -314,6 +321,7 @@ export class PayProfileDetailComponent implements OnInit {
     };
     this.formWorkerType.set(this.form.workerType);
     this.formGroupCode.set(this.form.salaryGroupCode);
+    this.customBasic = !!(cur?.overrides && (cur.overrides as any)['BASIC'] != null);
     this.preview.set(null);
     this.submitted.set(false);
     this.serverError.set(null);
@@ -355,6 +363,11 @@ export class PayProfileDetailComponent implements OnInit {
       else if ((this.data()?.versions || []).some((v: any) => String(v.effectiveFrom).slice(0, 10) === f.effectiveFrom)) e['effectiveFrom'] = 'A version already starts on this date — pick another or revise from a later date.';
     }
     const monthly = ctc > 0 ? ctc / 12 : 0;
+    const basic = f.overrides?.['BASIC'];
+    if (this.customBasic && basic !== null && basic !== undefined && basic !== '') {
+      const min = this.ruleBasic() ?? 0;
+      if (Number(basic) < min) e['override:BASIC'] = `Basic can't be below 50% of CTC (₹${min.toLocaleString('en-IN')} a month).`;
+    }
     let overrideTotal = 0;
     for (const [code, v] of Object.entries(f.overrides || {})) {
       if (v === null || v === undefined || (v as any) === '') continue;

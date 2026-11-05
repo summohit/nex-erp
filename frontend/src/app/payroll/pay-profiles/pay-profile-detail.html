@@ -160,6 +160,11 @@
 
             <!-- Basic per person (5 Nov 2026): empty = the group's rule (50% of CTC) -->
             <div class="form-group" *ngIf="basicOverridable()">
+              <label class="pp-gst-toggle" style="margin-bottom:6px">
+                <input type="checkbox" [(ngModel)]="customBasic" (ngModelChange)="onCustomBasic($event)">
+                <span><b>Custom Basic for this person</b> <small>(off = 50% of CTC)</small></span>
+              </label>
+              <ng-container *ngIf="customBasic">
               <label class="form-label">Basic Salary (₹ / month)</label>
               <div class="input-currency-wrapper">
                 <span class="currency-prefix">₹</span>
@@ -168,7 +173,8 @@
                        [placeholder]="defaultBasic() ? defaultBasic() + ' (50% of CTC)' : '50% of CTC'">
               </div>
               <span class="field-error" *ngIf="err('override:BASIC') as m">{{ m }}</span>
-              <span class="field-hint-text" *ngIf="!err('override:BASIC')">Leave empty for 50% of CTC. Enter an amount to set a higher Basic for this person.</span>
+              <span class="field-hint-text" *ngIf="!err('override:BASIC')">At least 50% of CTC (₹{{ ruleBasic() | number:'1.0-0' }}). Leave empty for exactly 50%.</span>
+              </ng-container>
             </div>
 
             <div class="form-group">

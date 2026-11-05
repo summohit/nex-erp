@@ -241,6 +241,14 @@ export class PayProfilesService {
     if (overrides && !reason) throw new BadRequestException('Give a reason for the component overrides.');
 
     const result = calc.run(annualCtc, overrides ?? undefined); // fails loudly on a broken formula
+    // Basic can be raised per person but never below the group's rule (50% of CTC).
+    if (overrides && 'BASIC' in overrides) {
+      const { BASIC: _ignored, ...rest } = overrides;
+      const ruleBasic = calc.run(annualCtc, Object.keys(rest).length ? rest : undefined).lines.find((l: any) => l.code === 'BASIC')?.monthly ?? 0;
+      if (overrides.BASIC + 0.5 < ruleBasic) {
+        throw new BadRequestException(`Basic can't be below the group's rule (50% of CTC = ₹${Math.round(ruleBasic).toLocaleString('en-IN')} a month). Enter ₹${Math.round(ruleBasic).toLocaleString('en-IN')} or more, or leave it empty.`);
+      }
+    }
     // A per-person amount (e.g. a higher Basic) must still fit inside the CTC.
     const negative = (result.warnings || []).find((w: string) => /negative/i.test(w));
     if (negative) {
