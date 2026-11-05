@@ -1660,6 +1660,83 @@ export class FieldVisitRequestsService {
     return manager ? this.approveModification(companyId, employeeId, role, id) : proposed;
   }
 
+  /**
+   * Prepone or postpone straight away (5 Nov 2026): the project manager or a
+   * Super Admin moves the dates and it applies immediately, never queued for
+   * approval. Recorded in the trail like an approved change.
+   */
+  async reschedule(
+    companyId: number, employeeId: number | null, role: string,
+    id: number, body: FieldVisitRequestInput & { reason?: string; changeReason?: string }, action: 'PREPONE' | 'POSTPONE',
+  ) {
+    const request = await this.loadForDecision(companyId, id);
+    this.assertOpenForRequest(request);
+    const reason = String(body?.reason ?? body?.changeReason ?? body?.remarks ?? '').trim();
+    if (!reason) throw new BadRequestException(`Give a reason to ${action === 'PREPONE' ? 'prepone' : 'postpone'} this field visit`);
+
+    const current: FieldVisitRequestInput = {
+      visitType: request.project.isSystem ? 'GENERAL' : 'PROJECT',
+      projectId: request.projectId,
+      location: request.location,
+      latitude: request.latitude as number,
+      longitude: request.longitude as number,
+      startDate: String(body?.startDate ?? ''),
+      endDate: String(body?.endDate ?? ''),
+      startTime: body?.startTime ?? request.startTime,
+      endTime: body?.endTime ?? request.endTime,
+      remarks: request.remarks ?? undefined,
+      travelZone: request.travelZone,
+      employeeIds: request.members.map((m) => m.employeeId),
+      tasks: request.tasks.map((t) => ({ name: t.name, description: t.description ?? undefined, issueId: t.issueId })) as any,
+    };
+    const { project, fields, employeeIds, tasks } = await this.normalize(companyId, current);
+    const manager = await this.mayRaise(companyId, project, role, employeeId);
+    if (!manager) throw new ForbiddenException('Only the project manager or a Super Admin can reschedule this field visit');
+    if (this.day(fields.startDate) === this.day(request.startDate) && this.day(fields.endDate) === this.day(request.endDate)) {
+      throw new BadRequestException('Pick new dates — these are the dates already set');
+    }
+    if (action === 'POSTPONE' && fields.startDate < request.startDate) {
+      throw new BadRequestException('Postponing moves a trip later; use Prepone to bring it forward');
+    }
+    if (action === 'PREPONE' && fields.startDate > request.startDate) {
+      throw new BadRequestException('Preponing brings a trip forward; use Postpone to move it later');
+    }
+
+    await this.proposeChange(companyId, employeeId, request, {
+      ...fields,
+      startDate: fields.startDate.toISOString(),
+      endDate: fields.endDate.toISOString(),
+      employeeIds,
+      tasks,
+      kind: action === 'POSTPONE' ? 'POSTPONE' : 'CHANGE',
+      reason,
+    }, `${action === 'PREPONE' ? 'prepone' : 'postpone'} from ${this.day(request.startDate)} to ${this.day(fields.startDate)}–${this.day(fields.endDate)}`,
+    { notify: false, managerIds: this.projectManagerIds(project) });
+    return this.approveModification(companyId, employeeId, role, id);
+  }
+
+  /**
+   * Field Visits History tab (5 Nov 2026): the activity trail across every
+   * request the viewer may see, newest first, with the request it belongs to.
+   */
+  async history(companyId: number, role: string, employeeId: number | null) {
+    const visible = await this.prisma.fieldVisitRequest.findMany({
+      where: this.visibilityWhere(companyId, role, employeeId),
+      select: { id: true },
+    });
+    if (!visible.length) return [];
+    return this.prisma.fieldVisitRequestActivity.findMany({
+      where: { requestId: { in: visible.map((r) => r.id) } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 500,
+      select: {
+        id: true, action: true, detail: true, oldValue: true, newValue: true,
+        createdAt: true, actor: this.PERSON,
+        request: { select: { id: true, requestNumber: true, location: true, project: { select: { id: true, name: true, key: true } } } },
+      },
+    });
+  }
+
   private projectManagerIds(project: any): number[] {
     return [...new Set<number>([
       ...(project?.leadId ? [project.leadId] : []),
