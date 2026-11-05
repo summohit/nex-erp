@@ -403,6 +403,22 @@ export class PayProfileDetailComponent implements OnInit {
   }
 
   /** Breakup lines grouped the way a payslip reads. */
+  /**
+   * GST on top of a consultant's fee (GST registered on the pay profile):
+   * fee × their GST %. Not part of CTC; TDS stays on the fee.
+   */
+  gstOf(b: SalaryCalculationResult | null): { pct: number; amount: number } | null {
+    const e: any = this.data()?.employee;
+    const fee = b?.lines.find((l) => l.code === 'CONSULTANT_FEE')?.monthly ?? 0;
+    if (!e?.gstin || !(fee > 0)) return null;
+    const pct = Number(e.gstPct ?? 18);
+    return { pct, amount: Math.round(fee * pct) / 100 };
+  }
+  /** Take-home including GST, when there is GST. */
+  payout(b: SalaryCalculationResult | null): number {
+    return (b?.netPayMonthly ?? 0) + (this.gstOf(b)?.amount ?? 0);
+  }
+
   sections(b: SalaryCalculationResult | null) {
     if (!b) return [];
     const by = (cat: string) => b.lines.filter((l) => l.category === cat && l.monthly !== 0);

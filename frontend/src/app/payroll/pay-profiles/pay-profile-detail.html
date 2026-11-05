@@ -362,7 +362,7 @@
               </div>
               <div class="meta-metric-chip net">
                 <span class="chip-label">Take-Home:</span>
-                <strong>{{ money(b.netPayMonthly) }}</strong><span class="chip-unit">/mo</span>
+                <strong>{{ money(payout(b)) }}</strong><span class="chip-unit">/mo<ng-container *ngIf="gstOf(b)"> incl. GST</ng-container></span>
               </div>
             </div>
           </div>
@@ -619,9 +619,18 @@
             <td class="num">{{ money(s.total) }}</td>
           </tr>
         </ng-container>
+        <ng-container *ngIf="gstOf(b) as g">
+          <tr class="section-cat-row">
+            <td colspan="2">GST (on top of the fee, not in CTC)</td>
+          </tr>
+          <tr class="breakup-line-row">
+            <td>GST @ {{ g.pct }}%</td>
+            <td class="num font-medium">{{ money(g.amount) }}</td>
+          </tr>
+        </ng-container>
         <tr class="takehome-summary-row">
-          <td><strong>Net pay / month</strong></td>
-          <td class="num"><strong>{{ money(b.netPayMonthly) }}</strong></td>
+          <td><strong>{{ gstOf(b) ? 'Net payable incl. GST / month' : 'Net pay / month' }}</strong></td>
+          <td class="num"><strong>{{ money(payout(b)) }}</strong></td>
         </tr>
         <tr class="ctc-summary-row">
           <td>CTC / month</td>
