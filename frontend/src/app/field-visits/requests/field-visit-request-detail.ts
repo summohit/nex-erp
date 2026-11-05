@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, computed, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -64,6 +64,44 @@ export class FieldVisitRequestDetailComponent implements OnInit {
 
   request = signal<FieldVisitRequest | null>(null);
   timeline = signal<FieldVisitActivity[]>([]);
+
+  /**
+   * Reschedule approvals table (5 Nov 2026): the change requests and their
+   * decisions from the activity trail, newest first.
+   */
+  rescheduleHistory = computed(() =>
+    this.timeline().filter((a) => /^MODIFICATION_(REQUESTED|APPROVED|REJECTED)$/.test(a.action)).slice().reverse());
+
+  /** Prepone / Postpone / Cancel / Change, read from the request row (decisions inherit it). */
+  rescheduleType(change: FieldVisitActivity): string {
+    const req = change.action === 'MODIFICATION_REQUESTED'
+      ? change
+      : [...this.timeline()].filter((a) => a.action === 'MODIFICATION_REQUESTED' && a.id < change.id).pop();
+    const d = String(req?.detail ?? '').toLowerCase();
+    if (d.includes('prepone')) return 'Prepone';
+    if (d.includes('postpone')) return 'Postpone';
+    if (d.includes('cancel')) return 'Cancel';
+    return 'Change';
+  }
+
+  rescheduleStatus(change: FieldVisitActivity): string {
+    return change.action === 'MODIFICATION_APPROVED' ? 'Approved' : change.action === 'MODIFICATION_REJECTED' ? 'Rejected' : 'Requested';
+  }
+
+  /** {startDate, endDate} stored on the request row; null when not recorded. */
+  changeDates(value: string | null | undefined): { startDate: string; endDate: string } | null {
+    if (!value) return null;
+    try {
+      const v = JSON.parse(value);
+      return v?.startDate ? { startDate: v.startDate, endDate: v.endDate ?? v.startDate } : null;
+    } catch { return null; }
+  }
+
+  changeReason(change: FieldVisitActivity): string {
+    const d = String(change.detail ?? '');
+    if (change.action === 'MODIFICATION_REQUESTED') return d.includes(': ') ? d.slice(d.indexOf(': ') + 2) : d || '—';
+    return d || '—';
+  }
   isLoading = signal(true);
   isWorking = signal(false);
 

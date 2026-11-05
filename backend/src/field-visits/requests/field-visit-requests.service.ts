@@ -1793,6 +1793,11 @@ export class FieldVisitRequestsService {
         data: {
           requestId: request.id, action: 'MODIFICATION_REQUESTED',
           detail: `Asked to ${what}: ${proposal.reason}`,
+          // Dates before and after, for the Reschedule approvals table.
+          oldValue: (request as any).startDate
+            ? JSON.stringify({ startDate: this.day((request as any).startDate), endDate: this.day((request as any).endDate) }) : null,
+          newValue: proposal.startDate
+            ? JSON.stringify({ startDate: String(proposal.startDate).slice(0, 10), endDate: String(proposal.endDate ?? proposal.startDate).slice(0, 10) }) : null,
           actorId: employeeId as number,
         },
       });
