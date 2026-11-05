@@ -1873,6 +1873,19 @@ export class AttendanceService {
           regularization.employee.designation?.name,
         )
         : {};
+      // Decided 5 Nov 2026: an approved regularization makes the day a full
+      // PRESENT — not late, not half day — whatever the corrected times are.
+      // The approval is the manager/HR accepting the day as worked. The shift
+      // from the score is kept; a leave / holiday / day-off row stays as it was.
+      if (rescore) {
+        Object.assign(score, {
+          status: 'PRESENT', isLate: false, isEarlyLeave: false,
+          // A missed or pending clock-out counts as half a day in payroll; the
+          // approval settles it.
+          missedClockOut: false, autoClockedOut: false, clockOutApproval: 'APPROVED',
+          clockOutApprovedById: approverUserId, clockOutApprovedAt: new Date(),
+        });
+      }
       const saved = attendance
         ? await this.prisma.attendance.update({
           where: { id: attendance.id },

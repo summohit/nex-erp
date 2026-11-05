@@ -101,16 +101,17 @@ describe('approving a regularization', () => {
       });
     });
 
-    it('keeps HALF_DAY when the corrected times still leave early', async () => {
+    // 5 Nov 2026: an approved regularization is a full Present day, whatever the times.
+    it('makes the day PRESENT even when the corrected times leave early', async () => {
       const { service, prisma } = make(halfDay, { ...onsiteDay, proposedClockOut: new Date('2026-10-06T15:00:00+05:30') });
       await service.resolveRegularization(1, 99, 'APPROVED', undefined, HR);
-      expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({ status: 'HALF_DAY', isEarlyLeave: true });
+      expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({ status: 'PRESENT', isEarlyLeave: false, isLate: false });
     });
 
-    it('marks late without halving the day before the half-day boundary', async () => {
+    it('does not mark a late corrected clock-in as late', async () => {
       const { service, prisma } = make(halfDay, { ...onsiteDay, proposedClockIn: new Date('2026-10-06T10:00:00+05:30') });
       await service.resolveRegularization(1, 99, 'APPROVED', undefined, HR);
-      expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({ status: 'PRESENT', isLate: true });
+      expect(prisma.attendance.update.mock.calls[0][0].data).toMatchObject({ status: 'PRESENT', isLate: false, clockOutApproval: 'APPROVED' });
     });
 
     it('compares a clock-out after midnight with that day\'s shift end', async () => {
