@@ -2,7 +2,7 @@
   <div class="drawer-content payslip-modal-content" (click)="$event.stopPropagation()">
     <div class="drawer-header">
       <div>
-        <h2>Payslip for {{ monthName(payslip.month) }} {{ payslip.year }}</h2>
+        <h2>{{ isConsultant() ? 'Fee Statement' : 'Payslip' }} for {{ monthName(payslip.month) }} {{ payslip.year }}</h2>
         <p class="edit-sub">
           {{ payslip.employee.firstName }} {{ payslip.employee.lastName }} · {{ payslip.employee.designation?.name || 'Staff' }}
           <span class="status-chip" [class.chip-preview]="statusLabel">{{ statusLabel || payslip.status }}</span>
@@ -63,7 +63,7 @@
     <div class="payslip-sticky-footer">
       <div class="net-pay-banner">
         <div class="net-pay-left">
-          <span class="net-pay-title">Net Salary Payable (Take Home):</span>
+          <span class="net-pay-title">{{ isConsultant() ? 'Net Professional Fee Payable:' : 'Net Salary Payable (Take Home):' }}</span>
           <em class="net-in-words">{{ amountInWords(payslip.netPay) }}</em>
         </div>
         <h2 class="net-pay-val">₹{{ payslip.netPay.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</h2>

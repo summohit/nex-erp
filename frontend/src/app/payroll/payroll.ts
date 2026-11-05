@@ -2750,6 +2750,11 @@ export class PayrollComponent implements OnInit {
     });
   }
 
+  /** Consultants (technical / non-technical) get a fee statement, not a salary payslip. */
+  isConsultantSlip(p: any): boolean {
+    return (p?.items || []).some((i: any) => i.type === 'EARNING' && /professional fee|consultant fee/i.test(i.componentName || ''));
+  }
+
   getMonthName(monthNum: number): string {
     const m = this.months.find(x => x.id === monthNum);
     return m ? m.name : '';

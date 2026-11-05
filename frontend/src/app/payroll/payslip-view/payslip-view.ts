@@ -41,6 +41,8 @@ export class PayslipViewComponent {
 
   logoUrl = computed(() => (this.auth.currentUser() as any)?.company?.logoUrl || '/logo.png');
 
+  /** Consultants get a fee, not a salary. */
+  isConsultant() { return (this.payslip?.items || []).some((i) => i.type === 'EARNING' && /professional fee|consultant fee/i.test(i.componentName || '')); }
   monthName(m: number) { return MONTHS[m - 1] || ''; }
   cleanComponentName(name: string) { return name ? name.replace(' [Statutory]', '') : ''; }
   isStatutory(name: string) { return name ? name.includes('[Statutory]') : false; }

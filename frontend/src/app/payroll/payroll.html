@@ -2603,7 +2603,7 @@
     <div class="drawer-content payslip-modal-content" (click)="$event.stopPropagation()">
       <div class="drawer-header">
         <div>
-          <h2>Payslip for {{ getMonthName(selectedPayslipDetail()?.month || 1) }} {{ selectedPayslipDetail()?.year }}</h2>
+          <h2>{{ isConsultantSlip(selectedPayslipDetail()) ? 'Fee Statement' : 'Payslip' }} for {{ getMonthName(selectedPayslipDetail()?.month || 1) }} {{ selectedPayslipDetail()?.year }}</h2>
           <p class="edit-sub" *ngIf="selectedPayslipDetail() as pd">
             {{ pd.employee.firstName }} {{ pd.employee.lastName }} · {{ pd.employee.designation?.name || 'Staff' }}
             <span class="status-chip" [class.chip-paid]="pd.status === 'PAID'">{{ pd.status }}<ng-container *ngIf="pd.status === 'PAID' && pd.paidOn"> · Paid on {{ pd.paidOn | date:'d MMM y':'+0530' }}</ng-container></span>
@@ -2680,7 +2680,7 @@
       <div class="payslip-sticky-footer" *ngIf="selectedPayslipDetail() as pd">
         <div class="net-pay-banner">
           <div class="net-pay-left">
-            <span class="net-pay-title">Net Salary Payable (Take Home):</span>
+            <span class="net-pay-title">{{ isConsultantSlip(pd) ? 'Net Professional Fee Payable:' : 'Net Salary Payable (Take Home):' }}</span>
             <em class="net-in-words">{{ amountInWords(pd.netPay) }}</em>
           </div>
           <h2 class="net-pay-val">₹{{ pd.netPay.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</h2>

@@ -180,6 +180,13 @@ export class PdfService {
       }
     }
 
+    // Consultants (technical / non-technical) are paid a professional fee, not a
+    // salary: the statement says so (5 Nov 2026).
+    const isConsultant = items.some((i) => i.type === 'EARNING' && /professional fee|consultant fee/i.test(i.componentName || ''));
+    const docTitle = isConsultant ? 'Fee Statement' : 'Payslip';
+    const netTitle = isConsultant ? 'Net Professional Fee Payable' : 'Net Salary Payable (Take Home)';
+    const grossTitle = isConsultant ? 'Total Fee & Reimbursements' : 'Total Gross Earnings';
+
     // Only lines with an amount (5 Nov 2026): ₹0 standard rows are hidden.
     // Reimbursements, expenses and GST go to the bottom of earnings.
     const atBottom = (label: string) => /reimburs|expense|^gst/i.test(label);
@@ -566,7 +573,7 @@ export class PdfService {
 
       <!-- Dark Navy Payslip Banner -->
       <div class="payslip-banner">
-        <div class="banner-title">Payslip for ${month} ${year}</div>
+        <div class="banner-title">${docTitle} for ${month} ${year}</div>
         ${salarySlipNo ? `<div class="banner-slip-no">Slip No: ${salarySlipNo}</div>` : ''}
       </div>
 
@@ -610,7 +617,7 @@ export class PdfService {
             <tbody>
               ${earningsRowsHtml}
               <tr class="total-row earnings-total">
-                <td>Total Gross Earnings</td>
+                <td>${grossTitle}</td>
                 <td class="amount">Rs. ${formatCurrency(grossEarnings)}</td>
               </tr>
             </tbody>
@@ -640,7 +647,7 @@ export class PdfService {
       <!-- Net Salary Payable Banner -->
       <div class="net-pay-banner">
         <div class="net-left">
-          <div class="net-title">Net Salary Payable (Take Home)</div>
+          <div class="net-title">${netTitle}</div>
           ${netPayWords ? `<div class="net-words">${netPayWords}</div>` : ''}
         </div>
         <div class="net-right">
