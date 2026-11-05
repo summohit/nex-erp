@@ -164,7 +164,7 @@ export class PayProfilesService {
         id: true, firstName: true, lastName: true, payType: true, employmentType: true, joiningDate: true, avatarUrl: true, employeeCode: true,
         department: { select: { name: true } }, designation: { select: { name: true } },
         bankName: true, bankAccountNumber: true, ifscCode: true,
-        panNumber: true, uanNumber: true, pfNumber: true, esiNumber: true,
+        panNumber: true, uanNumber: true, pfNumber: true, esiNumber: true, gstin: true, gstPct: true,
         panVerifiedAt: true, uanVerifiedAt: true, bankVerifiedAt: true,
         documents: {
           where: { documentType: { in: Object.keys(READABLE_DOCUMENTS) } },
