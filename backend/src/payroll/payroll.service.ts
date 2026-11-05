@@ -1219,6 +1219,28 @@ export class PayrollService {
       orderBy: { employee: { firstName: 'asc' } }
     });
 
+    // Each payslip's salary group (5 Nov 2026), for the group filter: the pay
+    // profile in force at the month's end, else the person's first profile.
+    if (existing.length) {
+      const monthEnd = month && year ? new Date(Date.UTC(Number(year), Number(month), 0, 23, 59, 59)) : new Date();
+      const profiles = await this.prisma.employeePayProfile.findMany({
+        where: { companyId, employeeId: { in: [...new Set(existing.map((p) => p.employeeId))] } },
+        select: { employeeId: true, version: true, effectiveFrom: true, salaryGroupCode: true },
+        orderBy: { version: 'desc' },
+      });
+      const groups = await this.prisma.payrollSalaryGroup.findMany({ where: { companyId }, select: { code: true, name: true }, orderBy: { version: 'desc' } });
+      const groupName = new Map<string, string>();
+      for (const g of groups) if (!groupName.has(g.code)) groupName.set(g.code, g.name);
+      const byEmp = new Map<number, string>();
+      for (const p of profiles) if (p.effectiveFrom <= monthEnd && !byEmp.has(p.employeeId)) byEmp.set(p.employeeId, p.salaryGroupCode);
+      for (const p of [...profiles].reverse()) if (!byEmp.has(p.employeeId)) byEmp.set(p.employeeId, p.salaryGroupCode);
+      for (const p of existing as any[]) {
+        const code = byEmp.get(p.employeeId) ?? null;
+        p.salaryGroupCode = code;
+        p.salaryGroupName = code ? groupName.get(code) ?? code : null;
+      }
+    }
+
     // Deliberately does NOT generate when the period is empty.
     //
     // It used to: a GET that found nothing created a full month of drafts as a

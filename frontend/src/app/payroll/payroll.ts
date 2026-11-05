@@ -124,6 +124,21 @@ export class PayrollComponent implements OnInit {
   processingSearchQuery = signal<string>('');
   processingDeptFilter = signal<string>('ALL');
   processingDesigFilter = signal<string>('ALL');
+  /** Salary group filter (5 Nov 2026): Regular, Technical / Non-tech consultant, Trainee… */
+  processingGroupFilter = signal<string>('ALL');
+  processingGroupOptions = computed<SearchableSelectOption[]>(() => {
+    const seen = new Map<string, string>();
+    let none = false;
+    for (const p of this.payslips() as any[]) {
+      if (p.salaryGroupCode) seen.set(p.salaryGroupCode, p.salaryGroupName || p.salaryGroupCode);
+      else none = true;
+    }
+    return [
+      { id: 'ALL', name: 'All Salary Groups' },
+      ...[...seen.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => ({ id, name })),
+      ...(none ? [{ id: 'NONE', name: 'No pay profile' }] : []),
+    ];
+  });
   processingStatusFilter = signal<string>('ALL');
   processingLopFilter = signal<'ALL' | 'WITH_LOP' | 'ZERO_LOP'>('ALL');
   processingSortColumn = signal<string>('name');
@@ -1067,6 +1082,7 @@ export class PayrollComponent implements OnInit {
     return this.processingSearchQuery().trim() !== '' ||
       this.processingDeptFilter() !== 'ALL' ||
       this.processingDesigFilter() !== 'ALL' ||
+      this.processingGroupFilter() !== 'ALL' ||
       this.processingStatusFilter() !== 'ALL' ||
       this.processingLopFilter() !== 'ALL';
   });
@@ -1075,6 +1091,7 @@ export class PayrollComponent implements OnInit {
     this.processingSearchQuery.set('');
     this.processingDeptFilter.set('ALL');
     this.processingDesigFilter.set('ALL');
+    this.processingGroupFilter.set('ALL');
     this.processingStatusFilter.set('ALL');
     this.processingLopFilter.set('ALL');
   }
@@ -1112,6 +1129,11 @@ export class PayrollComponent implements OnInit {
 
     if (desig !== 'ALL') {
       list = list.filter(p => p.employee?.designation?.name === desig);
+    }
+
+    const group = this.processingGroupFilter();
+    if (group !== 'ALL') {
+      list = list.filter((p: any) => (group === 'NONE' ? !p.salaryGroupCode : p.salaryGroupCode === group));
     }
 
     if (status !== 'ALL') {

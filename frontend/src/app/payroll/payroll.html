@@ -373,6 +373,20 @@
             </div>
           </div>
 
+          <!-- Salary Group Filter -->
+          <div class="filter-item">
+            <label>Salary Group</label>
+            <div class="searchable-select-wrap">
+              <app-searchable-select
+                [options]="processingGroupOptions()"
+                [value]="processingGroupFilter()"
+                [clearable]="processingGroupFilter() !== 'ALL'"
+                placeholder="All Salary Groups"
+                (valueChange)="processingGroupFilter.set($event || 'ALL')">
+              </app-searchable-select>
+            </div>
+          </div>
+
           <!-- Department Filter -->
           <div class="filter-item">
             <label>Department</label>
