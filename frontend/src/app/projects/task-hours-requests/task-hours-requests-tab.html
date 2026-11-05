@@ -790,17 +790,15 @@
   </ng-container>
 
   <!-- ── Loading / empty, shared by the three new queues ──────────────────── -->
-  <!-- Same approval toolbar across every Delivery queue. These queues currently
-       provide actionable rows only, so the historical status tabs are visible
-       but unavailable instead of suggesting data that has not been loaded. -->
+  <!-- One working status switcher across every Delivery queue. -->
   <ng-container *ngIf="requestType() !== 'HOURS'">
     <div class="thr-controls-card delivery-shared-controls">
       <div class="thr-view-tabs" role="tablist" aria-label="Approval status">
-        <button type="button" class="thr-tab-btn active" role="tab" aria-selected="true"><svg lucideClock size="15"></svg><span>Awaiting Decision</span><span class="thr-tab-pill pill-warn">{{ otherQueueCount() }}</span></button>
-        <button type="button" class="thr-tab-btn" disabled title="This queue loads actionable requests only"><svg lucideHistory size="15"></svg><span>Decision History</span><span class="thr-tab-pill">0</span></button>
-        <button type="button" class="thr-tab-btn" disabled title="This queue loads actionable requests only"><svg lucideCheckCircle2 size="15"></svg><span>Approved</span><span class="thr-tab-pill">0</span></button>
-        <button type="button" class="thr-tab-btn" disabled title="This queue loads actionable requests only"><svg lucideXCircle size="15"></svg><span>Declined</span><span class="thr-tab-pill">0</span></button>
-        <button type="button" class="thr-tab-btn" disabled title="This queue loads actionable requests only"><svg lucideSlidersHorizontal size="15"></svg><span>All Requests</span><span class="thr-tab-pill">{{ otherQueueCount() }}</span></button>
+        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'AWAITING'" role="tab" [attr.aria-selected]="otherActiveTab() === 'AWAITING'" (click)="setOtherActiveTab('AWAITING')"><svg lucideClock size="15"></svg><span>Awaiting Decision</span><span class="thr-tab-pill pill-warn">{{ otherTabCount('AWAITING') }}</span></button>
+        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'HISTORY'" role="tab" [attr.aria-selected]="otherActiveTab() === 'HISTORY'" (click)="setOtherActiveTab('HISTORY')"><svg lucideHistory size="15"></svg><span>Decision History</span><span class="thr-tab-pill">{{ otherTabCount('HISTORY') }}</span></button>
+        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'APPROVED'" role="tab" [attr.aria-selected]="otherActiveTab() === 'APPROVED'" (click)="setOtherActiveTab('APPROVED')"><svg lucideCheckCircle2 size="15"></svg><span>Approved</span><span class="thr-tab-pill">{{ otherTabCount('APPROVED') }}</span></button>
+        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'REJECTED'" role="tab" [attr.aria-selected]="otherActiveTab() === 'REJECTED'" (click)="setOtherActiveTab('REJECTED')"><svg lucideXCircle size="15"></svg><span>Declined</span><span class="thr-tab-pill">{{ otherTabCount('REJECTED') }}</span></button>
+        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'ALL'" role="tab" [attr.aria-selected]="otherActiveTab() === 'ALL'" (click)="setOtherActiveTab('ALL')"><svg lucideSlidersHorizontal size="15"></svg><span>All Requests</span><span class="thr-tab-pill">{{ otherTabCount('ALL') }}</span></button>
       </div>
       <div class="thr-filter-row">
         <div class="thr-search-box">

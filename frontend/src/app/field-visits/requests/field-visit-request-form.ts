@@ -90,6 +90,8 @@ export class FieldVisitRequestFormComponent implements OnInit {
   /** The trip being edited or changed; absent when raising a new one. */
   @Input() request: FieldVisitRequest | null = null;
   @Input() mode: FieldVisitFormMode = 'create';
+  /** Set by the approved-row action menu so the shared change dialog has a clear intent. */
+  @Input() rescheduleAction: 'PREPONE' | 'POSTPONE' | null = null;
   /** Project selected before the create dialog opens (for project-board entry points). */
   @Input() initialProjectId: number | null = null;
 
@@ -470,6 +472,8 @@ export class FieldVisitRequestFormComponent implements OnInit {
   };
 
   get title(): string {
+    if (this.rescheduleAction === 'PREPONE') return `Prepone ${this.request?.requestNumber ?? 'field visit'}`;
+    if (this.rescheduleAction === 'POSTPONE') return `Postpone ${this.request?.requestNumber ?? 'field visit'}`;
     if (this.mode === 'modify') return `Change ${this.request?.requestNumber ?? 'this field visit'}`;
     return this.mode === 'edit' ? 'Edit field visit request' : 'New field visit request';
   }
@@ -1316,16 +1320,21 @@ export class FieldVisitRequestFormComponent implements OnInit {
       return;
     }
     if (!this.form.changeReason.trim()) {
-      this.error.set('Give a reason for the change — the approver reads it.');
+      this.error.set('Give a reason for the change so it can be recorded in the visit history.');
       return;
     }
     this.error.set(null);
     this.isSaving.set(true);
 
-    this.api.requestModification(id, this.payload(false)).subscribe({
+    const request$ = this.rescheduleAction
+      ? this.api.reschedule(id, this.payload(false), this.rescheduleAction)
+      : this.api.requestModification(id, this.payload(false));
+    request$.subscribe({
       next: () => {
         this.isSaving.set(false);
-        this.toast.success('Change sent for approval — the trip runs as approved until it is decided');
+        this.toast.success(this.rescheduleAction
+          ? `${this.rescheduleAction === 'PREPONE' ? 'Prepone' : 'Postpone'} applied immediately and recorded in history`
+          : 'Change saved — date moves take effect immediately; other changes follow their normal review flow');
         this.saved.emit();
       },
       error: (err: any) => {

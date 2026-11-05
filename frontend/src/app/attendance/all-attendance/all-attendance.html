@@ -1022,7 +1022,7 @@
         <ng-container *ngIf="selectedDayDetails()?.logs && selectedDayDetails()!.logs.length > 0; else noPunches">
           <div *ngFor="let punch of selectedDayDetails()?.logs; let i = index" class="session-punch-card">
             <div class="session-card-title">
-              SESSION {{ i + 1 }}
+              {{ punch.plannedShift ? 'SCHEDULED SHIFT' : 'SESSION ' + (i + 1) }}
             </div>
             <div class="session-card-grid">
               <!-- Clock In -->

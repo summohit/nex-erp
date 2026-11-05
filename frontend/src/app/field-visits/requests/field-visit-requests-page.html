@@ -167,6 +167,51 @@
     }
   </div>
 
+  @if (!isLoading() && statusFilter() === 'HISTORY') {
+    <div class="card field-visit-history-card">
+      <div class="history-heading">
+        <div>
+          <span class="history-kicker">AUDIT TRAIL</span>
+          <h2><span class="history-heading-icon"><svg lucideHistory [size]="19"></svg></span> Field Visit History</h2>
+          <p>A complete, time-stamped record of schedule moves, cancellations, site changes and decisions.</p>
+        </div>
+        <span class="history-total"><strong>{{ historySummary().total }}</strong> {{ historySummary().total === 1 ? 'entry' : 'entries' }}</span>
+      </div>
+
+      <div class="history-stat-grid">
+        <div class="history-stat total"><span>All events</span><strong>{{ historySummary().total }}</strong><small>Recorded activity</small></div>
+        <div class="history-stat move"><span>Schedule moves</span><strong>{{ historySummary().reschedules }}</strong><small>Preponed or postponed</small></div>
+        <div class="history-stat change"><span>Changes</span><strong>{{ historySummary().changes }}</strong><small>Location or request updates</small></div>
+        <div class="history-stat cancel"><span>Cancelled</span><strong>{{ historySummary().cancellations }}</strong><small>Trips called off</small></div>
+      </div>
+
+      @if (!historyEntries().length) {
+        <div class="history-empty-state">
+          <div class="history-empty-icon"><svg lucideHistory [size]="28"></svg></div>
+          <div><h3>Your audit trail will appear here</h3><p>When a field visit is postponed, preponed, cancelled, edited or decided, the complete record will be saved here.</p></div>
+        </div>
+      } @else {
+        <div class="history-table-wrap">
+          <table class="field-visit-history-table">
+            <thead><tr><th>When</th><th>Request</th><th>Project / site</th><th>Change</th><th>Details</th><th>Changed by</th></tr></thead>
+            <tbody>
+              @for (entry of historyEntries(); track entry.id) {
+                <tr>
+                  <td><span class="history-time">{{ entry.createdAt | date:'dd MMM yyyy' }}</span><small>{{ entry.createdAt | date:'h:mm a' }}</small></td>
+                  <td><a class="history-request-link" [routerLink]="['/field-visits/requests', entry.request.id]">{{ entry.request.requestNumber }} <svg lucideArrowRight [size]="13"></svg></a></td>
+                  <td><strong>{{ entry.request.project.name }}</strong><span>{{ entry.request.location }}</span></td>
+                  <td><span class="history-action">{{ historyLabel(entry.action) }}</span></td>
+                  <td>{{ entry.detail || '—' }}</td>
+                  <td>{{ entry.actor.firstName }} {{ entry.actor.lastName }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+
   <!-- Table View / Empty States -->
   @if (isLoading()) {
     <div class="card loading-card">
@@ -190,6 +235,8 @@
         <p>Field visits you are sent on by your project manager appear here.</p>
       }
     </div>
+  } @else if (statusFilter() === 'HISTORY') {
+    <!-- The dedicated history table above is the complete History view. -->
   } @else if (filteredRequests().length === 0) {
     <!-- Empty tab or no matching filters -->
     <div class="card empty-card">
@@ -339,6 +386,10 @@
                     <div class="row-action-menu">
                       <button type="button" (click)="openRequest(r)"><svg lucideArrowRight [size]="14"></svg> View</button>
                       @if (r.canEdit || isSuperAdmin()) { <button type="button" (click)="openForm(r)"><svg lucideEdit2 [size]="14"></svg> Edit</button> }
+                      @if (canReschedule(r)) {
+                        <button type="button" (click)="openReschedule(r, 'PREPONE', $event)"><svg lucideCalendarDays [size]="14"></svg> Prepone</button>
+                        <button type="button" (click)="openReschedule(r, 'POSTPONE', $event)"><svg lucideCalendarDays [size]="14"></svg> Postpone</button>
+                      }
                       @if (isSuperAdmin()) {
                         @if (r.status === 'PENDING_APPROVAL') { <button type="button" (click)="approveRow(r, $event)"><svg lucideCheck [size]="14"></svg> Approve</button><button type="button" class="danger" (click)="rejectRow(r, $event)"><svg lucideX [size]="14"></svg> Reject</button> }
                         @if (r.status !== 'CANCELLED' && r.status !== 'COMPLETED') { <button type="button" class="danger" (click)="cancelRow(r, $event)"><svg lucideX [size]="14"></svg> Cancel</button> }
@@ -447,6 +498,10 @@
                       @if (r.canEdit || isSuperAdmin()) {
                         <button type="button" (click)="openForm(r)"><svg lucideEdit2 [size]="14"></svg> Edit</button>
                       }
+                      @if (canReschedule(r)) {
+                        <button type="button" (click)="openReschedule(r, 'PREPONE', $event)"><svg lucideCalendarDays [size]="14"></svg> Prepone</button>
+                        <button type="button" (click)="openReschedule(r, 'POSTPONE', $event)"><svg lucideCalendarDays [size]="14"></svg> Postpone</button>
+                      }
                       @if (isSuperAdmin()) {
                         @if (r.status === 'PENDING_APPROVAL') {
                           <button type="button" (click)="approveRow(r, $event)"><svg lucideCheck [size]="14"></svg> Approve</button>
@@ -479,7 +534,8 @@
 @if (isFormOpen()) {
   <app-field-visit-request-form
     [request]="editing()"
-    [mode]="editing() ? 'edit' : 'create'"
+    [mode]="rescheduleAction() ? 'modify' : (editing() ? 'edit' : 'create')"
+    [rescheduleAction]="rescheduleAction()"
     [initialProjectId]="createProjectId()"
     (saved)="onSaved()"
     (closed)="closeForm()">

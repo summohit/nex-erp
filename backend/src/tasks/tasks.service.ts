@@ -706,6 +706,29 @@ export class TasksService {
   }
 
   /**
+   * Board placement is the live workflow state. `Issue.status` is kept in
+   * sync when a card moves, but this read-side guard also makes the register
+   * correct for records created before that invariant was enforced.
+   */
+  private statusFromBoardColumn(
+    issue: { status: string | null; column?: { type: string; name: string } | null },
+  ): string | null {
+    const byType: Record<string, string> = {
+      TODO: 'TODO', IN_PROGRESS: 'IN_PROGRESS', REVIEW: 'IN_REVIEW',
+      DONE: 'DONE', CANCELLED: 'CANCELLED',
+    };
+    const typed = byType[String(issue.column?.type ?? '').toUpperCase()];
+    if (typed) return typed;
+    const name = String(issue.column?.name ?? '').toLowerCase();
+    if (name.includes('done') || name.includes('complete')) return 'DONE';
+    if (name.includes('cancel')) return 'CANCELLED';
+    if (name.includes('progress') || name.includes('doing')) return 'IN_PROGRESS';
+    if (name.includes('review')) return 'IN_REVIEW';
+    if (name.includes('to do') || name.includes('todo')) return 'TODO';
+    return issue.status;
+  }
+
+  /**
    * Everything assigned to one person, across projects, the General project and
    * pre-sales, in one list.
    *
@@ -749,7 +772,7 @@ export class TasksService {
         ...(opts.includeDone ? {} : { status: { notIn: CLOSED_STATUSES } }),
         ...(everyone
           ? (onePerson ? { OR: [{ assigneeId: onePerson }, { members: { some: { employeeId: onePerson } } }] } : {})
-          : created ? { reporterId: employeeId } : { OR: mine, AND: [approvedOrRaisedBy(employeeId)] }),
+          : created ? { reporterId: employeeId } : { OR: mine }),
       },
       select: {
         id: true, key: true, title: true, status: true, priority: true,
@@ -758,6 +781,7 @@ export class TasksService {
         // why it came back if it was sent back.
         approvalState: true,
         approvalRejectionReason: true,
+        column: { select: { type: true, name: true } },
         project: { select: { id: true, name: true, key: true, isSystem: true } },
         // §17: the task list filters by project code and by milestone, and
         // both are cheap joins the row already half-carries.
@@ -831,8 +855,8 @@ export class TasksService {
         id: i.id,
         refKey: i.key,
         title: i.title,
-        status: this.normaliseIssueStatus(i.status),
-        rawStatus: i.status,
+        status: this.normaliseIssueStatus(this.statusFromBoardColumn(i)),
+        rawStatus: this.statusFromBoardColumn(i),
         priority: i.priority,
         taskType: i.taskType?.name ?? null,
         // §8: both id and name -- the name renders, the id drives the filter.

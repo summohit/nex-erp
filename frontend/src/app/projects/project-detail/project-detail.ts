@@ -3006,6 +3006,26 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return col ? col.name : 'Unknown';
   }
 
+  /**
+   * The modal is a workflow chooser, not a board-layout editor. Keep its
+   * states in the same predictable order for every project even if someone
+   * rearranges the visible board columns. Unknown custom columns follow the
+   * standard workflow in their board order.
+   */
+  taskModalColumns(): any[] {
+    const rank = (column: any): number => {
+      const type = String(column?.type ?? '').toUpperCase();
+      const name = String(column?.name ?? '').toLowerCase();
+      if (type === 'TODO' || name.includes('to do') || name.includes('todo')) return 0;
+      if (type === 'IN_PROGRESS' || name.includes('progress') || name.includes('doing')) return 1;
+      if (type === 'REVIEW' || name.includes('review')) return 2;
+      if (type === 'DONE' || name.includes('done') || name.includes('complete')) return 3;
+      if (type === 'CANCELLED' || name.includes('cancel')) return 4;
+      return 5;
+    };
+    return [...this.columns()].sort((a, b) => rank(a) - rank(b) || Number(a.position ?? 0) - Number(b.position ?? 0));
+  }
+
   getStatusDotClass(columnId: string | number | null): string {
     if (!columnId) return 'dot-todo';
     const numId = Number(columnId);
@@ -3105,7 +3125,45 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return !!me && !!this.project()?.members?.some((m: any) => m.role === 'PROJECT_MANAGER' && m.employeeId === me);
   }
 
+  /** Project leadership can move any task through the active workflow. */
+  private canMoveAnyTask(): boolean {
+    return this.roles.isSuperAdmin() || this.isProjectOwner || this.isCurrentUserPM();
+  }
+
+  /** A member listed on a task is an assignee for workflow purposes too. */
+  private isMyTask(issue: any): boolean {
+    const me = this.currentEmployeeId();
+    if (!issue || !me) return false;
+    return Number(issue.assigneeId) === Number(me) || !!issue.members?.some((member: any) =>
+      Number(member.employeeId) === Number(me) || Number(member.employee?.id) === Number(me),
+    );
+  }
+
+  private isOrdinaryWorkflowColumn(columnId: number): boolean {
+    const col = this.getColumnById(columnId);
+    const type = String(col?.type ?? '').toUpperCase();
+    const name = String(col?.name ?? '').toLowerCase();
+    return type === 'TODO' || type === 'IN_PROGRESS' || type === 'REVIEW'
+      || name.includes('todo') || name.includes('to do')
+      || name.includes('progress') || name.includes('doing') || name.includes('review');
+  }
+
+  /**
+   * Employees can move only work assigned to them, and only between To Do,
+   * In Progress and In Review. Completing or cancelling is a leadership act.
+   * This mirrors the API guard; the API remains the source of authority.
+   */
+  private canMoveTaskToColumn(issue: any, columnId: number): boolean {
+    if (!issue || issue.columnId === columnId) return true;
+    if (this.isDoneOrArchiveColumn(columnId) || this.isCancelColumn(columnId)) {
+      return this.canCloseTasks();
+    }
+    if (!this.isOrdinaryWorkflowColumn(columnId)) return false;
+    return this.canMoveAnyTask() || this.isMyTask(issue);
+  }
+
   canMoveIntoReviewOrDone(issue: any, columnId: number): boolean {
+    if (!this.canMoveTaskToColumn(issue, columnId)) return false;
     if (this.isDoneOrArchiveColumn(columnId) && !this.canCloseTasks()) return false;
     if (this.isAssigneeProjectManager(issue) && this.isDoneOrArchiveColumn(columnId)) {
       return this.isProjectOwner;
@@ -3139,9 +3197,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   canDropOnColumn(drag: any, columnId: number): boolean {
-    // Employees cannot drop a card on Done or Cancelled at all.
-    if ((this.isDoneOrArchiveColumn(columnId) || this.isCancelColumn(columnId))
-        && drag?.data?.columnId !== columnId && !this.canCloseTasks()) return false;
+    if (!this.canMoveTaskToColumn(drag?.data, columnId)) return false;
     return this.isAdjacentColumnMove(drag?.data, columnId);
   }
 
@@ -3180,20 +3236,30 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   private needsProofUpload(columnId: number | null | undefined): boolean {
-    return this.isReviewColumn(columnId) || this.isDoneOrArchiveColumn(columnId);
+    // Review is part of the assignee's normal workflow, including for overdue
+    // work. Evidence is collected only when authorised leadership completes
+    // the task; an elapsed due date must never stop a task from progressing.
+    return this.isDoneOrArchiveColumn(columnId);
   }
 
   isStatusMoveBlocked(columnId: number): boolean {
     const issue = this.selectedIssue();
     if (!issue) return false;
+    if (!this.canMoveTaskToColumn(issue, columnId)) return true;
     if ((this.isReviewColumn(columnId) || this.isDoneOrArchiveColumn(columnId)) && !this.canMoveIntoReviewOrDone(issue, columnId)) return true;
     // Cancelling: the same people who may close the task.
     if (this.isCancelColumn(columnId) && issue.columnId !== columnId && !this.canCloseTasks()) return true;
     if (this.isCancelColumn(columnId) && issue.columnId !== columnId) {
       if (this.isAssigneeProjectManager(issue) ? !this.isProjectOwner : !(this.isProjectOwner || this.canCompleteIssue(issue))) return true;
     }
-    if (!this.isAdjacentColumnMove(issue, columnId)) return true;
     return false;
+  }
+
+  statusMoveBlockedMessage(columnId: number): string {
+    if (this.isDoneOrArchiveColumn(columnId) || this.isCancelColumn(columnId)) {
+      return 'Only a Project Manager or Super Admin can complete or cancel a task.';
+    }
+    return 'You can move only a task assigned to you.';
   }
 
   /**
@@ -3275,15 +3341,15 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     this.closePopover();
     if (this.selectedIssue()) {
       const issue = this.selectedIssue();
+      if (!this.canMoveTaskToColumn(issue, columnId)) {
+        this.toast.error('You can move only your own tasks between To Do, In Progress and In Review. Only a Project Manager or Super Admin can complete or cancel a task.');
+        return;
+      }
       if ((this.isReviewColumn(columnId) || this.isDoneOrArchiveColumn(columnId)) && !this.canMoveIntoReviewOrDone(issue, columnId)) {
         const msg = this.isAssigneeProjectManager(issue)
           ? 'Permission Denied: Only the project owner can move a task assigned to a Project Manager into this stage.'
           : 'Permission Denied: Only Project Managers, the project owner, or the assignee\'s manager are authorized to move tasks to Done.';
         this.toast.error(msg);
-        return;
-      }
-      if (!this.isAdjacentColumnMove(issue, columnId)) {
-        this.toast.warning('Cannot skip columns. Please move the card one column at a time.');
         return;
       }
       // Review or Done → open proof upload modal

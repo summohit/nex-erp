@@ -132,6 +132,10 @@ export interface FieldVisitActivity {
   actor: FieldVisitPerson;
 }
 
+export interface FieldVisitHistoryEntry extends FieldVisitActivity {
+  request: { id: number; requestNumber: string; location: string; project: { id: number; name: string; key?: string | null } };
+}
+
 export interface FieldVisitLeaveConflict {
   employeeId: number;
   startDate: string;
@@ -185,6 +189,10 @@ export class FieldVisitRequestsService {
     return this.http.get<FieldVisitActivity[]>(`${this.apiUrl}/${id}/timeline`);
   }
 
+  history() {
+    return this.http.get<FieldVisitHistoryEntry[]>(`${this.apiUrl}/history`);
+  }
+
   create(body: FieldVisitRequestInput) {
     return this.http.post<FieldVisitRequest>(this.apiUrl, body);
   }
@@ -232,6 +240,11 @@ export class FieldVisitRequestsService {
 
   requestModification(id: number, body: FieldVisitRequestInput) {
     return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/request-modification`, body);
+  }
+
+  /** A named prepone/postpone action is immediate, never an approval request. */
+  reschedule(id: number, body: FieldVisitRequestInput, action: 'PREPONE' | 'POSTPONE') {
+    return this.http.post<FieldVisitRequest>(`${this.apiUrl}/${id}/reschedule`, { ...body, action });
   }
 
   requestPostpone(id: number, body: { startDate: string; endDate: string; reason: string }) {

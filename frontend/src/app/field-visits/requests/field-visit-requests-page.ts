@@ -8,9 +8,9 @@ import {
   LucideX, LucideCalendarDays, LucideUsers, LucideBuilding,
   LucideClock, LucideArrowRight, LucideCheckCircle2,
   LucideRotateCcw, LucideRefreshCw, LucideFilter, LucideCheck,
-  LucideChevronDown, LucideAlertTriangle, LucideMoreHorizontal, LucideEdit2,
+  LucideChevronDown, LucideAlertTriangle, LucideMoreHorizontal, LucideEdit2, LucideHistory,
 } from '@lucide/angular';
-import { FieldVisitRequestsService, FieldVisitRequest, FieldVisitRequestTask } from '../../services/field-visit-requests';
+import { FieldVisitRequestsService, FieldVisitRequest, FieldVisitRequestTask, FieldVisitHistoryEntry } from '../../services/field-visit-requests';
 import { FieldVisitRequestFormComponent } from './field-visit-request-form';
 import { MyFieldVisitComponent } from '../my-field-visit/my-field-visit';
 import { DialogService } from '../../shared/services/dialog.service';
@@ -40,7 +40,7 @@ const STATUS_LABELS: Record<string, string> = {
     LucideX, LucideCalendarDays, LucideUsers, LucideBuilding,
     LucideClock, LucideArrowRight, LucideCheckCircle2,
     LucideRotateCcw, LucideRefreshCw, LucideFilter, LucideCheck,
-    LucideChevronDown, LucideAlertTriangle, LucideMoreHorizontal, LucideEdit2,
+    LucideChevronDown, LucideAlertTriangle, LucideMoreHorizontal, LucideEdit2, LucideHistory,
   ],
   templateUrl: './field-visit-requests-page.html',
   styleUrls: ['./field-visit-requests-page.css'],
@@ -68,6 +68,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
   });
   isLocationFormOpen = signal(false);
   allRequests = signal<FieldVisitRequest[]>([]);
+  historyEntries = signal<FieldVisitHistoryEntry[]>([]);
   isLoading = signal(true);
 
   // Filters
@@ -116,10 +117,13 @@ export class FieldVisitRequestsPageComponent implements OnInit {
 
   isFormOpen = signal(false);
   editing = signal<FieldVisitRequest | null>(null);
+  /** An approved trip opened from the Prepone/Postpone row actions. */
+  rescheduleAction = signal<'PREPONE' | 'POSTPONE' | null>(null);
   createProjectId = signal<number | null>(null);
 
   statuses = [
     { key: '', label: 'All' },
+    { key: 'HISTORY', label: 'History' },
     { key: 'DRAFT', label: 'Draft' },
     { key: 'PENDING_APPROVAL', label: 'Pending approval' },
     { key: 'APPROVED', label: 'Approved' },
@@ -225,11 +229,23 @@ export class FieldVisitRequestsPageComponent implements OnInit {
     const rows = this.baseRows();
     const counts: Record<string, number> = { '': rows.length };
     for (const s of this.statuses) if (s.key) counts[s.key] = 0;
+    counts['HISTORY'] = this.historyEntries().length;
     for (const r of rows) {
       if (counts[r.status] !== undefined) counts[r.status]++;
       if (r.postponeState) counts['POSTPONED']++;
     }
     return counts;
+  });
+
+  historySummary = computed(() => {
+    const entries = this.historyEntries();
+    const action = (entry: FieldVisitHistoryEntry) => String(entry.action ?? '').toUpperCase();
+    return {
+      total: entries.length,
+      reschedules: entries.filter((entry) => action(entry).includes('RESCHEDULE') || action(entry).includes('POSTPONE')).length,
+      cancellations: entries.filter((entry) => action(entry).includes('CANCEL')).length,
+      changes: entries.filter((entry) => action(entry).includes('MODIFICATION') || action(entry).includes('UPDATED')).length,
+    };
   });
 
   summaryKpis = computed(() => {
@@ -249,6 +265,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
 
   filteredRequests = computed(() => {
     const status = this.statusFilter();
+    if (status === 'HISTORY') return [];
     const rows = this.baseRows();
     if (status === 'POSTPONED') return rows.filter((r) => r.postponeState);
     return status ? rows.filter((r) => r.status === status) : rows;
@@ -313,6 +330,14 @@ export class FieldVisitRequestsPageComponent implements OnInit {
         this.isLoading.set(false);
       },
     });
+    this.api.history().subscribe({
+      next: (entries) => this.historyEntries.set(entries || []),
+      error: () => this.historyEntries.set([]),
+    });
+  }
+
+  historyLabel(action: string): string {
+    return String(action || 'UPDATED').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
   }
 
   setStatus(status: string): void {
@@ -657,6 +682,21 @@ export class FieldVisitRequestsPageComponent implements OnInit {
     this.activeActionMenuId.update(open => open === id ? null : id);
   }
 
+  /** Project Managers and Super Admins can move any field visit that is still active. */
+  canReschedule(request: FieldVisitRequest): boolean {
+    return !(['CANCELLED', 'COMPLETED', 'REJECTED'] as string[]).includes(request.status)
+      && (this.isSuperAdmin() || this.locationCapabilities()?.isProjectManager === true);
+  }
+
+  openReschedule(request: FieldVisitRequest, action: 'PREPONE' | 'POSTPONE', event?: Event): void {
+    event?.stopPropagation();
+    this.activeActionMenuId.set(null);
+    this.editing.set(request);
+    this.rescheduleAction.set(action);
+    this.createProjectId.set(null);
+    this.isFormOpen.set(true);
+  }
+
   cancelRow(r: FieldVisitRequest, event: Event): void {
     event.stopPropagation();
     if (!this.isSuperAdmin() || this.deciding()) return;
@@ -719,6 +759,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
 
   openForm(request?: FieldVisitRequest): void {
     this.editing.set(request ?? null);
+    this.rescheduleAction.set(null);
     this.createProjectId.set(null);
     this.isFormOpen.set(true);
   }
@@ -726,6 +767,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
   closeForm(): void {
     this.isFormOpen.set(false);
     this.editing.set(null);
+    this.rescheduleAction.set(null);
     this.createProjectId.set(null);
   }
 

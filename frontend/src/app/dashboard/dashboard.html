@@ -1,5 +1,5 @@
 <div class="cmd-dashboard" [class.dark-theme]="darkMode()">
-  <div class="cmd-container" *ngIf="user() as currentUser">
+  <div class="cmd-container" *ngIf="user() as currentUser; else dashboardLoading">
 
     <!-- ====================================================================
          TOP BAR: Segmented Control [My Workspace] [My Team] [Organization]
@@ -1071,6 +1071,15 @@
       <span>{{ !todayAttendance()?.clockIn ? 'Clock In' : 'Clock Out' }}</span>
     </button>
   </div>
+
+  <ng-template #dashboardLoading>
+    <div style="min-height: 360px; display: grid; place-items: center; color: #64748b; text-align: center;">
+      <div>
+        <strong style="display: block; color: #334155; margin-bottom: 8px;">Loading your dashboard…</strong>
+        <span>Fetching your profile and workspace data.</span>
+      </div>
+    </div>
+  </ng-template>
 </div>
 
 <!-- Holidays, birthdays and kudos: shown on Organization, and on My Workspace for employees -->

@@ -7184,6 +7184,12 @@
    Keep these selectors under ::ng-deep so their controls never fall back to
    browser-default buttons (which was making each task title overlap rows). */
 :host ::ng-deep .my-tasks-table-wrapper .ag-cell { display: flex; align-items: center; overflow: hidden; }
+/* No bottom scrollbar: the flexible middle columns yield first while Status
+   and Action remain pinned and fully usable on the right. */
+:host ::ng-deep .my-tasks-table-wrapper .ag-body-horizontal-scroll { display: none !important; }
+:host ::ng-deep .my-tasks-table-wrapper .ag-center-cols-viewport { overflow-x: hidden !important; }
+:host ::ng-deep .my-tasks-table-wrapper .ag-pinned-right-header,
+:host ::ng-deep .my-tasks-table-wrapper .ag-pinned-right-cols-container { border-left: 1px solid #e2e8f0; }
 :host ::ng-deep .my-tasks-table-wrapper .task-table-link { display: inline; max-width: 100%; padding: 0; margin: 0; color: #1d4ed8; border: 0; background: transparent; font: inherit; line-height: 1.25; cursor: pointer; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :host ::ng-deep .my-tasks-table-wrapper .task-table-link:hover { color: #1e40af; text-decoration: underline; }
 :host ::ng-deep .my-tasks-table-wrapper .task-code-link { font-size: 12px; font-weight: 650; }

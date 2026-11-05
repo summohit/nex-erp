@@ -783,6 +783,34 @@
   background: #fbfcfe;
 }
 
+/* Approval history for moved field-visit dates.  This stays a table rather
+   than a timeline because the old/new date comparison is the important part. */
+.reschedule-history-card {
+  padding: 22px 24px;
+}
+
+.reschedule-history-table td {
+  white-space: nowrap;
+}
+
+.reschedule-history-table td:nth-child(6) {
+  white-space: normal;
+  min-width: 220px;
+}
+
+.reschedule-status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.reschedule-approved { background: #dcfce7; color: #166534; }
+.reschedule-applied { background: #dbeafe; color: #1d4ed8; }
+.reschedule-rejected { background: #fee2e2; color: #b91c1c; }
+.reschedule-pending-approval { background: #fef3c7; color: #92400e; }
+
 .attendee-cell {
   display: flex;
   align-items: center;

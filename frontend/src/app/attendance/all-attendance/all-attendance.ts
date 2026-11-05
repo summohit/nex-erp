@@ -733,6 +733,23 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
         } else if (day.isFuture) {
           status = 'Empty';
           tooltip = `${day.dayNumber} ${day.weekdayStr} - Upcoming`;
+        // Team Timeline corrections deliberately do not create fake punch
+        // times. Render their Attendance.status before falling back to the
+        // no-punch "Absent" rule so this matrix matches the employee view.
+        } else if (record?.status === 'ABSENT') {
+          status = 'Absent';
+          tooltip = 'Absent (set from Team Timeline)';
+          countsWorking = !isDayOff && !holiday;
+        } else if (record?.status === 'HALF_DAY') {
+          status = 'Half Day';
+          tooltip = record.clockIn ? 'Half Day' : 'Half Day (set from Team Timeline)';
+          countsPresent = true;
+          countsWorking = !isDayOff && !holiday;
+        } else if (record?.status === 'PRESENT' && !record.clockIn) {
+          status = 'Present';
+          tooltip = 'Present (set from Team Timeline)';
+          countsPresent = true;
+          countsWorking = !isDayOff && !holiday;
         } else if (record && record.fieldVisit && !record.clockIn) {
           status = 'Present';
           tooltip = `Scheduled field visit at ${record.fieldVisit.location || 'site'}`;
@@ -750,8 +767,6 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
             // Worked a holiday (B1): recorded, never late or a half day —
             // nobody was expected in.
             status = 'Present';
-          } else if (record.status === 'HALF_DAY') {
-            status = 'Half Day';
           } else if (record.isLate) {
             status = 'Late';
           } else {
@@ -1667,12 +1682,16 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     if (!r.clockIn && this.getBackendDateString(r.date) > this.getLocalDateString(new Date())) {
       return r.status === 'ON_LEAVE' ? 'On Leave' : 'Upcoming';
     }
+    // These values can be explicitly set in Team Timeline without inventing
+    // punch times; they must match the calendar's rendered result.
+    if (r.status === 'ABSENT') return 'Absent';
+    if (r.status === 'HALF_DAY') return 'Half Day';
+    if (r.status === 'PRESENT' && !r.clockIn) return 'Present';
     // A planned field visit with no clock-in, as the grid shows it.
     if (!r.clockIn && (r as any).fieldVisit) return 'Present';
     if (r.clockIn) {
       if (this.clockOutHalfDay(r)) return 'Half Day';
       if (r.clockOutApproval === 'APPROVED') return 'Present';
-      if (r.status === 'HALF_DAY') return 'Half Day';
       if (r.isLate) return 'Late';
       return 'Present';
     }
@@ -1951,6 +1970,24 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
           clockOutLng: record.clockOutLng,
           autoClockedOut: record.autoClockedOut
         }];
+      }
+
+      // Records corrected before shift times were persisted still need to be
+      // understandable. Show the assigned shift as a planned session in the
+      // detail modal; real punch logs always win above.
+      const shift: any = (record as any).shift || mergedEmp.shift;
+      if (!logs.length && ['PRESENT', 'HALF_DAY'].includes(record.status) && shift?.startTime && shift?.endTime) {
+        const onDay = new Date(day.date);
+        const toTime = (hhmm: string) => {
+          const [hours, minutes] = hhmm.split(':').map(Number);
+          const time = new Date(onDay);
+          time.setHours(hours, minutes, 0, 0);
+          return time;
+        };
+        const clockIn = toTime(shift.startTime);
+        const clockOut = toTime(shift.endTime);
+        if (clockOut <= clockIn) clockOut.setDate(clockOut.getDate() + 1);
+        logs = [{ clockIn, clockOut, plannedShift: true }];
       }
 
       const sessionDuration = this.durationForAttendance(record, logs);

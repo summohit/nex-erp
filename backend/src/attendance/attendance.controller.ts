@@ -3,7 +3,7 @@ import { AttendanceService } from './attendance.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
-import { isSuperAdmin, normaliseRole } from '../common/company-roles';
+import { isHrAdmin, isSuperAdmin, normaliseRole } from '../common/company-roles';
 
 /**
  * Everybody's attendance is for the company owner and HR only, the same rule
@@ -168,6 +168,19 @@ export class AttendanceController {
   @Get('team/timeline')
   getTeamTimeline(@Request() req, @Query('start') start: string, @Query('end') end: string) {
     return this.attendanceService.getTeamTimeline(req.user.companyId, start, end);
+  }
+
+  @Post('team/timeline/override')
+  overrideTeamTimelineAttendance(
+    @Request() req,
+    @Body() body: { employeeId: number; date: string; status: string; note?: string },
+  ) {
+    // Match the Team Timeline UI: HR may correct attendance alongside
+    // company administrators.
+    if (!isHrAdmin(req.user.role)) {
+      throw new ForbiddenException('Only an administrator can change an employee attendance status.');
+    }
+    return this.attendanceService.overrideAttendanceStatus(req.user.companyId, body);
   }
 
   /** §Att7: attendance grouped by shift, for a week or a month. */

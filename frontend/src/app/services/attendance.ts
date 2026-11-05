@@ -239,6 +239,13 @@ export class AttendanceService {
     return this.http.get<any[]>(`${this.apiUrl}/team/timeline?start=${start}&end=${end}`);
   }
 
+  /** Administrative correction made from the Team Timeline. */
+  overrideAttendance(employeeId: number, date: string, status: string, note?: string): Observable<AttendanceRecord> {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/team/timeline/override`, {
+      employeeId, date, status, note,
+    });
+  }
+
   /** Roster rows (working and day off) for the grid's rest-day rule. */
   getRosterDays(from: string, to: string): Observable<{ employeeId: number; date: string; isDayOff: boolean }[]> {
     return this.http.get<{ employeeId: number; date: string; isDayOff: boolean }[]>(

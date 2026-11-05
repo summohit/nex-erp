@@ -140,8 +140,10 @@ export function mayChangeAnyTask(viewer: ProjectViewer): boolean {
  * or null when they may see everything.
  *
  * Assignee, member or reporter: a task somebody was added to, or raised and
- * handed over, is still theirs to look at. Combine it with `AND` rather than
- * spreading it, since several of these queries carry an `OR` of their own.
+ * handed over, is still theirs to look at. In particular, approval must never
+ * make an assignee's own task disappear: a pending task is still work they
+ * need to know about. Approval controls workflow, not whether its assignee
+ * can find it.
  */
 export function taskVisibilityFilter(viewer: ProjectViewer): any | null {
   if (seesEveryTask(viewer)) return null;
@@ -155,7 +157,6 @@ export function taskVisibilityFilter(viewer: ProjectViewer): any | null {
       { reporterId: me },
       { members: { some: { employeeId: me } } },
     ],
-    AND: [approvedOrRaisedBy(me)],
   };
 }
 

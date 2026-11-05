@@ -39,6 +39,7 @@ export interface StandingShift {
   startTime: string | null;
   endTime: string | null;
   bufferTimeMinutes: number;
+  earlyClockInMinutes: number;
   workingDays: string | null;
   halfDayTime?: string | null;
   officeGeofence?: boolean;
@@ -61,6 +62,7 @@ export interface EffectiveShift {
     id: number;
     name: string;
     bufferTimeMinutes: number;
+    earlyClockInMinutes: number;
     halfDayTime?: string | null;
     /** Whether this shift is worked at the office and so geofenced (B3). */
     officeGeofence?: boolean;
@@ -164,7 +166,9 @@ export class ShiftRosterService {
           companyId,
           employeeId: { in: empIds },
           visitDate: { gte: start, lte: end },
-          status: { not: 'RELEASED' },
+          // Completed days are kept for reporting, but only open visit days
+          // make somebody on-site for roster and clock-in purposes.
+          status: { in: ['SCHEDULED', 'IN_PROGRESS'] },
           request: { status: { in: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] } },
         },
         include: {
@@ -533,6 +537,7 @@ export class ShiftRosterService {
           id: standing.id,
           name: standing.name,
           bufferTimeMinutes: standing.bufferTimeMinutes,
+          earlyClockInMinutes: standing.earlyClockInMinutes,
           halfDayTime: standing.halfDayTime ?? null,
           officeGeofence: standing.officeGeofence ?? false,
         },
@@ -566,6 +571,7 @@ export class ShiftRosterService {
         id: shift.id,
         name: shift.name,
         bufferTimeMinutes: shift.bufferTimeMinutes,
+          earlyClockInMinutes: shift.earlyClockInMinutes,
         halfDayTime: shift.halfDayTime ?? null,
         officeGeofence: shift.officeGeofence ?? false,
       },

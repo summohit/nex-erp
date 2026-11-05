@@ -329,17 +329,22 @@ export class IssuesService {
   }
 
   /**
-   * Anyone may move their own card through ordinary workflow stages. Project
-   * Managers and Super Admin may move any card; final Done/Cancelled states
-   * are separately guarded below.
+   * Anyone assigned to a card (including a task member) may move it through
+   * the ordinary workflow stages. Project leadership may move any card;
+   * final Done/Cancelled states are separately guarded below.
    */
   private async assertDeliveryLeadMayMove(
     companyId: number, projectId: number, employeeId: number, issue: any, data: any, role?: string,
   ): Promise<void> {
     if (data.columnId === undefined && data.status === undefined && data.position === undefined) return;
     const viewer = await resolveProjectViewer(this.prisma as any, companyId, projectId, employeeId, role);
-    if (role === 'SUPERADMIN' || viewer.projectRole === PROJECT_ROLE.MANAGER) return;
+    if (mayChangeAnyTask(viewer)) return;
     if (issue.assigneeId === employeeId) return;
+    const isTaskMember = !!(await this.prisma.issueMember.findUnique({
+      where: { issueId_employeeId: { issueId: issue.id, employeeId } },
+      select: { issueId: true },
+    }));
+    if (isTaskMember) return;
     throw new ForbiddenException('You can move only tasks assigned to you.');
   }
 
@@ -1238,30 +1243,50 @@ export class IssuesService {
         if (targetCol.type === 'CANCELLED' || targetCol.name.toLowerCase().includes('cancel')) {
           isCancelTarget = true;
         }
-        // Enforce adjacent-column-only moves on the backend (not for Cancelled)
-        if (!isCancelTarget && oldIssue.columnId && oldIssue.columnId !== updateData.columnId) {
-          const columns = await this.prisma.boardColumn.findMany({
-            where: { board: { projectId }, isArchived: false },
-            orderBy: { position: 'asc' }
-          });
-          const fromIdx = columns.findIndex(c => c.id === oldIssue.columnId);
-          const toIdx = columns.findIndex(c => c.id === updateData.columnId);
-          if (fromIdx !== -1 && toIdx !== -1 && Math.abs(toIdx - fromIdx) !== 1) {
-            const next = columns[fromIdx + (toIdx > fromIdx ? 1 : -1)];
-            throw new ForbiddenException(
-              `A task moves one column at a time${next ? `, so "${columns[fromIdx].name}" goes to "${next.name}" next` : ''}.`,
-            );
-          }
-        }
-        if (data.status === undefined) {
-          const colName = targetCol.name.toLowerCase();
-          if (colName.includes('done') || colName.includes('complete')) updateData.status = 'DONE';
-          else if (targetCol.type === 'CANCELLED' || colName.includes('cancel')) updateData.status = 'CANCELLED';
-          else if (colName.includes('progress') || colName.includes('doing')) updateData.status = 'IN_PROGRESS';
-          else if (colName.includes('review')) updateData.status = 'IN_REVIEW';
-          else if (colName.includes('to do') || colName.includes('todo')) updateData.status = 'TODO';
-        }
+        // The task modal is an explicit workflow chooser. An assignee may
+        // select any ordinary stage (To Do, In Progress or In Review), rather
+        // than being blocked because a board was visually rearranged. The
+        // permission checks above and the Done/Cancelled checks below still
+        // protect every move.
+        // A board column is the workflow state. Always derive the stored
+        // status from it on a card move, rather than trusting a stale status
+        // sent by a client or relying only on a column's display name.
+        const columnStatuses: Record<string, string> = {
+          TODO: 'TODO', IN_PROGRESS: 'IN_PROGRESS', REVIEW: 'IN_REVIEW',
+          DONE: 'DONE', CANCELLED: 'CANCELLED',
+        };
+        const typedStatus = columnStatuses[String(targetCol.type ?? '').toUpperCase()];
+        const colName = targetCol.name.toLowerCase();
+        const namedStatus = colName.includes('done') || colName.includes('complete') ? 'DONE'
+          : targetCol.type === 'CANCELLED' || colName.includes('cancel') ? 'CANCELLED'
+          : colName.includes('progress') || colName.includes('doing') ? 'IN_PROGRESS'
+          : colName.includes('review') ? 'IN_REVIEW'
+          : colName.includes('to do') || colName.includes('todo') ? 'TODO'
+          : undefined;
+        updateData.status = typedStatus ?? namedStatus ?? updateData.status;
       }
+    }
+
+    // The Tasks register can change a status directly. Find the matching board
+    // column as part of that same write so a status picked in the register and
+    // a card's board placement can never drift apart.
+    if (data.status !== undefined && data.columnId === undefined) {
+      const status = String(data.status).toUpperCase();
+      const columns = (await this.prisma.boardColumn.findMany({
+        where: { board: { projectId }, isArchived: false },
+        orderBy: { position: 'asc' },
+        select: { id: true, type: true, name: true },
+      })) ?? [];
+      const target = columns.find((column) => {
+        const type = String(column.type ?? '').toUpperCase();
+        const name = String(column.name ?? '').toLowerCase();
+        return (status === 'TODO' && (type === 'TODO' || name.includes('todo') || name.includes('to do')))
+          || (status === 'IN_PROGRESS' && (type === 'IN_PROGRESS' || name.includes('progress') || name.includes('doing')))
+          || (status === 'IN_REVIEW' && (type === 'REVIEW' || name.includes('review')))
+          || (status === 'DONE' && (type === 'DONE' || name.includes('done') || name.includes('complete')))
+          || (status === 'CANCELLED' && (type === 'CANCELLED' || name.includes('cancel')));
+      });
+      if (target) updateData.columnId = target.id;
     }
 
     if (isCancelTarget && !isRestrictedTarget && oldIssue.status !== 'CANCELLED') {

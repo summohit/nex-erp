@@ -112,6 +112,7 @@ export class ShiftsService {
     } else if (!data.startTime || !data.endTime) {
       throw new BadRequestException('Start and end time are required for a strict shift');
     }
+    this.assertTimePolicies(data);
 
     return this.prisma.shift.create({
       data: { ...this.toShiftData(data), name: data.name, companyId },
@@ -123,6 +124,7 @@ export class ShiftsService {
     if (!existing || existing.companyId !== companyId) {
       throw new BadRequestException('Shift not found');
     }
+    this.assertTimePolicies(data);
 
     return this.prisma.shift.update({
       where: { id },
@@ -148,6 +150,18 @@ export class ShiftsService {
       workingDays: Array.isArray(d.workingDays) ? d.workingDays.join(',') : d.workingDays,
       officeGeofence: typeof d.officeGeofence === 'boolean' ? d.officeGeofence : undefined,
     };
+  }
+
+  /** Guard against a typo turning a short attendance tolerance into a day. */
+  private assertTimePolicies(d: ShiftInput) {
+    for (const [label, value] of [
+      ['Late-mark grace period', d.bufferTimeMinutes],
+      ['Early clock-in allowance', d.earlyClockInMinutes],
+    ] as const) {
+      if (value !== undefined && (!Number.isInteger(value) || value < 0 || value > 240)) {
+        throw new BadRequestException(`${label} must be a whole number between 0 and 240 minutes`);
+      }
+    }
   }
 
   async delete(companyId: number, id: number) {

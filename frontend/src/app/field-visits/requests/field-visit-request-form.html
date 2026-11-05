@@ -28,9 +28,9 @@
       @if (mode === 'modify') {
         <div class="modify-note">
           <div class="note-title">Running Field Visit Notice</div>
-          This trip is approved and may already be running. Nothing here changes until an
-          administrator approves it — people on site keep clocking against the approved
-          site and dates in the meantime.
+          This trip is approved and may already be running. Date changes are applied
+          immediately, so its assigned team is released back to their normal office
+          attendance for dates no longer on the trip.
         </div>
       }
 
@@ -1015,7 +1015,7 @@
             <textarea
               rows="3"
               [(ngModel)]="form.changeReason"
-              placeholder="Why does this trip need to change? The approver sees this."></textarea>
+              placeholder="Why does this trip need to change? This is saved in the field-visit history."></textarea>
           </div>
         </div>
       }
@@ -1057,7 +1057,7 @@
             <svg lucideLoader [size]="15" class="spin-icon"></svg>
             Sending…
           } @else {
-            Send change for approval
+            Apply date change
           }
         </button>
       } @else {

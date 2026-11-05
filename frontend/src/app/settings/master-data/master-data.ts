@@ -757,7 +757,7 @@ export class MasterDataComponent implements OnInit {
           `;
         }
         const grace = d.bufferTimeMinutes ? `Grace: ${d.bufferTimeMinutes}m` : 'No grace';
-        const early = d.earlyClockInMinutes ? `Early: ${d.earlyClockInMinutes}m` : 'Early: Std';
+        const early = d.earlyClockInMinutes ? `In/out buffer: ${d.earlyClockInMinutes}m` : 'In/out buffer: none';
         const halfDayFormatted = d.halfDayTime ? this.formatTime12h(d.halfDayTime) : '—';
         return `
           <div class="shift-policy-cell">
@@ -1273,9 +1273,9 @@ export class MasterDataComponent implements OnInit {
       halfDayTime: '13:30',
       halfDayHours: 4,
       totalHours: 9,
-      earlyClockInMinutes: 30,
+      earlyClockInMinutes: 60,
       autoClockOutHours: 0,
-      bufferTimeMinutes: 15,
+      bufferTimeMinutes: 0,
       maxCheckIns: 2,
       workingDays: [...this.WEEK_DAYS],
     };

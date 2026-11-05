@@ -97,6 +97,7 @@ export class FieldVisitClockService {
       where: {
         employeeId: employee.id,
         visitDate: istDateKey(new Date()),
+        status: { in: OPEN_VISIT_DAYS },
         request: { status: FIELD_VISIT_STATUS.APPROVED },
       },
       orderBy: [{ requestId: 'desc' }, { id: 'desc' }],
@@ -193,6 +194,7 @@ export class FieldVisitClockService {
       where: {
         employeeId,
         visitDate: istDateKey(new Date()),
+        status: { in: OPEN_VISIT_DAYS },
         request: {
           status: FIELD_VISIT_STATUS.APPROVED,
           ...(requestId ? { id: Number(requestId) } : {}),

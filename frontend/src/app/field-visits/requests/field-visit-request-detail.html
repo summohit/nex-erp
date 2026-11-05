@@ -626,6 +626,48 @@
         </div>
       }
     </div>
+
+    <!-- Reschedule approvals are kept separate from the general activity feed
+         so Delivery can audit a postpone/prepone without reading prose. -->
+    @if (rescheduleHistory().length) {
+      <div class="card reschedule-history-card">
+        <div class="card-header-bar">
+          <h3>
+            <svg lucideCalendarDays [size]="17"></svg>
+            Reschedule approvals
+          </h3>
+          <span class="count-badge">{{ rescheduleHistory().length }} record{{ rescheduleHistory().length === 1 ? '' : 's' }}</span>
+        </div>
+        <div class="table-container">
+          <table class="register-table reschedule-history-table">
+            <thead>
+              <tr>
+                <th>Changed on</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Previous dates</th>
+                <th>Requested dates</th>
+                <th>Reason / decision</th>
+                <th>By</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (change of rescheduleHistory(); track change.id) {
+                <tr>
+                  <td>{{ change.createdAt | date:'dd-MM-yyyy, h:mm a' }}</td>
+                  <td>{{ rescheduleType(change) }}</td>
+                  <td><span class="reschedule-status" [class]="'reschedule-' + rescheduleStatus(change).toLowerCase().replace(' ', '-')">{{ rescheduleStatus(change) }}</span></td>
+                  <td>@if (changeDates(change.oldValue); as oldDates) { {{ oldDates.startDate }} to {{ oldDates.endDate }} } @else { — }</td>
+                  <td>@if (changeDates(change.newValue); as newDates) { {{ newDates.startDate }} to {{ newDates.endDate }} } @else { — }</td>
+                  <td>{{ changeReason(change) }}</td>
+                  <td>{{ personName(change.actor) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
   }
 </div>
 

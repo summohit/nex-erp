@@ -304,6 +304,7 @@ export class TaskHoursRequestsTabComponent {
   locationCapabilities = signal<VisitLocationRequestCapabilities | null>(null);
   loadingOthers = signal(false);
   /** Shared lightweight filters for queues whose APIs return actionable rows only. */
+  otherActiveTab = signal<RequestTabFilter>('AWAITING');
   otherSearchQuery = signal('');
   otherSortBy = signal<'newest' | 'oldest'>('newest');
   otherSelectedProject = signal('ALL');
@@ -346,12 +347,46 @@ export class TaskHoursRequestsTabComponent {
   filteredFieldVisitRequests = computed(() =>
     this.filterOtherQueue(this.fieldVisitRequests(), (request: any) => request.submittedAt || request.createdAt || request.startDate));
 
+  setOtherActiveTab(tab: RequestTabFilter): void {
+    this.otherActiveTab.set(tab);
+  }
+
+  private otherTabStatus(row: any): RequestTabFilter {
+    const status = String(row?.status ?? row?.approvalState ?? '').toUpperCase();
+    if (['APPROVED', 'COMPLETED', 'CONVERTED'].includes(status)) return 'APPROVED';
+    if (['REJECTED', 'DECLINED', 'CANCELLED', 'ARCHIVED'].includes(status)) return 'REJECTED';
+    return 'AWAITING';
+  }
+
+  otherTabCount(tab: RequestTabFilter): number {
+    const rows = this.otherRows();
+    if (tab === 'ALL') return rows.length;
+    if (tab === 'HISTORY') return rows.filter((row) => this.otherTabStatus(row) !== 'AWAITING').length;
+    return rows.filter((row) => this.otherTabStatus(row) === tab).length;
+  }
+
+  private otherRows(): any[] {
+    switch (this.requestType()) {
+      case 'TASKS': return this.taskApprovals();
+      case 'BUDGET': return this.budgetRequests();
+      case 'SCOPE': return this.scopeRequests();
+      case 'VISIT_LOCATIONS': return this.visitLocationRequests();
+      case 'FIELD_VISITS': return this.fieldVisitRequests();
+      case 'TICKETS': return this.ticketRequests();
+      default: return [];
+    }
+  }
+
   private filterOtherQueue<T extends Record<string, any>>(rows: T[], dateFor: (row: T) => any): T[] {
     const query = this.otherSearchQuery().trim().toLowerCase();
     const projectId = this.otherSelectedProject();
+    const tab = this.otherActiveTab();
     const result = rows.filter((row) =>
       this.matchesApprovalDate(dateFor(row))
       && (projectId === 'ALL' || String(this.projectIdFor(row)) === projectId)
+      && (tab === 'ALL' || (tab === 'HISTORY'
+        ? this.otherTabStatus(row) !== 'AWAITING'
+        : this.otherTabStatus(row) === tab))
       && (!query || JSON.stringify(row).toLowerCase().includes(query)));
     return result.sort((a, b) => {
       const aDate = new Date(dateFor(a) || 0).getTime();
@@ -907,6 +942,7 @@ export class TaskHoursRequestsTabComponent {
   setRequestType(type: ProjectRequestType) {
     if (type === this.requestType()) return;
     this.requestType.set(type);
+    this.otherActiveTab.set('AWAITING');
     if (type !== 'HOURS') this.loadOthers(type);
   }
 
@@ -1464,14 +1500,13 @@ export class TaskHoursRequestsTabComponent {
   // ── Field visits ──────────────────────────────────────────────────────────
 
   /**
-   * Pending trips this viewer can actually decide. The field visit list is
-   * already scoped server-side; `canReview` drops the viewer's own requests,
-   * which they may not approve.
+   * Field-visit records, including settled outcomes, so every status tab has
+   * real data. `canReview` still controls the decision buttons themselves.
    */
   loadFieldVisits(done?: () => void) {
-    this.fieldVisitApi.list({ status: 'PENDING_APPROVAL' }).subscribe({
+    this.fieldVisitApi.list().subscribe({
       next: (rows) => {
-        this.fieldVisitRequests.set((rows || []).filter((r) => r.canReview));
+        this.fieldVisitRequests.set(rows || []);
         done?.();
       },
       error: () => {

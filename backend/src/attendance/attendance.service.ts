@@ -355,7 +355,7 @@ export class AttendanceService {
   ) {
     const employee = await this.prisma.employee.findUnique({ 
       where: { userId },
-      include: { shift: true, branch: true }
+      include: { shift: true, branch: true, designation: { select: { name: true } } }
     });
     if (!employee) throw new BadRequestException('Employee profile not found');
 
@@ -377,6 +377,10 @@ export class AttendanceService {
       where: {
         employeeId: employee.id,
         visitDate: todayKey,
+        // A released (for example, rescheduled) visit day is historical only.
+        // It must never keep an employee tied to the old site or bypass the
+        // office clock-in rules.
+        status: { in: [FIELD_VISIT_DAY.SCHEDULED, FIELD_VISIT_DAY.IN_PROGRESS] },
         request: { status: FIELD_VISIT_STATUS.APPROVED },
       },
       select: {
@@ -482,7 +486,12 @@ export class AttendanceService {
     // Duration-only shifts have no startTime, so there is nothing to be late for.
     // The window comes from the roster when one is set for today, which is how
     // an on-site stint with its own hours stops reading as three hours late.
-    const buffer = effective.shift?.bufferTimeMinutes ?? 0;
+    // Office boys have a fixed operational buffer: they may arrive up to one
+    // hour before the shift, leave up to one hour after it, but do not receive
+    // a late clock-in grace. They are intentionally identified by designation
+    // because the current office-boy employees work across several shifts.
+    const isOfficeBoy = this.isOfficeBoy(employee.designation?.name);
+    const buffer = isOfficeBoy ? 0 : (effective.shift?.bufferTimeMinutes ?? 0);
     // Working a holiday is recorded and nothing more (B1): no late mark and no
     // half day, because nobody was expected in.
     // A weekly off (e.g. 2nd Saturday) is treated the same way: worked, recorded, never late.
@@ -492,6 +501,13 @@ export class AttendanceService {
       // resolves them to the correct real-world instant regardless of what
       // timezone this server's OS happens to be configured with.
       const expectedStart = istTimeInstant(now, effective.startTime);
+      const earlyClockInMinutes = isOfficeBoy ? 60 : (effective.shift?.earlyClockInMinutes ?? 0);
+      const earliestStartTime = new Date(expectedStart.getTime() - earlyClockInMinutes * 60000);
+      if (now < earliestStartTime) {
+        throw new BadRequestException(
+          `Clock-in is available from ${effective.startTime} minus ${earlyClockInMinutes} minutes for your shift.`,
+        );
+      }
       const maxStartTime = new Date(expectedStart.getTime() + buffer * 60000);
 
       if (now > maxStartTime) {
@@ -599,6 +615,11 @@ export class AttendanceService {
     const endTime = effective.endTime < shiftEnd ? effective.endTime : shiftEnd;
     if (endTime <= startTime) return effective;
     return { ...effective, startTime, endTime };
+  }
+
+  /** The policy follows the role people actually hold, even when their shifts differ. */
+  private isOfficeBoy(designationName?: string | null): boolean {
+    return /^office\s*boy$/i.test((designationName ?? '').trim());
   }
 
   /**
@@ -1783,6 +1804,7 @@ export class AttendanceService {
    */
   private async scoreRegularizedDay(
     employeeId: number, companyId: number, date: Date, clockIn: Date | null, clockOut: Date | null,
+    designationName?: string | null,
   ): Promise<{ status: string; isLate: boolean; isEarlyLeave: boolean; shiftId: number | null }> {
     const effective = this.workingWindow(await this.roster.getEffectiveShift(employeeId, date));
     const onHoliday = effective.isDayOff || await this.isHoliday(companyId, date);
@@ -1792,7 +1814,9 @@ export class AttendanceService {
     let isLate = false;
     let lateStartHalfDay = false;
     if (clockIn && effective.startTime) {
-      const buffer = effective.shift?.bufferTimeMinutes ?? 0;
+      // A corrected Office Boy attendance row must follow the same policy as a
+      // live punch: no late clock-in grace, even if their shared shift has one.
+      const buffer = this.isOfficeBoy(designationName) ? 0 : (effective.shift?.bufferTimeMinutes ?? 0);
       isLate = clockIn.getTime() > istTimeInstant(clockIn, effective.startTime).getTime() + buffer * 60000;
       lateStartHalfDay = isHalfDayStart(clockIn, effective.startTime, effective.shift?.halfDayTime, istTimeInstant);
     }
@@ -1820,7 +1844,7 @@ export class AttendanceService {
   ) {
     const regularization = await this.prisma.attendanceRegularization.findUnique({
       where: { id },
-      include: { employee: true }
+      include: { employee: { include: { designation: { select: { name: true } } } } }
     });
     if (!regularization) throw new BadRequestException('Regularization not found');
     // Approving writes attendance and can credit comp-off, so it is checked
@@ -1844,7 +1868,10 @@ export class AttendanceService {
       // holiday or weekly-off row is not a worked-day score, so it is left as it was.
       const rescore = !attendance || ['PRESENT', 'HALF_DAY'].includes(String(attendance.status));
       const score = rescore
-        ? await this.scoreRegularizedDay(regularization.employeeId, regularization.employee.companyId, regularization.date, clockIn, clockOut)
+        ? await this.scoreRegularizedDay(
+          regularization.employeeId, regularization.employee.companyId, regularization.date, clockIn, clockOut,
+          regularization.employee.designation?.name,
+        )
         : {};
       const saved = attendance
         ? await this.prisma.attendance.update({
@@ -1942,6 +1969,84 @@ export class AttendanceService {
     return employees;
   }
 
+  /**
+   * Persist an administrator's Team Timeline correction.  The attendance page
+   * and timeline both read Attendance, so changing this one record keeps their
+   * views consistent (including after a page reload).
+   */
+  async overrideAttendanceStatus(
+    companyId: number,
+    data: { employeeId: number; date: string; status: string; note?: string },
+  ) {
+    const employeeId = Number(data.employeeId);
+    const date = String(data.date ?? '');
+    const status = String(data.status ?? '').toUpperCase();
+    const validStatuses = new Set(['PRESENT', 'ABSENT', 'HALF_DAY', 'ON_LEAVE', 'HOLIDAY', 'WEEKLY_OFF']);
+
+    if (!Number.isInteger(employeeId) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestException('Employee and attendance date are required.');
+    }
+    if (!validStatuses.has(status)) {
+      throw new BadRequestException('Invalid attendance status.');
+    }
+
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId }, select: { id: true },
+    });
+    if (!employee) throw new BadRequestException('Employee not found.');
+
+    const attendanceDate = new Date(`${date}T00:00:00.000Z`);
+    const existing = await this.prisma.attendance.findUnique({
+      where: { employeeId_date: { employeeId, date: attendanceDate } },
+      select: { id: true, clockIn: true, clockOut: true, shiftId: true },
+    });
+
+    // A timeline correction is an administrative attendance entry, not an
+    // actual device punch. For worked statuses, show the employee's scheduled
+    // shift window in Attendance (and its detail modal) while never replacing
+    // a real recorded clock-in/out. The roster is consulted first, so a shift
+    // assigned just for this date is respected.
+    let defaultClockIn: Date | null = null;
+    let defaultClockOut: Date | null = null;
+    let shiftId: number | null = existing?.shiftId ?? null;
+    if (status === 'PRESENT' || status === 'HALF_DAY') {
+      const effective = this.workingWindow(await this.roster.getEffectiveShift(employeeId, attendanceDate));
+      shiftId = effective.shift?.id ?? shiftId;
+      if (effective.startTime && effective.endTime) {
+        defaultClockIn = istTimeInstant(attendanceDate, effective.startTime);
+        defaultClockOut = istTimeInstant(attendanceDate, effective.endTime);
+        // A shift ending before it starts runs past midnight.
+        if (defaultClockOut <= defaultClockIn) {
+          defaultClockOut = new Date(defaultClockOut.getTime() + 86_400_000);
+        }
+      }
+    }
+
+    return this.prisma.attendance.upsert({
+      where: { employeeId_date: { employeeId, date: attendanceDate } },
+      create: {
+        employeeId,
+        date: attendanceDate,
+        status,
+        clockIn: defaultClockIn,
+        clockOut: defaultClockOut,
+        shiftId,
+        isLate: false,
+        isEarlyLeave: false,
+      },
+      // This explicit correction must not still render as Late or Early Leave.
+      update: {
+        status,
+        clockIn: existing?.clockIn ?? defaultClockIn,
+        clockOut: existing?.clockOut ?? defaultClockOut,
+        shiftId,
+        isLate: false,
+        isEarlyLeave: false,
+      },
+      include: { logs: true },
+    });
+  }
+
   async getAllEmployeesAttendance(
     companyId: number,
     filters: {
@@ -1991,7 +2096,7 @@ export class AttendanceService {
             department: { select: { id: true, name: true } },
             designation: { select: { id: true, name: true } },
             user: { select: { email: true, role: true } },
-            shift: { select: { id: true, name: true, workingDays: true } },
+            shift: { select: { id: true, name: true, startTime: true, endTime: true, workingDays: true } },
             branch: { select: { weeklyOffs: true } },
             weeklyOffs: true,
           },

@@ -6,6 +6,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   OnDestroy,
   OnInit,
@@ -271,7 +272,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   // ── User, Attendance & Shift Hub ────────────────────────────────────────
-  user = signal<any>(null);
+  // The header, sidebar and dashboard must all use the same authenticated
+  // profile. Keeping a second local signal meant the dashboard could remain
+  // null when its duplicate /users/me request failed, leaving an empty page
+  // while the rest of the shell showed the signed-in user.
+  user = this.authService.currentUser;
+  private initializedUserKey: string | number | null = null;
+  private authUserWatcher = effect(() => {
+    const user = this.authService.currentUser();
+    if (user) this.initializeForUser(user);
+  });
   onboardingStatus = signal<string>('COMPLETED');
   onboardingTasks = signal<EmployeeOnboardingTask[]>([]);
   isCompletingTask = signal<number | null>(null);
@@ -1101,16 +1111,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }, 1000);
 
     this.authService.getMe().subscribe({
-      next: (user) => {
-        if (!user.company?.onboardingCompleted) {
-          this.router.navigate(['/onboarding']);
-          return;
-        }
-        this.user.set(user);
-        this.loadOnboardingTasks();
-        this.loadAttendance();
-        this.loadDashboard();
-      },
+      next: (user) => this.initializeForUser(user),
       error: (err) => {
         // Only a rejected session signs out. No answer at all — the API
         // restarting — leaves the session alone; the dashboard just stays
@@ -1120,6 +1121,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.router.navigate(['/']);
       },
     });
+  }
+
+  /** Load dashboard data once for the authenticated profile. */
+  private initializeForUser(user: any) {
+    const key = user?.id ?? user?.email ?? null;
+    if (key === null || this.initializedUserKey === key) return;
+    this.initializedUserKey = key;
+
+    if (!user.company?.onboardingCompleted) {
+      this.router.navigate(['/onboarding']);
+      return;
+    }
+    this.loadOnboardingTasks();
+    this.loadAttendance();
+    this.loadDashboard();
   }
 
   ngOnDestroy() {

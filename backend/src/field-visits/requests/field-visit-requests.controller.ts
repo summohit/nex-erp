@@ -48,6 +48,12 @@ export class FieldVisitRequestsController {
     return this.requests.availability(req.user.companyId, String(employeeIds ?? '').split(',').filter(Boolean).map(Number), startDate, endDate);
   }
 
+  /** Company-visible audit events for the Field Visits History tab. */
+  @Get('history')
+  history(@Req() req) {
+    return this.requests.history(req.user.companyId, req.user.role, req.user.employeeId ?? null);
+  }
+
   @Get(':id')
   getOne(@Req() req, @Param('id', ParseIntPipe) id: number) {
     return this.requests.getOne(
@@ -145,6 +151,19 @@ export class FieldVisitRequestsController {
   ) {
     return this.requests.requestModification(
       req.user.companyId, req.user.employeeId ?? null, req.user.role, id, body,
+    );
+  }
+
+  /** A Project Manager/Super Admin date move: applies immediately, never queues approval. */
+  @Post(':id/reschedule')
+  reschedule(
+    @Req() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: FieldVisitRequestInput & { action?: 'PREPONE' | 'POSTPONE' },
+  ) {
+    return this.requests.reschedule(
+      req.user.companyId, req.user.employeeId ?? null, req.user.role, id, body,
+      body?.action === 'PREPONE' ? 'PREPONE' : 'POSTPONE',
     );
   }
 

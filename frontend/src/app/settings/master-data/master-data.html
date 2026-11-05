@@ -664,21 +664,21 @@
 
             <div class="shift-two-cols">
               <div class="form-group" *ngIf="formData.shiftType !== 'FLEXIBLE'">
-                <label>Late Mark Grace Period</label>
+                <label>Late Clock-in Grace Period</label>
                 <div class="input-unit-wrapper">
-                  <input type="number" class="form-control" [(ngModel)]="formData.bufferTimeMinutes" min="0" placeholder="15">
+                  <input type="number" class="form-control" [(ngModel)]="formData.bufferTimeMinutes" min="0" placeholder="0">
                   <span class="input-unit">mins</span>
                 </div>
-                <p class="help-text">Buffer allowed after start time before marked late.</p>
+                <p class="help-text">Optional late clock-in grace. Set to 0 for the Office Boy shift so any clock-in after shift start is marked late.</p>
               </div>
 
               <div class="form-group" *ngIf="formData.shiftType !== 'FLEXIBLE'">
-                <label>Early Clock-in Allowance</label>
+                <label>Early Clock-in / Late Clock-out Buffer</label>
                 <div class="input-unit-wrapper">
-                  <input type="number" class="form-control" [(ngModel)]="formData.earlyClockInMinutes" min="0" placeholder="30">
+                  <input type="number" class="form-control" [(ngModel)]="formData.earlyClockInMinutes" min="0" placeholder="60">
                   <span class="input-unit">mins</span>
                 </div>
-                <p class="help-text">How early employees are permitted to punch in.</p>
+                <p class="help-text">Allows early clock-in and late clock-out only. It does not allow a late clock-in; use 0 late clock-in grace above for the Office Boy shift.</p>
               </div>
 
               <div class="form-group">

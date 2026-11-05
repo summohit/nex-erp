@@ -222,7 +222,10 @@ export class ProjectsComponent implements OnInit {
   myTasksLoading = signal<boolean>(false);
   myTasksLoaded = signal<boolean>(false);
   myTasksTruncated = signal<boolean>(false);
-  myTasksShowDone = signal<boolean>(false);
+  // This is a personal work register, so start with the complete assignment
+  // history. The control still lets someone hide completed work when they
+  // want to focus on their active queue.
+  myTasksShowDone = signal<boolean>(true);
   /** Tracks if user explicitly clicked the Assigned to me / Everyone toggle */
   userExplicitlyToggledScope = false;
 
@@ -620,8 +623,10 @@ export class ProjectsComponent implements OnInit {
   });
 
   // AG Grid: Table View
-  paginationPageSize = 20;
-  paginationPageSizeOptions = [10, 20, 50, 100];
+  // Show a useful first page of the work register while retaining a pager for
+  // longer assignment histories.
+  paginationPageSize = 10;
+  paginationPageSizeOptions = [5, 10, 20, 50];
   gridApi: any;
   selectedProjects = signal<any[]>([]);
 
@@ -4039,9 +4044,9 @@ export class ProjectsComponent implements OnInit {
 
   /** Compact delivery register shown on the Tasks tab. */
   taskTableColDefs: ColDef[] = [
-    { headerName: 'Code', field: 'refKey', width: 125, minWidth: 105,
+    { headerName: 'Code', field: 'refKey', width: 112, minWidth: 96,
       cellRenderer: (p: any) => `<button type="button" class="task-table-link task-code-link" data-act="task">${this.esc(p.value || '—')}</button>` },
-    { headerName: 'Task', field: 'title', flex: 1.6, minWidth: 230,
+    { headerName: 'Task', field: 'title', flex: 1.6, minWidth: 190,
       cellRenderer: (p: any) => {
         const priority = p.data?.priority ? `<span class="task-priority-chip">${this.esc(p.data.priority)}</span>` : '';
         const project = p.data?.parent?.name ? `<button type="button" class="task-table-link task-project-link" data-act="project">${this.esc(p.data.parent.name)}</button>` : '';
@@ -4053,7 +4058,9 @@ export class ProjectsComponent implements OnInit {
     { headerName: 'Due date', field: 'dueDate', width: 108, minWidth: 96, cellRenderer: (p: any) => `<span class="${p.data?.isOverdue ? 'task-due-overdue' : ''}">${this.taskTableDate(p.value)}</span>` },
     { headerName: 'Hours logged', field: 'loggedMinutes', width: 105, minWidth: 95, valueFormatter: (p: any) => this.taskTableDuration(p.value) },
     { headerName: 'Assigned to', field: 'assignees', width: 120, minWidth: 105, sortable: false, valueGetter: (p: any) => (p.data?.assignees || []).map((a: any) => `${a.firstName || ''} ${a.lastName || ''}`.trim()).join(', ') || '—' },
-    { headerName: 'Status', field: 'status', width: 120, minWidth: 105, cellRenderer: (p: any) => this.taskTableStatus(p.value) },
+    // Keep this control visible at the right edge even when the table is
+    // narrower than its ideal desktop width.
+    { headerName: 'Status', field: 'status', width: 142, minWidth: 142, pinned: 'right', cellRenderer: (p: any) => this.taskTableStatus(p.value) },
     { headerName: 'Action', field: 'actions', width: 82, minWidth: 76, sortable: false, filter: false, cellRenderer: () => '<button type="button" class="task-table-more" data-act="task" title="Open task">⋮</button>' },
   ];
 
@@ -4063,7 +4070,7 @@ export class ProjectsComponent implements OnInit {
     this.taskTableColDefs = this.taskTableColDefs.map((column: any) => {
       if (column.headerName !== 'Milestones') return column;
       return {
-        headerName: 'Evidence', field: 'evidenceCount', width: 105, minWidth: 95, sortable: true,
+        headerName: 'Evidence', field: 'evidenceCount', width: 98, minWidth: 86, sortable: true,
         valueGetter: (p: any) => Number(p.data?.evidenceCount || 0),
         cellRenderer: (p: any) => {
           const count = Number(p.value || 0);
@@ -4078,7 +4085,7 @@ export class ProjectsComponent implements OnInit {
       const at = this.taskTableColDefs.findIndex((c: any) => c.headerName === 'Evidence');
       const esc = (t: string) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
       this.taskTableColDefs.splice(at === -1 ? 2 : at, 0, {
-        headerName: 'Location', field: 'location', width: 150, minWidth: 120, sortable: true,
+        headerName: 'Location', field: 'location', width: 130, minWidth: 110, sortable: true,
         cellRenderer: (p: any) => {
           if (!p.value) return '<span class="task-evidence-empty">—</span>';
           const [city, state] = String(p.value).split(/,\s*(.+)/);
@@ -4117,6 +4124,11 @@ export class ProjectsComponent implements OnInit {
     };
 
     const actionColumn: any = this.taskTableColDefs.find((column: any) => column.headerName === 'Action');
+    if (actionColumn) {
+      actionColumn.width = 70;
+      actionColumn.minWidth = 64;
+      actionColumn.pinned = 'right';
+    }
     if (actionColumn) actionColumn.cellRenderer = (p: any) => {
       const pinned = this.isTaskTablePinned(p.data?.id);
       const item = (label: string, action: string, danger = false) => `<button type="button" data-act="task-action" data-task-action="${action}" class="task-table-action-item${danger ? ' danger' : ''}">${label}</button>`;

@@ -833,6 +833,36 @@ export class FieldVisitActivationService {
     return { ...added, releasedDays, archivedTasks };
   }
 
+  /**
+   * A manager moving a trip must not leave people geofenced to the old site
+   * while the reschedule is waiting for review.  Release only the unclocked
+   * dates which disappear from the proposed schedule; an already clocked day
+   * is historical attendance and is never rewritten.
+   *
+   * The request itself is deliberately not changed here.  Approval activates
+   * the proposed dates, while rejection can activate this original shape
+   * again.  That gives employees their normal office shift immediately without
+   * treating a pending change as an approved new trip.
+   */
+  async releaseForPendingReschedule(
+    tx: Tx,
+    request: ActivationRequest,
+    proposedStartDate: Date,
+    proposedEndDate: Date,
+    proposedEmployeeIds: number[],
+  ): Promise<number> {
+    const proposed: ActivationRequest = {
+      ...request,
+      startDate: proposedStartDate,
+      endDate: proposedEndDate,
+      members: proposedEmployeeIds.map((employeeId) => ({ employeeId })),
+    };
+    const wantedDays = new Set(this.daysOf(proposed).map((day) => this.key(day)));
+    const releasedDays = await this.dropStaleDays(tx, request, proposedEmployeeIds, wantedDays);
+    await this.dropStaleRoster(tx, request, proposedEmployeeIds, wantedDays);
+    return releasedDays;
+  }
+
   /** Attendance rows the new shape has no room for — never a clocked one. */
   private async dropStaleDays(
     tx: Tx, request: ActivationRequest, employeeIds: number[], wantedDays: Set<string>,
