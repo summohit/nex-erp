@@ -228,7 +228,7 @@ export class PayProfileDetailComponent implements OnInit {
           panNumber: e.panNumber, uanNumber: e.uanNumber, pfNumber: e.pfNumber, esiNumber: e.esiNumber,
           bankName: e.bankName, bankAccountNumber: e.bankAccountNumber, ifscCode: e.ifscCode,
         };
-        this.gstOn = !!(e as any).gstin;
+        this.gstOn = (e as any).gstPct != null;
         this.loading.set(false);
       },
       error: (e) => { this.loading.set(false); this.toast.error(e?.error?.message || 'Failed to load the pay profile'); },
@@ -240,6 +240,19 @@ export class PayProfileDetailComponent implements OnInit {
   }
 
   saveDetails() {
+    // GST: the % is required when GST registered is on; the GSTIN is optional.
+    if (this.gstOn) {
+      const pct = this.details['gstPct'];
+      if (pct === null || pct === undefined || pct === '' || !(Number(pct) > 0 && Number(pct) <= 28)) {
+        this.toast.error('Enter the GST % (1–28) — it is required when GST registered is on');
+        return;
+      }
+      this.details['gstPct'] = Number(pct);
+      this.details['gstin'] = String(this.details['gstin'] || '').trim().toUpperCase() || null;
+    } else {
+      this.details['gstin'] = null;
+      this.details['gstPct'] = null;
+    }
     this.savingDetails.set(true);
     this.payroll.updatePayDetails(this.employeeId, this.details).subscribe({
       next: () => { this.savingDetails.set(false); this.toast.success('Details saved'); this.load(); },
@@ -410,8 +423,8 @@ export class PayProfileDetailComponent implements OnInit {
   gstOf(b: SalaryCalculationResult | null): { pct: number; amount: number } | null {
     const e: any = this.data()?.employee;
     const fee = b?.lines.find((l) => l.code === 'CONSULTANT_FEE')?.monthly ?? 0;
-    if (!e?.gstin || !(fee > 0)) return null;
-    const pct = Number(e.gstPct ?? 18);
+    if (e?.gstPct == null || !(fee > 0)) return null;
+    const pct = Number(e.gstPct);
     return { pct, amount: Math.round(fee * pct) / 100 };
   }
   /** Take-home including GST, when there is GST. */

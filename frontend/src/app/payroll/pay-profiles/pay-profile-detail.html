@@ -409,11 +409,11 @@
               </label>
               <div class="form-grid-2" *ngIf="gstOn" style="margin-top:8px">
                 <div>
-                  <label class="form-label">GSTIN</label>
+                  <label class="form-label">GSTIN <span class="field-hint-text" style="font-weight:400">(optional)</span></label>
                   <input class="form-control" [(ngModel)]="details['gstin']" placeholder="07ABCDE1234F1Z5" maxlength="15" [disabled]="!canEdit()">
                 </div>
                 <div>
-                  <label class="form-label">GST %</label>
+                  <label class="form-label">GST % <span style="color:#dc2626">*</span></label>
                   <input class="form-control" type="number" min="0" max="28" step="0.5" [(ngModel)]="details['gstPct']" placeholder="18" [disabled]="!canEdit()">
                 </div>
               </div>
