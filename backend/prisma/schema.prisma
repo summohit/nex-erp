@@ -524,6 +524,8 @@ model Employee {
   probationConfirmedAt DateTime?
   /// Times this probation was extended (limit in the company's probation policy).
   probationExtensions  Int       @default(0)
+  /// Consultant's GSTIN (5 Nov 2026): GST is added on top of the fee when the salary group has GST on.
+  gstin                String?
   /// The manager's review for the current probation period: { rating, comments,
   /// recommendation CONFIRM|EXTEND|NOT_CONFIRM, extendMonths?, reviewerId,
   /// reviewerName, at }. Cleared when probation is extended.

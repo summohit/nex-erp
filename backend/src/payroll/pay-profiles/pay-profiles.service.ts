@@ -273,7 +273,7 @@ export class PayProfilesService {
   async updateDetails(companyId: number, employeeId: number, body: Record<string, string | null>, actorUserId?: number) {
     const before = await this.prisma.employee.findFirst({
       where: { id: employeeId, companyId },
-      select: { panNumber: true, uanNumber: true, pfNumber: true, esiNumber: true, bankName: true, bankAccountNumber: true, ifscCode: true },
+      select: { panNumber: true, uanNumber: true, pfNumber: true, esiNumber: true, bankName: true, bankAccountNumber: true, ifscCode: true, gstin: true },
     });
     if (!before) throw new NotFoundException('Employee not found');
     const data: Record<string, any> = this.cleanStatutory(body) ?? {};
@@ -394,6 +394,11 @@ export class PayProfilesService {
     if (ifsc !== undefined) {
       if (ifsc && !IFSC.test(ifsc)) throw new BadRequestException('IFSC should look like HDFC0001234.');
       data.ifscCode = ifsc;
+    }
+    const gstin = pick('gstin');
+    if (gstin !== undefined) {
+      if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin)) throw new BadRequestException('GSTIN should look like 07ABCDE1234F1Z5.');
+      data.gstin = gstin;
     }
     for (const k of ['pfNumber', 'esiNumber', 'bankAccountNumber']) {
       const v = pick(k);

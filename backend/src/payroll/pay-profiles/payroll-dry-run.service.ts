@@ -74,7 +74,7 @@ export class PayrollDryRunService {
       select: {
         id: true, firstName: true, lastName: true, avatarUrl: true, employeeCode: true,
         department: { select: { name: true } }, designation: { select: { name: true } },
-        bankAccountNumber: true, panNumber: true,
+        bankAccountNumber: true, panNumber: true, gstin: true,
         user: { select: { role: true } },
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
@@ -108,6 +108,7 @@ export class PayrollDryRunService {
     const pfCeiling = Number(rate('PF_EMPLOYER', 'wageCeiling') ?? 15000);
     const esiPct = Number(rate('ESI_EMPLOYEE', 'ratePct') ?? 0.75);
     const esiLimit = Number(rate('ESI_EMPLOYER', 'eligibilityLimit') ?? 21000);
+    const gstPct = Number(rate('GST', 'ratePct') ?? 18);
 
     const calcs = new Map<string, Awaited<ReturnType<PayrollMastersService['prepareCalculator']>>>();
     const calcFor = async (code: string, onDate: Date, regime: 'NEW' | 'OLD') => {
@@ -179,7 +180,11 @@ export class PayrollDryRunService {
         deductions.push({ code: 'TDS', name: 'Income Tax (TDS)', full: out.tax.monthlyTds, paid: out.tax.monthlyTds });
       }
       const totalDeductions = r2(deductions.reduce((t, d) => t + d.paid, 0));
-      const net = r2(Math.max(0, grossPaid - totalDeductions));
+      // GST on top of a consultant's fee (5 Nov 2026), when the group has GST on
+      // and the consultant has a GSTIN. Not part of CTC; TDS stays on the fee.
+      const feePaid = earnings.find((l) => l.code === 'CONSULTANT_FEE')?.paid ?? 0;
+      const gst = payee === 'CONSULTANT' && calc.group.gstApplicable && (e as any).gstin && feePaid > 0 ? r2((feePaid * gstPct) / 100) : 0;
+      const net = r2(Math.max(0, grossPaid + gst - totalDeductions));
 
       const warnings: string[] = [];
       const notes: string[] = exempt && !fullMonth ? [`Paid in full — ${e.user!.role === 'FINANCE' ? 'Finance' : 'Super Admin'} logins have no loss of pay.`] : [];
@@ -187,6 +192,7 @@ export class PayrollDryRunService {
       else if (att.workingDays > 0 && att.absences / att.workingDays > 0.5) warnings.push(`Absent ${att.absences} of ${att.workingDays} working days — check attendance before paying.`);
       if (!e.bankAccountNumber) warnings.push('No bank account on file.');
       if (!e.panNumber && grossFull * 12 > 250000) warnings.push('No PAN on file — TDS may need to be higher (20%) without it.');
+      if (payee === 'CONSULTANT' && calc.group.gstApplicable && !(e as any).gstin) warnings.push('No GSTIN on file — GST is not added to this fee.');
 
       rows.push({
         ...base,
@@ -206,6 +212,8 @@ export class PayrollDryRunService {
         deductions,
         totalDeductions,
         net,
+        gst,
+        gstPct: gst ? gstPct : null,
         lopExempt: exempt,
         notes,
         employerContributions: r2(out.lines.filter((l) => l.category === 'EMPLOYER_CONTRIBUTION').reduce((t, l) => t + l.monthly, 0)),

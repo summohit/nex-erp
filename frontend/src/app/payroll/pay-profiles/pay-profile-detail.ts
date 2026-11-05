@@ -210,6 +210,7 @@ export class PayProfileDetailComponent implements OnInit {
         this.data.set(d);
         const e = d.employee;
         this.details = {
+          gstin: (e as any).gstin ?? null,
           panNumber: e.panNumber, uanNumber: e.uanNumber, pfNumber: e.pfNumber, esiNumber: e.esiNumber,
           bankName: e.bankName, bankAccountNumber: e.bankAccountNumber, ifscCode: e.ifscCode,
         };

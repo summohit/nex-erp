@@ -700,6 +700,9 @@ export interface PayrollDryRunRow {
   totalDeductions?: number;
   net?: number;
   employerContributions?: number;
+  /** GST added on top of a consultant's fee (₹), and its rate. */
+  gst?: number;
+  gstPct?: number | null;
   lopExempt?: boolean;
   notes?: string[];
   warnings: string[];

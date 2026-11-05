@@ -382,6 +382,14 @@
           </div>
 
           <div class="detail-inputs-grid">
+            <!-- GSTIN (consultants: GST is added on top of the fee) -->
+            <div class="form-group">
+              <div class="label-with-meta">
+                <label class="form-label">GSTIN <span class="field-hint-text" style="font-weight:400">(consultants only)</span></label>
+              </div>
+              <input class="form-control" [(ngModel)]="details['gstin']" placeholder="07ABCDE1234F1Z5" maxlength="15" [disabled]="!canEdit()">
+            </div>
+
             <!-- PAN -->
             <div class="form-group">
               <div class="label-with-meta">

@@ -169,11 +169,12 @@ export class PayrollDryRunComponent implements OnInit {
       absentDays: x.absences ?? 0,
       items: [
         ...(x.earnings || []).map((l) => ({ componentName: l.name, type: 'EARNING', amount: l.full })),
+        ...(x.gst ? [{ componentName: `GST @ ${x.gstPct}%`, type: 'EARNING', amount: x.gst }] : []),
         ...(x.deductions || []).filter((l) => l.paid > 0).map((l) => ({ componentName: l.name, type: 'DEDUCTION', amount: l.paid })),
       ],
       lossOfPay: x.lossOfPay ?? 0,
       expenseAmount: 0,
-      totalEarnings: x.grossFull ?? 0,
+      totalEarnings: (x.grossFull ?? 0) + (x.gst ?? 0),
       totalDeductions: x.totalDeductions ?? 0,
       netPay: x.net ?? 0,
     });

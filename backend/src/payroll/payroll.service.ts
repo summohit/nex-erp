@@ -979,6 +979,11 @@ export class PayrollService {
         for (const l of fromEngine.deductions) if (l.paid > 0) payslipItemsData.push({ componentName: l.name, type: 'DEDUCTION', amount: l.paid });
         totalEarnings = fromEngine.grossFull;
         totalDeductions = fromEngine.totalDeductions;
+        // GST on top of a consultant's fee: paid to them, not cut for loss of pay.
+        if (fromEngine.gst > 0) {
+          payslipItemsData.push({ componentName: `GST @ ${fromEngine.gstPct}%`, type: 'EARNING', amount: fromEngine.gst });
+          totalEarnings += fromEngine.gst;
+        }
       }
       // No pay profile and no old salary set-up: nothing to pay, so no ₹0 draft.
       if (!fromEngine && totalEarnings <= 0) continue;
