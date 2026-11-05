@@ -646,6 +646,7 @@ export interface SalaryCalculationResult {
 export interface PayProfileRow {
   employeeId: number;
   name: string;
+  email?: string | null;
   avatarUrl: string | null;
   employeeCode: string | null;
   department: string | null;

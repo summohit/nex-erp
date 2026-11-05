@@ -13,9 +13,11 @@ import {
   PayrollDropdownList,
   PayrollService,
   SalaryCalculationResult,
+  PayProfileRow,
 } from '../../services/payroll.service';
 import {
   LucideArrowLeft,
+  LucideChevronDown,
   LucidePlus,
   LucideSave,
   LucideCheck,
@@ -48,6 +50,7 @@ import {
     CommonModule,
     FormsModule,
     RouterModule,
+    LucideChevronDown,
     LucideArrowLeft,
     LucidePlus,
     LucideSave,
@@ -82,6 +85,23 @@ export class PayProfileDetailComponent implements OnInit {
   employeeId = 0;
   data = signal<PayProfileDetail | null>(null);
   loading = signal(true);
+
+  // ── Person switcher (5 Nov 2026) ──
+  people = signal<PayProfileRow[]>([]);
+  switcherOpen = signal(false);
+  switcherQuery = signal('');
+  switcherList = computed(() => {
+    const q = this.switcherQuery().trim().toLowerCase();
+    const all = this.people();
+    return q ? all.filter((p) => `${p.name} ${p.email ?? ''} ${p.employeeCode ?? ''}`.toLowerCase().includes(q)) : all;
+  });
+  currentPerson = computed(() => this.people().find((p) => p.employeeId === this.data()?.employee?.id) ?? null);
+  switchTo(p: PayProfileRow) {
+    this.switcherOpen.set(false);
+    this.switcherQuery.set('');
+    if (p.employeeId !== this.employeeId) this.router.navigate(['/payroll/pay-profiles', p.employeeId]);
+  }
+  initialsOf(name: string) { return name.split(' ').filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase(); }
   groups = signal<MasterSalaryGroup[]>([]);
   dropdowns = signal<PayrollDropdownList[]>([]);
 
@@ -210,8 +230,16 @@ export class PayProfileDetailComponent implements OnInit {
   formGroupCode = signal<string | null>(null);
 
   ngOnInit() {
-    this.employeeId = Number(this.route.snapshot.paramMap.get('employeeId'));
-    this.load();
+    // Re-load when the person changes through the switcher (same component, new route param).
+    this.route.paramMap.subscribe((pm) => {
+      const id = Number(pm.get('employeeId'));
+      if (!id || id === this.employeeId) return;
+      this.employeeId = id;
+      this.formOpen.set(false);
+      this.data.set(null);
+      this.load();
+    });
+    this.payroll.getPayProfiles().subscribe({ next: (rows) => this.people.set(rows), error: () => {} });
     this.payroll.getPayrollSalaryGroups().subscribe({ next: (g) => this.groups.set(g), error: () => {} });
     this.payroll.getPayrollDropdowns().subscribe({ next: (d) => this.dropdowns.set(d), error: () => {} });
   }

@@ -2442,3 +2442,23 @@
 .pp-gst-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #334155; }
 .pp-gst-toggle small { color: #64748b; font-weight: 400; }
 .pp-gst-toggle input { width: 16px; height: 16px; accent-color: #2563eb; }
+
+/* Person switcher on the pay profile page */
+.pp-breadcrumb-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pp-switcher { position: relative; }
+.pp-switcher-btn { display: inline-flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; cursor: pointer; min-width: 240px; max-width: 360px; text-align: left; }
+.pp-switcher-btn:hover { border-color: #cbd5e1; }
+.pp-sw-av { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none; }
+.pp-sw-av-i { display: grid; place-items: center; background: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 11px; }
+.pp-sw-text { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.2; }
+.pp-sw-text b { font-size: 13px; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-sw-text small { font-size: 11.5px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-sw-spin { width: 14px; height: 14px; border: 2px solid #2563eb; border-right-color: transparent; border-radius: 50%; animation: pp-sw-spin .7s linear infinite; flex: none; }
+@keyframes pp-sw-spin { to { transform: rotate(360deg); } }
+.pp-switcher-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 50; width: 340px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 16px 40px rgba(15, 23, 42, .14); padding: 8px; }
+.pp-switcher-search { width: 100%; height: 36px; border: 1px solid #cbd5e1; border-radius: 9px; padding: 0 10px; font-size: 13px; margin-bottom: 6px; }
+.pp-switcher-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.pp-switcher-item { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border: 0; background: none; border-radius: 9px; cursor: pointer; text-align: left; }
+.pp-switcher-item:hover { background: #f1f5f9; }
+.pp-switcher-item.on { background: #eff6ff; }
+.pp-switcher-empty { padding: 10px; color: #94a3b8; font-size: 13px; }

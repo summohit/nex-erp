@@ -11,6 +11,31 @@
           <svg lucideArrowLeft [size]="14"></svg>
           <span>Back to Pay Profiles</span>
         </button>
+
+        <!-- Switch person without going back to the list -->
+        <div class="pp-switcher">
+          <button type="button" class="pp-switcher-btn" (click)="switcherOpen.set(!switcherOpen())" [attr.aria-expanded]="switcherOpen()">
+            <ng-container *ngIf="currentPerson() as c; else noPerson">
+              <img *ngIf="c.avatarUrl" class="pp-sw-av" [src]="c.avatarUrl" alt="">
+              <span *ngIf="!c.avatarUrl" class="pp-sw-av pp-sw-av-i">{{ initialsOf(c.name) }}</span>
+              <span class="pp-sw-text"><b>{{ c.name }}</b><small>{{ c.email || c.employeeCode || '' }}</small></span>
+            </ng-container>
+            <ng-template #noPerson><span class="pp-sw-text"><b>Switch employee</b></span></ng-template>
+            <span class="pp-sw-spin" *ngIf="loading()"></span>
+            <svg *ngIf="!loading()" lucideChevronDown [size]="14"></svg>
+          </button>
+          <div class="pp-switcher-menu" *ngIf="switcherOpen()">
+            <input class="pp-switcher-search" type="search" placeholder="Search name, email or code…" [ngModel]="switcherQuery()" (ngModelChange)="switcherQuery.set($event)" autofocus>
+            <div class="pp-switcher-list">
+              <button type="button" class="pp-switcher-item" *ngFor="let p of switcherList()" [class.on]="p.employeeId === employeeId" (click)="switchTo(p)">
+                <img *ngIf="p.avatarUrl" class="pp-sw-av" [src]="p.avatarUrl" alt="">
+                <span *ngIf="!p.avatarUrl" class="pp-sw-av pp-sw-av-i">{{ initialsOf(p.name) }}</span>
+                <span class="pp-sw-text"><b>{{ p.name }}</b><small>{{ p.email || p.employeeCode || '' }}</small></span>
+              </button>
+              <div class="pp-switcher-empty" *ngIf="!switcherList().length">No one matches</div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="pp-employee-hero">
         <div class="pp-hero-avatar" [style.background]="getAvatarBg(d.employee.firstName + ' ' + d.employee.lastName)">

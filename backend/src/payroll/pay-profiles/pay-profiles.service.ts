@@ -105,6 +105,7 @@ export class PayProfilesService {
       where: { companyId, user: { status: { notIn: INACTIVE_USER_STATUSES } }, offboardingStatus: { not: 'SEPARATED' } },
       select: {
         id: true, firstName: true, lastName: true, payType: true, employmentType: true, avatarUrl: true, employeeCode: true, firstJob: true,
+        user: { select: { email: true } },
         bankAccountNumber: true, ifscCode: true, panNumber: true, uanNumber: true,
         panVerifiedAt: true, uanVerifiedAt: true, bankVerifiedAt: true,
         department: { select: { name: true } },
@@ -144,6 +145,7 @@ export class PayProfilesService {
         details,
         employeeId: e.id,
         name: `${e.firstName} ${e.lastName}`.trim(),
+        email: (e as any).user?.email ?? null,
         avatarUrl: e.avatarUrl,
         employeeCode: e.employeeCode,
         department: e.department?.name ?? null,
