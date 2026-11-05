@@ -96,7 +96,8 @@ export class PdfService {
     const designation = emp.designation?.name || 'Staff';
     const department = emp.department?.name || 'General';
     const salarySlipNo = `${year}/${String(payslipData.month || 1).padStart(2, '0')}/${emp.id ?? payslipData.id}`;
-    const noOfDays = payslipData.workingDays != null ? payslipData.workingDays : (payslipData.presentDays != null ? payslipData.presentDays : 30);
+    // Days in the month (5 Nov 2026), whatever an older draft stored as working days.
+    const noOfDays = new Date(Date.UTC(Number(payslipData.year) || year, Number(payslipData.month) || 1, 0)).getUTCDate();
     const ctc = payslipData.ctc || 0;
 
     const logoDataUri = companyLogoUrl || getLogoDataUri();
@@ -598,7 +599,7 @@ export class PdfService {
           </div>
           <div class="emp-item">
             <span class="emp-label">No. of Days</span>
-            <span class="emp-value">${noOfDays !== undefined && noOfDays !== null && noOfDays !== '' ? noOfDays : 30}</span>
+            <span class="emp-value">${noOfDays}</span>
           </div>
         </div>
       </div>

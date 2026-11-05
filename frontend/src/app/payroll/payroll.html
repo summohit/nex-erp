@@ -2620,7 +2620,7 @@
           <div class="meta-item"><span class="meta-label">Employee Name:</span> <span class="meta-val">{{ pd.employee.firstName }} {{ pd.employee.lastName }}</span></div>
           <div class="meta-item"><span class="meta-label">Department:</span> <span class="meta-val">{{ pd.employee.department?.name || 'General' }}</span></div>
           <div class="meta-item"><span class="meta-label">Designation:</span> <span class="meta-val">{{ pd.employee.designation?.name || 'N/A' }}</span></div>
-          <div class="meta-item"><span class="meta-label">Working Days:</span> <span class="meta-val">{{ pd.workingDays }}</span></div>
+          <div class="meta-item"><span class="meta-label">Days in Month:</span> <span class="meta-val">{{ daysInMonth(pd) }}</span></div>
           <div class="meta-item"><span class="meta-label">Present Days:</span> <span class="meta-val">{{ pd.presentDays }}</span></div>
           <div class="meta-item"><span class="meta-label">Absent Days:</span> <span class="meta-val" [class.text-rose]="pd.absentDays > 0">{{ pd.absentDays }}</span></div>
         </div>

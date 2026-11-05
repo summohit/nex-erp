@@ -2750,6 +2750,11 @@ export class PayrollComponent implements OnInit {
     });
   }
 
+  /** Total days in the payslip's month (shown instead of working days). */
+  daysInMonth(p: any): number {
+    return new Date(Number(p?.year) || new Date().getFullYear(), Number(p?.month) || 1, 0).getDate();
+  }
+
   /** Consultants (technical / non-technical) get a fee statement, not a salary payslip. */
   isConsultantSlip(p: any): boolean {
     return (p?.items || []).some((i: any) => i.type === 'EARNING' && /professional fee|consultant fee/i.test(i.componentName || ''));
