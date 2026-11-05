@@ -210,11 +210,21 @@ export class PayProfileDetailComponent implements OnInit {
   formWorkerType = signal<string | null>(null);
 
   /** Lines in the chosen group that may be overridden. */
-  /** Per-person amounts the group allows, except the reimbursements (Other Reimbursement has its own box). */
+  /** Per-person amounts the group allows, except Basic and reimbursements (they have their own fields). */
   overridableLines = computed(() => {
     const g = this.groups().find((x) => x.code === this.formGroupCode());
-    return (g?.lines || []).filter((l) => l.overrideAllowed && !/_REIMB$/.test(l.component?.code || ''));
+    return (g?.lines || []).filter((l) => l.overrideAllowed && !/_REIMB$/.test(l.component?.code || '') && l.component?.code !== 'BASIC');
   });
+  /** The group lets Basic be set per person. */
+  basicOverridable = computed(() => {
+    const g = this.groups().find((x) => x.code === this.formGroupCode());
+    return !!(g?.lines || []).find((l) => l.overrideAllowed && l.component?.code === 'BASIC');
+  });
+  /** Basic the group's rule gives (shown as the placeholder). */
+  defaultBasic(): number | null {
+    const b = this.preview()?.lines.find((l) => l.code === 'BASIC');
+    return this.form?.overrides?.['BASIC'] ? null : b ? Math.round(b.monthly) : null;
+  }
   /** The group's Other Reimbursement line, if it has one. */
   reimbursementLine = computed(() => {
     const g = this.groups().find((x) => x.code === this.formGroupCode());
@@ -289,6 +299,8 @@ export class PayProfileDetailComponent implements OnInit {
   }
 
   openNewVersion() {
+    // Latest salary groups, so a per-person field added in Settings shows up without a page reload.
+    this.payroll.getPayrollSalaryGroups().subscribe({ next: (g) => this.groups.set(g), error: () => {} });
     const cur = this.current();
     this.form = {
       salaryGroupCode: cur?.salaryGroupCode ?? null,
