@@ -168,6 +168,7 @@ export class PayrollDryRunComponent implements OnInit {
       workingDays: (r as any).lopDayBasis === 'WORKING' ? (full ? 'Full month' : x.workingDays ?? 0) : (r as any).daysInMonth ?? x.workingDays ?? 0,
       presentDays: full ? 'Full month' : x.presentDays ?? 0,
       absentDays: x.absences ?? 0,
+      notEmployedDays: (x as any).notEmployedDays ?? 0,
       items: [
         ...[...(x.earnings || []).filter((l) => !/_REIMB$/.test(l.code)), ...(x.earnings || []).filter((l) => /_REIMB$/.test(l.code))]
           .map((l) => ({ componentName: l.name, type: 'EARNING', amount: l.full })),

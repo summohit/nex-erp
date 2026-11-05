@@ -155,7 +155,10 @@ export class PayrollDryRunService {
 
       const earningLines = out.lines.filter((l) => l.category === 'EARNING' && l.monthly !== 0);
       const divisor = lopDivisor((companyConfig as any).lopDayBasis, daysInMonth, att.workingDays);
-      const { lines: earnings, lossOfPay } = applyLossOfPay(earningLines, divisor, att.absences);
+      // Mid-month joiner: days before joining are unpaid too (not absences).
+      const gap = (att as any).notEmployed ?? { calendar: 0, working: 0 };
+      const notEmployedDays = (companyConfig as any).lopDayBasis === 'WORKING' ? gap.working : gap.calendar;
+      const { lines: earnings, lossOfPay } = applyLossOfPay(earningLines, divisor, att.absences + notEmployedDays);
       const grossFull = r2(earnings.reduce((t, l) => t + l.full, 0));
       const grossPaid = r2(earnings.reduce((t, l) => t + l.paid, 0));
       const basicPaid = earnings.find((l) => l.code === 'BASIC')?.paid ?? 0;
@@ -207,6 +210,7 @@ export class PayrollDryRunService {
         workingDays: att.workingDays,
         presentDays: att.presentDays,
         absences: r2(att.absences),
+        notEmployedDays,
         earnings,
         grossFull,
         lossOfPay,

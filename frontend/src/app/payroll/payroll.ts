@@ -2755,6 +2755,15 @@ export class PayrollComponent implements OnInit {
     return new Date(Number(p?.year) || new Date().getFullYear(), Number(p?.month) || 1, 0).getDate();
   }
 
+  /** Days paid: days in the month less days before joining and absences. */
+  paidDays(p: any): number {
+    const dim = this.daysInMonth(p);
+    const j = p?.employee?.joiningDate ? new Date(p.employee.joiningDate) : null;
+    const start = Date.UTC(Number(p?.year), Number(p?.month) - 1, 1);
+    const before = j && j.getTime() > start ? Math.min(dim, Math.round((Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - start) / 86400000)) : 0;
+    return Math.max(0, dim - before - (Number(p?.absentDays) || 0));
+  }
+
   /** Consultants (technical / non-technical) get a fee statement, not a salary payslip. */
   isConsultantSlip(p: any): boolean {
     return (p?.items || []).some((i: any) => i.type === 'EARNING' && /professional fee|consultant fee/i.test(i.componentName || ''));

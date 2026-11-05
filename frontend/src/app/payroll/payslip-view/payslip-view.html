@@ -19,7 +19,7 @@
         <div class="meta-item"><span class="meta-label">Employee Name:</span> <span class="meta-val">{{ payslip.employee.firstName }} {{ payslip.employee.lastName }}</span></div>
         <div class="meta-item"><span class="meta-label">Department:</span> <span class="meta-val">{{ payslip.employee.department?.name || 'General' }}</span></div>
         <div class="meta-item"><span class="meta-label">Designation:</span> <span class="meta-val">{{ payslip.employee.designation?.name || 'N/A' }}</span></div>
-        <div class="meta-item"><span class="meta-label">Paid Days:</span> <span class="meta-val">{{ daysInMonthOf() - (payslip.absentDays || 0) }} of {{ daysInMonthOf() }}</span></div>
+        <div class="meta-item"><span class="meta-label">Paid Days:</span> <span class="meta-val">{{ daysInMonthOf() - (payslip.notEmployedDays || 0) - (payslip.absentDays || 0) }} of {{ daysInMonthOf() }}</span></div>
         <div class="meta-item"><span class="meta-label">Present Days:</span> <span class="meta-val">{{ payslip.presentDays }}</span></div>
         <div class="meta-item"><span class="meta-label">Absent Days:</span> <span class="meta-val" [class.text-rose]="payslip.absentDays > 0">{{ payslip.absentDays }}</span></div>
       </div>

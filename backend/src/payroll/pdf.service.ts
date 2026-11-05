@@ -98,7 +98,13 @@ export class PdfService {
     const salarySlipNo = `${year}/${String(payslipData.month || 1).padStart(2, '0')}/${emp.id ?? payslipData.id}`;
     // Paid days (5 Nov 2026): days in the month less absent days, e.g. 31 − 0.5 = 30.5.
     const daysInMonth = new Date(Date.UTC(Number(payslipData.year) || year, Number(payslipData.month) || 1, 0)).getUTCDate();
-    const noOfDays = Math.max(0, daysInMonth - (Number(payslipData.absentDays) || 0));
+    // A mid-month joiner is paid from the joining date.
+    const joined = emp.joiningDate ? new Date(emp.joiningDate) : null;
+    const monthStart = Date.UTC(Number(payslipData.year) || year, (Number(payslipData.month) || 1) - 1, 1);
+    const beforeJoining = joined && joined.getTime() > monthStart
+      ? Math.min(daysInMonth, Math.round((Date.UTC(joined.getUTCFullYear(), joined.getUTCMonth(), joined.getUTCDate()) - monthStart) / 86400000))
+      : 0;
+    const noOfDays = Math.max(0, daysInMonth - beforeJoining - (Number(payslipData.absentDays) || 0));
     const ctc = payslipData.ctc || 0;
 
     const logoDataUri = companyLogoUrl || getLogoDataUri();

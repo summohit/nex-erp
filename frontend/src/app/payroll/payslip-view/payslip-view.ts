@@ -11,6 +11,8 @@ export interface PayslipViewData {
   workingDays: number | string;
   presentDays: number | string;
   absentDays: number;
+  /** Days of the month before the person joined (unpaid). */
+  notEmployedDays?: number;
   items: { componentName: string; type: 'EARNING' | 'DEDUCTION' | string; amount: number }[];
   lossOfPay: number;
   expenseAmount: number;

@@ -63,6 +63,29 @@ export class PayrollService {
    * Employees with no pay profile aren't in the map and keep the old rules.
    * Loaded lazily: the dry run itself depends on this service.
    */
+  /** A day before the person joined (mid-month joiner). */
+  private beforeJoining(emp: { joiningDate?: Date | null }, date: Date): boolean {
+    return !!emp.joiningDate && date.getTime() < new Date(emp.joiningDate).getTime();
+  }
+
+  /**
+   * Days of the month before the person joined, unpaid (5 Nov 2026): calendar
+   * days, and the working days among them (for the working-day basis).
+   */
+  private daysBeforeJoining(
+    emp: { joiningDate?: Date | null }, year: number, month: number, totalDays: number,
+    isWorkingDay: (date: Date) => boolean,
+  ): { calendar: number; working: number } {
+    let calendar = 0, working = 0;
+    for (let d = 1; d <= totalDays; d++) {
+      const date = this.payrollDate(year, month, d);
+      if (!this.beforeJoining(emp, date)) break;
+      calendar++;
+      if (isWorkingDay(date)) working++;
+    }
+    return { calendar, working };
+  }
+
   /** The company's loss-of-pay day basis; unit tests without the table get the working-day rule they were written for. */
   private async lopBasis(companyId: number): Promise<string> {
     if (!(this.prisma as any).payrollCompanyConfig?.findUnique) return 'WORKING';
@@ -586,7 +609,7 @@ export class PayrollService {
     const startDate = this.payrollDate(year, month, 1);
     const endDate = this.payrollDate(year, month, totalDaysInMonth);
     const holidayKeys = await this.payrollHolidayKeys(companyId, startDate, endDate);
-    const out = new Map<number, { workingDays: number; presentDays: number; absences: number; noAttendance: boolean }>();
+    const out = new Map<number, { workingDays: number; presentDays: number; absences: number; noAttendance: boolean; notEmployed: { calendar: number; working: number } }>();
 
     for (const emp of employees) {
       const restDay = await this.restDayCheck(emp, startDate, endDate);
@@ -619,6 +642,7 @@ export class PayrollService {
       let half = 0;
       for (let d = 1; d <= totalDaysInMonth; d++) {
         const date = this.payrollDate(year, month, d);
+        if (this.beforeJoining(emp, date)) continue; // not employed yet: neither absent nor paid
         if (restDay(date) || holidayKeys.has(this.payrollDateKey(date))) continue;
         const key = this.payrollDateKey(date);
         const credit = this.attendanceCredit(byDay.get(key));
@@ -626,7 +650,8 @@ export class PayrollService {
         else if (credit === 0.5) half++;
         absences += 1 - Math.min(1, credit + this.paidLeaveCredit(key, leaves));
       }
-      out.set(emp.id, { workingDays, presentDays: present + half * 0.5, absences, noAttendance: attendances.length === 0 });
+      const gap = this.daysBeforeJoining(emp, year, month, totalDaysInMonth, (date) => !restDay(date) && !holidayKeys.has(this.payrollDateKey(date)));
+      out.set(emp.id, { workingDays, presentDays: present + half * 0.5, absences, noAttendance: attendances.length === 0, notEmployed: gap });
     }
     return out;
   }
@@ -720,6 +745,7 @@ export class PayrollService {
       let half = 0;
       for (let d = 1; d <= totalDaysInMonth; d++) {
         const date = this.payrollDate(year, month, d);
+        if (this.beforeJoining(emp, date)) continue; // not employed yet: neither absent nor paid
         if (restDay(date) || holidayKeys.has(this.payrollDateKey(date))) continue;
         const key = this.payrollDateKey(date);
         const st = byDay.get(key);
@@ -731,7 +757,9 @@ export class PayrollService {
       }
       if (isLopExempt(emp.user?.role)) absences = 0;
 
-      let lossOfPay = Math.round((gross / lopDivisor(basis, totalDaysInMonth, workingDays)) * absences * 100) / 100;
+      const gap = this.daysBeforeJoining(emp, year, month, totalDaysInMonth, (date) => !restDay(date) && !holidayKeys.has(this.payrollDateKey(date)));
+      const unpaidBeforeJoining = basis === 'WORKING' ? gap.working : gap.calendar;
+      let lossOfPay = Math.round((gross / lopDivisor(basis, totalDaysInMonth, workingDays)) * (absences + unpaidBeforeJoining) * 100) / 100;
       if (fromEngine) {
         gross = fromEngine.grossFull;
         deductions = fromEngine.totalDeductions;
@@ -884,6 +912,7 @@ export class PayrollService {
 
       for (let d = 1; d <= totalDaysInMonth; d++) {
         const date = this.payrollDate(year, month, d);
+        if (this.beforeJoining(emp, date)) continue; // not employed yet: neither absent nor paid
         // Only check working days for LOP
         if (!restDay(date) && !holidayKeys.has(this.payrollDateKey(date))) {
           const dateStr = this.payrollDateKey(date);
@@ -1000,7 +1029,9 @@ export class PayrollService {
         ? 0
         : fromEngine
           ? fromEngine.lossOfPay
-          : Math.round(dailyRate * unexcusedAbsences * 100) / 100;
+          : Math.round(dailyRate * (unexcusedAbsences + (basis === 'WORKING'
+              ? this.daysBeforeJoining(emp, year, month, totalDaysInMonth, (date) => !restDay(date) && !holidayKeys.has(this.payrollDateKey(date))).working
+              : this.daysBeforeJoining(emp, year, month, totalDaysInMonth, () => true).calendar)) * 100) / 100;
 
       // Leave encashment, on the December slip only. Deliberately after the
       // statutory block and after dailyRate: a one-off payout must not inflate
@@ -1177,6 +1208,7 @@ export class PayrollService {
             firstName: true,
             lastName: true,
             avatarUrl: true,
+            joiningDate: true,
             department: { select: { name: true } },
             designation: { select: { name: true } },
             user: { select: { status: true } }
@@ -1219,6 +1251,7 @@ export class PayrollService {
             firstName: true,
             lastName: true,
             employeeCode: true,
+            joiningDate: true,
             department: { select: { name: true } },
             designation: { select: { name: true } }
           }
