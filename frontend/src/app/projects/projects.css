@@ -864,6 +864,41 @@
   width: 100%;
 }
 
+a.board-title {
+  text-decoration: none;
+  color: inherit;
+}
+
+a.board-title:hover {
+  color: #0f4f9c;
+}
+
+.boards-grid-table ::ng-deep .board-title-link,
+.boards-grid-table .board-title-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.boards-grid-table ::ng-deep .board-title-link:hover,
+.boards-grid-table .board-title-link:hover {
+  color: #0f4f9c;
+  text-decoration: underline;
+}
+
+a.team-avatar-circle {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  transition: transform 0.15s ease;
+}
+
+a.team-avatar-circle:hover {
+  transform: scale(1.12);
+  z-index: 50 !important;
+}
+
 .card-meta-row {
   display: flex;
   align-items: center;

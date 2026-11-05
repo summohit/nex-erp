@@ -435,14 +435,19 @@ export class ProjectsComponent implements OnInit {
 
     const circles = visible.map((m, i) => {
       const url = this.memberAvatarUrl(m);
-      const name = this.memberDisplayName(m);
+      const name = this.esc(this.memberDisplayName(m));
       const ml = i === 0 ? '0' : '-8px';
       const z = visible.length - i;
+      const empId = m.employeeId || m.employee?.id || m.id;
+      const linkOpen = empId ? `<a href="/employees/${empId}/profile" style="display:inline-block;line-height:0;margin-left:${ml};z-index:${z};text-decoration:none;" title="${name} — View Profile">` : '';
+      const linkClose = empId ? `</a>` : '';
+      const marginStyle = empId ? 'margin-left:0;z-index:auto;' : `margin-left:${ml};z-index:${z};`;
+
       if (url) {
-        return `<span style="${this.avatarBase}margin-left:${ml};z-index:${z};background:url('${url}') center/cover no-repeat;" title="${name}"></span>`;
+        return `${linkOpen}<span style="${this.avatarBase}${marginStyle}background:url('${url}') center/cover no-repeat;" title="${name}"></span>${linkClose}`;
       }
       const color = this.getPmColor(m.employeeId || m.id || i);
-      return `<span style="${this.avatarBase}margin-left:${ml};z-index:${z};background:${color};" title="${name}">${this.memberInitial(m)}</span>`;
+      return `${linkOpen}<span style="${this.avatarBase}${marginStyle}background:${color};" title="${name}">${this.memberInitial(m)}</span>${linkClose}`;
     }).join('');
 
     const overflowCircle = overflow > 0
@@ -752,8 +757,14 @@ export class ProjectsComponent implements OnInit {
         field: 'key',
         width: 140,
         minWidth: 120,
-        cellRenderer: (params: any) =>
-          params.value ? `<span class="project-code-chip">${params.value}</span>` : '<span class="cell-muted">—</span>'
+        cellRenderer: (params: any) => {
+          if (!params.value) return '<span class="cell-muted">—</span>';
+          const id = params.data?.id;
+          const code = this.esc(params.value);
+          return id
+            ? `<span class="project-code-chip"><a href="/projects/${id}" style="color:inherit;text-decoration:none;" title="Open in new tab">${code}</a></span>`
+            : `<span class="project-code-chip">${code}</span>`;
+        }
       },
       {
         headerName: 'Project',
@@ -763,10 +774,15 @@ export class ProjectsComponent implements OnInit {
         cellRenderer: (params: any) => {
           if (!params.data) return '';
           const color = this.getGradient(params.data.color, params.node?.rowIndex || 0);
+          const name = this.esc(params.data.name || '—');
+          const id = params.data?.id;
+          const link = id
+            ? `<a href="/projects/${id}" class="board-title-link" style="color:inherit;text-decoration:none;">${name}</a>`
+            : name;
           return `
             <div class="table-name-cell">
               <span class="table-color-dot" style="background:${color}"></span>
-              <span class="board-title">${params.data.name}</span>
+              <span class="board-title">${link}</span>
             </div>
           `;
         }
@@ -1074,8 +1090,14 @@ export class ProjectsComponent implements OnInit {
       field: 'key',
       width: 120,
       minWidth: 100,
-      cellRenderer: (params: any) =>
-        params.value ? `<span class="project-code-chip">${params.value}</span>` : '<span class="cell-muted">—</span>'
+      cellRenderer: (params: any) => {
+        if (!params.value) return '<span class="cell-muted">—</span>';
+        const id = params.data?.id;
+        const code = this.esc(params.value);
+        return id
+          ? `<span class="project-code-chip"><a href="/projects/${id}" style="color:inherit;text-decoration:none;" title="Open in new tab">${code}</a></span>`
+          : `<span class="project-code-chip">${code}</span>`;
+      }
     },
     {
       headerName: 'Project name',
@@ -1084,15 +1106,19 @@ export class ProjectsComponent implements OnInit {
       minWidth: 150,
       // A subproject sits indented under its parent, marked with an arrow.
       cellRenderer: (params: any) => {
-        const name = params.value || '—';
+        const name = this.esc(params.value || '—');
+        const id = params.data?.id;
+        const link = id
+          ? `<a href="/projects/${id}" class="board-title-link" style="color:inherit;text-decoration:none;">${name}</a>`
+          : name;
         if (params.data?.parentId) {
           const parent = this.parentOf(params.data);
-          return `<span class="board-title board-title-sub"><span class="sub-arrow">↳</span>${name}<span class="struct-tag sub" title="Subproject of ${parent ? parent.key + ' — ' + parent.name : 'another project'}">Subproject</span></span>`;
+          return `<span class="board-title board-title-sub"><span class="sub-arrow">↳</span>${link}<span class="struct-tag sub" title="Subproject of ${parent ? this.esc(parent.key + ' — ' + parent.name) : 'another project'}">Subproject</span></span>`;
         }
         const n = this.subprojectCount(params.data);
         return n
-          ? `<span class="board-title">${name}<span class="struct-tag parent" title="${n} subproject${n === 1 ? '' : 's'}">Parent · ${n}</span></span>`
-          : `<span class="board-title">${name}</span>`;
+          ? `<span class="board-title">${link}<span class="struct-tag parent" title="${n} subproject${n === 1 ? '' : 's'}">Parent · ${n}</span></span>`
+          : `<span class="board-title">${link}</span>`;
       }
     },
     {
@@ -1181,8 +1207,8 @@ export class ProjectsComponent implements OnInit {
 
   onBoardRowClicked(event: any) {
     const target = event.event?.target as HTMLElement | null;
-    // Don't navigate when clicking the team count button, checkbox, or action menu
-    if (target?.closest('[data-team-project-id], input[type=checkbox], .ag-checkbox, button')) return;
+    // Don't navigate when clicking the team count button, checkbox, action menu, or an employee avatar link
+    if (target?.closest('[data-team-project-id], input[type=checkbox], .ag-checkbox, button, a[href*="/employees/"]')) return;
     if (event.data) this.goToProject(event.data.id);
   }
 
@@ -4194,8 +4220,12 @@ export class ProjectsComponent implements OnInit {
   }
 
   private taskTableDuration(value: number | null | undefined): string {
-    const minutes = Math.max(0, Number(value || 0));
-    return minutes < 60 ? `${Math.round(minutes)}s` : `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${Math.round(minutes % 60)}m` : ''}`;
+    if (value == null || Number(value) === 0) return '0h';
+    const minutes = Math.max(0, Number(value));
+    if (minutes < 60) return `${Math.round(minutes)}m`;
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
   }
 
   private taskTableStatus(value: string, editable = false): string {
@@ -5014,5 +5044,15 @@ export class ProjectsComponent implements OnInit {
     localStorage.setItem('recently_viewed_board_ids', JSON.stringify(recent));
 
     this.router.navigate(['/projects', id]);
+  }
+
+  onCardAuxClick(event: MouseEvent, id: number) {
+    if (event.button === 1) { // Middle click (scroll wheel)
+      event.preventDefault();
+      let recent = [id, ...this.recentlyViewedIds().filter(i => i !== id)].slice(0, 6);
+      this.recentlyViewedIds.set(recent);
+      localStorage.setItem('recently_viewed_board_ids', JSON.stringify(recent));
+      window.open(`/projects/${id}`, '_blank');
+    }
   }
 }

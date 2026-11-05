@@ -34,10 +34,10 @@
       <svg lucideCalendar size="18"></svg> Appraisal Cycles
     </button>
     <button class="tab-btn" [class.active]="activeTab() === 'probation'" *ngIf="canSeePeople()" (click)="setTab('probation')">
-      <svg lucideAward size="18"></svg> Probation
+      <svg lucideUserCheck size="18"></svg> Probation
     </button>
     <button class="tab-btn" [class.active]="activeTab() === 'people'" *ngIf="canSeePeople()" (click)="setTab('people')">
-      <svg lucideAward size="18"></svg> PIP & Notice
+      <svg lucideAlertTriangle size="18"></svg> PIP & Notice
     </button>
   </div>
 

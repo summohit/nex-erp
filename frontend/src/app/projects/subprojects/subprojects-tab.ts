@@ -1,9 +1,30 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { Router, RouterModule } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
 import { ProjectsService } from '../../services/projects';
 import { EmployeeService } from '../../services/employee.service';
 import { DialogService } from '../../shared/services/dialog.service';
+import {
+  LucideLayers,
+  LucideFolder,
+  LucideGitBranch,
+  LucidePlus,
+  LucideLink,
+  LucideArrowUpRight,
+  LucideCheckSquare,
+  LucideUsers,
+  LucideCheck,
+  LucideInfo,
+  LucideCoins,
+  LucideSplit,
+  LucidePencil,
+  LucideUnlink,
+  LucideAlertTriangle,
+  LucideX,
+  LucideArrowRight,
+  LucideClock,
+} from '@lucide/angular';
 
 /**
  * Subprojects of a parent project: ABC holds ABC-A, ABC-B, ABC-C.
@@ -15,165 +36,1354 @@ import { DialogService } from '../../shared/services/dialog.service';
 @Component({
   selector: 'app-subprojects-tab',
   standalone: true,
+  imports: [
+    CommonModule,
+    RouterModule,
+    LucideLayers,
+    LucideFolder,
+    LucideGitBranch,
+    LucidePlus,
+    LucideLink,
+    LucideArrowUpRight,
+    LucideCheckSquare,
+    LucideUsers,
+    LucideCheck,
+    LucideInfo,
+    LucideCoins,
+    LucideSplit,
+    LucidePencil,
+    LucideUnlink,
+    LucideAlertTriangle,
+    LucideX,
+    LucideArrowRight,
+    LucideClock,
+  ],
   template: `
     @if (project(); as p) {
-      <div class="sp">
-        <!-- The parent -->
-        <div class="sp-parent">
+      <div class="sp-container">
+        <!-- Master / Parent Project Hero Banner -->
+        <div class="sp-parent-card">
           <div class="sp-parent-main">
-            <svg class="sp-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <div>
-              <div class="sp-parent-title">{{ p.key }} — {{ p.name }}</div>
-              <div class="sp-sub">Parent project code: {{ p.key }}</div>
+            <div class="sp-parent-icon-box">
+              <svg lucideLayers [size]="22"></svg>
+            </div>
+            <div class="sp-parent-details">
+              <div class="sp-parent-tag-row">
+                <span class="sp-master-badge">
+                  <span class="sp-master-dot"></span>
+                  MASTER PROJECT
+                </span>
+                <span class="sp-parent-code-chip">{{ p.key }}</span>
+              </div>
+              <h2 class="sp-parent-title">{{ p.name }}</h2>
+              <div class="sp-parent-meta">
+                <span>Parent code: <strong>{{ p.key }}</strong></span>
+                <span class="meta-dot">·</span>
+                <span>
+                  <strong>{{ (p.subprojects || []).length }}</strong> 
+                  connected subproject{{ (p.subprojects || []).length === 1 ? '' : 's' }}
+                </span>
+              </div>
             </div>
           </div>
-          @if (isAdmin()) {
-            <div class="sp-mode" title="How the subprojects' budgets work">
-              <span class="sp-mode-label">Budget</span>
-              <button type="button" [class.on]="mode() === 'SEPARATE'" (click)="setMode('SEPARATE')" [disabled]="busy()">Separate</button>
-              <button type="button" [class.on]="mode() === 'SHARED'" (click)="setMode('SHARED')" [disabled]="busy()">Shared</button>
+
+          <!-- Budget Mode Controls -->
+          <div class="sp-parent-controls">
+            <div class="sp-mode-container">
+              <div class="sp-mode-top">
+                <svg lucideCoins [size]="14" class="text-indigo-600"></svg>
+                <span class="sp-mode-title">Budget Allocation</span>
+              </div>
+              @if (isAdmin()) {
+                <div class="sp-mode-toggle" title="Select how subprojects handle their budgets">
+                  <button 
+                    type="button" 
+                    class="mode-btn" 
+                    [class.active]="mode() === 'SEPARATE'" 
+                    (click)="setMode('SEPARATE')" 
+                    [disabled]="busy()">
+                    <svg lucideSplit [size]="13"></svg>
+                    <span>Separate</span>
+                  </button>
+                  <button 
+                    type="button" 
+                    class="mode-btn" 
+                    [class.active]="mode() === 'SHARED'" 
+                    (click)="setMode('SHARED')" 
+                    [disabled]="busy()">
+                    <svg lucideCoins [size]="13"></svg>
+                    <span>Shared</span>
+                  </button>
+                </div>
+              } @else {
+                <span class="sp-mode-readonly">
+                  <span class="ro-dot"></span>
+                  {{ mode() === 'SHARED' ? 'Shared Master Budget' : 'Separate Subproject Budgets' }}
+                </span>
+              }
             </div>
-          } @else {
-            <span class="sp-mode-ro">{{ mode() === 'SHARED' ? 'Shared budget' : 'Separate budgets' }}</span>
+          </div>
+        </div>
+
+        <!-- Budget Strategy Info Callout -->
+        <div class="sp-info-callout" [class.shared]="mode() === 'SHARED'">
+          <div class="callout-icon">
+            <svg lucideInfo [size]="16"></svg>
+          </div>
+          <div class="callout-content">
+            <span class="callout-strategy">
+              {{ mode() === 'SHARED' ? 'Shared Budget Strategy' : 'Separate Budgets Strategy' }}:
+            </span>
+            {{ mode() === 'SHARED'
+              ? 'All subprojects draw from ' + p.key + '’s master budget pool. The Summary tab counts collective spend against it.'
+              : 'Each subproject maintains an independent budget. ' + p.key + '’s Summary tab displays the combined portfolio total.' }}
+          </div>
+        </div>
+
+        <!-- Section Bar: Title & Action Buttons -->
+        <div class="sp-section-bar">
+          <div class="sp-section-title-wrap">
+            <div class="sp-tree-icon-badge">
+              <svg lucideGitBranch [size]="16"></svg>
+            </div>
+            <div class="sp-section-heading-group">
+              <div class="sp-heading-with-count">
+                <h3>Subprojects Hierarchy</h3>
+                <span class="sp-count-pill">{{ (p.subprojects || []).length }}</span>
+              </div>
+              <p class="sp-section-sub">Autonomous task boards and delivery pipelines organized under {{ p.key }}</p>
+            </div>
+          </div>
+
+          @if (isAdmin()) {
+            <div class="sp-action-btns">
+              <button type="button" class="btn-sp primary" (click)="openForm('new')">
+                <svg lucidePlus [size]="15"></svg>
+                <span>New Subproject</span>
+              </button>
+              <button type="button" class="btn-sp outline" (click)="openForm('attach')">
+                <svg lucideLink [size]="14"></svg>
+                <span>Add Existing Project</span>
+              </button>
+            </div>
           }
         </div>
-        <p class="sp-hint">
-          {{ mode() === 'SHARED'
-            ? 'Shared: the subprojects spend from ' + p.key + '\\'s budget. Its Summary counts everyone\\'s spend against it.'
-            : 'Separate: each subproject has its own budget. ' + p.key + '\\'s Summary shows the combined total.' }}
-        </p>
 
-        <!-- The subprojects -->
-        @for (c of p.subprojects || []; track c.id) {
-          <div class="sp-child">
-            <span class="sp-arrow" aria-hidden="true">↳</span>
-            <button type="button" class="sp-card" (click)="open(c.id)">
-              <div class="sp-card-title">{{ c.key }} — {{ c.name }}</div>
-              <div class="sp-card-meta">
-                <span>Code: {{ c.key }}</span>
-                <span>· {{ c._count?.issues ?? 0 }} task{{ c._count?.issues === 1 ? '' : 's' }}</span>
-                @if (pmNames(c)) { <span>· PM: {{ pmNames(c) }}</span> }
-                @if (c.workStatus) { <span class="sp-status">{{ c.workStatus.replace('_', ' ').toLowerCase() }}</span> }
+        <!-- Form: New Subproject -->
+        @if (form() === 'new') {
+          <div class="sp-form-card">
+            <div class="sp-form-header">
+              <div class="form-title-wrap">
+                <div class="form-icon-badge new">
+                  <svg lucidePlus [size]="16"></svg>
+                </div>
+                <div>
+                  <h4>Create New Subproject under {{ p.key }}</h4>
+                  <p class="form-subtitle">Sets up a new child workspace linked directly to this master project.</p>
+                </div>
               </div>
-            </button>
-            @if (isAdmin()) {
-              <div class="sp-actions">
-                <button type="button" class="sp-link" (click)="renameSub(c)">Change code</button>
-                <button type="button" class="sp-link danger" (click)="detach(c)">Detach</button>
-              </div>
-            }
-          </div>
-        } @empty {
-          <p class="sp-empty">No subprojects yet.{{ isAdmin() ? ' Create one, or add an existing project under ' + p.key + '.' : '' }}</p>
-        }
+              <button type="button" class="form-close-btn" (click)="form.set(null)" [disabled]="busy()" title="Close form">
+                <svg lucideX [size]="16"></svg>
+              </button>
+            </div>
 
-        @if (isAdmin()) {
-          <div class="sp-add-bar">
-            <button type="button" class="sp-btn primary" (click)="openForm('new')">+ New subproject</button>
-            <button type="button" class="sp-btn" (click)="openForm('attach')">Add existing project</button>
-          </div>
+            <div class="sp-form-body">
+              <div class="sp-form-grid">
+                <div class="sp-form-field">
+                  <label class="sp-label">Subproject Name <span class="req">*</span></label>
+                  <input 
+                    class="sp-input"
+                    [value]="name()" 
+                    (input)="name.set($any($event.target).value)" 
+                    placeholder="e.g. Mobile Application / Phase 1" />
+                </div>
 
-          @if (form() === 'new') {
-            <div class="sp-form">
-              <h4>New subproject under {{ p.key }}</h4>
-              <div class="sp-grid">
-                <label>Name <span class="req">*</span>
-                  <input [value]="name()" (input)="name.set($any($event.target).value)" placeholder="e.g. Site A rollout" />
-                </label>
-                <label>Sub code <span class="req">*</span>
-                  <input [value]="subCode()" (input)="subCode.set($any($event.target).value.toUpperCase())" placeholder="A" maxlength="10" />
-                  <span class="sp-preview">Code: {{ p.key }}-{{ subCode() || '…' }}</span>
-                </label>
-                <label>Project manager <span class="req">*</span>
-                  <select (change)="pmId.set(+$any($event.target).value || null)">
-                    <option value="">Choose…</option>
-                    @for (e of employees(); track e.id) { <option [value]="e.id">{{ e.firstName }} {{ e.lastName }}</option> }
+                <div class="sp-form-field">
+                  <label class="sp-label">Sub Code Identifier <span class="req">*</span></label>
+                  <div class="sp-code-group">
+                    <input 
+                      class="sp-input code-input"
+                      [value]="subCode()" 
+                      (input)="subCode.set($any($event.target).value.toUpperCase())" 
+                      placeholder="A" 
+                      maxlength="10" />
+                    <div class="sp-generated-preview">
+                      <span class="preview-label">Generated Key:</span>
+                      <strong class="preview-key">{{ p.key }}-{{ subCode() || '…' }}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="sp-form-field">
+                  <label class="sp-label">Project Manager <span class="req">*</span></label>
+                  <select class="sp-select" (change)="pmId.set(+$any($event.target).value || null)">
+                    <option value="">Choose Project Manager…</option>
+                    @for (e of employees(); track e.id) { 
+                      <option [value]="e.id">{{ e.firstName }} {{ e.lastName }}</option> 
+                    }
                   </select>
-                </label>
+                </div>
+
                 @if (mode() === 'SEPARATE') {
-                  <label>Budget ({{ p.currency || 'INR' }})
-                    <input type="number" min="0" [value]="budget() ?? ''" (input)="budget.set($any($event.target).value === '' ? null : +$any($event.target).value)" />
-                  </label>
+                  <div class="sp-form-field">
+                    <label class="sp-label">Allocated Budget ({{ p.currency || 'INR' }})</label>
+                    <div class="sp-curr-wrapper">
+                      <span class="curr-sign">{{ p.currency === 'USD' ? '$' : p.currency === 'EUR' ? '€' : '₹' }}</span>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        class="sp-input curr-input"
+                        [value]="budget() ?? ''" 
+                        (input)="budget.set($any($event.target).value === '' ? null : +$any($event.target).value)" 
+                        placeholder="e.g. 500000" />
+                    </div>
+                  </div>
                 }
               </div>
-              <p class="sp-note">Dates, department, category and client are taken from {{ p.key }}; they can be changed on the subproject afterwards.</p>
-              <div class="sp-form-actions">
-                <button type="button" class="sp-btn" (click)="form.set(null)" [disabled]="busy()">Cancel</button>
-                <button type="button" class="sp-btn primary" (click)="create()" [disabled]="busy() || !name().trim() || !subCode().trim() || !pmId()">
-                  {{ busy() ? 'Creating…' : 'Create subproject' }}
-                </button>
-              </div>
-            </div>
-          }
 
-          @if (form() === 'attach') {
-            <div class="sp-form">
-              <h4>Add an existing project under {{ p.key }}</h4>
-              <div class="sp-grid">
-                <label>Project <span class="req">*</span>
-                  <select (change)="attachId.set(+$any($event.target).value || null)">
-                    <option value="">Choose…</option>
-                    @for (o of attachable(); track o.id) { <option [value]="o.id">{{ o.key }} — {{ o.name }}</option> }
-                  </select>
-                </label>
-                <label>Sub code <span class="req">*</span>
-                  <input [value]="subCode()" (input)="subCode.set($any($event.target).value.toUpperCase())" placeholder="B" maxlength="10" />
-                  <span class="sp-preview">New code: {{ p.key }}-{{ subCode() || '…' }}</span>
-                </label>
-              </div>
-              <p class="sp-note warn">Its code and every task ID change to the new code, e.g. {{ p.key }}-{{ subCode() || 'B' }}-12. Links keep working; text that quoted an old task ID is not rewritten.</p>
-              <div class="sp-form-actions">
-                <button type="button" class="sp-btn" (click)="form.set(null)" [disabled]="busy()">Cancel</button>
-                <button type="button" class="sp-btn primary" (click)="attach()" [disabled]="busy() || !attachId() || !subCode().trim()">
-                  {{ busy() ? 'Adding…' : 'Add as subproject' }}
-                </button>
+              <div class="sp-form-callout">
+                <svg lucideInfo [size]="15"></svg>
+                <span>Timeline dates, department, category, and client are cloned from <strong>{{ p.key }}</strong> and can be modified on the subproject board anytime.</span>
               </div>
             </div>
-          }
+
+            <div class="sp-form-footer">
+              <button type="button" class="btn-form-cancel" (click)="form.set(null)" [disabled]="busy()">Cancel</button>
+              <button 
+                type="button" 
+                class="btn-form-submit primary" 
+                (click)="create()" 
+                [disabled]="busy() || !name().trim() || !subCode().trim() || !pmId()">
+                <svg lucidePlus [size]="14" *ngIf="!busy()"></svg>
+                <span>{{ busy() ? 'Creating Subproject…' : 'Create Subproject' }}</span>
+              </button>
+            </div>
+          </div>
         }
+
+        <!-- Form: Attach Existing Standalone Project -->
+        @if (form() === 'attach') {
+          <div class="sp-form-card attach">
+            <div class="sp-form-header">
+              <div class="form-title-wrap">
+                <div class="form-icon-badge attach">
+                  <svg lucideLink [size]="16"></svg>
+                </div>
+                <div>
+                  <h4>Add Existing Standalone Project under {{ p.key }}</h4>
+                  <p class="form-subtitle">Converts an independent project into a structured subproject under this parent.</p>
+                </div>
+              </div>
+              <button type="button" class="form-close-btn" (click)="form.set(null)" [disabled]="busy()" title="Close form">
+                <svg lucideX [size]="16"></svg>
+              </button>
+            </div>
+
+            <div class="sp-form-body">
+              <div class="sp-form-grid">
+                <div class="sp-form-field">
+                  <label class="sp-label">Select Project to Attach <span class="req">*</span></label>
+                  <select class="sp-select" (change)="attachId.set(+$any($event.target).value || null)">
+                    <option value="">Choose an existing project…</option>
+                    @for (o of attachable(); track o.id) { 
+                      <option [value]="o.id">{{ o.key }} — {{ o.name }}</option> 
+                    }
+                  </select>
+                </div>
+
+                <div class="sp-form-field">
+                  <label class="sp-label">Sub Code Identifier <span class="req">*</span></label>
+                  <div class="sp-code-group">
+                    <input 
+                      class="sp-input code-input"
+                      [value]="subCode()" 
+                      (input)="subCode.set($any($event.target).value.toUpperCase())" 
+                      placeholder="B" 
+                      maxlength="10" />
+                    <div class="sp-generated-preview">
+                      <span class="preview-label">New Subproject Key:</span>
+                      <strong class="preview-key">{{ p.key }}-{{ subCode() || '…' }}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="sp-form-callout warn">
+                <svg lucideAlertTriangle [size]="16"></svg>
+                <span>
+                  <strong>Important Notice:</strong> The attached project’s code and all associated task IDs will seamlessly migrate to 
+                  <strong>{{ p.key }}-{{ subCode() || 'B' }}-#</strong>. Existing URLs and links will redirect automatically.
+                </span>
+              </div>
+            </div>
+
+            <div class="sp-form-footer">
+              <button type="button" class="btn-form-cancel" (click)="form.set(null)" [disabled]="busy()">Cancel</button>
+              <button 
+                type="button" 
+                class="btn-form-submit attach" 
+                (click)="attach()" 
+                [disabled]="busy() || !attachId() || !subCode().trim()">
+                <svg lucideLink [size]="14" *ngIf="!busy()"></svg>
+                <span>{{ busy() ? 'Connecting Subproject…' : 'Attach as Subproject' }}</span>
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Subprojects Hierarchy Tree List -->
+        <div class="sp-tree-container">
+          @for (c of p.subprojects || []; track c.id) {
+            <div class="sp-tree-item">
+              <!-- Visual Branch Connector -->
+              <div class="sp-branch-line" aria-hidden="true">
+                <svg width="24" height="48" viewBox="0 0 24 48" fill="none">
+                  <path d="M6 0v24a10 10 0 0 0 10 10h8" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+
+              <!-- Subproject Card -->
+              <div 
+                class="sp-card" 
+                (click)="open(c.id)" 
+                (auxclick)="onCardAuxClick($event, c.id)">
+                
+                <div class="sp-card-content">
+                  <!-- Header: Code chip, Title with external icon, Level pill, Status badge -->
+                  <div class="sp-card-header">
+                    <div class="sp-card-title-group">
+                      <span class="sp-subcode-chip">{{ c.key }}</span>
+                      
+                      <a 
+                        class="sp-card-link" 
+                        [routerLink]="['/projects', c.id]" 
+                        (click)="$event.stopPropagation(); open(c.id)"
+                        title="Open subproject board">
+                        <span class="sp-card-name-text">{{ c.name }}</span>
+                        <svg lucideArrowUpRight [size]="15" class="sp-ext-icon"></svg>
+                      </a>
+
+                      <span class="sp-sub-level-badge">SUBPROJECT {{ c.subCode }}</span>
+                    </div>
+
+                    <div class="sp-card-status-wrap">
+                      <span class="sp-status-chip" [ngStyle]="getStatusStyle(c.workStatus)">
+                        <span class="status-pulse-dot" [style.background]="getStatusDot(c.workStatus)"></span>
+                        {{ formatStatus(c.workStatus) }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Details Row: Tasks count, PM info, and Action buttons -->
+                  <div class="sp-card-footer">
+                    <div class="sp-card-meta-chips">
+                      <!-- Tasks Count Chip -->
+                      <div class="sp-meta-chip">
+                        <div class="meta-chip-icon">
+                          <svg lucideCheckSquare [size]="13"></svg>
+                        </div>
+                        <span class="meta-chip-text">
+                          <strong>{{ c._count?.issues ?? 0 }}</strong> task{{ c._count?.issues === 1 ? '' : 's' }}
+                        </span>
+                      </div>
+
+                      <!-- Project Manager Chip -->
+                      <div class="sp-meta-chip pm">
+                        <div class="sp-pm-avatar" [style.background]="getAvatarBg(pmNames(c))">
+                          {{ getPmInitial(c) }}
+                        </div>
+                        <span class="meta-chip-text">
+                          PM: <strong>{{ pmNames(c) || 'Unassigned' }}</strong>
+                        </span>
+                      </div>
+
+                      <!-- Progress Indicator (if available) -->
+                      @if (c.progress != null && c.progress > 0) {
+                        <div class="sp-meta-chip progress-chip">
+                          <div class="sp-progress-track">
+                            <div class="sp-progress-fill" [style.width.%]="c.progress"></div>
+                          </div>
+                          <span class="progress-pct">{{ c.progress }}%</span>
+                        </div>
+                      }
+                    </div>
+
+                    <!-- Admin Row Actions -->
+                    @if (isAdmin()) {
+                      <div class="sp-card-actions">
+                        <button 
+                          type="button" 
+                          class="sp-action-btn edit" 
+                          (click)="$event.stopPropagation(); renameSub(c)" 
+                          title="Change subproject identifier code">
+                          <svg lucidePencil [size]="12"></svg>
+                          <span>Change code</span>
+                        </button>
+                        <button 
+                          type="button" 
+                          class="sp-action-btn danger" 
+                          (click)="$event.stopPropagation(); detach(c)" 
+                          title="Detach from parent project">
+                          <svg lucideUnlink [size]="12"></svg>
+                          <span>Detach</span>
+                        </button>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+          } @empty {
+            <!-- Empty State Card -->
+            <div class="sp-empty-card">
+              <div class="sp-empty-icon-box">
+                <svg lucideLayers [size]="30"></svg>
+              </div>
+              <h4 class="sp-empty-title">No Subprojects Connected Yet</h4>
+              <p class="sp-empty-desc">
+                Divide <strong>{{ p.name }}</strong> into structured, modular subprojects. Each subproject maintains its own board, milestones, and issues while synchronizing into this master project.
+              </p>
+              @if (isAdmin()) {
+                <div class="sp-empty-buttons">
+                  <button type="button" class="btn-sp primary" (click)="openForm('new')">
+                    <svg lucidePlus [size]="15"></svg>
+                    <span>Create First Subproject</span>
+                  </button>
+                  <button type="button" class="btn-sp outline" (click)="openForm('attach')">
+                    <svg lucideLink [size]="14"></svg>
+                    <span>Add Existing Project</span>
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
       </div>
     }
   `,
   styles: [`
-    .sp { display: grid; gap: 10px; max-width: 1100px; }
-    .sp-parent { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 14px; padding: 16px 18px; }
-    .sp-parent-main { display: flex; gap: 12px; align-items: center; min-width: 0; }
-    .sp-icon { color: #4338CA; flex-shrink: 0; }
-    .sp-parent-title { font-size: 17px; font-weight: 700; color: #0F172A; }
-    .sp-sub { font-size: 13px; color: #475569; margin-top: 2px; }
-    .sp-mode { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 1px solid #E2E8F0; border-radius: 999px; padding: 3px; }
-    .sp-mode-label { font-size: 12px; color: #64748B; padding: 0 6px 0 8px; }
-    .sp-mode button { border: none; background: none; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 600; color: #475569; cursor: pointer; }
-    .sp-mode button.on { background: var(--color-primary, #1373E5); color: #fff; }
-    .sp-mode-ro { font-size: 12px; font-weight: 600; color: #4338CA; background: #fff; border-radius: 999px; padding: 4px 10px; }
-    .sp-hint { margin: 0 4px; font-size: 12px; color: #64748B; }
-    .sp-child { display: flex; align-items: center; gap: 10px; padding-left: 14px; }
-    .sp-arrow { color: #94A3B8; font-size: 18px; }
-    .sp-card { flex: 1; min-width: 0; text-align: left; background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px 16px; cursor: pointer; font: inherit; transition: border-color .15s, box-shadow .15s; }
-    .sp-card:hover { border-color: #93C5FD; box-shadow: 0 2px 8px rgba(15,23,42,.06); }
-    .sp-card-title { font-size: 15px; font-weight: 700; color: #0F172A; }
-    .sp-card-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; color: #64748B; margin-top: 4px; }
-    .sp-status { text-transform: capitalize; background: #F1F5F9; border-radius: 999px; padding: 0 8px; color: #475569; }
-    .sp-actions { display: flex; flex-direction: column; gap: 2px; }
-    .sp-link { background: none; border: none; color: var(--color-primary, #1373E5); font-size: 12px; font-weight: 600; cursor: pointer; padding: 2px 4px; text-align: right; white-space: nowrap; }
-    .sp-link.danger { color: #DC2626; }
-    .sp-empty { margin: 4px 14px; font-size: 13px; color: #94A3B8; font-style: italic; }
-    .sp-add-bar { display: flex; gap: 8px; padding-left: 14px; margin-top: 4px; }
-    .sp-btn { border: 1px solid #CBD5E1; background: #fff; border-radius: 8px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; color: #1E293B; }
-    .sp-btn.primary { background: var(--color-primary, #1373E5); border-color: transparent; color: #fff; }
-    .sp-btn:disabled { opacity: .5; cursor: default; }
-    .sp-form { margin-left: 14px; border: 1px solid #E2E8F0; border-radius: 12px; background: #fff; padding: 14px 16px; display: grid; gap: 10px; }
-    .sp-form h4 { margin: 0; font-size: 14px; color: #0F172A; }
-    .sp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-    .sp-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #475569; }
-    .sp-grid input, .sp-grid select { font: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid #E2E8F0; border-radius: 8px; font-weight: 400; color: #0F172A; }
-    .sp-preview { font-size: 11px; font-weight: 600; color: #4338CA; }
-    .req { color: #DC2626; }
-    .sp-note { margin: 0; font-size: 12px; color: #64748B; }
-    .sp-note.warn { color: #B45309; }
-    .sp-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .sp-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-width: 1100px;
+      margin: 0;
+      padding: 4px 0 32px 0;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+
+    /* ── Master Project Hero Banner ── */
+    .sp-parent-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      background: linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
+      border: 1px solid #e0e7ff;
+      border-radius: 16px;
+      padding: 20px 24px;
+      box-shadow: 0 4px 16px -2px rgba(99, 102, 241, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .sp-parent-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(180deg, #4f46e5 0%, #3b82f6 100%);
+    }
+
+    .sp-parent-main {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .sp-parent-icon-box {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    }
+
+    .sp-parent-details {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .sp-parent-tag-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sp-master-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 8px;
+      background: rgba(79, 70, 229, 0.08);
+      color: #4338ca;
+      border: 1px solid rgba(79, 70, 229, 0.16);
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: 0.04em;
+    }
+
+    .sp-master-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4f46e5;
+    }
+
+    .sp-parent-code-chip {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #334155;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 1px 7px;
+    }
+
+    .sp-parent-title {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 750;
+      color: #0f172a;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+
+    .sp-parent-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: #64748b;
+    }
+
+    .meta-dot {
+      color: #cbd5e1;
+      font-weight: bold;
+    }
+
+    /* ── Budget Mode Box ── */
+    .sp-parent-controls {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .sp-mode-container {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+
+    .sp-mode-top {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11.5px;
+      font-weight: 650;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .sp-mode-toggle {
+      display: inline-flex;
+      align-items: center;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 3px;
+      gap: 3px;
+    }
+
+    .mode-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: none;
+      background: transparent;
+      border-radius: 7px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 650;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .mode-btn:hover:not(.active):not(:disabled) {
+      color: #0f172a;
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    .mode-btn.active {
+      background: #0f4f9c;
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(15, 79, 156, 0.28);
+    }
+
+    .mode-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .sp-mode-readonly {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #ffffff;
+      border: 1px solid #c7d2fe;
+      color: #4338ca;
+      font-size: 12px;
+      font-weight: 650;
+      padding: 5px 12px;
+      border-radius: 999px;
+    }
+
+    .ro-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4f46e5;
+    }
+
+    /* ── Info Callout ── */
+    .sp-info-callout {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 3px solid #3b82f6;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 12.5px;
+      color: #475569;
+      line-height: 1.45;
+    }
+
+    .sp-info-callout.shared {
+      background: #fbfbfe;
+      border-left-color: #6366f1;
+    }
+
+    .callout-icon {
+      color: #3b82f6;
+      margin-top: 1px;
+      flex-shrink: 0;
+    }
+
+    .sp-info-callout.shared .callout-icon {
+      color: #6366f1;
+    }
+
+    .callout-strategy {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    /* ── Section Bar ── */
+    .sp-section-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .sp-section-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sp-tree-icon-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .sp-section-heading-group {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .sp-heading-with-count {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sp-heading-with-count h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 750;
+      color: #0f172a;
+    }
+
+    .sp-count-pill {
+      font-size: 11px;
+      font-weight: 700;
+      background: #f1f5f9;
+      color: #475569;
+      border-radius: 999px;
+      padding: 1px 8px;
+    }
+
+    .sp-section-sub {
+      margin: 0;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .sp-action-btns {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-sp {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 9px;
+      padding: 7px 14px;
+      font-size: 12.5px;
+      font-weight: 650;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      border: 1px solid transparent;
+    }
+
+    .btn-sp.primary {
+      background: #0f4f9c;
+      color: #ffffff;
+      box-shadow: 0 1px 2px rgba(15, 79, 156, 0.2);
+    }
+
+    .btn-sp.primary:hover {
+      background: #0c3e7a;
+      box-shadow: 0 4px 12px rgba(15, 79, 156, 0.25);
+    }
+
+    .btn-sp.outline {
+      background: #ffffff;
+      border-color: #cbd5e1;
+      color: #334155;
+    }
+
+    .btn-sp.outline:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+      color: #0f172a;
+    }
+
+    /* ── Subprojects Hierarchy Tree List ── */
+    .sp-tree-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .sp-tree-item {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+    }
+
+    .sp-branch-line {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      flex-shrink: 0;
+      margin-left: 10px;
+    }
+
+    /* ── Subproject Card ── */
+    .sp-card {
+      flex: 1;
+      min-width: 0;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 16px 20px;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+
+    .sp-card:hover {
+      border-color: #0f4f9c;
+      box-shadow: 0 8px 24px -4px rgba(15, 79, 156, 0.12), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+      transform: translateY(-2px);
+    }
+
+    .sp-card-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .sp-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .sp-card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .sp-subcode-chip {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11.5px;
+      font-weight: 750;
+      color: #0f4f9c;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 2px 8px;
+      white-space: nowrap;
+    }
+
+    .sp-card-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      text-decoration: none;
+      color: #0f172a;
+      transition: color 0.15s ease;
+    }
+
+    .sp-card-name-text {
+      font-size: 15px;
+      font-weight: 750;
+      color: #0f172a;
+      transition: color 0.15s ease;
+    }
+
+    .sp-card:hover .sp-card-name-text {
+      color: #0f4f9c;
+      text-decoration: underline;
+    }
+
+    .sp-ext-icon {
+      color: #94a3b8;
+      transition: all 0.15s ease;
+    }
+
+    .sp-card:hover .sp-ext-icon {
+      color: #0f4f9c;
+      transform: translate(1px, -1px);
+    }
+
+    .sp-sub-level-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: #f8fafc;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      padding: 1px 7px;
+    }
+
+    .sp-card-status-wrap {
+      display: flex;
+      align-items: center;
+    }
+
+    .sp-status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .status-pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    /* ── Subproject Card Footer & Meta ── */
+    .sp-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-top: 8px;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .sp-card-meta-chips {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .sp-meta-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #475569;
+    }
+
+    .meta-chip-icon {
+      color: #0f4f9c;
+      display: flex;
+    }
+
+    .meta-chip-text strong {
+      color: #0f172a;
+    }
+
+    .sp-meta-chip.pm {
+      gap: 7px;
+    }
+
+    .sp-pm-avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 750;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.15);
+      flex-shrink: 0;
+    }
+
+    .progress-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .sp-progress-track {
+      width: 60px;
+      height: 5px;
+      background: #e2e8f0;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .sp-progress-fill {
+      height: 100%;
+      background: #10b981;
+      border-radius: inherit;
+    }
+
+    .progress-pct {
+      font-size: 11px;
+      font-weight: 700;
+      color: #059669;
+    }
+
+    /* ── Card Action Buttons ── */
+    .sp-card-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sp-action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      border-radius: 7px;
+      padding: 4px 9px;
+      font-size: 11.5px;
+      font-weight: 650;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .sp-action-btn:hover {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    .sp-action-btn.danger {
+      color: #dc2626;
+      border-color: #fee2e2;
+      background: #fff5f5;
+    }
+
+    .sp-action-btn.danger:hover {
+      background: #fee2e2;
+      border-color: #fca5a5;
+      color: #b91c1c;
+    }
+
+    /* ── Empty State ── */
+    .sp-empty-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 48px 24px;
+      background: #ffffff;
+      border: 1.5px dashed #cbd5e1;
+      border-radius: 16px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
+    }
+
+    .sp-empty-icon-box {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: #eff6ff;
+      color: #0f4f9c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+
+    .sp-empty-title {
+      margin: 0 0 6px 0;
+      font-size: 16px;
+      font-weight: 750;
+      color: #0f172a;
+    }
+
+    .sp-empty-desc {
+      margin: 0 0 20px 0;
+      max-width: 500px;
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    .sp-empty-buttons {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ── Form Cards (New & Attach) ── */
+    .sp-form-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 16px;
+      padding: 20px 24px;
+      box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.1), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .sp-form-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .form-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .form-icon-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .form-icon-badge.new {
+      background: #eff6ff;
+      color: #0f4f9c;
+    }
+
+    .form-icon-badge.attach {
+      background: #f5f3ff;
+      color: #7c3aed;
+    }
+
+    .form-title-wrap h4 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 750;
+      color: #0f172a;
+    }
+
+    .form-subtitle {
+      margin: 2px 0 0 0;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .form-close-btn {
+      border: none;
+      background: none;
+      color: #94a3b8;
+      border-radius: 6px;
+      padding: 4px;
+      cursor: pointer;
+      display: flex;
+      transition: color 0.15s ease;
+    }
+
+    .form-close-btn:hover {
+      color: #0f172a;
+      background: #f1f5f9;
+    }
+
+    .sp-form-body {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .sp-form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 16px;
+    }
+
+    .sp-form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .sp-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .req {
+      color: #ef4444;
+    }
+
+    .sp-input, .sp-select {
+      font: inherit;
+      font-size: 13px;
+      padding: 9px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 9px;
+      color: #0f172a;
+      background: #ffffff;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+
+    .sp-input:focus, .sp-select:focus {
+      border-color: #0f4f9c;
+      box-shadow: 0 0 0 3px rgba(15, 79, 156, 0.12);
+    }
+
+    .sp-code-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .code-input {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .sp-generated-preview {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      color: #64748b;
+    }
+
+    .preview-key {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: #0f4f9c;
+      font-size: 12px;
+      background: #eff6ff;
+      padding: 1px 6px;
+      border-radius: 5px;
+      border: 1px solid #bfdbfe;
+    }
+
+    .sp-curr-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .curr-sign {
+      position: absolute;
+      left: 11px;
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .curr-input {
+      padding-left: 26px;
+      width: 100%;
+    }
+
+    .sp-form-callout {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 9px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #475569;
+      line-height: 1.45;
+    }
+
+    .sp-form-callout svg {
+      color: #0f4f9c;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .sp-form-callout.warn {
+      background: #fffbeb;
+      border-color: #fde68a;
+      color: #92400e;
+    }
+
+    .sp-form-callout.warn svg {
+      color: #d97706;
+    }
+
+    .sp-form-footer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 10px;
+      padding-top: 14px;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .btn-form-cancel {
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 12.5px;
+      font-weight: 650;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-form-cancel:hover:not(:disabled) {
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    .btn-form-submit {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 8px;
+      padding: 8px 18px;
+      font-size: 12.5px;
+      font-weight: 650;
+      cursor: pointer;
+      border: 1px solid transparent;
+      color: #ffffff;
+      transition: all 0.15s ease;
+    }
+
+    .btn-form-submit.primary {
+      background: #0f4f9c;
+    }
+
+    .btn-form-submit.primary:hover:not(:disabled) {
+      background: #0c3e7a;
+    }
+
+    .btn-form-submit.attach {
+      background: #7c3aed;
+    }
+
+    .btn-form-submit.attach:hover:not(:disabled) {
+      background: #6d28d9;
+    }
+
+    .btn-form-submit:disabled, .btn-form-cancel:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   `],
 })
 export class SubprojectsTabComponent {
@@ -210,13 +1420,68 @@ export class SubprojectsTabComponent {
   });
 
   pmNames(c: any): string {
-    const pms = (c.members || []).map((m: any) => m.employee?.firstName).filter(Boolean);
+    const pms = (c.members || []).map((m: any) => m.employee?.firstName || m.employee?.name).filter(Boolean);
     if (pms.length) return pms.join(', ');
     return '';
   }
 
+  getPmInitial(c: any): string {
+    const name = this.pmNames(c);
+    if (!name) return '?';
+    return name[0].toUpperCase();
+  }
+
+  getAvatarBg(name: string): string {
+    const colors = [
+      'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+      'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+      'linear-gradient(135deg, #ec4899, #be185d)',
+      'linear-gradient(135deg, #10b981, #047857)',
+      'linear-gradient(135deg, #f59e0b, #b45309)',
+      'linear-gradient(135deg, #06b6d4, #0e7490)',
+    ];
+    let hash = 0;
+    for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  formatStatus(status: string | null | undefined): string {
+    if (!status) return 'Active';
+    const s = String(status).toUpperCase();
+    if (s === 'IN_PROGRESS') return 'In Progress';
+    if (s === 'TODO') return 'To Do';
+    if (s === 'DONE' || s === 'COMPLETED') return 'Completed';
+    if (s === 'ON_HOLD') return 'On Hold';
+    return s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  getStatusStyle(status: string | null | undefined): { [key: string]: string } {
+    const s = String(status || 'ACTIVE').toUpperCase();
+    if (s === 'IN_PROGRESS') return { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' };
+    if (s === 'DONE' || s === 'COMPLETED') return { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' };
+    if (s === 'ON_HOLD') return { background: '#faf5ff', color: '#7e22ce', border: '1px solid #e9d5ff' };
+    if (s === 'TODO') return { background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' };
+    return { background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' };
+  }
+
+  getStatusDot(status: string | null | undefined): string {
+    const s = String(status || 'ACTIVE').toUpperCase();
+    if (s === 'IN_PROGRESS') return '#2563eb';
+    if (s === 'DONE' || s === 'COMPLETED') return '#16a34a';
+    if (s === 'ON_HOLD') return '#9333ea';
+    if (s === 'TODO') return '#d97706';
+    return '#10b981';
+  }
+
   open(id: number) {
     this.router.navigate(['/projects', id]);
+  }
+
+  onCardAuxClick(event: MouseEvent, id: number) {
+    if (event.button === 1) { // Middle click (scroll wheel)
+      event.preventDefault();
+      window.open(`/projects/${id}`, '_blank');
+    }
   }
 
   openForm(kind: 'new' | 'attach') {

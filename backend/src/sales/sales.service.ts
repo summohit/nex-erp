@@ -588,6 +588,10 @@ export class SalesService {
   
   async createPosCheckout(companyId: number, data: any) {
     const { items, clientId, ...orderData } = data;
+    // The buyer must be one of this company's clients.
+    const client = await this.prisma.client.findFirst({ where: { id: Number(clientId), companyId }, select: { id: true } });
+    if (!client) throw new BadRequestException('Choose one of your clients for this sale.');
+    if (!Array.isArray(items) || !items.length) throw new BadRequestException('Add at least one item.');
     
     // Quick calculate total
     let total = 0;

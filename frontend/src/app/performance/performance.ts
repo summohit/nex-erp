@@ -19,7 +19,9 @@ import {
   LucideXCircle,
   LucideTrendingUp,
   LucideUsers,
-  LucideCalendar
+  LucideCalendar,
+  LucideUserCheck,
+  LucideAlertTriangle
 } from '@lucide/angular';
 
 @Component({
@@ -39,7 +41,9 @@ import {
     LucideXCircle,
     LucideTrendingUp,
     LucideUsers,
-    LucideCalendar
+    LucideCalendar,
+    LucideUserCheck,
+    LucideAlertTriangle
   ],
   providers: [DatePipe],
   templateUrl: './performance.html',

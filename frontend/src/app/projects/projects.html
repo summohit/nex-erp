@@ -1,13 +1,15 @@
 <!-- Reusable team avatar stack overlay, shown bottom-left of a board card banner -->
 <ng-template #teamStack let-p="p">
   <div class="team-stack-overlay" *ngIf="getTeamStack(p).visible.length > 0">
-    <span
+    <a
       class="team-avatar-circle"
       *ngFor="let m of getTeamStack(p).visible; let mi = index"
+      [routerLink]="['/employees', m.employeeId || m.employee?.id, 'profile']"
+      (click)="$event.stopPropagation()"
       [style.zIndex]="getTeamStack(p).visible.length - mi"
       [style.marginLeft.px]="mi === 0 ? 0 : -8"
       [style.background]="!m.employee?.avatarUrl ? getPmColor(m.employeeId) : 'transparent'"
-      [title]="(m.employee?.firstName || '') + ' ' + (m.employee?.lastName || '')">
+      [title]="(m.employee?.firstName || '') + ' ' + (m.employee?.lastName || '') + ' — View Profile'">
       <!-- Use <img> for real photos so base64 data URIs render reliably -->
       <img
         *ngIf="m.employee?.avatarUrl"
@@ -15,8 +17,9 @@
         class="team-avatar-img"
         [alt]="(m.employee?.firstName || '') + ' ' + (m.employee?.lastName || '')" />
       <ng-container *ngIf="!m.employee?.avatarUrl">{{ (m.employee?.firstName || '?')[0] | uppercase }}</ng-container>
-    </span>
-    <span class="team-avatar-circle team-avatar-overflow" *ngIf="getTeamStack(p).overflow > 0" style="margin-left:-8px;">
+    </a>
+    <span class="team-avatar-circle team-avatar-overflow" *ngIf="getTeamStack(p).overflow > 0" style="margin-left:-8px;"
+          (click)="$event.stopPropagation(); openTeamModal(p, $event)" [title]="'View all ' + p.members?.length + ' members'">
       +{{ getTeamStack(p).overflow }}
     </span>
   </div>
@@ -322,7 +325,8 @@
       <div 
         class="board-card" 
         *ngFor="let p of starredProjects(); let i = index" 
-        (click)="goToProject(p.id)">
+        (click)="goToProject(p.id)"
+        (auxclick)="onCardAuxClick($event, p.id)">
         <div class="board-card-banner" [style.background]="projectCardBackground(p, i)">
           <div class="card-actions-wrapper">
             <button 
@@ -362,7 +366,7 @@
           <ng-container *ngTemplateOutlet="projectHealthTip; context: {p: p}"></ng-container>
         </div>
         <div class="board-card-footer">
-          <span class="board-title">{{ p.name }}</span>
+          <a class="board-title" [routerLink]="['/projects', p.id]" (click)="$event.stopPropagation(); goToProject(p.id)">{{ p.name }}</a>
               <!-- Where it sits: under a parent, or holding subprojects. -->
               <span class="card-struct sub" *ngIf="p.parentId" [title]="parentOf(p) ? 'Subproject of ' + parentOf(p).key + ' — ' + parentOf(p).name : 'Subproject'">
                 ↳ Subproject{{ parentOf(p) ? ' of ' + parentOf(p).key : '' }}
@@ -397,7 +401,8 @@
       <div 
         class="board-card" 
         *ngFor="let p of recentlyViewedProjects(); let i = index" 
-        (click)="goToProject(p.id)">
+        (click)="goToProject(p.id)"
+        (auxclick)="onCardAuxClick($event, p.id)">
         <div class="board-card-banner" [style.background]="projectCardBackground(p, i)">
           <div class="card-actions-wrapper">
             <button 
@@ -437,7 +442,7 @@
           <ng-container *ngTemplateOutlet="projectHealthTip; context: {p: p}"></ng-container>
         </div>
         <div class="board-card-footer">
-          <span class="board-title">{{ p.name }}</span>
+          <a class="board-title" [routerLink]="['/projects', p.id]" (click)="$event.stopPropagation(); goToProject(p.id)">{{ p.name }}</a>
               <!-- Where it sits: under a parent, or holding subprojects. -->
               <span class="card-struct sub" *ngIf="p.parentId" [title]="parentOf(p) ? 'Subproject of ' + parentOf(p).key + ' — ' + parentOf(p).name : 'Subproject'">
                 ↳ Subproject{{ parentOf(p) ? ' of ' + parentOf(p).key : '' }}
@@ -920,7 +925,8 @@
           <div
             class="board-card"
             *ngFor="let p of filteredProjects(); let i = index"
-            (click)="goToProject(p.id)">
+            (click)="goToProject(p.id)"
+            (auxclick)="onCardAuxClick($event, p.id)">
             <div class="board-card-banner" [style.background]="projectCardBackground(p, i)">
               <div class="card-actions-wrapper">
                 <button
@@ -961,7 +967,7 @@
               <ng-container *ngTemplateOutlet="projectHealthTip; context: {p: p}"></ng-container>
             </div>
             <div class="board-card-footer">
-              <span class="board-title">{{ p.name }}</span>
+              <a class="board-title" [routerLink]="['/projects', p.id]" (click)="$event.stopPropagation(); goToProject(p.id)">{{ p.name }}</a>
               <!-- Where it sits: under a parent, or holding subprojects. -->
               <span class="card-struct sub" *ngIf="p.parentId" [title]="parentOf(p) ? 'Subproject of ' + parentOf(p).key + ' — ' + parentOf(p).name : 'Subproject'">
                 ↳ Subproject{{ parentOf(p) ? ' of ' + parentOf(p).key : '' }}
@@ -1546,44 +1552,6 @@
     </div>
 
     <ng-container *ngIf="!myTasksByLocation(); else byLocationView">
-    <!-- Notices Container (Overdue, Blocked, Truncated) -->
-    <div class="notices-container" *ngIf="myTasksOverdueCount() || myTasksBlockedCount() || myTasksTruncated()">
-      <div class="quota-notice-card warn" *ngIf="myTasksOverdueCount() && myTasksFilter() !== 'overdue'">
-        <div class="notice-icon-badge">
-          <svg lucideAlertTriangle size="15"></svg>
-        </div>
-        <div class="notice-text-wrap">
-          <span class="notice-text">
-            <strong>{{ myTasksOverdueCount() }} {{ myTasksOverdueCount() === 1 ? 'task is' : 'tasks are' }}</strong> past due date. Action needed to keep work on schedule.
-          </span>
-        </div>
-        <button type="button" class="notice-filter-link" (click)="setMyTasksFilter('overdue')">
-          <span>View overdue</span>
-          <svg lucideChevronLeft size="13" style="transform: rotate(180deg);"></svg>
-        </button>
-      </div>
-
-      <div class="quota-notice-card info" *ngIf="myTasksBlockedCount()">
-        <div class="notice-icon-badge blue">
-          <svg lucideClock size="15"></svg>
-        </div>
-        <div class="notice-text-wrap">
-          <span class="notice-text">
-            <strong>{{ myTasksBlockedCount() }} {{ myTasksBlockedCount() === 1 ? 'task is' : 'tasks are' }}</strong> waiting on another task. (You can still proceed — this is a note).
-          </span>
-        </div>
-      </div>
-
-      <div class="quota-notice-card warn" *ngIf="myTasksTruncated()">
-        <div class="notice-icon-badge">
-          <svg lucideAlertTriangle size="15"></svg>
-        </div>
-        <div class="notice-text-wrap">
-          <span class="notice-text">Showing the first 200 per source. Narrow the list to see the rest.</span>
-        </div>
-      </div>
-    </div>
-
     <!-- Skeleton Loaders -->
     <div class="boards-table-wrapper" *ngIf="myTasksLoading()">
       <div style="display: flex; flex-direction: column; gap: 12px; padding: 12px 0;">
@@ -1738,7 +1706,9 @@
     <div class="boards-grid" *ngIf="archivedProjects().length > 0">
       <div 
         class="board-card archived-card" 
-        *ngFor="let p of archivedProjects(); let i = index">
+        *ngFor="let p of archivedProjects(); let i = index"
+        (click)="goToProject(p.id)"
+        (auxclick)="onCardAuxClick($event, p.id)">
         <div class="board-card-banner" [style.background]="projectCardBackground(p, i)">
           <div class="archived-badge">Archived</div>
           <div class="card-actions-wrapper">
@@ -1754,7 +1724,7 @@
           <ng-container *ngTemplateOutlet="projectHealthTip; context: {p: p}"></ng-container>
         </div>
         <div class="board-card-footer">
-          <span class="board-title">{{ p.name }}</span>
+          <a class="board-title" [routerLink]="['/projects', p.id]" (click)="$event.stopPropagation(); goToProject(p.id)">{{ p.name }}</a>
               <!-- Where it sits: under a parent, or holding subprojects. -->
               <span class="card-struct sub" *ngIf="p.parentId" [title]="parentOf(p) ? 'Subproject of ' + parentOf(p).key + ' — ' + parentOf(p).name : 'Subproject'">
                 ↳ Subproject{{ parentOf(p) ? ' of ' + parentOf(p).key : '' }}

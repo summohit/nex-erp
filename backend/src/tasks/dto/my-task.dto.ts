@@ -41,6 +41,8 @@ export interface MyTaskDto {
   startDate: Date | null;
   dueDate: Date | null;
   estimatedHours: number | null;
+  /** Total minutes logged on this task. */
+  loggedMinutes?: number;
   /** Number of files attached to this task as evidence. */
   evidenceCount?: number;
   /** Where the task is carried out, as "City, State". Null when none is set. */

@@ -816,6 +816,17 @@ export class TasksService {
       take: PER_SOURCE_CAP,
     });
 
+    const issueIds = issues.map((i) => i.id);
+    // Optional chaining keeps focused unit tests (no time-log delegate) working.
+    const timeLogs = issueIds.length && (this.prisma as any).issueTimeLog?.groupBy
+      ? await this.prisma.issueTimeLog.groupBy({
+          by: ['issueId'],
+          where: { issueId: { in: issueIds } },
+          _sum: { durationMin: true },
+        })
+      : [];
+    const loggedMinutesByIssueId = new Map(timeLogs.map((t) => [t.issueId, t._sum.durationMin ?? 0]));
+
     const now = new Date();
     const items: MyTaskDto[] = issues.map((i) => {
       const assignees: TaskPerson[] = i.members.length
@@ -856,7 +867,7 @@ export class TasksService {
         refKey: i.key,
         title: i.title,
         status: this.normaliseIssueStatus(this.statusFromBoardColumn(i)),
-        rawStatus: this.statusFromBoardColumn(i),
+        rawStatus: this.statusFromBoardColumn(i) ?? i.status ?? "TODO",
         priority: i.priority,
         taskType: i.taskType?.name ?? null,
         // §8: both id and name -- the name renders, the id drives the filter.
@@ -869,6 +880,7 @@ export class TasksService {
         startDate: i.startDate,
         dueDate: i.dueDate,
         estimatedHours: i.estimatedHours,
+        loggedMinutes: loggedMinutesByIssueId.get(i.id) ?? 0,
         evidenceCount: i._count.attachments,
         createdAt: i.createdAt ?? null,
         // The project the issue lives in — null on a pre-sales task, and the

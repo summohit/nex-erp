@@ -20,6 +20,8 @@ export class SalesController {
    * nothing to store and it always reflects the current details.
    */
   @Get('quotations/:id/pdf')
+  // Prices and the client's details: same rule as the quotation list.
+  @Permissions('sales/quotations')
   async quotationPdf(
     @Request() req,
     @Param('id', ParseIntPipe) id: number,
