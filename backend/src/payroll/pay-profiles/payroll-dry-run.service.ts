@@ -232,6 +232,7 @@ export class PayrollDryRunService {
       regimeCode,
       fullMonth,
       lopDayBasis: (companyConfig as any).lopDayBasis ?? 'CALENDAR',
+      daysInMonth,
       currentProfiles,
       borrowedProfiles: borrowed.size,
       summary: {

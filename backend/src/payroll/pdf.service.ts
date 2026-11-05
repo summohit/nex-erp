@@ -180,6 +180,16 @@ export class PdfService {
       }
     }
 
+    // Only lines with an amount (5 Nov 2026): ₹0 standard rows are hidden.
+    // Reimbursements, expenses and GST go to the bottom of earnings.
+    const atBottom = (label: string) => /reimburs|expense|^gst/i.test(label);
+    const keptEarnings = allEarnings.filter((e) => e.amount > 0);
+    allEarnings.length = 0;
+    allEarnings.push(...keptEarnings.filter((e) => !atBottom(e.label)), ...keptEarnings.filter((e) => atBottom(e.label)));
+    const keptDeductions = allDeductions.filter((d) => d.amount > 0);
+    allDeductions.length = 0;
+    allDeductions.push(...keptDeductions);
+
     const grossEarnings = allEarnings.reduce((t, e) => t + e.amount, 0);
     const totalDeductions = allDeductions.reduce((t, d) => t + d.amount, 0);
     const netPay = Math.max(0, payslipData.netPay != null ? Number(payslipData.netPay) : grossEarnings - totalDeductions);

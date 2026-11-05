@@ -164,11 +164,13 @@ export class PayrollDryRunComponent implements OnInit {
         department: x.department ? { name: x.department } : null,
         designation: x.designation ? { name: x.designation } : null,
       },
-      workingDays: full ? 'Full month' : x.workingDays ?? 0,
+      // Same as the saved payslip: days in the month when loss of pay is per calendar day.
+      workingDays: (r as any).lopDayBasis === 'WORKING' ? (full ? 'Full month' : x.workingDays ?? 0) : (r as any).daysInMonth ?? x.workingDays ?? 0,
       presentDays: full ? 'Full month' : x.presentDays ?? 0,
       absentDays: x.absences ?? 0,
       items: [
-        ...(x.earnings || []).map((l) => ({ componentName: l.name, type: 'EARNING', amount: l.full })),
+        ...[...(x.earnings || []).filter((l) => !/_REIMB$/.test(l.code)), ...(x.earnings || []).filter((l) => /_REIMB$/.test(l.code))]
+          .map((l) => ({ componentName: l.name, type: 'EARNING', amount: l.full })),
         ...(x.gst ? [{ componentName: `GST @ ${x.gstPct}%`, type: 'EARNING', amount: x.gst }] : []),
         ...(x.deductions || []).filter((l) => l.paid > 0).map((l) => ({ componentName: l.name, type: 'DEDUCTION', amount: l.paid })),
       ],

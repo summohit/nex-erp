@@ -975,7 +975,11 @@ export class PayrollService {
       const fromEngine = engine.get(emp.id);
       if (fromEngine) {
         payslipItemsData.length = 0;
-        for (const l of fromEngine.earnings) payslipItemsData.push({ componentName: l.name, type: 'EARNING', amount: l.full });
+        // Reimbursements listed after the salary lines on the payslip.
+        const reimb = (l: { code: string }) => /_REIMB$/.test(l.code);
+        for (const l of [...fromEngine.earnings.filter((l: any) => !reimb(l)), ...fromEngine.earnings.filter((l: any) => reimb(l))]) {
+          payslipItemsData.push({ componentName: l.name, type: 'EARNING', amount: l.full });
+        }
         for (const l of fromEngine.deductions) if (l.paid > 0) payslipItemsData.push({ componentName: l.name, type: 'DEDUCTION', amount: l.paid });
         totalEarnings = fromEngine.grossFull;
         totalDeductions = fromEngine.totalDeductions;
@@ -1028,7 +1032,8 @@ export class PayrollService {
           }
         },
         update: {
-          workingDays: workingDaysInMonth,
+          // Shown on the payslip: days in the month when loss of pay is per calendar day.
+          workingDays: basis === 'WORKING' ? workingDaysInMonth : totalDaysInMonth,
           presentDays,
           absentDays: unexcusedAbsences,
           halfDays: halfDayCount,
@@ -1044,7 +1049,8 @@ export class PayrollService {
           companyId,
           month: Number(month),
           year: Number(year),
-          workingDays: workingDaysInMonth,
+          // Shown on the payslip: days in the month when loss of pay is per calendar day.
+          workingDays: basis === 'WORKING' ? workingDaysInMonth : totalDaysInMonth,
           presentDays,
           absentDays: unexcusedAbsences,
           halfDays: halfDayCount,
