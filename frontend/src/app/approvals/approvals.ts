@@ -17,7 +17,7 @@ import { DialogService } from '../shared/services/dialog.service';
  * queue is asked for separately and a tab only appears when the server lets
  * this person act on it (HR / admins the company, a manager their team).
  */
-export type ApprovalKind = 'LEAVE' | 'WFH' | 'REG' | 'CLOCKOUT' | 'OUTSIDE' | 'RELEASE';
+export type ApprovalKind = 'LEAVE' | 'WFH' | 'REG' | 'CLOCKOUT' | 'VISITS' | 'RELEASE';
 
 export interface ApprovalRow {
   kind: ApprovalKind;
@@ -58,7 +58,7 @@ export class ApprovalsComponent implements OnInit {
     { kind: 'WFH', label: 'Work From Home', shortDesc: 'Remote work days', tone: 'emerald' },
     { kind: 'REG', label: 'Regularization', shortDesc: 'Attendance corrections', tone: 'blue' },
     { kind: 'CLOCKOUT', label: 'Late Clock-out', shortDesc: 'Closed on later day', tone: 'amber' },
-    { kind: 'OUTSIDE', label: 'Out of Office', shortDesc: 'Outside geofence radius', tone: 'rose' },
+    { kind: 'VISITS', label: 'Visits', shortDesc: 'Out-of-geo attendance requests', tone: 'rose' },
     { kind: 'RELEASE', label: 'Early Release', shortDesc: 'Field visit done early', tone: 'blue' },
   ];
 
@@ -473,19 +473,19 @@ export class ApprovalsComponent implements OnInit {
       }
     }
     if (oo.ok) {
-      avail.add('OUTSIDE');
+      avail.add('VISITS');
       for (const a of oo.v ?? []) {
         const parts = [
           a.clockInOutside ? `In ${a.clockInDistanceKm == null ? 'no GPS' : Number(a.clockInDistanceKm).toFixed(2) + ' km'}` : '',
           a.clockOutOutside ? `Out ${a.clockOutDistanceKm == null ? 'no GPS' : Number(a.clockOutDistanceKm).toFixed(2) + ' km'}` : '',
         ].filter(Boolean);
         out.push({
-          kind: 'OUTSIDE',
+          kind: 'VISITS',
           id: a.id,
           ...this.person(a.employee),
           date: this.day(a.date),
           raw: a,
-          title: 'Out of Office',
+          title: 'Visit request',
           detail: `${parts.join(' · ')} from office`,
           reason: [a.clockInOutsideReason, a.clockOutOutsideReason].filter(Boolean).join(' / ') || null,
           badge: a.approvedWfh ? 'Approved WFH' : a.profileWfh ? 'WFH (Profile)' : null,
@@ -511,7 +511,7 @@ export class ApprovalsComponent implements OnInit {
         return firstValueFrom(this.attendance.resolveRegularization(r.id, approve ? 'APPROVED' : 'REJECTED', note));
       case 'CLOCKOUT':
         return firstValueFrom(this.attendance.reviewClockOut(r.id, approve ? 'APPROVE' : 'REJECT', note));
-      case 'OUTSIDE':
+      case 'VISITS':
         return firstValueFrom(this.attendance.reviewGeofence(r.id, approve ? 'APPROVE' : 'REJECT', note));
     }
   }

@@ -11,7 +11,7 @@ import { CLOCK_OUT_APPROVAL, UNQUEUED_CLOCKOUT_FROM } from './clock-out-approval
 import { isHalfDayStart } from './half-day-rule';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
-import { isCompanyAdmin, isHrAdmin } from '../common/company-roles';
+import { isSuperAdmin, isHrAdmin } from '../common/company-roles';
 import { isBranchWeeklyOff, personalDaysOff } from '../common/weekly-offs';
 import { isRestDay } from '../common/rest-day';
 import { permanentWfhCovers, permanentWfhWhere } from '../common/permanent-wfh';
@@ -399,6 +399,9 @@ export class AttendanceService {
     });
 
     const unopenedVisitDay = visitDayToday && !visitDayToday.clockInTime ? visitDayToday : null;
+    // A confirmed Delivery visit is attendance for the day, not a normal shift
+    // to score by duration. Its punch timestamps are retained solely for audit.
+    const approvedVisitClock = !!visitDayToday || !!options?.fieldVisit;
 
     // Enforce field visit geofence if clocking in on an approved field visit day
     if (visitDayToday && !options?.fieldVisit) {
@@ -496,7 +499,7 @@ export class AttendanceService {
     // half day, because nobody was expected in.
     // A weekly off (e.g. 2nd Saturday) is treated the same way: worked, recorded, never late.
     const onHoliday = await this.isHoliday(employee.companyId, todayKey) || effective.isDayOff;
-    if (effective.startTime && !onHoliday) {
+    if (effective.startTime && !onHoliday && !approvedVisitClock) {
       // Shift times ("09:00") are IST wall-clock, not server-local — istTimeInstant
       // resolves them to the correct real-world instant regardless of what
       // timezone this server's OS happens to be configured with.
@@ -535,8 +538,10 @@ export class AttendanceService {
           clockIn: now,
           clockInLat: data.lat,
           clockInLng: data.lng,
-          status: isHalfDay ? 'HALF_DAY' : 'PRESENT',
-          isLate,
+          // An out-of-geo clock-in is a visit claim; it becomes present only
+          // after a Super Admin has approved it.
+          status: outsideIn.geofenceApproval === 'PENDING' ? 'ABSENT' : (approvedVisitClock ? 'PRESENT' : (isHalfDay ? 'HALF_DAY' : 'PRESENT')),
+          isLate: approvedVisitClock ? false : isLate,
           shiftId: effective.shift?.id ?? null,
           projectId: effective.onsite?.projectId ?? options?.fieldVisit?.projectId ?? null,
           isOnsite: onsite,
@@ -576,7 +581,7 @@ export class AttendanceService {
       data: {
         ...(returning
           ? this.returningStatus(existing, effective, onHoliday)
-          : { status: isHalfDay ? 'HALF_DAY' : 'PRESENT', isLate }),
+          : { status: outsideIn.geofenceApproval === 'PENDING' ? 'ABSENT' : (approvedVisitClock ? 'PRESENT' : (isHalfDay ? 'HALF_DAY' : 'PRESENT')), isLate: approvedVisitClock ? false : isLate }),
         clockOut: null, // Reset clockOut on parent since they are active
         autoClockedOut: false, // reopened — the old cutoff no longer describes the day
         clockIn: existing.clockIn || now,
@@ -728,6 +733,27 @@ export class AttendanceService {
     return { outside, distanceKm, branchName: branch.name, radiusM };
   }
 
+  /** Planned Delivery visits use their approved site geofence, not the
+   * out-of-geo exception path. A typed reason must never bypass this check. */
+  private assertWithinApprovedVisitSite(
+    visit: { request: { requestNumber: string; location: string; latitude: number; longitude: number; geofenceRadiusM: number | null } },
+    data: { lat?: number; lng?: number; accuracy?: number }, direction: 'in' | 'out',
+  ) {
+    if (data.lat == null || data.lng == null || !Number.isFinite(data.lat) || !Number.isFinite(data.lng)) {
+      throw new BadRequestException(`Your GPS location is required to clock ${direction} on an approved field visit.`);
+    }
+    const radiusM = visit.request.geofenceRadiusM ?? 1000;
+    const distanceKm = haversineKm(visit.request.latitude, visit.request.longitude, data.lat, data.lng);
+    if (distanceAllowingAccuracyM(distanceKm, data.accuracy) > radiusM) {
+      const metres = Math.round(distanceKm * 1000);
+      const away = metres >= 1000 ? `${(metres / 1000).toFixed(1)}km` : `${metres}m`;
+      throw new BadRequestException(
+        `Clock-${direction} denied: You are outside the approved Field Visit location (${visit.request.requestNumber}). ` +
+        `Move within ${radiusM} metres of ${visit.request.location}; you are ${away} away.`,
+      );
+    }
+  }
+
   /** The Attendance fields one outside-office clock writes, or none. */
   private outsideFields(
     direction: 'in' | 'out',
@@ -736,31 +762,17 @@ export class AttendanceService {
   ): Record<string, any> {
     if (!office?.outside) return {};
 
-    // Strict Office Geofence Enforcement for Clock-In:
-    // Staff on an office geofenced shift must be physically within the branch geofence radius.
-    // They cannot clock in from home or outside the office merely by supplying a text reason.
-    // Remote / WFH clock-ins strictly require an approved WFH request or field visit.
-    if (direction === 'in') {
-      const where = office.distanceKm == null
-        ? 'Your location could not be verified'
-        : `You are ${office.distanceKm.toFixed(2)} km from ${office.branchName}`;
-      throw new BadRequestException(
-        `Clock-in denied: ${where}, outside the ${office.radiusM} m office geofence. ` +
-        `You must be at the office to clock in, or submit an official Work From Home (WFH) request.`,
-      );
-    }
-
     const reason = String(data.outsideReason ?? '').trim();
     if (!reason) {
       throw new OutsideOfficeError(direction, office.branchName, office.distanceKm, office.radiusM);
     }
     const proof = String(data.outsideProofUrl ?? '').trim() || null;
     const km = office.distanceKm == null ? null : Math.round(office.distanceKm * 100) / 100;
+    const fields = direction === 'in'
+      ? { clockInOutside: true, clockInDistanceKm: km, clockInOutsideReason: reason, clockInOutsideProofUrl: proof }
+      : { clockOutOutside: true, clockOutDistanceKm: km, clockOutOutsideReason: reason, clockOutOutsideProofUrl: proof };
     return {
-      clockOutOutside: true,
-      clockOutDistanceKm: km,
-      clockOutOutsideReason: reason,
-      clockOutOutsideProofUrl: proof,
+      ...fields,
       // Every new outside clock needs a decision, even if an earlier one today
       // was already approved.
       geofenceApproval: 'PENDING',
@@ -916,6 +928,16 @@ export class AttendanceService {
       throw new LateClockOutError(existing.date);
     }
 
+    const plannedVisitDay = options?.fieldVisit ? null : await this.prisma.fieldVisitAttendance.findFirst({
+      where: {
+        employeeId: employee.id, visitDate: existing.date,
+        status: { in: [FIELD_VISIT_DAY.SCHEDULED, FIELD_VISIT_DAY.IN_PROGRESS] },
+        request: { status: FIELD_VISIT_STATUS.APPROVED },
+      },
+      select: { id: true, request: { select: { requestNumber: true, location: true, latitude: true, longitude: true, geofenceRadiusM: true } } },
+    });
+    if (plannedVisitDay) this.assertWithinApprovedVisitSite(plannedVisitDay as any, data, 'out');
+
     const effective = this.workingWindow(await this.roster.getEffectiveShift(
       employee.id, existing.date, personalDaysOff(employee as any).shift as any, personalDaysOff(employee as any).weeklyOffs,
     ));
@@ -923,7 +945,7 @@ export class AttendanceService {
     // Office geofence (B3), on the same on-site exemption as clock-in — and
     // skipped entirely for a previous day. Someone closing Monday's session at
     // one in the morning is at home; that case has its own reason flow above.
-    const exemptOut = isPreviousDay || !!effective.onsite || !!options?.fieldVisit;
+    const exemptOut = isPreviousDay || !!effective.onsite || !!options?.fieldVisit || !!plannedVisitDay;
     const officeOut = await this.officeCheck(
       employee, effective, exemptOut || (await this.hasApprovedWfh(employee.id, existing.date)), data,
     );
@@ -935,7 +957,7 @@ export class AttendanceService {
     // A session closed on a previous day keeps its existing status. For a
     // same-day close, leaving before the scheduled end remains a half day.
     const onHoliday = await this.isHoliday(employee.companyId, existing.date) || effective.isDayOff;
-    if (!isPreviousDay && effective.endTime && !onHoliday) {
+    if (!isPreviousDay && effective.endTime && !onHoliday && !plannedVisitDay) {
       // Same IST-fixed resolution as clockIn — see the comment there.
       const expectedEnd = istTimeInstant(now, effective.endTime);
 
@@ -990,7 +1012,8 @@ export class AttendanceService {
         clockOutLat: data.lat, // We can track the latest clock out coords here too
         clockOutLng: data.lng,
         isEarlyLeave,
-        status,
+        status: outsideOut.geofenceApproval === 'PENDING' || existing.geofenceApproval === 'PENDING'
+          ? 'ABSENT' : (plannedVisitDay ? 'PRESENT' : status),
         // Retain the database field for historical records, but attendance no
         // longer awards overtime for newly closed sessions.
         overtimeHours: 0,
@@ -1533,12 +1556,12 @@ export class AttendanceService {
   // left exactly as recorded; what to do about it is HR's call.
 
   mayApproveGeofence(role?: string | null): boolean {
-    return isCompanyAdmin(role);
+    return isSuperAdmin(role);
   }
 
   async getPendingGeofence(companyId: number, role?: string | null) {
     if (!this.mayApproveGeofence(role)) {
-      throw new ForbiddenException('Only an administrator reviews out-of-office clock-ins and clock-outs.');
+      throw new ForbiddenException('Only the Super Admin reviews out-of-geo visit requests.');
     }
     const rows = await this.prisma.attendance.findMany({
       where: { geofenceApproval: 'PENDING', employee: { companyId } },
@@ -1606,7 +1629,7 @@ export class AttendanceService {
     approverEmployeeId?: number | null,
   ) {
     if (!this.mayApproveGeofence(role)) {
-      throw new ForbiddenException('Only an administrator reviews out-of-office clock-ins and clock-outs.');
+      throw new ForbiddenException('Only the Super Admin reviews out-of-geo visit requests.');
     }
     const record = await this.prisma.attendance.findFirst({
       where: { id: attendanceId, employee: { companyId } },
@@ -1619,7 +1642,7 @@ export class AttendanceService {
     }
     // Two administrators exist to check each other; nobody clears their own.
     if (approverEmployeeId != null && record.employeeId === approverEmployeeId) {
-      throw new ForbiddenException('Another administrator has to review your own out-of-office clock.');
+      throw new ForbiddenException('Another Super Admin has to review your own out-of-geo visit request.');
     }
 
     const rejecting = data.action === 'REJECT';
@@ -1630,6 +1653,11 @@ export class AttendanceService {
       where: { id: record.id },
       data: {
         geofenceApproval: rejecting ? 'REJECTED' : 'APPROVED',
+        // Visit approval deliberately overrides normal shift-duration, late,
+        // and early-leave scoring. Punch times remain as an audit trail only:
+        // an approved client meeting / unapproved field visit is Present even
+        // when its logged duration is shorter than the assigned shift.
+        status: rejecting ? 'ABSENT' : 'PRESENT',
         geofenceReviewedById: approverEmployeeId ?? null,
         geofenceReviewedAt: new Date(),
         geofenceReviewNote: note || null,

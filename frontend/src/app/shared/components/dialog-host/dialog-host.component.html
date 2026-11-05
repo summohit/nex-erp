@@ -56,9 +56,15 @@
 
     <!-- Prompt Textarea -->
     <div class="dlg-field-container" *ngIf="s.variant === 'prompt'">
+      <label class="dlg-field-label dlg-select-label" *ngIf="s.select as select">
+        {{ select.label }}
+        <select class="dlg-select" [(ngModel)]="dialog.promptSelection">
+          <option *ngFor="let option of select.options" [value]="option.value">{{ option.label }}</option>
+        </select>
+      </label>
       <div class="dlg-field-header">
         <label class="dlg-field-label">
-          Reason & Details
+          Remarks
           <span class="dlg-req-star" *ngIf="s.required">*</span>
         </label>
         <span class="dlg-char-count" [class.has-text]="charCount > 0">

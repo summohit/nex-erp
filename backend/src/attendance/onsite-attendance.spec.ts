@@ -94,23 +94,28 @@ describe('clockIn / clockOut on an on-site day', () => {
     // check that has to catch this, so the IP rule cannot mask it.
     await expect(
       service.clockIn(99, { ...SITE, ipAddress: '10.0.0.1' }),
-    ).rejects.toThrow(/office geofence/i);
+    ).rejects.toThrow(/Give a reason to clock in/i);
   });
 
-  it('strictly blocks an outside-office clock-in even if a reason is given', async () => {
+  it('submits an outside-office clock-in with a reason for visit approval', async () => {
     officeDay();
-    jest.useFakeTimers().setSystemTime(ist(9, 25));
+    jest.useFakeTimers().setSystemTime(ist(9, 31));
 
     await expect(
-      service.clockIn(99, { ...SITE, ipAddress: '10.0.0.1', outsideReason: 'Client meeting' }),
-    ).rejects.toThrow(/office geofence/i);
+      service.clockIn(99, { ...SITE, ipAddress: '10.0.0.1', outsideReason: 'Client meeting: site kickoff' }),
+    ).resolves.toBeDefined();
+    expect(prisma.attendance.create.mock.calls[0][0].data).toMatchObject({
+      clockInOutside: true,
+      geofenceApproval: 'PENDING',
+      status: 'ABSENT',
+    });
   });
 
   it('rejects clock-in when there is no location reading at all on an office shift', async () => {
     officeDay();
     jest.useFakeTimers().setSystemTime(ist(9, 25));
 
-    await expect(service.clockIn(99, { ipAddress: '10.0.0.1' })).rejects.toThrow(/location could not be verified/i);
+    await expect(service.clockIn(99, { ipAddress: '10.0.0.1' })).rejects.toThrow(/Give a reason to clock in/i);
   });
 
   it('does not geofence a shift that is not an office shift (e.g. Night Shift)', async () => {
@@ -119,7 +124,7 @@ describe('clockIn / clockOut on an on-site day', () => {
       shift: { id: 3, name: 'Night Shift', bufferTimeMinutes: 15, officeGeofence: false },
       startTime: '21:30', endTime: '06:30', isDayOff: false, onsite: null,
     });
-    jest.useFakeTimers().setSystemTime(ist(21, 25));
+    jest.useFakeTimers().setSystemTime(ist(21, 31));
 
     await service.clockIn(99, { ...SITE, ipAddress: '10.0.0.1' });
     expect(prisma.attendance.create.mock.calls[0][0].data.clockInOutside).toBeUndefined();

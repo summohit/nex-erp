@@ -22,6 +22,7 @@ export interface DialogState {
    * mandatory would only teach people to attach any file at all.
    */
   attachment?: { accept: string; label: string; hint?: string };
+  select?: { label: string; options: { value: string; label: string }[] };
   resolve: (result: boolean) => void;
 }
 
@@ -99,6 +100,7 @@ export class DialogService {
 
   /** The file chosen in a prompt that offers one. Same reasoning as above. */
   promptFile: File | null = null;
+  promptSelection = '';
 
   /**
    * Ask for a sentence and, optionally, something to back it up (§Att4).
@@ -119,12 +121,14 @@ export class DialogService {
       accept?: string;
       attachmentLabel?: string;
       attachmentHint?: string;
+      select?: { label: string; options: { value: string; label: string }[] };
       tone?: DialogTone;
     } = {},
   ): Promise<{ text: string; file: File | null } | null> {
     return new Promise(resolve => {
       this.promptValue = '';
       this.promptFile = null;
+      this.promptSelection = opts.select?.options?.[0]?.value ?? '';
       this.state.set({
         variant: 'prompt',
         tone: opts.tone,
@@ -139,6 +143,7 @@ export class DialogService {
           label: opts.attachmentLabel ?? 'Attach proof (optional)',
           hint: opts.attachmentHint,
         },
+        select: opts.select,
         resolve: (ok: boolean) =>
           resolve(ok ? { text: (this.promptValue ?? '').trim(), file: this.promptFile } : null),
       });

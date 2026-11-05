@@ -72,7 +72,9 @@ describe('the ordinary clock on a field visit day', () => {
     await service.clockIn(99, SITE);
 
     const written = prisma.attendance.create.mock.calls[0][0].data;
-    expect(written.isLate).toBe(true);
+    // An approved Delivery visit is present for the day; its timestamps are
+    // audit data, not a normal-shift lateness calculation.
+    expect(written.isLate).toBe(false);
     expect(written.isOnsite).toBe(true);
     expect(written.projectId).toBe(3);
 
@@ -149,6 +151,6 @@ describe('the ordinary clock on a field visit day', () => {
 
     // And with the office IP, by the geofence behind it.
     await expect(service.clockIn(99, { ...SOFA, ipAddress: '10.0.0.1' }))
-      .rejects.toThrow(/outside the .* office geofence/);
+      .rejects.toThrow(/Give a reason to clock in/);
   });
 });

@@ -170,6 +170,9 @@
   align-items: center;
   gap: 4px;
 }
+.dlg-select-label { display: grid; gap: 6px; margin: 0 2px 14px; }
+.dlg-select { width: 100%; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 12px; color: #1e293b; background: #f8fafc; font: inherit; font-size: .875rem; }
+.dlg-select:focus { outline: none; border-color: #2563eb; background: #fff; }
 
 .dlg-req-star {
   color: #e11d48;

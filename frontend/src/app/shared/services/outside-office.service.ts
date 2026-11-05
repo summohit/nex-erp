@@ -8,6 +8,7 @@ export const OUTSIDE_OFFICE_CODE = 'OUTSIDE_OFFICE_REASON_REQUIRED';
 
 export interface OutsideOfficeAnswer {
   reason: string;
+  visitType: 'CLIENT_MEETING' | 'FIELD_VISIT_UNAPPROVED';
   proofUrl?: string;
 }
 
@@ -34,25 +35,34 @@ export class OutsideOfficeService {
     const direction = body.direction === 'out' ? 'out' : 'in';
     const answer = await this.dialog.promptWithAttachment(
       `${body.message || 'You are outside the office radius.'} `
-        + 'Your clock is saved straight away; an administrator reviews the reason.',
-      `Clocking ${direction} away from the office`,
+        + 'Your clock is saved straight away; the Super Admin reviews the visit request.',
+      `Out-of-geo ${direction === 'in' ? 'clock-in' : 'clock-out'} visit`,
       {
         placeholder: direction === 'in'
-          ? 'e.g. Starting the day at the client site in Gurgaon'
-          : 'e.g. Left early for a client meeting',
-        confirmLabel: `Clock ${direction}`,
+          ? 'Explain the client meeting or unapproved field visit'
+          : 'Explain why you are clocking out away from the office',
+        confirmLabel: 'Submit for approval',
         required: true,
         accept: 'image/*,application/pdf',
         attachmentLabel: 'Attach a photo or document (optional)',
         attachmentHint: 'Anything that backs up the reason. JPG, PNG or PDF.',
+        select: {
+          label: 'Visit type',
+          options: [
+            { value: 'CLIENT_MEETING', label: 'Client meeting' },
+            { value: 'FIELD_VISIT_UNAPPROVED', label: 'Field visit (unapproved)' },
+          ],
+        },
       },
     );
     if (!answer?.text?.trim()) return null;
-    if (!answer.file) return { reason: answer.text.trim() };
+    const visitType = this.dialog.promptSelection as OutsideOfficeAnswer['visitType'];
+    const reason = `${visitType === 'CLIENT_MEETING' ? 'Client meeting' : 'Field visit (unapproved)'}: ${answer.text.trim()}`;
+    if (!answer.file) return { reason, visitType };
 
     try {
       const res: any = await firstValueFrom(this.upload.uploadAttendanceProof(answer.file));
-      return { reason: answer.text.trim(), proofUrl: res?.url ?? res?.path ?? undefined };
+      return { reason, visitType, proofUrl: res?.url ?? res?.path ?? undefined };
     } catch {
       const ok = await this.dialog.confirm(
         'The attachment could not be uploaded. Continue with just the reason, or cancel and try again?',
@@ -60,7 +70,7 @@ export class OutsideOfficeService {
         `Clock ${direction} without it`,
         'Cancel',
       );
-      return ok ? { reason: answer.text.trim() } : null;
+      return ok ? { reason, visitType } : null;
     }
   }
 }

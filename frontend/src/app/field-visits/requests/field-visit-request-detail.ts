@@ -64,7 +64,6 @@ export class FieldVisitRequestDetailComponent implements OnInit {
 
   request = signal<FieldVisitRequest | null>(null);
   timeline = signal<FieldVisitActivity[]>([]);
-
   /**
    * Reschedule approvals table (5 Nov 2026): the change requests and their
    * decisions from the activity trail, newest first.
