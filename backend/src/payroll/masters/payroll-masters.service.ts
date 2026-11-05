@@ -627,7 +627,11 @@ export class PayrollMastersService {
       });
     }
 
-    return PayrollCalculator.calculate(this.buildCalcInput(group, statutoryRates, components, taxRegime, params));
+    try {
+      return PayrollCalculator.calculate(this.buildCalcInput(group, statutoryRates, components, taxRegime, params));
+    } catch (err: any) {
+      throw new BadRequestException(`Salary group ${group.name} (${group.code}) can't be calculated: ${err?.message || err}. Fix its formulas in Settings → Payroll → Salary Groups.`);
+    }
   }
 
 
@@ -740,8 +744,15 @@ export class PayrollMastersService {
     return {
       group,
       hasTax: !!taxRegime,
-      run: (annualCtc: number, overrides?: { [componentCode: string]: number }) =>
-        PayrollCalculator.calculate(this.buildCalcInput(group, statutoryRates, components, taxRegime ?? undefined, { annualCtc, overrides })),
+      run: (annualCtc: number, overrides?: { [componentCode: string]: number }) => {
+        try {
+          return PayrollCalculator.calculate(this.buildCalcInput(group, statutoryRates, components, taxRegime ?? undefined, { annualCtc, overrides }));
+        } catch (err: any) {
+          // A broken formula in the group (e.g. a name the group doesn't have)
+          // used to surface as "Internal server error" on every screen.
+          throw new BadRequestException(`Salary group ${group.name} (${group.code}) can't be calculated: ${err?.message || err}. Fix its formulas in Settings → Payroll → Salary Groups.`);
+        }
+      },
     };
   }
 
