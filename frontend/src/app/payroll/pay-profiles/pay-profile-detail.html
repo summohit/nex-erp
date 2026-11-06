@@ -149,7 +149,7 @@
               <label class="form-label">Annual CTC (₹) <span class="text-rose-500">*</span></label>
               <div class="input-currency-wrapper">
                 <span class="currency-prefix">₹</span>
-                <input id="f-annualCtc" class="form-control currency-input" [class.is-invalid]="err('annualCtc')" type="number" min="0" step="1000" [(ngModel)]="form.annualCtc" (change)="amountsChanged()" placeholder="e.g. 336000">
+                <input id="f-annualCtc" class="form-control currency-input" [class.is-invalid]="err('annualCtc')" type="number" min="0" step="any" [(ngModel)]="form.annualCtc" (change)="amountsChanged()" placeholder="e.g. 336000">
               </div>
               <span class="field-error" *ngIf="err('annualCtc') as m">{{ m }}</span>
               <span class="field-warn" *ngIf="!err('annualCtc') && ctcWarning() as w">{{ w }}</span>
@@ -161,7 +161,7 @@
               <label class="form-label">Monthly Gross (₹) <span class="text-rose-500">*</span></label>
               <div class="input-currency-wrapper">
                 <span class="currency-prefix">₹</span>
-                <input id="f-grossMonthly" class="form-control currency-input" [class.is-invalid]="err('grossMonthly')" type="number" min="0" step="100"
+                <input id="f-grossMonthly" class="form-control currency-input" [class.is-invalid]="err('grossMonthly')" type="number" min="0" step="any"
                        [(ngModel)]="form.grossMonthly" (change)="amountsChanged()" placeholder="e.g. 30000">
               </div>
               <span class="field-error" *ngIf="err('grossMonthly') as m">{{ m }}</span>
@@ -180,7 +180,7 @@
               <label class="form-label">Basic Salary (₹ / month)</label>
               <div class="input-currency-wrapper">
                 <span class="currency-prefix">₹</span>
-                <input id="f-override-BASIC" class="form-control currency-input" [class.is-invalid]="err('override:BASIC')" type="number" min="0" step="100"
+                <input id="f-override-BASIC" class="form-control currency-input" [class.is-invalid]="err('override:BASIC')" type="number" min="0" step="any"
                        [(ngModel)]="form.overrides['BASIC']" (change)="amountsChanged()"
                        [placeholder]="defaultBasic() ? defaultBasic() + ' (50% of CTC)' : '50% of CTC'">
               </div>
@@ -215,6 +215,24 @@
               <span class="field-hint-text">Used for this employee's monthly TDS.</span>
             </div>
 
+            <!-- TDS per person (6 Nov 2026): off = from the tax slabs -->
+            <div class="form-group" *ngIf="hasTdsLine()">
+              <label class="pp-gst-toggle" style="margin-bottom:6px">
+                <input type="checkbox" [(ngModel)]="customTds" (ngModelChange)="onCustomTds($event)">
+                <span><b>Custom TDS for this person</b> <small>(off = worked out from the tax slabs)</small></span>
+              </label>
+              <ng-container *ngIf="customTds">
+              <label class="form-label">TDS (₹ / month)</label>
+              <div class="input-currency-wrapper">
+                <span class="currency-prefix">₹</span>
+                <input id="f-override-TDS" class="form-control currency-input" [class.is-invalid]="err('override:TDS')" type="number" min="0" step="any"
+                       [(ngModel)]="form.overrides['TDS']" (change)="amountsChanged()" placeholder="e.g. 13230">
+              </div>
+              <span class="field-error" *ngIf="err('override:TDS') as m">{{ m }}</span>
+              <span class="field-hint-text" *ngIf="!err('override:TDS')">Deducted every month instead of the slab estimate<ng-container *ngIf="estimatedTds() !== null"> (₹{{ estimatedTds() | number:'1.0-0' }})</ng-container>. 0 = no TDS.</span>
+              </ng-container>
+            </div>
+
             <div class="form-group">
               <label class="form-label">Reason {{ form.overrides && (form.overrides | keyvalue)?.length ? '*' : '' }}</label>
               <input id="f-reason" class="form-control" [class.is-invalid]="err('reason')" [(ngModel)]="form.reason" placeholder="e.g. Annual appraisal, promotion, correction…" maxlength="500">
@@ -233,7 +251,7 @@
                 <label class="form-label">Amount (₹ / month)</label>
                 <div class="input-currency-wrapper">
                   <span class="currency-prefix">₹</span>
-                  <input class="form-control currency-input" [class.is-invalid]="err('override:OTHER_REIMB')" type="number" min="0" step="100"
+                  <input class="form-control currency-input" [class.is-invalid]="err('override:OTHER_REIMB')" type="number" min="0" step="any"
                          [(ngModel)]="form.overrides['OTHER_REIMB']" (change)="amountsChanged()" placeholder="0">
                 </div>
                 <span class="field-error" *ngIf="err('override:OTHER_REIMB') as m">{{ m }}</span>

@@ -250,12 +250,12 @@ export class PayProfilesService {
     if (grossMonthly != null && grossMonthly > annualCtc / 12) throw new BadRequestException('Monthly gross can\'t be more than the monthly CTC.');
 
     const result = calc.run(annualCtc, overrides ?? undefined, grossMonthly); // fails loudly on a broken formula
-    // Basic can be raised per person but never below the group's rule (50% of CTC).
+    // Basic can be set per person but never below 50% of the monthly CTC (the
+    // company rule; a group's floor such as BASIC_FLOOR doesn't apply to a typed Basic).
     if (overrides && 'BASIC' in overrides) {
-      const { BASIC: _ignored, ...rest } = overrides;
-      const ruleBasic = calc.run(annualCtc, Object.keys(rest).length ? rest : undefined, grossMonthly).lines.find((l: any) => l.code === 'BASIC')?.monthly ?? 0;
-      if (overrides.BASIC + 0.5 < ruleBasic) {
-        throw new BadRequestException(`Basic can't be below the group's rule (50% of CTC = ₹${Math.round(ruleBasic).toLocaleString('en-IN')} a month). Enter ₹${Math.round(ruleBasic).toLocaleString('en-IN')} or more, or leave it empty.`);
+      const minBasic = Math.round(annualCtc / 12 / 2);
+      if (overrides.BASIC + 0.5 < minBasic) {
+        throw new BadRequestException(`Basic can't be below 50% of CTC (₹${minBasic.toLocaleString('en-IN')} a month). Enter ₹${minBasic.toLocaleString('en-IN')} or more, or leave it empty.`);
       }
     }
     // A per-person amount (e.g. a higher Basic) must still fit inside the CTC.
@@ -393,7 +393,8 @@ export class PayProfilesService {
     for (const [code, v] of Object.entries(raw)) {
       if (v === null || v === undefined || (v as any) === '') continue;
       if (!allowed.has(code)) throw new BadRequestException(`${code} is not part of ${group.name} v${group.version}, the version in force on the date this takes effect.`);
-      if (!allowed.get(code)) throw new BadRequestException(`${code} can't be overridden in ${group.name} v${group.version}, the version in force on the date this takes effect. Pick a later date, or allow the override in that version.`);
+      // TDS can always be set per person (6 Nov 2026) — e.g. catching up after a mid-year hike.
+      if (!allowed.get(code) && code !== 'TDS') throw new BadRequestException(`${code} can't be overridden in ${group.name} v${group.version}, the version in force on the date this takes effect. Pick a later date, or allow the override in that version.`);
       const n = Number(v);
       if (!(n >= 0)) throw new BadRequestException(`${code}: the amount must be zero or more.`);
       out[code] = n;

@@ -103,6 +103,62 @@ export interface CalculationOutput {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * Lines reordered so each comes after the components it refers to. Lines that
+ * need GROSS or the balancing line go after the balancing line (they're
+ * evaluated once it's known); everything else goes before it. Ties keep the
+ * listed order. A reference loop throws, naming the components involved.
+ */
+export function orderForEvaluation<T extends { component: string; calcType: string; formula?: string; condition?: string }>(lines: T[]): T[] {
+  const codes = new Set(lines.map((l) => l.component));
+  const balancing = lines.find((l) => l.calcType === 'BALANCING');
+  const refs = new Map<string, Set<string>>();
+  for (const l of lines) {
+    const words = `${l.formula ?? ''} ${l.condition ?? ''}`.match(/[A-Z_][A-Z0-9_]*/g) ?? [];
+    const set = new Set<string>();
+    for (const w of words) {
+      if (w === l.component) continue;
+      if (codes.has(w)) set.add(w);
+      if (w === 'GROSS' && balancing && balancing !== l) set.add(balancing.component);
+      if (w === 'PF_BASE' && codes.has('BASIC') && l.component !== 'BASIC') set.add('BASIC');
+    }
+    refs.set(l.component, set);
+  }
+  // After the balancing line = depends on it, directly or through another line.
+  const after = new Set<string>();
+  if (balancing) {
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const l of lines) {
+        if (l === balancing || after.has(l.component)) continue;
+        for (const d of refs.get(l.component)!) {
+          if (d === balancing.component || after.has(d)) { after.add(l.component); grew = true; break; }
+        }
+      }
+    }
+  }
+  const out: T[] = [];
+  const done = new Set<string>();
+  const place = (group: T[], ignore: Set<string>) => {
+    const left = [...group];
+    while (left.length) {
+      const i = left.findIndex((l) => [...refs.get(l.component)!].every((d) => done.has(d) || ignore.has(d) || !group.some((g) => g.component === d)));
+      if (i === -1) throw new Error(`These lines refer to each other in a loop: ${left.map((l) => l.component).join(', ')}`);
+      const [l] = left.splice(i, 1);
+      out.push(l);
+      done.add(l.component);
+    }
+  };
+  place(lines.filter((l) => l !== balancing && !after.has(l.component)), new Set());
+  if (balancing) {
+    out.push(balancing);
+    done.add(balancing.component);
+    place(lines.filter((l) => after.has(l.component)), new Set());
+  }
+  return out;
+}
+
 export class PayrollCalculator {
   /**
    * Main calculation entrypoint.
@@ -156,7 +212,9 @@ export class PayrollCalculator {
     });
 
     const overrides = input.componentOverrides || {};
-    const lines = input.salaryGroup.lines;
+    // Evaluated in dependency order (6 Nov 2026), so a line listed before the
+    // components it uses still works; the breakdown keeps the listed order.
+    const lines = orderForEvaluation(input.salaryGroup.lines);
     const computedValues = new Map<string, number>();
 
     // 3. First pass: Evaluate non-balancing lines before the balancing line
@@ -297,7 +355,7 @@ export class PayrollCalculator {
     let totalDeductions = 0;
     let totalEmployerContributions = 0;
 
-    for (const line of lines) {
+    for (const line of input.salaryGroup.lines) {
       const code = line.component;
       const comp = componentMap.get(code);
       if (!comp) continue;
@@ -354,7 +412,7 @@ export class PayrollCalculator {
       taxResult = this.calculateTax(grossMonthly * 12, input.taxRegime, input.declarations);
       // An employee's TDS line is a monthly input; with a regime, show the slab estimate in it.
       const tdsLine = calculatedLines.find((l) => l.code === 'TDS');
-      if (input.salaryGroup.payeeType === 'EMPLOYEE' && tdsLine && !tdsLine.monthly && taxResult.monthlyTds > 0) {
+      if (input.salaryGroup.payeeType === 'EMPLOYEE' && tdsLine && !('TDS' in overrides) && !tdsLine.monthly && taxResult.monthlyTds > 0) {
         tdsLine.monthly = taxResult.monthlyTds;
         tdsLine.annual = round2(taxResult.monthlyTds * 12);
         totalDeductions = round2(totalDeductions + taxResult.monthlyTds);

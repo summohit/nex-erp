@@ -179,8 +179,11 @@ export class PayrollDryRunService {
         if (Math.abs(paid) < 0.005 && Math.abs(l.monthly) < 0.005) continue;
         deductions.push({ code: l.code, name: l.name, full: r2(l.monthly), paid: r2(paid) });
       }
-      if (payee === 'EMPLOYEE' && out.tax && out.tax.monthlyTds > 0) {
-        deductions.push({ code: 'TDS', name: 'Income Tax (TDS)', full: out.tax.monthlyTds, paid: out.tax.monthlyTds });
+      // A TDS set on the pay profile replaces the slab estimate (0 = no TDS).
+      const tdsOverride = (profile.overrides as any)?.TDS;
+      const tds = payee === 'EMPLOYEE' ? (tdsOverride != null ? Number(tdsOverride) : out.tax?.monthlyTds ?? 0) : 0;
+      if (tds > 0) {
+        deductions.push({ code: 'TDS', name: 'Income Tax (TDS)', full: r2(tds), paid: r2(tds) });
       }
       const totalDeductions = r2(deductions.reduce((t, d) => t + d.paid, 0));
       // GST on top of a consultant's fee (5 Nov 2026), when the group has GST on

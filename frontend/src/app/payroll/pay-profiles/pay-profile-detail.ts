@@ -213,7 +213,7 @@ export class PayProfileDetailComponent implements OnInit {
   /** Per-person amounts the group allows, except Basic and reimbursements (they have their own fields). */
   overridableLines = computed(() => {
     const g = this.groups().find((x) => x.code === this.formGroupCode());
-    return (g?.lines || []).filter((l) => l.overrideAllowed && !/_REIMB$/.test(l.component?.code || '') && l.component?.code !== 'BASIC');
+    return (g?.lines || []).filter((l) => l.overrideAllowed && !/_REIMB$/.test(l.component?.code || '') && l.component?.code !== 'BASIC' && l.component?.code !== 'TDS');
   });
   /** The group lets Basic be set per person. */
   basicOverridable = computed(() => {
@@ -249,7 +249,7 @@ export class PayProfileDetailComponent implements OnInit {
 
   /** Scroll to and focus the first field with an error. */
   private focusFirstError(errors: Record<string, string>) {
-    const order = ['salaryGroupCode', 'annualCtc', 'grossMonthly', 'override:BASIC', 'effectiveFrom', 'reason'];
+    const order = ['salaryGroupCode', 'annualCtc', 'grossMonthly', 'override:BASIC', 'effectiveFrom', 'override:TDS', 'reason'];
     const key = order.find((k) => errors[k]) ?? Object.keys(errors)[0];
     const id = 'f-' + key.replace(':', '-');
     setTimeout(() => {
@@ -262,6 +262,22 @@ export class PayProfileDetailComponent implements OnInit {
   customBasic = false;
   onCustomBasic(on: boolean) {
     if (!on) { delete this.form.overrides['BASIC']; this.runPreview(); }
+  }
+  /** Custom TDS (6 Nov 2026): off = estimated from the tax slabs; on = this amount every month (0 = none). */
+  customTds = false;
+  onCustomTds(on: boolean) {
+    if (!on) delete this.form.overrides['TDS'];
+    this.runPreview();
+  }
+  /** The group has a TDS line (employee groups). */
+  hasTdsLine = computed(() => {
+    const g = this.groups().find((x) => x.code === this.formGroupCode());
+    return !!(g?.lines || []).find((l) => l.component?.code === 'TDS') && (!g || g.payeeType === 'EMPLOYEE');
+  });
+  /** The slab estimate, shown as a hint next to a custom TDS. */
+  estimatedTds(): number | null {
+    const t = (this.preview() as any)?.tax?.monthlyTds;
+    return t == null ? null : Math.round(t);
   }
   /** The group's Other Reimbursement line, if it has one. */
   reimbursementLine = computed(() => {
@@ -353,6 +369,7 @@ export class PayProfileDetailComponent implements OnInit {
     this.formWorkerType.set(this.form.workerType);
     this.formGroupCode.set(this.form.salaryGroupCode);
     this.customBasic = !!(cur?.overrides && (cur.overrides as any)['BASIC'] != null);
+    this.customTds = !!(cur?.overrides && (cur.overrides as any)['TDS'] != null);
     this.form.grossMonthly = (cur as any)?.grossMonthly ?? ((this.data() as any)?.breakup?.grossMonthly ? Math.round((this.data() as any).breakup.grossMonthly) : null);
     this.preview.set(null);
     this.submitted.set(false);
@@ -400,12 +417,14 @@ export class PayProfileDetailComponent implements OnInit {
       const min = this.ruleBasic() ?? 0;
       if (Number(basic) < min) e['override:BASIC'] = `Basic can't be below 50% of CTC (₹${min.toLocaleString('en-IN')} a month).`;
     }
+    const tds = f.overrides?.['TDS'];
+    if (this.customTds && (tds === null || tds === undefined || tds === '')) e['override:TDS'] = 'Enter the monthly TDS, or turn Custom TDS off.';
     let overrideTotal = 0;
     for (const [code, v] of Object.entries(f.overrides || {})) {
       if (v === null || v === undefined || (v as any) === '') continue;
       const n = Number(v);
       if (!Number.isFinite(n) || n < 0) e['override:' + code] = "Can't be negative.";
-      else overrideTotal += n;
+      else if (code !== 'TDS') overrideTotal += n; // TDS is a deduction, not part of the CTC
     }
     if (this.grossApplies()) {
       const gross = Number(f.grossMonthly);
@@ -445,6 +464,7 @@ export class PayProfileDetailComponent implements OnInit {
     this.formGroupCode.set(v);
     this.form.overrides = {};
     this.customBasic = false;
+    this.customTds = false;
     this.runPreview();
   }
 
