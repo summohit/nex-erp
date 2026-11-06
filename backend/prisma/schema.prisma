@@ -5307,6 +5307,8 @@ model EmployeePayProfile {
   /// Salary group by code: the group version in force on a date is used.
   salaryGroupCode  String
   annualCtc        Float
+  /// Monthly gross typed by Finance (5 Nov 2026). Null = gross is CTC less employer contributions.
+  grossMonthly     Float?
   /// PayrollDropdownOption value in WORKER_TYPE
   workerType       String?
   /// PayrollDropdownOption value in PAYMENT_METHOD

@@ -157,7 +157,7 @@ export class PayrollCompareService {
       const payee = payeeKind(calc.group.payeeType);
       let out;
       try {
-        out = calc.run(profile.annualCtc, (profile.overrides as any) ?? undefined);
+        out = calc.run(profile.annualCtc, (profile.overrides as any) ?? undefined, profile.grossMonthly);
       } catch (err: any) {
         rows.push({ ...base, status: 'ERROR', salaryGroupCode: profile.salaryGroupCode, old: before, new: null, diffNet: null, reasons: [err?.message || 'Calculation failed'] });
         continue;

@@ -38,6 +38,8 @@ export interface CalculationInput {
   taxRegime?: SeedTaxRegime;
   declarations?: { [sectionCode: string]: number };
   componentOverrides?: { [componentCode: string]: number };
+  /** Gross typed per person: earnings balance to it and the rest of the CTC is "Other employer cost". */
+  fixedGrossMonthly?: number;
 }
 
 export interface CalculatedLine {
@@ -209,8 +211,13 @@ export class PayrollCalculator {
     }
     totalEmployerShare = round2(totalEmployerShare);
 
-    // Gross Salary = CTC - Employer contributions
-    const grossMonthly = round2(ctcMonthly - totalEmployerShare);
+    // Gross Salary = CTC - Employer contributions, unless the person's gross was typed
+    const fixedGross = input.salaryGroup.payeeType === 'EMPLOYEE' && Number(input.fixedGrossMonthly) > 0 ? round2(Number(input.fixedGrossMonthly)) : null;
+    const grossMonthly = fixedGross ?? round2(ctcMonthly - totalEmployerShare);
+    const otherEmployerCost = fixedGross == null ? 0 : round2(ctcMonthly - totalEmployerShare - fixedGross);
+    if (otherEmployerCost < 0) {
+      warnings.push(`Gross ₹${fixedGross} plus employer contributions ₹${totalEmployerShare} is more than the monthly CTC ₹${ctcMonthly} (allowed; other employer cost is below zero).`);
+    }
     context['GROSS'] = grossMonthly;
 
     // 5. Evaluate the BALANCING line (e.g. OTHER_ALLOWANCE)
@@ -318,16 +325,42 @@ export class PayrollCalculator {
       });
     }
 
+    if (fixedGross != null && otherEmployerCost !== 0) {
+      totalEmployerContributions += otherEmployerCost;
+      calculatedLines.push({
+        code: 'OTHER_EMPLOYER_COST',
+        name: 'Other employer cost',
+        category: 'EMPLOYER_CONTRIBUTION' as ComponentCategory,
+        monthly: otherEmployerCost,
+        annual: round2(otherEmployerCost * 12),
+        partOfCtc: true,
+        partOfGross: false,
+        taxable: false,
+        reduceForLop: false,
+        showOnPayslip: false,
+        showOnAnnexure: true,
+      });
+    }
+
     totalEarnings = round2(totalEarnings);
     totalDeductions = round2(totalDeductions);
     totalEmployerContributions = round2(totalEmployerContributions);
-    const netPayMonthly = round2(totalEarnings - totalDeductions);
-    const netPayAnnual = round2(netPayMonthly * 12);
+    let netPayMonthly = round2(totalEarnings - totalDeductions);
+    let netPayAnnual = round2(netPayMonthly * 12);
 
     // 7. Calculate Tax if a Tax Regime is selected or requested
     let taxResult: TaxCalculationResult | undefined;
     if (input.taxRegime) {
       taxResult = this.calculateTax(grossMonthly * 12, input.taxRegime, input.declarations);
+      // An employee's TDS line is a monthly input; with a regime, show the slab estimate in it.
+      const tdsLine = calculatedLines.find((l) => l.code === 'TDS');
+      if (input.salaryGroup.payeeType === 'EMPLOYEE' && tdsLine && !tdsLine.monthly && taxResult.monthlyTds > 0) {
+        tdsLine.monthly = taxResult.monthlyTds;
+        tdsLine.annual = round2(taxResult.monthlyTds * 12);
+        totalDeductions = round2(totalDeductions + taxResult.monthlyTds);
+        netPayMonthly = round2(totalEarnings - totalDeductions);
+        netPayAnnual = round2(netPayMonthly * 12);
+      }
     }
 
     return {

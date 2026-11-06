@@ -227,6 +227,37 @@ export class PayProfileDetailComponent implements OnInit {
   }
   defaultBasic(): number | null { return this.ruleBasic(); }
 
+  /** Gross and CTC are both typed (5 Nov 2026); gross only applies to employee groups. */
+  grossApplies(): boolean {
+    const g = this.groups().find((x) => x.code === this.form?.salaryGroupCode);
+    return !g || g.payeeType === 'EMPLOYEE';
+  }
+  amountsChanged() { this.runPreview(); }
+  /** '2026-27' for a date (April–March); today when empty. */
+  private fyOf(date?: string): string {
+    const d = date ? new Date(date) : new Date();
+    const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    return `${y}-${String((y + 1) % 100).padStart(2, '0')}`;
+  }
+  /** Gross + employer PF/ESI over the CTC is allowed (5 Nov 2026) but flagged. */
+  grossWarning(): string | null {
+    const gross = Number(this.form?.grossMonthly), monthly = Number(this.form?.annualCtc) / 12;
+    if (!this.grossApplies() || !(gross > 0) || !(monthly > 0)) return null;
+    const employer = (this.preview()?.lines || []).filter((l: any) => l.category === 'EMPLOYER_CONTRIBUTION' && l.code !== 'OTHER_EMPLOYER_COST').reduce((a: number, l: any) => a + l.monthly, 0);
+    return gross + employer > monthly + 0.5 ? `Gross + employer PF/ESI (${this.money(gross + employer)}) is more than the monthly CTC (${this.money(monthly)}). You can still save.` : null;
+  }
+
+  /** Scroll to and focus the first field with an error. */
+  private focusFirstError(errors: Record<string, string>) {
+    const order = ['salaryGroupCode', 'annualCtc', 'grossMonthly', 'override:BASIC', 'effectiveFrom', 'reason'];
+    const key = order.find((k) => errors[k]) ?? Object.keys(errors)[0];
+    const id = 'f-' + key.replace(':', '-');
+    setTimeout(() => {
+      const el = document.getElementById(id) as HTMLElement | null;
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus({ preventScroll: true }); }
+    });
+  }
+
   /** Custom Basic is off (hidden) by default; on shows the Basic field for this person. */
   customBasic = false;
   onCustomBasic(on: boolean) {
@@ -322,6 +353,7 @@ export class PayProfileDetailComponent implements OnInit {
     this.formWorkerType.set(this.form.workerType);
     this.formGroupCode.set(this.form.salaryGroupCode);
     this.customBasic = !!(cur?.overrides && (cur.overrides as any)['BASIC'] != null);
+    this.form.grossMonthly = (cur as any)?.grossMonthly ?? ((this.data() as any)?.breakup?.grossMonthly ? Math.round((this.data() as any).breakup.grossMonthly) : null);
     this.preview.set(null);
     this.submitted.set(false);
     this.serverError.set(null);
@@ -375,6 +407,11 @@ export class PayProfileDetailComponent implements OnInit {
       if (!Number.isFinite(n) || n < 0) e['override:' + code] = "Can't be negative.";
       else overrideTotal += n;
     }
+    if (this.grossApplies()) {
+      const gross = Number(f.grossMonthly);
+      if (f.grossMonthly === null || f.grossMonthly === undefined || f.grossMonthly === '' || !(gross > 0)) e['grossMonthly'] = 'Enter the monthly gross.';
+      else if (monthly > 0 && gross > monthly) e['grossMonthly'] = `Gross is more than the monthly CTC (${this.money(monthly)}).`;
+    }
     if (monthly > 0 && overrideTotal > monthly) e['annualCtc'] = e['annualCtc'] || `Overrides add up to ${this.money(overrideTotal)}/month — more than the monthly CTC (${this.money(monthly)}).`;
     if (this.cleanOverrides() && !String(f.reason || '').trim()) e['reason'] = 'Give a reason for the overrides.';
     return e;
@@ -407,6 +444,7 @@ export class PayProfileDetailComponent implements OnInit {
     this.form.salaryGroupCode = v;
     this.formGroupCode.set(v);
     this.form.overrides = {};
+    this.customBasic = false;
     this.runPreview();
   }
 
@@ -425,8 +463,12 @@ export class PayProfileDetailComponent implements OnInit {
     this.payroll.calculateSalary({
       groupCode: this.form.salaryGroupCode,
       annualCtc: Number(this.form.annualCtc),
+      onDate: this.form.effectiveFrom || undefined,
+      regimeCode: this.form.taxRegime === 'OLD' ? 'OLD' : 'NEW',
+      financialYear: this.fyOf(this.form.effectiveFrom),
+      grossMonthly: this.grossApplies() && Number(this.form.grossMonthly) > 0 ? Number(this.form.grossMonthly) : undefined,
       overrides: this.cleanOverrides(),
-    }).subscribe({
+    } as any).subscribe({
       next: (r) => { this.preview.set(r); this.previewing.set(false); },
       error: (e) => { this.previewing.set(false); this.preview.set(null); this.toast.error(e?.error?.message || 'Could not calculate'); },
     });
@@ -436,9 +478,11 @@ export class PayProfileDetailComponent implements OnInit {
     const f = this.form;
     this.submitted.set(true);
     this.serverError.set(null);
-    const problems = Object.values(this.validate());
+    const errors = this.validate();
+    const problems = Object.values(errors);
     if (problems.length) {
       this.toast.error(problems.length === 1 ? problems[0] : `Fix the ${problems.length} highlighted fields`);
+      this.focusFirstError(errors);
       return;
     }
     const overrides = this.cleanOverrides();
@@ -446,6 +490,7 @@ export class PayProfileDetailComponent implements OnInit {
     this.payroll.addPayProfileVersion(this.employeeId, {
       salaryGroupCode: f.salaryGroupCode,
       annualCtc: Number(f.annualCtc),
+      grossMonthly: this.grossApplies() ? Number(f.grossMonthly) : null,
       effectiveFrom: f.effectiveFrom,
       workerType: f.workerType || null,
       paymentMethod: f.paymentMethod || null,

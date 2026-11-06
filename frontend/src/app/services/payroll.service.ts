@@ -444,6 +444,8 @@ export class PayrollService {
     return this.http.get<PayProfileDetail>(`${this.apiUrl}/pay-profiles/${employeeId}`);
   }
 
+  /** Annual CTC that gives a monthly gross in a salary group. */
+
   addPayProfileVersion(employeeId: number, data: any): Observable<{ profile: PayProfileVersion; breakup: SalaryCalculationResult }> {
     return this.http.post<{ profile: PayProfileVersion; breakup: SalaryCalculationResult }>(`${this.apiUrl}/pay-profiles/${employeeId}/versions`, data);
   }

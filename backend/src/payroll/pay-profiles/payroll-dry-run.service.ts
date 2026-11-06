@@ -142,7 +142,7 @@ export class PayrollDryRunService {
       }
       let out;
       try {
-        out = calc.run(profile.annualCtc, (profile.overrides as any) ?? undefined);
+        out = calc.run(profile.annualCtc, (profile.overrides as any) ?? undefined, profile.grossMonthly);
       } catch (err: any) {
         rows.push({ ...base, status: 'BLOCKED', warnings: [err?.message || 'Calculation failed'] });
         continue;

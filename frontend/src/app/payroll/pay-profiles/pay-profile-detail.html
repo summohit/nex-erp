@@ -135,7 +135,7 @@
 
             <div class="form-group">
               <label class="form-label">Salary Group <span class="text-rose-500">*</span></label>
-              <select class="form-control" [class.is-invalid]="err('salaryGroupCode')" [ngModel]="form.salaryGroupCode" (ngModelChange)="onGroupChange($event)">
+              <select id="f-salaryGroupCode" class="form-control" [class.is-invalid]="err('salaryGroupCode')" [ngModel]="form.salaryGroupCode" (ngModelChange)="onGroupChange($event)">
                 <option [ngValue]="null">— pick —</option>
                 <option *ngFor="let g of groupChoices()" [ngValue]="g.code">{{ g.name }} ({{ g.code }})</option>
               </select>
@@ -149,7 +149,7 @@
               <label class="form-label">Annual CTC (₹) <span class="text-rose-500">*</span></label>
               <div class="input-currency-wrapper">
                 <span class="currency-prefix">₹</span>
-                <input class="form-control currency-input" [class.is-invalid]="err('annualCtc')" type="number" min="0" step="1000" [(ngModel)]="form.annualCtc" (change)="runPreview()" placeholder="e.g. 600000">
+                <input id="f-annualCtc" class="form-control currency-input" [class.is-invalid]="err('annualCtc')" type="number" min="0" step="1000" [(ngModel)]="form.annualCtc" (change)="amountsChanged()" placeholder="e.g. 336000">
               </div>
               <span class="field-error" *ngIf="err('annualCtc') as m">{{ m }}</span>
               <span class="field-warn" *ngIf="!err('annualCtc') && ctcWarning() as w">{{ w }}</span>
@@ -157,6 +157,18 @@
                 Monthly equivalent: {{ getMonthlyEquivalent(form.annualCtc) }}
               </span>
             </div>
+            <div class="form-group" *ngIf="grossApplies()">
+              <label class="form-label">Monthly Gross (₹) <span class="text-rose-500">*</span></label>
+              <div class="input-currency-wrapper">
+                <span class="currency-prefix">₹</span>
+                <input id="f-grossMonthly" class="form-control currency-input" [class.is-invalid]="err('grossMonthly')" type="number" min="0" step="100"
+                       [(ngModel)]="form.grossMonthly" (change)="amountsChanged()" placeholder="e.g. 30000">
+              </div>
+              <span class="field-error" *ngIf="err('grossMonthly') as m">{{ m }}</span>
+              <span class="field-warn" *ngIf="!err('grossMonthly') && grossWarning() as w">{{ w }}</span>
+              <span class="field-hint-text" *ngIf="!err('grossMonthly') && !grossWarning()">What the employee is paid a month. Whatever CTC is left after gross and employer PF / ESI shows as “Other employer cost”.</span>
+            </div>
+
 
             <!-- Basic per person (5 Nov 2026): empty = the group's rule (50% of CTC) -->
             <div class="form-group" *ngIf="basicOverridable()">
@@ -168,8 +180,8 @@
               <label class="form-label">Basic Salary (₹ / month)</label>
               <div class="input-currency-wrapper">
                 <span class="currency-prefix">₹</span>
-                <input class="form-control currency-input" [class.is-invalid]="err('override:BASIC')" type="number" min="0" step="100"
-                       [(ngModel)]="form.overrides['BASIC']" (change)="runPreview()"
+                <input id="f-override-BASIC" class="form-control currency-input" [class.is-invalid]="err('override:BASIC')" type="number" min="0" step="100"
+                       [(ngModel)]="form.overrides['BASIC']" (change)="amountsChanged()"
                        [placeholder]="defaultBasic() ? defaultBasic() + ' (50% of CTC)' : '50% of CTC'">
               </div>
               <span class="field-error" *ngIf="err('override:BASIC') as m">{{ m }}</span>
@@ -179,7 +191,7 @@
 
             <div class="form-group">
               <label class="form-label">Takes Effect From <span class="text-rose-500">*</span></label>
-              <input class="form-control" [class.is-invalid]="err('effectiveFrom')" type="date" [(ngModel)]="form.effectiveFrom">
+              <input id="f-effectiveFrom" class="form-control" [class.is-invalid]="err('effectiveFrom')" type="date" [(ngModel)]="form.effectiveFrom" (change)="runPreview()">
               <span class="field-error" *ngIf="err('effectiveFrom') as m">{{ m }}</span>
               <span class="field-hint-text" *ngIf="!err('effectiveFrom')">A past date is allowed; arrears come with revisions.</span>
             </div>
@@ -196,7 +208,7 @@
 
             <div class="form-group">
               <label class="form-label">Tax Regime</label>
-              <select class="form-control" [(ngModel)]="form.taxRegime">
+              <select class="form-control" [(ngModel)]="form.taxRegime" (ngModelChange)="runPreview()">
                 <option value="NEW">New regime (default)</option>
                 <option value="OLD">Old regime</option>
               </select>
@@ -205,7 +217,7 @@
 
             <div class="form-group">
               <label class="form-label">Reason {{ form.overrides && (form.overrides | keyvalue)?.length ? '*' : '' }}</label>
-              <input class="form-control" [class.is-invalid]="err('reason')" [(ngModel)]="form.reason" placeholder="e.g. Annual appraisal, promotion, correction…" maxlength="500">
+              <input id="f-reason" class="form-control" [class.is-invalid]="err('reason')" [(ngModel)]="form.reason" placeholder="e.g. Annual appraisal, promotion, correction…" maxlength="500">
               <span class="field-error" *ngIf="err('reason') as m">{{ m }}</span>
             </div>
           </div>
@@ -222,7 +234,7 @@
                 <div class="input-currency-wrapper">
                   <span class="currency-prefix">₹</span>
                   <input class="form-control currency-input" [class.is-invalid]="err('override:OTHER_REIMB')" type="number" min="0" step="100"
-                         [(ngModel)]="form.overrides['OTHER_REIMB']" (change)="runPreview()" placeholder="0">
+                         [(ngModel)]="form.overrides['OTHER_REIMB']" (change)="amountsChanged()" placeholder="0">
                 </div>
                 <span class="field-error" *ngIf="err('override:OTHER_REIMB') as m">{{ m }}</span>
               </div>

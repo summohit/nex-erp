@@ -583,6 +583,8 @@ export class PayrollMastersService {
       financialYear?: string;
       declarations?: { [sectionCode: string]: number };
       overrides?: { [componentCode: string]: number };
+      grossMonthly?: number;
+      onDate?: string;
     },
   ): Promise<CalculationOutput> {
     // 1. Fetch Salary Group
@@ -591,8 +593,13 @@ export class PayrollMastersService {
     if (!isNaN(rawGid)) {
       group = await this.getSalaryGroupById(companyId, rawGid);
     } else if (params.groupCode) {
+      // With onDate: the version in force that day (what a pay profile from that date uses).
+      const on = params.onDate ? new Date(params.onDate) : null;
       group = await this.prisma.payrollSalaryGroup.findFirst({
-        where: { companyId, code: params.groupCode, retiredAt: null },
+        where: on && !isNaN(on.getTime())
+          ? { companyId, code: params.groupCode, effectiveFrom: { lte: on }, OR: [{ retiredAt: null }, { retiredAt: { gt: on } }] }
+          : { companyId, code: params.groupCode, retiredAt: null },
+        orderBy: { version: 'desc' },
         include: {
           lines: {
             include: { component: true },
@@ -646,11 +653,13 @@ export class PayrollMastersService {
       monthlyCtc?: number;
       declarations?: { [sectionCode: string]: number };
       overrides?: { [componentCode: string]: number };
+      grossMonthly?: number;
     },
   ): CalculationInput {
     const calcInput: CalculationInput = {
       annualCtc: params.annualCtc,
       monthlyCtc: params.monthlyCtc,
+      fixedGrossMonthly: params.grossMonthly ? Number(params.grossMonthly) : undefined,
       salaryGroup: {
         code: group.code,
         name: group.name,
@@ -744,9 +753,9 @@ export class PayrollMastersService {
     return {
       group,
       hasTax: !!taxRegime,
-      run: (annualCtc: number, overrides?: { [componentCode: string]: number }) => {
+      run: (annualCtc: number, overrides?: { [componentCode: string]: number }, grossMonthly?: number | null) => {
         try {
-          return PayrollCalculator.calculate(this.buildCalcInput(group, statutoryRates, components, taxRegime ?? undefined, { annualCtc, overrides }));
+          return PayrollCalculator.calculate(this.buildCalcInput(group, statutoryRates, components, taxRegime ?? undefined, { annualCtc, overrides, grossMonthly: grossMonthly ?? undefined }));
         } catch (err: any) {
           // A broken formula in the group (e.g. a name the group doesn't have)
           // used to surface as "Internal server error" on every screen.

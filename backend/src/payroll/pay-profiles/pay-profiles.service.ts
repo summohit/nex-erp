@@ -184,8 +184,11 @@ export class PayProfilesService {
     const cur = this.current(versions);
     let breakup: any = null;
     if (cur) {
-      const calc = await this.masters.prepareCalculator(companyId, cur.salaryGroupCode);
-      breakup = calc ? calc.run(cur.annualCtc, (cur.overrides as any) ?? undefined) : null;
+      const now = new Date();
+      const fyStart = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      const financialYear = `${fyStart}-${String((fyStart + 1) % 100).padStart(2, '0')}`;
+      const calc = await this.masters.prepareCalculator(companyId, cur.salaryGroupCode, now, { regimeCode: cur.taxRegime === 'OLD' ? 'OLD' : 'NEW', financialYear });
+      breakup = calc ? calc.run(cur.annualCtc, (cur.overrides as any) ?? undefined, cur.grossMonthly) : null;
     }
     return { employee, versions, currentVersion: cur?.version ?? null, breakup, suggestions };
   }
@@ -208,6 +211,8 @@ export class PayProfilesService {
       /** NEW | OLD; null = the financial year's default */
       taxRegime?: string | null;
       overrides?: Record<string, number> | null;
+      /** Monthly gross typed by Finance; null = CTC less employer contributions */
+      grossMonthly?: number | null;
       reason?: string | null;
       source?: string;
       employee?: {
@@ -240,11 +245,15 @@ export class PayProfilesService {
     const reason = (body.reason || '').trim().slice(0, 500) || null;
     if (overrides && !reason) throw new BadRequestException('Give a reason for the component overrides.');
 
-    const result = calc.run(annualCtc, overrides ?? undefined); // fails loudly on a broken formula
+    const grossMonthly = body.grossMonthly == null || (body.grossMonthly as any) === '' ? null : Number(body.grossMonthly);
+    if (grossMonthly != null && !(grossMonthly > 0)) throw new BadRequestException('Monthly gross must be more than zero.');
+    if (grossMonthly != null && grossMonthly > annualCtc / 12) throw new BadRequestException('Monthly gross can\'t be more than the monthly CTC.');
+
+    const result = calc.run(annualCtc, overrides ?? undefined, grossMonthly); // fails loudly on a broken formula
     // Basic can be raised per person but never below the group's rule (50% of CTC).
     if (overrides && 'BASIC' in overrides) {
       const { BASIC: _ignored, ...rest } = overrides;
-      const ruleBasic = calc.run(annualCtc, Object.keys(rest).length ? rest : undefined).lines.find((l: any) => l.code === 'BASIC')?.monthly ?? 0;
+      const ruleBasic = calc.run(annualCtc, Object.keys(rest).length ? rest : undefined, grossMonthly).lines.find((l: any) => l.code === 'BASIC')?.monthly ?? 0;
       if (overrides.BASIC + 0.5 < ruleBasic) {
         throw new BadRequestException(`Basic can't be below the group's rule (50% of CTC = ₹${Math.round(ruleBasic).toLocaleString('en-IN')} a month). Enter ₹${Math.round(ruleBasic).toLocaleString('en-IN')} or more, or leave it empty.`);
       }
@@ -252,7 +261,7 @@ export class PayProfilesService {
     // A per-person amount (e.g. a higher Basic) must still fit inside the CTC.
     const negative = (result.warnings || []).find((w: string) => /negative/i.test(w));
     if (negative) {
-      throw new BadRequestException(`These amounts don't fit in the CTC: ${negative} Lower the Basic or reimbursement, or raise the CTC.`);
+      throw new BadRequestException(`These amounts don't fit: ${negative} Lower the Basic or reimbursement, or change the gross or CTC.`);
     }
 
     const statutory = this.cleanStatutory(body.employee);
@@ -267,6 +276,7 @@ export class PayProfilesService {
           effectiveFrom,
           salaryGroupCode: code,
           annualCtc,
+          grossMonthly,
           workerType: workerType?.value ?? null,
           paymentMethod: paymentMethod?.value ?? null,
           taxRegime: body.taxRegime === 'OLD' || body.taxRegime === 'NEW' ? body.taxRegime : null,
@@ -382,8 +392,8 @@ export class PayProfilesService {
     const out: Record<string, number> = {};
     for (const [code, v] of Object.entries(raw)) {
       if (v === null || v === undefined || (v as any) === '') continue;
-      if (!allowed.has(code)) throw new BadRequestException(`${code} is not part of this salary group.`);
-      if (!allowed.get(code)) throw new BadRequestException(`${code} can't be overridden in this salary group.`);
+      if (!allowed.has(code)) throw new BadRequestException(`${code} is not part of ${group.name} v${group.version}, the version in force on the date this takes effect.`);
+      if (!allowed.get(code)) throw new BadRequestException(`${code} can't be overridden in ${group.name} v${group.version}, the version in force on the date this takes effect. Pick a later date, or allow the override in that version.`);
       const n = Number(v);
       if (!(n >= 0)) throw new BadRequestException(`${code}: the amount must be zero or more.`);
       out[code] = n;
@@ -608,6 +618,12 @@ export class PayProfilesService {
   }
 
   /** Annual CTC whose engine gross matches today's gross (gross rises with CTC, so bisect). */
+  /**
+   * The annual CTC that gives a monthly gross (5 Nov 2026): HR enters the gross
+   * they agreed, MIRA works out the CTC for the group (employer PF/ESI on top).
+   */
+
+
   private solveCtc(run: (annualCtc: number) => { grossMonthly: number }, targetGrossMonthly: number): number {
     let lo = 0;
     let hi = targetGrossMonthly * 12 * 2 + 600000;
