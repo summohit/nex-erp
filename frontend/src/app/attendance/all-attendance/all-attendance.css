@@ -1652,6 +1652,9 @@
 
 .status-absent { color: #919192; }
 .bg-absent { background-color: rgba(225, 75, 66, 0.15); }
+.status-meeting { color: #0d9488; }
+.bg-meeting { background-color: rgba(13, 148, 136, 0.14); }
+.status-meeting-badge { background: rgba(13, 148, 136, 0.14); color: #0f766e; }
 
 .status-leave { color: #3b82f6; }
 .bg-leave { background-color: rgba(59, 130, 246, 0.15); }

@@ -233,6 +233,12 @@ export class PayProfileDetailComponent implements OnInit {
     return !g || g.payeeType === 'EMPLOYEE';
   }
   amountsChanged() { this.runPreview(); }
+  /** Re-preview shortly after typing stops, so the breakup follows the amount boxes without leaving them. */
+  private previewTimer?: ReturnType<typeof setTimeout>;
+  previewSoon() {
+    clearTimeout(this.previewTimer);
+    this.previewTimer = setTimeout(() => this.runPreview(), 400);
+  }
   /** '2026-27' for a date (April–March); today when empty. */
   private fyOf(date?: string): string {
     const d = date ? new Date(date) : new Date();
@@ -552,9 +558,10 @@ export class PayProfileDetailComponent implements OnInit {
 
   sections(b: SalaryCalculationResult | null) {
     if (!b) return [];
-    const by = (cat: string) => b.lines.filter((l) => l.category === cat && l.monthly !== 0);
+    const by = (...cats: string[]) => b.lines.filter((l) => cats.includes(l.category) && l.monthly !== 0);
     return [
-      { title: 'Earnings', lines: by('EARNING'), total: b.grossMonthly, totalLabel: 'Gross' },
+      { title: 'Earnings', lines: by('EARNING', 'REIMBURSEMENT').filter((l) => l.partOfCtc !== false), total: b.grossMonthly, totalLabel: 'Gross' },
+      { title: 'Paid on top (outside CTC)', lines: by('EARNING', 'REIMBURSEMENT').filter((l) => l.partOfCtc === false), total: by('EARNING', 'REIMBURSEMENT').filter((l) => l.partOfCtc === false).reduce((t, l) => t + l.monthly, 0), totalLabel: 'Total on top' },
       { title: 'Deductions', lines: by('EMPLOYEE_DEDUCTION'), total: b.totalDeductionsMonthly, totalLabel: 'Total deductions' },
       { title: 'Paid by the company (in CTC)', lines: by('EMPLOYER_CONTRIBUTION'), total: b.totalEmployerContributionsMonthly, totalLabel: 'Employer contributions' },
     ].filter((s) => s.lines.length);

@@ -1010,7 +1010,8 @@ export class PayrollService {
           payslipItemsData.push({ componentName: l.name, type: 'EARNING', amount: l.full });
         }
         for (const l of fromEngine.deductions) if (l.paid > 0) payslipItemsData.push({ componentName: l.name, type: 'DEDUCTION', amount: l.paid });
-        totalEarnings = fromEngine.grossFull;
+        // Plus earnings paid on top of the CTC (their component's CTC flag is off).
+        totalEarnings = fromEngine.grossFull + ((fromEngine as any).onTopFull ?? 0);
         totalDeductions = fromEngine.totalDeductions;
         // GST on top of a consultant's fee: paid to them, not cut for loss of pay.
         if (fromEngine.gst > 0) {

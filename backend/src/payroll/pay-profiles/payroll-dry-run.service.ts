@@ -159,8 +159,12 @@ export class PayrollDryRunService {
       const gap = (att as any).notEmployed ?? { calendar: 0, working: 0 };
       const notEmployedDays = (companyConfig as any).lopDayBasis === 'WORKING' ? gap.working : gap.calendar;
       const { lines: earnings, lossOfPay } = applyLossOfPay(earningLines, divisor, att.absences + notEmployedDays);
-      const grossFull = r2(earnings.reduce((t, l) => t + l.full, 0));
-      const grossPaid = r2(earnings.reduce((t, l) => t + l.paid, 0));
+      // Earnings outside the CTC (e.g. an extra reimbursement) are paid on top: not gross, no ESI.
+      const onTop = new Set(earningLines.filter((l) => l.partOfCtc === false).map((l) => l.code));
+      const grossFull = r2(earnings.filter((l) => !onTop.has(l.code)).reduce((t, l) => t + l.full, 0));
+      const grossPaid = r2(earnings.filter((l) => !onTop.has(l.code)).reduce((t, l) => t + l.paid, 0));
+      const onTopFull = r2(earnings.filter((l) => onTop.has(l.code)).reduce((t, l) => t + l.full, 0));
+      const onTopPaid = r2(earnings.filter((l) => onTop.has(l.code)).reduce((t, l) => t + l.paid, 0));
       const basicPaid = earnings.find((l) => l.code === 'BASIC')?.paid ?? 0;
 
       const deductions: DryRunLine[] = [];
@@ -168,8 +172,17 @@ export class PayrollDryRunService {
         let paid = l.monthly;
         if (l.code === 'EMPLOYEE_PF' && l.monthly > 0) {
           // PF on Basic earned, capped at the wage ceiling unless the group pays on full Basic.
-          const wage = calc.group.pfWageBasis === 'FULL_BASIC' ? basicPaid : Math.min(basicPaid, pfCeiling);
-          paid = (wage * pfPct) / 100;
+          // Full Basic: 12% of Basic earned. Capped: the month's PF is capped on full Basic first,
+          // then paid for the days worked (cap 3,000 × 26/31 = 2,516, not 12% of a reduced Basic).
+          const basicFullPf = earnings.find((x) => x.code === 'BASIC')?.full ?? 0;
+          paid = calc.group.pfWageBasis === 'FULL_BASIC'
+            ? (basicPaid * pfPct) / 100
+            : basicFullPf > 0 ? ((Math.min(basicFullPf, pfCeiling) * pfPct) / 100) * (basicPaid / basicFullPf) : 0;
+        } else if (l.code === 'EMPLOYEE_ESI' && l.formula && /\bBASIC\b/.test(l.formula) && !/\bGROSS\b/.test(l.formula)) {
+          // The group charges ESI on Basic (its own formula and condition decide who pays):
+          // the full-month amount, scaled to the Basic actually earned.
+          const basicFull = earnings.find((x) => x.code === 'BASIC')?.full ?? 0;
+          paid = basicFull > 0 ? (l.monthly * basicPaid) / basicFull : 0;
         } else if (l.code === 'EMPLOYEE_ESI') {
           // ESI on wages earned, for those eligible on their full-month gross.
           paid = grossFull <= esiLimit ? (grossPaid * esiPct) / 100 : 0;
@@ -192,7 +205,7 @@ export class PayrollDryRunService {
       // Per person (pay profile "GST registered" toggle = a GST % on file; the GSTIN is optional).
       const personGstPct = (e as any).gstPct;
       const gst = payee === 'CONSULTANT' && personGstPct != null && personGstPct > 0 && feePaid > 0 ? r2((feePaid * personGstPct) / 100) : 0;
-      const net = r2(Math.max(0, grossPaid + gst - totalDeductions));
+      const net = r2(Math.max(0, grossPaid + onTopPaid + gst - totalDeductions));
 
       const warnings: string[] = [];
       const notes: string[] = exempt && !fullMonth ? [`Paid in full — ${e.user!.role === 'FINANCE' ? 'Finance' : 'Super Admin'} logins have no loss of pay.`] : [];
@@ -216,6 +229,7 @@ export class PayrollDryRunService {
         notEmployedDays,
         earnings,
         grossFull,
+        onTopFull,
         lossOfPay,
         grossPaid,
         deductions,

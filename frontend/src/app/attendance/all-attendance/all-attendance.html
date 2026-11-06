@@ -578,6 +578,7 @@
                     <svg *ngIf="s.icon === 'calendar'" lucideCalendar class="status-icon" [ngClass]="s.iconClass"></svg>
                     <svg *ngIf="s.icon === 'zap'" lucideZap class="status-icon" [ngClass]="s.iconClass"></svg>
                     <svg *ngIf="s.icon === 'timer-off'" lucideTimerOff class="status-icon" [ngClass]="s.iconClass"></svg>
+                    <svg *ngIf="s.icon === 'map-pin'" lucideMapPin class="status-icon" [ngClass]="s.iconClass"></svg>
                   </div>
                   <span class="option-primary">{{ s.label }}</span>
                 </div>
@@ -649,6 +650,7 @@
           <svg *ngIf="tag.icon === 'calendar'" lucideCalendar class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'zap'" lucideZap class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'timer-off'" lucideTimerOff class="status-icon" [ngClass]="tag.iconClass"></svg>
+                    <svg *ngIf="tag.icon === 'map-pin'" lucideMapPin class="status-icon" [ngClass]="tag.iconClass"></svg>
         </div>
         <span class="legend-label">{{ tag.label }}</span>
       </button>
@@ -713,6 +715,7 @@
                      'bg-half-day': day.status === 'Half Day',
                      'bg-late': day.status === 'Late',
                      'bg-absent': day.status === 'Absent',
+                     'bg-meeting': day.status === 'On Meeting',
                      'bg-leave': day.status === 'On Leave',
                      'bg-holiday': day.status === 'Holiday',
                      'bg-day-off': day.status === 'Day Off',
@@ -725,6 +728,7 @@
                   <svg *ngIf="day.status === 'Half Day'" lucideStarHalf class="status-half-day status-icon"></svg>
                   <svg *ngIf="day.status === 'Late'" lucideAlertCircle class="status-late status-icon"></svg>
                   <svg *ngIf="day.status === 'Absent'" lucideX class="status-absent status-icon"></svg>
+                  <svg *ngIf="day.status === 'On Meeting'" lucideMapPin class="status-meeting status-icon"></svg>
                   <svg *ngIf="day.status === 'On Leave'" lucidePlane class="status-leave status-icon"></svg>
                   <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
                   <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>

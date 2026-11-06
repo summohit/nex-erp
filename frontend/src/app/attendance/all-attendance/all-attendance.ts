@@ -30,7 +30,7 @@ export interface DayMatrixStatus {
   dateStr: string;
   isWeekend: boolean;
   isFuture: boolean;
-  status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Leave' | 'Holiday' | 'Day Off' | 'Missed Clock Out' | 'Empty';
+  status: 'Present' | 'Half Day' | 'Late' | 'Absent' | 'On Meeting' | 'On Leave' | 'Holiday' | 'Day Off' | 'Missed Clock Out' | 'Empty';
   tooltip: string;
   record?: AttendanceRecord;
   /** Why this day carries the status it does — shown on hover. */
@@ -210,6 +210,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     { value: 'Half Day', label: 'Half Day', icon: 'star-half', bgClass: 'bg-half-day', iconClass: 'status-half-day' },
     { value: 'Late', label: 'Late', icon: 'alert-circle', bgClass: 'bg-late', iconClass: 'status-late' },
     { value: 'Absent', label: 'Absent', icon: 'x', bgClass: 'bg-absent', iconClass: 'status-absent' },
+    { value: 'On Meeting', label: 'On Meeting', icon: 'map-pin', bgClass: 'bg-meeting', iconClass: 'status-meeting' },
     { value: 'On Leave', label: 'On Leave', icon: 'plane', bgClass: 'bg-leave', iconClass: 'status-leave' },
     { value: 'Holiday', label: 'Holiday', icon: 'star', bgClass: 'bg-holiday', iconClass: 'status-holiday' },
     { value: 'Day Off', label: 'Day Off', icon: 'calendar', bgClass: 'bg-day-off', iconClass: 'status-day-off' },
@@ -736,6 +737,12 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
         // Team Timeline corrections deliberately do not create fake punch
         // times. Render their Attendance.status before falling back to the
         // no-punch "Absent" rule so this matrix matches the employee view.
+        } else if (this.isPendingVisit(record)) {
+          // Out-of-geo visit (client meeting / unapproved field visit) waiting
+          // for the Super Admin: Present once approved, Absent if rejected.
+          status = 'On Meeting';
+          tooltip = 'On meeting — visit awaiting approval';
+          countsWorking = !isDayOff && !holiday;
         } else if (record?.status === 'ABSENT') {
           status = 'Absent';
           tooltip = 'Absent (set from Team Timeline)';
@@ -1675,6 +1682,11 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     this.load();
   }
 
+  /** A clocked day whose out-of-geo visit request hasn't been decided yet. */
+  isPendingVisit(r?: AttendanceRecord | null): boolean {
+    return !!r && !!r.clockIn && (r as any).geofenceApproval === 'PENDING';
+  }
+
   // Mirrors the grid's day-cell classification for a single record.
   recordDayStatus(r: AttendanceRecord): string {
     // A day still ahead is planned, not missed (19 Oct 2026): a booked field
@@ -1684,6 +1696,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     }
     // These values can be explicitly set in Team Timeline without inventing
     // punch times; they must match the calendar's rendered result.
+    if (this.isPendingVisit(r)) return 'On Meeting';
     if (r.status === 'ABSENT') return 'Absent';
     if (r.status === 'HALF_DAY') return 'Half Day';
     if (r.status === 'PRESENT' && !r.clockIn) return 'Present';
@@ -1718,6 +1731,10 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     }
     if (status === 'Day Off') return 'Non-working day on this roster';
     if (status === 'On Leave') return 'Approved leave for this day';
+    if (status === 'On Meeting') {
+      const why = (r as any)?.clockInOutsideReason || (r as any)?.clockOutOutsideReason;
+      return `Out-of-office visit awaiting Super Admin approval${why ? ' — ' + why : ''}. Present once approved.`;
+    }
     if (status === 'Absent') return 'No clock-in recorded on a working day';
     if (!r) return '';
 
@@ -1819,6 +1836,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   statusClass(status: string): string {
     if (status === 'Present') return 'status-approved';
     if (status === 'Absent') return 'status-rejected';
+    if (status === 'On Meeting') return 'status-meeting-badge';
     if (status === 'Half Day' || status === 'Late') return 'status-pending';
     if (status === 'On Leave') return 'status-leave-badge';
     if (status === 'Holiday') return 'status-holiday-badge';

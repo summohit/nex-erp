@@ -288,7 +288,8 @@ export class PayrollCalculator {
         let otherEarningsSum = 0;
         for (const [code, val] of computedValues.entries()) {
           const comp = componentMap.get(code);
-          if (comp?.category === 'EARNING' && code !== compCode) {
+          // An earning outside the CTC (component's CTC flag off) is paid on top, not balanced away.
+          if (comp?.category === 'EARNING' && comp.partOfCtc !== false && code !== compCode) {
             otherEarningsSum += val;
           }
         }
@@ -306,7 +307,7 @@ export class PayrollCalculator {
         let otherEarnings = 0;
         for (const [code, val] of computedValues.entries()) {
           const comp = componentMap.get(code);
-          if (comp?.category === 'EARNING' && code !== compCode) otherEarnings += val;
+          if (comp?.category === 'EARNING' && comp.partOfCtc !== false && code !== compCode) otherEarnings += val;
         }
         const fee = round2(ctcMonthly - otherEarnings);
         if (fee < 0) warnings.push(`Reimbursements exceed the monthly CTC (₹${ctcMonthly}); the fee would be negative.`);
