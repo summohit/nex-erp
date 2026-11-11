@@ -227,11 +227,23 @@ export class AttendanceService {
 
   /**
    * Why there is no clock-in today, or null on a working day (11 Nov 2026):
-   * a company holiday (by name), a rostered day off, or a weekly off. An
-   * approved field visit day is still clocked, so it never counts as off.
+   * a company holiday (by name), a rostered day off, a weekly off, or an
+   * approved full-day leave. An approved field visit day is still clocked, so
+   * it never counts as off. A half-day leave leaves the other half to work.
    */
-  async offDayReason(companyId: number, day: Date, effective: { isDayOff: boolean; source?: string }): Promise<string | null> {
+  async offDayReason(
+    companyId: number, day: Date, effective: { isDayOff: boolean; source?: string }, employeeId?: number,
+  ): Promise<string | null> {
     const end = new Date(day.getTime() + 24 * 60 * 60 * 1000);
+    // Approved leave (11 Nov 2026): clocking in on it left a leave and a
+    // Present on the same day. To work that day, cancel the leave first.
+    if (employeeId && this.prisma.leaveRequest?.findFirst) {
+      const leave = await this.prisma.leaveRequest.findFirst({
+        where: { employeeId, status: 'APPROVED', deletedAt: null, isHalfDay: false, startDate: { lt: end }, endDate: { gte: day } },
+        select: { leaveType: { select: { name: true } } },
+      });
+      if (leave) return `On leave: ${leave.leaveType?.name || 'approved leave'}`;
+    }
     const holiday = await this.prisma.holiday.findFirst({
       where: { companyId, date: { gte: day, lt: end } }, select: { name: true },
     });
@@ -259,7 +271,7 @@ export class AttendanceService {
     const effective = await this.roster.getEffectiveShift(
       employee.id, today, personalDaysOff(employee as any).shift as any, personalDaysOff(employee as any).weeklyOffs,
     );
-    return { reason: await this.offDayReason(employee.companyId, today, effective) };
+    return { reason: await this.offDayReason(employee.companyId, today, effective, employee.id) };
   }
 
   private withTotalHours(record: any) {
@@ -484,8 +496,11 @@ export class AttendanceService {
     // No clock-in on a holiday, weekly off or rostered day off (11 Nov 2026);
     // an approved field visit day is the one exception.
     if (!approvedVisitClock) {
-      const offReason = await this.offDayReason(employee.companyId, todayKey, effective);
-      if (offReason) throw new BadRequestException(`No clock-in today. ${offReason}.`);
+      const offReason = await this.offDayReason(employee.companyId, todayKey, effective, employee.id);
+      if (offReason) {
+        const hint = offReason.startsWith('On leave') ? ' To work today, cancel the leave first.' : '';
+        throw new BadRequestException(`No clock-in today. ${offReason}.${hint}`);
+      }
     }
     // WFC (work from anywhere): no office IP or location check, never late.
     // Either the person's WFC switch or a shift with short code WFC.
