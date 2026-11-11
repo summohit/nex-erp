@@ -44,8 +44,20 @@
           </div>
           <div class="kpi-info">
             <span class="kpi-label">Deductions</span>
-            <span class="kpi-value text-rose">₹{{ periodDeductions() | number:'1.0-0' }}</span>
-            <span class="kpi-subtext">PF, ESI &amp; statutory</span>
+            <span class="kpi-value text-rose">₹{{ deductionBreakdown().total | number:'1.0-0' }}</span>
+            <div class="kpi-chips" *ngIf="deductionBreakdown().rows.length; else noDed">
+              <span class="kpi-chip" *ngFor="let r of deductionBreakdown().rows">
+                {{ r.label }} <strong>₹{{ r.amount | number:'1.0-0' }}</strong>
+              </span>
+            </div>
+            <ng-template #noDed><span class="kpi-subtext">{{ periodLabel() }}</span></ng-template>
+            <span class="kpi-subtext kpi-company-cost" *ngIf="deductionBreakdown().employerPf > 0 || deductionBreakdown().gst > 0"
+                  title="Company costs, not deducted from pay">
+              Company:
+              <ng-container *ngIf="deductionBreakdown().employerPf > 0">Employer PF ₹{{ deductionBreakdown().employerPf | number:'1.0-0' }}</ng-container>
+              <ng-container *ngIf="deductionBreakdown().employerPf > 0 && deductionBreakdown().gst > 0"> · </ng-container>
+              <ng-container *ngIf="deductionBreakdown().gst > 0">GST ₹{{ deductionBreakdown().gst | number:'1.0-0' }}</ng-container>
+            </span>
           </div>
         </div>
 
@@ -256,6 +268,10 @@
           <button class="btn btn-success" (click)="markPaid()" [disabled]="processingCounts().finalized === 0">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
             Mark as Paid
+          </button>
+          <button class="btn btn-outline" (click)="exportPayslipsExcel()" [disabled]="payslips().length === 0 || exportingExcel()" title="Download this month's salary register as Excel">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            {{ exportingExcel() ? 'Exporting…' : 'Export Excel' }}
           </button>
           <button class="btn btn-outline" (click)="sendBulkPayslipEmails()" [disabled]="payslips().length === 0" title="Send email with PDF attached to employees">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>

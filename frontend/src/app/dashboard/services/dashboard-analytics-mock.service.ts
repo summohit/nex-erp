@@ -441,10 +441,10 @@ export class DashboardAnalyticsMockService {
     const orgAtt = payload?.org?.todayAttendance;
     const wfhCount = payload?.common?.onWfhToday?.length || 0;
     const leaveCount = orgAtt?.onLeave ?? (payload?.common?.onLeaveToday?.length || 0);
-    const rawPresent = orgAtt?.present ?? 18;
+    const rawPresent = orgAtt?.present ?? 0;
     const presentOnSite = Math.max(0, rawPresent - wfhCount);
-    const notPunched = orgAtt?.notClockedIn ?? 2;
-    const totalHeadcount = orgAtt?.totalEmployees || payload?.org?.headcount?.total || Math.max(24, rawPresent + leaveCount + notPunched + 1);
+    const notPunched = orgAtt?.notClockedIn ?? 0;
+    const totalHeadcount = orgAtt?.totalEmployees || payload?.org?.headcount?.total || rawPresent + leaveCount + notPunched;
     const absent = Math.max(0, totalHeadcount - (presentOnSite + wfhCount + leaveCount + notPunched));
     const safeTotal = Math.max(1, presentOnSite + wfhCount + leaveCount + absent + notPunched);
 

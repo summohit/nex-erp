@@ -1986,13 +1986,37 @@
   height: 16px;
 }
 
-.day-location-pin {
-  font-size: 11px;
-  line-height: 1;
+/* Sleek micro-badges in day cell corner */
+.day-badge-corner {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  opacity: 0.75;
+  top: -2px;
+  right: -2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.day-badge-icon {
+  width: 7.5px;
+  height: 7.5px;
+  stroke-width: 2.5px;
+}
+
+.day-badge-onsite {
+  background: #EEF2FF;
+  border: 1.5px solid #C7D2FE;
+  color: #4338CA;
+}
+
+.day-badge-outside {
+  background: #FEF3C7;
+  border: 1.5px solid #FCD34D;
+  color: #D97706;
 }
 
 /* Missed-clock-out mini symbol pinned to a day-cell corner */
@@ -3121,15 +3145,6 @@
   color: #4f46e5;
 }
 
-.day-fv-pin {
-  font-size: 11px;
-  line-height: 1;
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
-}
-
 .cell-tooltip-field-visit {
   margin-top: 6px;
   padding: 6px 8px;
@@ -3139,6 +3154,13 @@
   color: #3730a3;
   font-size: 11px;
   line-height: 1.4;
+}
+
+.cell-tooltip-field-visit .fv-tip-svg {
+  display: inline-block;
+  vertical-align: -1px;
+  margin-right: 4px;
+  color: #4338ca;
 }
 
 .cell-tooltip-field-visit strong {
@@ -3475,7 +3497,15 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
-.loc-emoji { font-size: 13px; }
+.loc-svg {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.loc-pill.loc-office .loc-svg { color: #2563eb; }
+.loc-pill.loc-onsite .loc-svg { color: #4338ca; }
+.loc-pill.loc-remote .loc-svg { color: #d97706; }
+
 .loc-text { color: #475569; }
 .loc-num { font-weight: 800; color: #0f172a; margin-left: 2px; }
 

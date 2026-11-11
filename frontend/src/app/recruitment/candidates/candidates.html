@@ -1850,10 +1850,18 @@
                   <button *ngIf="c.kind !== 'BALANCER'" type="button" class="annexure-remove-btn" (click)="removeAnnexureComponent(c.id)" title="Remove {{ c.name }}">
                     <svg lucideX size="13"></svg>
                   </button>
+                  <button *ngIf="c.kind === 'BALANCER'" type="button" class="annexure-remove-btn" (click)="setAnnexureBalancing(false)" title="Turn auto-balancing off">
+                    <svg lucideX size="13"></svg>
+                  </button>
                 </td>
                 <td class="col-num">
                   <ng-container *ngIf="c.kind === 'BALANCER'; else earnFixedInput">
-                    <span class="annexure-auto-val"><strong>{{ c.monthly | number }}</strong><span class="annexure-auto-badge">Auto</span></span>
+                    <span class="annexure-auto-val">
+                      <input type="number" class="annexure-comp-input" min="0" step="1"
+                             [ngModel]="c.monthly" (change)="updateAnnexureComponent(c.id, $any($event.target).value)"
+                             title="Type an amount to fix it; whatever is left of the CTC keeps balancing" />
+                      <span class="annexure-auto-badge">Auto</span>
+                    </span>
                   </ng-container>
                   <ng-template #earnFixedInput>
                     <input type="number" class="annexure-comp-input" min="0" step="1"
@@ -1916,6 +1924,13 @@
               <td colspan="3">
                 <div class="annexure-add-controls">
                   <span class="annexure-edit-hint">Tick or clear a checkbox to include / exclude that component from the CTC. You can edit any amount directly.</span>
+                  <span class="annexure-edit-hint" style="color:#b45309" *ngIf="annexureOverCtc() > 0">
+                    The components add up to ₹{{ annexureOverCtc() | number }} a month more than the offered CTC.
+                  </span>
+                  <span class="annexure-edit-hint" *ngIf="annexureNoBalancer()">
+                    Auto-balancing is off<ng-container *ngIf="annexureUnderCtc() > 0"> — ₹{{ annexureUnderCtc() | number }} a month of the offered CTC is not allocated</ng-container>.
+                    <a href="javascript:void(0)" (click)="setAnnexureBalancing(true)">Turn auto-balancing on</a>
+                  </span>
                 </div>
                 <div class="annexure-add-controls">
                   <select class="annexure-component-select" [(ngModel)]="annexureCatId" title="Add a salary component">

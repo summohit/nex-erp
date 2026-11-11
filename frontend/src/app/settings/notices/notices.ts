@@ -55,6 +55,10 @@ export class NoticesComponent {
   statusFilter = signal<"ALL" | "ACTIVE" | "HIGH" | "ATTACHMENTS" | "SCHEDULED" | "EXPIRED">("ALL");
   priorityFilter = signal<string>("ALL");
   sortBy = signal<"NEWEST" | "OLDEST" | "PRIORITY">("NEWEST");
+  /** Posted within: last 7 / 30 / 60 days or a custom range (11 Nov 2026). */
+  dateRange = signal<"ALL" | "7" | "30" | "60" | "CUSTOM">("ALL");
+  customFrom = signal("");
+  customTo = signal("");
 
   // Expanded cards state (for long bodies)
   expandedNoticeIds = signal<Set<number>>(new Set());
@@ -290,6 +294,7 @@ export class NoticesComponent {
       this.searchQuery().trim().length > 0 ||
       this.statusFilter() !== "ALL" ||
       this.priorityFilter() !== "ALL" ||
+      this.dateRange() !== "ALL" ||
       this.sortBy() !== "NEWEST"
     );
   });
@@ -331,7 +336,20 @@ export class NoticesComponent {
       list = list.filter((n) => n.priority === pFilter);
     }
 
-    // 4. Sorting
+    // 4. Posted date
+    const range = this.dateRange();
+    const posted = (n: Notice) => new Date(n.publishedAt || n.createdAt).getTime();
+    if (range === "7" || range === "30" || range === "60") {
+      const since = Date.now() - Number(range) * 24 * 60 * 60 * 1000;
+      list = list.filter((n) => posted(n) >= since);
+    } else if (range === "CUSTOM") {
+      // Local-day bounds: "to" includes the whole of that day.
+      const from = this.customFrom() ? new Date(`${this.customFrom()}T00:00:00`).getTime() : -Infinity;
+      const to = this.customTo() ? new Date(`${this.customTo()}T23:59:59.999`).getTime() : Infinity;
+      list = list.filter((n) => posted(n) >= from && posted(n) <= to);
+    }
+
+    // 5. Sorting
     const sort = this.sortBy();
     list.sort((a, b) => {
       if (sort === "NEWEST") {
@@ -515,6 +533,9 @@ export class NoticesComponent {
     this.searchQuery.set("");
     this.statusFilter.set("ALL");
     this.priorityFilter.set("ALL");
+    this.dateRange.set("ALL");
+    this.customFrom.set("");
+    this.customTo.set("");
     this.sortBy.set("NEWEST");
   }
 

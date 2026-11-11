@@ -1184,3 +1184,10 @@ button.menu-link {
 .task-timer-stop { border: 1px solid #15803d; color: #fff; background: #16a34a; }
 .task-timer-cancel { width: 100%; margin-top: 12px; border: 0; color: #64748b; background: transparent; }
 .task-timer-clockout-actions button:disabled, .task-timer-cancel:disabled { opacity: .55; cursor: wait; }
+
+/* Holiday / weekly off in place of Clock In (11 Nov 2026). */
+.off-today-pill {
+  display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+  background: #fef3c7; color: #92400e; border: 1px solid #fde68a;
+}

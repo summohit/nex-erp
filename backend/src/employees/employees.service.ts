@@ -281,6 +281,7 @@ export class EmployeesService {
           branchId: data.branchId || null,
           managerId: managerId,
           shiftId: data.shiftId ? (typeof data.shiftId === 'string' ? parseInt(data.shiftId, 10) : data.shiftId) : null,
+          workFromAnywhere: !!data.workFromAnywhere,
           companyId: companyId,
           userId: newUser.id,
           onboardingStatus: 'PENDING',
@@ -558,6 +559,10 @@ export class EmployeesService {
     if (data.shiftId !== undefined) {
       if (data.shiftId) updateData.shift = { connect: { id: typeof data.shiftId === 'string' ? parseInt(data.shiftId, 10) : data.shiftId } };
       else updateData.shift = { disconnect: true };
+    }
+
+    if (data.workFromAnywhere !== undefined) {
+      updateData.workFromAnywhere = Boolean(data.workFromAnywhere);
     }
 
     if (data.isProjectManager !== undefined) {

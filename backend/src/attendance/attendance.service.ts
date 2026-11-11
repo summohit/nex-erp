@@ -216,6 +216,43 @@ export class AttendanceService {
     return this.withTotalHours(record);
   }
 
+  /**
+   * Why there is no clock-in today, or null on a working day (11 Nov 2026):
+   * a company holiday (by name), a rostered day off, or a weekly off. An
+   * approved field visit day is still clocked, so it never counts as off.
+   */
+  async offDayReason(companyId: number, day: Date, effective: { isDayOff: boolean; source?: string }): Promise<string | null> {
+    const end = new Date(day.getTime() + 24 * 60 * 60 * 1000);
+    const holiday = await this.prisma.holiday.findFirst({
+      where: { companyId, date: { gte: day, lt: end } }, select: { name: true },
+    });
+    if (holiday) return `Holiday: ${holiday.name || "company holiday"}`;
+    if (effective.isDayOff) return effective.source === 'ROSTER' ? 'Rostered day off' : 'Weekly off';
+    return null;
+  }
+
+  /** Today's off-day reason for the signed-in person, for the clock-in button. */
+  async getMyOffToday(userId: number): Promise<{ reason: string | null }> {
+    const employee = await this.prisma.employee.findUnique({
+      where: { userId }, include: { shift: true, branch: true },
+    });
+    if (!employee) return { reason: null };
+    const today = istDateKey(new Date());
+    const visit = await this.prisma.fieldVisitAttendance.findFirst({
+      where: {
+        employeeId: employee.id, visitDate: today,
+        status: { in: [FIELD_VISIT_DAY.SCHEDULED, FIELD_VISIT_DAY.IN_PROGRESS] },
+        request: { status: FIELD_VISIT_STATUS.APPROVED },
+      },
+      select: { id: true },
+    });
+    if (visit) return { reason: null };
+    const effective = await this.roster.getEffectiveShift(
+      employee.id, today, personalDaysOff(employee as any).shift as any, personalDaysOff(employee as any).weeklyOffs,
+    );
+    return { reason: await this.offDayReason(employee.companyId, today, effective) };
+  }
+
   private withTotalHours(record: any) {
     if (!record) return record;
     let totalHours = 0;
@@ -435,6 +472,15 @@ export class AttendanceService {
       }
     }
 
+    // No clock-in on a holiday, weekly off or rostered day off (11 Nov 2026);
+    // an approved field visit day is the one exception.
+    if (!approvedVisitClock) {
+      const offReason = await this.offDayReason(employee.companyId, todayKey, effective);
+      if (offReason) throw new BadRequestException(`No clock-in today. ${offReason}.`);
+    }
+    // WFC (work from anywhere): no office IP or location check, never late.
+    const anywhere = !!(employee as any).workFromAnywhere;
+
     // On-site either because the roster says so, or because this came through
     // the field visit screen — which is on-site by definition, and says so even
     // if somebody has since edited the roster entry out from under the trip.
@@ -445,7 +491,7 @@ export class AttendanceService {
       // 1. IP Restriction Check
       // Skipped on-site: the whole point of an on-site day is that the person
       // is not on the office network.
-      if (branch.allowedIps && !onsite) {
+      if (branch.allowedIps && !onsite && !anywhere) {
         const allowed = branch.allowedIps.split(',').map(ip => ip.trim());
         if (data.ipAddress && !allowed.includes(data.ipAddress)) {
           throw new BadRequestException(`Clock-in denied. IP Address ${data.ipAddress} is not in the allowed list.`);
@@ -457,7 +503,7 @@ export class AttendanceService {
     // 2. Office geofence (B3) — see officeCheck. An approved Work From Home
     // day is not checked against the office either (19 Oct 2026).
     const wfhToday = !onsite && (await this.hasApprovedWfh(employee.id, new Date()));
-    const office = await this.officeCheck(employee, effective, onsite || wfhToday, data);
+    const office = await this.officeCheck(employee, effective, onsite || wfhToday || anywhere, data);
     const outsideIn = this.outsideFields('in', office, data);
 
     // Nothing may start while something earlier is still running.
@@ -499,7 +545,7 @@ export class AttendanceService {
     // half day, because nobody was expected in.
     // A weekly off (e.g. 2nd Saturday) is treated the same way: worked, recorded, never late.
     const onHoliday = await this.isHoliday(employee.companyId, todayKey) || effective.isDayOff;
-    if (effective.startTime && !onHoliday && !approvedVisitClock) {
+    if (effective.startTime && !onHoliday && !approvedVisitClock && !anywhere) {
       // Shift times ("09:00") are IST wall-clock, not server-local — istTimeInstant
       // resolves them to the correct real-world instant regardless of what
       // timezone this server's OS happens to be configured with.
@@ -580,7 +626,7 @@ export class AttendanceService {
       where: { id: existing.id },
       data: {
         ...(returning
-          ? this.returningStatus(existing, effective, onHoliday)
+          ? this.returningStatus(existing, effective, onHoliday || anywhere)
           : { status: outsideIn.geofenceApproval === 'PENDING' ? 'ABSENT' : (approvedVisitClock ? 'PRESENT' : (isHalfDay ? 'HALF_DAY' : 'PRESENT')), isLate: approvedVisitClock ? false : isLate }),
         clockOut: null, // Reset clockOut on parent since they are active
         autoClockedOut: false, // reopened — the old cutoff no longer describes the day
@@ -945,7 +991,8 @@ export class AttendanceService {
     // Office geofence (B3), on the same on-site exemption as clock-in — and
     // skipped entirely for a previous day. Someone closing Monday's session at
     // one in the morning is at home; that case has its own reason flow above.
-    const exemptOut = isPreviousDay || !!effective.onsite || !!options?.fieldVisit || !!plannedVisitDay;
+    const anywhereOut = !!(employee as any).workFromAnywhere;
+    const exemptOut = isPreviousDay || !!effective.onsite || !!options?.fieldVisit || !!plannedVisitDay || anywhereOut;
     const officeOut = await this.officeCheck(
       employee, effective, exemptOut || (await this.hasApprovedWfh(employee.id, existing.date)), data,
     );
@@ -957,7 +1004,7 @@ export class AttendanceService {
     // A session closed on a previous day keeps its existing status. For a
     // same-day close, leaving before the scheduled end remains a half day.
     const onHoliday = await this.isHoliday(employee.companyId, existing.date) || effective.isDayOff;
-    if (!isPreviousDay && effective.endTime && !onHoliday && !plannedVisitDay) {
+    if (!isPreviousDay && effective.endTime && !onHoliday && !plannedVisitDay && !anywhereOut) {
       // Same IST-fixed resolution as clockIn — see the comment there.
       const expectedEnd = istTimeInstant(now, effective.endTime);
 

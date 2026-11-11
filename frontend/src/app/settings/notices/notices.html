@@ -180,6 +180,22 @@
         <svg lucideChevronDown size="14" class="nb-dropdown-icon"></svg>
       </div>
 
+      <!-- Posted date range -->
+      <div class="nb-dropdown-wrap">
+        <select [ngModel]="dateRange()" (ngModelChange)="dateRange.set($event)" aria-label="Posted within">
+          <option value="ALL">Any Date</option>
+          <option value="7">Last 1 Week</option>
+          <option value="30">Last 30 Days</option>
+          <option value="60">Last 60 Days</option>
+          <option value="CUSTOM">Custom Range</option>
+        </select>
+        <svg lucideChevronDown size="14" class="nb-dropdown-icon"></svg>
+      </div>
+      <ng-container *ngIf="dateRange() === 'CUSTOM'">
+        <input type="date" class="nb-date-input" aria-label="From date" [ngModel]="customFrom()" (ngModelChange)="customFrom.set($event)" />
+        <input type="date" class="nb-date-input" aria-label="To date" [ngModel]="customTo()" (ngModelChange)="customTo.set($event)" />
+      </ng-container>
+
       <!-- Sort Dropdown -->
       <div class="nb-dropdown-wrap">
         <select [ngModel]="sortBy()" (ngModelChange)="sortBy.set($event)">

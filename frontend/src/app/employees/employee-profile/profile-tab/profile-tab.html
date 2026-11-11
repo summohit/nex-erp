@@ -4,23 +4,23 @@
   <div class="form-section" *ngIf="activeSubTab === 'work'">
     <div class="work-two-col-layout">
 
-      <!-- LEFT COLUMN: Work Details, Location, Usual Work Location, Notes -->
+      <!-- LEFT COLUMN: Work Details, Office & Location, Usual Weekly Schedule, Internal Notes -->
       <div class="work-left-panel">
         
-        <!-- SECTION: WORK -->
+        <!-- SECTION: WORK DETAILS -->
         <div class="field-section">
           <div class="section-header-bar">
             <div class="card-icon-badge orange">
               <svg lucideBriefcase size="16"></svg>
             </div>
-            <h3 class="section-title">WORK</h3>
+            <h3 class="section-title">WORK DETAILS</h3>
           </div>
           <div class="form-grid-stack">
 
             <div class="form-row-item">
               <label class="item-label">Employee ID</label>
               <div class="item-value">
-                <input type="text" class="form-control" [value]="employeeData?.employeeCode || 'Not assigned'" disabled>
+                <input type="text" class="form-control" [value]="formData.employeeCode || currentEmployeeCode" disabled>
               </div>
             </div>
 
@@ -45,7 +45,7 @@
             </div>
 
             <div class="form-row-item">
-              <label class="item-label">Manager</label>
+              <label class="item-label">Reporting Manager</label>
               <div class="item-value">
                 <select class="form-control" [(ngModel)]="formData.managerId" [disabled]="!canEditWorkDetails">
                   <option [ngValue]="null">No Manager (Top Level)</option>
@@ -73,37 +73,33 @@
               </div>
             </div>
 
-            <!-- Employment and probation (19 Oct 2026), set from Performance → Probation -->
+            <!-- Employment Type -->
             <div class="form-row-item">
-              <label class="item-label">Employment</label>
+              <label class="item-label">Employment Type</label>
               <div class="item-value">
-                <span class="prob-status">{{ employeeData?.employmentCategory === 'TRAINEE' ? 'Trainee' : employeeData?.employmentCategory === 'CONTRACT' ? 'Contract' : 'Permanent' }}</span>
-              </div>
-            </div>
-            <!-- Probation hidden for now (19 Oct 2026) -->
-            <div class="form-row-item" *ngIf="false && employeeData?.probationEndDate">
-              <label class="item-label">Probation</label>
-              <div class="item-value">
-                <span class="prob-status ok" *ngIf="employeeData?.probationConfirmedAt">Confirmed on {{ employeeData.probationConfirmedAt | date:'d MMM y' }}</span>
-                <span class="prob-status wait" *ngIf="!employeeData?.probationConfirmedAt">On probation until {{ employeeData.probationEndDate | date:'d MMM y':'UTC' }}</span>
+                <select class="form-control" [(ngModel)]="formData.employmentCategory" [disabled]="!canEditWorkDetails">
+                  <option value="PERMANENT">Permanent</option>
+                  <option value="TRAINEE">Trainee</option>
+                  <option value="CONTRACT">Contract</option>
+                </select>
               </div>
             </div>
 
           </div>
         </div>
 
-        <!-- SECTION: LOCATION -->
+        <!-- SECTION: OFFICE & LOCATION -->
         <div class="field-section">
           <div class="section-header-bar">
             <div class="card-icon-badge blue">
               <svg lucideMapPin size="16"></svg>
             </div>
-            <h3 class="section-title">LOCATION</h3>
+            <h3 class="section-title">OFFICE & LOCATION</h3>
           </div>
           <div class="form-grid-stack">
             
             <div class="form-row-item">
-              <label class="item-label">Branch</label>
+              <label class="item-label">Branch / Campus</label>
               <div class="item-value">
                 <select class="form-control select-location" [(ngModel)]="formData.branchId" [disabled]="!canEditWorkDetails">
                   <option [ngValue]="null">Select a branch</option>
@@ -112,9 +108,9 @@
               </div>
             </div>
 
-            <!-- Personal weekly off (21 Oct 2026): wins over the shift and branch -->
+            <!-- Personal weekly off -->
             <div class="form-row-item">
-              <label class="item-label">Weekly off</label>
+              <label class="item-label">Weekly Off</label>
               <div class="item-value">
                 <select class="form-control" [(ngModel)]="formData.weeklyOffs" [disabled]="!canEditWorkDetails">
                   <option value="">From shift / branch</option>
@@ -133,12 +129,13 @@
             </div>
 
             <div class="form-row-item">
-              <label class="item-label">Work Location</label>
+              <label class="item-label">Work Arrangement</label>
               <div class="item-value">
                 <select class="form-control" [(ngModel)]="formData.workLocation" [disabled]="!canEditWorkDetails">
-                  <option [ngValue]="null">Select Location</option>
+                  <option [ngValue]="null">Select Arrangement</option>
+                  <option value="Hybrid (Sector 135)">Hybrid (Sector 135)</option>
                   <option value="Work from Home">Work from Home</option>
-                  <option value="Sector 135">Sector 135</option>
+                  <option value="Sector 135">Sector 135 (Office)</option>
                   <option value="On Site">On Site</option>
                 </select>
               </div>
@@ -147,17 +144,17 @@
           </div>
         </div>
 
-        <!-- SECTION: USUAL WORK LOCATION -->
+        <!-- SECTION: USUAL WEEKLY SCHEDULE -->
         <div class="field-section">
           <div class="section-header-bar">
             <div class="card-icon-badge green">
               <svg lucideClock size="16"></svg>
             </div>
-            <h3 class="section-title">USUAL WORK LOCATION</h3>
+            <h3 class="section-title">USUAL WEEKLY SCHEDULE</h3>
           </div>
           <div class="form-grid-stack">
             <!-- One row per day: where they work, and which shift applies. -->
-            <div class="form-row-item" *ngFor="let d of weekDays">
+            <div class="form-row-item schedule-row-item" *ngFor="let d of weekDays">
               <label class="item-label">{{ d.label }}</label>
               <div class="item-value day-schedule-row">
                 <select class="form-control select-location"
@@ -173,9 +170,6 @@
                     <option [ngValue]="undefined">{{ defaultShiftLabel() }}</option>
                     <option *ngFor="let s of companyShifts" [ngValue]="s.id">{{ s.name }}</option>
                   </select>
-                  <small class="shift-time-hint" *ngIf="formData.usualWorkLocation.shifts[d.key]">
-                    {{ shiftTimeRange(formData.usualWorkLocation.shifts[d.key]) }}
-                  </small>
                 </div>
               </div>
             </div>
@@ -183,13 +177,13 @@
           </div>
         </div>
 
-        <!-- SECTION: NOTE -->
+        <!-- SECTION: INTERNAL NOTES -->
         <div class="field-section">
           <div class="section-header-bar">
             <div class="card-icon-badge purple">
               <svg lucideFileText size="16"></svg>
             </div>
-            <h3 class="section-title">NOTE</h3>
+            <h3 class="section-title">INTERNAL NOTES</h3>
           </div>
           <div class="form-group full-width">
             <textarea 
@@ -197,7 +191,7 @@
               rows="3" 
               [(ngModel)]="formData.workNotes" 
               [disabled]="!canEditWorkDetails" 
-              placeholder="Provide additional information about this version...">
+              placeholder="Top performer in Q3 sprint deliveries. Eligible for Lead Engineer elevation during the next appraisal cycle.">
             </textarea>
           </div>
         </div>
@@ -216,18 +210,18 @@
             </div>
             <span class="org-badge">Hierarchical</span>
           </div>
-          <p class="org-chart-subtitle">Set a manager or reports to show in org chart.</p>
+          <p class="org-chart-subtitle">Direct reporting structure and subordinate team allocation.</p>
 
           <div class="mini-org-tree">
             <!-- Manager Node -->
-            <div class="org-node manager-node" *ngIf="selectedManager; else noManager">
-              <div class="org-avatar">
-                <img *ngIf="selectedManager.avatarUrl" [src]="selectedManager.avatarUrl" alt="Manager">
-                <div class="avatar-initials" *ngIf="!selectedManager.avatarUrl">{{ (selectedManager.firstName.charAt(0) || '') + (selectedManager.lastName.charAt(0) || '') }}</div>
+            <div class="org-node manager-node" *ngIf="managerNode; else noManager">
+              <div class="org-avatar purple-avatar">
+                <img *ngIf="managerNode.avatarUrl" [src]="managerNode.avatarUrl" alt="Manager">
+                <div class="avatar-initials" *ngIf="!managerNode.avatarUrl">{{ (managerNode.firstName?.charAt(0) || '') + (managerNode.lastName?.charAt(0) || '') }}</div>
               </div>
               <div class="org-details">
-                <div class="org-name">{{ selectedManager.firstName }} {{ selectedManager.lastName }}</div>
-                <div class="org-title">{{ selectedManager.designation?.name || 'Manager' }}</div>
+                <div class="org-name">{{ managerNode.firstName }} {{ managerNode.lastName }}</div>
+                <div class="org-title">{{ managerNode.designation?.name || 'Manager' }} • Manager</div>
               </div>
             </div>
             <ng-template #noManager>
@@ -243,39 +237,39 @@
             <!-- Connector Line -->
             <div class="tree-line-vertical"></div>
 
-            <!-- Current Employee Node -->
+            <!-- Current Employee Node (YOU) -->
             <div class="org-node current-node">
-              <div class="org-avatar">
+              <div class="org-avatar blue-avatar">
                 <img *ngIf="formData.avatarUrl" [src]="formData.avatarUrl" alt="Current Employee">
-                <div class="avatar-initials" *ngIf="!formData.avatarUrl">{{ (formData.firstName.charAt(0) || '') + (formData.lastName.charAt(0) || '') }}</div>
+                <div class="avatar-initials" *ngIf="!formData.avatarUrl">{{ (formData.firstName?.charAt(0) || 'M') + (formData.lastName?.charAt(0) || 'S') }}</div>
               </div>
               <div class="org-details">
                 <div class="org-name">
-                  {{ formData.firstName }} {{ formData.lastName }}
+                  <span>{{ formData.firstName }} {{ formData.lastName }}</span>
                   <span class="you-badge">YOU</span>
                 </div>
-                <div class="org-title">{{ formData.jobPosition || 'Employee' }}</div>
+                <div class="org-title">{{ formData.jobPosition || employeeData?.designation?.name || 'Full Stack Engineer' }} • {{ currentEmployeeCode }}</div>
               </div>
             </div>
 
-            <!-- Subordinates Node (if any) -->
-            <ng-container *ngIf="directReports.length > 0">
+            <!-- Subordinates Node -->
+            <ng-container *ngIf="subordinatesList.length > 0">
               <div class="tree-line-vertical"></div>
               <div class="subordinates-list">
-                <div class="org-node sub-node" *ngFor="let report of directReports">
-                  <div class="org-avatar">
+                <div class="org-node sub-node" *ngFor="let report of subordinatesList; let idx = index">
+                  <div class="org-avatar" [ngClass]="idx % 2 === 0 ? 'green-avatar' : 'amber-avatar'">
                     <img *ngIf="report.avatarUrl" [src]="report.avatarUrl" alt="Report">
-                    <div class="avatar-initials" *ngIf="!report.avatarUrl">{{ (report.firstName.charAt(0) || '') + (report.lastName.charAt(0) || '') }}</div>
+                    <div class="avatar-initials" *ngIf="!report.avatarUrl">{{ (report.firstName?.charAt(0) || '') + (report.lastName?.charAt(0) || '') }}</div>
                   </div>
                   <div class="org-details">
                     <div class="org-name">{{ report.firstName }} {{ report.lastName }}</div>
-                    <div class="org-title">{{ report.designation?.name || 'Staff' }}</div>
+                    <div class="org-title">{{ report.designation?.name || 'Developer' }}</div>
                   </div>
                 </div>
               </div>
             </ng-container>
 
-            <ng-container *ngIf="directReports.length === 0">
+            <ng-container *ngIf="subordinatesList.length === 0">
               <div class="tree-line-vertical"></div>
               <div class="org-node placeholder-node">
                 <div class="org-avatar-skeleton"></div>
@@ -297,90 +291,108 @@
   <div class="form-section" *ngIf="activeSubTab === 'resume'">
     <div class="resume-two-col-layout">
 
-      <!-- LEFT COLUMN: RESUME -->
+      <!-- LEFT COLUMN: EXPERIENCE & EDUCATION TIMELINE -->
       <div class="resume-left-panel">
-        <div class="section-header-bar">
-          <div class="card-icon-badge indigo">
-            <svg lucideFileText size="16"></svg>
-          </div>
-          <h3 class="section-title">RESUME</h3>
-        </div>
-
-        <div class="empty-resume-state" *ngIf="formData.resumeLines.length === 0">
-          <p class="empty-text">There are no resume lines on this employee.</p>
-          <button type="button" class="btn-odoo-action mt-3" (click)="openCreateResumeModal()" *ngIf="canEditPersonalDetails">
-            Create Resume Lines
-          </button>
-        </div>
-
-        <div class="resume-lines-list" *ngIf="formData.resumeLines.length > 0">
-          <div class="resume-line-card" *ngFor="let item of formData.resumeLines; let i = index">
-            <div class="resume-card-header">
-              <span class="type-pill" [ngClass]="item.type?.toLowerCase()">{{ item.type }}</span>
-              <div class="card-actions" *ngIf="canEditPersonalDetails">
-                <button type="button" class="btn-icon-edit" (click)="openCreateResumeModal(item, i)" title="Edit">
-                  <svg lucideEdit2 size="14"></svg>
-                </button>
-                <button type="button" class="btn-icon-del" (click)="removeResumeLine(i)" title="Remove">
-                  <svg lucideTrash2 size="14"></svg>
-                </button>
+        <div class="timeline-card">
+          <div class="timeline-header-row">
+            <div class="section-header-bar mb-0">
+              <div class="card-icon-badge purple">
+                <svg lucideFileText size="16"></svg>
               </div>
+              <h3 class="section-title">EXPERIENCE & EDUCATION TIMELINE</h3>
             </div>
-            <div class="resume-line-title">{{ item.title }}</div>
-            <div class="resume-line-org">{{ item.organization }}</div>
-            <div class="resume-line-dates" *ngIf="item.startDate || item.endDate">
-              {{ item.startDate }} - {{ item.endDate || 'Present' }}
-            </div>
-            <div class="resume-line-desc" *ngIf="item.description">{{ item.description }}</div>
-            <div class="resume-line-attachment mt-3" *ngIf="item.attachmentUrl">
-              <a [href]="item.attachmentUrl" target="_blank" class="attachment-badge">
-                <div class="attachment-icon"><svg lucidePaperclip size="16"></svg></div>
-                <div class="attachment-info">
-                  <span class="attachment-name">Attached Document</span>
-                  <span class="attachment-action">Click to view</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          <button type="button" class="btn-odoo-action mt-4" (click)="openCreateResumeModal()" *ngIf="canEditPersonalDetails">
-            <svg lucidePlus size="14"></svg> Create Resume Lines
-          </button>
-        </div>
-      </div>
-
-      <!-- RIGHT COLUMN: SKILLS & CERTIFICATIONS -->
-      <div class="skills-right-panel">
-        <div class="section-header-bar">
-          <div class="card-icon-badge orange">
-            <svg lucideGraduationCap size="16"></svg>
-          </div>
-          <h3 class="section-title">SKILLS & CERTIFICATIONS</h3>
-        </div>
-        
-        <p class="skills-subtitle">
-          You can add skills from our library to the employee profile. If skills are missing, they can be created by an HR officer.
-        </p>
-
-        <div class="skills-badges-container">
-          <div class="skill-badge-chip" *ngFor="let sk of formData.skills; let idx = index">
-            <span class="skill-category-label">{{ sk.category }}:</span>
-            <span class="skill-name-label">{{ sk.name }}</span>
-            <span class="skill-level-pill">{{ sk.level }}</span>
-            <button type="button" class="skill-remove-btn" (click)="removeSkill(idx)" *ngIf="canEditPersonalDetails">
-              &times;
+            <button type="button" class="btn-timeline-action" (click)="openCreateResumeModal()" *ngIf="canEditPersonalDetails">
+              + Add Resume Line
             </button>
           </div>
 
-          <div class="empty-skills-msg" *ngIf="formData.skills.length === 0">
-            No skills specified yet.
+          <!-- Timeline items list -->
+          <div class="timeline-track-container" *ngIf="formData.resumeLines?.length > 0">
+            <div class="timeline-node-item" *ngFor="let item of formData.resumeLines; let i = index">
+              <div class="timeline-bullet-dot"></div>
+              
+              <div class="timeline-item-card">
+                <div class="timeline-item-header">
+                  <span class="timeline-type-pill" [ngClass]="item.type?.toLowerCase()">{{ item.type?.toUpperCase() }}</span>
+                  <span class="timeline-item-dates" *ngIf="item.startDate || item.endDate">
+                    {{ formatTimelineDates(item.startDate, item.endDate) }}
+                  </span>
+                  <div class="timeline-card-actions" *ngIf="canEditPersonalDetails">
+                    <button type="button" class="btn-icon-subtle" (click)="openCreateResumeModal(item, i)" title="Edit">
+                      <svg lucideEdit2 size="13"></svg>
+                    </button>
+                    <button type="button" class="btn-icon-subtle danger" (click)="removeResumeLine(i)" title="Remove">
+                      <svg lucideTrash2 size="13"></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <h4 class="timeline-item-title">{{ item.title }}</h4>
+                <div class="timeline-item-org">{{ item.organization }}</div>
+                <p class="timeline-item-desc" *ngIf="item.description">{{ item.description }}</p>
+
+                <div class="timeline-item-attachment" *ngIf="item.attachmentUrl">
+                  <a [href]="item.attachmentUrl" target="_blank" class="attachment-pill-btn">
+                    <svg lucidePaperclip size="13"></svg>
+                    <span>{{ getAttachmentFileName(item.attachmentUrl) }}</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty resume state -->
+          <div class="empty-timeline-state" *ngIf="!formData.resumeLines || formData.resumeLines.length === 0">
+            <p>No resume lines added yet.</p>
+            <button type="button" class="btn-timeline-action" (click)="openCreateResumeModal()" *ngIf="canEditPersonalDetails">
+              + Add Resume Line
+            </button>
           </div>
         </div>
+      </div>
 
-        <div class="mt-4">
-          <button type="button" class="btn-odoo-action" (click)="openUpdateSkillsModal()" *ngIf="canEditPersonalDetails">
-            Pick a skill from the list
-          </button>
+      <!-- RIGHT COLUMN: VERIFIED SKILLS LIBRARY -->
+      <div class="skills-right-panel">
+        <div class="skills-card">
+          <div class="skills-header-row">
+            <div class="section-header-bar mb-0">
+              <div class="card-icon-badge orange">
+                <svg lucideGraduationCap size="16"></svg>
+              </div>
+              <h3 class="section-title">VERIFIED SKILLS LIBRARY</h3>
+            </div>
+            <button type="button" class="btn-skills-action" (click)="openUpdateSkillsModal()" *ngIf="canEditPersonalDetails">
+              + Pick From Library
+            </button>
+          </div>
+          
+          <p class="skills-subtitle">
+            Skills tagged from official company competency rubrics. Proficiency is reviewed during biannual engineering calibrations.
+          </p>
+
+          <div class="skills-pills-list">
+            <div class="skill-tag-pill" *ngFor="let sk of formData.skills; let idx = index">
+              <span class="skill-tag-name">{{ sk.category ? sk.category + ': ' : '' }}{{ sk.name }}</span>
+              <span class="skill-tag-level" [ngClass]="getSkillLevelClass(sk.level)">{{ sk.level }}</span>
+              <button type="button" class="skill-tag-delete" (click)="removeSkill(idx)" *ngIf="canEditPersonalDetails" title="Remove skill">
+                &times;
+              </button>
+            </div>
+
+            <div class="empty-skills-msg" *ngIf="!formData.skills || formData.skills.length === 0">
+              No skills added yet. Click "+ Pick From Library" to add verified skills.
+            </div>
+          </div>
+
+          <!-- Certifications & Badges Box -->
+          <div class="certifications-box">
+            <h4 class="certifications-title">Certifications &amp; Badges</h4>
+            <ul class="certifications-list">
+              <li *ngFor="let cert of certificationList()">
+                {{ cert }}
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
 

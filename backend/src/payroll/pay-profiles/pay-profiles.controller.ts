@@ -1,4 +1,10 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { isSuperAdmin } from '../../common/company-roles';
+
+/** Salary amounts are changed by the Super Admin only (11 Nov 2026), not Finance or HR. */
+export function assertSalaryEditor(role?: string | null): void {
+  if (!isSuperAdmin(role)) throw new ForbiddenException('Only the Super Admin can change a salary.');
+}
 import { AuthGuard } from '../../auth/auth.guard';
 import { PayProfilesService, assertPayrollEditor, assertPayrollViewer } from './pay-profiles.service';
 import { DocumentReaderService } from './document-reader.service';
@@ -31,7 +37,7 @@ export class PayProfilesController {
 
   @Post('import/apply')
   applyImport(@Req() req: any, @Body() body: any) {
-    assertPayrollEditor(req.user.role);
+    assertSalaryEditor(req.user.role);
     return this.profiles.applyImport(req.user.companyId, body ?? {}, req.user.sub);
   }
 
@@ -90,7 +96,7 @@ export class PayProfilesController {
 
   @Post(':employeeId/versions')
   addVersion(@Req() req: any, @Param('employeeId', ParseIntPipe) employeeId: number, @Body() body: any) {
-    assertPayrollEditor(req.user.role);
+    assertSalaryEditor(req.user.role);
     return this.profiles.addVersion(req.user.companyId, employeeId, body ?? {}, req.user.sub);
   }
 }

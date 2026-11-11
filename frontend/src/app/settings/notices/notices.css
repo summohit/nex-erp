@@ -1797,3 +1797,9 @@
 .nb-match-row:hover { background: #f8fafc; }
 .nb-match-row input { grid-row: span 2; width: 16px; height: 16px; accent-color: #2563eb; }
 .nb-match-row.off .nb-person-name { color: #94a3b8; text-decoration: line-through; }
+
+/* Custom date range on the Notice Board filter bar (11 Nov 2026). */
+.nb-date-input {
+  height: 38px; padding: 0 10px; border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px; font-size: 13px; background: var(--bg-card, #fff); color: inherit;
+}

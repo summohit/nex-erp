@@ -88,7 +88,8 @@ export class DashboardService {
       ticketStats,
       weekTimelogs,
       myCalendar,
-      probation
+      probation,
+      myWorkHours84d
     ] = await Promise.all([
       this.leavesService.getMyBalances(user.sub, currentYear),
       this.getMyTasks(user.companyId, user.employeeId),
@@ -103,7 +104,8 @@ export class DashboardService {
       this.getMyTicketStats(user.companyId, user.employeeId),
       this.getWeekTimelogs(user.employeeId),
       this.getMyCalendar(user.companyId, user.employeeId),
-      this.getProbationInfo(user.employeeId)
+      this.getProbationInfo(user.employeeId),
+      this.getMyWorkHours(user.employeeId, 84)
     ]);
 
     const myTasksByStatus = this.countBy(myTasks, (t: any) => t.status);
@@ -129,7 +131,8 @@ export class DashboardService {
       ticketStats,
       weekTimelogs,
       myCalendar,
-      probation
+      probation,
+      myWorkHours84d
     };
   }
 
@@ -735,6 +738,40 @@ export class DashboardService {
     return buckets.map(b => ({ ...b, hours: Math.round(b.hours * 10) / 10 }));
   }
 
+  /**
+   * Hours between clock-in and clock-out per day for the last `days` days
+   * (oldest first), for the v2 dashboard's trend chart and 12-week heatmap.
+   * A day without a clock-out counts 0.
+   */
+  private async getMyWorkHours(employeeId: number | null, days: number) {
+    if (!employeeId) return [];
+    const start = new Date();
+    start.setDate(start.getDate() - (days - 1));
+    start.setHours(0, 0, 0, 0);
+
+    const records = await this.prisma.attendance.findMany({
+      where: { employeeId, date: { gte: start } },
+      select: { date: true, clockIn: true, clockOut: true, status: true, isLate: true }
+    });
+    const byDate = new Map(records.map(r => [r.date.toISOString().slice(0, 10), r]));
+
+    const out: { date: string; hours: number; status: string | null; isLate: boolean }[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const r = byDate.get(key);
+      const ms = r?.clockIn && r?.clockOut ? r.clockOut.getTime() - r.clockIn.getTime() : 0;
+      out.push({
+        date: key,
+        hours: Math.max(0, Math.round((ms / 3_600_000) * 10) / 10),
+        status: r?.status ?? null,
+        isLate: !!r?.isLate
+      });
+    }
+    return out;
+  }
+
   // ---------------- ORG (SUPERADMIN / ADMIN / HR) ----------------
 
   private async buildOrgWidgets(companyId: number, isHR: boolean) {
@@ -745,7 +782,10 @@ export class DashboardService {
       attendanceTrend,
       pendingLeaveApprovals,
       recruitmentAnalytics,
-      projectStatus
+      projectStatus,
+      joiningsExits,
+      attendanceWeekly,
+      ticketSla
     ] = await Promise.all([
       this.employeesService.getHeadcountSummary(companyId),
       this.getHeadcountTrend(companyId),
@@ -753,7 +793,10 @@ export class DashboardService {
       this.getAttendanceTrend(companyId),
       this.leavesService.getPendingApprovalsForCompany(companyId, 8),
       this.applicationsService.getAnalytics(companyId),
-      this.getProjectStatus(companyId)
+      this.getProjectStatus(companyId),
+      this.getJoiningsExits(companyId),
+      this.getAttendanceWeekly(companyId),
+      this.getTicketSla(companyId)
     ]);
 
     const base = {
@@ -763,7 +806,10 @@ export class DashboardService {
       attendanceTrend,
       pendingLeaveApprovals,
       recruitmentAnalytics,
-      projectStatus
+      projectStatus,
+      joiningsExits,
+      attendanceWeekly,
+      ticketSla
     };
 
     if (!isHR) return base;
@@ -850,6 +896,115 @@ export class DashboardService {
       if (bucket) bucket.present++;
     }
     return buckets;
+  }
+
+  /** Joinings (by joining date) and exits (separated, by last working day) for the last 6 months. */
+  private async getJoiningsExits(companyId: number) {
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const [joined, resignations] = await Promise.all([
+      this.prisma.employee.findMany({
+        where: { companyId, joiningDate: { gte: from } },
+        select: { joiningDate: true }
+      }),
+      this.prisma.resignation.findMany({
+        where: { companyId, status: 'APPROVED', employee: { offboardingStatus: 'SEPARATED' } },
+        select: { employeeId: true, approvedLastWorkingDay: true, intendedLastWorkingDay: true }
+      })
+    ]);
+    // One exit per person: their latest approved resignation.
+    const exitByEmp = new Map<number, Date>();
+    for (const r of resignations) {
+      const d = r.approvedLastWorkingDay || r.intendedLastWorkingDay;
+      const prev = exitByEmp.get(r.employeeId);
+      if (!prev || d > prev) exitByEmp.set(r.employeeId, d);
+    }
+    const out: { month: string; joinings: number; exits: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const y = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const same = (d: Date) => d.getFullYear() === y.getFullYear() && d.getMonth() === y.getMonth();
+      out.push({
+        month: `${MONTH_LABELS[y.getMonth()]} ${y.getFullYear()}`,
+        joinings: joined.filter(e => e.joiningDate && same(e.joiningDate)).length,
+        exits: [...exitByEmp.values()].filter(same).length
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Last 8 weeks (Mon–Sun, current week last): attendance % = days marked
+   * present/half day/late out of all attendance rows; on-time % = present
+   * days that were not late.
+   */
+  private async getAttendanceWeekly(companyId: number) {
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    const start = new Date(monday);
+    start.setDate(start.getDate() - 7 * 7);
+
+    const records = await this.prisma.attendance.findMany({
+      where: { employee: { companyId }, date: { gte: start } },
+      select: { date: true, status: true, isLate: true }
+    });
+    const weeks = Array.from({ length: 8 }, (_, i) => {
+      const s = new Date(start);
+      s.setDate(s.getDate() + i * 7);
+      return { start: s, total: 0, present: 0, onTime: 0 };
+    });
+    for (const r of records) {
+      const idx = Math.floor((r.date.getTime() - start.getTime()) / (7 * 86_400_000));
+      const w = weeks[idx];
+      if (!w) continue;
+      w.total++;
+      if (r.status !== 'ABSENT') {
+        w.present++;
+        if (!r.isLate) w.onTime++;
+      }
+    }
+    return weeks.map((w, i) => ({
+      week: i === 7 ? 'This wk' : `${w.start.getDate()} ${MONTH_LABELS[w.start.getMonth()]}`,
+      attendancePct: w.total ? Math.round((w.present / w.total) * 1000) / 10 : 0,
+      onTimePct: w.present ? Math.round((w.onTime / w.present) * 1000) / 10 : 0
+    }));
+  }
+
+  /**
+   * Ticket SLA for the last 30 days against the 30 days before: share of
+   * tickets resolved within 48h of being raised, and open tickets by age.
+   */
+  private async getTicketSla(companyId: number) {
+    const now = Date.now();
+    const day = 86_400_000;
+    const [recent, open] = await Promise.all([
+      this.prisma.ticket.findMany({
+        where: { companyId, createdAt: { gte: new Date(now - 60 * day) } },
+        select: { createdAt: true, resolvedAt: true }
+      }),
+      this.prisma.ticket.findMany({
+        where: { companyId, status: { in: ['OPEN', 'IN_PROGRESS'] } },
+        select: { createdAt: true }
+      })
+    ]);
+    const rate = (from: number, to: number) => {
+      const list = recent.filter(t => t.createdAt.getTime() >= from && t.createdAt.getTime() < to);
+      if (!list.length) return null;
+      const ok = list.filter(t => t.resolvedAt && t.resolvedAt.getTime() - t.createdAt.getTime() <= 2 * day).length;
+      return Math.round((ok / list.length) * 1000) / 10;
+    };
+    const age = (t: { createdAt: Date }) => now - t.createdAt.getTime();
+    return {
+      slaRate: rate(now - 30 * day, now + 1),
+      previousRate: rate(now - 60 * day, now - 30 * day),
+      raised30d: recent.filter(t => t.createdAt.getTime() >= now - 30 * day).length,
+      open: {
+        under24h: open.filter(t => age(t) < day).length,
+        from24to48h: open.filter(t => age(t) >= day && age(t) < 2 * day).length,
+        over48h: open.filter(t => age(t) >= 2 * day).length
+      }
+    };
   }
 
   private async getProjectStatus(companyId: number) {

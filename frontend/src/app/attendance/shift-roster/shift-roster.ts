@@ -83,6 +83,11 @@ export class ShiftRosterComponent implements OnInit {
   wfhMode = signal<'DAYS' | 'PERMANENT'>('DAYS');
   wfhStart = '';
   permanentRules = signal<any[]>([]);
+  /** Permanent (standing) shift change for many people: Super Admin only. */
+  canPermanentShift(): boolean {
+    const r = this.currentUser()?.role;
+    return r === 'SUPERADMIN' || r === 'SUPER_ADMIN';
+  }
   canPermanentWfh(): boolean {
     const r = this.currentUser()?.role;
     return r === 'HR' || r === 'SUPERADMIN' || r === 'SUPER_ADMIN';
@@ -1168,6 +1173,9 @@ export class ShiftRosterComponent implements OnInit {
   /** "12 people × 7 days" for the footer, so the reach is clear before applying. */
   get bulkSummary(): string {
     const people = this.bulkSelection().size;
+    if (this.bulkForm.mode === 'permanent') {
+      return people ? `${people} ${people === 1 ? 'person' : 'people'} · standing shift changes from today` : '';
+    }
     const days = this.bulkDayCount;
     if (!people || !days) return '';
     return `${people} ${people === 1 ? 'person' : 'people'} × ${days} ${days === 1 ? 'day' : 'days'}`
@@ -1230,6 +1238,8 @@ export class ShiftRosterComponent implements OnInit {
       end: this.fmt(this.rangeEnd()),
       skipNonWorkingDays: true,
       overwriteExisting: true,
+      mode: 'dates',
+      clearFutureRoster: true,
     };
     this.bulkEmpSearch.set('');
     this.bulkDept.set('');
@@ -1269,6 +1279,7 @@ export class ShiftRosterComponent implements OnInit {
   submitBulk() {
     const ids = [...this.bulkSelection()];
     if (!ids.length) { this.toast.error('Select at least one employee'); return; }
+    if (this.bulkForm.mode === 'permanent') { this.submitPermanentShift(ids); return; }
     const shiftId = this.bulkForm.isDayOff ? null : Number(this.bulkForm.shiftId);
 
     // On-site shift → ask for the project / address before applying the bulk.
@@ -1307,6 +1318,22 @@ export class ShiftRosterComponent implements OnInit {
       },
       error: (e) => this.toast.error(e.error?.message || 'Bulk assign failed'),
     });
+  }
+
+  private submitPermanentShift(ids: number[]) {
+    const shiftId = Number(this.bulkForm.shiftId);
+    if (!shiftId) { this.toast.error('Choose a shift'); return; }
+    const name = this.grid().shifts.find(s => s.id === shiftId)?.name ?? 'this shift';
+    if (!confirm(`Move ${ids.length} employee(s) to ${name} permanently?`)) return;
+    this.shiftsService.setPermanentShift({ employeeIds: ids, shiftId, clearFutureRoster: !!this.bulkForm.clearFutureRoster })
+      .subscribe({
+        next: (r) => {
+          this.toast.success(`${r.updated} employee(s) now on ${name}${r.clearedRoster ? ` (${r.clearedRoster} rostered day(s) removed)` : ''}`);
+          this.closeBulk();
+          this.load();
+        },
+        error: (e) => this.toast.error(e.error?.message || 'Shift change failed'),
+      });
   }
 
   clearSelectedRange() {

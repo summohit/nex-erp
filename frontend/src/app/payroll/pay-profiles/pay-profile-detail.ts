@@ -106,6 +106,8 @@ export class PayProfileDetailComponent implements OnInit {
   dropdowns = signal<PayrollDropdownList[]>([]);
 
   canEdit = computed(() => ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'].includes(this.auth.currentUser()?.role));
+  /** The salary itself (a new pay version) is the Super Admin's alone (11 Nov 2026). */
+  canEditSalary = computed(() => ['SUPERADMIN', 'SUPER_ADMIN'].includes(this.auth.currentUser()?.role));
 
   current = computed<PayProfileVersion | null>(() => {
     const d = this.data();

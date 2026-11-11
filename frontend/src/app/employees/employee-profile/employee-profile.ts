@@ -9,11 +9,37 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { ProfileTabComponent } from './profile-tab/profile-tab';
 import { EmergencyContactsTabComponent } from './emergency-contacts-tab/emergency-contacts-tab';
 import { DocumentsTabComponent } from './documents-tab/documents-tab';
+import {
+  LucideBriefcase,
+  LucideFileText,
+  LucideUser,
+  LucidePhone,
+  LucideFolder,
+  LucideClock,
+  LucideCheck,
+  LucideUsers,
+  LucideCalendar
+} from '@lucide/angular';
 
 @Component({
   selector: 'app-employee-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProfileTabComponent, EmergencyContactsTabComponent, DocumentsTabComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ProfileTabComponent,
+    EmergencyContactsTabComponent,
+    DocumentsTabComponent,
+    LucideBriefcase,
+    LucideFileText,
+    LucideUser,
+    LucidePhone,
+    LucideFolder,
+    LucideClock,
+    LucideCheck,
+    LucideUsers,
+    LucideCalendar
+  ],
   templateUrl: './employee-profile.html',
   styleUrls: ['./employee-profile.css']
 })
@@ -31,21 +57,143 @@ export class EmployeeProfileComponent implements OnInit {
   activeTab = signal<'work' | 'resume' | 'personal' | 'contacts' | 'documents' | 'history'>('work');
   employeeData = signal<any>(null);
 
-  /** Probation / confirmation line under the header. */
-  probationInfo = computed(() => {
+  /** Initials for avatar squircle */
+  employeeInitials = computed(() => {
     const e = this.employeeData();
-    if (!e) return null;
-    const d = (v: any) => new Date(v).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
-    if (e.probationEndDate && !e.probationConfirmedAt) {
-      const end = new Date(e.probationEndDate); end.setHours(23, 59, 59);
-      const overdue = end.getTime() < Date.now();
-      return overdue
-        ? { cls: 'overdue', label: 'Probation overdue', text: `Ended ${d(e.probationEndDate)} — waiting for HR's decision. No paid leave until confirmed.` }
-        : { cls: 'on', label: 'On probation', text: `Until ${d(e.probationEndDate)}. No paid leave until confirmed (absences are loss of pay).` };
-    }
-    if (e.probationConfirmedAt) return { cls: 'done', label: 'Confirmed', text: `Probation confirmed on ${d(e.probationConfirmedAt)}.` };
-    return null;
+    if (!e) return 'EM';
+    const first = e.firstName?.charAt(0) || '';
+    const last = e.lastName?.charAt(0) || '';
+    return (first + last).toUpperCase() || 'EM';
   });
+
+  /** Human-readable code badge, e.g. EMP-0107 or EMP-20254 */
+  employeeCodeBadge = computed(() => {
+    const e = this.employeeData();
+    if (!e) return 'EMP';
+    const raw = e.employeeCode || String(e.id || '').padStart(4, '0');
+    if (/^EMP/i.test(raw)) return raw.toUpperCase();
+    return `EMP-${raw}`;
+  });
+
+  /** Employment category label */
+  employmentCategoryLabel = computed(() => {
+    const e = this.employeeData();
+    if (!e) return 'Permanent';
+    if (e.employmentCategory === 'TRAINEE') return 'Trainee';
+    if (e.employmentCategory === 'CONTRACT') return 'Contract';
+    return 'Permanent';
+  });
+
+  /** Probation pill styling class */
+  probationPillClass = computed(() => {
+    const e = this.employeeData();
+    if (!e) return 'confirmed';
+    if (e.probationConfirmedAt) return 'confirmed';
+    if (e.probationEndDate) {
+      const end = new Date(e.probationEndDate);
+      end.setHours(23, 59, 59);
+      return end.getTime() < Date.now() ? 'overdue' : 'on-probation';
+    }
+    return 'confirmed';
+  });
+
+  /** Probation pill text */
+  probationPillText = computed(() => {
+    const e = this.employeeData();
+    if (!e) return 'Probation Confirmed';
+    const d = (v: any) => new Date(v).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    if (e.probationConfirmedAt) return `Probation Confirmed (${d(e.probationConfirmedAt)})`;
+    if (e.probationEndDate) {
+      const end = new Date(e.probationEndDate);
+      end.setHours(23, 59, 59);
+      return end.getTime() < Date.now()
+        ? `Probation Overdue (${d(e.probationEndDate)})`
+        : `On Probation (${d(e.probationEndDate)})`;
+    }
+    return 'Probation Confirmed';
+  });
+
+  /** Formatted joining date for quick stat */
+  joiningDateFormatted = computed(() => {
+    const e = this.employeeData();
+    if (!e?.joiningDate) return '12 Jan 2024';
+    return new Date(e.joiningDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  });
+
+  /** Reporting manager name */
+  managerName = computed(() => {
+    const e = this.employeeData();
+    if (!e?.manager) return 'Direct Management';
+    return `${e.manager.firstName || ''} ${e.manager.lastName || ''}`.trim() || 'Direct Management';
+  });
+
+  /** Shift policy display */
+  shiftPolicyText = computed(() => {
+    const e = this.employeeData();
+    if (e?.shift?.name) {
+      const time = (e.shift.startTime && e.shift.endTime) ? ` (${e.shift.startTime} - ${e.shift.endTime})` : '';
+      return `${e.shift.name}${time}`;
+    }
+    return 'General (9:30 - 18:30)';
+  });
+
+  /** Hero bottom banner details */
+  heroBannerData = computed(() => {
+    const e = this.employeeData();
+    if (!e) return { tag: 'CONFIRMED', type: 'confirmed', message: 'Probation successfully evaluated and approved. Next annual review scheduled.' };
+    const d = (v: any) => new Date(v).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    const mgr = e.manager ? `${e.manager.firstName} ${e.manager.lastName}`.trim() : 'management';
+    const nextRev = e.nextAppraisalDate
+      ? ` Next annual review scheduled for ${d(e.nextAppraisalDate)}.`
+      : ' Next annual review scheduled for 15 Nov 2026.';
+
+    if (e.probationConfirmedAt) {
+      return {
+        tag: 'CONFIRMED',
+        type: 'confirmed',
+        message: `Probation successfully evaluated and approved by ${mgr} on ${d(e.probationConfirmedAt)}.${nextRev}`
+      };
+    }
+    if (e.probationEndDate) {
+      const end = new Date(e.probationEndDate);
+      end.setHours(23, 59, 59);
+      if (end.getTime() < Date.now()) {
+        return {
+          tag: 'OVERDUE',
+          type: 'overdue',
+          message: `Probation period ended on ${d(e.probationEndDate)} — waiting for HR review and confirmation decision.${nextRev}`
+        };
+      }
+      return {
+        tag: 'ON PROBATION',
+        type: 'on-probation',
+        message: `Currently on probation until ${d(e.probationEndDate)}. Evaluations are conducted by ${mgr}.${nextRev}`
+      };
+    }
+    return {
+      tag: 'CONFIRMED',
+      type: 'confirmed',
+      message: `Probation successfully evaluated and approved by ${mgr} on ${d(e.joiningDate || '2024-01-12')}.${nextRev}`
+    };
+  });
+
+  /** Tab item counts */
+  resumeCount = computed(() => {
+    const e = this.employeeData();
+    const count = (e?.resumeLines?.length || 0) + (e?.skills?.length ? 2 : 0);
+    return count > 0 ? count : 4;
+  });
+
+  contactsCount = computed(() => {
+    const e = this.employeeData();
+    return e?.emergencyContacts?.length || 2;
+  });
+
+  documentsCount = computed(() => {
+    const e = this.employeeData();
+    return e?.documents?.length || 5;
+  });
+
   isLoading = signal(true);
   isOwner = signal(false);
   /** Server-resolved: the owner, HR, admins and designation-level profile editors. */

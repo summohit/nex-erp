@@ -76,6 +76,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
   isClockedIn = signal<boolean>(false);
   isClocking = signal<boolean>(false);
   clockInTime = signal<Date | null>(null);
+  /** Why there is no clock-in today (holiday, weekly off), or null. */
+  offToday = signal<string | null>(null);
   timerStr = signal<string>('00:00:00');
   totalHoursStr = signal<string>('');
   activeTaskTimer = signal<{ projectId: number; issueId: number; taskKey: string; taskTitle: string } | null>(null);
@@ -168,6 +170,10 @@ export class HeaderComponent implements OnInit, OnDestroy {
   }
 
   checkTodayAttendance() {
+    this.attendanceService.getOffToday().subscribe({
+      next: (r) => this.offToday.set(r?.reason ?? null),
+      error: () => this.offToday.set(null),
+    });
     this.attendanceService.getTodayAttendance().subscribe({
       next: (res) => {
         if (res && res.clockIn && !res.clockOut) {

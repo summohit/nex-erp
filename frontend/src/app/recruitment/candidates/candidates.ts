@@ -490,6 +490,12 @@ export class CandidatesComponent implements OnInit {
   /** CTC = gross + employer contributions. What the employee has withheld is
    *  already inside gross, so it is deliberately absent from this sum. */
   annexureTotalMonthly = computed(() => this.annexureEarningsMonthly() + this.annexureDeductionsMonthly());
+  /** How far the edited components exceed the offered monthly CTC (0 when they fit). */
+  annexureOverCtc = computed(() => Math.max(0, this.annexureTotalMonthly() - this.annexureOfferedMonthly()));
+  /** The offer's monthly CTC (what balancing fills to). */
+  annexureOfferedMonthly = computed(() => { const d = this.annexureData(); return Math.round((d?.offeredCTC ?? d?.totalCTC ?? 0) / 12); });
+  /** With balancing off: how much of the offered CTC the table leaves unallocated. */
+  annexureUnderCtc = computed(() => this.annexureNoBalancer() ? Math.max(0, this.annexureOfferedMonthly() - this.annexureTotalMonthly()) : 0);
   annexureNetMonthly = computed(() => Math.max(0, this.annexureEarningsMonthly() - this.annexureEmployeeDedMonthly()));
   annexureTotalAnnual = computed(() => this.annexureTotalMonthly() * 12);
 
@@ -1301,8 +1307,18 @@ export class CandidatesComponent implements OnInit {
    * rows keep their amounts), then derive the BALANCER row so the included
    * components reach the offered monthly CTC — nothing is ever overwritten.
    */
+  /** Auto-balancing switched off: no "Other Allowance (Balancing)" row; the table is what was typed. */
+  annexureNoBalancer = signal(false);
+
+  /** Turn the balancing row on or off (setting it to 0 turns it off). */
+  setAnnexureBalancing(on: boolean) {
+    this.annexureNoBalancer.set(!on);
+    this.annexureComponents.set(this.recalcAnnexure(this.annexureComponents()));
+  }
+
   private recalcAnnexure(list: any[]): any[] {
-    const target = Math.max(1, Math.round((this.annexureData()?.totalCTC ?? 0) / 12));
+    const d = this.annexureData();
+    const target = Math.max(1, Math.round((d?.offeredCTC ?? d?.totalCTC ?? 0) / 12));
     const base = list.filter(c => c.kind !== 'BALANCER');
     // Employee deductions come out of gross, not on top of it, so they must not
     // consume the CTC the balancer is filling — otherwise ticking "Employee PF"
@@ -1312,7 +1328,7 @@ export class CandidatesComponent implements OnInit {
       .reduce((s, c) => s + (Number(c.monthly) || 0), 0);
     const balanceMonthly = Math.max(0, target - includedFixed);
     const out = base.map(c => ({ ...c }));
-    if (balanceMonthly > 0) {
+    if (balanceMonthly > 0 && !this.annexureNoBalancer()) {
       out.push({
         id: 'balance',
         name: 'Other Allowance (Balancing)',
@@ -1331,6 +1347,7 @@ export class CandidatesComponent implements OnInit {
     if (!d) return;
     const source = Array.isArray(d.allComponents) ? d.allComponents : (this.annexureComponents() as any[]);
     if (!Array.isArray(source) || source.length === 0) return;
+    this.annexureNoBalancer.set(!!d.noBalancer);
     this.annexureComponents.set(this.recalcAnnexure(source.map(c => ({
       ...c,
       included: c.included !== false,
@@ -1355,7 +1372,18 @@ export class CandidatesComponent implements OnInit {
 
   updateAnnexureComponent(id: string, monthly: number) {
     const val = Math.max(0, Math.round(Number(monthly) || 0));
-    const next = this.annexureComponents().map(c => (c.id === id ? { ...c, monthly: val } : c));
+    // Typing over the balancing amount pins it: it becomes a fixed "Other
+    // Allowance" row, and only what is still left of the CTC balances.
+    // 0 on the balancing row switches balancing off rather than pinning a ₹0 row.
+    if (val === 0 && this.annexureComponents().some(c => c.id === id && c.kind === 'BALANCER')) {
+      this.setAnnexureBalancing(false);
+      return;
+    }
+    const next = this.annexureComponents().map(c => (c.id === id
+      ? (c.kind === 'BALANCER'
+          ? { ...c, id: `custom_other_allowance_${Date.now()}`, name: 'Other Allowance', kind: 'FIXED', isCustom: true, monthly: val }
+          : { ...c, monthly: val })
+      : c));
     this.annexureComponents.set(this.recalcAnnexure(next));
   }
 
@@ -1466,7 +1494,7 @@ export class CandidatesComponent implements OnInit {
     if (!appId) return;
     const components = this.annexureComponents().map(({ annual, ...c }: any) => c);
     this.isSavingAnnexure.set(true);
-    this.candidatesService.saveAnnexure(appId, { components }).subscribe({
+    this.candidatesService.saveAnnexure(appId, { components, noBalancer: this.annexureNoBalancer() } as any).subscribe({
       next: (data) => {
         this.annexureData.set(data);
         this.annexureEditing.set(false);

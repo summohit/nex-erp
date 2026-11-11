@@ -1784,7 +1784,8 @@ export class OfferLettersService {
     // the CTC the balancer fills.
     const fixedTotal = [...earnings, ...contributions]
       .reduce((sum: number, c: any) => sum + (Number(c.monthly) || 0), 0);
-    const balance = Math.max(0, Math.round(monthlyCtc - fixedTotal));
+    // Auto-balancing can be switched off on the annexure (11 Nov 2026).
+    const balance = structure?.noBalancer ? 0 : Math.max(0, Math.round(monthlyCtc - fixedTotal));
 
     const rows: SalaryRow[] = [row('CTC', monthlyCtc, { emphasis: true, group: true })];
     earnings.forEach((c: any) => rows.push(row(String(c.name), Number(c.monthly) || 0)));

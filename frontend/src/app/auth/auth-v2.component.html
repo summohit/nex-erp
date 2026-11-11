@@ -1,0 +1,428 @@
+<!-- REGISTER VIEW -->
+<div *ngIf="currentView === 'register'" class="signup-wrapper">
+  
+  <!-- Ambient background glow elements -->
+  <div class="auth-ambient-glow glow-top-left"></div>
+  <div class="auth-ambient-glow glow-bottom-right"></div>
+  <div class="auth-pattern-overlay"></div>
+
+  <div class="signup-layout">
+    
+    <!-- LEFT COLUMN: PRODUCT SHOWCASE & SOCIAL PROOF -->
+    <div class="signup-showcase-panel">
+      
+      <div class="brand-logo-wrap mb-4">
+        <a routerLink="/" title="Back to home">
+          <img src="/logo.png" class="brand-logo" alt="MIRA logo">
+        </a>
+      </div>
+
+      <h1 class="showcase-title">
+        Empower your business with <span class="text-gradient">MIRA</span>
+      </h1>
+      
+      <p class="showcase-subtitle">
+        Everything your organization needs — CRM, HRMS, Projects, Attendance & Payroll — unified in one intelligent workspace.
+      </p>
+
+      <!-- MODERN PRODUCT PREVIEW WIDGET -->
+      <div class="preview-browser-card">
+        <div class="preview-browser-header">
+          <div class="mock-dots">
+            <span class="mock-dot dot-red"></span>
+            <span class="mock-dot dot-yellow"></span>
+            <span class="mock-dot dot-green"></span>
+          </div>
+          <div class="browser-url-pill">
+            <span class="url-lock">🔒</span> app.mira-erp.com/dashboard
+          </div>
+          <div class="live-status-badge">
+            <span class="live-dot"></span>
+            <span>Live</span>
+          </div>
+        </div>
+
+        <div class="preview-browser-body">
+          <!-- Mini metrics grid -->
+          <div class="preview-metrics-grid">
+            <div class="mini-stat-card">
+              <div class="stat-icon-wrap orange">
+                <svg lucideTrendingUp size="15"></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-num">60% Faster</span>
+                <span class="stat-lbl">AI Operations</span>
+              </div>
+            </div>
+
+            <div class="mini-stat-card">
+              <div class="stat-icon-wrap blue">
+                <svg lucideShieldCheck size="15"></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-num">99.99%</span>
+                <span class="stat-lbl">System Uptime</span>
+              </div>
+            </div>
+
+            <div class="mini-stat-card">
+              <div class="stat-icon-wrap green">
+                <svg lucideBriefcase size="15"></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-num">&lt; 3 Months</span>
+                <span class="stat-lbl">Payback Period</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mini activity row -->
+          <div class="preview-activity-bar">
+            <div class="activity-chip">
+              <span class="activity-dot"></span>
+              <span>CRM & Lead Pipelines: Active</span>
+            </div>
+            <div class="activity-chip">
+              <span class="activity-dot blue"></span>
+              <span>Attendance & Payroll: Synced</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VALUE HIGHLIGHTS -->
+      <div class="showcase-features-list">
+        <div class="feature-item">
+          <div class="feature-icon-box">
+            <svg lucideCheckCircle2 size="16"></svg>
+          </div>
+          <div class="feature-text">
+            <strong>Full Enterprise Access</strong> — CRM, HRMS, Timesheets, Shifts & Payroll.
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-icon-box">
+            <svg lucideCheckCircle2 size="16"></svg>
+          </div>
+          <div class="feature-text">
+            <strong>Autonomous AI Agents</strong> — Fast deflection and automated workflows.
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-icon-box">
+            <svg lucideCheckCircle2 size="16"></svg>
+          </div>
+          <div class="feature-text">
+            <strong>Instant Onboarding</strong> — Zero credit card required. Setup in 2 minutes.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: REGISTRATION FORM CARD -->
+    <div class="signup-form-panel">
+      <div class="signup-card">
+        <div class="card-accent-bar"></div>
+
+        <div class="form-card-header">
+          <h2 class="form-card-title">
+            Try <span class="brand-text">MIRA</span> for free
+          </h2>
+          <p class="form-card-subtitle">
+            No credit card required. No strings attached.
+          </p>
+        </div>
+
+        <form [formGroup]="registerForm" (ngSubmit)="onRegister()" class="signup-form">
+          
+          <!-- FIRST NAME & LAST NAME ROW -->
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label class="form-label" for="reg-firstName">First Name *</label>
+              <div class="input-wrapper" [class.has-error]="registerForm.get('firstName')?.invalid && registerForm.get('firstName')?.touched">
+                <div class="input-icon-left">
+                  <svg lucideUser size="17"></svg>
+                </div>
+                <input 
+                  id="reg-firstName"
+                  type="text" 
+                  formControlName="firstName" 
+                  placeholder="John" 
+                  class="auth-input">
+              </div>
+              <div class="error-msg" *ngIf="registerForm.get('firstName')?.invalid && registerForm.get('firstName')?.touched">
+                First name is required
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="reg-lastName">Last Name *</label>
+              <div class="input-wrapper" [class.has-error]="registerForm.get('lastName')?.invalid && registerForm.get('lastName')?.touched">
+                <div class="input-icon-left">
+                  <svg lucideUser size="17"></svg>
+                </div>
+                <input 
+                  id="reg-lastName"
+                  type="text" 
+                  formControlName="lastName" 
+                  placeholder="Doe" 
+                  class="auth-input">
+              </div>
+              <div class="error-msg" *ngIf="registerForm.get('lastName')?.invalid && registerForm.get('lastName')?.touched">
+                Last name is required
+              </div>
+            </div>
+          </div>
+
+          <!-- WORK EMAIL -->
+          <div class="form-group">
+            <label class="form-label" for="reg-email">Work Email *</label>
+            <div class="input-wrapper" [class.has-error]="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">
+              <div class="input-icon-left">
+                <svg lucideMail size="17"></svg>
+              </div>
+              <input 
+                id="reg-email"
+                type="email" 
+                formControlName="email" 
+                placeholder="name@company.com" 
+                autocomplete="email"
+                class="auth-input">
+            </div>
+            <div class="error-msg" *ngIf="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">
+              Please enter a valid work email
+            </div>
+          </div>
+
+          <!-- COMPANY NAME -->
+          <div class="form-group">
+            <label class="form-label" for="reg-company">Company Name *</label>
+            <div class="input-wrapper" [class.has-error]="registerForm.get('companyName')?.invalid && registerForm.get('companyName')?.touched">
+              <div class="input-icon-left">
+                <svg lucideBriefcase size="17"></svg>
+              </div>
+              <input 
+                id="reg-company"
+                type="text" 
+                formControlName="companyName" 
+                placeholder="Acme Technologies Inc." 
+                class="auth-input">
+            </div>
+            <div class="error-msg" *ngIf="registerForm.get('companyName')?.invalid && registerForm.get('companyName')?.touched">
+              Company name is required
+            </div>
+          </div>
+
+          <!-- PHONE NUMBER -->
+          <div class="form-group">
+            <label class="form-label" for="reg-phone">Phone Number</label>
+            <div class="input-wrapper">
+              <div class="input-icon-left">
+                <svg lucidePhone size="17"></svg>
+              </div>
+              <input 
+                id="reg-phone"
+                type="tel" 
+                formControlName="phone" 
+                placeholder="+1 (555) 000-0000" 
+                class="auth-input">
+            </div>
+          </div>
+
+          <!-- PASSWORD FIELD -->
+          <div class="form-group">
+            <label class="form-label" for="reg-password">Password *</label>
+            <div class="input-wrapper" [class.has-error]="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">
+              <div class="input-icon-left">
+                <svg lucideLock size="17"></svg>
+              </div>
+              <input 
+                id="reg-password"
+                [type]="showPassword ? 'text' : 'password'" 
+                formControlName="password" 
+                placeholder="Create a secure password (min. 8 chars)" 
+                autocomplete="new-password"
+                class="auth-input">
+              <button 
+                type="button" 
+                class="password-toggle-btn" 
+                (click)="togglePassword()"
+                [title]="showPassword ? 'Hide password' : 'Show password'"
+                tabindex="-1">
+                <svg *ngIf="!showPassword" lucideEye size="18"></svg>
+                <svg *ngIf="showPassword" lucideEyeOff size="18"></svg>
+              </button>
+            </div>
+            <div class="error-msg" *ngIf="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">
+              Password must be at least 8 characters
+            </div>
+          </div>
+
+          <!-- TERMS CHECKBOX -->
+          <div class="terms-group">
+            <label class="terms-label">
+              <input type="checkbox" id="terms" formControlName="terms" class="custom-checkbox">
+              <span class="terms-text">
+                I agree to the MIRA <a href="#" class="legal-link">Terms & Conditions</a> and <a href="#" class="legal-link">Privacy Policy</a> governing this free trial.
+              </span>
+            </label>
+            <div class="error-msg" *ngIf="registerForm.get('terms')?.invalid && registerForm.get('terms')?.touched">
+              You must accept the terms to continue
+            </div>
+          </div>
+
+          <!-- SUBMIT BUTTON -->
+          <button type="submit" class="auth-submit-btn" [disabled]="isSubmitting()">
+            <span *ngIf="!isSubmitting()" class="btn-content">
+              <span>Start 14-Day Free Trial</span>
+              <svg lucideArrowRight size="18" class="btn-arrow"></svg>
+            </span>
+            <span *ngIf="isSubmitting()" class="btn-loader">
+              <span class="spinner-ring"></span>
+              <span>Creating your workspace...</span>
+            </span>
+          </button>
+
+        </form>
+
+        <!-- CARD FOOTER: LOGIN LINK -->
+        <div class="card-footer">
+          <span class="footer-text">Already have an account?</span>
+          <a class="signup-link" (click)="toggleView()">
+            <span>Log in here</span>
+            <svg lucideArrowRight size="14" class="inline-arrow"></svg>
+          </a>
+        </div>
+
+      </div>
+
+      <!-- TRUST BADGE -->
+      <div class="security-badge mt-3">
+        <svg lucideShieldCheck size="15" class="shield-icon"></svg>
+        <span>Instant Activation • No Credit Card Required</span>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+
+<!-- LOGIN VIEW -->
+<div *ngIf="currentView === 'login'" class="auth-centered">
+  <!-- Dot matrix background layer -->
+  <div class="auth-dots-layer"></div>
+
+  <!-- The logo's two figures, drawn large and faint behind the card -->
+  <svg class="auth-mark" viewBox="0 0 240 208" aria-hidden="true">
+    <defs>
+      <linearGradient id="authMarkFill" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#1e6fe0" />
+        <stop offset="1" stop-color="#2fbf8a" />
+      </linearGradient>
+    </defs>
+    <g fill="url(#authMarkFill)">
+      <circle cx="58" cy="26" r="22" />
+      <circle cx="182" cy="26" r="22" />
+    </g>
+    <path d="M40 184 V92 Q40 66 62 82 L120 136 L178 82 Q200 66 200 92 V184"
+          fill="none" stroke="url(#authMarkFill)" stroke-width="40"
+          stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+
+  <div class="auth-container">
+    <div class="brand-section">
+      <a routerLink="/" title="Back to home" class="brand-logo-wrap">
+        <img src="/logo.png" class="brand-logo" alt="MIRA">
+      </a>
+
+      <h1 class="auth-title">Welcome back</h1>
+      <p class="auth-subtitle">Sign in to your MIRA workspace</p>
+    </div>
+
+    <div class="login-card">
+      <form [formGroup]="loginForm" (ngSubmit)="onLogin()" class="login-form">
+
+        <div class="form-group">
+          <label class="form-label" for="login-email">Work email</label>
+          <div class="input-wrapper" [class.has-error]="loginForm.get('email')?.invalid && loginForm.get('email')?.touched">
+            <div class="input-icon-left">
+              <svg lucideMail size="16"></svg>
+            </div>
+            <input
+              id="login-email"
+              type="email"
+              formControlName="email"
+              placeholder="user@company.com"
+              autocomplete="email"
+              class="auth-input">
+          </div>
+          <div *ngIf="loginForm.get('email')?.invalid && loginForm.get('email')?.touched" class="error-msg">
+            Enter a valid work email
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="label-row">
+            <label class="form-label" for="login-password">Password</label>
+            <a class="forgot-link" routerLink="/auth/forgot-password">Forgot password?</a>
+          </div>
+          <div class="input-wrapper" [class.has-error]="loginForm.get('password')?.invalid && loginForm.get('password')?.touched">
+            <div class="input-icon-left">
+              <svg lucideLock size="16"></svg>
+            </div>
+            <input
+              id="login-password"
+              [type]="showPassword ? 'text' : 'password'"
+              formControlName="password"
+              autocomplete="current-password"
+              class="auth-input">
+            <button
+              type="button"
+              class="password-toggle-btn"
+              (click)="togglePassword()"
+              [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
+              [title]="showPassword ? 'Hide password' : 'Show password'">
+              <svg *ngIf="!showPassword" lucideEye size="16"></svg>
+              <svg *ngIf="showPassword" lucideEyeOff size="16"></svg>
+            </button>
+          </div>
+          <div *ngIf="loginForm.get('password')?.invalid && loginForm.get('password')?.touched" class="error-msg">
+            Enter your password
+          </div>
+        </div>
+
+        <label class="remember-label">
+          <input type="checkbox" formControlName="rememberMe" class="custom-checkbox">
+          <span class="remember-text">Keep me signed in</span>
+        </label>
+
+        <button type="submit" class="auth-submit-btn" [disabled]="isSubmitting()">
+          <span *ngIf="!isSubmitting()">Sign In</span>
+          <span *ngIf="isSubmitting()" class="btn-loader">
+            <span class="spinner-ring"></span>
+            <span>Signing in...</span>
+          </span>
+        </button>
+      </form>
+
+      <div class="card-footer" *ngIf="showSignup">
+        <span class="footer-text">New to MIRA?</span>
+        <a class="signup-link" (click)="toggleView()">Create an account</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="legal-notice">
+    <span>Encrypted connection</span>
+    <span class="legal-dot">·</span>
+    <a routerLink="/terms-of-service" class="legal-link">Terms of Service</a>
+    <span class="legal-dot">·</span>
+    <a routerLink="/privacy-policy" class="legal-link">Privacy Policy</a>
+    <span class="legal-dot">·</span>
+    <a href="mailto:support@mira-erp.com" class="legal-link">Need help?</a>
+  </div>
+</div>

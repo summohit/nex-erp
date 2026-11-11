@@ -1,0 +1,368 @@
+<div class="page-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Employee Directory</h1>
+      <p>Everyone in the company, with their department, role and status</p>
+    </div>
+    <div class="header-actions">
+      <!-- View mode toggle -->
+      <div class="view-mode-toggle">
+        <button type="button" class="btn-view-toggle" [class.active]="viewMode() === 'table'" (click)="viewMode.set('table')" title="Table View">
+          <svg lucideList size="15"></svg>
+          <span>Table</span>
+        </button>
+        <button type="button" class="btn-view-toggle" [class.active]="viewMode() === 'cards'" (click)="viewMode.set('cards')" title="Card View">
+          <svg lucideLayoutGrid size="15"></svg>
+          <span>Cards</span>
+        </button>
+      </div>
+
+      <button class="btn-secondary" (click)="openBulkUpload()" *ngIf="isAdmin()">
+        <svg lucideUpload size="16"></svg>
+        <span>Bulk import</span>
+      </button>
+      <button class="btn-primary" (click)="openDrawer()" *ngIf="isAdmin()">
+        <svg lucidePlus size="16"></svg>
+        <span>Add employee</span>
+      </button>
+    </div>
+  </div>
+
+  <app-bulk-upload-modal 
+    *ngIf="isBulkUploadOpen" 
+    (close)="onBulkUploadClose($event)">
+  </app-bulk-upload-modal>
+
+  <!-- 4 KPI Stat Cards Row (Figma Design) -->
+  <section class="dir-kpi-grid" *ngIf="!isLoading() && headcount().total > 0">
+    <!-- Card 1: HEADCOUNT (Wide Card with Watermark & Multi-segment bar) -->
+    <article class="dir-kpi-card dir-card-headcount">
+      <div class="dir-card-watermark"></div>
+      <div class="dir-kpi-inner">
+        <span class="dir-kpi-eyebrow">HEADCOUNT</span>
+        <div class="dir-kpi-val-row">
+          <span class="dir-kpi-big-num">{{ headcount().total }}</span>
+          <span class="dir-kpi-trend">
+            <svg lucideTrendingUp size="11"></svg>
+            <span>&uarr; 4.2% this month</span>
+          </span>
+        </div>
+
+        <!-- Multi-segment Progress Bar -->
+        <div class="dir-mix-bar" role="group" aria-label="Employment mix">
+          <button
+            type="button"
+            class="dir-mix-segment"
+            *ngFor="let m of headcount().mix"
+            [style.flex-grow]="m.count"
+            [style.background]="m.colour"
+            [class.dimmed]="filterEmploymentStatus && filterEmploymentStatus !== m.id"
+            [title]="m.label + ': ' + m.count + ' (' + (m.pct | number:'1.0-0') + '%)'"
+            (click)="toggleEmploymentFilter(m.id)"
+          ></button>
+        </div>
+
+        <!-- Legend Items -->
+        <div class="dir-mix-legend">
+          <button
+            type="button"
+            class="dir-legend-btn"
+            *ngFor="let m of headcount().mix"
+            [class.selected]="filterEmploymentStatus === m.id"
+            [class.dimmed]="filterEmploymentStatus && filterEmploymentStatus !== m.id"
+            (click)="toggleEmploymentFilter(m.id)"
+          >
+            <span class="dir-legend-dot" [style.background]="m.colour"></span>
+            <span class="dir-legend-name">{{ m.label }}</span>
+            <strong class="dir-legend-count">{{ m.count }}</strong>
+          </button>
+        </div>
+      </div>
+    </article>
+
+    <!-- Card 2: ACTIVE ACCOUNTS -->
+    <article class="dir-kpi-card">
+      <div class="dir-kpi-inner">
+        <div class="dir-kpi-card-header">
+          <div class="dir-icon-badge blue">
+            <svg lucideUserPlus size="18"></svg>
+          </div>
+        </div>
+        <span class="dir-kpi-eyebrow">ACTIVE ACCOUNTS</span>
+        <span class="dir-kpi-big-num">{{ headcount().active }}</span>
+        <span class="dir-kpi-sub">
+          {{ ((headcount().active / (headcount().total || 1)) * 100) | number:'1.1-1' }}% of total workforce
+        </span>
+      </div>
+    </article>
+
+    <!-- Card 3: ON PROBATION -->
+    <article class="dir-kpi-card dir-card-clickable" (click)="goToProbation()" tabindex="0" role="button" aria-label="View probation reviews">
+      <div class="dir-kpi-inner">
+        <div class="dir-kpi-card-header">
+          <div class="dir-icon-badge amber">
+            <svg lucideClock size="18"></svg>
+          </div>
+          <a
+            routerLink="/performance"
+            [queryParams]="{ tab: 'probation' }"
+            class="dir-card-view-all"
+            (click)="$event.stopPropagation()"
+            title="View all probation reviews"
+          >
+            <span>View all</span>
+            <svg lucideChevronRight size="13"></svg>
+          </a>
+        </div>
+        <span class="dir-kpi-eyebrow">ON PROBATION</span>
+        <span class="dir-kpi-big-num">{{ headcount().onProbation }}</span>
+        <span class="dir-kpi-sub" [class.danger]="headcount().overdue > 0">
+          {{ headcount().overdue ? headcount().overdue + ' overdue for review' : 'All reviews on track' }}
+        </span>
+      </div>
+    </article>
+
+    <!-- Card 4: ONBOARDING -->
+    <article class="dir-kpi-card dir-card-clickable" (click)="goToOnboarding()" tabindex="0" role="button" aria-label="View onboarding processes">
+      <div class="dir-kpi-inner">
+        <div class="dir-kpi-card-header">
+          <div class="dir-icon-badge purple">
+            <svg lucideCheckSquare size="18"></svg>
+          </div>
+          <a
+            routerLink="/employees/onboarding"
+            class="dir-card-view-all"
+            (click)="$event.stopPropagation()"
+            title="View all onboarding processes"
+          >
+            <span>View all</span>
+            <svg lucideChevronRight size="13"></svg>
+          </a>
+        </div>
+        <span class="dir-kpi-eyebrow">ONBOARDING</span>
+        <span class="dir-kpi-big-num">{{ headcount().onboarding }}</span>
+        <span class="dir-kpi-sub">
+          {{ headcount().onboarding }} in progress &middot; {{ headcount().onboardingPending }} pending
+        </span>
+      </div>
+    </article>
+  </section>
+
+  <div class="filter-card">
+    <div class="filter-group search-group">
+      <svg lucideSearch size="16" class="search-icon"></svg>
+      <input #directorySearch type="search" [ngModel]="searchText"
+        (ngModelChange)="onDirectorySearch($event)" (focus)="inlineSearchOpen = true"
+        (blur)="inlineSearchOpen = false" autocomplete="off"
+        placeholder="Search employees" aria-label="Search employees">
+      <div class="employee-search-dropdown" *ngIf="inlineSearchOpen && directorySearchSuggestions().length">
+        <button type="button" class="employee-search-option" *ngFor="let employee of directorySearchSuggestions()"
+          (mousedown)="$event.preventDefault()" (click)="selectDirectorySuggestion(employee)">
+          <span class="employee-search-avatar">
+            <img *ngIf="employee.avatarUrl || employee.user?.avatarUrl" [src]="employee.avatarUrl || employee.user?.avatarUrl" alt="">
+            <span *ngIf="!(employee.avatarUrl || employee.user?.avatarUrl)">{{ getEmployeeInitials(employee) }}</span>
+          </span>
+          <span class="employee-search-details">
+            <span class="employee-search-name">{{ employee.firstName }} {{ employee.lastName }}</span>
+            <span class="employee-search-meta">{{ employee.department?.name || 'Unassigned' }} · {{ employee.designation?.name || employee.employeeCode || 'Employee' }}</span>
+          </span>
+        </button>
+      </div>
+    </div>
+    
+    <div class="filter-group">
+      <app-searchable-select
+        [options]="departmentOptions()"
+        placeholder="All departments"
+        [value]="filterDepartmentId"
+        (valueChange)="filterDepartmentId = $event; applyFilters()">
+      </app-searchable-select>
+    </div>
+
+    <div class="filter-group">
+      <app-searchable-select
+        [options]="designationOptions()"
+        placeholder="All designations"
+        [value]="filterDesignationId"
+        (valueChange)="filterDesignationId = $event; applyFilters()">
+      </app-searchable-select>
+    </div>
+
+    <div class="filter-group">
+      <app-searchable-select
+        [options]="roleOptions"
+        placeholder="All roles"
+        [value]="filterRole"
+        (valueChange)="filterRole = $event; applyFilters()">
+      </app-searchable-select>
+    </div>
+
+    <div class="filter-group">
+      <app-searchable-select
+        [options]="onboardingStatusOptions"
+        placeholder="Any onboarding status"
+        [value]="filterOnboardingStatus"
+        (valueChange)="filterOnboardingStatus = $event; applyFilters()">
+      </app-searchable-select>
+    </div>
+
+    <div class="filter-group">
+      <app-searchable-select
+        [options]="offboardingStatusOptions"
+        placeholder="Any offboarding status"
+        [value]="filterOffboardingStatus"
+        (valueChange)="filterOffboardingStatus = $event; applyFilters()">
+      </app-searchable-select>
+    </div>
+
+    <div class="filter-group">
+      <app-searchable-select
+        [options]="employmentStatusOptions"
+        placeholder="Any employment status"
+        [value]="filterEmploymentStatus"
+        (valueChange)="filterEmploymentStatus = $event; applyFilters()">
+      </app-searchable-select>
+    </div>
+
+    <button
+      type="button"
+      class="btn-clear-filters"
+      (click)="clearFilters()"
+      *ngIf="hasActiveFilters()"
+      title="Clear all active filters"
+    >
+      <span class="clear-filter-icon">
+        <svg lucideRotateCcw size="13"></svg>
+      </span>
+      <span>Clear filters</span>
+      <span class="clear-count-badge" *ngIf="getActiveFilterCount() > 0">
+        {{ getActiveFilterCount() }}
+      </span>
+    </button>
+  </div>
+
+  <!-- Cards View (for mobile or toggle) -->
+  <div class="employee-cards-view" *ngIf="viewMode() === 'cards' && !isLoading()">
+    <div class="employee-cards-grid" *ngIf="getFilteredEmployees().length > 0">
+      <div class="emp-card" *ngFor="let emp of getFilteredEmployees()" (click)="openProfile(emp)">
+        <div class="emp-card-header">
+          <div class="emp-card-avatar">
+            <img *ngIf="emp.avatarUrl || emp.user?.avatarUrl" [src]="emp.avatarUrl || emp.user?.avatarUrl" alt="Avatar">
+            <div *ngIf="!(emp.avatarUrl || emp.user?.avatarUrl)" class="emp-card-initials">
+              {{ getEmployeeInitials(emp) }}
+            </div>
+          </div>
+          <div class="emp-card-info">
+            <div class="emp-card-name-row">
+              <span class="emp-card-name">{{ toTitleCase(emp.firstName + ' ' + emp.lastName) }}</span>
+              <span class="badge-pm" *ngIf="emp.isProjectManager">PM</span>
+            </div>
+            <div class="emp-card-meta-row">
+              <span class="emp-id-badge" *ngIf="emp.employeeCode">{{ emp.employeeCode }}</span>
+              <span class="emp-role-badge">{{ roleLabel(emp.user?.role) }}</span>
+            </div>
+          </div>
+          <span class="emp-status-dot" [class.active]="emp.user?.status !== 'SUSPENDED'" [title]="emp.user?.status || 'ACTIVE'"></span>
+        </div>
+
+        <div class="emp-card-body">
+          <div class="emp-detail-row" *ngIf="emp.department?.name || emp.designation?.name">
+            <svg lucideBuilding size="14" class="emp-detail-icon"></svg>
+            <span class="emp-detail-text">{{ emp.department?.name || 'Unassigned' }} &bull; {{ emp.designation?.name || 'Staff' }}</span>
+          </div>
+          <div class="emp-detail-row" *ngIf="emp.user?.email">
+            <svg lucideMail size="14" class="emp-detail-icon"></svg>
+            <a [href]="'mailto:' + emp.user?.email" (click)="$event.stopPropagation()" class="emp-detail-link">{{ emp.user?.email }}</a>
+          </div>
+          <div class="emp-detail-row" *ngIf="emp.phone">
+            <svg lucidePhone size="14" class="emp-detail-icon"></svg>
+            <a [href]="'tel:' + emp.phone" (click)="$event.stopPropagation()" class="emp-detail-link">{{ emp.phone }}</a>
+          </div>
+        </div>
+
+        <div class="emp-card-footer">
+          <span class="onboarding-badge" [ngClass]="'status-' + ((emp.onboardingStatus || 'active') | lowercase)">
+            {{ onboardingLabel(emp.onboardingStatus) }}
+          </span>
+          <span class="employment-badge {{ employmentBadge(emp).cls }}" [title]="employmentBadge(emp).title">{{ employmentBadge(emp).label }}</span>
+          <button type="button" class="btn-card-edit" (click)="$event.stopPropagation(); openDrawer(emp)">
+            <span>View profile</span>
+            <svg lucideChevronRight size="13"></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty-cards-state" *ngIf="getFilteredEmployees().length === 0">
+      <svg lucideSearch size="32" class="empty-icon"></svg>
+      <p>No employees match your search or filters</p>
+      <button class="btn-clear-filters-inline" (click)="clearFilters()">Clear filters</button>
+    </div>
+  </div>
+
+  <!-- Table View (AG Grid) -->
+  <div class="grid-container" *ngIf="viewMode() === 'table' || isLoading()">
+    <div class="table-swipe-hint" *ngIf="!isLoading() && viewMode() === 'table'">
+      <svg lucideChevronRight size="13"></svg>
+      <span>Swipe horizontally to view all columns</span>
+    </div>
+
+    <!-- Skeleton Loader -->
+    <ng-container *ngIf="isLoading()">
+      <div style="background: white; border-radius: 8px; padding: 0; border: 1px solid #e2e8f0; width: 100%; height: 600px; overflow: hidden;">
+        <!-- Header -->
+        <div style="display: flex; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; background: #f8fafc;">
+          <div class="skeleton-line shimmer" style="width: 24px; height: 16px; margin-right: 16px;"></div>
+          <div class="skeleton-line shimmer" style="width: 200px; height: 16px; margin-right: 32px;"></div>
+          <div class="skeleton-line shimmer" style="width: 140px; height: 16px; margin-right: 32px;"></div>
+          <div class="skeleton-line shimmer" style="width: 140px; height: 16px; margin-right: 32px;"></div>
+          <div class="skeleton-line shimmer" style="width: 120px; height: 16px; margin-right: 32px;"></div>
+          <div class="skeleton-line shimmer" style="width: 120px; height: 16px; margin-right: 32px;"></div>
+          <div class="skeleton-line shimmer" style="width: 80px; height: 16px; margin-left: auto;"></div>
+        </div>
+        <!-- Rows -->
+        <div *ngFor="let s of [1,2,3,4,5,6,7,8,9,10,11,12]" style="display: flex; align-items: center; padding: 16px; border-bottom: 1px solid #f1f5f9;">
+          <div class="skeleton-line shimmer" style="width: 16px; height: 16px; border-radius: 4px; margin-right: 24px;"></div>
+          
+          <div style="display: flex; align-items: center; gap: 12px; width: 200px; margin-right: 32px;">
+            <div class="skeleton-line shimmer" style="width: 34px; height: 34px; border-radius: 50%;"></div>
+            <div>
+              <div class="skeleton-line shimmer" style="width: 120px; height: 14px; margin-bottom: 6px;"></div>
+              <div class="skeleton-line shimmer" style="width: 80px; height: 12px;"></div>
+            </div>
+          </div>
+          
+          <div class="skeleton-line shimmer" style="width: 110px; height: 14px; margin-right: 62px;"></div>
+          <div class="skeleton-line shimmer" style="width: 110px; height: 14px; margin-right: 62px;"></div>
+          <div class="skeleton-line shimmer" style="width: 70px; height: 24px; border-radius: 6px; margin-right: 82px;"></div>
+          <div class="skeleton-line shimmer" style="width: 70px; height: 24px; border-radius: 6px; margin-right: 82px;"></div>
+          
+          <div class="skeleton-line shimmer" style="width: 24px; height: 24px; border-radius: 4px; margin-left: auto;"></div>
+        </div>
+      </div>
+    </ng-container>
+
+    <ag-grid-angular
+      *ngIf="!isLoading()"
+      style="width: 100%; height: 600px;"
+      class="ag-theme-quartz"
+      [rowData]="employees()"
+      [columnDefs]="colDefs"
+      [defaultColDef]="defaultColDef"
+      [pagination]="true"
+      [paginationPageSize]="paginationPageSize"
+      [paginationPageSizeSelector]="paginationPageSizeSelector"
+      [gridOptions]="gridOptions"
+      (gridReady)="onGridReady($event)"
+      [theme]="'legacy'">
+    </ag-grid-angular>
+  </div>
+</div>
+
+<app-employee-drawer 
+  [isOpen]="isDrawerOpen" 
+  [employeeData]="selectedEmployee"
+  (closeDrawer)="closeDrawer()"
+  (saveSuccess)="onSaveSuccess()">
+</app-employee-drawer>
+

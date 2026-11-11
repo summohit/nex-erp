@@ -1,8 +1,8 @@
 <div class="dashboard-layout">
-  <app-sidebar></app-sidebar>
+  @if (v2) { <app-sidebar-v2></app-sidebar-v2> } @else { <app-sidebar></app-sidebar> }
   
   <div class="main-content">
-    <app-header></app-header>
+    @if (v2) { <app-header-v2></app-header-v2> } @else { <app-header></app-header> }
     
     <main class="content-area">
       <router-outlet></router-outlet>

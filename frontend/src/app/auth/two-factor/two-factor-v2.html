@@ -1,0 +1,259 @@
+<div class="auth-centered">
+  <!-- The logo's two figures, drawn large and faint behind the card (matches /login) -->
+  <svg class="auth-mark" viewBox="0 0 240 208" aria-hidden="true">
+    <defs>
+      <linearGradient id="twoFactorMarkFill" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#1e6fe0" />
+        <stop offset="1" stop-color="#2fbf8a" />
+      </linearGradient>
+    </defs>
+    <g fill="url(#twoFactorMarkFill)">
+      <circle cx="58" cy="26" r="22" />
+      <circle cx="182" cy="26" r="22" />
+    </g>
+    <path d="M40 184 V92 Q40 66 62 82 L120 136 L178 82 Q200 66 200 92 V184"
+          fill="none" stroke="url(#twoFactorMarkFill)" stroke-width="40"
+          stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+
+  <div class="auth-container">
+
+    <div class="brand-section">
+      <a routerLink="/" title="Back to home" class="brand-logo-wrap">
+        <img src="/logo.png" class="brand-logo" alt="MIRA">
+      </a>
+
+      <ng-container [ngSwitch]="step">
+        <ng-container *ngSwitchCase="'verify'">
+          <h1 class="auth-title">Two-step verification</h1>
+          <p class="auth-subtitle" *ngIf="!isBackupMode">Enter the code from your authenticator app</p>
+          <p class="auth-subtitle" *ngIf="isBackupMode">Enter one of the backup codes you saved</p>
+        </ng-container>
+        <ng-container *ngSwitchCase="'enrol'">
+          <h1 class="auth-title">Set up two-step verification</h1>
+          <p class="auth-subtitle">Your company requires it. Scan the code with an authenticator app</p>
+        </ng-container>
+        <ng-container *ngSwitchCase="'codes'">
+          <h1 class="auth-title">Save your backup codes</h1>
+          <p class="auth-subtitle">Each one signs you in once if you lose your phone</p>
+        </ng-container>
+      </ng-container>
+    </div>
+
+    <div class="login-card">
+
+      <!-- STEP: VERIFY -->
+      <div *ngIf="step === 'verify'" class="form-panel">
+
+        <!-- Authenticator code -->
+        <ng-container *ngIf="!isBackupMode">
+          <div class="form-group">
+            <label class="form-label" for="verify-code">Authentication code</label>
+            <div class="code-boxes" [class.is-focused]="isCodeFocused">
+              <input
+                id="verify-code"
+                type="text"
+                class="code-input-overlay"
+                [(ngModel)]="code"
+                (focus)="isCodeFocused = true"
+                (blur)="isCodeFocused = false"
+                (input)="onCodeInput()"
+                (keyup.enter)="submit()"
+                maxlength="6"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                aria-describedby="verify-hint"
+                autofocus
+              />
+              <span *ngFor="let i of [0, 1, 2, 3, 4, 5]"
+                    class="code-box"
+                    [class.is-filled]="getCodeDigit(i)"
+                    [class.is-active]="isDigitActive(i)"
+                    [class.gap-after]="i === 2"
+                    aria-hidden="true">{{ getCodeDigit(i) }}</span>
+            </div>
+          </div>
+
+          <div class="auth-options-row">
+            <span class="helper-hint" id="verify-hint">A new code every 30 seconds</span>
+            <button type="button" class="toggle-link" (click)="toggleBackupMode()">Use a backup code</button>
+          </div>
+
+          <button type="button" class="auth-submit-btn" (click)="submit()" [disabled]="isSubmitting()">
+            <span *ngIf="!isSubmitting()">Verify</span>
+            <span *ngIf="isSubmitting()" class="btn-loader">
+              <span class="spinner-ring"></span>
+              <span>Verifying</span>
+            </span>
+          </button>
+        </ng-container>
+
+        <!-- Backup code -->
+        <ng-container *ngIf="isBackupMode">
+          <div class="form-group">
+            <label class="form-label" for="backup-code">Backup code</label>
+            <div class="input-wrapper">
+              <div class="input-icon-left">
+                <svg lucideKeyRound size="16"></svg>
+              </div>
+              <input
+                id="backup-code"
+                type="text"
+                class="auth-input mono-input"
+                [(ngModel)]="code"
+                (keyup.enter)="submit()"
+                autocomplete="off"
+                spellcheck="false"
+                autofocus
+              />
+            </div>
+          </div>
+
+          <div class="auth-options-row">
+            <span class="helper-hint">Each code works once</span>
+            <button type="button" class="toggle-link" (click)="toggleBackupMode()">Use authenticator app</button>
+          </div>
+
+          <button type="button" class="auth-submit-btn" (click)="submit()" [disabled]="isSubmitting()">
+            <span *ngIf="!isSubmitting()">Sign in with backup code</span>
+            <span *ngIf="isSubmitting()" class="btn-loader">
+              <span class="spinner-ring"></span>
+              <span>Verifying</span>
+            </span>
+          </button>
+        </ng-container>
+
+        <div class="card-footer">
+          <span class="footer-text">Not your account?</span>
+          <button type="button" class="signup-link" (click)="cancel()">Back to sign in</button>
+        </div>
+      </div>
+
+      <!-- STEP: ENROL -->
+      <div *ngIf="step === 'enrol'" class="form-panel">
+
+        <div class="qr-setup-box" *ngIf="qrDataUri(); else qrLoading">
+          <div class="qr-canvas-frame">
+            <img [src]="qrDataUri()" alt="QR code for your authenticator app" class="qr-img">
+          </div>
+
+          <div class="setup-key-row">
+            <span class="key-label">Can't scan? Enter this key</span>
+            <div class="key-line">
+              <code class="key-val">{{ formattedSecret() }}</code>
+              <button type="button" class="btn-copy-chip" (click)="copySecret()" [attr.aria-label]="secretCopied() ? 'Copied' : 'Copy setup key'">
+                <svg *ngIf="!secretCopied()" lucideCopy size="14"></svg>
+                <svg *ngIf="secretCopied()" lucideCheck size="14"></svg>
+                <span>{{ secretCopied() ? 'Copied' : 'Copy' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #qrLoading>
+          <div class="qr-loading-box">
+            <span class="spinner-ring dark"></span>
+            <span>Preparing your code</span>
+          </div>
+        </ng-template>
+
+        <div class="form-group">
+          <label class="form-label" for="enrol-code">Code from your app</label>
+          <div class="code-boxes" [class.is-focused]="isCodeFocused">
+            <input
+              id="enrol-code"
+              type="text"
+              class="code-input-overlay"
+              [(ngModel)]="code"
+              (focus)="isCodeFocused = true"
+              (blur)="isCodeFocused = false"
+              (input)="onCodeInput()"
+              (keyup.enter)="submit()"
+              maxlength="6"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              autofocus
+            />
+            <span *ngFor="let i of [0, 1, 2, 3, 4, 5]"
+                  class="code-box"
+                  [class.is-filled]="getCodeDigit(i)"
+                  [class.is-active]="isDigitActive(i)"
+                  [class.gap-after]="i === 2"
+                  aria-hidden="true">{{ getCodeDigit(i) }}</span>
+          </div>
+        </div>
+
+        <button type="button" class="auth-submit-btn" (click)="submit()" [disabled]="isSubmitting() || !qrDataUri()">
+          <span *ngIf="!isSubmitting()">Turn on two-step verification</span>
+          <span *ngIf="isSubmitting()" class="btn-loader">
+            <span class="spinner-ring"></span>
+            <span>Turning on</span>
+          </span>
+        </button>
+
+        <div class="card-footer">
+          <span class="footer-text">Not your account?</span>
+          <button type="button" class="signup-link" (click)="cancel()">Back to sign in</button>
+        </div>
+      </div>
+
+      <!-- STEP: CODES -->
+      <div *ngIf="step === 'codes'" class="form-panel">
+
+        <div class="vault-warning-box">
+          <svg lucideInfo size="16" class="warn-icon"></svg>
+          <p>You won't see these codes again. Keep them in a password manager or print them.</p>
+        </div>
+
+        <ol class="codes-list-grid">
+          <li *ngFor="let c of backupCodes(); let i = index">
+            <button
+              type="button"
+              class="code-chip-item"
+              (click)="copySingleBackupCode(c, i)"
+              [class.is-copied]="copiedCodeIndex() === i"
+              [attr.aria-label]="'Copy backup code ' + (i + 1)">
+              <span class="c-num">{{ i + 1 < 10 ? '0' + (i + 1) : (i + 1) }}</span>
+              <code class="c-code">{{ c }}</code>
+              <svg *ngIf="copiedCodeIndex() !== i" lucideCopy size="14" class="c-icon"></svg>
+              <svg *ngIf="copiedCodeIndex() === i" lucideCheck size="14" class="c-icon is-done"></svg>
+            </button>
+          </li>
+        </ol>
+
+        <div class="codes-btn-row">
+          <button type="button" class="btn-outline-action" (click)="copyBackupCodes()">
+            <svg *ngIf="!backupCodesCopied()" lucideCopy size="16"></svg>
+            <svg *ngIf="backupCodesCopied()" lucideCheck size="16"></svg>
+            <span>{{ backupCodesCopied() ? 'Copied' : 'Copy all' }}</span>
+          </button>
+          <button type="button" class="btn-outline-action" (click)="downloadBackupCodes()">
+            <svg lucideDownload size="16"></svg>
+            <span>Download</span>
+          </button>
+        </div>
+
+        <label class="ack-checkbox-label">
+          <input
+            type="checkbox"
+            [checked]="acknowledged()"
+            (change)="acknowledged.set(!acknowledged())"
+            class="custom-check"
+          />
+          <span>I've saved these codes</span>
+        </label>
+
+        <button type="button" class="auth-submit-btn" (click)="finish()" [disabled]="!acknowledged()">
+          Continue to MIRA
+        </button>
+      </div>
+
+    </div>
+
+    <p class="legal-notice">
+      <svg lucideLock size="12"></svg>
+      Encrypted connection
+    </p>
+
+  </div>
+</div>

@@ -162,6 +162,21 @@ h1, h2, h3, h4, h5, h6 {
   body.sidebar-collapsed .dashboard-layout {
     padding-left: 80px !important;
   }
+
+  /* UI v2 (new design, behind ?ui=v2): 68px icon rail + 252px panel. */
+  body.ui-v2 .dashboard-layout {
+    padding-left: 320px !important;
+    transition: padding-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  body.ui-v2.sidebar-collapsed .dashboard-layout {
+    padding-left: 68px !important;
+  }
+}
+
+/* UI v2: Allow position: sticky on header and sub-nav topbars */
+html:has(body.ui-v2),
+body.ui-v2 {
+  overflow-x: clip !important;
 }
 
 /* Form Styles */

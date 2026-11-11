@@ -13,7 +13,7 @@ import {
   LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
   LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
   LucideZap, LucideExternalLink, LucideTrophy, LucideAward,
-  LucideRoute
+  LucideRoute, LucideCar, LucideHouse
 } from '@lucide/angular';
 import { forkJoin, firstValueFrom } from 'rxjs';
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
@@ -72,7 +72,7 @@ interface WorkLocationBreakdown {
     LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
     LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
     LucideZap, LucideExternalLink, LucideTrophy, LucideAward,
-    LucideRoute
+    LucideRoute, LucideCar, LucideHouse
   ],
   templateUrl: './all-attendance.html',
   styleUrls: ['./all-attendance.css']
@@ -1685,6 +1685,16 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   /** A clocked day whose out-of-geo visit request hasn't been decided yet. */
   isPendingVisit(r?: AttendanceRecord | null): boolean {
     return !!r && !!r.clockIn && (r as any).geofenceApproval === 'PENDING';
+  }
+
+  /** Whether this record represents a field visit or on-site work. */
+  isFieldVisit(r?: AttendanceRecord | null): boolean {
+    return !!r && (!!(r as any).fieldVisit || !!r.isOnsite);
+  }
+
+  /** Whether the employee clocked in or out outside their assigned office branch. */
+  isOutsideOffice(r?: AttendanceRecord | null): boolean {
+    return !!r && (!!r.clockInOutside || !!r.clockOutOutside);
   }
 
   // Mirrors the grid's day-cell classification for a single record.

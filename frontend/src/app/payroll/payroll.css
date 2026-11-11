@@ -325,6 +325,22 @@
   color: #94A3B8;
 }
 
+/* Deductions card: a chip per kind of deduction, company costs underneath. */
+.kpi-summary-grid > .kpi-card { align-items: flex-start; }
+.kpi-deductions .kpi-info { flex: 1; min-width: 0; }
+.kpi-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 4px; }
+.kpi-chip {
+  font-size: 11px;
+  color: #64748B;
+  background: #FFF1F2;
+  border: 1px solid #FFE4E6;
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.kpi-chip strong { color: #BE123C; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kpi-company-cost { white-space: normal; }
+
 /* Horizontal Underline Tabs Navigation */
 .segmented-tabs-wrapper {
   margin-bottom: 24px;

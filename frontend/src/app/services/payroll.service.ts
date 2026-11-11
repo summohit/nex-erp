@@ -272,6 +272,11 @@ export class PayrollService {
   }
 
   /** The PDF itself, so the caller can save it rather than open a tab. */
+  /** The month's salary register as an Excel file. */
+  exportPayslips(month: number, year: number): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/payslips/export`, { params: { month, year }, responseType: 'blob' });
+  }
+
   downloadPayslip(id: number): Observable<Blob> {
     return this.http.get(`${this.apiUrl}/payslips/${id}/pdf`, { responseType: 'blob' });
   }

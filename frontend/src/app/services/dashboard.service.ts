@@ -91,6 +91,8 @@ export interface DashboardPayload {
     weekTimelogs: { days: { date: string; label: string; minutes: number }[]; totalMinutes: number; breakMinutes: number };
     myCalendar: { weekStart: string; weekEnd: string; days: DashboardCalendarDay[]; events: DashboardCalendarEvent[] };
     probation: { nextAppraisalDate: string | null; joiningDate: string | null; employmentCategory: string } | null;
+    /** Clock-in to clock-out hours per day, last 84 days, oldest first. */
+    myWorkHours84d?: { date: string; hours: number; status: string | null; isLate: boolean }[];
   };
   org?: {
     headcount: { total: number; byDepartment: { name: string; count: number }[] };
@@ -103,6 +105,14 @@ export interface DashboardPayload {
     onboardingPipeline?: { onboardingStatus: string; _count: number }[];
     leaveByType?: { name: string; count: number }[];
     celebrations?: { birthdays: any[]; anniversaries: any[] };
+    joiningsExits?: { month: string; joinings: number; exits: number }[];
+    attendanceWeekly?: { week: string; attendancePct: number; onTimePct: number }[];
+    ticketSla?: {
+      slaRate: number | null;
+      previousRate: number | null;
+      raised30d: number;
+      open: { under24h: number; from24to48h: number; over48h: number };
+    };
   };
   finance?: {
     payrollSummary?: { month: number; year: number; payslipCount: number; totalNetPay: number; totalEarnings: number; totalDeductions: number };

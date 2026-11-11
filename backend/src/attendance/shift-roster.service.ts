@@ -771,6 +771,31 @@ export class ShiftRosterService {
     return { written: rows.length, skipped: 0 };
   }
 
+  /**
+   * Set the standing shift (Employee.shiftId) for many people. With
+   * clearFutureRoster, rostered shifts from today on are removed so the new
+   * shift shows at once; rostered days off are kept.
+   */
+  async setPermanentShift(companyId: number, data: { employeeIds: number[]; shiftId: number; clearFutureRoster?: boolean }) {
+    const ids = data.employeeIds || [];
+    if (!ids.length) throw new BadRequestException('Select at least one employee');
+    if (!data.shiftId) throw new BadRequestException('Choose a shift');
+    await this.assertShift(companyId, data.shiftId);
+    const res = await this.prisma.employee.updateMany({
+      where: { companyId, id: { in: ids } },
+      data: { shiftId: data.shiftId },
+    });
+    let clearedRoster = 0;
+    if (data.clearFutureRoster) {
+      const today = dateKey(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
+      const del = await this.prisma.shiftRosterEntry.deleteMany({
+        where: { companyId, employeeId: { in: ids }, date: { gte: today }, isDayOff: false },
+      });
+      clearedRoster = del.count;
+    }
+    return { updated: res.count, clearedRoster };
+  }
+
   async clearRange(companyId: number, data: { employeeIds: number[]; start: string; end: string }) {
     const res = await this.prisma.shiftRosterEntry.deleteMany({
       where: {

@@ -150,8 +150,11 @@
         </div>
 
         <div class="sh-action-block">
+          <div class="sh-completed-pill sh-off-pill" *ngIf="offToday() && !todayAttendance()?.clockIn">
+            <span>{{ offToday() }}</span>
+          </div>
           <button
-            *ngIf="!todayAttendance()?.clockOut"
+            *ngIf="!todayAttendance()?.clockOut && !(offToday() && !todayAttendance()?.clockIn)"
             type="button"
             class="sh-cta-btn"
             [class.clock-out]="todayAttendance()?.clockIn"

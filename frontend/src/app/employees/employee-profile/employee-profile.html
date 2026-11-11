@@ -1,38 +1,122 @@
 <div class="page-container" [class.embedded]="embedded">
-  <div class="page-header" *ngIf="!embedded">
-    <div class="header-content">
-      <h1>Profile Settings</h1>
-      <p>Manage your profile, emergency contacts, and personal documents.</p>
-    </div>
-    <button type="button" class="btn-convert-trainee" *ngIf="canConvertTrainee()" (click)="openConversion()">Convert to Employee</button>
-  </div>
-
   <div class="profile-layout" *ngIf="!isLoading()">
-    <!-- Employment / probation status (4 Nov 2026) -->
-    <div class="probation-strip" *ngIf="probationInfo() as p" [ngClass]="p.cls">
-      <span class="probation-strip-label">{{ p.label }}</span>
-      <span class="probation-strip-text">{{ p.text }}</span>
+    
+    <!-- Hero Header Profile Card -->
+    <div class="hero-profile-card" *ngIf="!embedded">
+      <div class="hero-main-row">
+        <!-- Left: Avatar, Name, Code, Designation, Department, Location, Badges -->
+        <div class="hero-left-section">
+          <div class="hero-avatar-wrapper">
+            <div class="hero-avatar" *ngIf="!employeeData()?.avatarUrl">
+              <span>{{ employeeInitials() }}</span>
+            </div>
+            <img *ngIf="employeeData()?.avatarUrl" [src]="employeeData()?.avatarUrl" class="hero-avatar-img" alt="Avatar" />
+            <span class="hero-status-dot" [class.active]="employeeData()?.user?.status !== 'DEACTIVATED'"></span>
+          </div>
+
+          <div class="hero-info">
+            <div class="hero-title-row">
+              <h1 class="hero-name">{{ employeeData()?.firstName }} {{ employeeData()?.lastName }}</h1>
+              <span class="hero-code-badge">{{ employeeCodeBadge() }}</span>
+            </div>
+
+            <p class="hero-subtitle">
+              <span>{{ employeeData()?.designation?.name || 'Full Stack Engineer' }}</span>
+              <span class="subtitle-bullet">•</span>
+              <span>{{ employeeData()?.department?.name || 'Engineering & Tech' }}</span>
+              <span class="subtitle-bullet">•</span>
+              <span>{{ employeeData()?.branch?.name || employeeData()?.workLocation || 'Sector 135, Noida HQ' }}</span>
+            </p>
+
+            <div class="hero-pills-row">
+              <span class="hero-pill employment">
+                <svg lucideCheck size="13" class="inline-icon"></svg>
+                <span>{{ employmentCategoryLabel() }} Employee</span>
+              </span>
+
+              <span class="hero-pill probation" [ngClass]="probationPillClass()">
+                <span>{{ probationPillText() }}</span>
+              </span>
+
+              <span class="hero-pill account" [class.deactivated]="employeeData()?.user?.status === 'DEACTIVATED'">
+                <span>{{ employeeData()?.user?.status === 'DEACTIVATED' ? 'Deactivated Account' : 'Active Account' }}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: 3 Key Metrics Columns -->
+        <div class="hero-right-section">
+          <div class="hero-stat-col">
+            <span class="stat-label">JOINING DATE</span>
+            <span class="stat-value">{{ joiningDateFormatted() }}</span>
+          </div>
+
+          <div class="hero-stat-col">
+            <span class="stat-label">REPORTS TO</span>
+            <span class="stat-value manager-link">
+              <svg lucideUsers size="14" class="stat-icon"></svg>
+              <span>{{ managerName() }}</span>
+            </span>
+          </div>
+
+          <div class="hero-stat-col">
+            <span class="stat-label">SHIFT POLICY</span>
+            <span class="stat-value">{{ shiftPolicyText() }}</span>
+          </div>
+
+          <button type="button" class="btn-convert-trainee-hero" *ngIf="canConvertTrainee()" (click)="openConversion()">
+            Convert to Employee
+          </button>
+        </div>
+      </div>
+
+      <!-- Bottom Banner inside Hero Card -->
+      <div class="hero-banner" [ngClass]="heroBannerData().type">
+        <div class="hero-banner-content">
+          <span class="hero-banner-tag">{{ heroBannerData().tag }}</span>
+          <span class="hero-banner-message">{{ heroBannerData().message }}</span>
+        </div>
+        <button type="button" class="hero-banner-btn" (click)="setTab('history')">
+          View Timeline
+        </button>
+      </div>
     </div>
-    <!-- Tabs Navigation -->
+
+    <!-- Modern Pill Tabs Navigation Bar -->
     <div class="tabs-container">
-      <div class="tabs">
-        <button class="tab-btn" [class.active]="activeTab() === 'work'" (click)="setTab('work')">
-          Work
+      <div class="pill-tabs-bar">
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'work'" (click)="setTab('work')">
+          <svg lucideBriefcase size="15"></svg>
+          <span>Work</span>
         </button>
-        <button class="tab-btn" [class.active]="activeTab() === 'resume'" (click)="setTab('resume')">
-          Resume & Skills
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'resume'" (click)="setTab('resume')">
+          <svg lucideFileText size="15"></svg>
+          <span>Resume & Skills</span>
+          <span class="tab-count-chip" *ngIf="resumeCount() > 0">{{ resumeCount() }}</span>
         </button>
-        <button class="tab-btn" [class.active]="activeTab() === 'personal'" (click)="setTab('personal')">
-          Personal
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'personal'" (click)="setTab('personal')">
+          <svg lucideUser size="15"></svg>
+          <span>Personal</span>
         </button>
-        <button class="tab-btn" [class.active]="activeTab() === 'contacts'" (click)="setTab('contacts')">
-          Emergency Contacts
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'contacts'" (click)="setTab('contacts')">
+          <svg lucidePhone size="15"></svg>
+          <span>Emergency Contacts</span>
+          <span class="tab-count-chip" *ngIf="contactsCount() > 0">{{ contactsCount() }}</span>
         </button>
-        <button class="tab-btn" [class.active]="activeTab() === 'documents'" (click)="setTab('documents')" *ngIf="canManageDocuments()">
-          Documents
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'documents'" (click)="setTab('documents')" *ngIf="canManageDocuments()">
+          <svg lucideFolder size="15"></svg>
+          <span>Documents</span>
+          <span class="tab-count-chip" *ngIf="documentsCount() > 0">{{ documentsCount() }}</span>
         </button>
-        <button class="tab-btn" [class.active]="activeTab() === 'history'" (click)="setTab('history')">
-          History
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'history'" (click)="setTab('history')">
+          <svg lucideClock size="15"></svg>
+          <span>History</span>
         </button>
       </div>
     </div>
@@ -76,6 +160,20 @@
     <div class="spinner"></div>
     <p>Loading profile...</p>
   </div>
+</div>
+
+<div class="conversion-overlay" *ngIf="conversionOpen()" (click)="conversionOpen.set(false)">
+  <section class="conversion-modal" (click)="$event.stopPropagation()">
+    <header><div><h2>Convert Trainee to Employee</h2><p>Creates an editable offer letter. The existing account is reused after signing.</p></div><button type="button" (click)="conversionOpen.set(false)">×</button></header>
+    <div class="conversion-body">
+      <div class="trainee-summary"><strong>{{ employeeData()?.firstName }} {{ employeeData()?.lastName }}</strong><span>{{ employeeData()?.user?.email || employeeData()?.email }}</span></div>
+      <label>Employee position<select [(ngModel)]="conversionForm.jobId"><option [ngValue]="null">Select a position</option><option *ngFor="let job of jobs()" [ngValue]="job.id">{{ job.title }}</option></select></label>
+      <label>Offered annual CTC (₹)<input type="number" min="1" [(ngModel)]="conversionForm.offeredSalary" placeholder="Enter offered CTC"></label>
+      <label>Joining date <input type="date" [(ngModel)]="conversionForm.joiningDate"></label>
+      <label>Remarks <textarea [(ngModel)]="conversionForm.remarks" placeholder="Optional internal remarks"></textarea></label>
+    </div>
+    <footer><button type="button" class="btn-cancel-conversion" (click)="conversionOpen.set(false)">Cancel</button><button type="button" class="btn-proceed-conversion" [disabled]="isStartingConversion()" (click)="startConversion()">{{ isStartingConversion() ? 'Saving…' : 'Proceed to Offered' }}</button></footer>
+  </section>
 </div>
 
 <div class="conversion-overlay" *ngIf="conversionOpen()" (click)="conversionOpen.set(false)">

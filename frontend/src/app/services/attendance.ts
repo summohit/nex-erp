@@ -139,6 +139,11 @@ export class AttendanceService {
     return this.http.get<ShiftPeriodSummary>(`${this.apiUrl}/shift-summary`, { params });
   }
 
+  /** Holiday / weekly off / day off today: there is no clock-in (11 Nov 2026). */
+  getOffToday(): Observable<{ reason: string | null }> {
+    return this.http.get<{ reason: string | null }>(`${this.apiUrl}/off-today`);
+  }
+
   getTodayAttendance(): Observable<AttendanceRecord | null> {
     return this.http.get<AttendanceRecord>(`${this.apiUrl}/me`);
   }

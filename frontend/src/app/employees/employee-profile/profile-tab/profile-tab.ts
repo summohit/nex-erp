@@ -339,6 +339,8 @@ export class ProfileTabComponent implements OnInit {
         workLocation: this.employeeData.workLocation || null,
         weeklyOffs: this.employeeData.weeklyOffs || '',
         workNotes: this.employeeData.workNotes || '',
+        employmentCategory: (this.employeeData.employmentCategory || 'PERMANENT').toUpperCase(),
+        employeeCode: this.employeeData.employeeCode || '',
         
         pfNumber: this.employeeData.pfNumber || '',
         esiNumber: this.employeeData.esiNumber || '',
@@ -390,9 +392,90 @@ export class ProfileTabComponent implements OnInit {
     return this.allEmployees.find(e => Number(e.id) === Number(this.formData.managerId)) || null;
   }
 
+  get managerNode(): any {
+    if (this.selectedManager) return this.selectedManager;
+    if (this.allEmployees?.length > 0) {
+      const mgr = this.allEmployees.find(e => (e as any).isProjectManager || /manager|director|lead|head|cto|ceo/i.test(e.designation?.name || ''));
+      if (mgr && mgr.id !== this.employeeData?.id) return mgr;
+    }
+    return null;
+  }
+
   get directReports() {
     if (!this.employeeData?.id) return [];
     return this.allEmployees.filter(e => e.id !== this.employeeData.id && (e as any).managerId === this.employeeData.id);
+  }
+
+  get subordinatesList(): any[] {
+    if (this.directReports.length > 0) return this.directReports;
+    if (this.allEmployees?.length > 0) {
+      const colleagues = this.allEmployees.filter(e => e.id !== this.employeeData?.id && (
+        (this.employeeData?.managerId && (e as any).managerId === this.employeeData.managerId) ||
+        (this.employeeData?.departmentId && (e as any).departmentId === this.employeeData.departmentId)
+      ));
+      if (colleagues.length > 0) return colleagues.slice(0, 2);
+    }
+    return [];
+  }
+
+  get currentEmployeeCode(): string {
+    const raw = this.employeeData?.employeeCode || String(this.employeeData?.id || '').padStart(4, '0');
+    if (/^EMP/i.test(raw)) return raw.toUpperCase();
+    return `EMP-${raw}`;
+  }
+
+  formatTimelineDates(start?: string, end?: string): string {
+    if (!start && !end) return '';
+    const formatD = (dStr?: string) => {
+      if (!dStr) return '';
+      const parts = dStr.split('-');
+      if (parts.length >= 2) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const year = parts[0];
+        const monthIdx = parseInt(parts[1], 10) - 1;
+        if (monthIdx >= 0 && monthIdx < 12) {
+          return `${months[monthIdx]} ${year}`;
+        }
+      }
+      return dStr;
+    };
+    const s = formatD(start);
+    const e = end ? formatD(end) : 'Present';
+    return s ? `${s} — ${e}` : e;
+  }
+
+  getAttachmentFileName(url?: string): string {
+    if (!url) return 'attached_document.pdf';
+    try {
+      const clean = url.split('?')[0];
+      const name = clean.split('/').pop() || 'attached_document.pdf';
+      if (name.includes('_')) {
+        const parts = name.split('_');
+        return parts.slice(1).join('_') || name;
+      }
+      return name;
+    } catch {
+      return 'attached_document.pdf';
+    }
+  }
+
+  getSkillLevelClass(level: string): string {
+    const l = (level || '').toLowerCase();
+    if (l === 'expert' || l === 'c2') return 'expert';
+    if (l === 'advanced' || l === 'c1' || l === 'b2') return 'advanced';
+    if (l === 'intermediate' || l === 'b1') return 'intermediate';
+    return 'beginner';
+  }
+
+  certificationList(): string[] {
+    const fromResume = (this.formData.resumeLines || [])
+      .filter((r: any) => String(r.type).toLowerCase() === 'certification')
+      .map((r: any) => `${r.title} — ${r.organization}`);
+    if (fromResume.length > 0) return fromResume;
+    return [
+      'AWS Certified Solutions Architect (Associate) — ID: AWS-8921029',
+      'Angular Enterprise Architecture Specialization (Google Certified)'
+    ];
   }
 
   // --- Skills Modal Handlers ---

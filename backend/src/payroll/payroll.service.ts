@@ -7,6 +7,7 @@ import { payableDayStatus } from '../attendance/clock-out-approval';
 import { isLopExempt } from './lop-exempt';
 import { lopDivisor } from './masters/payroll-masters.service';
 import { ModuleRef } from '@nestjs/core';
+import * as ExcelJS from 'exceljs';
 import {
   DEFAULT_TEMPLATE, LINE_COMPONENT_NAMES, SalaryTemplateRules, TemplateLine,
   gradeFor, splitGross,
@@ -1255,6 +1256,96 @@ export class PayrollService {
     // having asked for them. Generating payroll is a decision; a page load is
     // not. The empty state has a button for it.
     return existing;
+  }
+
+  /**
+   * Salary register for a month as .xlsx: one row per payslip, every earning
+   * and deduction line as its own column (in the order they first appear),
+   * then loss of pay, totals, net pay and the bank details payroll pays to.
+   */
+  async exportPayslipsXlsx(companyId: number, month: number, year: number) {
+    if (!(month >= 1 && month <= 12) || !(year > 2000)) throw new BadRequestException('Choose a month and year to export');
+    const slips = await this.prisma.payslip.findMany({
+      where: { companyId, month, year },
+      include: {
+        items: { orderBy: { id: 'asc' } },
+        employee: {
+          select: {
+            employeeCode: true, firstName: true, lastName: true, joiningDate: true,
+            bankName: true, bankAccountNumber: true, ifscCode: true,
+            department: { select: { name: true } }, designation: { select: { name: true } },
+          },
+        },
+      },
+    });
+    slips.sort((a, b) => `${a.employee?.firstName} ${a.employee?.lastName}`.localeCompare(`${b.employee?.firstName} ${b.employee?.lastName}`));
+
+    const earningCols: string[] = [];
+    const deductionCols: string[] = [];
+    for (const p of slips) for (const i of p.items) {
+      const list = i.type === 'DEDUCTION' ? deductionCols : earningCols;
+      if (!list.includes(i.componentName)) list.push(i.componentName);
+    }
+    const monthName = new Date(Date.UTC(year, month - 1, 1)).toLocaleString('en-IN', { month: 'long', timeZone: 'UTC' });
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet(`${monthName} ${year}`, { views: [{ state: 'frozen', xSplit: 3, ySplit: 1 }] });
+    const fixedHead = ['Slip No', 'Emp Code', 'Name', 'Department', 'Designation', 'Status', 'Days in Month', 'Paid Days', 'Present Days', 'Absent Days', 'Half Days'];
+    const tail = ['Total Earnings', ...deductionCols, 'Loss of Pay', 'Total Deductions (incl. LOP)', 'Net Pay', 'Bank', 'Account Number', 'IFSC', 'Paid On'];
+    ws.addRow([...fixedHead, ...earningCols, ...tail]);
+
+    // Paid days as on the payslip: days in the month less days before joining and absent days.
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const monthStart = Date.UTC(year, month - 1, 1);
+    const paidDays = (p: typeof slips[number]) => {
+      const j = p.employee?.joiningDate ? new Date(p.employee.joiningDate) : null;
+      const before = j && j.getTime() > monthStart
+        ? Math.min(daysInMonth, Math.round((Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - monthStart) / 86400000))
+        : 0;
+      return Math.max(0, daysInMonth - before - (Number(p.absentDays) || 0));
+    };
+    const sumOf = (p: typeof slips[number], type: string, name: string) =>
+      p.items.filter((i) => (type === 'DEDUCTION' ? i.type === 'DEDUCTION' : i.type !== 'DEDUCTION') && i.componentName === name).reduce((t, i) => t + i.amount, 0);
+    for (const p of slips) {
+      const e = p.employee;
+      ws.addRow([
+        `${year}/${String(month).padStart(2, '0')}/${p.employeeId}`, e?.employeeCode ?? '', `${e?.firstName ?? ''} ${e?.lastName ?? ''}`.trim(), e?.department?.name ?? '', e?.designation?.name ?? '',
+        p.status, daysInMonth, paidDays(p), p.presentDays, p.absentDays, p.halfDays,
+        ...earningCols.map((c) => sumOf(p, 'EARNING', c) || null),
+        p.totalEarnings,
+        ...deductionCols.map((c) => sumOf(p, 'DEDUCTION', c) || null),
+        p.lossOfPay || null, Math.round((p.totalDeductions + p.lossOfPay) * 100) / 100, p.netPay,
+        e?.bankName ?? '', e?.bankAccountNumber ?? '', e?.ifscCode ?? '', p.paidOn ?? null,
+      ]);
+    }
+
+    // Totals row for every money column.
+    const firstMoney = fixedHead.length + 1;
+    const lastMoney = fixedHead.length + earningCols.length + 1 + deductionCols.length + 3;
+    const totals: any[] = ['', '', 'TOTAL'];
+    for (let c = 4; c <= lastMoney; c++) {
+      totals[c - 1] = c >= firstMoney && slips.length
+        ? { formula: `SUM(${ws.getColumn(c).letter}2:${ws.getColumn(c).letter}${slips.length + 1})` }
+        : '';
+    }
+    const totalRow = ws.addRow(totals);
+    totalRow.font = { bold: true };
+
+    const header = ws.getRow(1);
+    header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+    header.alignment = { vertical: 'middle', wrapText: true };
+    header.height = 32;
+    ws.columns.forEach((col, idx) => {
+      const c = idx + 1;
+      col.width = c === 3 ? 26 : c <= fixedHead.length ? 14 : c > lastMoney ? 18 : 15;
+      if (c >= firstMoney && c <= lastMoney) col.numFmt = '#,##0.00';
+    });
+    ws.getColumn(lastMoney + 4).numFmt = 'dd-mmm-yyyy';
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: lastMoney + 4 } };
+
+    const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+    return { buffer, filename: `Salary-Register-${monthName}-${year}.xlsx` };
   }
 
   async getMyPayslips(companyId: number, userId: number) {

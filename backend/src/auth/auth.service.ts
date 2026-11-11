@@ -39,9 +39,9 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
     // 3. Create Company and Admin User in a transaction
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const company = await tx.company.create({
-        data: { name: companyName, domain },
+        data: { name: companyName, domain, onboardingCompleted: true },
       });
 
       const user = await tx.user.create({
@@ -50,6 +50,8 @@ export class AuthService {
           password: hashedPassword,
           role: 'SUPERADMIN',
           companyId: company.id,
+          status: 'ACTIVE',
+          emailVerifiedAt: new Date(),
         },
       });
 
@@ -164,9 +166,18 @@ export class AuthService {
       // 8. Seed default master data asynchronously
       this.companySeederService.seedCompanyDefaults(company.id).catch(e => console.error(e));
 
-      // We do not return JWTs here because the user must verify their email first.
-      return { message: 'Signup successful. Please check your email to verify your account.' };
+      return { user, employee };
     });
+
+    const tokens = await this.issueTokens({
+      ...result.user,
+      employee: result.employee,
+    });
+
+    return {
+      ...tokens,
+      message: 'Signup successful. Welcome to your dashboard.',
+    };
   }
 
   /**

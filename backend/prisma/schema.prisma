@@ -380,6 +380,9 @@ model Designation {
 // Core Employee Profile
 model Employee {
   id                   Int          @id @default(autoincrement())
+  /// WFC, work from anywhere (11 Nov 2026): clock in and out from any place,
+  /// and the day is never marked late, half day or early leave.
+  workFromAnywhere     Boolean      @default(false)
   firstName            String
   lastName             String
   departmentId         Int?

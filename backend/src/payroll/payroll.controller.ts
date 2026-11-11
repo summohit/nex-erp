@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Requ
 import { PayrollService } from './payroll.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { isPayrollRole } from '../common/company-roles';
+import { assertSalaryEditor } from './pay-profiles/pay-profiles.controller';
 
 @Controller('payroll')
 @UseGuards(AuthGuard)
@@ -120,7 +121,7 @@ export class PayrollController {
     @Param('employeeId', ParseIntPipe) employeeId: number,
     @Body() body: { gross: number },
   ) {
-    this.assertPayrollOperator(req, 'apply the salary template');
+    assertSalaryEditor(req.user.role);
     return this.payrollService.applyTemplate(req.user.companyId, employeeId, Number(body.gross));
   }
 
@@ -139,7 +140,7 @@ export class PayrollController {
     @Param('employeeId', ParseIntPipe) employeeId: number,
     @Body() items: { componentId: number; amount: number }[]
   ) {
-    this.assertPayrollOperator(req, 'change a salary');
+    assertSalaryEditor(req.user.role);
     return this.payrollService.updateSalaryStructure(req.user.companyId, employeeId, items);
   }
 
@@ -219,6 +220,19 @@ export class PayrollController {
   getPayslips(@Request() req, @Query('month') month?: number, @Query('year') year?: number) {
     this.assertPayrollOperator(req, 'browse every payslip in the company');
     return this.payrollService.getPayslips(req.user.companyId, month, year);
+  }
+
+  /** The month's payslips as an Excel sheet: one row per person, a column per earning and deduction. */
+  @Get('payslips/export')
+  async exportPayslips(@Request() req, @Res() res, @Query('month') month: string, @Query('year') year: string) {
+    this.assertPayrollOperator(req, 'export payslips');
+    const { buffer, filename } = await this.payrollService.exportPayslipsXlsx(req.user.companyId, Number(month), Number(year));
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
   }
 
   @Put('payslips/finalize-all')

@@ -59,6 +59,7 @@ export class EmployeeDrawerComponent implements OnInit {
       shiftId: [null, Validators.required],
       managerId: [null],
       isProjectManager: [false],
+      workFromAnywhere: [false],
       // §23. Not part of the employee payload — saved through its own
       // endpoint after the profile save, because only Admin and Finance may
       // set it and it must not ride in beside a phone number.
@@ -149,6 +150,7 @@ export class EmployeeDrawerComponent implements OnInit {
           designationId: this.employeeData.designationId,
           branchId: this.employeeData.branchId,
           shiftId: this.employeeData.shiftId,
+          workFromAnywhere: !!this.employeeData.workFromAnywhere,
           managerId: this.employeeData.managerId,
           isProjectManager: this.employeeData.isProjectManager || this.isProjectManagerDesignation(this.employeeData.designationId),
           // Absent from the payload entirely when the viewer may not see it,
@@ -164,7 +166,7 @@ export class EmployeeDrawerComponent implements OnInit {
           this.form.get('employmentCategory')?.disable();
         }
       } else {
-        this.form.reset({ role: 'EMPLOYEE', isProjectManager: false, employmentCategory: 'PERMANENT' });
+        this.form.reset({ role: 'EMPLOYEE', isProjectManager: false, workFromAnywhere: false, employmentCategory: 'PERMANENT' });
         this.form.get('email')?.enable();
         this.form.get('employmentCategory')?.enable();
         // Default reporting line: CEO of the organization

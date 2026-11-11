@@ -27,6 +27,12 @@ export class AttendanceController {
     return isSuperAdmin(role) || normaliseRole(role) === 'HR';
   }
 
+  /** Holiday / weekly off / day off today, so the app can hide Clock In. */
+  @Get('off-today')
+  getMyOffToday(@Request() req) {
+    return this.attendanceService.getMyOffToday(req.user.sub);
+  }
+
   @Get('me')
   getTodayAttendance(@Request() req) {
     return this.attendanceService.getTodayAttendance(req.user.sub);

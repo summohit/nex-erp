@@ -1,0 +1,226 @@
+<!-- Mobile navigation backdrop: tapping anywhere outside the sidebar closes it -->
+<button
+  type="button"
+  class="mobile-nav-backdrop"
+  *ngIf="layout.isMobileNavOpen()"
+  (click)="closeMobileNav()"
+  aria-label="Close navigation"></button>
+
+<aside class="sidebar-wrapper" [class.collapsed]="!drawerVisible()">
+
+  <!-- ==========================================
+       TIER 1: DARK PRIMARY ICON RAIL
+       ========================================== -->
+  <div class="sidebar-rail" (mouseover)="showRailTip($event)" (focusin)="showRailTip($event)"
+       (mouseleave)="hideRailTip()" (focusout)="hideRailTip()" (click)="hideRailTip()">
+    <!-- Top Gradient MIRA Brand Logo -->
+    <a href="/dashboard" class="rail-logo-badge" [class.has-logo]="user()?.company?.logoUrl && !logoFailed()"
+       [attr.aria-label]="(user()?.company?.name || 'MIRA') + ' — Dashboard'" data-label="Dashboard"
+       (click)="$event.preventDefault(); router.navigate(['/dashboard']); closeMobileNav()">
+      <img *ngIf="user()?.company?.logoUrl && !logoFailed(); else railLetter" [src]="user()?.company?.logoUrl"
+           (error)="onLogoError()" [alt]="user()?.company?.name || 'Company logo'" class="rail-logo-img">
+      <ng-template #railLetter><span class="rail-logo-letter">{{ (user()?.company?.name || 'M')[0] }}</span></ng-template>
+    </a>
+
+    <!-- Rail Navigation Icons Scroll -->
+    <div class="rail-icons-scroll">
+      <ng-container *ngFor="let mod of modules">
+        <button
+          type="button"
+          class="rail-icon-btn"
+          [class.active]="activeModuleId() === mod.id"
+          (click)="onSelectModule(mod)"
+          [attr.aria-label]="mod.title"
+          [attr.data-label]="mod.title">
+          
+          <!-- Left Emerald Active Pill (Figma spec) -->
+          <span class="rail-active-indicator" *ngIf="activeModuleId() === mod.id"></span>
+
+          <!-- Lucide Icon Matching Module -->
+          <ng-container [ngSwitch]="mod.icon">
+            <svg *ngSwitchCase="'dashboard'" lucideLayoutDashboard size="20"></svg>
+            <svg *ngSwitchCase="'approvals'" lucideCheckCircle2 size="20"></svg>
+            <svg *ngSwitchCase="'crm'" lucideFunnel size="20"></svg>
+            <svg *ngSwitchCase="'sales'" lucideShoppingCart size="20"></svg>
+            <svg *ngSwitchCase="'delivery'" lucideKanban size="20"></svg>
+            <svg *ngSwitchCase="'employees'" lucideUsers size="20"></svg>
+            <svg *ngSwitchCase="'recruitment'" lucideBriefcase size="20"></svg>
+            <svg *ngSwitchCase="'performance'" lucideTarget size="20"></svg>
+            <svg *ngSwitchCase="'attendance'" lucideCalendarClock size="20"></svg>
+            <svg *ngSwitchCase="'payroll'" lucideBanknote size="20"></svg>
+            <svg *ngSwitchCase="'clients'" lucideBuilding size="20"></svg>
+            <svg *ngSwitchCase="'assets'" lucideLaptop size="20"></svg>
+            <svg *ngSwitchCase="'appreciation'" lucideTrophy size="20"></svg>
+            <svg *ngSwitchCase="'offboarding'" lucideDoorOpen size="20"></svg>
+            <svg *ngSwitchCase="'notices'" lucideMegaphone size="20"></svg>
+            <svg *ngSwitchCase="'chat'" lucideMessageCircle size="20"></svg>
+            <svg *ngSwitchCase="'bug'" lucideBug size="20"></svg>
+            <svg *ngSwitchCase="'map'" lucideMapPin size="20"></svg>
+          </ng-container>
+
+          <!-- Top-Right Red Notification Pill (Approvals 3) -->
+          <span class="rail-badge" *ngIf="mod.badge">{{ mod.badge }}</span>
+        </button>
+      </ng-container>
+    </div>
+
+    <!-- Rail Bottom Actions -->
+    <div class="rail-bottom-actions">
+      <!-- Settings Icon -->
+      <button
+        *ngIf="settingsModule"
+        type="button"
+        class="rail-icon-btn"
+        [class.active]="activeModuleId() === settingsModule.id"
+        (click)="onSelectModule(settingsModule)"
+        [attr.aria-label]="settingsModule.title"
+        [attr.data-label]="settingsModule.title">
+        <span class="rail-active-indicator" *ngIf="activeModuleId() === settingsModule.id"></span>
+        <svg lucideSettings size="20"></svg>
+      </button>
+
+      <!-- User Profile Initials Avatar with Green Online Dot -->
+      <div class="rail-user-avatar-wrap" (click)="goToProfile()" aria-label="My profile" data-label="My profile">
+        <div class="rail-user-avatar">{{ getUserInitials() }}</div>
+        <span class="online-dot"></span>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==========================================
+       TIER 2: SECONDARY SUB-MENU DRAWER (WHITE)
+       ========================================== -->
+  <div class="sidebar-drawer" *ngIf="drawerVisible()">
+
+    <!-- Drawer Header -->
+    <div class="drawer-header">
+      <h3 class="drawer-title">
+        {{ viewMode() === 'tree' ? 'All modules' : currentActiveModule()?.title }}
+      </h3>
+
+      <div class="drawer-header-actions">
+        <!-- Toggle Single Module vs All Modules Tree -->
+        <button
+          type="button"
+          class="btn-drawer-tool"
+          [class.active]="viewMode() === 'tree'"
+          (click)="toggleViewMode()"
+          [attr.title]="viewMode() === 'tree' ? 'Switch to Single Module' : 'View All Modules Tree'">
+          <svg lucideList size="16"></svg>
+        </button>
+
+        <!-- Collapse Drawer Button (< chevron) -->
+        <button
+          type="button"
+          class="btn-drawer-tool"
+          (click)="toggleDrawer()"
+          title="Collapse Sidebar Drawer">
+          <svg lucideChevronLeft size="16"></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Menus Search Bar -->
+    <div class="drawer-search-wrap">
+      <div class="drawer-search-box">
+        <svg lucideSearch size="14" class="drawer-search-icon"></svg>
+        <input
+          type="text"
+          class="drawer-search-input"
+          placeholder="Filter menus..."
+          [value]="searchFilter()"
+          (input)="onSearchInput($event)">
+      </div>
+    </div>
+
+    <!-- Scrollable Drawer Body -->
+    <div class="drawer-scroll-body">
+
+      <!-- VIEW A: SINGLE MODULE VIEW (Figma Image 1) -->
+      <ng-container *ngIf="viewMode() === 'single'">
+
+        <nav class="drawer-items-nav">
+          <a
+            *ngFor="let item of filteredActiveItems()"
+            [attr.href]="item.route"
+            class="drawer-item"
+            [class.active]="isSubItemActive(item)"
+            (click)="onItemClick(item, $event)">
+            
+            <div class="item-left">
+              <span class="item-bullet"></span>
+              <span class="item-title">{{ item.title }}</span>
+            </div>
+
+            <!-- Count Badge -->
+            <span class="item-badge" *ngIf="item.badge" [class.badge-active]="isSubItemActive(item)">
+              {{ item.badge }}
+            </span>
+          </a>
+        </nav>
+      </ng-container>
+
+      <!-- VIEW B: ALL MODULES TREE VIEW (Figma Image 2) -->
+      <ng-container *ngIf="viewMode() === 'tree'">
+        <div class="tree-container">
+          <div *ngFor="let mod of filteredTreeModules()" class="tree-group">
+            
+            <div class="tree-group-header" (click)="activeModuleId.set(mod.id)">
+              <span class="tree-group-title">{{ mod.title }}</span>
+              <span class="tree-group-count">{{ mod.items.length }} items</span>
+            </div>
+
+            <div class="tree-group-items">
+              <a
+                *ngFor="let sub of mod.items"
+                [attr.href]="sub.route"
+                class="tree-item"
+                [class.active]="isSubItemActive(sub)"
+                (click)="onItemClick(sub, $event)">
+                
+                <span class="tree-dash">- {{ sub.title }}</span>
+
+                <span class="item-badge" *ngIf="sub.badge" [class.badge-active]="isSubItemActive(sub)">
+                  {{ sub.badge }}
+                </span>
+              </a>
+            </div>
+
+          </div>
+        </div>
+      </ng-container>
+
+    </div>
+
+    <!-- Drawer Footer (Figma: Module Status: LIVE  v2.4) -->
+    <div class="drawer-footer">
+      <span class="footer-status-label">Module Status: <strong>LIVE</strong></span>
+      <span class="footer-version">v2.4</span>
+    </div>
+
+  </div>
+
+  <!-- Rail hover label -->
+  <div class="rail-tip" *ngIf="railTip() as t" [style.top.px]="t.top" [style.left.px]="t.left" role="tooltip">{{ t.text }}</div>
+
+  <!-- Logout Confirmation Modal -->
+  <div class="modal-overlay" *ngIf="showLogoutModal()" (click)="cancelLogout()">
+    <div class="modal-container" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Confirm Logout</h3>
+        <button class="btn-icon" (click)="cancelLogout()">
+          <svg lucideX size="20"></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to log out of your session?</p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" (click)="cancelLogout()">Cancel</button>
+        <button class="btn-danger" (click)="confirmLogout()">Logout</button>
+      </div>
+    </div>
+  </div>
+
+</aside>

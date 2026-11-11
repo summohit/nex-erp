@@ -400,6 +400,10 @@
     <div class="modal-body automate-modal-body">
       <!-- 1. Compact Shift & Schedule Configuration Bar -->
       <div class="automate-setup-bar">
+        <div class="bulk-view-toggle bulk-mode-toggle" *ngIf="canPermanentShift()">
+          <button type="button" [class.active]="bulkForm.mode !== 'permanent'" (click)="bulkForm.mode = 'dates'">Selected dates</button>
+          <button type="button" [class.active]="bulkForm.mode === 'permanent'" (click)="bulkForm.mode = 'permanent'; bulkForm.isDayOff = false">Permanent</button>
+        </div>
         <div class="setup-grid">
           <!-- Target Shift -->
           <div class="setup-col setup-shift-col" [class.field-disabled]="bulkForm.isDayOff">
@@ -426,7 +430,7 @@
           </div>
 
           <!-- Date Range & Presets -->
-          <div class="setup-col setup-dates-col">
+          <div class="setup-col setup-dates-col" *ngIf="bulkForm.mode !== 'permanent'; else permanentNote">
             <div class="setup-label-row">
               <label class="setup-field-label">
                 <svg lucideCalendar size="14"></svg>
@@ -459,8 +463,20 @@
           </div>
         </div>
 
+        <ng-template #permanentNote>
+          <div class="setup-col setup-dates-col">
+            <label class="compact-option-card" [class.is-active]="bulkForm.clearFutureRoster">
+              <input type="checkbox" [(ngModel)]="bulkForm.clearFutureRoster" class="custom-check-input">
+              <div class="option-card-text">
+                <span class="opt-title">Remove rostered shifts from today</span>
+                <span class="opt-desc">The new shift shows at once; rostered days off stay</span>
+              </div>
+            </label>
+          </div>
+        </ng-template>
+
         <!-- Sleek Horizontal Options Strip -->
-        <div class="setup-options-row">
+        <div class="setup-options-row" *ngIf="bulkForm.mode !== 'permanent'">
           <label class="compact-option-card" [class.is-active]="bulkForm.isDayOff">
             <input type="checkbox" [(ngModel)]="bulkForm.isDayOff" class="custom-check-input">
             <div class="option-card-text">
@@ -698,7 +714,7 @@
         (click)="submitBulk()"
       >
         <span class="btn-inner-content">
-          <span>Apply Shifts <ng-container *ngIf="bulkSelection().size > 0">({{ bulkSelection().size }})</ng-container></span>
+          <span>{{ bulkForm.mode === 'permanent' ? 'Change Shift' : 'Apply Shifts' }} <ng-container *ngIf="bulkSelection().size > 0">({{ bulkSelection().size }})</ng-container></span>
           <svg lucideWandSparkles size="15"></svg>
         </span>
       </button>

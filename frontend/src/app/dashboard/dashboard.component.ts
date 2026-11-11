@@ -1212,9 +1212,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Holiday / weekly off today: shown instead of Clock In (11 Nov 2026). */
+  offToday = signal<string | null>(null);
+
   loadAttendance() {
     this.attendanceService.getTodayAttendance().subscribe({
       next: (res: any) => this.todayAttendance.set(res),
+    });
+    this.attendanceService.getOffToday().subscribe({
+      next: (r) => this.offToday.set(r?.reason ?? null),
+      error: () => this.offToday.set(null),
     });
   }
 

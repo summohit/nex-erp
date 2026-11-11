@@ -2,6 +2,7 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
+import { LucideHourglass } from '@lucide/angular';
 import { LifecycleService, LcOverview, LcProbation } from '../../services/lifecycle.service';
 
 /**
@@ -14,12 +15,14 @@ import { LifecycleService, LcOverview, LcProbation } from '../../services/lifecy
 @Component({
   selector: 'app-probation-watch-card',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LucideHourglass],
   template: `
     <section class="pwc" *ngIf="visible()">
       <header class="pwc-head">
         <div class="pwc-title">
-          <span class="pwc-icon">⏳</span>
+          <span class="pwc-icon">
+            <svg lucideHourglass size="20"></svg>
+          </span>
           <div>
             <h3>Probation — action needed</h3>
             <p>{{ d()!.canManageProbation ? 'Decide reviewed probations, chase overdue reviews.' : 'Review your team members before their probation ends.' }}</p>

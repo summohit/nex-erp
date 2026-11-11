@@ -1,0 +1,255 @@
+<header class="topbar">
+  <!-- Spotlight Search Component -->
+  <app-spotlight-search></app-spotlight-search>
+
+  <!-- Phone navigation. Hidden on desktop, where the rail is always visible. -->
+  <button
+    type="button"
+    class="btn-mobile-nav"
+    (click)="layout.toggleMobileNav()"
+    [attr.aria-expanded]="layout.isMobileNavOpen()"
+    aria-label="Menu">
+    <svg lucideMenu size="20"></svg>
+  </button>
+
+  <!-- Global Search Input Trigger -->
+  <div class="global-search-container" (click)="openSpotlight()">
+    <svg lucideSearch size="16" class="search-icon"></svg>
+    <input type="text" 
+           readonly
+           placeholder="Search" 
+           class="global-search-input cursor-pointer">
+    <span class="search-kbd">⌘K</span>
+  </div>
+
+  <!-- Every action sits in one right-aligned group -->
+  <div class="topbar-actions">
+
+  <!-- Global Systray Clock-in Widget -->
+  <div class="clock-systray-widget" [class.is-active]="isClockedIn()">
+    <div class="clock-timer-display">
+      <div class="status-indicator-wrapper">
+        <div class="status-indicator-dot"></div>
+      </div>
+      <svg lucideClock size="14" class="clock-icon-muted"></svg>
+      <span class="timer-digits" *ngIf="isClockedIn()">{{ timerStr() }}</span>
+      <span class="timer-digits" *ngIf="!isClockedIn() && totalHoursStr()">{{ totalHoursStr() }}</span>
+      <span class="timer-digits" *ngIf="!isClockedIn() && !totalHoursStr()">{{ timerStr() }}</span>
+    </div>
+
+    <div class="clock-divider"></div>
+
+    <button 
+      type="button" 
+      (click)="toggleClock()"
+      [disabled]="isClocking()"
+      class="btn-clock-action"
+      [class.btn-clock-in]="!isClockedIn()"
+      [class.btn-clock-out]="isClockedIn()"
+      [title]="isClockedIn() ? 'Clock Out of your current shift' : 'Clock In to start your shift'">
+      <svg lucidePlay size="12" *ngIf="!isClockedIn() && !isClocking()" fill="currentColor"></svg>
+      <svg lucideSquare size="12" *ngIf="isClockedIn() && !isClocking()" fill="currentColor"></svg>
+      <svg lucideLoader2 size="12" *ngIf="isClocking()" class="spinner-icon"></svg>
+      <span>{{ isClocking() ? 'Processing…' : (isClockedIn() ? 'Clock out' : 'Clock in') }}</span>
+    </button>
+  </div>
+
+  <!-- Tickets (Helpdesk) -->
+  <button
+    class="btn-header-tickets"
+    routerLink="/crm/tickets"
+    type="button"
+    [title]="canSeeTicketAlerts() && openTicketCount() > 0
+      ? openTicketCount() + ' open ticket(s) awaiting the team'
+      : 'Helpdesk & Tickets'">
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ticket-btn-icon">
+      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+      <path d="M13 5v2"/>
+      <path d="M13 17v2"/>
+      <path d="M13 11v2"/>
+    </svg>
+    <span class="btn-tickets-text">Tickets</span>
+
+    <span class="ticket-count-badge"
+          *ngIf="canSeeTicketAlerts() && openTicketCount() > 0">
+      {{ openTicketCount() > 99 ? '99+' : openTicketCount() }}
+    </span>
+  </button>
+
+  <!-- Notifications Bell -->
+  <div class="relative">
+    <button class="btn-header-icon" (click)="toggleNotifications()" type="button" title="Notifications">
+      <svg lucideBell size="18"></svg>
+      <span class="notification-badge" *ngIf="notificationsService.unreadCount() > 0">
+        {{ notificationsService.unreadCount() > 99 ? '99+' : notificationsService.unreadCount() }}
+      </span>
+    </button>
+
+    <!-- Notifications Dropdown -->
+    <div class="header-popover notifications-popover" *ngIf="isNotificationOpen()" (click)="$event.stopPropagation()">
+      <div class="notifications-header">
+        <div class="notifications-title-area">
+          <span>Notifications</span>
+          <span class="notification-badge-inline" *ngIf="notificationsService.unreadCount() > 0">
+            {{ notificationsService.unreadCount() }} new
+          </span>
+        </div>
+        <div class="notifications-header-actions">
+          <button class="mark-read-btn" (click)="markAllAsRead()" *ngIf="notificationsService.unreadCount() > 0">Mark all read</button>
+          <button type="button" class="btn-close-popover" (click)="isNotificationOpen.set(false)" title="Close notifications">
+            <svg lucideX size="15"></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Shown only while the browser has not been asked. Once the answer is
+           known — granted or denied — the prompt is gone: a denied permission
+           is sticky and the button could do nothing but lie. -->
+      <div class="push-optin" *ngIf="canOfferPush">
+        <div class="push-optin-text">
+          <strong>Turn on shift reminders</strong>
+          <span>Get told to clock in and out even when this tab is closed.</span>
+        </div>
+        <button type="button" class="push-optin-btn" (click)="enablePush()">Enable</button>
+      </div>
+
+      <div class="notifications-list">
+        <div *ngIf="notificationsService.notifications().length === 0" class="no-notifications">
+          <svg lucideBell size="28" class="text-slate-300 mb-2"></svg>
+          <p class="text-sm text-slate-500 font-medium">No notifications yet</p>
+        </div>
+
+        <div 
+          class="notification-item" 
+          *ngFor="let n of notificationsService.notifications()" 
+          [class.unread]="!n.isRead"
+          (click)="markSingleAsRead(n.id)"
+        >
+          <div class="notification-dot" *ngIf="!n.isRead"></div>
+          <div class="notification-content">
+            <div class="notification-title">{{ n.title }}</div>
+            <div class="notification-desc">{{ n.message }}</div>
+            <div class="notification-time">{{ n.createdAt | date:'shortTime' }}</div>
+          </div>
+          <button 
+            type="button" 
+            class="notification-dismiss-btn" 
+            (click)="dismissNotification($event, n.id)" 
+            title="Dismiss notification">
+            <svg lucideX size="14"></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- The popover only holds the latest few; the page has filters + history. -->
+      <a class="notifications-footer" routerLink="/notifications" (click)="isNotificationOpen.set(false)">
+        View all notifications
+        <svg lucideArrowRight size="14"></svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- Divider -->
+  <div class="header-divider"></div>
+
+  <!-- User Profile Dropdown -->
+  <div class="relative">
+    <button class="user-profile-trigger" (click)="toggleProfileMenu()" type="button">
+      <div class="user-avatar">
+        <img *ngIf="currentUser()?.employee?.avatarUrl" [src]="currentUser().employee.avatarUrl" [alt]="currentUser()?.firstName">
+        <span *ngIf="!currentUser()?.employee?.avatarUrl">{{ getUserInitials() }}</span>
+      </div>
+      <div class="user-details hidden md:flex">
+        <span class="user-name">{{ currentUser()?.employee?.firstName || currentUser()?.firstName || 'User' }} {{ currentUser()?.employee?.lastName || currentUser()?.lastName || '' }}</span>
+        <span class="user-role">{{ getUserRoleLabel() }}</span>
+      </div>
+      <svg lucideChevronDown size="16" class="text-slate-400"></svg>
+    </button>
+
+    <!-- User Profile Menu -->
+    <div class="header-popover profile-menu-popover" *ngIf="isProfileMenuOpen()" (click)="$event.stopPropagation()">
+      <div class="profile-menu-header">
+        <span class="menu-user-name">{{ currentUser()?.employee?.firstName || currentUser()?.firstName }} {{ currentUser()?.employee?.lastName || currentUser()?.lastName }}</span>
+        <span class="menu-user-email">{{ currentUser()?.email }}</span>
+      </div>
+      
+      <div class="profile-menu-body">
+        <a [routerLink]="['/employees', currentUser()?.employee?.id || 1, 'profile']" (click)="isProfileMenuOpen.set(false)" class="menu-link">
+          <svg lucideUser size="15"></svg>
+          <span>My Profile</span>
+        </a>
+        <a routerLink="/projects" (click)="isProfileMenuOpen.set(false)" class="menu-link">
+          <svg lucideKanban size="15"></svg>
+          <span>Projects</span>
+        </a>
+        <button type="button" class="menu-link" (click)="openChangePasswordModal()">
+          <svg lucideLock size="15"></svg>
+          <span>Change Password</span>
+        </button>
+      </div>
+
+      <div class="profile-menu-footer">
+        <button class="logout-btn" (click)="logout()" type="button">
+          <svg lucideLogOut size="15"></svg>
+          <span>Log Out</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /.topbar-actions -->
+</header>
+
+<!-- Change Password Modal -->
+<div class="header-modal-overlay" *ngIf="isChangePasswordModalOpen()" (click)="closeChangePasswordModal()">
+  <div class="header-modal-box" (click)="$event.stopPropagation()">
+    <div class="header-modal-header">
+      <h2>Change Password</h2>
+      <button type="button" class="btn-close-popover" (click)="closeChangePasswordModal()">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+    <div class="header-modal-body">
+      <div class="header-modal-field">
+        <label>New Password</label>
+        <div class="compound-input">
+          <input [type]="showNewPassword() ? 'text' : 'password'" [(ngModel)]="newPassword" placeholder="Must have at least 8 characters" class="form-control" (keyup.enter)="submitChangePassword()">
+          <button type="button" class="icon-btn" (click)="showNewPassword.set(!showNewPassword())">
+            <svg lucideEye size="16" *ngIf="!showNewPassword()"></svg>
+            <svg lucideEyeOff size="16" *ngIf="showNewPassword()"></svg>
+          </button>
+        </div>
+      </div>
+      <div class="header-modal-field">
+        <label>Confirm Password</label>
+        <div class="compound-input">
+          <input [type]="showConfirmPassword() ? 'text' : 'password'" [(ngModel)]="confirmPassword" placeholder="Re-enter new password" class="form-control" (keyup.enter)="submitChangePassword()">
+          <button type="button" class="icon-btn" (click)="showConfirmPassword.set(!showConfirmPassword())">
+            <svg lucideEye size="16" *ngIf="!showConfirmPassword()"></svg>
+            <svg lucideEyeOff size="16" *ngIf="showConfirmPassword()"></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="header-modal-footer">
+      <button type="button" class="btn-discard" (click)="closeChangePasswordModal()">Cancel</button>
+      <button type="button" class="btn-primary-purple" [disabled]="isChangingPassword()" (click)="submitChangePassword()">
+        {{ isChangingPassword() ? 'Saving...' : 'Reset Password' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- An open task timer must be settled before attendance is closed. -->
+<div class="task-timer-clockout-overlay" *ngIf="isTaskTimerModalOpen()" (click)="closeTaskTimerModal()">
+  <section class="task-timer-clockout-modal" role="dialog" aria-modal="true" aria-labelledby="task-timer-clockout-title" (click)="$event.stopPropagation()">
+    <div class="task-timer-clockout-icon"><svg lucideClock size="22"></svg></div>
+    <h2 id="task-timer-clockout-title">Task timer is still running</h2>
+    <p>The timer for <strong>{{ activeTaskTimer()?.taskKey }} · {{ activeTaskTimer()?.taskTitle }}</strong> is on. Choose what to do before clocking out.</p>
+    <div class="task-timer-clockout-actions">
+      <button type="button" class="task-timer-pause" [disabled]="isClocking()" (click)="resolveTaskTimerAndClockOut('pause')">Pause task timer and clock out</button>
+      <button type="button" class="task-timer-stop" [disabled]="isClocking()" (click)="resolveTaskTimerAndClockOut('stop')">Stop task timer and clock out</button>
+    </div>
+    <button type="button" class="task-timer-cancel" [disabled]="isClocking()" (click)="closeTaskTimerModal()">Cancel</button>
+  </section>
+</div>

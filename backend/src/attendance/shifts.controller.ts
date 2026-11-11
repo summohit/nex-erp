@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, ParseIntPipe, ForbiddenException } from '@nestjs/common';
 import { ShiftsService } from './shifts.service';
 import { ShiftRosterService } from './shift-roster.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { isSuperAdmin } from '../common/company-roles';
 
 @Controller('shifts')
 @UseGuards(AuthGuard, PermissionsGuard)
@@ -48,6 +49,17 @@ export class ShiftsController {
   @Permissions('attendance/shifts')
   copyPreviousMonth(@Request() req, @Body() data: any) {
     return this.rosterService.copyPreviousMonth(req.user.companyId, data);
+  }
+
+  /**
+   * Change the standing shift of many people at once (11 Nov 2026). Super Admin
+   * only: this is permanent, unlike the roster, which is per day.
+   */
+  @Post('roster/permanent')
+  @Permissions('attendance/shifts')
+  setPermanentShift(@Request() req, @Body() data: { employeeIds: number[]; shiftId: number; clearFutureRoster?: boolean }) {
+    if (!isSuperAdmin(req.user.role)) throw new ForbiddenException('Only a Super Admin can change shifts permanently');
+    return this.rosterService.setPermanentShift(req.user.companyId, data);
   }
 
   @Post('roster/clear')

@@ -3676,3 +3676,6 @@ textarea.form-control-enhanced:focus {
 .awfh-perm-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; }
 .awfh-perm-row .perm-name { font-weight: 600; }
 .awfh-perm-row .perm-meta { flex: 1; color: #64748b; font-size: 12px; }
+
+/* Selected dates / Permanent switch in Automate Shifts (11 Nov 2026). */
+.bulk-mode-toggle { margin-bottom: 12px; align-self: flex-start; }

@@ -1,26 +1,37 @@
 import { Routes } from '@angular/router';
+import { isUiV2 } from './core/ui-version';
 import { AuthComponent } from './auth/auth.component';
+import { AuthComponentV2 } from './auth/auth-v2.component';
 import { DashboardComponent } from './dashboard/dashboard.component';
+import { DashboardComponentV2 } from './dashboard/dashboard-v2.component';
 import { MainLayoutComponent } from './layout/main-layout/main-layout';
 import { authGuard } from './guards/auth.guard';
 import { permissionGuard } from './guards/permission.guard';
 import { attendanceHomeGuard, attendanceLandingGuard, companyAttendanceGuard } from './guards/attendance-landing.guard';
 import { EmployeeListComponent } from './employees/employee-list/employee-list';
+import { EmployeeListComponentV2 } from './employees/employee-list/employee-list-v2';
 import { OnboardingComponent } from './employees/onboarding/onboarding';
 import { TimesheetsComponent } from './timesheets/timesheets.component';
+
+// Redesigned screens (UI v2, see core/ui-version.ts): v1 unless ?ui=v2.
+const Auth = isUiV2() ? AuthComponentV2 : AuthComponent;
+const Dashboard = isUiV2() ? DashboardComponentV2 : DashboardComponent;
+const EmployeeList = isUiV2() ? EmployeeListComponentV2 : EmployeeListComponent;
 
 export const routes: Routes = [
   // Public marketing site. Sign in / sign up live on their own routes so they can be
   // linked to directly (and so permissionGuard's existing '/login' redirect resolves).
   { path: '', pathMatch: 'full', loadComponent: () => import('./public/landing/landing').then(m => m.LandingComponent) },
-  { path: 'login', component: AuthComponent, data: { view: 'login' } },
-  { path: 'signup', component: AuthComponent, data: { view: 'register' } },
+  { path: 'login', component: Auth, data: { view: 'login' } },
+  { path: 'signup', component: Auth, data: { view: 'register' } },
   { path: 'auth/check-email', loadComponent: () => import('./auth/check-email/check-email').then(m => m.CheckEmailComponent) },
   { path: 'auth/verify-email', loadComponent: () => import('./auth/verify-email/verify-email').then(m => m.VerifyEmailComponent) },
   { path: 'auth/forgot-password', loadComponent: () => import('./auth/forgot-password/forgot-password').then(m => m.ForgotPasswordComponent) },
   // Unguarded like the other auth routes: the user is only half-authenticated
   // here and holds no access_token, so authGuard would bounce them.
-  { path: 'auth/two-factor', loadComponent: () => import('./auth/two-factor/two-factor').then(m => m.TwoFactorComponent) },
+  { path: 'auth/two-factor', loadComponent: () => isUiV2()
+    ? import('./auth/two-factor/two-factor-v2').then(m => m.TwoFactorComponentV2)
+    : import('./auth/two-factor/two-factor').then(m => m.TwoFactorComponent) },
   { path: 'kiosk/:companyId', loadComponent: () => import('./kiosk/kiosk').then(m => m.Kiosk) },
   { path: 'onboarding', loadComponent: () => import('./onboarding/onboarding.component').then(m => m.OnboardingComponent) },
   { path: 'careers/:companyId', loadComponent: () => import('./public/careers/careers').then(m => m.CareersComponent) },
@@ -47,7 +58,7 @@ export const routes: Routes = [
     component: MainLayoutComponent, 
     canActivate: [authGuard],
     children: [
-      { path: 'dashboard', component: DashboardComponent },
+      { path: 'dashboard', component: Dashboard },
       { 
         // Delivery > Timesheet. Shares the projects permission, as Field Visits
         // and Tasks do: menus.service grants all three off 'projects', and a
@@ -92,7 +103,7 @@ export const routes: Routes = [
         path: 'employees/directory',
         canActivate: [permissionGuard],
         data: { module: 'employees/directory' },
-        component: EmployeeListComponent
+        component: EmployeeList
       },
       {
         path: 'employees/onboarding',
@@ -149,12 +160,12 @@ export const routes: Routes = [
         loadComponent: () => import('./settings/permissions/permissions.component').then(m => m.PermissionsComponent)
       },
       {
-        // §Att5. Guarded on settings/permissions: choosing who may approve is
-        // the same kind of decision as choosing who may do anything else, and
-        // the server refuses the write to anyone but a Super Admin regardless.
+        // §Att5. Its own 'Approval Delegation' toggle under Settings in Roles &
+        // Permissions, the same key the sidebar entry is shown by. The server
+        // refuses the write to anyone but a Super Admin regardless.
         path: 'settings/approvals',
         canActivate: [permissionGuard],
-        data: { module: 'settings/permissions' },
+        data: { module: 'settings/approvals' },
         loadComponent: () => import('./settings/approvals/approvals').then(m => m.ApprovalSettingsComponent)
       },
       {
@@ -175,7 +186,8 @@ export const routes: Routes = [
       {
         path: 'settings/payroll',
         canActivate: [permissionGuard],
-        data: { module: 'settings/company' }, // Re-using company permission for now
+        // 'Payroll Rules' toggle in Roles & Permissions; the sidebar entry uses the same key.
+        data: { module: 'settings/payroll' },
         loadComponent: () => import('./settings/payroll-settings/payroll-settings').then(m => m.PayrollSettingsComponent)
       },
       {

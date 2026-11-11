@@ -664,21 +664,13 @@ export class ApplicationsService {
       return employee;
     });
 
-    // The offer's salary group and CTC become the new employee's pay profile, from
-    // the joining date, so payroll needs no import step. Outside the
-    // transaction: a profile that can't be created must not undo the hire.
-    const groupCode = application.compensationStructure?.salaryGroupCode;
-    if (groupCode && Number(application.offeredSalary) > 0) {
+    // The signed annexure becomes the new employee's pay profile, from the
+    // joining date, so payroll needs no import step and the first payslip
+    // matches the offer. Outside the transaction: a profile that can't be
+    // created must not undo the hire.
+    if (Number(application.offeredSalary) > 0) {
       try {
-        const from = application.joiningDate ? new Date(application.joiningDate) : new Date();
-        await this.payProfiles.addVersion(companyId, newEmployee.id, {
-          salaryGroupCode: groupCode,
-          annualCtc: Number(application.offeredSalary),
-          effectiveFrom: from.toISOString().slice(0, 10),
-          taxRegime: application.compensationStructure?.taxRegime ?? null,
-          reason: 'From the offer letter at onboarding',
-          source: 'OFFER',
-        }, actorUserId);
+        await this.payProfileFromAnnexure(companyId, newEmployee.id, application, actorUserId);
       } catch (err) {
         this.logger.error(`Pay profile from offer failed for employee ${newEmployee.id}: ${err}`);
       }
@@ -732,6 +724,8 @@ export class ApplicationsService {
   private normalizeComponents(
     raw: any[],
     targetMonthly: number,
+    /** Auto-balancing switched off by the recruiter: no balancing row at all. */
+    noBalancer = false,
   ): AnnexureComponent[] {
     const items: Omit<AnnexureComponent, 'annual'>[] =
       raw.map((c) => {
@@ -760,7 +754,7 @@ export class ApplicationsService {
 
     const balanceMonthly = Math.max(0, targetMonthly - includedFixedSum);
     let withBalance = [...fixed];
-    if (balanceMonthly > 0) {
+    if (balanceMonthly > 0 && !noBalancer) {
       withBalance.push({
         id: 'balance', name: 'Other Allowance (Balancing)',
         group: 'EARNINGS', kind: 'BALANCER', monthly: balanceMonthly, included: true,
@@ -803,6 +797,10 @@ export class ApplicationsService {
       /** Set when the table was filled from a payroll salary group (the same engine payslips use). */
       salaryGroupCode: application.compensationStructure?.salaryGroupCode ?? null,
       taxRegime: application.compensationStructure?.taxRegime ?? null,
+      /** Auto-balancing switched off: the table is exactly what was typed. */
+      noBalancer: !!application.compensationStructure?.noBalancer,
+      /** The offer's CTC — what balancing fills to, even when the table totals less. */
+      offeredCTC: application.offeredSalary ?? totalMonthly * 12,
       totalCTC: totalMonthly * 12,
       monthlyCTC: totalMonthly,
       components: visible,
@@ -849,7 +847,7 @@ export class ApplicationsService {
 
     let components: any[];
     if (Array.isArray((application as any).compensationStructure?.components)) {
-      components = this.normalizeComponents((application as any).compensationStructure.components, targetMonthly);
+      components = this.normalizeComponents((application as any).compensationStructure.components, targetMonthly, !!(application as any).compensationStructure.noBalancer);
     } else {
       // The company's standard structure, defined once alongside the offer
       // letter's own table. These used to be derived here from payrollSettings
@@ -868,6 +866,96 @@ export class ApplicationsService {
   }
 
   /**
+   * Pay profile from the annexure the candidate signed (11 Nov 2026).
+   *
+   * Group: the one the annexure was filled from; otherwise the employee
+   * group most profiles already use. CTC is the offered CTC and the monthly
+   * gross is the annexure's gross. Amounts typed on the annexure (Basic, HRA,
+   * Travelling, …) go in as per-person amounts wherever the group lets that
+   * line be set per person. Anything the group can't hold is listed in the
+   * version's reason so HR sees what the payroll breakup does differently.
+   */
+  private async payProfileFromAnnexure(companyId: number, employeeId: number, application: any, actorUserId?: number) {
+    const cs = application.compensationStructure ?? null;
+    const annualCtc = Number(application.offeredSalary);
+    const from = (application.joiningDate ? new Date(application.joiningDate) : new Date()).toISOString().slice(0, 10);
+    const on = new Date(from);
+
+    let groupCode: string | null = cs?.salaryGroupCode ?? null;
+    if (!groupCode) {
+      const common = await this.prisma.employeePayProfile.groupBy({
+        by: ['salaryGroupCode'], where: { companyId }, _count: { _all: true },
+        orderBy: { _count: { salaryGroupCode: 'desc' } },
+      }).catch(() => [] as any[]);
+      for (const g of common) {
+        const grp = await this.prisma.payrollSalaryGroup.findFirst({ where: { companyId, code: g.salaryGroupCode, retiredAt: null, payeeType: 'EMPLOYEE' } });
+        if (grp) { groupCode = grp.code; break; }
+      }
+    }
+    if (!groupCode) {
+      this.logger.warn(`No salary group for the pay profile of employee ${employeeId}; set it in Pay Profiles.`);
+      return;
+    }
+
+    // Hand-built annexure: carry its amounts. Group-filled annexures already
+    // are the group's breakup, so the group alone reproduces them.
+    const comps: any[] = Array.isArray(cs?.components) && !cs?.salaryGroupCode
+      ? cs.components.filter((c: any) => c?.included !== false && (c?.group ?? 'EARNINGS') === 'EARNINGS')
+      : [];
+    let grossMonthly: number | null = null;
+    const overrides: Record<string, number> = {};
+    const notes: string[] = [];
+    if (comps.length) {
+      const group = await this.prisma.payrollSalaryGroup.findFirst({
+        where: { companyId, code: groupCode, effectiveFrom: { lte: on }, OR: [{ retiredAt: null }, { retiredAt: { gt: on } }] },
+        orderBy: { version: 'desc' },
+        include: { lines: { include: { component: true } } },
+      });
+      const typed = comps.reduce((t: number, c: any) => t + (Number(c.monthly) || 0), 0);
+      const balance = cs?.noBalancer ? 0 : Math.max(0, Math.round(annualCtc / 12) - typed
+        - (cs.components as any[]).filter((c: any) => c?.included !== false && c?.group === 'DEDUCTIONS').reduce((t: number, c: any) => t + (Number(c.monthly) || 0), 0));
+      grossMonthly = Math.round(typed + balance) || null;
+      const codeFor = (c: any): string | null => {
+        const t = `${c.id ?? ''} ${c.name ?? ''}`.toLowerCase();
+        if (/basic/.test(t)) return 'BASIC';
+        if (/\bhra\b|house rent/.test(t)) return 'HRA';
+        if (/travel/.test(t)) return 'TRAVEL_ALLOWANCE';
+        if (/medical/.test(t)) return 'MEDICAL_ALLOWANCE';
+        if (/other allowance/.test(t)) return 'OTHER_ALLOWANCE';
+        const byName = group?.lines.find((l: any) => l.component.name.toLowerCase() === String(c.name ?? '').toLowerCase());
+        return byName?.component.code ?? null;
+      };
+      for (const c of comps) {
+        const code = codeFor(c);
+        const line = code ? group?.lines.find((l: any) => l.component.code === code) : null;
+        const amount = Math.round(Number(c.monthly) || 0);
+        if (line && line.overrideAllowed && line.calcType !== 'BALANCING') overrides[code!] = amount;
+        else if (!line || line.calcType !== 'BALANCING') notes.push(`${c.name} ₹${amount.toLocaleString('en-IN')}`);
+      }
+      if (balance > 0) notes.push(`Other Allowance (Balancing) ₹${balance.toLocaleString('en-IN')}`);
+    }
+
+    const reason = notes.length
+      ? `From the signed annexure at onboarding. Not set per person in ${groupCode} (the group's rules / balancing line cover them): ${notes.join(', ')}`
+      : 'From the signed annexure at onboarding';
+    const body = {
+      salaryGroupCode: groupCode, annualCtc, effectiveFrom: from, grossMonthly,
+      taxRegime: cs?.taxRegime ?? null, reason: reason.slice(0, 500), source: 'OFFER',
+      overrides: Object.keys(overrides).length ? overrides : null,
+    };
+    try {
+      await this.payProfiles.addVersion(companyId, employeeId, body, actorUserId);
+    } catch (err) {
+      // Typed amounts the group refuses (e.g. Basic under its minimum): keep CTC and gross.
+      this.logger.warn(`Annexure amounts refused for employee ${employeeId} (${err}); creating the profile from CTC and gross only.`);
+      await this.payProfiles.addVersion(companyId, employeeId, {
+        ...body, overrides: null,
+        reason: `From the signed annexure at onboarding — per-person amounts not accepted by ${groupCode}: ${String((err as any)?.message ?? err).slice(0, 200)}`,
+      }, actorUserId);
+    }
+  }
+
+  /**
    * Persist a customised CTC structure for the candidate. The BALANCER row is
    * always recomputed on save so the annexure stays internally consistent.
    */
@@ -882,7 +970,8 @@ export class ApplicationsService {
     }
 
     const targetMonthly = Math.round(application.offeredSalary / 12);
-    const components = this.normalizeComponents(body.components, targetMonthly);
+    const noBalancer = !!body?.noBalancer;
+    const components = this.normalizeComponents(body.components, targetMonthly, noBalancer);
 
     // `annual` is derived from `monthly` and the BALANCER row is re-derived on
     // load, so persist only the fixed rows (including toggled-off ones).
@@ -892,10 +981,10 @@ export class ApplicationsService {
 
     await this.prisma.jobApplication.update({
       where: { id },
-      data: { compensationStructure: { version: 1, components: persisted } },
+      data: { compensationStructure: { version: 1, components: persisted, noBalancer } },
     });
 
-    (application as any).compensationStructure = { version: 1, components: persisted };
+    (application as any).compensationStructure = { version: 1, components: persisted, noBalancer };
     return this.renderAnnexure(application, components);
   }
 

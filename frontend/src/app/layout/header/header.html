@@ -40,6 +40,10 @@
 
     <div class="clock-divider"></div>
 
+    <span class="off-today-pill" *ngIf="offToday() && !isClockedIn(); else clockBtn" [title]="'No clock-in today: ' + offToday()">
+      {{ offToday() }}
+    </span>
+    <ng-template #clockBtn>
     <button 
       type="button" 
       (click)="toggleClock()"
@@ -53,6 +57,7 @@
       <svg lucideLoader2 size="12" *ngIf="isClocking()" class="spinner-icon"></svg>
       <span>{{ isClocking() ? 'Processing...' : (isClockedIn() ? 'Clock Out' : 'Clock In') }}</span>
     </button>
+    </ng-template>
   </div>
 
   <!-- Tickets (Helpdesk) -->

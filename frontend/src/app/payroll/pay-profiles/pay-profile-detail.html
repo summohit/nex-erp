@@ -74,7 +74,7 @@
           </div>
         </div>
         <div class="pp-hero-action">
-          <button type="button" class="btn-primary" *ngIf="canEdit() && !formOpen()" (click)="openNewVersion()">
+          <button type="button" class="btn-primary" *ngIf="canEditSalary() && !formOpen()" (click)="openNewVersion()">
             <svg lucidePlus [size]="15"></svg>
             <span>{{ d.versions.length ? 'New Version (Revision)' : 'Create Pay Profile' }}</span>
           </button>
@@ -93,7 +93,7 @@
           No pay profile yet. Create one here, or use Import on the Pay Profiles page.
         </div>
       </div>
-      <button type="button" class="btn-sm btn-primary pp-notice-btn" *ngIf="canEdit()" (click)="openNewVersion()">
+      <button type="button" class="btn-sm btn-primary pp-notice-btn" *ngIf="canEditSalary()" (click)="openNewVersion()">
         <svg lucidePlus [size]="14"></svg>
         <span>Create Pay Profile</span>
       </button>

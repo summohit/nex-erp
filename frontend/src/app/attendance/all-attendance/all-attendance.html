@@ -256,17 +256,17 @@
       <span class="loc-bar-title">Active Workspaces:</span>
       <div class="loc-pills">
         <span class="loc-pill loc-office" title="Clocked in at office branch">
-          <span class="loc-emoji">🏢</span>
+          <svg lucideBuilding [size]="13" class="loc-svg"></svg>
           <span class="loc-text">Office</span>
           <strong class="loc-num">{{ t.office }}</strong>
         </span>
         <span class="loc-pill loc-onsite" title="Clocked in at client site or field visit">
-          <span class="loc-emoji">🚗</span>
+          <svg lucideCar [size]="13" class="loc-svg"></svg>
           <span class="loc-text">On site</span>
           <strong class="loc-num">{{ t.onsite }}</strong>
         </span>
         <span class="loc-pill loc-remote" title="Clocked in remotely / WFH">
-          <span class="loc-emoji">🏠</span>
+          <svg lucideHouse [size]="13" class="loc-svg"></svg>
           <span class="loc-text">WFH / Outside</span>
           <strong class="loc-num">{{ t.remote }}</strong>
         </span>
@@ -650,7 +650,7 @@
           <svg *ngIf="tag.icon === 'calendar'" lucideCalendar class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'zap'" lucideZap class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'timer-off'" lucideTimerOff class="status-icon" [ngClass]="tag.iconClass"></svg>
-                    <svg *ngIf="tag.icon === 'map-pin'" lucideMapPin class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'map-pin'" lucideMapPin class="status-icon" [ngClass]="tag.iconClass"></svg>
         </div>
         <span class="legend-label">{{ tag.label }}</span>
       </button>
@@ -733,8 +733,15 @@
                   <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
                   <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
                   <svg *ngIf="day.status === 'Missed Clock Out'" lucideTimerOff class="status-clockoff-full status-icon" title="Clock-out approval pending"></svg>
-                  <span *ngIf="day.record?.fieldVisit || day.record?.isOnsite" class="day-fv-pin" title="Field Visit on site">🚗</span>
-                  <span *ngIf="day.record?.clockInLat && !day.record?.fieldVisit && !day.record?.isOnsite" class="day-location-pin" title="GPS location logged">📍</span>
+                  <!-- Field Visit / Onsite badge (Top-Right) -->
+                  <span *ngIf="isFieldVisit(day.record)" class="day-badge-corner day-badge-onsite" title="Field Visit / On-site">
+                    <svg lucideCar class="day-badge-icon"></svg>
+                  </span>
+
+                  <!-- Outside Office Geofence indicator (Top-Right, if not field visit) -->
+                  <span *ngIf="!isFieldVisit(day.record) && isOutsideOffice(day.record)" class="day-badge-corner day-badge-outside" title="Clocked outside office radius">
+                    <svg lucideMapPin class="day-badge-icon"></svg>
+                  </span>
                   <svg *ngIf="showResolvedClockOutMarker(day.record)" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" title="Approved clock-out"></svg>
                   <svg *ngIf="day.record && clockOutHalfDay(day.record)" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" [attr.title]="'Half day — ' + clockOutHalfDayReason(day.record)"></svg>
                 </ng-container>
@@ -799,7 +806,8 @@
         ⏱ Missed clock-out: "{{ tip.day.record?.clockOutReason }}"
       </div>
       <div class="cell-tooltip-field-visit" *ngIf="tip.day.record?.fieldVisit as fv">
-        🚗 <strong>Field Visit:</strong> {{ fv.requestNumber || 'On-site' }}
+        <svg lucideCar [size]="12" class="fv-tip-svg"></svg>
+        <strong>Field Visit:</strong> {{ fv.requestNumber || 'On-site' }}
         <div class="fv-tip-sub" *ngIf="fv.location">{{ fv.location }}</div>
         <div class="fv-tip-time" *ngIf="fv.startTime && fv.endTime">Expected: {{ fv.startTime }} – {{ fv.endTime }}</div>
       </div>

@@ -55,6 +55,11 @@ export class ShiftsService {
     return this.http.post(`${this.apiUrl}/roster`, data);
   }
 
+  /** Standing shift for many people (Super Admin, 11 Nov 2026). */
+  setPermanentShift(data: { employeeIds: number[]; shiftId: number; clearFutureRoster: boolean }) {
+    return this.http.post<{ updated: number; clearedRoster: number }>(`${this.apiUrl}/roster/permanent`, data);
+  }
+
   bulkAssignRoster(data: RosterBulkPayload) {
     return this.http.post<{ written: number; skipped: number }>(`${this.apiUrl}/roster/bulk`, data);
   }

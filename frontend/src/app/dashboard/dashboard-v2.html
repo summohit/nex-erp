@@ -1,0 +1,1342 @@
+<div class="cmd-dashboard" [class.dark-theme]="darkMode()">
+  <div class="cmd-container" *ngIf="user() as currentUser; else dashboardLoading">
+
+    <!-- ====================================================================
+         TOP BAR: Segmented Control [My Workspace] [My Team] [Organization]
+         + Compact Status Pill + Theme Toggle
+         ==================================================================== -->
+    <div class="cmd-topbar">
+      <div class="cmd-segmented" role="tablist" aria-label="Dashboard perspective">
+        <button
+          type="button"
+          role="tab"
+          class="seg-btn"
+          [class.active]="activeTab() === 'workspace'"
+          [attr.aria-selected]="activeTab() === 'workspace'"
+          (click)="setTab('workspace')"
+        >
+          <svg lucideLayers size="15"></svg>
+          <span>My Workspace</span>
+        </button>
+
+        <button
+          *ngIf="canSeeTeamAndOrg()"
+          type="button"
+          role="tab"
+          class="seg-btn"
+          [class.active]="activeTab() === 'team'"
+          [attr.aria-selected]="activeTab() === 'team'"
+          (click)="setTab('team')"
+        >
+          <svg lucideUsers size="15"></svg>
+          <span>My Team</span>
+          <span class="seg-count" *ngIf="pendingApprovals().length > 0">
+            {{ pendingApprovals().length }}
+          </span>
+        </button>
+
+        <button
+          *ngIf="canSeeTeamAndOrg()"
+          type="button"
+          role="tab"
+          class="seg-btn"
+          [class.active]="activeTab() === 'organization'"
+          [attr.aria-selected]="activeTab() === 'organization'"
+          (click)="setTab('organization')"
+        >
+          <svg lucideBuilding2 size="15"></svg>
+          <span>Organization</span>
+        </button>
+      </div>
+
+      <div class="cmd-topbar-right">
+        <!-- Figma Header Date Pill -->
+        <div class="cmd-date-pill">
+          <svg lucideCalendar size="14"></svg>
+          <span>{{ formattedFullDate() }}</span>
+        </div>
+
+        <!-- Dark Mode Toggle -->
+        <button
+          type="button"
+          class="cmd-theme-btn"
+          (click)="toggleDarkMode()"
+          [title]="darkMode() ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+          [attr.aria-label]="darkMode() ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+        >
+          <svg *ngIf="!darkMode()" lucideMoon size="15"></svg>
+          <svg *ngIf="darkMode()" lucideSun size="15"></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         TAB 1: MY WORKSPACE (FIGMA REDESIGN)
+         ==================================================================== -->
+    <ng-container *ngIf="activeTab() === 'workspace'">
+      <!-- ====================================================================
+           ROW 1: GREETING + 2-ROW QUICK ACCESS (FIGMA DESIGN)
+           ==================================================================== -->
+      <section class="cmd-row-hero">
+      <!-- Greeting Block with User Avatar -->
+      <div class="hero-greeting-col">
+        <div class="hero-user-av-wrap">
+          <div class="hero-user-av">
+            <img
+              *ngIf="currentUser.employee?.avatarUrl"
+              [src]="currentUser.employee.avatarUrl"
+              [alt]="currentUser.employee?.firstName || 'User'"
+              (error)="currentUser.employee.avatarUrl = null"
+            />
+            <span *ngIf="!currentUser.employee?.avatarUrl">
+              {{ getInitials(currentUser.employee?.firstName, currentUser.employee?.lastName) }}
+            </span>
+          </div>
+          <span
+            class="hero-user-status-dot"
+            [class.is-online]="todayAttendance()?.clockIn && !todayAttendance()?.clockOut"
+            [class.is-done]="todayAttendance()?.clockOut"
+          ></span>
+        </div>
+
+        <div class="hero-greeting-copy">
+          <nav class="dash-hero-breadcrumb" aria-label="Role & Department">
+            <span class="bc-badge blue">
+              <svg lucideShield size="11"></svg>
+              <span>{{ userRole() }}</span>
+            </span>
+            <svg lucideChevronRight size="12" class="bc-chevron"></svg>
+            <span class="bc-scope">
+              {{ currentUser.employee?.department?.name || '—' }}
+            </span>
+            <span class="bc-dot">&middot;</span>
+            <span class="bc-meta">{{ user()?.company?.name }}</span>
+          </nav>
+          <h1 class="hero-title">
+            {{ greetingText() }}, {{ currentUser.employee?.firstName }}
+          </h1>
+          <p class="hero-subtitle">
+            Here is your live operational overview and daily agenda.
+          </p>
+          <div class="hero-status-tags">
+            <span class="hero-tag"><i class="tag-dot blue"></i> {{ tasksDueToday() }} task{{ tasksDueToday() === 1 ? '' : 's' }} due today</span>
+            <span class="hero-tag"><i class="tag-dot blue"></i> {{ weekHoursLabel() }} this week</span>
+          </div>
+        </div>
+      </div>
+
+
+
+      <!-- Right Quick Access 2-Row Grid (Figma Design) -->
+      <nav class="hero-quick-grid" aria-label="Quick navigation">
+        <div class="quick-row">
+          <a routerLink="/attendance/leaves" [queryParams]="{ apply: 1 }" class="quick-btn">
+            <svg lucideCalendar size="15" class="ico-purple"></svg>
+            <span>Apply Leave</span>
+          </a>
+          <a routerLink="/tasks" class="quick-btn">
+            <svg lucideCheckSquare size="15" class="ico-blue"></svg>
+            <span>My Tasks</span>
+          </a>
+          <a routerLink="/attendance" class="quick-btn">
+            <svg lucideClock size="15" class="ico-emerald"></svg>
+            <span>Attendance</span>
+          </a>
+        </div>
+        <div class="quick-row">
+          <a routerLink="/approvals" class="quick-btn">
+            <svg lucideCheckCircle2 size="15" class="ico-emerald"></svg>
+            <span>Approvals{{ pendingApprovals().length ? ' (' + pendingApprovals().length + ')' : '' }}</span>
+          </a>
+          <a routerLink="/payroll/payslips" class="quick-btn">
+            <svg lucideReceipt size="15" class="ico-amber"></svg>
+            <span>Payslips</span>
+          </a>
+        </div>
+      </nav>
+    </section>
+
+    <!-- ====================================================================
+         URGENT NOTICE BANNER (FIGMA DESIGN)
+         ==================================================================== -->
+    <section class="urgent-notice-strip" *ngIf="featuredNotice() as fn" (click)="openNotice(fn)">
+      <div class="un-content">
+        <span class="un-badge">{{ fn.priority === 'HIGH' ? 'URGENT NOTICE' : 'NOTICE' }}</span>
+        <strong class="un-title">{{ fn.title }}</strong>
+        <span class="un-body">{{ noticeText(fn.body) }}</span>
+      </div>
+      <a class="un-link">Read Announcement &rarr;</a>
+    </section>
+
+    <!-- ====================================================================
+         AGENDA STATUS BAR (FIGMA DESIGN)
+         ==================================================================== -->
+    <section class="agenda-status-strip">
+      <div class="agenda-left">
+        <span class="agenda-item"><i class="ag-dot green"></i> <strong>{{ tasksDueToday() }} task{{ tasksDueToday() === 1 ? '' : 's' }}</strong> due today</span>
+        <span class="agenda-item" *ngIf="canSeeTeamAndOrg()"><i class="ag-dot orange"></i> <strong>{{ pendingApprovals().length }} pending approval{{ pendingApprovals().length === 1 ? '' : 's' }}</strong> awaiting sign-off</span>
+        <span class="agenda-item"><i class="ag-dot blue"></i> <strong>{{ dashboard()?.common?.onLeaveToday?.length || 0 }} on leave</strong> &middot; {{ dashboard()?.common?.onWfhToday?.length || 0 }} WFH today</span>
+      </div>
+      <div class="agenda-right">
+        <span>This week: <strong>{{ weekHoursLabel() }}</strong> logged</span>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         5 KPI SUMMARY CARDS WITH TOP ACCENT BORDERS (FIGMA DESIGN)
+         ==================================================================== -->
+    <section class="kpi-accent-grid" *ngIf="dashboard()?.common as c">
+      <!-- 1. Days Present (Month) -->
+      <article class="kpi-accent-card border-mint">
+        <div class="kpi-accent-head">
+          <span class="kpi-accent-label">DAYS PRESENT (MONTH)</span>
+          <span class="kpi-accent-ico text-mint"><svg lucideClock size="16"></svg></span>
+        </div>
+        <div class="kpi-accent-val-row">
+          <span class="kpi-accent-val">{{ c.myAttendanceThisMonth.presentCount || 0 }}</span>
+        </div>
+        <div class="kpi-accent-sub">{{ c.myAttendanceThisMonth.lateCount || 0 }} late &middot; {{ c.myAttendanceThisMonth.absentCount || 0 }} absent</div>
+      </article>
+
+      <!-- 2. Paid Leave Balance -->
+      <article class="kpi-accent-card border-purple">
+        <div class="kpi-accent-head">
+          <span class="kpi-accent-label">PAID LEAVE BALANCE</span>
+          <span class="kpi-accent-ico text-purple"><svg lucideCalendar size="16"></svg></span>
+        </div>
+        <div class="kpi-accent-val-row">
+          <span class="kpi-accent-val">{{ myLeaveBalanceDays() }}d</span>
+        </div>
+        <div class="kpi-accent-sub">{{ myLeaveUsedTotal().split('/')[0] }}d taken of {{ myLeaveUsedTotal().split('/')[1] }}d this year</div>
+      </article>
+
+      <!-- 3. My Open Tasks -->
+      <article class="kpi-accent-card border-blue">
+        <div class="kpi-accent-head">
+          <span class="kpi-accent-label">MY OPEN TASKS</span>
+          <span class="kpi-accent-ico text-blue"><svg lucideCheck size="16"></svg></span>
+        </div>
+        <div class="kpi-accent-val-row">
+          <span class="kpi-accent-val">{{ c.taskStats.pending || 0 }}</span>
+          <span class="kpi-accent-pill red" *ngIf="c.taskStats.overdue">{{ c.taskStats.overdue }} Overdue</span>
+        </div>
+        <div class="kpi-accent-sub" [class.danger]="c.taskStats.overdue">{{ c.taskStats.overdue ? c.taskStats.overdue + ' past due date' : 'Nothing overdue' }}</div>
+      </article>
+
+      <!-- 4. Active Projects -->
+      <article class="kpi-accent-card border-indigo">
+        <div class="kpi-accent-head">
+          <span class="kpi-accent-label">ACTIVE PROJECTS</span>
+          <span class="kpi-accent-ico text-indigo"><svg lucideBarChart3 size="16"></svg></span>
+        </div>
+        <div class="kpi-accent-val-row">
+          <span class="kpi-accent-val">{{ c.projectStats.inProgress || 0 }}</span>
+          <span class="kpi-accent-pill-text" [class.green]="!c.projectStats.overdue" [class.red]="c.projectStats.overdue">{{ c.projectStats.overdue ? 'Delayed' : 'On Track' }}</span>
+        </div>
+        <div class="kpi-accent-sub">{{ (c.projectStats.inProgress || 0) - (c.projectStats.overdue || 0) }} on schedule &middot; {{ c.projectStats.overdue || 0 }} delayed</div>
+      </article>
+
+      <!-- 5. Support Tickets -->
+      <article class="kpi-accent-card border-amber">
+        <div class="kpi-accent-head">
+          <span class="kpi-accent-label">SUPPORT TICKETS</span>
+          <span class="kpi-accent-ico text-amber"><svg lucideTicket size="16"></svg></span>
+        </div>
+        <div class="kpi-accent-val-row">
+          <span class="kpi-accent-val">{{ c.ticketStats.pending || 0 }}</span>
+        </div>
+        <div class="kpi-accent-sub" [class.danger]="c.ticketStats.overdue">{{ c.ticketStats.overdue ? c.ticketStats.overdue + ' overdue' : 'None overdue' }}</div>
+      </article>
+    </section>
+
+    <!-- Notice Modal -->
+    <div class="nb-backdrop" *ngIf="activeNotice() as n" (click)="dismissNotice(n)">
+      <div class="nb-modal" [class.high]="n.priority === 'HIGH'" (click)="$event.stopPropagation()">
+        <div class="nb-modal-bar"></div>
+        <div class="nb-modal-top">
+          <div class="nb-modal-badges">
+            <span class="nb-chip" [class.high]="n.priority === 'HIGH'">
+              <svg *ngIf="n.priority === 'HIGH'" lucideAlertTriangle size="12"></svg>
+              <svg *ngIf="n.priority !== 'HIGH'" lucideBell size="12"></svg>
+              <span>{{ n.priority === 'HIGH' ? 'Important Notice' : 'Announcement' }}</span>
+            </span>
+            <span class="nb-modal-date">{{ formatStandardDate(n.publishedAt || n.createdAt) }}</span>
+          </div>
+          <button type="button" class="nb-close" (click)="dismissNotice(n)" aria-label="Close">
+            <svg lucideX size="16"></svg>
+          </button>
+        </div>
+
+        <h2 class="nb-modal-title">{{ n.title }}</h2>
+
+        <!-- Author Metadata -->
+        <div class="nb-modal-author" *ngIf="n.createdBy">
+          <div
+            class="nb-author-av"
+            [style.background]="getAvatarBg(n.createdBy.firstName, n.createdBy.lastName)"
+          >
+            <img
+              *ngIf="n.createdBy.avatarUrl"
+              [src]="n.createdBy.avatarUrl"
+              [alt]="n.createdBy.firstName"
+              (error)="n.createdBy.avatarUrl = null"
+            />
+            <span *ngIf="!n.createdBy.avatarUrl">
+              {{ getInitials(n.createdBy.firstName, n.createdBy.lastName) }}
+            </span>
+          </div>
+          <div class="nb-author-meta">
+            <strong>{{ n.createdBy.firstName }} {{ n.createdBy.lastName }}</strong>
+            <span>Posted on {{ (n.publishedAt || n.createdAt) | date:'mediumDate' }} at {{ (n.publishedAt || n.createdAt) | date:'shortTime' }}</span>
+          </div>
+        </div>
+
+        <!-- Rich HTML Notice Body -->
+        <div class="nb-modal-body" [innerHTML]="noticeHtml(n.body)"></div>
+
+        <!-- Attachments -->
+        <div class="nb-modal-files" *ngIf="n.attachments?.length">
+          <div class="nb-files-hdr">
+            <svg lucidePaperclip size="13"></svg>
+            <span>Attachments ({{ n.attachments!.length }})</span>
+          </div>
+          <div class="nb-files-grid">
+            <a
+              *ngFor="let a of n.attachments; trackBy: trackById"
+              [href]="a.fileUrl"
+              target="_blank"
+              rel="noopener"
+              class="nb-file-card"
+            >
+              <span class="nb-file-name">{{ a.fileName }}</span>
+              <span class="nb-file-size" *ngIf="a.fileSize">{{ fileSize(a.fileSize) }}</span>
+              <svg lucideExternalLink size="13"></svg>
+            </a>
+          </div>
+        </div>
+
+        <div class="nb-modal-foot">
+          <a routerLink="/notices" class="nb-all-link" (click)="dismissNotice(n)">
+            <span>View All Notices</span>
+            <svg lucideArrowRight size="13"></svg>
+          </a>
+          <button type="button" class="nb-ack-btn" (click)="dismissNotice(n)">
+            <svg lucideCheckCircle2 size="16"></svg>
+            <span>{{ n.isRead ? 'Close' : 'Got it, Mark as Read' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Onboarding Banner (Only if IN_PROGRESS) -->
+    <section
+      class="onboarding-strip"
+      *ngIf="onboardingStatus() === 'IN_PROGRESS' && onboardingTasks().length > 0"
+    >
+      <div class="ob-head">
+        <div>
+          <h3>Complete Your Onboarding Checklist</h3>
+          <p>{{ getCompletedCount() }} of {{ onboardingTasks().length }} steps completed ({{ getProgressPercentage() }}%)</p>
+        </div>
+        <div class="ob-bar"><i [style.width.%]="getProgressPercentage()"></i></div>
+      </div>
+    </section>
+
+      <!-- TWO-COLUMN GRID: SPRINT EXECUTION (COL-7) + MY SUPPORT TICKETS (COL-5) (FIGMA DESIGN) -->
+      <section class="grid-12 sprint-tickets-row">
+        <!-- Left: Priority Tasks · Sprint Execution (col-7) -->
+        <div class="col-7">
+          <article class="sprint-card">
+            <header class="sprint-card-header">
+              <div class="sprint-title-left">
+                <h3>My Priority Tasks</h3>
+                <span class="sp-pill active">{{ dashboard()?.common?.taskStats?.pending || 0 }} open</span>
+                <span class="sp-pill overdue" *ngIf="dashboard()?.common?.taskStats?.overdue">{{ dashboard()?.common?.taskStats?.overdue }} overdue</span>
+              </div>
+              <div class="sprint-actions-right">
+                <a routerLink="/tasks" class="sp-link">Full Board &rarr;</a>
+              </div>
+            </header>
+
+            <!-- Monday.com / ClickUp style table -->
+            <div class="sprint-table-container">
+              <table class="sprint-table">
+                <thead>
+                  <tr>
+                    <th class="th-title">TASK TITLE</th>
+                    <th class="th-owner">OWNER</th>
+                    <th class="th-status">STATUS</th>
+                    <th class="th-timeline">PROJECT</th>
+                    <th class="th-due">DUE DATE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let st of sprintTasks()">
+                    <td class="td-title">
+                      <div class="st-title-wrap">
+                        <span class="st-name">{{ st.title }}</span>
+                        <span class="st-prio-tag" [style.color]="st.priorityColor">
+                          <span class="st-prio-dot" [style.background]="st.priorityColor"></span>
+                          {{ st.priority }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="td-owner">
+                      <div class="st-avatar" [style.background]="st.ownerBg">
+                        <img *ngIf="st.ownerAvatar && !st.avatarFailed" [src]="st.ownerAvatar" alt="" (error)="st.avatarFailed = true" />
+                        <span *ngIf="!st.ownerAvatar || st.avatarFailed">{{ st.owner }}</span>
+                      </div>
+                    </td>
+                    <td class="td-status">
+                      <span class="st-status-badge" [attr.data-tone]="st.statusTone">
+                        {{ st.status }}
+                      </span>
+                    </td>
+                    <td class="td-timeline">
+                      <span class="st-timeline-badge" [attr.data-tone]="st.statusTone">
+                        {{ st.timeline }}
+                      </span>
+                    </td>
+                    <td class="td-due">
+                      <div class="st-due-cell">
+                        <span class="st-due-date" [class.is-overdue]="st.overdueDays">{{ st.dueDate }}</span>
+                        <span class="st-overdue-tag" *ngIf="st.overdueDays">Overdue {{ st.overdueDays }}d</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="sprint-add-row" *ngIf="sprintTasks().length === 0">
+              <span>No open tasks — you're all caught up.</span>
+            </div>
+
+            <div class="sprint-footer-progress" *ngIf="sprintTasks().length">
+              <div class="sprint-multi-bar">
+                <div *ngFor="let d of sprintDistribution()" class="bar-segment" [ngClass]="d.cls" [style.width.%]="d.percent"></div>
+              </div>
+              <div class="sprint-legend-row">
+                <div class="legend-items">
+                  <span class="leg-item" *ngFor="let d of sprintDistribution()"><i class="leg-dot" [ngClass]="d.dot"></i> {{ d.count }} {{ d.label }} ({{ d.percent }}%)</span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <!-- Right: My Support Tickets (col-5) -->
+        <div class="col-5">
+          <article class="support-card">
+            <header class="support-card-header">
+              <div class="support-title-left">
+                <h3>My Support Tickets</h3>
+                <span class="sp-pill active">{{ supportTickets().length }} open</span>
+              </div>
+              <a routerLink="/crm/tickets" class="sp-link">Helpdesk &rarr;</a>
+            </header>
+
+            <div class="support-table-container">
+              <table class="support-table">
+                <thead>
+                  <tr>
+                    <th>SUBJECT</th>
+                    <th>CATEGORY</th>
+                    <th class="text-right">RAISED</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let tick of supportTickets()">
+                    <td class="st-subject-cell">
+                      <span class="st-ticket-title">{{ tick.subject }}</span>
+                    </td>
+                    <td>
+                      <span class="st-category-chip" [attr.data-tone]="tick.categoryTone">
+                        {{ tick.category }}
+                      </span>
+                    </td>
+                    <td class="text-right st-raised-cell">
+                      {{ tick.raised }}
+                    </td>
+                  </tr>
+                  <tr *ngIf="supportTickets().length === 0">
+                    <td colspan="3" class="st-subject-cell">No open tickets</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- CHARTS ROW: ATTENDANCE TREND (COL-8) + TASK DISTRIBUTION (COL-4) (FIGMA DESIGN) -->
+      <section class="grid-12 charts-row">
+        <div class="col-8">
+          <app-apex-chart-card
+            title="Attendance &amp; Work-Hours Trend"
+            subtitle="Last 30 days &middot; Clock-in to clock-out hours vs 9h target"
+            [badge]="trendDailyAvg()"
+            badgeTone="success"
+            [options]="attendanceTrendOptions()"
+            [loading]="isLoadingMetrics()"
+            [height]="265"
+            detailLink="/attendance"
+            detailLabel="Attendance Log"
+          ></app-apex-chart-card>
+        </div>
+
+        <div class="col-4">
+          <app-apex-chart-card
+            title="Task Distribution"
+            subtitle="Todo &middot; In Progress &middot; Review &middot; Done"
+            [badge]="taskDonutData().total + ' Total'"
+            badgeTone="brand"
+            [options]="taskDonutOptions()"
+            [loading]="isLoadingMetrics()"
+            [empty]="taskDonutData().total === 0"
+            [height]="265"
+            detailLink="/tasks"
+            detailLabel="Board"
+          ></app-apex-chart-card>
+        </div>
+      </section>
+
+      <!-- 12-WEEK ACTIVITY & WORK-HOURS INTENSITY HEATMAP (ENHANCED EXECUTIVE HUB) -->
+      <section class="grid-12 heatmap-row">
+        <div class="col-12">
+          <article class="heatmap-card">
+            <header class="heatmap-header">
+              <div class="hm-header-left">
+                <div class="hm-title-row">
+                  <h3>12-Week Activity &amp; Work-Hours Intensity</h3>
+                  <span class="hm-period-badge">{{ heatmapStats().period }}</span>
+                </div>
+                <p class="heatmap-sub">Clock-in to clock-out hours per working day</p>
+              </div>
+              <div class="heatmap-legend">
+                <span>Less</span>
+                <span class="hm-box lvl-0" title="0–6h (Minimal/Off)"></span>
+                <span class="hm-box lvl-1" title="6–8h (Partial)"></span>
+                <span class="hm-box lvl-2" title="8–9h (Standard)"></span>
+                <span class="hm-box lvl-3" title="9–10h (Optimal)"></span>
+                <span class="hm-box lvl-4" title="10h+ (Overtime)"></span>
+                <span>More</span>
+              </div>
+            </header>
+
+            <div class="heatmap-body-flex">
+              <!-- Left: Matrix with Month markers -->
+              <div class="heatmap-matrix-wrap">
+                <div class="heatmap-grid-wrap">
+                  <div class="hm-days-labels">
+                    <span>Mon</span>
+                    <span>Tue</span>
+                    <span>Wed</span>
+                    <span>Thu</span>
+                    <span>Fri</span>
+                  </div>
+                  <div class="hm-columns">
+                    <div class="hm-col" *ngFor="let wk of workHeatmap()">
+                      <span class="hm-col-label">{{ wk.label }}</span>
+                      <div
+                        class="hm-cell"
+                        *ngFor="let cell of wk.cells"
+                        [attr.data-level]="cell.future ? null : cell.level"
+                        [style.opacity]="cell.future ? 0.3 : null"
+                        [title]="cell.date + ': ' + (cell.future ? 'upcoming' : cell.hours + 'h')"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Telemetry & Intensity Distribution -->
+              <div class="heatmap-telemetry-col">
+                <div class="hm-telemetry-grid">
+                  <div class="hm-stat-chip">
+                    <div class="hm-sc-top">
+                      <span class="hm-sc-label">TOTAL HOURS (12W)</span>
+                    </div>
+                    <div class="hm-sc-val">{{ heatmapStats().totalHours }} hrs</div>
+                    <div class="hm-sc-sub">Over {{ heatmapStats().daysWorked }} days worked</div>
+                  </div>
+
+                  <div class="hm-stat-chip">
+                    <div class="hm-sc-top">
+                      <span class="hm-sc-label">DAILY AVERAGE</span>
+                    </div>
+                    <div class="hm-sc-val">{{ heatmapStats().dailyAvg }} hrs/day</div>
+                    <div class="hm-sc-sub">On days worked</div>
+                  </div>
+
+                  <div class="hm-stat-chip">
+                    <div class="hm-sc-top">
+                      <span class="hm-sc-label">DAYS WORKED</span>
+                    </div>
+                    <div class="hm-sc-val">{{ heatmapStats().adherence }}%</div>
+                    <div class="hm-sc-sub">{{ heatmapStats().daysWorked }} of {{ heatmapStats().workdays }} weekdays</div>
+                  </div>
+                </div>
+
+                <!-- Intensity Distribution Bar -->
+                <div class="hm-intensity-distribution">
+                  <div class="hm-id-header">
+                    <span>Intensity Breakdown</span>
+                    <strong>{{ heatmapStats().daysWorked }} Days Logged</strong>
+                  </div>
+                  <div class="hm-stacked-bar">
+                    <div class="hm-bar-seg s-overtime" [style.width.%]="heatmapStats().overtime" title="Overtime (9.5h+)"></div>
+                    <div class="hm-bar-seg s-optimal" [style.width.%]="heatmapStats().optimal" title="Optimal (8.5–9.5h)"></div>
+                    <div class="hm-bar-seg s-standard" [style.width.%]="heatmapStats().standard" title="Standard (6–8.5h)"></div>
+                    <div class="hm-bar-seg s-partial" [style.width.%]="heatmapStats().partial" title="Partial (under 6h)"></div>
+                  </div>
+                  <div class="hm-id-legend">
+                    <span><i class="hm-dot d-overtime"></i> Overtime ({{ heatmapStats().overtime }}%)</span>
+                    <span><i class="hm-dot d-optimal"></i> Optimal ({{ heatmapStats().optimal }}%)</span>
+                    <span><i class="hm-dot d-standard"></i> Standard ({{ heatmapStats().standard }}%)</span>
+                    <span><i class="hm-dot d-partial"></i> Partial ({{ heatmapStats().partial }}%)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- PRESERVED CRM FEATURES (UNTOUCHED LOGIC) -->
+      <!-- Probations needing action: HR, Super Admin and managers (hidden otherwise) -->
+      <app-probation-watch-card></app-probation-watch-card>
+      <!-- My probation and My PIP, for the employee they concern -->
+      <app-my-probation-card></app-my-probation-card>
+      <app-my-pip-card></app-my-pip-card>
+      <!-- Who is on a PIP or serving notice: HR, super admin and reporting
+           managers (the card hides itself for everyone else). -->
+      <app-people-watch-card></app-people-watch-card>
+
+      <section class="grid-12 existing-crm-sections">
+        <div class="col-12">
+          <app-my-calendar></app-my-calendar>
+        </div>
+      </section>
+
+      <!-- Approval Requests, the same component as Delivery → Approval Requests -->
+      <section class="dashboard-card dash-approvals" *ngIf="canSeeTeamAndOrg()">
+        <div class="dash-approvals-head">
+          <h3>Approval Requests</h3>
+          <a routerLink="/task-requests" class="dash-approvals-link">Open full page</a>
+        </div>
+        @defer (on viewport) {
+          <app-task-hours-requests-tab [embedded]="true"></app-task-hours-requests-tab>
+        } @placeholder {
+          <div class="dash-approvals-loading">Loading approval requests…</div>
+        }
+      </section>
+
+      <!-- Floating MIRA AI Prompt Bar (Figma Design) -->
+      <aside class="floating-mira-bar" (click)="triggerMiraAI()">
+        <div class="mira-bar-content">
+          <svg lucideSparkles size="18" class="mira-sparkle-ico"></svg>
+          <span class="mira-bar-text">Ask MIRA AI, generate report, create lead or press <strong>&#8984;K</strong>.</span>
+        </div>
+        <div class="mira-bar-actions">
+          <kbd class="mira-kbd">&#8984;K</kbd>
+          <button type="button" class="mira-run-btn">
+            <span>Run</span>
+            <svg lucideArrowRight size="14"></svg>
+          </button>
+        </div>
+      </aside>
+    </ng-container>
+
+    <!-- ====================================================================
+         TAB 2: MY TEAM
+         ==================================================================== -->
+    <!-- Holidays, birthdays and kudos for employees, who have no Organization tab -->
+    <ng-container *ngIf="activeTab() === 'workspace' && !canSeeTeamAndOrg()">
+      <ng-container *ngTemplateOutlet="peopleCards"></ng-container>
+    </ng-container>
+
+    <ng-container *ngIf="activeTab() === 'team' && canSeeTeamAndOrg()">
+      <!-- 1. Team Operations & Approvals Center Hero Card (Figma Design) -->
+      <section class="cmd-row-team-hero">
+        <div class="team-hero-left">
+          <div class="team-hero-icon-badge">
+            <svg lucideUsers size="22"></svg>
+          </div>
+          <div class="team-hero-info">
+            <nav class="dash-hero-breadcrumb" aria-label="Team Context">
+              <span class="bc-badge emerald">
+                <svg lucideUsers size="11"></svg>
+                <span>Team Management Hub</span>
+              </span>
+              <svg lucideChevronRight size="12" class="bc-chevron"></svg>
+              <span class="bc-scope">
+                {{ currentUser.employee?.department?.name || '—' }}
+              </span>
+              <span class="bc-dot">&middot;</span>
+              <span class="bc-meta">{{ teamPresenceBreakdown().total }} Team Members</span>
+            </nav>
+            <h1 class="team-hero-title">Team Operations &amp; Approvals Center</h1>
+            <p class="team-hero-subtitle">
+              {{ pendingApprovals().length }} pending leave approvals &middot;
+              {{ dashboard()?.common?.onLeaveToday?.length || 0 }} on leave &middot;
+              {{ dashboard()?.common?.onWfhToday?.length || 0 }} remote WFH &middot;
+              {{ teamThisWeek().onTimePct }}% on-time this week
+            </p>
+            <div class="team-hero-tags">
+              <span class="hero-tag">
+                <i class="tag-dot emerald"></i>
+                {{ teamPresenceBreakdown().segments[0]?.count || 0 }} on-site now
+              </span>
+              <span class="hero-tag">
+                <i class="tag-dot teal"></i>
+                {{ teamThisWeek().onTimePct }}% on-time
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="team-hero-actions">
+          <button
+            type="button"
+            class="team-btn-primary"
+            [disabled]="isBulkApproving() || pendingApprovals().length === 0"
+            (click)="approveAllLeaves()"
+          >
+            <svg lucideCheck size="16"></svg>
+            <span>Bulk Approve ({{ pendingApprovals().length }})</span>
+          </button>
+          <a routerLink="/attendance" class="team-btn-outline">
+            <svg lucideCalendar size="15"></svg>
+            <span>Team Calendar</span>
+          </a>
+        </div>
+      </section>
+
+      <!-- 2. Today's Workforce Presence (Figma Design) -->
+      <section class="grid-12">
+        <div class="col-12">
+          <article class="workforce-presence-card">
+            <header class="wp-header">
+              <div class="wp-header-left">
+                <h3 class="wp-title">Today's Workforce Presence</h3>
+                <span class="wp-members-badge">{{ teamPresenceBreakdown().total }} Members</span>
+              </div>
+              <div class="wp-header-right">
+                <span class="wp-telemetry-tag">Today</span>
+              </div>
+            </header>
+
+            <!-- Multi-segment Stacked Horizontal Bar -->
+            <div class="wp-stacked-bar" role="img" aria-label="Today's Workforce Presence">
+              <div
+                class="wp-seg on-site"
+                [style.width.%]="teamPresenceBreakdown().segments[0]?.percent || 0"
+                [title]="'On-site: ' + (teamPresenceBreakdown().segments[0]?.count || 0) + ' (' + (teamPresenceBreakdown().segments[0]?.percent || 0) + '%)'"
+              ></div>
+              <div
+                class="wp-seg remote"
+                [style.width.%]="teamPresenceBreakdown().segments[1]?.percent || 0"
+                [title]="'WFH / Remote: ' + (teamPresenceBreakdown().segments[1]?.count || 0) + ' (' + (teamPresenceBreakdown().segments[1]?.percent || 0) + '%)'"
+              ></div>
+              <div
+                class="wp-seg on-leave"
+                [style.width.%]="teamPresenceBreakdown().segments[2]?.percent || 0"
+                [title]="'On Leave: ' + (teamPresenceBreakdown().segments[2]?.count || 0) + ' (' + (teamPresenceBreakdown().segments[2]?.percent || 0) + '%)'"
+              ></div>
+              <div
+                class="wp-seg absent"
+                [style.width.%]="teamPresenceBreakdown().segments[3]?.percent || 0"
+                [title]="'Absent: ' + (teamPresenceBreakdown().segments[3]?.count || 0) + ' (' + (teamPresenceBreakdown().segments[3]?.percent || 0) + '%)'"
+              ></div>
+              <div
+                class="wp-seg"
+                style="background: #94a3b8"
+                [style.width.%]="teamPresenceBreakdown().segments[4]?.percent || 0"
+                [title]="'Not punched in: ' + (teamPresenceBreakdown().segments[4]?.count || 0)"
+              ></div>
+            </div>
+
+            <!-- Segment Legend Row -->
+            <div class="wp-legend-row">
+              <div class="wp-legend-item">
+                <span class="wp-dot on-site"></span>
+                <span class="wp-leg-label">
+                  <strong>{{ teamPresenceBreakdown().segments[0]?.count || 0 }} On-site</strong>
+                  ({{ teamPresenceBreakdown().segments[0]?.percent || 0 }}%)
+                </span>
+              </div>
+              <div class="wp-legend-item">
+                <span class="wp-dot remote"></span>
+                <span class="wp-leg-label">
+                  <strong>{{ teamPresenceBreakdown().segments[1]?.count || 0 }} WFH / Remote</strong>
+                  ({{ teamPresenceBreakdown().segments[1]?.percent || 0 }}%)
+                </span>
+              </div>
+              <div class="wp-legend-item">
+                <span class="wp-dot on-leave"></span>
+                <span class="wp-leg-label">
+                  <strong>{{ teamPresenceBreakdown().segments[2]?.count || 0 }} On Leave</strong>
+                  ({{ teamPresenceBreakdown().segments[2]?.percent || 0 }}%)
+                </span>
+              </div>
+              <div class="wp-legend-item">
+                <span class="wp-dot absent"></span>
+                <span class="wp-leg-label">
+                  <strong>{{ teamPresenceBreakdown().segments[3]?.count || 0 }} Absent</strong>
+                  ({{ teamPresenceBreakdown().segments[3]?.percent || 0 }}%)
+                </span>
+              </div>
+              <div class="wp-legend-item">
+                <span class="wp-dot" style="background: #94a3b8"></span>
+                <span class="wp-leg-label">
+                  <strong>{{ teamPresenceBreakdown().segments[4]?.count || 0 }} Not punched in</strong>
+                  ({{ teamPresenceBreakdown().segments[4]?.percent || 0 }}%)
+                </span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 3. Row 1: Pending Leave Requests (8-col) + Out of Office & Remote (4-col) -->
+      <section class="grid-12 team-requests-row">
+        <!-- Left: Pending Leave Requests (col-8) -->
+        <div class="col-8">
+          <article class="team-card pending-requests-card" [class.is-empty]="pendingApprovals().length === 0">
+            <header class="team-card-head">
+              <div class="team-card-title-group">
+                <h3>Pending Leave Requests</h3>
+                <span class="team-badge amber">
+                  {{ pendingApprovals().length }} Awaiting Decision
+                </span>
+              </div>
+              <div class="team-card-actions-right">
+                <button
+                  type="button"
+                  class="team-approve-all-btn"
+                  [disabled]="isBulkApproving() || pendingApprovals().length === 0"
+                  (click)="approveAllLeaves()"
+                >
+                  <svg lucideCheck size="14"></svg>
+                  <span>Approve All</span>
+                </button>
+                <a routerLink="/attendance/approvals" class="team-link-more">
+                  All Requests &rarr;
+                </a>
+              </div>
+            </header>
+
+            <div class="team-empty-state" *ngIf="pendingApprovals().length === 0">
+              <svg lucideCheckCircle2 size="18"></svg>
+              <span>Zero pending leave approvals — your team inbox is all caught up.</span>
+            </div>
+
+            <div class="team-table-wrap" *ngIf="pendingApprovals().length > 0">
+              <table class="team-table">
+                <thead>
+                  <tr>
+                    <th class="th-cb">
+                      <input
+                        type="checkbox"
+                        class="team-checkbox"
+                        [checked]="allApprovalsSelected()"
+                        (change)="toggleAllApprovals()"
+                        aria-label="Select all decidable requests"
+                      />
+                    </th>
+                    <th>EMPLOYEE</th>
+                    <th>LEAVE TYPE</th>
+                    <th>DATES &amp; DURATION</th>
+                    <th class="th-decision">DECISION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let req of pendingApprovals(); trackBy: trackById">
+                    <td class="td-cb">
+                      <input
+                        type="checkbox"
+                        class="team-checkbox"
+                        [disabled]="!canDecideLeave(req)"
+                        [checked]="selectedApprovalIds().has(req.id)"
+                        (change)="toggleApprovalSelection(req.id)"
+                        [attr.aria-label]="'Select ' + req.employee?.firstName"
+                      />
+                    </td>
+                    <td>
+                      <div class="team-emp-cell">
+                        <span class="team-emp-av" [style.background]="getAvatarBgColor(req.employee?.firstName)">
+                          <img
+                            *ngIf="req.employee?.avatarUrl"
+                            [src]="req.employee.avatarUrl"
+                            [alt]="req.employee?.firstName || 'Employee'"
+                            (error)="req.employee.avatarUrl = null"
+                          />
+                          <span *ngIf="!req.employee?.avatarUrl">
+                            {{ getInitials(req.employee?.firstName, req.employee?.lastName) }}
+                          </span>
+                        </span>
+                        <div class="team-emp-meta">
+                          <strong class="team-emp-name">{{ req.employee?.firstName }} {{ req.employee?.lastName }}</strong>
+                          <span class="team-emp-role">{{ req.employee?.designation?.name || req.employee?.department?.name || '' }}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="leave-type-pill" [attr.data-tone]="getLeaveTypeTone(req.leaveType?.name)">
+                        {{ req.leaveType?.name || 'Leave' }}
+                      </span>
+                    </td>
+                    <td>
+                      <div class="leave-dates-cell">
+                        <strong class="leave-date-range">{{ formatStandardDate(req.startDate) }} &ndash; {{ formatStandardDate(req.endDate) }}</strong>
+                        <span class="leave-duration-sub">{{ leaveDurationLabel(req) }}{{ req.reason ? ' · ' + req.reason : '' }}</span>
+                      </div>
+                    </td>
+                    <td class="td-decision">
+                      <div class="decision-action-group" *ngIf="canDecideLeave(req); else selfReq">
+                        <button
+                          type="button"
+                          class="btn-decision-approve"
+                          (click)="approveLeave(req.id)"
+                          title="Approve Leave"
+                        >
+                          <svg lucideCheck size="13"></svg>
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-decision-reject"
+                          (click)="rejectLeave(req.id)"
+                          title="Reject Leave"
+                        >
+                          <svg lucideX size="13"></svg>
+                        </button>
+                      </div>
+                      <ng-template #selfReq>
+                        <span class="self-tag">Your request</span>
+                      </ng-template>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+
+        <!-- Right: Out of Office & Remote (col-4) -->
+        <div class="col-4">
+          <article class="team-card out-of-office-card">
+            <header class="team-card-head">
+              <div class="team-card-title-group">
+                <h3>Out of Office &amp; Remote</h3>
+              </div>
+              <a routerLink="/attendance" class="team-link-more">Full Roster &rarr;</a>
+            </header>
+
+            <div class="team-roster-list">
+              <!-- On Leave Today Members (Real Data) -->
+              <div class="team-roster-row" *ngFor="let p of dashboard()?.common?.onLeaveToday; trackBy: trackById">
+                <span class="team-emp-av" [style.background]="getAvatarBgColor(p.firstName)">
+                  <img *ngIf="p.avatarUrl" [src]="p.avatarUrl" [alt]="p.firstName" (error)="p.avatarUrl = null" />
+                  <span *ngIf="!p.avatarUrl">{{ getInitials(p.firstName, p.lastName) }}</span>
+                </span>
+                <div class="team-emp-meta">
+                  <strong class="team-emp-name">{{ p.firstName }} {{ p.lastName }}</strong>
+                  <span class="team-emp-role">{{ p.department || 'Team Member' }}</span>
+                </div>
+                <span class="roster-status-pill amber">{{ p.leaveType || 'On Leave' }}</span>
+              </div>
+
+              <!-- WFH Today Members (Real Data) -->
+              <div class="team-roster-row" *ngFor="let p of dashboard()?.common?.onWfhToday; trackBy: trackById">
+                <span class="team-emp-av" [style.background]="getAvatarBgColor(p.firstName)">
+                  <img *ngIf="p.avatarUrl" [src]="p.avatarUrl" [alt]="p.firstName" (error)="p.avatarUrl = null" />
+                  <span *ngIf="!p.avatarUrl">{{ getInitials(p.firstName, p.lastName) }}</span>
+                </span>
+                <div class="team-emp-meta">
+                  <strong class="team-emp-name">{{ p.firstName }} {{ p.lastName }}</strong>
+                  <span class="team-emp-role">{{ p.department || 'Remote' }}</span>
+                </div>
+                <span class="roster-status-pill blue">WFH</span>
+              </div>
+
+              <!-- Empty state when no one is on leave or WFH today -->
+              <div
+                class="team-roster-empty"
+                *ngIf="!dashboard()?.common?.onLeaveToday?.length && !dashboard()?.common?.onWfhToday?.length"
+              >
+                <svg lucideCheckCircle2 size="16"></svg>
+                <span>Full team on-site today &middot; 0 on leave &middot; 0 WFH</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 4. Row 2: Team Attendance & Punctuality Trend (7-col) + Ticket SLA & Resolution Queue (5-col) -->
+      <section class="grid-12 team-metrics-row">
+        <!-- Left: Team Attendance & Punctuality Trend (8 Weeks) (col-7) -->
+        <div class="col-7">
+          <app-apex-chart-card
+            title="Team Attendance &amp; Punctuality Trend (8 Weeks)"
+            subtitle="Last 8 weeks &middot; Overall attendance % vs on-time check-in %"
+            [badge]="teamThisWeek().attendancePct + '% This Week'"
+            badgeTone="success"
+            [options]="teamAttendanceOptions()"
+            [loading]="isLoadingMetrics()"
+            [height]="255"
+            detailLink="/attendance"
+            detailLabel="Team Logs"
+          ></app-apex-chart-card>
+        </div>
+
+        <!-- Right: Ticket SLA & Resolution Queue (col-5) (Figma Design) -->
+        <div class="col-5">
+          <article class="team-card ticket-sla-card">
+            <header class="team-card-head">
+              <div class="team-card-title-group">
+                <h3>Ticket SLA &amp; Resolution Queue</h3>
+                <span class="team-badge amber">SLA Watch</span>
+              </div>
+              <a routerLink="/crm/tickets" class="team-link-more">Helpdesk &rarr;</a>
+            </header>
+
+            <div class="sla-body">
+              <div class="sla-kpi-row">
+                <div class="sla-rate-block">
+                  <span class="sla-big-rate">{{ teamTicketSlaSummary().rate }}</span>
+                  <span class="sla-delta-pill" *ngIf="teamTicketSlaSummary().delta">{{ teamTicketSlaSummary().delta }}</span>
+                  <span class="sla-period-text">{{ teamTicketSlaSummary().period }}</span>
+                </div>
+                <p class="sla-subtitle">{{ teamTicketSlaSummary().subtitle }}</p>
+              </div>
+
+              <!-- Open Queue Aging Buckets -->
+              <div class="sla-aging-section">
+                <div class="sla-aging-label">OPEN QUEUE AGING BUCKETS</div>
+                <div class="sla-buckets-grid">
+                  <div
+                    class="sla-bucket-box"
+                    *ngFor="let b of teamTicketSlaSummary().buckets"
+                    [class.is-escalated]="b.isEscalated"
+                  >
+                    <span class="sla-box-label">{{ b.label }}</span>
+                    <strong class="sla-box-count">{{ b.count }}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </ng-container>
+
+    <!-- ====================================================================
+         TAB 3: ORGANIZATION
+         ==================================================================== -->
+    <ng-container *ngIf="activeTab() === 'organization' && canSeeTeamAndOrg()">
+      <!-- 1. Organization & Workforce Demographics Hero Card (Figma Design) -->
+      <section class="cmd-row-org-hero">
+        <div class="org-hero-left">
+          <div class="org-hero-icon-badge">
+            <svg lucideBuilding2 size="22"></svg>
+          </div>
+          <div class="org-hero-info">
+            <nav class="dash-hero-breadcrumb" aria-label="Organization Context">
+              <span class="bc-badge purple">
+                <svg lucideBuilding2 size="11"></svg>
+                <span>Executive Telemetry</span>
+              </span>
+              <svg lucideChevronRight size="12" class="bc-chevron"></svg>
+              <span class="bc-scope">
+                {{ user()?.company?.name }}
+              </span>
+              <span class="bc-dot">&middot;</span>
+              <span class="bc-meta">{{ deptHeadcountSummary().totalDepts }} Departments</span>
+            </nav>
+            <h2>Organization &amp; Workforce Demographics</h2>
+            <p class="org-hero-sub">
+              {{ deptHeadcountSummary().totalEmployees }} total active personnel &middot;
+              {{ deptHeadcountSummary().totalDepts }} departments &middot;
+              Net {{ joiningsExitsSummary().net >= 0 ? '+' : '' }}{{ joiningsExitsSummary().net }} in past 6 months
+            </p>
+            <div class="org-hero-pills">
+              <span class="org-hero-pill purple">
+                <span class="org-pill-dot"></span>
+                {{ deptHeadcountSummary().totalEmployees }} active people
+              </span>
+              <span class="org-hero-pill purple">
+                <span class="org-pill-dot"></span>
+                {{ joiningsExitsSummary().net >= 0 ? '+' : '' }}{{ joiningsExitsSummary().net }} net growth
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="org-hero-right">
+          <button type="button" class="org-audit-btn" (click)="exportAuditPdf()">
+            <svg lucideDownload size="15"></svg>
+            <span>Export Audit PDF</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. Row 1: Headcount by Department (6-col) + Joinings vs Exits (6-col) -->
+      <section class="grid-12 org-charts-row">
+        <!-- Left: Headcount by Department (col-6) -->
+        <div class="col-6">
+          <article class="org-card">
+            <header class="org-card-head">
+              <div class="org-card-title-group">
+                <h3>Headcount by Department</h3>
+                <span class="org-badge blue">{{ deptHeadcountSummary().totalEmployees }} Employees</span>
+              </div>
+              <a routerLink="/employees" class="org-link-more">Directory &rarr;</a>
+            </header>
+
+            <!-- Scrollable Department Progress List -->
+            <div class="org-dept-list">
+              <div
+                class="org-dept-row"
+                *ngFor="let d of (deptHeadcountSummary().sorted || deptHeadcountSummary().chartRows); let i = index"
+              >
+                <span class="org-dept-name" [title]="d.name">{{ d.name }}</span>
+                <div class="org-dept-track">
+                  <div
+                    class="org-dept-fill"
+                    [style.width.%]="(d.count / deptHeadcountSummary().totalEmployees) * 100"
+                    [style.background]="getDeptBarColor(i)"
+                  ></div>
+                </div>
+                <span class="org-dept-stat">
+                  <strong>{{ d.count }}</strong>
+                  <span class="org-dept-pct">
+                    ({{ ((d.count / deptHeadcountSummary().totalEmployees) * 100).toFixed(1) }}%)
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Footer Stats -->
+            <footer class="org-card-footer">
+              <div class="org-footer-item">
+                <span>Active Departments:</span>
+                <strong>{{ deptHeadcountSummary().totalDepts }} units</strong>
+              </div>
+              <div class="org-footer-item">
+                <span>Largest Unit:</span>
+                <strong>{{ deptHeadcountSummary().largestName }} ({{ deptHeadcountSummary().largestCount }})</strong>
+              </div>
+              <div class="org-footer-item">
+                <span>Avg Unit Size:</span>
+                <strong>{{ deptHeadcountSummary().avgSize }} / dept</strong>
+              </div>
+            </footer>
+          </article>
+        </div>
+
+        <!-- Right: Joinings vs Exits (Last 6 Months) (col-6) -->
+        <div class="col-6">
+          <article class="org-card">
+            <header class="org-card-head">
+              <div class="org-card-title-group">
+                <h3>Joinings vs Exits (Last 6 Months)</h3>
+                <span class="org-badge green">
+                  Net {{ joiningsExitsSummary().net >= 0 ? '+' : '' }}{{ joiningsExitsSummary().net }} Hires
+                </span>
+              </div>
+              <div class="org-legend-group">
+                <span class="org-legend-item">
+                  <span class="legend-sq green"></span>
+                  <span>Joinings (+{{ joiningsExitsSummary().totalJoinings }})</span>
+                </span>
+                <span class="org-legend-item">
+                  <span class="legend-sq red"></span>
+                  <span>Exits (-{{ joiningsExitsSummary().totalExits }})</span>
+                </span>
+              </div>
+            </header>
+
+            <!-- Clean Bar Chart Body -->
+            <div class="org-chart-wrap">
+              <div class="org-bar-chart">
+                <div class="org-bar-col" *ngFor="let p of joiningsExitsPoints()">
+                  <div class="org-bar-pair">
+                    <!-- Joinings bar (green) -->
+                    <div
+                      class="org-bar-bar green"
+                      [style.height.%]="(p.joinings / maxJoiningsExitsVal()) * 100"
+                      [title]="p.month + ' Joinings: +' + p.joinings"
+                    ></div>
+                    <!-- Exits bar (red) -->
+                    <div
+                      class="org-bar-bar red"
+                      [style.height.%]="(p.exits / maxJoiningsExitsVal()) * 100"
+                      [title]="p.month + ' Exits: -' + p.exits"
+                    ></div>
+                  </div>
+                  <span class="org-bar-month">{{ p.month.split(' ')[0] }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer Stats -->
+            <footer class="org-card-footer">
+              <div class="org-footer-item green">
+                <span>6M New Hires:</span>
+                <strong>+{{ joiningsExitsSummary().totalJoinings }}</strong>
+              </div>
+              <div class="org-footer-item red">
+                <span>6M Exits:</span>
+                <strong>-{{ joiningsExitsSummary().totalExits }}</strong>
+              </div>
+              <div class="org-footer-item blue">
+                <span>Net Headcount Growth:</span>
+                <strong>{{ joiningsExitsSummary().net >= 0 ? '+' : '' }}{{ joiningsExitsSummary().net }}</strong>
+              </div>
+            </footer>
+          </article>
+        </div>
+      </section>
+
+      <!-- Row 2: Holidays, Birthdays, Kudos -->
+      <ng-container *ngTemplateOutlet="peopleCards"></ng-container>
+    </ng-container>
+
+  </div>
+
+  <!-- ======================================================================
+       MOBILE STICKY CLOCK-IN BAR (< 768px)
+       ====================================================================== -->
+  <div class="mobile-sticky-clock" *ngIf="user() && !todayAttendance()?.clockOut">
+    <div class="msc-info">
+      <span class="msc-time">{{ formattedTime() }}</span>
+      <span class="msc-sub">
+        {{ todayAttendance()?.clockIn ? 'Worked: ' + workedDuration() : 'Shift not started' }}
+      </span>
+    </div>
+    <button
+      type="button"
+      class="sh-cta-btn"
+      [class.clock-out]="todayAttendance()?.clockIn"
+      [disabled]="isClocking()"
+      (click)="clockInOut()"
+    >
+      <svg *ngIf="!todayAttendance()?.clockIn" lucidePlay size="14" fill="currentColor"></svg>
+      <svg *ngIf="todayAttendance()?.clockIn" lucideSquare size="14" fill="currentColor"></svg>
+      <span>{{ !todayAttendance()?.clockIn ? 'Clock In' : 'Clock Out' }}</span>
+    </button>
+  </div>
+
+  <ng-template #dashboardLoading>
+    <div style="min-height: 360px; display: grid; place-items: center; color: #64748b; text-align: center;">
+      <div>
+        <strong style="display: block; color: #334155; margin-bottom: 8px;">Loading your dashboard…</strong>
+        <span>Fetching your profile and workspace data.</span>
+      </div>
+    </div>
+  </ng-template>
+</div>
+
+<!-- Holidays, birthdays and kudos: shown on Organization, and on My Workspace for employees -->
+<ng-template #peopleCards>
+  <section class="grid-12 org-people-row" *ngIf="dashboard()?.common as c">
+    <!-- 1. Upcoming Holidays (col-4) -->
+    <div class="col-4">
+      <article class="org-mini-card">
+        <header class="org-mini-head">
+          <div class="org-mini-title-wrap">
+            <h3>Upcoming Holidays</h3>
+          </div>
+          <a routerLink="/attendance/holidays" class="org-subtle-link">Calendar</a>
+        </header>
+
+        <div class="org-mini-empty" *ngIf="c.upcomingHolidays.length === 0">
+          <svg lucideCalendar size="16"></svg>
+          <span>No upcoming holidays in this cycle</span>
+        </div>
+
+        <div class="org-mini-list" *ngIf="c.upcomingHolidays.length > 0">
+          <div class="org-mini-row" *ngFor="let h of c.upcomingHolidays; trackBy: trackById">
+            <span class="org-mini-icon-circle purple">
+              <svg lucideCalendar size="15"></svg>
+            </span>
+            <div class="org-mini-info">
+              <strong class="org-mini-title">{{ h.name }}</strong>
+              <span class="org-mini-sub">{{ formatHolidayDate(h.date) }}</span>
+            </div>
+            <span class="org-countdown-pill blue">
+              {{ daysUntil(h.date) === 0 ? 'Today' : 'In ' + daysUntil(h.date) + 'd' }}
+            </span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <!-- 2. Upcoming Birthdays (col-4) -->
+    <div class="col-4">
+      <article class="org-mini-card">
+        <header class="org-mini-head">
+          <div class="org-mini-title-wrap">
+            <h3>Upcoming Birthdays</h3>
+          </div>
+          <span class="org-subtle-label">Next 30 Days</span>
+        </header>
+
+        <div class="org-mini-empty" *ngIf="c.birthdays.length === 0">
+          <svg lucideCake size="16"></svg>
+          <span>No birthdays in the next 30 days</span>
+        </div>
+
+        <div class="org-mini-list" *ngIf="c.birthdays.length > 0">
+          <div class="org-mini-row" *ngFor="let b of c.birthdays; trackBy: trackById">
+            <span class="org-mini-icon-circle amber" [class.has-photo]="b.avatarUrl">
+              <img *ngIf="b.avatarUrl" [src]="b.avatarUrl" [alt]="b.firstName" (error)="b.avatarUrl = null" />
+              <svg *ngIf="!b.avatarUrl" lucideCake size="15"></svg>
+            </span>
+            <div class="org-mini-info">
+              <strong class="org-mini-title">{{ b.firstName }} {{ b.lastName }}</strong>
+              <span class="org-mini-sub">{{ b.department || 'Team' }} &middot; {{ formatBirthdayDate(b.upcomingDate) }}</span>
+            </div>
+            <span class="org-countdown-pill amber">
+              {{ b.inDays === 0 ? 'Today!' : 'In ' + b.inDays + 'd' }}
+            </span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <!-- 3. Appreciations & Kudos (col-4) -->
+    <div class="col-4">
+      <article class="org-mini-card">
+        <header class="org-mini-head">
+          <div class="org-mini-title-wrap">
+            <h3>Appreciations &amp; Kudos</h3>
+          </div>
+          <a routerLink="/appreciation" class="org-subtle-link">Feed</a>
+        </header>
+
+        <div class="org-mini-empty" *ngIf="c.appreciations.length === 0">
+          <svg lucideTrophy size="16"></svg>
+          <span>No recent appreciations posted yet</span>
+        </div>
+
+        <div class="org-mini-list" *ngIf="c.appreciations.length > 0">
+          <div class="org-mini-row" *ngFor="let a of c.appreciations; let i = index; trackBy: trackById">
+            <span class="org-mini-icon-circle" [ngClass]="i % 2 === 0 ? 'emerald' : 'blue'" [class.has-photo]="a.employee?.avatarUrl">
+              <img *ngIf="a.employee?.avatarUrl" [src]="a.employee!.avatarUrl" [alt]="a.employee!.firstName" (error)="a.employee!.avatarUrl = null" />
+              <svg *ngIf="!a.employee?.avatarUrl && i % 2 === 0" lucideTrophy size="15"></svg>
+              <svg *ngIf="!a.employee?.avatarUrl && i % 2 !== 0" lucideAward size="15"></svg>
+            </span>
+            <div class="org-mini-info">
+              <strong class="org-mini-title">{{ a.employee ? a.employee.firstName + ' ' + a.employee.lastName : 'Team Member' }}</strong>
+              <span class="org-mini-sub">{{ a.awardTitle || 'Appreciation' }}</span>
+            </div>
+            <span class="org-mini-date">{{ formatAppreciationDate(a.givenDate) }}</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+</ng-template>

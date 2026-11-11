@@ -158,7 +158,11 @@ export class PermissionsComponent implements OnInit {
         { id: 'settings/letter-templates', title: 'Letter Templates', enabled: false },
         { id: 'settings/permissions', title: 'Roles & Permissions', enabled: false },
         { id: 'settings/system', title: 'System Settings', enabled: false },
-        { id: 'settings/integrations', title: 'Integrations', enabled: false }
+        { id: 'settings/integrations', title: 'Integrations', enabled: false },
+        // Ids match the sidebar routes (/settings/payroll, /settings/approvals).
+        // Security has no toggle: every role manages their own two-factor setup.
+        { id: 'settings/payroll', title: 'Payroll Rules', enabled: false },
+        { id: 'settings/approvals', title: 'Approval Delegation', enabled: false }
       ]
     }
   ];

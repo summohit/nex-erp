@@ -46,14 +46,12 @@ describe('clockIn / clockOut on a holiday', () => {
 
   afterEach(() => jest.useRealTimers());
 
-  it('does not mark a late or half-day clock-in on a holiday', async () => {
-    jest.useFakeTimers().setSystemTime(ist(14, 0)); // past both the buffer and half-day time
+  // 11 Nov 2026: no clock-in on a holiday at all (field visit days aside).
+  it('refuses a clock-in on a holiday, naming it', async () => {
+    jest.useFakeTimers().setSystemTime(ist(14, 0));
 
-    await service.clockIn(99, {});
-
-    const data = prisma.attendance.create.mock.calls[0][0].data;
-    expect(data.isLate).toBe(false);
-    expect(data.status).toBe('PRESENT');
+    await expect(service.clockIn(99, {})).rejects.toThrow(/No clock-in today\. Holiday/);
+    expect(prisma.attendance.create).not.toHaveBeenCalled();
   });
 
   it('still marks late on an ordinary day', async () => {
@@ -68,7 +66,7 @@ describe('clockIn / clockOut on a holiday', () => {
   it('looks the holiday up by the attendance day', async () => {
     jest.useFakeTimers().setSystemTime(ist(10, 0));
 
-    await service.clockIn(99, {});
+    await service.clockIn(99, {}).catch(() => {});
 
     const where = prisma.holiday.findFirst.mock.calls[0][0].where;
     expect(where.companyId).toBe(1);

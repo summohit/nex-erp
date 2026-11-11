@@ -723,6 +723,37 @@ export class PayrollComponent implements OnInit {
     this.payslips().reduce((t, p) => t + (p.totalDeductions || 0), 0));
   periodLossOfPay = computed(() =>
     this.payslips().reduce((t, p) => t + (p.lossOfPay || 0), 0));
+  /**
+   * The period's deductions by kind for the Deductions card (loss of pay has
+   * its own card). Lines are grouped by name; GST is paid to consultants on top of the
+   * fee, so it is listed for reference but not added to the deductions total.
+   */
+  deductionBreakdown = computed(() => {
+    const kinds: { key: string; label: string; test: RegExp }[] = [
+      { key: 'LOP', label: 'Loss of Pay', test: /unpaid days|loss of pay/i },
+      { key: 'PF', label: 'PF', test: /provident|\bpf\b/i },
+      { key: 'ESI', label: 'ESI', test: /\besi|state insurance/i },
+      { key: 'TDS', label: 'TDS', test: /\btds\b|income tax|tax deducted/i },
+      { key: 'PT', label: 'Professional Tax', test: /professional tax/i },
+    ];
+    const sums: Record<string, number> = { LOP: 0, PF: 0, ESI: 0, TDS: 0, PT: 0, OTHER: 0 };
+    let gst = 0;
+    for (const p of this.payslips()) {
+      for (const i of p.items || []) {
+        if (i.type !== 'DEDUCTION') {
+          if (/^gst\b/i.test(i.componentName)) gst += i.amount || 0;
+          continue;
+        }
+        const k = kinds.find((x) => x.test.test(i.componentName))?.key ?? 'OTHER';
+        sums[k] += i.amount || 0;
+      }
+    }
+    // Loss of pay is shown on its own card, so it stays out of this list and total.
+    const rows = [...kinds.filter((k) => k.key !== 'LOP').map((k) => ({ label: k.label, amount: sums[k.key] })), { label: 'Other', amount: sums['OTHER'] }]
+      .filter((r) => r.amount > 0);
+    const total = rows.reduce((t, r) => t + r.amount, 0);
+    return { rows, total, employerPf: sums['PF'], gst };
+  });
   periodNet = computed(() =>
     this.payslips().reduce((t, p) => t + (p.netPay || 0), 0));
   periodLabel = computed(() => {
@@ -2112,6 +2143,25 @@ export class PayrollComponent implements OnInit {
   }
 
   /** Save the PDF the server renders, rather than printing the browser's view. */
+  exportingExcel = signal(false);
+  /** Salary register for the selected month: a row per person, a column per earning and deduction. */
+  exportPayslipsExcel() {
+    const month = Number(this.selectedMonth()), year = Number(this.selectedYear());
+    this.exportingExcel.set(true);
+    this.payrollService.exportPayslips(month, year).subscribe({
+      next: (blob) => {
+        this.exportingExcel.set(false);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Salary-Register-${this.getMonthName(month)}-${year}.xlsx`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      },
+      error: () => { this.exportingExcel.set(false); this.toast.error('Could not export the salary register'); },
+    });
+  }
+
   downloadPayslip(p: Payslip) {
     this.isPayslipBusy.set(true);
     this.payrollService.downloadPayslip(p.id).subscribe({
