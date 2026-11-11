@@ -40,6 +40,15 @@ function profileSaysWfh(emp: { workLocation?: string | null; usualWorkLocation?:
   return WFH_NAME.test(String(emp.workLocation ?? ''));
 }
 
+/**
+ * Work from client (WFC): the employee's WFC switch, or the day's shift has
+ * short code "WFC" (or "WFA"). Clock in and out from anywhere, never late.
+ */
+function isAnywhere(employee: any, effective: { shift?: { shortCode?: string | null } | null }): boolean {
+  const code = (effective.shift?.shortCode ?? '').trim().toUpperCase();
+  return !!employee?.workFromAnywhere || code === 'WFC' || code === 'WFA';
+}
+
 @Injectable()
 export class AttendanceService {
   constructor(
@@ -479,7 +488,8 @@ export class AttendanceService {
       if (offReason) throw new BadRequestException(`No clock-in today. ${offReason}.`);
     }
     // WFC (work from anywhere): no office IP or location check, never late.
-    const anywhere = !!(employee as any).workFromAnywhere;
+    // Either the person's WFC switch or a shift with short code WFC.
+    const anywhere = isAnywhere(employee, effective);
 
     // On-site either because the roster says so, or because this came through
     // the field visit screen — which is on-site by definition, and says so even
@@ -991,7 +1001,7 @@ export class AttendanceService {
     // Office geofence (B3), on the same on-site exemption as clock-in — and
     // skipped entirely for a previous day. Someone closing Monday's session at
     // one in the morning is at home; that case has its own reason flow above.
-    const anywhereOut = !!(employee as any).workFromAnywhere;
+    const anywhereOut = isAnywhere(employee, effective);
     const exemptOut = isPreviousDay || !!effective.onsite || !!options?.fieldVisit || !!plannedVisitDay || anywhereOut;
     const officeOut = await this.officeCheck(
       employee, effective, exemptOut || (await this.hasApprovedWfh(employee.id, existing.date)), data,

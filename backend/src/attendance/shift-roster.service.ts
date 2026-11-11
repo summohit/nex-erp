@@ -43,6 +43,7 @@ export interface StandingShift {
   workingDays: string | null;
   halfDayTime?: string | null;
   officeGeofence?: boolean;
+  shortCode?: string | null;
 }
 
 /** One roster row, as much of it as the resolution rule reads. */
@@ -66,6 +67,8 @@ export interface EffectiveShift {
     halfDayTime?: string | null;
     /** Whether this shift is worked at the office and so geofenced (B3). */
     officeGeofence?: boolean;
+    /** "WFC" (work from client) marks a clock-from-anywhere shift (11 Nov 2026). */
+    shortCode?: string | null;
   } | null;
   startTime: string | null;
   endTime: string | null;
@@ -540,6 +543,7 @@ export class ShiftRosterService {
           earlyClockInMinutes: standing.earlyClockInMinutes,
           halfDayTime: standing.halfDayTime ?? null,
           officeGeofence: standing.officeGeofence ?? false,
+          shortCode: standing.shortCode ?? null,
         },
         startTime: standing.startTime,
         endTime: standing.endTime,
@@ -574,6 +578,7 @@ export class ShiftRosterService {
           earlyClockInMinutes: shift.earlyClockInMinutes,
         halfDayTime: shift.halfDayTime ?? null,
         officeGeofence: shift.officeGeofence ?? false,
+        shortCode: (shift as any).shortCode ?? null,
       },
       // The entry's own window wins; the shift's is the fallback.
       startTime: entry.startTime ?? shift.startTime,

@@ -1098,10 +1098,48 @@
         <span class="duration-title">⏱️ Total Duration Worked:</span>
         <span class="duration-highlight">{{ displayedDuration(selectedDayDetails()) }}</span>
       </div>
+
+      <!-- Change this day: the Team Timeline override, here (11 Nov 2026) -->
+      <div class="dd-override" *ngIf="overrideOpen()">
+        <div class="dd-ov-label">Set the day to</div>
+        <div class="dd-ov-options">
+          <label class="dd-ov-option" [class.selected]="overrideForm.status === 'PRESENT'">
+            <input type="radio" name="ddStatus" value="PRESENT" [(ngModel)]="overrideForm.status">
+            <span class="dd-ov-dot present"></span>
+            <span><b>Present</b><small>Full day at office timing (shift start to end)</small></span>
+          </label>
+          <label class="dd-ov-option" [class.selected]="overrideForm.status === 'HALF_DAY'">
+            <input type="radio" name="ddStatus" value="HALF_DAY" [(ngModel)]="overrideForm.status">
+            <span class="dd-ov-dot half"></span>
+            <span><b>Half Day</b><small>First half of the shift; half a day's pay</small></span>
+          </label>
+          <label class="dd-ov-option" [class.selected]="overrideForm.status === 'ABSENT'">
+            <input type="radio" name="ddStatus" value="ABSENT" [(ngModel)]="overrideForm.status">
+            <span class="dd-ov-dot absent"></span>
+            <span><b>Absent</b><small>No attendance; counted as loss of pay</small></span>
+          </label>
+        </div>
+        <div class="dd-ov-warn" *ngIf="selectedDayDetails()?.status === 'On Leave'">
+          This day is on approved leave. Applying cancels the leave for this day only and returns it to their balance.
+        </div>
+        <div class="dd-ov-label">Reason <span style="color:#dc2626">*</span></div>
+        <textarea class="form-control dd-ov-reason" [(ngModel)]="overrideForm.note" rows="3" maxlength="500"
+          placeholder="e.g. Was in office — biometric missed; leave withdrawn by employee…"></textarea>
+        <div class="dd-ov-foot">Visible to the employee in their notification · {{ (overrideForm.note || '').length }}/500</div>
+      </div>
     </div>
 
     <!-- Modal Footer -->
     <div class="session-modal-footer">
+      <ng-container *ngIf="canOverrideDay()">
+        <button type="button" class="btn btn-outline" *ngIf="!overrideOpen()" (click)="openOverride()">Change this day</button>
+        <ng-container *ngIf="overrideOpen()">
+          <button type="button" class="btn btn-outline" (click)="overrideOpen.set(false)">Back</button>
+          <button type="button" class="btn btn-primary" (click)="applyOverride()" [disabled]="overrideSaving() || !(overrideForm.note || '').trim()">
+            {{ overrideSaving() ? 'Applying…' : 'Apply change' }}
+          </button>
+        </ng-container>
+      </ng-container>
       <button type="button" class="btn btn-outline" (click)="closeDayDetailsModal()">Close Log</button>
     </div>
   </div>

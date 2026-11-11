@@ -1423,7 +1423,9 @@
       <div class="sc-list">
         <label class="sc-row" *ngFor="let r of scRows()">
           <input type="checkbox" [checked]="scPicked().has(r.employee.id)" (change)="scToggle(r.employee.id)">
-          <span>{{ r.employee.name }}</span>
+          <img class="sc-avatar" *ngIf="r.employee.avatarUrl; else scInitials" [src]="r.employee.avatarUrl" alt="">
+          <ng-template #scInitials><span class="sc-avatar sc-initials">{{ (r.employee.name || '?').charAt(0) }}</span></ng-template>
+          <span class="sc-name">{{ r.employee.name }}<small *ngIf="r.employee.designation">{{ r.employee.designation }}</small></span>
         </label>
       </div>
     </div>

@@ -21,6 +21,8 @@ import { AttendanceService, AttendanceRecord } from '../../services/attendance';
 import { isRestDay } from '../../shared/utils/weekly-offs';
 import { MasterDataService, Department } from '../../services/master-data.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
+import { LeavesService } from '../../services/leaves';
+import { AuthService } from '../../services/auth.service';
 import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDatePreset } from '../../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 
 export interface DayMatrixStatus {
@@ -84,6 +86,46 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   private toast = inject(HotToastService);
   profileModal = inject(ProfileModalService);
   private router = inject(Router);
+  private leavesService = inject(LeavesService);
+  private auth = inject(AuthService);
+
+  /**
+   * "Change this day" in the day pop-up (11 Nov 2026): the same override as
+   * Team Timeline, so the Super Admin needn't switch pages. The server checks
+   * the role too.
+   */
+  canOverrideDay = computed(() => ['SUPERADMIN', 'SUPER_ADMIN'].includes(this.auth.currentUser()?.role));
+  overrideOpen = signal(false);
+  overrideSaving = signal(false);
+  overrideForm = { status: 'PRESENT', note: '' };
+
+  openOverride() {
+    const st = this.selectedDayDetails()?.status;
+    this.overrideForm = { status: st === 'Half Day' ? 'HALF_DAY' : st === 'Absent' ? 'ABSENT' : 'PRESENT', note: '' };
+    this.overrideOpen.set(true);
+  }
+
+  applyOverride() {
+    const d = this.selectedDayDetails();
+    const note = (this.overrideForm.note || '').trim();
+    if (!d?.employeeId || !note) { this.toast.error('Give a reason for the change'); return; }
+    this.overrideSaving.set(true);
+    this.leavesService.overrideDay({
+      employeeId: d.employeeId,
+      date: this.getIstDateString(d.date),
+      status: this.overrideForm.status,
+      note,
+    }).subscribe({
+      next: (r) => {
+        this.overrideSaving.set(false);
+        this.toast.success(r.leavesChanged ? 'Leave cancelled for that day and attendance updated' : 'Attendance updated');
+        this.closeDayDetailsModal();
+        this.load();
+        this.loadToday();
+      },
+      error: (e) => { this.overrideSaving.set(false); this.toast.error(e?.error?.message || 'Could not change this day'); },
+    });
+  }
 
   viewMode = signal<'grid' | 'table'>('grid');
   records = signal<AttendanceRecord[]>([]);
@@ -95,6 +137,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
 
   // Selected Day Details for Modal (matching Screenshot 3)
   selectedDayDetails = signal<{
+    employeeId: number | null;
     employeeName: string;
     employeeEmail: string;
     employeeDesignation: string;
@@ -2046,6 +2089,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     }
 
     this.selectedDayDetails.set({
+      employeeId: mergedEmp.id ?? record?.employeeId ?? null,
       employeeName: empName,
       employeeEmail: empEmail,
       employeeDesignation: empDesignation,
@@ -2092,6 +2136,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   }
 
   closeDayDetailsModal() {
+    this.overrideOpen.set(false);
     this.isDetailsModalOpen.set(false);
     this.selectedDayDetails.set(null);
     if (this.activeDurationTick) {

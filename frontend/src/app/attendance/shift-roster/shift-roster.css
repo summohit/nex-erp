@@ -3686,3 +3686,7 @@ textarea.form-control-enhanced:focus {
 .sc-list { max-height: 320px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
 .sc-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; font-size: 14px; }
 .sc-row:last-child { border-bottom: 0; }
+.sc-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.sc-initials { display: inline-flex; align-items: center; justify-content: center; background: #e0e7ff; color: #3730a3; font-weight: 600; font-size: 13px; }
+.sc-name { display: flex; flex-direction: column; line-height: 1.25; }
+.sc-name small { color: #64748b; font-size: 12px; }
