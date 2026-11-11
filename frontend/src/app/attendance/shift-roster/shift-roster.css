@@ -3677,5 +3677,12 @@ textarea.form-control-enhanced:focus {
 .awfh-perm-row .perm-name { font-weight: 600; }
 .awfh-perm-row .perm-meta { flex: 1; color: #64748b; font-size: 12px; }
 
-/* Selected dates / Permanent switch in Automate Shifts (11 Nov 2026). */
-.bulk-mode-toggle { margin-bottom: 12px; align-self: flex-start; }
+/* Change Shift pop-up (11 Nov 2026). */
+.sc-card { max-width: 520px; width: 100%; }
+.sc-body { display: flex; flex-direction: column; gap: 10px; }
+.sc-label { font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; margin-top: 6px; }
+.sc-count { font-weight: 500; color: #64748b; }
+.sc-search { height: 38px; padding: 0 10px; border: 1px solid #e2e8f0; border-radius: 8px; }
+.sc-list { max-height: 320px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+.sc-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; font-size: 14px; }
+.sc-row:last-child { border-bottom: 0; }

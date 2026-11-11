@@ -773,8 +773,8 @@ export class ShiftRosterService {
 
   /**
    * Set the standing shift (Employee.shiftId) for many people. With
-   * clearFutureRoster, rostered shifts from today on are removed so the new
-   * shift shows at once; rostered days off are kept.
+   * clearFutureRoster, roster entries from today on are removed, days off
+   * included, so the new shift alone decides working days and days off.
    */
   async setPermanentShift(companyId: number, data: { employeeIds: number[]; shiftId: number; clearFutureRoster?: boolean }) {
     const ids = data.employeeIds || [];
@@ -789,7 +789,7 @@ export class ShiftRosterService {
     if (data.clearFutureRoster) {
       const today = dateKey(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
       const del = await this.prisma.shiftRosterEntry.deleteMany({
-        where: { companyId, employeeId: { in: ids }, date: { gte: today }, isDayOff: false },
+        where: { companyId, employeeId: { in: ids }, date: { gte: today } },
       });
       clearedRoster = del.count;
     }

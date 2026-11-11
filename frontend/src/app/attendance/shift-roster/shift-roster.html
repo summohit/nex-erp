@@ -51,6 +51,11 @@
         <span>{{ copyPrevBusy() ? 'Copying…' : 'Copy previous month' }}</span>
       </button>
 
+      <button type="button" class="btn-action-outline" (click)="openShiftChange()" *ngIf="canPermanentShift()" title="Change the shift of many people at once">
+        <svg lucideWandSparkles size="15"></svg>
+        <span>Change Shift</span>
+      </button>
+
       <span class="actions-divider" *ngIf="canAssignWfh()"></span>
 
       <button type="button" class="btn-action-primary btn-assign-wfh" (click)="openAssignWfh()" *ngIf="canAssignWfh()" title="Assign Work From Home to employees">
@@ -400,10 +405,6 @@
     <div class="modal-body automate-modal-body">
       <!-- 1. Compact Shift & Schedule Configuration Bar -->
       <div class="automate-setup-bar">
-        <div class="bulk-view-toggle bulk-mode-toggle" *ngIf="canPermanentShift()">
-          <button type="button" [class.active]="bulkForm.mode !== 'permanent'" (click)="bulkForm.mode = 'dates'">Selected dates</button>
-          <button type="button" [class.active]="bulkForm.mode === 'permanent'" (click)="bulkForm.mode = 'permanent'; bulkForm.isDayOff = false">Permanent</button>
-        </div>
         <div class="setup-grid">
           <!-- Target Shift -->
           <div class="setup-col setup-shift-col" [class.field-disabled]="bulkForm.isDayOff">
@@ -430,7 +431,7 @@
           </div>
 
           <!-- Date Range & Presets -->
-          <div class="setup-col setup-dates-col" *ngIf="bulkForm.mode !== 'permanent'; else permanentNote">
+          <div class="setup-col setup-dates-col">
             <div class="setup-label-row">
               <label class="setup-field-label">
                 <svg lucideCalendar size="14"></svg>
@@ -463,20 +464,8 @@
           </div>
         </div>
 
-        <ng-template #permanentNote>
-          <div class="setup-col setup-dates-col">
-            <label class="compact-option-card" [class.is-active]="bulkForm.clearFutureRoster">
-              <input type="checkbox" [(ngModel)]="bulkForm.clearFutureRoster" class="custom-check-input">
-              <div class="option-card-text">
-                <span class="opt-title">Remove rostered shifts from today</span>
-                <span class="opt-desc">The new shift shows at once; rostered days off stay</span>
-              </div>
-            </label>
-          </div>
-        </ng-template>
-
         <!-- Sleek Horizontal Options Strip -->
-        <div class="setup-options-row" *ngIf="bulkForm.mode !== 'permanent'">
+        <div class="setup-options-row">
           <label class="compact-option-card" [class.is-active]="bulkForm.isDayOff">
             <input type="checkbox" [(ngModel)]="bulkForm.isDayOff" class="custom-check-input">
             <div class="option-card-text">
@@ -714,7 +703,7 @@
         (click)="submitBulk()"
       >
         <span class="btn-inner-content">
-          <span>{{ bulkForm.mode === 'permanent' ? 'Change Shift' : 'Apply Shifts' }} <ng-container *ngIf="bulkSelection().size > 0">({{ bulkSelection().size }})</ng-container></span>
+          <span>Apply Shifts <ng-container *ngIf="bulkSelection().size > 0">({{ bulkSelection().size }})</ng-container></span>
           <svg lucideWandSparkles size="15"></svg>
         </span>
       </button>
@@ -1413,5 +1402,36 @@
   <div class="roster-tip-footer">
     <span *ngIf="tip.cell.type !== 'LEAVE'">💡 Click cell to edit or reassign shift</span>
     <span *ngIf="tip.cell.type === 'LEAVE'">🔒 Leave is managed in the Leave module</span>
+  </div>
+</div>
+
+<!-- Change Shift (Super Admin, 11 Nov 2026): pick a shift, tick people, save.
+     Their working days and days off then come from that shift. -->
+<div class="modal-overlay" *ngIf="scOpen()" (click)="scOpen.set(false)">
+  <div class="modal-card sc-card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Change Shift</h2>
+      <button class="icon-btn-close" (click)="scOpen.set(false)" aria-label="Close"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-body sc-body">
+      <label class="sc-label">Shift</label>
+      <app-searchable-select [options]="shiftOptions()" [value]="scShiftId()" [fullWidth]="true"
+        placeholder="Select shift…" (valueChange)="scShiftId.set($event)"></app-searchable-select>
+
+      <label class="sc-label">Employees <span class="sc-count">{{ scPicked().size }} selected</span></label>
+      <input class="sc-search" type="search" placeholder="Search by name" [ngModel]="scQuery()" (ngModelChange)="scQuery.set($event)">
+      <div class="sc-list">
+        <label class="sc-row" *ngFor="let r of scRows()">
+          <input type="checkbox" [checked]="scPicked().has(r.employee.id)" (change)="scToggle(r.employee.id)">
+          <span>{{ r.employee.name }}</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal-cancel" (click)="scOpen.set(false)">Cancel</button>
+      <button class="btn-modal-submit" [disabled]="!scShiftId() || !scPicked().size || scSaving()" (click)="saveShiftChange()">
+        {{ scSaving() ? 'Saving…' : 'Save' }}
+      </button>
+    </div>
   </div>
 </div>
