@@ -133,6 +133,10 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   changeShiftId = signal<number | null>(null);
   changeShiftScope = signal<'day' | 'permanent'>('day');
   isSavingShift = signal(false);
+  isChangeDayOpen = signal(false);
+  changeDayStatus = signal<'PRESENT' | 'HALF_DAY' | 'ABSENT'>('PRESENT');
+  changeDayReason = signal('');
+  isSavingDayChange = signal(false);
   /** Refreshes active-session durations while the day-detail modal stays open. */
   private activeDurationTick: ReturnType<typeof setInterval> | null = null;
   activeDurationNow = signal(Date.now());
@@ -2095,6 +2099,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   closeDayDetailsModal() {
     this.isDetailsModalOpen.set(false);
     this.isChangeShiftOpen.set(false);
+    this.isChangeDayOpen.set(false);
     this.selectedDayDetails.set(null);
     if (this.activeDurationTick) {
       clearInterval(this.activeDurationTick);
@@ -2105,6 +2110,40 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   canChangeShift(): boolean {
     const role = this.authService.currentUser()?.role;
     return role === 'SUPERADMIN' || role === 'SUPER_ADMIN';
+  }
+
+  canChangeDay(): boolean {
+    const role = this.authService.currentUser()?.role;
+    return role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'HR';
+  }
+
+  openChangeDay(): void {
+    const details = this.selectedDayDetails();
+    if (!details?.employeeId) return;
+    const current = details.status === 'Half Day' ? 'HALF_DAY' : details.status === 'Absent' ? 'ABSENT' : 'PRESENT';
+    this.changeDayStatus.set(current);
+    this.changeDayReason.set('');
+    this.isChangeDayOpen.set(true);
+  }
+
+  saveDayChange(): void {
+    const details = this.selectedDayDetails();
+    const note = this.changeDayReason().trim();
+    if (!details?.employeeId || !note || this.isSavingDayChange()) {
+      if (!note) this.toast.error('Please provide a reason for this change');
+      return;
+    }
+    this.isSavingDayChange.set(true);
+    this.attendanceService.overrideAttendance(details.employeeId, this.getBackendDateString(details.date), this.changeDayStatus(), note).subscribe({
+      next: () => {
+        this.isSavingDayChange.set(false);
+        this.isChangeDayOpen.set(false);
+        this.selectedDayDetails.set(null);
+        this.toast.success('Attendance day updated');
+        this.load();
+      },
+      error: (error: any) => { this.isSavingDayChange.set(false); this.toast.error(error?.error?.message || 'Could not update attendance'); },
+    });
   }
 
   openChangeShift(): void {
