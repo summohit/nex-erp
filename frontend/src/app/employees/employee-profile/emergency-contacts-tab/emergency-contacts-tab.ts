@@ -33,7 +33,7 @@ export class EmergencyContactsTabComponent implements OnInit {
     if (!token) return false;
     try {
       const role = JSON.parse(atob(token.split('.')[1])).role;
-      return role === 'ADMIN' || role === 'HR' || role === 'SUPERADMIN';
+      return role === 'SUPERADMIN';
     } catch {
       return false;
     }
@@ -42,6 +42,7 @@ export class EmergencyContactsTabComponent implements OnInit {
 
   showModal = false;
   submitted = false;
+  editingContactId: number | null = null;
   newContact: any = {
     name: '',
     email: '',
@@ -88,6 +89,7 @@ export class EmergencyContactsTabComponent implements OnInit {
         flex: 0,
         cellRenderer: ActionCellRendererComponent,
         cellRendererParams: {
+          onEdit: (data: any) => this.openEditModal(data),
           onDelete: (data: any) => this.deleteContact(data.id)
         },
         sortable: false,
@@ -100,6 +102,7 @@ export class EmergencyContactsTabComponent implements OnInit {
   openModal() {
     this.showModal = true;
     this.submitted = false;
+    this.editingContactId = null;
     this.newContact = {
       name: '',
       email: '',
@@ -110,6 +113,14 @@ export class EmergencyContactsTabComponent implements OnInit {
 
   closeModal() {
     this.showModal = false;
+    this.editingContactId = null;
+  }
+
+  openEditModal(contact: any) {
+    this.submitted = false;
+    this.editingContactId = contact.id;
+    this.newContact = { name: contact.name || '', email: contact.email || '', mobile: contact.mobile || '', relationship: contact.relationship || 'Father' };
+    this.showModal = true;
   }
 
   saveContact() {
@@ -131,9 +142,12 @@ export class EmergencyContactsTabComponent implements OnInit {
       return;
     }
     
-    this.employeeService.addContact(this.employeeData.id, this.newContact).subscribe({
+    const request = this.editingContactId
+      ? this.employeeService.updateContact(this.employeeData.id, this.editingContactId, this.newContact)
+      : this.employeeService.addContact(this.employeeData.id, this.newContact);
+    request.subscribe({
       next: () => {
-        this.toast.success('Contact added');
+        this.toast.success(this.editingContactId ? 'Contact updated' : 'Contact added');
         this.closeModal();
         this.refreshProfile.emit();
       },

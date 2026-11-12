@@ -9,6 +9,7 @@ import {
   LucideUser, LucideDownload, LucideTrash2, LucideSparkles, LucideChevronDown,
   LucideChevronUp, LucideRefreshCw, LucideFile, LucideImage, LucideFileSpreadsheet,
   LucideExternalLink, LucideEye, LucideBell, LucideShare2, LucideCheck, LucideUsers,
+  LucideLayoutGrid, LucideTable2,
 } from "@lucide/angular";
 import { QuillModule } from "ngx-quill";
 import Quill from "quill";
@@ -33,7 +34,7 @@ import { UploadService } from "../../services/upload.service";
     LucideUser, LucideDownload, LucideTrash2, LucideSparkles, LucideChevronDown,
     LucideChevronUp, LucideRefreshCw, LucideFile, LucideImage, LucideFileSpreadsheet,
     LucideExternalLink, LucideEye, LucideBell, LucideShare2, LucideCheck,
-    LucideUsers, QuillModule,
+    LucideUsers, LucideLayoutGrid, LucideTable2, QuillModule,
   ],
   templateUrl: "./notices.html",
   styleUrls: ["./notices.css"],
@@ -55,6 +56,9 @@ export class NoticesComponent {
   statusFilter = signal<"ALL" | "ACTIVE" | "HIGH" | "ATTACHMENTS" | "SCHEDULED" | "EXPIRED">("ALL");
   priorityFilter = signal<string>("ALL");
   sortBy = signal<"NEWEST" | "OLDEST" | "PRIORITY">("NEWEST");
+  dateFilter = signal("");
+  viewMode = signal<"CARDS" | "TABLE">(this.readViewMode());
+  selectedNotice = signal<Notice | null>(null);
 
   // Expanded cards state (for long bodies)
   expandedNoticeIds = signal<Set<number>>(new Set());
@@ -290,6 +294,7 @@ export class NoticesComponent {
       this.searchQuery().trim().length > 0 ||
       this.statusFilter() !== "ALL" ||
       this.priorityFilter() !== "ALL" ||
+      this.dateFilter() !== "" ||
       this.sortBy() !== "NEWEST"
     );
   });
@@ -331,6 +336,9 @@ export class NoticesComponent {
       list = list.filter((n) => n.priority === pFilter);
     }
 
+    const date = this.dateFilter();
+    if (date) list = list.filter((n) => this.noticeDateKey(n) === date);
+
     // 4. Sorting
     const sort = this.sortBy();
     list.sort((a, b) => {
@@ -356,6 +364,24 @@ export class NoticesComponent {
 
   constructor() {
     this.load();
+  }
+
+  private readViewMode(): "CARDS" | "TABLE" {
+    try { return localStorage.getItem("notice-board-view") === "TABLE" ? "TABLE" : "CARDS"; }
+    catch { return "CARDS"; }
+  }
+
+  setViewMode(view: "CARDS" | "TABLE") {
+    this.viewMode.set(view);
+    try { localStorage.setItem("notice-board-view", view); } catch { /* storage unavailable */ }
+  }
+
+  openNotice(n: Notice) { this.selectedNotice.set(n); }
+  closeNotice() { this.selectedNotice.set(null); }
+
+  noticeDateKey(n: Notice): string {
+    const d = new Date(n.publishedAt || n.createdAt);
+    return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
   }
 
   bodyHtml(body: string): string {
@@ -515,6 +541,7 @@ export class NoticesComponent {
     this.searchQuery.set("");
     this.statusFilter.set("ALL");
     this.priorityFilter.set("ALL");
+    this.dateFilter.set("");
     this.sortBy.set("NEWEST");
   }
 

@@ -3,7 +3,7 @@
   <div class="header-actions" *ngIf="canManageContacts">
     <button class="btn-primary" (click)="openModal()">
       <svg lucidePlus size="16"></svg>
-      Create New
+      Add Contact
     </button>
   </div>
 
@@ -27,7 +27,7 @@
 <div class="modal-overlay" *ngIf="showModal" (click)="closeModal()">
   <div class="modal-content" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h2>Add Emergency Contact</h2>
+      <h2>{{ editingContactId ? 'Edit Emergency Contact' : 'Add Emergency Contact' }}</h2>
       <button class="close-btn" (click)="closeModal()">✕</button>
     </div>
     
@@ -64,7 +64,7 @@
     
     <div class="modal-footer">
       <button class="btn-secondary" (click)="closeModal()">Cancel</button>
-      <button class="btn-primary" (click)="saveContact()">Submit</button>
+      <button class="btn-primary" (click)="saveContact()">{{ editingContactId ? 'Save Changes' : 'Add Contact' }}</button>
     </div>
   </div>
 </div>

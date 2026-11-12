@@ -7,7 +7,7 @@ import { AuthService } from '../../services/auth.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
 import { MasterDataService, Department, Designation } from '../../services/master-data.service';
 import { HotToastService } from '@ngneat/hot-toast';
-import { LucidePlus, LucideSearch, LucideX, LucideChevronRight, LucideUpload, LucideLayoutGrid, LucideList, LucideBuilding, LucideMail, LucidePhone } from '@lucide/angular';
+import { LucidePlus, LucideSearch, LucideX, LucideChevronRight, LucideUpload, LucideLayoutGrid, LucideList, LucideBuilding, LucideMail, LucidePhone, LucideFilter } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { ActionCellRendererComponent } from '../../shared/components/action-cell-renderer.component';
@@ -33,6 +33,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LucideBuilding,
     LucideMail,
     LucidePhone,
+    LucideFilter,
     AgGridAngular,
     EmployeeDrawerComponent,
     BulkUploadModalComponent,
@@ -191,21 +192,22 @@ export class EmployeeListComponent implements OnInit {
   filterOffboardingStatus: string | null = null;
 
   defaultColDef: ColDef = {
-    minWidth: 120,
+    minWidth: 70,
     filter: true,
     sortable: true
   };
 
-  paginationPageSize = 100;
-  paginationPageSizeSelector = [20, 50, 100, 200];
+  // Ten complete rows fit in the fixed directory panel. Keeping the page size
+  // aligned to that height avoids an internal vertical scroller.
+  paginationPageSize = 10;
+  paginationPageSizeSelector = [10];
 
   gridOptions = {
     headerHeight: 48,
     rowHeight: 70,
-    // Keep every directory column at a readable width.  On a narrow viewport
-    // AG Grid's horizontal rail is intentionally available rather than
-    // shrinking text until names, emails, and job titles are cut off.
-    suppressHorizontalScroll: false,
+    // The directory uses compact, wrapping columns and always fits them to
+    // its own width. This keeps pagination visible and avoids a bottom rail.
+    suppressHorizontalScroll: true,
     // Keep former employees visually separate from the live directory.
     rowClassRules: {
       'offboarded-employee-row': (params: any) => params.data?.offboardingStatus === 'SEPARATED',
@@ -243,8 +245,8 @@ export class EmployeeListComponent implements OnInit {
     { 
       headerName: 'Employee Name',
       field: 'firstName',
-      width: 360,
-      minWidth: 330,
+      flex: 2.1,
+      minWidth: 210,
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         const fn = params.data.firstName || '';
@@ -276,14 +278,15 @@ export class EmployeeListComponent implements OnInit {
     {
       field: 'employeeCode',
       headerName: 'ID',
-      width: 115,
+      width: 82,
+      minWidth: 72,
       valueFormatter: (params) => params.value || '—'
     },
     {
       field: 'department.name',
       headerName: 'Department',
-      width: 230,
-      minWidth: 190,
+      flex: 1.25,
+      minWidth: 130,
       wrapText: true,
       // Department names can be long (for example, "Information Technology
       // (IT)"). Let AG Grid grow that row instead of painting the second line
@@ -303,8 +306,8 @@ export class EmployeeListComponent implements OnInit {
     { 
       field: 'designation.name', 
       headerName: 'Designation',
-      width: 250,
-      minWidth: 210,
+      flex: 1.35,
+      minWidth: 135,
       autoHeight: true,
       cellRenderer: (params: any) => {
         const value = String(params.value || 'Unassigned')
@@ -318,7 +321,8 @@ export class EmployeeListComponent implements OnInit {
     {
       field: 'user.role',
       headerName: 'Role',
-      width: 125,
+      width: 105,
+      minWidth: 95,
       cellRenderer: (params: any) => {
         let badges = '';
         if (params.value) {
@@ -339,7 +343,8 @@ export class EmployeeListComponent implements OnInit {
     {
       field: 'user.status',
       headerName: 'Status',
-      width: 115,
+      width: 105,
+      minWidth: 92,
       cellRenderer: (params: any) => {
         if (!params.value) return '';
         const statusStr = params.value;
@@ -358,7 +363,8 @@ export class EmployeeListComponent implements OnInit {
     {
       colId: 'employment',
       headerName: 'Employment',
-      width: 175,
+      width: 135,
+      minWidth: 120,
       filter: 'agTextColumnFilter',
       valueGetter: (params: any) => this.employmentStatus(params.data),
       cellRenderer: (params: any) => {
@@ -374,7 +380,8 @@ export class EmployeeListComponent implements OnInit {
     {
       field: 'onboardingStatus',
       headerName: 'Onboarding',
-      width: 150,
+      width: 120,
+      minWidth: 108,
       cellRenderer: (params: any) => {
         const statusStr = params.value || 'PENDING';
         let color = '#64748B'; let bg = '#F1F5F9'; let label = statusStr;
@@ -392,7 +399,8 @@ export class EmployeeListComponent implements OnInit {
     {
       field: 'offboardingStatus',
       headerName: 'Offboarding',
-      width: 150,
+      width: 120,
+      minWidth: 108,
       cellRenderer: (params: any) => {
         const status = params.value || 'NONE';
         if (status === 'NONE') return `<span style="font-size:12px; color:#94A3B8;">N/A</span>`;
@@ -405,7 +413,8 @@ export class EmployeeListComponent implements OnInit {
     },
     { 
       headerName: 'Actions',
-      width: 72,
+      width: 64,
+      minWidth: 64,
       flex: 0,
       sortable: false,
       filter: false,
@@ -537,6 +546,12 @@ export class EmployeeListComponent implements OnInit {
       applyOrder: true,
     });
     this.gridApi.sizeColumnsToFit();
+  }
+
+  @HostListener('window:resize')
+  fitDirectoryColumns() {
+    // Let AG Grid recalculate after the sidebar or browser width changes.
+    requestAnimationFrame(() => this.gridApi?.sizeColumnsToFit());
   }
 
   onSearch() {

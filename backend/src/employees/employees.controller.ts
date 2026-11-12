@@ -206,6 +206,11 @@ export class EmployeesController {
     return this.employeesService.addContact(+id, req.user.companyId, req.user.sub, req.user.role, data);
   }
 
+  @Put(':id/contacts/:contactId')
+  updateContact(@Request() req, @Param('id') id: string, @Param('contactId') contactId: string, @Body() data: any) {
+    return this.employeesService.updateContact(+id, +contactId, req.user.companyId, req.user.sub, req.user.role, data);
+  }
+
   @Delete(':id/contacts/:contactId')
   deleteContact(@Request() req, @Param('id') id: string, @Param('contactId') contactId: string) {
     return this.employeesService.deleteContact(+id, +contactId, req.user.companyId, req.user.sub, req.user.role);

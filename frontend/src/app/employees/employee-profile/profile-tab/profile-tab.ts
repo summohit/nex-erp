@@ -124,7 +124,6 @@ export class ProfileTabComponent implements OnInit {
   companyBranches: Branch[] = [];
   companyDepartments: Department[] = [];
   companyDesignations: Designation[] = [];
-  dynamicLocationOptions: string[] = ['Unspecified', 'Home', 'Other'];
 
   get canEditWorkDetails(): boolean {
     const token = getAccessToken();
@@ -146,6 +145,12 @@ export class ProfileTabComponent implements OnInit {
   get canSaveProfile(): boolean {
     return this.isOwner || this.canEditWorkDetails;
   }
+
+  isShiftChangeOpen = false;
+  shiftSaving = false;
+  shiftChange: { shiftId: number | null; mode: 'PERMANENT' | 'DATES'; start: string; end: string } = {
+    shiftId: null, mode: 'PERMANENT', start: '', end: ''
+  };
 
   countries = Country.getAllCountries();
   states: any[] = [];
@@ -228,31 +233,7 @@ export class ProfileTabComponent implements OnInit {
     });
   }
 
-  readonly weekDays = [
-    { key: 'monday',    label: 'Monday' },
-    { key: 'tuesday',   label: 'Tuesday' },
-    { key: 'wednesday', label: 'Wednesday' },
-    { key: 'thursday',  label: 'Thursday' },
-    { key: 'friday',    label: 'Friday' },
-    { key: 'saturday',  label: 'Saturday' },
-    { key: 'sunday',    label: 'Sunday' },
-  ];
-
   companyShifts: Shift[] = [];
-
-  /**
-   * Older records stored only `{ monday: 'Home', ... }`. Bring them forward by
-   * adding the `shifts` map rather than rewriting the shape, so nothing that
-   * already reads the day keys breaks.
-   */
-  private normaliseWorkLocation(raw: any) {
-    const base: any = raw && typeof raw === 'object' ? { ...raw } : {};
-    for (const d of this.weekDays) {
-      if (!base[d.key]) base[d.key] = 'Unspecified';
-    }
-    base.shifts = base.shifts && typeof base.shifts === 'object' ? { ...base.shifts } : {};
-    return base;
-  }
 
   loadShifts() {
     this.shiftsService.getShifts().subscribe({
@@ -261,28 +242,59 @@ export class ProfileTabComponent implements OnInit {
     });
   }
 
-  /** Label for the "use the employee's default" option. */
-  defaultShiftLabel(): string {
-    const s = this.employeeData?.shift;
-    return s?.name ? `Default (${s.name})` : 'Default shift';
-  }
-
   /** Time range shown under a day when an override is picked. */
   shiftTimeRange(shiftId: any): string {
     const s = this.companyShifts.find(x => String(x.id) === String(shiftId));
     return s ? `${s.startTime} – ${s.endTime}` : '';
   }
 
+  currentShiftName(): string {
+    return this.employeeData?.shift?.name || 'No standing shift assigned';
+  }
+
+  currentShiftTiming(): string {
+    const shift = this.employeeData?.shift;
+    return shift?.startTime && shift?.endTime ? `${shift.startTime} – ${shift.endTime}` : 'Use Change shift to assign one';
+  }
+
+  openShiftChange() {
+    const current = this.employeeData?.shift;
+    const matchingShift = this.companyShifts.find(s =>
+      String(s.id) === String(current?.id) || (!!current?.name && s.name === current.name)
+    );
+    this.shiftChange = { shiftId: matchingShift?.id ?? null, mode: 'PERMANENT', start: '', end: '' };
+    this.isShiftChangeOpen = true;
+  }
+
+  closeShiftChange() {
+    if (!this.shiftSaving) this.isShiftChangeOpen = false;
+  }
+
+  saveShiftChange() {
+    const employeeId = this.employeeData?.id;
+    const { shiftId, mode, start, end } = this.shiftChange;
+    if (!employeeId || !shiftId) { this.toast.error('Please choose a shift'); return; }
+    if (mode === 'DATES' && (!start || !end || start > end)) { this.toast.error('Choose a valid start and end date'); return; }
+    this.shiftSaving = true;
+    const request = mode === 'PERMANENT'
+      ? this.shiftsService.assignPermanent({ employeeId, shiftId })
+      : this.shiftsService.bulkAssignRoster({ employeeIds: [employeeId], start, end, shiftId, overwriteExisting: true });
+    request.subscribe({
+      next: () => {
+        if (mode === 'PERMANENT') this.employeeData.shift = this.companyShifts.find(s => s.id === shiftId) || { id: shiftId, name: 'Assigned shift' };
+        this.toast.success(mode === 'PERMANENT' ? 'Standing shift updated' : 'Shift assigned for the selected dates');
+        this.shiftSaving = false;
+        this.isShiftChangeOpen = false;
+        this.refreshProfile.emit();
+      },
+      error: () => { this.shiftSaving = false; this.toast.error('Unable to update shift. Please try again.'); }
+    });
+  }
+
   loadBranches() {
     this.masterDataService.getBranches().subscribe({
       next: (branches) => {
         this.companyBranches = branches || [];
-        this.dynamicLocationOptions = [
-          'Unspecified', 
-          'Home', 
-          ...this.companyBranches.map(b => b.name), 
-          'Other'
-        ];
       },
       error: (err) => console.error('Failed to load branches', err)
     });
@@ -333,9 +345,6 @@ export class ProfileTabComponent implements OnInit {
           ? new Date(this.employeeData.nextAppraisalDate).toISOString().split('T')[0]
           : '',
 
-        // Usual work location mapping per day. Per-day shift overrides live in a
-        // nested `shifts` key so records saved before this existed still load.
-        usualWorkLocation: this.normaliseWorkLocation(this.employeeData.usualWorkLocation),
         workLocation: this.employeeData.workLocation || null,
         weeklyOffs: this.employeeData.weeklyOffs || '',
         workNotes: this.employeeData.workNotes || '',

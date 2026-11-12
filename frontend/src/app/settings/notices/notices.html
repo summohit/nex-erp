@@ -190,6 +190,16 @@
         <svg lucideChevronDown size="14" class="nb-dropdown-icon"></svg>
       </div>
 
+      <div class="nb-date-filter">
+        <svg lucideCalendar size="14"></svg>
+        <input type="date" [ngModel]="dateFilter()" (ngModelChange)="dateFilter.set($event)" aria-label="Filter notices by posted date">
+      </div>
+
+      <div class="nb-view-toggle" aria-label="Notice view">
+        <button type="button" [class.active]="viewMode() === 'CARDS'" (click)="setViewMode('CARDS')"><svg lucideLayoutGrid size="15"></svg><span>Cards</span></button>
+        <button type="button" [class.active]="viewMode() === 'TABLE'" (click)="setViewMode('TABLE')"><svg lucideTable2 size="15"></svg><span>Table</span></button>
+      </div>
+
       <!-- Clear All Filters Button -->
       <button type="button" class="nb-btn-clear" *ngIf="hasActiveFilters()" (click)="clearAllFilters()" title="Reset all filters">
         <svg lucideX size="13"></svg>
@@ -241,7 +251,7 @@
   </div>
 
   <!-- Notices List -->
-  <div class="nb-list" *ngIf="!loading() && filteredNotices().length > 0">
+  <div class="nb-list" *ngIf="!loading() && filteredNotices().length > 0 && viewMode() === 'CARDS'">
     <article class="nb-card"
              *ngFor="let n of filteredNotices()"
              [class.high-priority]="n.priority === 'HIGH'"
@@ -396,6 +406,59 @@
           </div>
         </div>
       </div>
+    </article>
+  </div>
+
+  <div class="nb-table-wrap" *ngIf="!loading() && filteredNotices().length > 0 && viewMode() === 'TABLE'">
+    <table class="nb-table">
+      <thead><tr><th class="nb-serial-col">S.No.</th><th>Title</th><th>Priority</th><th>Posted by</th><th>Posted on</th><th>Expires</th><th>Audience</th><th>Attachments</th><th>Actions</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let n of filteredNotices(); let i = index" class="nb-table-row" (click)="openNotice(n)">
+          <td class="nb-serial-col"><span>{{ i + 1 }}</span></td>
+          <td><strong>{{ n.title }}</strong><small class="nb-table-status" *ngIf="!n.isActive || hasExpired(n)">{{ !n.isActive ? 'Retired' : 'Expired' }}</small></td>
+          <td><span class="nb-priority-badge" [class]="'p-' + n.priority.toLowerCase()">{{ n.priority }}</span></td>
+          <td>{{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'CES Tech Administration' }}</td>
+          <td>{{ n.publishedAt | date:'dd MMM y' }}</td>
+          <td>{{ n.expiresAt ? (n.expiresAt | date:'dd MMM y') : '—' }}</td>
+          <td><span class="nb-table-audience" [title]="audienceSummary(n.audience)">{{ audienceSummary(n.audience) }}</span></td>
+          <td><span class="nb-attachment-count"><svg lucidePaperclip size="13"></svg>{{ n.attachments?.length || 0 }}</span></td>
+          <td><div class="nb-table-actions" (click)="$event.stopPropagation()"><button type="button" class="nb-btn-action" (click)="copyNoticeText(n)" title="Copy notice"><svg lucideShare2 size="14"></svg></button><button type="button" class="nb-btn-action" *ngIf="canPost()" (click)="openEdit(n)" title="Edit notice"><svg lucideEdit2 size="14"></svg></button><button type="button" class="nb-btn-action nb-btn-retire" *ngIf="canPost() && n.isActive" (click)="openRetireModal(n)" title="Retire notice"><svg lucideArchive size="14"></svg></button></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nb-modal-backdrop nb-notice-detail-backdrop" *ngIf="selectedNotice() as n" (click)="closeNotice()">
+    <article class="nb-notice-detail-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" [attr.aria-label]="n.title">
+      <header class="nb-notice-detail-head">
+        <div><div class="nb-notice-detail-topline"><span class="nb-priority-badge" [class]="'p-' + n.priority.toLowerCase()">{{ n.priority }}</span><span class="nb-detail-status" [class.is-live]="n.isActive && !hasExpired(n) && !isScheduled(n)" [class.is-expired]="hasExpired(n)" [class.is-scheduled]="isScheduled(n)" [class.is-inactive]="!n.isActive"><svg lucideCheckCircle2 size="13" *ngIf="n.isActive && !hasExpired(n) && !isScheduled(n)"></svg><svg lucideClock size="13" *ngIf="isScheduled(n)"></svg><svg lucideArchive size="13" *ngIf="hasExpired(n) || !n.isActive"></svg>{{ !n.isActive ? 'Archived' : (hasExpired(n) ? 'Expired' : (isScheduled(n) ? 'Scheduled' : 'Live')) }}</span></div><h2>{{ n.title }}</h2><p>Notice #{{ n.id }} · Posted by {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'CES Tech Administration' }}</p></div>
+        <button type="button" class="nb-btn-close" (click)="closeNotice()" aria-label="Close notice"><svg lucideX size="18"></svg></button>
+      </header>
+      <div class="nb-notice-detail-body">
+        <section class="nb-notice-detail-facts" aria-label="Notice details">
+          <div><span>Posted on</span><strong><svg lucideCalendar size="15"></svg>{{ n.publishedAt | date:'dd MMM y, h:mm a' }}</strong></div>
+          <div><span>Expires</span><strong><svg lucideClock size="15"></svg>{{ n.expiresAt ? (n.expiresAt | date:'dd MMM y, h:mm a') : 'No expiry date' }}</strong></div>
+          <div><span>Audience</span><strong><svg lucideUsers size="15"></svg>{{ audienceSummary(n.audience) }}</strong></div>
+          <div><span>Email delivery</span><strong><svg lucideMail size="15"></svg>{{ n.emailSentAt ? ('Sent ' + (n.emailSentAt | date:'dd MMM y, h:mm a')) : 'Not sent by email' }}</strong></div>
+        </section>
+
+        <section class="nb-notice-detail-section">
+          <h3>Description</h3>
+          <div class="nb-notice-detail-content nb-rich" [innerHTML]="bodyHtml(n.body)"></div>
+        </section>
+
+        <section class="nb-notice-reader-progress" *ngIf="n._count">
+          <div><span>Reader progress</span><strong>{{ n._count.reads }} of {{ n._count.recipients }} recipients viewed this notice</strong></div>
+          <div class="nb-reader-progress-track"><i [style.width.%]="viewedPercent(n)"></i></div>
+          <small>{{ viewedPercent(n) }}% viewed</small>
+        </section>
+
+        <section class="nb-notice-detail-files" *ngIf="n.attachments?.length">
+          <h3>Attachments <span>{{ n.attachments.length }}</span></h3>
+          <a *ngFor="let a of n.attachments" [href]="a.fileUrl" target="_blank" rel="noopener"><span class="nb-detail-file-icon"><svg lucideFileText size="17"></svg></span><span class="nb-detail-file-name">{{ a.fileName }}<small>{{ a.fileSize ? fileSize(a.fileSize) : 'Attachment' }}</small></span><svg lucideDownload size="16"></svg></a>
+        </section>
+      </div>
+      <footer class="nb-notice-detail-foot"><button type="button" class="nb-btn-secondary" (click)="closeNotice()">Close</button></footer>
     </article>
   </div>
 
