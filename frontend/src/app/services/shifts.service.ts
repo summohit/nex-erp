@@ -55,6 +55,10 @@ export class ShiftsService {
     return this.http.post(`${this.apiUrl}/roster`, data);
   }
 
+  assignPermanent(data: { employeeId: number; shiftId: number }) {
+    return this.http.post(`${this.apiUrl}/roster/permanent`, data);
+  }
+
   bulkAssignRoster(data: RosterBulkPayload) {
     return this.http.post<{ written: number; skipped: number }>(`${this.apiUrl}/roster/bulk`, data);
   }

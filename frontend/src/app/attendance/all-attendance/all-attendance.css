@@ -2387,6 +2387,49 @@
   background: #fafafa;
 }
 
+/* Refined day-record dialog */
+.session-modal-card { border: 1px solid rgba(255, 255, 255, .72); box-shadow: 0 30px 80px -20px rgba(15, 23, 42, .5); }
+.session-modal-header { padding: 20px 22px; background: linear-gradient(135deg, #fff 0%, #f8fbff 100%); }
+.avatar-circle-md, .avatar-img-md { box-shadow: 0 0 0 4px #eef4ff, 0 8px 18px rgba(37, 99, 235, .16); }
+.session-emp-name { font-size: 17px; letter-spacing: -.02em; }.session-emp-email { margin-top: 1px; }
+.session-modal-body { padding: 20px 22px; gap: 16px; background: #fcfdff; }
+.session-date-status-bar { padding: 14px 16px; background: linear-gradient(135deg, #f8fbff, #f5f8fc); border-color: #dbe5f1; box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
+.session-date-status-bar .date-label { color: #72829a; font-weight: 800; }.session-date-status-bar .date-val { margin-top: 2px; font-size: 15px; }
+.status-round { padding: 6px 12px; box-shadow: 0 2px 5px rgba(15, 23, 42, .05); }
+.session-empty-state { padding: 28px 22px; border-style: dashed; border-color: #cad8ea; background: radial-gradient(circle at 50% 0%, #fff 0%, #f7faff 100%); color: #61738f; line-height: 1.55; }
+.session-duration-summary { min-height: 50px; padding: 12px 16px; background: linear-gradient(110deg, #f4f0ff, #eef5ff); border-color: #ddd3ff; }
+.session-duration-summary .duration-highlight { color: #4338ca; }
+.session-modal-footer { justify-content: space-between; gap: 12px; padding: 15px 22px; background: #fff; }
+.change-shift-action { gap: 9px !important; padding: 7px 14px !important; border: 1px solid #b9c8ff !important; color: #3730a3 !important; background: linear-gradient(135deg, #eef2ff, #f8f7ff) !important; box-shadow: 0 4px 12px rgba(79, 70, 229, .12); }
+.change-shift-action:hover { transform: translateY(-1px); border-color: #818cf8 !important; box-shadow: 0 7px 18px rgba(79, 70, 229, .2); }
+.change-shift-action small { display: block; margin-bottom: 1px; font-size: 9px; line-height: 1; letter-spacing: .08em; text-transform: uppercase; opacity: .72; }
+.footer-action-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: #4f46e5; color: #fff; }
+.close-log-action { padding: 9px 16px !important; color: #475569 !important; }
+
+/* Premium roster-picker details */
+.shift-change-header { padding: 18px 20px 15px; background: linear-gradient(135deg, #ffffff, #f7faff); }
+.shift-change-header h3 { display: flex; align-items: center; gap: 9px; font-size: 18px; letter-spacing: -.02em; }
+.shift-change-header h3::before { content: '↻'; width: 29px; height: 29px; display: grid; place-items: center; border-radius: 9px; background: #e8f1ff; color: #1373e5; font-size: 18px; font-weight: 500; }
+.shift-change-header p { padding-left: 38px; }
+.shift-section-label { margin: 2px 0; color: #64748b; font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.shift-apply-label { margin-top: 10px; }
+.shift-choice { position: relative; }.shift-choice:has(input:checked)::after { content: 'Selected'; position: absolute; right: 12px; top: 10px; color: #1373e5; font-size: 10px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
+.shift-scope { min-height: 62px; align-items: center; margin-top: 0; border-color: #e2e8f0; background: #fff; transition: all .15s ease; }.shift-scope:hover { border-color: #cbd5e1; background: #f8fafc; }
+.shift-scope span { display: flex; flex-direction: column; gap: 3px; }.shift-scope b { color: #0f172a; font-size: 13px; }.shift-scope small { color: #64748b; font-size: 11px; font-weight: 500; line-height: 1.35; }.shift-scope:has(input:checked) b { color: #1373e5; }
+.shift-change-footer .btn { min-width: 116px; height: 44px; border-radius: 10px; font-weight: 700; }.shift-change-footer .btn-primary { box-shadow: 0 8px 18px rgba(19,115,229,.22); }
+
+.shift-change-overlay { position: fixed; inset: 0; z-index: 11000; display: grid; place-items: center; padding: 20px; background: rgba(15,23,42,.45); backdrop-filter: blur(3px); }
+/* Matches the Shift Roster cell-editor: fixed header/footer and a scrolling choice list. */
+.shift-change-dialog { width: min(440px, 100%); max-height: 88vh; border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 20px 25px -5px rgba(0,0,0,.15); display: flex; flex-direction: column; }
+.shift-change-header, .shift-change-footer { display: flex; align-items: center; gap: 12px; padding: 20px 20px 12px; flex: 0 0 auto; }
+.shift-change-header { justify-content: space-between; border-bottom: 1px solid #f1f5f9; }.shift-change-header h3 { margin: 0; font-size: 17px; font-weight: 700; color: #0f172a; }.shift-change-header p { margin: 4px 0 0; color: #64748b; font-size: 12px; }
+.shift-change-body { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 16px 20px; }
+.shift-choice { display: flex; gap: 10px; align-items: center; min-height: 54px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all .15s ease; }
+.shift-choice:hover { background: #f8fafc; border-color: #cbd5e1; }.shift-choice:has(input:checked) { border-color: #1373e5; background: #f8f8f9; box-shadow: inset 3px 0 0 #1373e5; }
+.shift-choice input, .shift-scope input { accent-color: #1373e5; margin: 0; flex: 0 0 auto; }.shift-choice span { display: grid; gap: 2px; }.shift-choice b { font-size: 13px; font-weight: 600; color: #0f172a; }.shift-choice small, .shift-help { color: #64748b; font-size: 11px; }
+.shift-scope { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; margin-top: 6px; border: 1px solid transparent; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }.shift-scope:has(input:checked) { border-color: #dbeafe; background: #eff6ff; color: #1373e5; }
+.shift-help { margin: -5px 0 0 32px; }.shift-empty { color: #64748b; }.shift-change-footer { justify-content: flex-end; padding: 14px 20px; border-top: 1px solid #f1f5f9; background: #fff; }.shift-change-footer .btn-primary { background: #1373e5; border-color: #1373e5; }
+
 .btn.btn-outline {
   display: inline-flex;
   align-items: center;
@@ -4286,3 +4329,22 @@
 .today-nav.today-now { color: #1373e5; border-color: #bfdbfe; background: #eff6ff; font-size: 12.5px; }
 .today-date-input, .today-dept { height: 34px; border: 1px solid #e2e8f0; border-radius: 9px; padding: 0 10px; font-size: 13px; color: #0f172a; background: #fff; }
 .today-dept { min-width: 170px; }
+
+/* Attendance uses the same visual treatment as the Shift Roster cell editor. */
+.shift-change-overlay { background: rgba(15,23,42,.45); backdrop-filter: none; }
+.shift-change-dialog { width: min(440px, 100%); max-height: 88vh; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,.15); }
+.shift-change-header { padding: 20px 20px 12px; background: #fff; }.shift-change-header h3 { display: block; font-size: 0; letter-spacing: normal; }.shift-change-header h3::before { display: none; }.shift-change-header h3::after { content: 'Assign Shift'; font-size: 17px; font-weight: 700; color: #0f172a; }.shift-change-header p { padding-left: 0; }
+.shift-change-body { padding: 16px 20px; gap: 8px; }.shift-choice { min-height: 54px; padding: 10px 12px; gap: 10px; border-color: #e2e8f0; border-radius: 8px; }.shift-choice input { position: absolute; opacity: 0; pointer-events: none; }.attendance-shift-dot { display: block !important; width: 12px; height: 12px; border-radius: 3px; flex: 0 0 12px; }.shift-choice:has(input:checked) { border-color: #1373e5; background: #f8f8f9; box-shadow: none; }.shift-choice:has(input:checked)::after { display: none; }
+.shift-scope { min-height: 54px; border-color: #e2e8f0; border-radius: 8px; background: #fff; }.shift-scope:has(input:checked) { border-color: #1373e5; background: #f8f8f9; }.shift-change-footer { padding: 14px 20px; }.shift-change-footer .btn { min-width: auto; height: 38px; border-radius: 8px; }.shift-change-footer .btn-primary { box-shadow: none; }
+
+/* Shift picker polish must follow the shared modal rules above. */
+.shift-change-header { padding: 18px 20px 15px; background: linear-gradient(135deg, #ffffff, #f7faff); }
+.shift-change-header h3 { display: flex; align-items: center; gap: 9px; font-size: 18px; letter-spacing: -.02em; }
+.shift-change-header h3::before { content: '↻'; width: 29px; height: 29px; display: grid; place-items: center; border-radius: 9px; background: #e8f1ff; color: #1373e5; font-size: 18px; font-weight: 500; }
+.shift-change-header p { padding-left: 38px; }
+.shift-section-label { margin: 2px 0; color: #64748b; font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.shift-apply-label { margin-top: 10px; }
+.shift-choice { position: relative; }.shift-choice:has(input:checked)::after { content: 'Selected'; position: absolute; right: 12px; top: 10px; color: #1373e5; font-size: 10px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
+.shift-scope { min-height: 62px; align-items: center; margin-top: 0; border-color: #e2e8f0; background: #fff; transition: all .15s ease; }.shift-scope:hover { border-color: #cbd5e1; background: #f8fafc; }
+.shift-scope span { display: flex; flex-direction: column; gap: 3px; }.shift-scope b { color: #0f172a; font-size: 13px; }.shift-scope small { color: #64748b; font-size: 11px; font-weight: 500; line-height: 1.35; }.shift-scope:has(input:checked) b { color: #1373e5; }
+.shift-change-footer .btn { min-width: 116px; height: 44px; border-radius: 10px; font-weight: 700; }.shift-change-footer .btn-primary { box-shadow: 0 8px 18px rgba(19,115,229,.22); }

@@ -37,6 +37,12 @@ export class ShiftsController {
     return this.rosterService.assign(req.user.companyId, data);
   }
 
+  @Post('roster/permanent')
+  @Permissions('attendance/shifts')
+  assignPermanent(@Request() req, @Body() data: any) {
+    return this.rosterService.assignPermanent(req.user.companyId, data, req.user.role);
+  }
+
   @Post('roster/bulk')
   @Permissions('attendance/shifts')
   bulkAssignRoster(@Request() req, @Body() data: any) {

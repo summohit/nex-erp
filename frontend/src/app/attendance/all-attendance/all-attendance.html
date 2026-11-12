@@ -1094,7 +1094,34 @@
 
     <!-- Modal Footer -->
     <div class="session-modal-footer">
-      <button type="button" class="btn btn-outline" (click)="closeDayDetailsModal()">Close Log</button>
+      <button *ngIf="canChangeShift()" type="button" class="btn btn-outline change-shift-action" (click)="openChangeShift()">
+        <span class="footer-action-icon"><svg lucideRepeat [size]="15"></svg></span>
+        <span><small>Schedule</small>Change shift</span>
+      </button>
+      <button type="button" class="btn btn-outline close-log-action" (click)="closeDayDetailsModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="shift-change-overlay" *ngIf="isChangeShiftOpen()" (click)="isChangeShiftOpen.set(false)">
+  <div class="shift-change-dialog" (click)="$event.stopPropagation()">
+    <div class="shift-change-header">
+      <div><h3>Change shift</h3><p>{{ selectedDayDetails()?.employeeName }} · {{ selectedDayDetails()?.date | date:'d MMM y' }}</p></div>
+      <button type="button" class="btn-modal-close" (click)="isChangeShiftOpen.set(false)"><svg lucideX [size]="18"></svg></button>
+    </div>
+    <div class="shift-change-body">
+      <label *ngFor="let shift of changeShiftOptions()" class="shift-choice">
+        <input type="radio" name="attendanceShift" [checked]="changeShiftId() === shift.id" (change)="changeShiftId.set(shift.id)">
+        <span class="attendance-shift-dot" [style.background]="shift.colorCode || '#94A3B8'"></span>
+        <span><b>{{ shift.name }}</b><small *ngIf="shift.startTime && shift.endTime">{{ shift.startTime }} – {{ shift.endTime }}</small></span>
+      </label>
+      <p class="shift-empty" *ngIf="!changeShiftOptions().length">No shifts are configured.</p>
+      <label class="shift-scope"><input type="radio" name="shiftScope" [checked]="changeShiftScope() === 'day'" (change)="changeShiftScope.set('day')"><span><b>This day only</b><small>Creates a roster entry for this date.</small></span></label>
+      <label class="shift-scope"><input type="radio" name="shiftScope" [checked]="changeShiftScope() === 'permanent'" (change)="changeShiftScope.set('permanent')"><span><b>Permanently</b><small>Updates the standing shift; dated roster entries stay unchanged.</small></span></label>
+    </div>
+    <div class="shift-change-footer">
+      <button type="button" class="btn btn-outline" (click)="isChangeShiftOpen.set(false)">Cancel</button>
+      <button type="button" class="btn btn-primary" [disabled]="!changeShiftId() || isSavingShift()" (click)="saveShiftChange()">{{ isSavingShift() ? 'Saving…' : 'Save shift' }}</button>
     </div>
   </div>
 </div>

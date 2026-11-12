@@ -13,7 +13,7 @@ import {
   LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
   LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
   LucideZap, LucideExternalLink, LucideTrophy, LucideAward,
-  LucideRoute
+  LucideRoute, LucideRepeat
 } from '@lucide/angular';
 import { forkJoin, firstValueFrom } from 'rxjs';
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
@@ -21,6 +21,8 @@ import { AttendanceService, AttendanceRecord } from '../../services/attendance';
 import { isRestDay } from '../../shared/utils/weekly-offs';
 import { MasterDataService, Department } from '../../services/master-data.service';
 import { EmployeeService, Employee } from '../../services/employee.service';
+import { ShiftsService, RosterShift } from '../../services/shifts.service';
+import { AuthService } from '../../services/auth.service';
 import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDatePreset } from '../../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 
 export interface DayMatrixStatus {
@@ -72,7 +74,7 @@ interface WorkLocationBreakdown {
     LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
     LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
     LucideZap, LucideExternalLink, LucideTrophy, LucideAward,
-    LucideRoute
+    LucideRoute, LucideRepeat
   ],
   templateUrl: './all-attendance.html',
   styleUrls: ['./all-attendance.css']
@@ -81,6 +83,8 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   private attendanceService = inject(AttendanceService);
   private masterDataService = inject(MasterDataService);
   private employeeService = inject(EmployeeService);
+  private shiftsService = inject(ShiftsService);
+  private authService = inject(AuthService);
   private toast = inject(HotToastService);
   profileModal = inject(ProfileModalService);
   private router = inject(Router);
@@ -95,6 +99,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
 
   // Selected Day Details for Modal (matching Screenshot 3)
   selectedDayDetails = signal<{
+    employeeId: number | null;
     employeeName: string;
     employeeEmail: string;
     employeeDesignation: string;
@@ -123,6 +128,11 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     } | null;
   } | null>(null);
   isDetailsModalOpen = signal(false);
+  isChangeShiftOpen = signal(false);
+  changeShiftOptions = signal<RosterShift[]>([]);
+  changeShiftId = signal<number | null>(null);
+  changeShiftScope = signal<'day' | 'permanent'>('day');
+  isSavingShift = signal(false);
   /** Refreshes active-session durations while the day-detail modal stays open. */
   private activeDurationTick: ReturnType<typeof setInterval> | null = null;
   activeDurationNow = signal(Date.now());
@@ -2036,6 +2046,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     }
 
     this.selectedDayDetails.set({
+      employeeId: mergedEmp.id ?? record?.employeeId ?? null,
       employeeName: empName,
       employeeEmail: empEmail,
       employeeDesignation: empDesignation,
@@ -2083,11 +2094,64 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
 
   closeDayDetailsModal() {
     this.isDetailsModalOpen.set(false);
+    this.isChangeShiftOpen.set(false);
     this.selectedDayDetails.set(null);
     if (this.activeDurationTick) {
       clearInterval(this.activeDurationTick);
       this.activeDurationTick = null;
     }
+  }
+
+  canChangeShift(): boolean {
+    const role = this.authService.currentUser()?.role;
+    return role === 'SUPERADMIN' || role === 'SUPER_ADMIN';
+  }
+
+  openChangeShift(): void {
+    const details = this.selectedDayDetails();
+    if (!details?.employeeId) return;
+    this.changeShiftOptions.set([]);
+    this.changeShiftId.set(null);
+    this.changeShiftScope.set('day');
+    // This is a replacement dialog, not a nested dialog. Keeping the day card
+    // open created a second backdrop and made the roster picker appear behind it.
+    this.isDetailsModalOpen.set(false);
+    if (this.activeDurationTick) {
+      clearInterval(this.activeDurationTick);
+      this.activeDurationTick = null;
+    }
+    this.isChangeShiftOpen.set(true);
+    const date = this.getBackendDateString(details.date);
+    this.shiftsService.getRoster({ start: date, end: date, employeeId: details.employeeId }).subscribe({
+      next: grid => {
+        this.changeShiftOptions.set(grid.shifts || []);
+        const cell = grid.rows[0]?.cells[0];
+        this.changeShiftId.set(cell?.shift?.id ?? grid.shifts?.[0]?.id ?? null);
+      },
+      error: () => this.toast.error('Could not load shifts'),
+    });
+  }
+
+  saveShiftChange(): void {
+    const details = this.selectedDayDetails();
+    const shiftId = this.changeShiftId();
+    if (!details?.employeeId || !shiftId || this.isSavingShift()) return;
+    this.isSavingShift.set(true);
+    const request = this.changeShiftScope() === 'permanent'
+      ? this.shiftsService.assignPermanent({ employeeId: details.employeeId, shiftId })
+      : this.shiftsService.assignRoster({ employeeId: details.employeeId, date: this.getBackendDateString(details.date), shiftId });
+    request.subscribe({
+      next: () => {
+        this.isSavingShift.set(false);
+        this.isChangeShiftOpen.set(false);
+        this.toast.success(this.changeShiftScope() === 'permanent' ? 'Standing shift updated' : 'Shift changed for this day');
+        this.load();
+      },
+      error: (error: any) => {
+        this.isSavingShift.set(false);
+        this.toast.error(error?.error?.message || 'Could not change shift');
+      },
+    });
   }
 
   openDetail(record: AttendanceRecord) {
