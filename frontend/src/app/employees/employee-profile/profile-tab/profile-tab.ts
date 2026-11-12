@@ -9,7 +9,7 @@ import {
   LucideCreditCard, LucideUser, LucideShieldCheck, LucideGraduationCap,
   LucidePlane, LucideUsers, LucideSettings, LucideEdit2, LucidePaperclip, LucideMapPin,
   LucideUploadCloud, LucideFileText, LucideCheckCircle2, LucideMail,
-  LucideBriefcase, LucideCalendar, LucideClock, LucideCircleHelp, LucideImage
+  LucideBriefcase, LucideCalendar, LucideClock, LucideCircleHelp, LucideImage, LucideDownload
 } from '@lucide/angular';
 import { EmployeeService, Employee } from '../../../services/employee.service';
 import { MasterDataService, Branch, Department, Designation } from '../../../services/master-data.service';
@@ -77,7 +77,8 @@ export interface ProfileFormErrors {
     LucideCalendar,
     LucideClock,
     LucideCircleHelp,
-    LucideImage
+    LucideImage,
+    LucideDownload
   ],
   templateUrl: './profile-tab.html',
   styleUrls: ['./profile-tab.css']
@@ -701,6 +702,7 @@ export class ProfileTabComponent implements OnInit {
 
   isUploadingAvatar = false;
   isSavingAvatar = false;
+  isDownloadMenuOpen = false;
 
   private saveAvatarUrl(avatarUrl: string, successMessage: string) {
     if (!this.employeeData?.id) return;
@@ -718,7 +720,12 @@ export class ProfileTabComponent implements OnInit {
     });
   }
 
-  downloadAvatar() {
+  toggleDownloadMenu() {
+    this.isDownloadMenuOpen = !this.isDownloadMenuOpen;
+  }
+
+  downloadOriginalPhoto() {
+    this.isDownloadMenuOpen = false;
     const url = this.formData.avatarUrl;
     if (!url) return;
     const link = document.createElement('a');
@@ -730,6 +737,56 @@ export class ProfileTabComponent implements OnInit {
     link.click();
     link.remove();
   }
+
+  async downloadSmallPhoto() {
+    this.isDownloadMenuOpen = false;
+    const url = this.formData.avatarUrl;
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      const source = URL.createObjectURL(await response.blob());
+      const image = new Image();
+      image.onload = () => {
+        const edge = 256;
+        const scale = Math.min(edge / image.width, edge / image.height, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+          URL.revokeObjectURL(source);
+          if (!blob) return;
+          this.downloadBlob(blob, `${this.profileFilePrefix()}-profile-photo-small.jpg`);
+        }, 'image/jpeg', .88);
+      };
+      image.onerror = () => { URL.revokeObjectURL(source); this.toast.error('Could not create the small photo'); };
+      image.src = source;
+    } catch { this.toast.error('Could not download the profile photo'); }
+  }
+
+  downloadProfilePdf() {
+    this.isDownloadMenuOpen = false;
+    const lines = [
+      'EMPLOYEE PROFILE', '',
+      `Name: ${this.formData.firstName || ''} ${this.formData.lastName || ''}`.trim(),
+      `Employee ID: ${this.employeeData?.employeeCode || 'Not assigned'}`,
+      `Email: ${this.formData.email || this.employeeData?.user?.email || 'Not provided'}`,
+      `Department: ${this.employeeData?.department?.name || 'Unassigned'}`,
+      `Designation: ${this.employeeData?.designation?.name || 'Unassigned'}`,
+      `Phone: ${this.formData.phone || 'Not provided'}`,
+      `Generated: ${new Date().toLocaleString('en-IN')}`,
+    ];
+    const text = lines.map((line, i) => `BT /F1 ${i === 0 ? 18 : 11} Tf 50 ${790 - i * 25} Td (${this.escapePdf(line)}) Tj ET`).join('\n');
+    const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>', `<< /Length ${text.length} >>\nstream\n${text}\nendstream`];
+    let pdf = '%PDF-1.4\n'; const offsets = [0];
+    objects.forEach((object, index) => { offsets.push(pdf.length); pdf += `${index + 1} 0 obj\n${object}\nendobj\n`; });
+    const xref = pdf.length; pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map(o => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+    this.downloadBlob(new Blob([pdf], { type: 'application/pdf' }), `${this.profileFilePrefix()}-profile-summary.pdf`);
+  }
+
+  private profileFilePrefix() { return `${this.formData.firstName || 'employee'}-${this.formData.lastName || 'profile'}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+  private escapePdf(value: string) { return String(value).replace(/\\/g, '\\\\').replace(/[()]/g, '\\$&').replace(/[^\x20-\x7E]/g, ''); }
+  private downloadBlob(blob: Blob, fileName: string) { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = fileName; link.click(); URL.revokeObjectURL(url); }
 
   removeAvatar() {
     if (!this.canEditPersonalDetails || !this.formData.avatarUrl || this.isSavingAvatar) return;
