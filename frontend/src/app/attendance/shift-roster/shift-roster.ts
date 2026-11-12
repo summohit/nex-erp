@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
-  LucideChevronLeft, LucideChevronRight, LucideX, LucideCalendar,
+  LucideChevronLeft, LucideChevronRight, LucideChevronDown, LucideX, LucideCalendar,
   LucideRotateCcw, LucideWandSparkles, LucideTrash2, LucideBadgeCheck, LucideXCircle,
   LucideBuilding2, LucideMapPin, LucideClock, LucideAlertCircle, LucideCheckCircle2,
   LucideArrowRight, LucideBriefcase, LucideInfo, LucideUserCheck, LucideUsers, LucideSearch, LucideCheck,
@@ -45,12 +45,14 @@ interface OnSiteCtx {
   };
 }
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-shift-roster',
   standalone: true,
   imports: [
+    PageHeaderComponent,
     RouterLink,
-    CommonModule, FormsModule, LucideChevronLeft, LucideChevronRight, LucideX,
+    CommonModule, FormsModule, LucideChevronLeft, LucideChevronRight, LucideChevronDown, LucideX,
     LucideCalendar, LucideRotateCcw, LucideWandSparkles, LucideTrash2,
     LucideBadgeCheck, LucideXCircle, LucideBuilding2, LucideMapPin,
     LucideClock, LucideAlertCircle, LucideCheckCircle2, LucideArrowRight,
@@ -560,6 +562,8 @@ export class ShiftRosterComponent implements OnInit {
     if (this.viewMode() === mode) return;
     this.customRange.set(null);
     this.viewMode.set(mode);
+    // Drop the old view's days at once, so a month never renders with week headings while loading.
+    this.grid.set({ ...this.grid(), days: [], rows: [] });
     const now = this.anchor();
     this.anchor.set(mode === 'week' ? this.startOfWeek(now) : new Date(now.getFullYear(), now.getMonth(), 1));
     this.rosterPage.set(1);
@@ -594,6 +598,20 @@ export class ShiftRosterComponent implements OnInit {
       error: (e) => { this.toast.error(e.error?.message || 'Failed to load roster'); this.loading.set(false); },
     });
   }
+
+  /** Shift legend opens as a panel from the filter row, instead of a scrolling strip (12 Nov 2026). */
+  legendOpen = signal(false);
+  activeLegendLabel = computed(() => {
+    const sid = this.rosterShiftFilter();
+    if (sid) return this.grid().shifts.find((x: any) => String(x.id) === sid)?.name || 'Shift';
+    const st = this.rosterStateFilter();
+    if (st) return ({ DAY_OFF: 'Day Off', ON_LEAVE: 'On Leave', FIELD_VISIT: 'Field Visit', PENDING: 'Pending' } as any)[st] || st;
+    return 'All shifts';
+  });
+  activeLegendColor = computed(() => {
+    const sid = this.rosterShiftFilter();
+    return sid ? (this.grid().shifts.find((x: any) => String(x.id) === sid) as any)?.colorCode || '#94A3B8' : null;
+  });
 
   hasActiveLegendFilter = computed(() => {
     return !!this.rosterShiftFilter() || !!this.rosterStateFilter();

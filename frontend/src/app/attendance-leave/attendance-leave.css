@@ -5432,3 +5432,100 @@
 .lr-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
 .lr-btn.primary:hover { background: #1d4ed8; }
 @media (max-width: 520px) { .lr-summary { flex-direction: column; align-items: flex-start; } .lr-duration { border-left: 0; padding-left: 0; text-align: left; } }
+
+/* Every tab: search boxes, dropdowns and toolbar buttons are one 40px control. */
+.leave-application-search, .reg-search-box, .leave-balances-search,
+.leave-filter-btn, .reg-btn, .lb-header-btn {
+  height: 40px !important; min-height: 40px !important; box-sizing: border-box !important;
+  border: 1px solid #d0d7e2 !important; border-radius: 8px !important; background: #fff !important;
+  box-shadow: none !important; font-size: 13.5px !important; font-weight: 500 !important;
+}
+.leave-application-search input, .reg-search-box input, .leave-balances-search input { height: 100% !important; font-size: 13.5px !important; border: 0 !important; background: transparent !important; }
+.leave-application-search input::placeholder, .reg-search-box input::placeholder, .leave-balances-search input::placeholder { color: #94a3b8; font-size: 13px; }
+.leave-application-search:focus-within, .reg-search-box:focus-within, .leave-balances-search:focus-within { border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12) !important; }
+.leave-filter-btn, .reg-btn, .lb-header-btn { display: inline-flex !important; align-items: center !important; gap: 7px; padding: 0 14px !important; color: #334155 !important; }
+:host ::ng-deep .lv-status-select .select-trigger {
+  height: 40px !important; min-height: 40px !important; box-sizing: border-box !important;
+  border: 1px solid #d0d7e2 !important; border-radius: 8px !important; box-shadow: none !important;
+  font-size: 13.5px !important; padding-top: 0 !important; padding-bottom: 0 !important; display: flex !important; align-items: center !important;
+}
+
+/* Bulk action bar for ticked Pending leaves */
+.lv-bulk-bar { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 12px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; }
+.lv-bulk-count { font-size: 13px; font-weight: 600; color: #1e3a8a; margin-right: 6px; }
+.lv-bulk-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid #d0d7e2; border-radius: 8px; background: #fff; color: #1e293b; font-size: 13px; font-weight: 600; cursor: pointer; }
+.lv-bulk-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+.lv-bulk-btn.primary:hover { background: #1d4ed8; }
+.lv-bulk-btn.danger { color: #b91c1c; border-color: #fecaca; }
+.lv-bulk-btn.danger:hover { background: #fef2f2; }
+.lv-bulk-btn.ghost { border-color: transparent; background: transparent; color: #1d4ed8; margin-left: auto; }
+
+/* Tick box column: greyed out on rows that can't be bulk-decided. */
+:host ::ng-deep .ag-selection-checkbox .ag-checkbox-input-wrapper.ag-disabled { opacity: .35; background: #f1f5f9; cursor: not-allowed; }
+:host ::ng-deep .ag-row:has(.ag-checkbox-input-wrapper.ag-disabled) .ag-selection-checkbox { cursor: not-allowed; }
+
+/* Space between the page header and the tabs; spacer in filter rows. */
+app-page-header { display: block; margin-bottom: 16px; }
+.lv-spacer { flex: 1 1 auto; }
+.reg-table-card .lv-bulk-bar { margin: 0 0 10px; }
+
+/* Leave Balances in the MIRA standard (12 Nov). */
+.alb-card { padding: 18px 20px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; box-shadow: none !important; margin-bottom: 16px !important; }
+.alb-header { padding-bottom: 14px !important; margin-bottom: 14px !important; }
+.alb-icon-badge { width: 40px !important; height: 40px !important; border-radius: 10px !important; }
+.alb-title { font-family: var(--font-heading); font-size: 17px !important; }
+.alb-subtitle { font-size: 13px !important; color: #64748b !important; }
+.alb-tag { font-size: 11px !important; padding: 2px 8px !important; }
+.alb-scope-switch { padding: 3px !important; border-radius: 10px !important; background: #f8fafc !important; border: 1px solid #e2e8f0 !important; }
+.alb-scope-btn { height: 32px !important; border-radius: 8px !important; font-size: 13px !important; }
+.alb-label { font-size: 12.5px !important; font-weight: 600 !important; color: #475569 !important; margin-bottom: 6px !important; }
+.alb-fields-row { align-items: end !important; gap: 12px !important; }
+.alb-input-wrap, .alb-input, .alb-submit-btn { height: 40px !important; min-height: 40px !important; box-sizing: border-box !important; border-radius: 8px !important; font-size: 13.5px !important; }
+.alb-input-wrap, .alb-input { border-color: #d0d7e2 !important; box-shadow: none !important; }
+.alb-input-wrap .alb-input { height: 100% !important; border: 0 !important; }
+.alb-submit-btn { padding: 0 18px !important; background: #2563eb !important; box-shadow: none !important; font-weight: 600 !important; }
+.alb-submit-btn:hover { background: #1d4ed8 !important; }
+:host ::ng-deep .alb-card .select-trigger { height: 40px !important; min-height: 40px !important; border: 1px solid #d0d7e2 !important; border-radius: 8px !important; box-shadow: none !important; font-size: 13.5px !important; padding-top: 0 !important; padding-bottom: 0 !important; display: flex !important; align-items: center !important; }
+
+.leave-balances-toolbar { display: flex !important; align-items: center !important; gap: 12px !important; flex-wrap: wrap; }
+.leave-balances-search { flex: 0 1 360px !important; }
+.balance-legend-group { margin-left: auto; gap: 14px !important; font-size: 12.5px; color: #64748b; }
+.leave-balances-count { font-size: 12px !important; padding: 3px 10px !important; }
+
+/* Assign Leave Balance: one aligned grid of equal 40px fields. */
+.alb-fields-row { display: grid !important; grid-template-columns: minmax(220px, 1.5fr) minmax(200px, 1.3fr) 150px 120px auto !important; gap: 14px !important; align-items: end !important; }
+.alb-fields-row:has(> .alb-field-employee) { }
+.alb-fields-row:not(:has(> .alb-field-employee)) { grid-template-columns: minmax(220px, 1.6fr) 150px 120px auto !important; }
+.alb-field-group { display: flex !important; flex-direction: column !important; min-width: 0 !important; width: auto !important; margin: 0 !important; }
+.alb-label { display: flex !important; align-items: center !important; gap: 6px !important; height: 18px; margin: 0 0 6px !important; font-size: 12.5px !important; font-weight: 600 !important; color: #475569 !important; }
+.alb-label svg { color: #94a3b8; }
+.alb-req { color: #dc2626 !important; margin-left: -2px; }
+.alb-input-wrap { display: flex !important; align-items: center !important; height: 40px !important; padding: 0 12px !important; border: 1px solid #d0d7e2 !important; border-radius: 8px !important; background: #fff !important; }
+.alb-input-wrap:focus-within { border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12) !important; }
+.alb-input-wrap .alb-input { flex: 1; min-width: 0; height: 100% !important; padding: 0 !important; border: 0 !important; outline: none; background: transparent !important; font-size: 13.5px !important; font-weight: 500; color: #0f172a; }
+.alb-input-suffix { font-size: 12.5px; color: #94a3b8; }
+.alb-action-group { display: flex; align-items: flex-end; margin: 0 !important; }
+.alb-submit-btn { height: 40px !important; white-space: nowrap; display: inline-flex !important; align-items: center; gap: 6px; border-radius: 8px !important; }
+:host ::ng-deep .alb-card app-searchable-select, :host ::ng-deep .alb-card .searchable-select { display: block; width: 100%; margin: 0 !important; }
+.alb-header { display: flex !important; align-items: center !important; border-bottom: 1px solid #eef2f6 !important; }
+.alb-title { font-size: 16px !important; margin: 0 !important; }
+.alb-scope-btn { padding: 0 12px !important; }
+@media (max-width: 1100px) { .alb-fields-row { grid-template-columns: 1fr 1fr !important; } }
+
+/* Employee Leave Balances: calmer grid, readable headers. */
+:host ::ng-deep .lb-type-header .ag-header-cell-label { justify-content: center; }
+:host ::ng-deep .lb-type-header .ag-header-cell-text { text-transform: none !important; letter-spacing: 0 !important; font-size: 12px !important; font-weight: 600 !important; color: #475569 !important; text-align: center; line-height: 1.3; }
+.leave-balances-header, .leave-balances-card .widget-header { align-items: flex-start !important; }
+.leave-balances-caption { font-size: 13px !important; color: #64748b !important; margin-top: 2px !important; }
+.leave-balances-toolbar { padding: 12px 0 14px !important; border-bottom: 1px solid #eef2f6; margin-bottom: 4px; }
+.balance-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Assign Leave Balance as a pop-up */
+.alb-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px; background: rgba(15,23,42,.45); }
+.alb-overlay .alb-card { position: relative; width: min(980px, 100%); max-height: 90vh; overflow: visible; margin: 0 !important; box-shadow: 0 24px 48px -12px rgba(15,23,42,.28) !important; }
+.alb-overlay .alb-header { padding-right: 40px !important; }
+.alb-close { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: #64748b; cursor: pointer; }
+.alb-close:hover { background: #f1f5f9; color: #0f172a; }
+
+/* Breathing room between the page header and the tabs. */
+.tabs-nav.leave-section-nav { margin-top: 20px !important; }

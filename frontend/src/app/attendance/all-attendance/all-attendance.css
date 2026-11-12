@@ -4578,3 +4578,7 @@
 .filter-bar-card .btn-attendance-filters,
 .filter-bar-card .att-clear-all { flex: 0 0 auto !important; min-width: max-content !important; }
 .filter-bar-card .filter-dropdown-trigger { max-width: none !important; white-space: nowrap; }
+
+/* Same outer spacing as the Leaves page: no extra page padding, 16px between sections. */
+.all-attendance-container { padding: 0 !important; gap: 16px !important; background: transparent !important; }
+.all-attendance-container > * { margin-top: 0 !important; margin-bottom: 0 !important; }

@@ -1,55 +1,13 @@
 <div class="page-container">
-  <div class="page-header roster-header-card">
-    <div class="roster-header-left">
-      <div class="roster-header-icon">
-        <svg lucideCalendarCheck size="22"></svg>
-      </div>
-      <div class="roster-header-text">
-        <div class="roster-title-row">
-          <h1>Shift Roster</h1>
-          <span class="roster-meta-pill" *ngIf="!loading()">
-            <svg lucideUsers size="13"></svg>
-            <strong>{{ visibleRows().length }}</strong>
-            <span>{{ visibleRows().length === 1 ? 'Employee' : 'Employees' }}</span>
-          </span>
-          <button type="button"
-                  class="field-visit-total"
-                  [class.is-active]="isStateFilterActive('FIELD_VISIT')"
-                  (click)="toggleStateFilter('FIELD_VISIT')"
-                  title="Click to filter by Field Visits in the displayed roster period">
-            <svg lucideMapPin size="13"></svg>
-            <strong>{{ fieldVisitCount() }}</strong>
-            <span>Field Visit{{ fieldVisitCount() === 1 ? '' : 's' }}</span>
-          </button>
-        </div>
-        <p class="roster-subtitle">Who works which shift, day by day. Click any cell to change it.</p>
-      </div>
-    </div>
-
-    <div class="header-actions">
+  <app-page-header icon="calendar" section="Attendance & Leave" heading="Shift Roster"
+    [subtitle]="loading() ? 'Who works which shift, day by day. Click any cell to change it.' : visibleRows().length + (visibleRows().length === 1 ? ' employee' : ' employees') + ' · click any cell to change it'">
       <div class="actions-utility-group">
-        <button type="button" class="btn-action-outline" (click)="exportCsv()" title="Export the visible roster">
-          <svg lucideDownload size="14"></svg>
-          <span>Export CSV</span>
-        </button>
-        <button type="button" class="btn-action-outline" (click)="load()" [disabled]="loading()" title="Reload shift roster">
-          <svg lucideRotateCcw size="14" [class.spinning]="loading()"></svg>
-          <span>Refresh</span>
-        </button>
         <button type="button" class="btn-action-outline btn-approvals-pill" *ngIf="isApprover && pendingOnsite().length > 0" (click)="openApprovals()" title="On-site (No Project) requests awaiting approval">
           <svg lucideBadgeCheck size="14"></svg>
           <span>Approvals</span>
           <span class="approval-count">{{ pendingOnsite().length }}</span>
         </button>
-        <a class="btn-action-outline btn-wfh-report" routerLink="/wfh-report" *ngIf="canAssignWfh()" title="View monthly WFH report">
-          <svg lucideFileText size="14"></svg>
-          <span>WFH Report</span>
-        </a>
       </div>
-
-      <button type="button" class="btn-action-outline" (click)="copyPreviousMonth()" [disabled]="copyPrevBusy()" title="Copy last month's roster into this month, weekday for weekday">
-        <span>{{ copyPrevBusy() ? 'Copying…' : 'Copy previous month' }}</span>
-      </button>
 
       <button type="button" class="btn-action-outline" (click)="openShiftChange()" *ngIf="canPermanentShift()" title="Change the shift of many people at once">
         <svg lucideWandSparkles size="15"></svg>
@@ -62,8 +20,7 @@
         <svg lucideHouse size="15"></svg>
         <span>Assign WFH</span>
       </button>
-    </div>
-  </div>
+  </app-page-header>
 
   <!-- Sticky controls section (toolbar + legend) -->
   <div class="roster-sticky-header">
@@ -85,7 +42,6 @@
       </div>
 
       <div class="roster-filter employee-filter" role="group" aria-label="Filter by employee">
-        <span class="roster-filter-label">Employee</span>
         <app-searchable-select
           [options]="employeeFilterOptions()"
           [value]="filterEmployeeId()"
@@ -95,8 +51,16 @@
         </app-searchable-select>
       </div>
 
+      <button type="button" class="field-visit-total"
+              [class.is-active]="isStateFilterActive('FIELD_VISIT')"
+              (click)="toggleStateFilter('FIELD_VISIT')"
+              title="Filter by Field Visits in the displayed roster period">
+        <svg lucideMapPin size="13"></svg>
+        <strong>{{ fieldVisitCount() }}</strong>
+        <span>Field visit{{ fieldVisitCount() === 1 ? '' : 's' }}</span>
+      </button>
+
       <div class="roster-filter department-filter" role="group" aria-label="Filter by department">
-        <span class="roster-filter-label">Department</span>
         <app-searchable-select
           [options]="departmentFilterOptions()"
           [value]="filterDepartmentId()"
@@ -105,6 +69,14 @@
           [loading]="loadingDepartments()"
           (valueChange)="setRosterDepartment($event)">
         </app-searchable-select>
+      </div>
+
+      <div class="shift-legend-wrap">
+        <button type="button" class="shift-legend-btn" [class.is-active]="hasActiveLegendFilter()" (click)="legendOpen.set(!legendOpen())" [attr.aria-expanded]="legendOpen()">
+          <span class="legend-dot" *ngIf="activeLegendColor() as c" [style.background]="c"></span>
+          <span>{{ activeLegendLabel() }}</span>
+          <svg lucideChevronDown size="15"></svg>
+        </button>
       </div>
 
     </div>
@@ -120,17 +92,17 @@
     </div>
 
     <!-- Legend -->
-    <div class="legend" [class.has-active-filter]="hasActiveLegendFilter()">
+    <div class="legend-backdrop" *ngIf="legendOpen()" (click)="legendOpen.set(false)"></div>
+    <div class="legend" *ngIf="legendOpen()" [class.has-active-filter]="hasActiveLegendFilter()" (click)="legendOpen.set(false)">
       <button *ngFor="let s of grid().shifts"
               type="button"
               class="legend-chip"
               [class.is-active]="isShiftFilterActive(s.id)"
-              [style.background]="s.colorCode || '#94A3B8'"
               (click)="toggleShiftFilter(s.id)"
               [attr.aria-pressed]="isShiftFilterActive(s.id)"
               [title]="isShiftFilterActive(s.id) ? 'Click to clear ' + s.name + ' filter' : 'Filter by ' + s.name">
-        <svg lucideCheck size="11" *ngIf="isShiftFilterActive(s.id)" class="chip-check-icon"></svg>
-        <ng-container *ngIf="s.shortCode">{{ s.shortCode }} : </ng-container>{{ s.name }}
+        <span class="legend-dot" [style.background]="s.colorCode || '#94A3B8'"></span>
+        <ng-container *ngIf="s.shortCode"><b class="legend-code">{{ s.shortCode }}</b></ng-container>{{ s.name }}
       </button>
 
       <button type="button"
@@ -348,7 +320,7 @@
 
     <div class="modal-body">
       <button *ngFor="let s of grid().shifts" class="shift-option"
-              [class.selected]="editorCell()?.shift?.id === s.id && !editorCell()?.isDefault"
+              [class.selected]="editorCell()?.shift?.id === s.id"
               (click)="applyCell(s.id, false)">
         <span class="legend-dot" [style.background]="s.colorCode || '#94A3B8'"></span>
         <span class="option-text">
@@ -356,6 +328,9 @@
           <span class="option-time">
             {{ s.shiftType === 'FLEXIBLE' ? (s.totalHours ? s.totalHours + ' hrs' : 'Flexible') : (s.startTime + ' - ' + s.endTime) }}
           </span>
+        </span>
+        <span class="option-current" *ngIf="editorCell()?.shift?.id === s.id">
+          <svg lucideCheck size="14"></svg>{{ editorCell()?.isDefault ? 'Standing shift' : 'Current' }}
         </span>
       </button>
 
@@ -367,10 +342,11 @@
         <span class="option-text"><span class="option-name">Back to WFH this day</span><span class="option-time">Undo the office call-in</span></span>
       </button>
 
-      <button class="shift-option" [class.selected]="editorCell()?.type === 'DAY_OFF' && !editorCell()?.isDefault"
+      <button class="shift-option" [class.selected]="editorCell()?.type === 'DAY_OFF'"
               (click)="applyCell(null, true)">
         <span class="legend-dot legend-off"></span>
         <span class="option-text"><span class="option-name">Day Off</span></span>
+        <span class="option-current" *ngIf="editorCell()?.type === 'DAY_OFF'"><svg lucideCheck size="14"></svg>Current</span>
       </button>
 
       <button class="shift-option danger" (click)="applyCell(null, false)">

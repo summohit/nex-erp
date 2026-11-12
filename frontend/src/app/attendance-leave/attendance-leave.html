@@ -5,6 +5,13 @@
     <ng-container *ngIf="activeTab() === 'leave' && leaveSection() !== 'balances' && leaveSection() !== 'regularizations'">
       <button type="button" class="lv-hdr-btn primary" (click)="openRequestModal()"><svg lucidePlus [size]="16"></svg>New leave</button>
     </ng-container>
+    <ng-container *ngIf="activeTab() === 'leave' && leaveSection() === 'balances' && isAdmin()">
+      <button type="button" class="lv-hdr-btn" (click)="openCompOffHistory(true)"><svg lucideHistory size="15"></svg>Comp-off history</button>
+      <input id="leave-balance-import" type="file" accept=".csv,text/csv" hidden (change)="importLeaveBalancesCsv($event)">
+      <label for="leave-balance-import" class="lv-hdr-btn" role="button" tabindex="0"><svg lucideUpload size="15"></svg>Import</label>
+      <button type="button" class="lv-hdr-btn" (click)="exportLeaveBalancesCsv()"><svg lucideDownload size="15"></svg>Export</button>
+      <button type="button" class="lv-hdr-btn primary" (click)="isAssignModalOpen.set(true)"><svg lucidePlus [size]="16"></svg>Assign balance</button>
+    </ng-container>
   </app-page-header>
 
   <!-- ATTENDANCE VIEW TAB -->
@@ -229,26 +236,36 @@
     (applied)="applyAttendanceFilters($event)">
   </app-attendance-filter-drawer>
 
-  <div class="leave-balances-header-actions" *ngIf="activeTab() === 'leave' && leaveSection() === 'balances'">
-    <button type="button" class="lb-header-btn lb-btn-compoff" *ngIf="isAdmin()" (click)="openCompOffHistory(true)">
-      <svg lucideHistory size="15"></svg>
-      <span>Comp-off history (all employees)</span>
-    </button>
-    <ng-container *ngIf="leaveSection() === 'balances' && isAdmin()">
-      <input id="leave-balance-import" type="file" accept=".csv,text/csv" hidden (change)="importLeaveBalancesCsv($event)">
-      <label for="leave-balance-import" class="lb-header-btn lb-btn-import" role="button" tabindex="0">
-        <svg lucideUpload size="15"></svg>
-        <span>Import Balances</span>
-      </label>
-      <button type="button" class="lb-header-btn lb-btn-export" (click)="exportLeaveBalancesCsv()">
-        <svg lucideDownload size="15"></svg>
-        <span>Export Balances</span>
-      </button>
-    </ng-container>
-  </div>
-
   <!-- Attendance corrections waiting on HR / admin -->
   <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() === 'regularizations' && isAdmin()">
+    <!-- Filter card: same as Leave Applications -->
+    <div class="leave-list-toolbar">
+      <div class="leave-search-filter-wrap">
+        <label class="leave-application-search">
+          <svg lucideSearch [size]="16" aria-hidden="true"></svg>
+          <input type="search" aria-label="Search regularizations" placeholder="Search employee, date, reason..."
+                 [ngModel]="regularizationSearch()" (ngModelChange)="regularizationSearch.set($event)">
+          <button type="button" *ngIf="regularizationSearch()" aria-label="Clear search" (click)="regularizationSearch.set('')">×</button>
+        </label>
+        <app-searchable-select class="lv-status-select"
+          [options]="regStatusOptions"
+          placeholder="All statuses"
+          [clearable]="true"
+          [value]="regularizationStatusFilter() === 'ALL' ? null : regularizationStatusFilter()"
+          (valueChange)="setRegularizationStatusFilter($event || 'ALL')">
+        </app-searchable-select>
+        <button type="button" class="clear-all-filters" *ngIf="regularizationSearch() || regularizationStatusFilter() !== 'ALL'"
+                (click)="regularizationSearch.set(''); setRegularizationStatusFilter('ALL')">Clear all</button>
+        <span class="lv-spacer"></span>
+        <button type="button" class="btn btn-outline reg-btn" (click)="exportPendingRegularizationsCsv()" [disabled]="allRegularizations().length === 0" title="Export list to CSV">
+          <svg lucideDownload [size]="15"></svg><span>Export</span>
+        </button>
+        <button type="button" class="btn btn-outline reg-btn" (click)="refreshPendingRegularizations()" [disabled]="isLoadingRegularizations()" title="Refresh requests">
+          <svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoadingRegularizations()"></svg><span>Refresh</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Main Regularizations Table Card -->
     <div class="widget-card reg-table-card">
       <div class="widget-header reg-table-header">
@@ -269,47 +286,14 @@
           </p>
         </div>
 
-        <div class="reg-header-actions">
-          <!-- Quick Status Filter Pills -->
-          <div class="reg-filter-pills">
-            <button type="button" class="reg-filter-pill" [class.active]="regularizationStatusFilter() === 'ALL'" (click)="setRegularizationStatusFilter('ALL')">
-              All ({{ allRegularizations().length }})
-            </button>
-            <button type="button" class="reg-filter-pill pending" [class.active]="regularizationStatusFilter() === 'PENDING'" (click)="setRegularizationStatusFilter('PENDING')">
-              Pending ({{ pendingRegularizations().length }})
-            </button>
-            <button type="button" class="reg-filter-pill approved" [class.active]="regularizationStatusFilter() === 'APPROVED'" (click)="setRegularizationStatusFilter('APPROVED')">
-              Approved ({{ approvedRegularizations().length }})
-            </button>
-            <button type="button" class="reg-filter-pill rejected" [class.active]="regularizationStatusFilter() === 'REJECTED'" (click)="setRegularizationStatusFilter('REJECTED')">
-              Rejected ({{ rejectedRegularizations().length }})
-            </button>
-          </div>
+      </div>
 
-          <!-- Search input -->
-          <div class="reg-search-box">
-            <svg lucideSearch [size]="15" class="reg-search-icon"></svg>
-            <input
-              type="search"
-              class="reg-search-input"
-              placeholder="Search employee, date, reason..."
-              [ngModel]="regularizationSearch()"
-              (ngModelChange)="regularizationSearch.set($event)" />
-            <button type="button" class="reg-search-clear" *ngIf="regularizationSearch()" (click)="regularizationSearch.set('')" title="Clear search">×</button>
-          </div>
-
-          <!-- Export CSV -->
-          <button type="button" class="btn btn-outline reg-btn" (click)="exportPendingRegularizationsCsv()" [disabled]="allRegularizations().length === 0" title="Export list to CSV">
-            <svg lucideDownload [size]="15"></svg>
-            <span>Export</span>
-          </button>
-
-          <!-- Refresh -->
-          <button type="button" class="btn btn-outline reg-btn" (click)="refreshPendingRegularizations()" [disabled]="isLoadingRegularizations()" title="Refresh requests">
-            <svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoadingRegularizations()"></svg>
-            <span>Refresh</span>
-          </button>
-        </div>
+      <!-- Bulk actions: Pending regularizations only -->
+      <div class="lv-bulk-bar" *ngIf="selectedRegIds().length">
+        <span class="lv-bulk-count">{{ selectedRegIds().length }} selected</span>
+        <button type="button" class="lv-bulk-btn primary" (click)="approveSelectedRegs()"><svg lucideCheck [size]="15"></svg>Approve</button>
+        <button type="button" class="lv-bulk-btn danger" (click)="rejectSelectedRegs()"><svg lucideX [size]="15"></svg>Reject</button>
+        <button type="button" class="lv-bulk-btn ghost" (click)="clearRegSelection()">Clear</button>
       </div>
 
       <div class="table-container mt-3">
@@ -319,6 +303,10 @@
           style="width: 100%; height: 560px;"
           [rowData]="filteredPendingRegularizations()"
           [columnDefs]="hrRegularizationColDefs"
+          [rowSelection]="regRowSelection"
+          [selectionColumnDef]="leaveSelectionColumnDef"
+          (gridReady)="regGridApi = $event.api"
+          (selectionChanged)="onRegSelectionChanged($event)"
           [defaultColDef]="defaultColDef"
           [rowHeight]="64"
           [headerHeight]="48"
@@ -397,6 +385,14 @@
           </div>
         </div>
 
+        <!-- Bulk actions: Pending leaves only -->
+        <div class="lv-bulk-bar" *ngIf="selectedApprovalIds().length && leaveViewMode() === 'list'">
+          <span class="lv-bulk-count">{{ selectedApprovalIds().length }} selected</span>
+          <button type="button" class="lv-bulk-btn primary" (click)="approveSelectedLeaveRequests()"><svg lucideCheck [size]="15"></svg>Approve</button>
+          <button type="button" class="lv-bulk-btn danger" (click)="rejectSelectedLeaveRequests()"><svg lucideX [size]="15"></svg>Reject</button>
+          <button type="button" class="lv-bulk-btn ghost" (click)="clearApprovalSelection()">Clear</button>
+        </div>
+
         <!-- Actual Table -->
         <div class="table-container mt-4" *ngIf="!isLoadingLeaveApplications() && leaveViewMode() === 'list'">
           <ag-grid-angular
@@ -414,6 +410,10 @@
             [paginationPageSize]="20"
             [paginationPageSizeSelector]="leavePageSizes"
             [gridOptions]="gridOptions"
+            [rowSelection]="isAdmin() || isManager() || managerRequests().length > 0 ? approvalRowSelection : undefined"
+            [selectionColumnDef]="leaveSelectionColumnDef"
+            (gridReady)="onApprovalsGridReady($event)"
+            (selectionChanged)="onApprovalSelectionChanged($event)"
             (cellClicked)="onCellClicked($event)">
           </ag-grid-angular>
         </div>
@@ -1024,11 +1024,6 @@
           </div>
         </section>
 
-        <div class="lr-quota" *ngIf="selectedLeaveQuota() as quota">
-          <div class="lr-quota-text"><b>{{ quota.allocated - quota.used }}</b> of {{ quota.allocated }} days available</div>
-          <div class="lr-quota-bar"><span [style.width.%]="quota.allocated ? ((quota.allocated - quota.used) / quota.allocated) * 100 : 0"></span></div>
-        </div>
-
         <dl class="lr-list">
           <div><dt>Applied on</dt><dd>{{ leave.createdAt ? (leave.createdAt | date: 'd MMM y, h:mm a') : '—' }}</dd></div>
           <div *ngIf="leave.approvedBy || leave.approvedById"><dt>{{ leave.status === 'REJECTED' ? 'Rejected by' : 'Approved by' }}</dt><dd>{{ leave.approvedBy?.employee?.firstName ? (leave.approvedBy.employee.firstName + ' ' + (leave.approvedBy.employee.lastName || '')) : (leave.approvedBy?.email || '—') }}</dd></div>
@@ -1062,7 +1057,9 @@
   <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() === 'balances' && isAdmin()">
       
       <!-- Assign Balances Form -->
-      <div class="widget-card alb-card">
+      <div class="alb-overlay" *ngIf="isAssignModalOpen()" (click)="isAssignModalOpen.set(false)">
+      <div class="widget-card alb-card" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <button type="button" class="alb-close" (click)="isAssignModalOpen.set(false)" aria-label="Close"><svg lucideX size="18"></svg></button>
         <div class="alb-header">
           <div class="alb-header-left">
             <div class="alb-icon-badge" aria-hidden="true">
@@ -1255,6 +1252,7 @@
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       <!-- All Balances Grid -->

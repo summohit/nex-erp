@@ -3690,3 +3690,115 @@ textarea.form-control-enhanced:focus {
 .sc-initials { display: inline-flex; align-items: center; justify-content: center; background: #e0e7ff; color: #3730a3; font-weight: 600; font-size: 13px; }
 .sc-name { display: flex; flex-direction: column; line-height: 1.25; }
 .sc-name small { color: #64748b; font-size: 12px; }
+
+/* ── MIRA UI standard (12 Nov): shared header, label-free filter row, clean day headings ── */
+.page-container { gap: 16px; }
+.actions-utility-group { display: contents !important; }
+.actions-divider { display: none !important; }
+app-page-header .btn-action-outline, app-page-header .btn-action-primary {
+  display: inline-flex !important; align-items: center !important; gap: 7px !important; height: 38px !important; padding: 0 14px !important;
+  border-radius: 8px !important; font-size: 13.5px !important; font-weight: 600 !important; white-space: nowrap; box-shadow: none !important; text-decoration: none;
+}
+app-page-header .btn-action-outline { border: 1px solid #e2e8f0 !important; background: #fff !important; color: #334155 !important; }
+app-page-header .btn-action-outline:hover:not(:disabled) { background: #f8fafc !important; border-color: #cbd5e1 !important; }
+app-page-header .btn-action-primary { border: 1px solid #2563eb !important; background: #2563eb !important; color: #fff !important; }
+app-page-header .btn-action-primary:hover { background: #1d4ed8 !important; }
+
+.roster-toolbar { display: flex !important; align-items: center !important; flex-wrap: wrap; gap: 10px !important; padding: 12px 14px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; background: #fff !important; box-shadow: none !important; position: relative; z-index: 30; }
+.roster-filter { display: block !important; width: 220px; margin: 0 !important; }
+.range-nav { height: 40px !important; border: 1px solid #d0d7e2 !important; border-radius: 8px !important; box-shadow: none !important; }
+.range-nav .icon-btn { height: 38px !important; }
+.range-label { font-size: 13.5px !important; font-weight: 600 !important; }
+.view-toggle { height: 40px; padding: 3px !important; border: 1px solid #e2e8f0 !important; border-radius: 10px !important; background: #f8fafc !important; }
+.view-toggle .toggle-btn { height: 32px !important; border-radius: 8px !important; font-size: 13px !important; background: transparent !important; color: #475569 !important; box-shadow: none !important; }
+.view-toggle .toggle-btn.active { background: #fff !important; color: #1d4ed8 !important; box-shadow: 0 1px 2px rgba(15,23,42,.08) !important; }
+:host ::ng-deep .roster-filter .select-trigger { height: 40px !important; min-height: 40px !important; border: 1px solid #d0d7e2 !important; border-radius: 8px !important; box-shadow: none !important; font-size: 13.5px !important; padding-top: 0 !important; padding-bottom: 0 !important; display: flex !important; align-items: center !important; }
+.roster-toolbar .field-visit-total { height: 40px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid #d0d7e2; border-radius: 8px; background: #fff; color: #334155; font-size: 13px; cursor: pointer; }
+.roster-toolbar .field-visit-total.is-active { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
+
+/* Week day headings: weekday on top, then the date, e.g. "Mon / 9 Nov". */
+.roster-table:not(.month-view) .day-header-content { display: flex !important; flex-direction: column-reverse !important; align-items: center !important; gap: 2px !important; }
+.roster-table:not(.month-view) .day-num { font-family: var(--font-heading); font-size: 20px !important; line-height: 1.1 !important; font-weight: 700 !important; color: #0f172a; }
+.roster-table:not(.month-view) .day-meta { display: flex !important; gap: 4px !important; align-items: baseline; }
+.roster-table:not(.month-view) .day-name { font-size: 11.5px !important; font-weight: 600 !important; color: #64748b !important; text-transform: none !important; }
+.roster-table:not(.month-view) .day-month { font-size: 11.5px !important; font-weight: 600 !important; color: #94a3b8 !important; }
+.roster-table:not(.month-view) .day-col.is-today .day-name, .roster-table:not(.month-view) .day-col.is-today .day-num { color: #1d4ed8 !important; }
+.legend-note { font-size: 12px !important; font-style: normal !important; color: #94a3b8 !important; }
+
+/* ── Legend + month picker, Google style (12 Nov) ── */
+/* Month picker: a quiet row; selected month is a soft blue pill, not a solid block. */
+.month-navigator { display: flex !important; align-items: center !important; gap: 2px !important; flex-wrap: wrap; padding: 6px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; background: #fff !important; }
+.month-year-select { height: 34px !important; margin-right: 8px !important; padding: 0 28px 0 12px !important; border: 1px solid #d0d7e2 !important; border-radius: 8px !important; font-size: 13.5px !important; font-weight: 600 !important; background-color: #fff !important; }
+.month-nav-button { height: 34px !important; min-width: 0 !important; padding: 0 14px !important; border: 0 !important; border-radius: 999px !important; background: transparent !important; color: #475569 !important; font-size: 13.5px !important; font-weight: 500 !important; box-shadow: none !important; }
+.month-nav-button:hover { background: #f1f5f9 !important; }
+.month-nav-button.active { background: #e8f0fe !important; color: #1967d2 !important; font-weight: 600 !important; }
+
+/* Legend: neutral chips with a colour dot; the active filter gets a blue outline. */
+.legend { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 6px !important; padding: 0 2px !important; }
+.legend-chip, .legend-chip.chip-neutral, .legend-chip.chip-leave-legend, .legend-chip.chip-field-visit-legend, .legend-chip.chip-pending-legend {
+  display: inline-flex !important; align-items: center !important; gap: 6px !important; height: 28px !important; padding: 0 10px !important;
+  border: 1px solid #e2e8f0 !important; border-radius: 999px !important; background: #fff !important; color: #334155 !important;
+  font-size: 12.5px !important; font-weight: 500 !important; box-shadow: none !important; text-shadow: none !important; cursor: pointer;
+}
+.legend-chip:hover { background: #f8fafc !important; border-color: #cbd5e1 !important; }
+.legend-chip.is-active, .legend-chip.chip-neutral.is-active, .legend-chip.chip-leave-legend.is-active, .legend-chip.chip-field-visit-legend.is-active, .legend-chip.chip-pending-legend.is-active {
+  background: #e8f0fe !important; border-color: #1967d2 !important; color: #1967d2 !important;
+}
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; }
+.legend-code { font-weight: 700; color: #0f172a; margin-right: 2px; }
+.legend-chip.is-active .legend-code { color: #1967d2; }
+.legend-chip.chip-neutral::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; }
+.legend-chip.chip-leave-legend::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #6b3fd6; }
+.legend-chip.chip-field-visit-legend::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #4f46e5; }
+.legend-chip.chip-pending-legend::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; }
+.legend-chip .chip-check-icon { color: #1967d2; }
+.legend-note { flex-basis: 100%; margin-top: 2px; }
+
+/* Filter row: clear separation between each control. */
+.roster-toolbar { gap: 12px !important; }
+.roster-toolbar > * { flex: 0 0 auto; }
+.roster-toolbar .view-toggle { margin: 0 4px; }
+.roster-toolbar .range-nav + .view-toggle, .roster-toolbar .view-toggle + .roster-filter { margin-left: 4px; }
+.roster-toolbar .roster-filter.employee-filter { padding-left: 16px; border-left: 1px solid #e2e8f0; }
+
+/* ── One control panel (12 Nov): filters, month picker and legend in a single card ── */
+.roster-sticky-header { padding: 12px 14px !important; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff !important; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+.roster-sticky-header .roster-toolbar { padding: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+.roster-sticky-header .month-navigator { margin-top: 12px !important; padding: 10px 0 0 !important; border: 0 !important; border-top: 1px solid #eef2f6 !important; border-radius: 0 !important; }
+
+/* Filters never overlap: each dropdown owns a fixed width. */
+.roster-toolbar .roster-filter { flex: 0 0 240px !important; width: 240px !important; min-width: 0; }
+.roster-toolbar .roster-filter.employee-filter { padding-left: 0 !important; border-left: 0 !important; }
+:host ::ng-deep .roster-toolbar .roster-filter app-searchable-select,
+:host ::ng-deep .roster-toolbar .roster-filter .select-trigger { display: block; width: 100% !important; max-width: 100% !important; box-sizing: border-box; }
+.roster-toolbar .view-toggle { margin-right: 4px; padding-right: 0; }
+.roster-toolbar .view-toggle::after { content: ''; }
+.roster-toolbar .field-visit-total strong { min-width: 20px; height: 20px; display: inline-grid; place-items: center; padding: 0 6px; border-radius: 999px; background: #eef2f6; color: #0f172a; font-size: 12px; }
+.roster-toolbar .field-visit-total.is-active strong { background: #1967d2; color: #fff; }
+
+/* Legend: one scrollable line under a divider, labelled, instead of two loose rows. */
+.roster-sticky-header .legend { flex-wrap: nowrap !important; overflow-x: auto; margin-top: 12px !important; padding: 10px 0 2px !important; border-top: 1px solid #eef2f6; scrollbar-width: thin; }
+.roster-sticky-header .legend::before { content: 'Shifts'; flex: 0 0 auto; margin-right: 4px; font-size: 12px; font-weight: 600; color: #64748b; }
+.roster-sticky-header .legend-chip { flex: 0 0 auto; }
+.roster-sticky-header .legend-note { flex: 0 0 auto; flex-basis: auto !important; margin: 0 0 0 8px !important; white-space: nowrap; }
+
+/* Shift legend as a dropdown panel (no horizontal scroll). */
+.roster-sticky-header { position: sticky; }
+.shift-legend-wrap { position: relative; flex: 0 0 auto; }
+.shift-legend-btn { height: 40px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid #d0d7e2; border-radius: 8px; background: #fff; color: #334155; font-size: 13.5px; font-weight: 500; cursor: pointer; white-space: nowrap; max-width: 260px; }
+.shift-legend-btn span:not(.legend-dot) { overflow: hidden; text-overflow: ellipsis; }
+.shift-legend-btn.is-active { border-color: #1967d2; background: #e8f0fe; color: #1967d2; }
+.legend-backdrop { position: fixed; inset: 0; z-index: 40; }
+.roster-sticky-header .legend {
+  position: absolute !important; left: 14px; right: 14px; top: calc(100% - 6px); z-index: 41;
+  display: flex !important; flex-wrap: wrap !important; gap: 8px !important; overflow: visible !important;
+  margin: 0 !important; padding: 14px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px;
+  background: #fff; box-shadow: 0 12px 32px -8px rgba(15,23,42,.22);
+}
+.roster-sticky-header .legend::before { content: 'Filter by shift'; flex-basis: 100%; margin: 0 0 2px; font-size: 12px; font-weight: 600; color: #64748b; }
+.roster-sticky-header .legend-note { flex-basis: 100% !important; margin: 4px 0 0 !important; white-space: normal; }
+
+/* Assign Shift: the current shift is clearly marked. */
+.shift-option.selected { border-color: #1967d2 !important; background: #e8f0fe !important; box-shadow: 0 0 0 1px #1967d2 inset !important; }
+.shift-option.selected .option-name { color: #1967d2 !important; }
+.option-current { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: #1967d2; color: #fff; font-size: 11.5px; font-weight: 600; white-space: nowrap; }

@@ -1552,9 +1552,17 @@ export class AttendanceLeaveComponent implements OnInit {
 
   selectedApprovalIds = signal<number[]>([]);
   private approvalGridApi: any;
+  /** Tick box column sits first, left of the pinned Employee column. */
+  readonly leaveSelectionColumnDef = { pinned: 'left' as const, width: 52, maxWidth: 52, resizable: false, sortable: false, suppressHeaderMenuButton: true, lockPosition: 'left' as const };
+
   readonly approvalRowSelection = {
     mode: 'multiRow' as const,
-    checkboxes: (params: any) => params.data?.status === 'PENDING',
+    // Every row shows a tick box in the first column; rows that cannot be
+    // decided show it greyed out (isRowSelectable below).
+    checkboxes: true,
+    hideDisabledCheckboxes: false,
+    // Only Pending leaves this user may decide can be ticked (12 Nov 2026).
+    isRowSelectable: (node: any) => node.data?.status === 'PENDING' && this.canApproveLeaveApplication(node.data),
     headerCheckbox: true,
     // The header checkbox is a page action: with 10 rows on screen it must
     // never silently select pending requests on later pages.
@@ -1944,6 +1952,58 @@ export class AttendanceLeaveComponent implements OnInit {
     }
     return ids.size;
   });
+
+  /** Status dropdown and bulk select for Pending Regularizations (12 Nov 2026). */
+  get regStatusOptions(): SearchableSelectOption[] {
+    return [
+      { id: 'PENDING', name: `Pending (${this.pendingRegularizations().length})` },
+      { id: 'APPROVED', name: `Approved (${this.approvedRegularizations().length})` },
+      { id: 'REJECTED', name: `Rejected (${this.rejectedRegularizations().length})` },
+    ] as any;
+  }
+  regGridApi: any;
+  selectedRegIds = signal<number[]>([]);
+  bulkRejectRegIds = signal<number[]>([]);
+  readonly regRowSelection = {
+    mode: 'multiRow' as const,
+    checkboxes: true,
+    hideDisabledCheckboxes: false,
+    headerCheckbox: true,
+    selectAll: 'currentPage' as const,
+    enableClickSelection: false,
+    isRowSelectable: (node: any) => String(node.data?.status || 'PENDING').toUpperCase() === 'PENDING',
+  };
+  onRegSelectionChanged(event: any): void {
+    this.selectedRegIds.set(event.api.getSelectedRows()
+      .filter((r: any) => String(r.status || 'PENDING').toUpperCase() === 'PENDING').map((r: any) => r.id));
+  }
+  clearRegSelection(): void { this.regGridApi?.deselectAll(); this.selectedRegIds.set([]); }
+  async approveSelectedRegs(): Promise<void> {
+    const ids = this.selectedRegIds();
+    if (!ids.length || !confirm(`Approve ${ids.length} regularization${ids.length === 1 ? '' : 's'}?`)) return;
+    await this.resolveRegsInBulk(ids, 'APPROVED');
+  }
+  rejectSelectedRegs(): void {
+    const ids = this.selectedRegIds();
+    if (!ids.length) return;
+    this.bulkRejectRegIds.set(ids);
+    this.rejectingRegularizationId.set(ids[0]);
+    this.rejectingRegularizationData.set(null);
+    this.rejectingRegularizationReason.set('');
+    this.isRejectRegularizationModalOpen.set(true);
+  }
+  private async resolveRegsInBulk(ids: number[], status: 'APPROVED' | 'REJECTED', reason?: string): Promise<void> {
+    // One at a time, as for leave: each approval rewrites attendance.
+    let ok = 0;
+    for (const id of ids) {
+      try { await firstValueFrom(this.attendanceService.resolveRegularization(id, status, reason)); ok++; } catch { /* keep going */ }
+    }
+    this.clearRegSelection();
+    this.loadPendingRegularizations();
+    const label = status === 'APPROVED' ? 'approved' : 'rejected';
+    if (ok === ids.length) this.toast.success(`${ok} regularization${ok === 1 ? '' : 's'} ${label}`);
+    else this.toast.error(`${ok} of ${ids.length} regularizations ${label}. Refresh and try the rest again.`);
+  }
 
   setRegularizationStatusFilter(filter: 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED') {
     this.regularizationStatusFilter.set(filter);
@@ -2475,6 +2535,7 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   closeRejectRegularizationModal() {
+    this.bulkRejectRegIds.set([]);
     this.isRejectRegularizationModalOpen.set(false);
     this.rejectingRegularizationId.set(null);
     this.rejectingRegularizationData.set(null);
@@ -2487,6 +2548,13 @@ export class AttendanceLeaveComponent implements OnInit {
     if (!id) return;
     if (!reason) {
       this.toast.error('Rejection reason is required');
+      return;
+    }
+    const bulk = this.bulkRejectRegIds();
+    if (bulk.length) {
+      this.bulkRejectRegIds.set([]);
+      this.closeRejectRegularizationModal();
+      void this.resolveRegsInBulk(bulk, 'REJECTED', reason);
       return;
     }
     this.attendanceService.resolveRegularization(id, 'REJECTED', reason).subscribe({
@@ -3087,9 +3155,8 @@ export class AttendanceLeaveComponent implements OnInit {
               <div style="min-width: 0 !important; flex: 1 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; justify-content: center !important; line-height: 1.25 !important;">
                 <div style="display: flex !important; align-items: center !important; gap: 6px !important; min-width: 0 !important;">
                   <span style="font-size: 13px !important; font-weight: 600 !important; color: #0f172a !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;">${safeName}</span>
-                  ${codeBadge}
                 </div>
-                <div style="font-size: 11.5px !important; color: #64748B !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 2px !important;">${sub}</div>
+                <div style="font-size: 11.5px !important; white-space: nowrap !important; margin-top: 2px !important;">${code ? `<span style="color:#94a3b8 !important;">Emp ID:</span> <span style="color:#2563eb !important; font-weight:600 !important;">${code}</span>` : '<span style="color:#cbd5e1 !important;">—</span>'}</div>
               </div>
             </div>
           `;
@@ -3117,9 +3184,12 @@ export class AttendanceLeaveComponent implements OnInit {
         headerTooltip: `${type} · Available / total${suffix}`,
         field: type,
         flex: 1,
-        minWidth: 125,
+        minWidth: 120,
         sortable: true,
         filter: true,
+        wrapHeaderText: true,
+        autoHeaderHeight: true,
+        headerClass: 'lb-type-header',
         cellRenderer: (params: any) => {
           const val = params.value;
           if (val === undefined || val === null || val === '') {
@@ -3131,40 +3201,17 @@ export class AttendanceLeaveComponent implements OnInit {
           }
           const avail = parseFloat(parts[0].trim());
           const alloc = parseFloat(parts[1].trim());
-
-          let bg = '#f8fafc';
-          let border = '#e2e8f0';
-          let availColor = '#334155';
-          let allocColor = '#64748b';
-
-          if (avail < 0) {
-            bg = '#fef2f2';
-            border = '#fecaca';
-            availColor = '#dc2626';
-            allocColor = '#991b1b';
-          } else if (avail === 0 && alloc > 0) {
-            bg = '#fffbeb';
-            border = '#fde68a';
-            availColor = '#d97706';
-            allocColor = '#b45309';
-          } else if (avail > 0) {
-            bg = '#f0fdf4';
-            border = '#bbf7d0';
-            availColor = '#16a34a';
-            allocColor = '#475569';
-          } else if (alloc === 0 && avail === 0) {
-            bg = '#f8fafc';
-            border = '#f1f5f9';
-            availColor = '#94a3b8';
-            allocColor = '#cbd5e1';
+          // Nothing allocated and nothing used: a quiet dash, not a pill (12 Nov 2026).
+          if (!alloc && !avail) {
+            return `<div style="display:flex;align-items:center;justify-content:center;height:100%;"><span style="color:#cbd5e1;font-size:13px;">—</span></div>`;
           }
-
+          const tone = avail < 0 ? '#dc2626' : (avail === 0 ? '#d97706' : '#15803d');
+          const pct = alloc > 0 ? Math.max(0, Math.min(100, (avail / alloc) * 100)) : 0;
+          const bar = avail < 0 ? '#fca5a5' : (avail === 0 ? '#fcd34d' : '#86efac');
           return `
-            <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
-              <span style="display: inline-flex; align-items: center; justify-content: center; gap: 3px; height: 24px; line-height: 22px; padding: 0 10px; border-radius: 6px; font-size: 11.5px; background: ${bg}; border: 1px solid ${border}; box-sizing: border-box; white-space: nowrap;">
-                <strong style="color: ${availColor}; font-weight: 700;">${avail}</strong>
-                <span style="color: ${allocColor}; opacity: 0.8; font-size: 10.5px;">/ ${alloc}</span>
-              </span>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;height:100%;">
+              <span style="font-size:13px;white-space:nowrap;line-height:1;"><strong style="color:${tone};font-weight:700;">${avail}</strong><span style="color:#94a3b8;font-size:12px;"> / ${alloc}</span></span>
+              <span style="display:block;width:56px;height:4px;border-radius:999px;background:#eef2f6;overflow:hidden;"><span style="display:block;height:100%;width:${avail < 0 ? 100 : pct}%;background:${bar};border-radius:999px;"></span></span>
             </div>
           `;
         }
@@ -4370,6 +4417,9 @@ export class AttendanceLeaveComponent implements OnInit {
     }
   }
 
+  /** Assign Leave Balance lives in a pop-up opened from the header (12 Nov 2026). */
+  isAssignModalOpen = signal(false);
+
   submitAssignBalance() {
     if (!this.selectedLeaveTypeId() || !this.allocatedDays() || !this.assignYear()) {
       this.toast.error('Please fill all required fields');
@@ -4397,6 +4447,7 @@ export class AttendanceLeaveComponent implements OnInit {
       forkJoin(requests).subscribe({
         next: () => {
           this.toast.success(`Successfully assigned balances to ${requests.length} employees`);
+          this.isAssignModalOpen.set(false);
           this.loadAdminData();
           this.resetAssignForm();
         },
@@ -4410,6 +4461,7 @@ export class AttendanceLeaveComponent implements OnInit {
       this.leavesService.assignBalance(payload).subscribe({
         next: () => {
           this.toast.success('Successfully assigned balance');
+          this.isAssignModalOpen.set(false);
           this.loadAdminData();
           this.resetAssignForm();
         },
