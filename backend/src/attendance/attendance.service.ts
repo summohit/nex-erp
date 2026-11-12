@@ -14,6 +14,7 @@ import { APPROVAL_WORKFLOW } from '../approvals/approval-workflows';
 import { isSuperAdmin, isHrAdmin } from '../common/company-roles';
 import { isBranchWeeklyOff, personalDaysOff } from '../common/weekly-offs';
 import { isRestDay } from '../common/rest-day';
+import { compOffUsedDays } from '../common/comp-off-used';
 import { permanentWfhCovers, permanentWfhWhere } from '../common/permanent-wfh';
 
 /**
@@ -1253,7 +1254,7 @@ export class AttendanceService {
     if (!ids.length) return { year: y, employees: [] };
 
     const dates = credits.map((c) => c.date).filter((d): d is Date => !!d);
-    const [people, holidays, visits, usedLeaves] = await Promise.all([
+    const [people, holidays, visits, usedLeaves, compOffUsed] = await Promise.all([
       this.prisma.employee.findMany({
         where: { id: { in: ids }, companyId },
         select: { id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true,
@@ -1277,6 +1278,12 @@ export class AttendanceService {
         select: { id: true, employeeId: true, startDate: true, endDate: true, isHalfDay: true, reason: true },
         orderBy: { startDate: 'desc' },
       }),
+      // The balance year's approved, non-deleted comp-off leave: the only
+      // thing that consumes a day. The stored counter is not trusted here.
+      compOffUsedDays(
+        this.prisma as any, companyId, y,
+        ids.map((id) => ({ employeeId: id, leaveTypeId: leaveType.id })),
+      ),
     ]);
 
     const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -1315,7 +1322,7 @@ export class AttendanceService {
         };
       });
       const allocated = b?.allocated ?? earned;
-      const used = b?.used ?? 0;
+      const used = compOffUsed.get(`${p.id}:${leaveType.id}`) ?? 0;
       return {
         employee: p,
         allocated, used, remaining: Math.round((allocated - used) * 100) / 100,

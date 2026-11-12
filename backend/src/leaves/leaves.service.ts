@@ -1,5 +1,5 @@
-import { personalDaysOff } from '../common/weekly-offs';
-import { isRestDay } from '../common/rest-day';
+import { countWorkingDays } from '../common/working-days';
+import { compOffUsedDays } from '../common/comp-off-used';
 import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -83,18 +83,36 @@ export class LeavesService {
     });
   }
 
+  /**
+   * Replace the stored comp-off `used` with the days the approved, non-deleted
+   * requests actually took. Other leave types keep their counter: only
+   * comp-off has the request-per-day history the screens reconcile against.
+   */
+  private async withCompOffUsed<T extends { employeeId: number; leaveTypeId: number; used: number }>(
+    companyId: number, year: number, balances: T[],
+  ): Promise<T[]> {
+    if (!balances.length) return balances;
+    const used = await compOffUsedDays(this.prisma as any, companyId, year, balances);
+    if (!used.size) return balances;
+    return balances.map((b) => {
+      const days = used.get(`${b.employeeId}:${b.leaveTypeId}`);
+      return days == null ? b : { ...b, used: days };
+    });
+  }
+
   async getMyBalances(userId: number, year: number) {
     const employee = await this.prisma.employee.findUnique({ where: { userId } });
     if (!employee) throw new BadRequestException('Employee not found');
     
-    return this.prisma.leaveBalance.findMany({
+    const balances = await this.prisma.leaveBalance.findMany({
       where: { employeeId: employee.id, year },
       include: { leaveType: true }
     });
+    return this.withCompOffUsed(employee.companyId, year, balances);
   }
 
   async getAllBalances(companyId: number, year: number, employeeId?: number, limit = 200) {
-    return this.prisma.leaveBalance.findMany({
+    const balances = await this.prisma.leaveBalance.findMany({
       where: { 
         employee: { companyId }, 
         year,
@@ -122,6 +140,7 @@ export class LeavesService {
       // employee per type for a single year — return all of it.
       ...(employeeId ? { take: limit } : {}),
     });
+    return this.withCompOffUsed(companyId, year, balances);
   }
 
   /**
@@ -205,6 +224,10 @@ export class LeavesService {
       byEmployee.set(b.employeeId, list);
     }
 
+    // Comp-off is counted from its approved, non-deleted requests, the same
+    // way the history and the balance screens count it.
+    const compOffUsed = await compOffUsedDays(this.prisma as any, companyId, year, balances);
+
     const encashedDays = new Map<string, number>();
     for (const e of encashments) {
       encashedDays.set(`${e.employeeId}:${e.leaveTypeId}`, e.days);
@@ -218,7 +241,7 @@ export class LeavesService {
       for (const type of leaveTypes) {
         const b = mine.find((x) => x.leaveTypeId === type.id);
         const a = b?.allocated ?? 0;
-        const u = b?.used ?? 0;
+        const u = compOffUsed.get(`${emp.id}:${type.id}`) ?? b?.used ?? 0;
         const e = encashedDays.get(`${emp.id}:${type.id}`) ?? 0;
         byType[type.id] = { allocated: a, used: u, remaining: a - u, encashed: e };
         // Unpaid leave (LOP) is shown per type but never counts toward the
@@ -1157,19 +1180,7 @@ export class LeavesService {
       : [];
     const roster = new Map(rows.map((r) => [r.date.toISOString().slice(0, 10), r]));
 
-    let count = 0;
-    while (current <= last) {
-      const dateStr = current.toISOString().split('T')[0];
-      // The person's own weekly off wins over shift and branch (21 Oct 2026).
-      const own = personalDaysOff(employee as any);
-      const rest = isRestDay(current, roster.get(dateStr), own.shiftWorkingDays, own.weeklyOffs || '0');
-      if (!rest && !(holidayDates && holidayDates.has(dateStr))) {
-        count++;
-      }
-      current.setUTCDate(current.getUTCDate() + 1);
-    }
-
-    return isHalfDay ? (count > 0 ? 0.5 : 0) : count;
+    return countWorkingDays(start, end, employee, isHalfDay, roster, holidayDates);
   }
 
   private async getHolidayDates(companyId: number, start: Date, end: Date): Promise<Set<string>> {
