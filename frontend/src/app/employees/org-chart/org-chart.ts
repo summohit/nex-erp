@@ -1,5 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -64,6 +65,7 @@ export interface DepartmentTheme {
   standalone: true,
   imports: [
     CommonModule,
+    PageHeaderComponent,
     FormsModule,
     RouterModule,
     NgxGraphModule,

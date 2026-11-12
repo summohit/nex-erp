@@ -450,3 +450,62 @@
 .appraisal-section h4 { margin: 0 0 16px 0; font-size: 16px; color: #0F172A; }
 .avatar-sm { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
 .ml-2 { margin-left: 8px; }
+
+/* ── Standard look (12 Nov 2026) ─────────────────────────────────────────── */
+.tabs-container { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px; margin-bottom: 16px; background: #fff; border: 1px solid #e6ebf5; border-radius: 12px; }
+.tab-btn { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: #475569; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.tab-btn:hover { background: #f1f5f9; color: #0f172a; }
+.tab-btn.active { background: #eff6ff; color: #1d4ed8; box-shadow: none; border: 0; }
+
+.pf-filter-row { position: relative; z-index: 30; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; margin-bottom: 16px; padding: 14px 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
+.pf-search { position: relative; flex: 1 1 220px; min-width: 160px; max-width: 320px; }
+.pf-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); }
+.pf-search input { width: 100%; height: 38px; padding: 0 12px 0 34px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 13px; outline: none; }
+.pf-search input:focus { background: #fff; border-color: #2563eb; }
+.pf-field { flex: 0 1 200px; min-width: 150px; max-width: 230px; }
+.pf-count { margin-left: auto; font-size: 13px; color: #64748b; white-space: nowrap; }
+.pf-filter-row .clear-all-filters { margin-left: 0; }
+@media (max-width: 1100px) { .pf-filter-row { flex-wrap: wrap; } }
+
+.pf-section { margin-bottom: 20px; }
+.pf-section h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-family: var(--font-heading); font-size: 16px; font-weight: 600; color: #0f172a; }
+.pf-badge { min-width: 24px; height: 22px; padding: 0 8px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+
+:host ::ng-deep .pf-grid .ag-cell { display: flex; align-items: center; }
+:host ::ng-deep .pf-grid .g-strong { font-weight: 600; color: #0f172a; }
+:host ::ng-deep .pf-grid .g-person { display: flex; align-items: center; gap: 10px; }
+:host ::ng-deep .pf-grid .g-avatar { width: 32px; height: 32px; border-radius: 50%; background: #e0e9ff; color: #2563eb; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+:host ::ng-deep .pf-grid .g-stars { color: #f59e0b; letter-spacing: 1px; }
+:host ::ng-deep .pf-grid .g-muted { color: #e2e8f0; }
+:host ::ng-deep .pf-grid .g-actions { display: flex; gap: 6px; }
+:host ::ng-deep .pf-grid .g-btn { height: 30px; padding: 0 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #334155; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+:host ::ng-deep .pf-grid .g-btn:hover { background: #f8fafc; }
+:host ::ng-deep .pf-grid .g-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+:host ::ng-deep .pf-grid .g-pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569; white-space: nowrap; }
+:host ::ng-deep .pf-grid .g-pill.st-pending_self_review { background: #fffbeb; color: #b45309; }
+:host ::ng-deep .pf-grid .g-pill.st-self_reviewed { background: #f5f3ff; color: #6d28d9; }
+:host ::ng-deep .pf-grid .g-pill.st-manager_reviewed { background: #eff6ff; color: #1d4ed8; }
+:host ::ng-deep .pf-grid .g-pill.st-acknowledged { background: #f0fdfa; color: #0f766e; }
+:host ::ng-deep .pf-grid .g-pill.st-hr_approved, :host ::ng-deep .pf-grid .g-pill.st-active { background: #ecfdf5; color: #047857; }
+:host ::ng-deep .pf-grid .g-pill.st-closed, :host ::ng-deep .pf-grid .g-pill.st-completed { background: #f1f5f9; color: #475569; }
+
+/* Header buttons: same size and look as the Employee Directory (12 Nov 2026). */
+:host ::ng-deep app-page-header .btn-primary,
+:host ::ng-deep app-page-header .btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; padding: 0 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; box-shadow: none; transition: background-color .15s ease, border-color .15s ease;
+}
+:host ::ng-deep app-page-header .btn-primary { background: #2563eb; border: 1px solid #2563eb; color: #fff; }
+:host ::ng-deep app-page-header .btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+:host ::ng-deep app-page-header .btn-secondary { background: #fff; border: 1px solid #e2e8f0; color: #334155; }
+:host ::ng-deep app-page-header .btn-secondary:hover { background: #f8fafc; border-color: #cbd5e1; }
+:host ::ng-deep app-page-header .btn-primary svg,
+:host ::ng-deep app-page-header .btn-secondary svg { width: 16px; height: 16px; }
+
+.view-switch-pills { display: inline-flex; background: #f1f5f9; padding: 3px; border-radius: 8px; border: 1px solid #e2e8f0; }
+.pill-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: none; background: transparent; color: #64748b; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.pill-btn:hover { color: #0f172a; }
+.pill-btn.active { background: #fff; color: #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,.08), inset 0 -2px 0 #2563eb; }
+.pill-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #e2e8f0; color: #475569; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.pill-btn.active .pill-count { background: #2563eb; color: #fff; }

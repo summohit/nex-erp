@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, viewChild } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PerformanceService, PerformanceGoal, PerformanceReview, CompanyOKR, AppraisalCycle, PeerFeedback } from '../services/performance.service';
@@ -7,6 +7,10 @@ import { AuthService } from '../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
 import { ActivatedRoute } from '@angular/router';
 import { PeopleWatchComponent } from './people-watch/people-watch';
+import { AgGridAngular } from 'ag-grid-angular';
+import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
+import { PageHeaderComponent } from '../shared/components/page-header/page-header';
+import { SearchableSelectComponent } from '../shared/components/searchable-select/searchable-select.component';
 import { LifecycleService } from '../services/lifecycle.service';
 import { 
   LucideTarget, 
@@ -24,11 +28,13 @@ import {
   LucideAlertTriangle
 } from '@lucide/angular';
 
+ModuleRegistry.registerModules([AllCommunityModule]);
+
 @Component({
   selector: 'app-performance',
   standalone: true,
   imports: [
-    PeopleWatchComponent,
+    PeopleWatchComponent, AgGridAngular, PageHeaderComponent, SearchableSelectComponent,
     CommonModule,
     FormsModule,
     LucideTarget, 
@@ -73,7 +79,118 @@ export class PerformanceComponent implements OnInit {
   mySubordinates = signal<Employee[]>([]);
   
   companyOKRs = signal<CompanyOKR[]>([]);
+  /** The Probation / PIP tab's list, so its buttons can live in the page header (12 Nov 2026). */
+  pw = viewChild(PeopleWatchComponent);
+
+  // ── Filters on every tab (12 Nov 2026) ─────────────────────────────────────
+  goalSearch = signal(''); goalStatus = signal('');
+  readonly goalStatusOptions = [
+    { id: 'NOT_STARTED', name: 'Not started' }, { id: 'IN_PROGRESS', name: 'In progress' },
+    { id: 'ACHIEVED', name: 'Achieved' }, { id: 'MISSED', name: 'Missed' },
+  ];
+  reviewSearch = signal(''); reviewCycle = signal(''); reviewStatus = signal('');
+  readonly reviewStatusOptions = [
+    { id: 'PENDING_SELF_REVIEW', name: 'Pending self review' }, { id: 'SELF_REVIEWED', name: 'Self reviewed' },
+    { id: 'MANAGER_REVIEWED', name: 'Manager reviewed' }, { id: 'ACKNOWLEDGED', name: 'Acknowledged' },
+    { id: 'HR_APPROVED', name: 'HR approved' },
+  ];
+  okrSearch = signal(''); okrPeriod = signal('');
+  cycleSearch = signal('');
   appraisalCycles = signal<AppraisalCycle[]>([]);
+
+  filteredGoals = computed(() => {
+    const q = this.goalSearch().trim().toLowerCase(), st = this.goalStatus();
+    return (this.myGoals() as any[]).filter(g => (!st || g.status === st)
+      && (!q || `${g.title} ${g.description || ''} ${g.okr?.title || ''}`.toLowerCase().includes(q)));
+  });
+  private reviewMatches(r: any): boolean {
+    const q = this.reviewSearch().trim().toLowerCase();
+    return (!this.reviewCycle() || r.cycleName === this.reviewCycle())
+      && (!this.reviewStatus() || r.status === this.reviewStatus())
+      && (!q || `${r.cycleName} ${r.employee?.firstName || ''} ${r.employee?.lastName || ''} ${r.reviewer?.firstName || ''} ${r.reviewer?.lastName || ''}`.toLowerCase().includes(q));
+  }
+  filteredMyReviews = computed(() => (this.myReviews() as any[]).filter(r => this.reviewMatches(r)));
+  filteredTeamReviews = computed(() => (this.teamReviews() as any[]).filter(r => this.reviewMatches(r)));
+  reviewCycleOptions = computed(() => [...new Set([...this.myReviews(), ...this.teamReviews()].map((r: any) => r.cycleName).filter(Boolean))]
+    .sort().map(c => ({ id: c, name: c })));
+  filteredOkrs = computed(() => {
+    const q = this.okrSearch().trim().toLowerCase(), per = this.okrPeriod();
+    return (this.companyOKRs() as any[]).filter(o => (!per || o.period === per)
+      && (!q || `${o.title} ${o.description || ''}`.toLowerCase().includes(q)));
+  });
+  okrPeriodOptions = computed(() => [...new Set((this.companyOKRs() as any[]).map(o => o.period).filter(Boolean))].map(p => ({ id: p, name: p })));
+  filteredCycles = computed(() => {
+    const q = this.cycleSearch().trim().toLowerCase();
+    return (this.appraisalCycles() as any[]).filter(c => !q || `${c.name} ${c.status}`.toLowerCase().includes(q));
+  });
+
+  // ── Tables: the same grid as the Employee Directory (12 Nov 2026) ──────────
+  readonly gridDefaultColDef: ColDef = { minWidth: 110, filter: true, sortable: true, resizable: true };
+  private esc(v: any): string {
+    return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[c]);
+  }
+  private nice(st: string): string { const t = String(st || '').replace(/_/g, ' ').toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); }
+  private statusPill(st: string): string { return `<span class="g-pill st-${String(st || '').toLowerCase()}">${this.esc(this.nice(st))}</span>`; }
+  private stars(n: number | null | undefined): string { return n ? `${'★'.repeat(n)}<span class="g-muted">${'★'.repeat(Math.max(0, 5 - n))}</span>` : '<span class="g-muted">—</span>'; }
+  private btn(act: string, label: string, primary = false): string {
+    return `<button type="button" class="g-btn${primary ? ' primary' : ''}" data-act="${act}">${label}</button>`;
+  }
+  private act(e: any): string | null { return (e.event?.target as HTMLElement)?.closest('[data-act]')?.getAttribute('data-act') ?? null; }
+
+  readonly myReviewCols: ColDef[] = [
+    { headerName: 'Cycle', field: 'cycleName', minWidth: 160, flex: 1, cellClass: 'g-strong' },
+    { headerName: 'Reviewer', colId: 'reviewer', minWidth: 160, flex: 1,
+      valueGetter: (p: any) => `${p.data?.reviewer?.firstName || ''} ${p.data?.reviewer?.lastName || ''}`.trim() || '—' },
+    { headerName: 'Rating', field: 'rating', minWidth: 120, flex: 0.6, cellRenderer: (p: any) => `<span class="g-stars">${this.stars(p.value)}</span>` },
+    { headerName: 'Status', field: 'status', minWidth: 170, flex: 0.9, cellRenderer: (p: any) => this.statusPill(p.value) },
+    { headerName: 'Actions', colId: 'actions', minWidth: 230, flex: 1.2, sortable: false, filter: false,
+      cellRenderer: (p: any) => `<div class="g-actions">`
+        + (p.data?.status === 'PENDING_SELF_REVIEW' ? this.btn('self', 'Complete self review', true) : '')
+        + (p.data?.status === 'MANAGER_REVIEWED' ? this.btn('ack', 'Acknowledge', true) : '')
+        + this.btn('view', 'View') + `</div>` },
+  ];
+  readonly myReviewGridOptions = {
+    headerHeight: 44, rowHeight: 60,
+    onCellClicked: (e: any) => {
+      const a = this.act(e);
+      if (a === 'self') this.openSelfAppraisal(e.data);
+      else if (a === 'ack') this.signoff(e.data.id, 'EMPLOYEE', 'ACKNOWLEDGED');
+      else if (a === 'view') this.openReviewModal(e.data);
+    },
+  };
+  readonly teamReviewCols: ColDef[] = [
+    { headerName: 'Employee', colId: 'employee', minWidth: 220, flex: 1.3,
+      valueGetter: (p: any) => `${p.data?.employee?.firstName || ''} ${p.data?.employee?.lastName || ''}`.trim(),
+      cellRenderer: (p: any) => {
+        const e = p.data?.employee || {};
+        const ini = `${(e.firstName || '?')[0]}${(e.lastName || '')[0] || ''}`.toUpperCase();
+        const face = e.avatarUrl ? `<img class="g-avatar" src="${this.esc(e.avatarUrl)}" alt="" style="object-fit:cover">` : `<span class="g-avatar">${this.esc(ini)}</span>`;
+        return `<div class="g-person">${face}<strong>${this.esc(p.value)}</strong></div>`;
+      } },
+    { headerName: 'Cycle', field: 'cycleName', minWidth: 150, flex: 1 },
+    { headerName: 'Rating', field: 'rating', minWidth: 120, flex: 0.6, cellRenderer: (p: any) => `<span class="g-stars">${this.stars(p.value)}</span>` },
+    { headerName: 'Status', field: 'status', minWidth: 170, flex: 0.9, cellRenderer: (p: any) => this.statusPill(p.value) },
+    { headerName: 'Actions', colId: 'actions', minWidth: 230, flex: 1.2, sortable: false, filter: false,
+      cellRenderer: (p: any) => `<div class="g-actions">`
+        + (p.data?.status === 'SELF_REVIEWED' ? this.btn('edit', 'Give feedback', true) : this.btn('edit', 'View / edit'))
+        + (this.isHR() && p.data?.status === 'ACKNOWLEDGED' ? this.btn('hr', 'HR approve', true) : '') + `</div>` },
+  ];
+  readonly teamReviewGridOptions = {
+    headerHeight: 44, rowHeight: 60,
+    onCellClicked: (e: any) => {
+      const a = this.act(e);
+      if (a === 'edit') this.openReviewModal(e.data);
+      else if (a === 'hr') this.signoff(e.data.id, 'HR', 'APPROVED');
+    },
+  };
+  readonly cycleCols: ColDef[] = [
+    { headerName: 'Name', field: 'name', minWidth: 200, flex: 1.4, cellClass: 'g-strong' },
+    { headerName: 'Start date', field: 'startDate', minWidth: 140, flex: 0.8, sort: 'desc',
+      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' },
+    { headerName: 'End date', field: 'endDate', minWidth: 140, flex: 0.8,
+      valueFormatter: (p: any) => p.value ? new Date(p.value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' },
+    { headerName: 'Status', field: 'status', minWidth: 140, flex: 0.7, cellRenderer: (p: any) => this.statusPill(p.value) },
+  ];
   peerRequests = signal<PeerFeedback[]>([]);
 
   isManager = computed(() => {

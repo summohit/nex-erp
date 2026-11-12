@@ -1,14 +1,38 @@
 import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideEye, LucideFileText, LucidePlus, LucideTrash2, LucideUploadCloud, LucideFolderOpen, LucideX } from '@lucide/angular';
+import {
+  LucideEye,
+  LucideFileText,
+  LucidePlus,
+  LucideTrash2,
+  LucideUploadCloud,
+  LucideFolderOpen,
+  LucideX,
+  LucideImage,
+  LucideClock,
+  LucideUpload
+} from '@lucide/angular';
 import { EmployeeService } from '../../../services/employee.service';
 import { HotToastService } from '@ngneat/hot-toast';
 
 @Component({
   selector: 'app-documents-tab',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideEye, LucideFileText, LucidePlus, LucideTrash2, LucideUploadCloud, LucideFolderOpen, LucideX],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucideEye,
+    LucideFileText,
+    LucidePlus,
+    LucideTrash2,
+    LucideUploadCloud,
+    LucideFolderOpen,
+    LucideX,
+    LucideImage,
+    LucideClock,
+    LucideUpload
+  ],
   templateUrl: './documents-tab.html',
   styleUrls: ['./documents-tab.css']
 })
@@ -49,6 +73,19 @@ export class DocumentsTabComponent implements OnInit {
   constructor(private employeeService: EmployeeService, private toast: HotToastService) {}
 
   ngOnInit() {}
+
+  isImageDoc(doc: any): boolean {
+    const type = (doc.documentType || '').toLowerCase();
+    const name = (doc.fileName || '').toLowerCase();
+    const url = (doc.fileUrl || '').toLowerCase();
+    return type.includes('id card') || type.includes('aadhaar') || type.includes('pan') || type.includes('photo') || type.includes('license') ||
+      name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || url.startsWith('data:image');
+  }
+
+  getDocBadgeLabel(type?: string): string {
+    if (!type || type === 'Other') return 'Other (Needs Categorization)';
+    return type;
+  }
 
   get availableDocumentTypes(): string[] {
     const existingTypes = (this.employeeData?.documents || []).map((d: any) => d.documentType);

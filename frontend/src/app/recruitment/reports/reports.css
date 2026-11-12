@@ -3,7 +3,7 @@
   padding: 24px;
   max-width: 1400px;
   margin: 0 auto;
-  font-family: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: #0f172a;
   display: flex;
   flex-direction: column;
@@ -804,3 +804,23 @@
   to { transform: rotate(360deg); }
 }
 
+
+/* Redesign (12 Nov 2026): shared header, Board|Table-style pills, one filter row. */
+.view-switch-pills { display: inline-flex; background: #f1f5f9; padding: 3px; border-radius: 8px; border: 1px solid #e2e8f0; }
+.pill-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: none; background: transparent; color: #64748b; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.pill-btn:hover { color: #0f172a; }
+.pill-btn.active { background: #fff; color: #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,.08), inset 0 -2px 0 #2563eb; }
+.btn-top-action.btn-top-primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+.btn-top-action.btn-top-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+.rp-filter-row { position: relative; z-index: 30; display: flex; align-items: center; flex-wrap: nowrap; gap: 10px; padding: 14px 16px; overflow: visible; }
+.rp-filter-row .filter-search-box { flex: 1 1 200px; min-width: 160px; max-width: 300px; }
+.rp-field { flex: 0 1 190px; min-width: 140px; max-width: 220px; }
+.rp-count { margin-left: auto; font-size: 13px; color: #64748b; white-space: nowrap; }
+.rp-filter-row .clear-all-filters { margin-left: 0; }
+.reports-page-container { overflow: visible !important; }
+@media (max-width: 1100px) { .rp-filter-row { flex-wrap: wrap; } }
+/* The old .filters-card is a column; this row must be a row (12 Nov 2026). */
+.filters-card.rp-filter-row { flex-direction: row !important; align-items: center !important; gap: 10px; }
+.rp-filter-row > * { flex-grow: 0; height: auto; }
+.rp-filter-row .filter-search-box { flex: 1 1 200px; min-width: 160px; max-width: 300px; }
+.rp-filter-row .filter-search-box input { height: 38px; padding: 0 12px 0 34px; }

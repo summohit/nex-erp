@@ -9,6 +9,8 @@ import { MasterDataService, Department, Designation } from '../../services/maste
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucidePlus,
+  LucideTable,
+  LucideFilter,
   LucideSearch,
   LucideX,
   LucideChevronRight,
@@ -30,6 +32,8 @@ import { ActionCellRendererComponent } from '../../shared/components/action-cell
 import { EmployeeDrawerComponent } from '../employee-drawer/employee-drawer';
 import { BulkUploadModalComponent } from '../components/bulk-upload-modal/bulk-upload-modal';
 import { SearchableSelectComponent } from '../../shared/components/searchable-select/searchable-select.component';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
+import { DatePresetFilterComponent, DatePreset, DateRange, inDateRange } from '../../shared/components/date-preset-filter/date-preset-filter';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -38,9 +42,13 @@ ModuleRegistry.registerModules([AllCommunityModule]);
   standalone: true,
   imports: [
     CommonModule,
+    DatePresetFilterComponent,
+    PageHeaderComponent,
     FormsModule,
     RouterLink,
     LucidePlus,
+    LucideTable,
+    LucideFilter,
     LucideSearch,
     LucideX,
     LucideChevronRight,
@@ -104,6 +112,19 @@ export class EmployeeListComponentV2 implements OnInit {
     { id: 'CONTRACT', name: 'Contract' },
   ];
   filterEmploymentStatus: string | null = null;
+  /** Directory opens on Active (management, 11 Nov); Reset returns to Active. */
+  filterAccountStatus: string | null = 'ACTIVE';
+  accountStatusOptions = [
+    { id: 'ACTIVE', name: 'Active' },
+    { id: 'DEACTIVATED', name: 'Deactivated' },
+    { id: 'OFFBOARDED', name: 'Offboarded' },
+  ];
+
+  accountStatus(e: any): 'ACTIVE' | 'DEACTIVATED' | 'OFFBOARDED' {
+    if (e?.offboardingStatus === 'SEPARATED') return 'OFFBOARDED';
+    if (['SUSPENDED', 'INACTIVE', 'BLOCKED'].includes(String(e?.user?.status || '').toUpperCase())) return 'DEACTIVATED';
+    return 'ACTIVE';
+  }
 
   /** Bar colours for the employment mix: settled staff in brand blues, the
       rest in the same tones as their status chips. */
@@ -174,7 +195,7 @@ export class EmployeeListComponentV2 implements OnInit {
     { id: 'SEPARATED', name: 'Offboarded' },
   ];
 
-  viewMode = signal<'table' | 'cards'>('cards');
+  viewMode = signal<'table' | 'cards'>('table');
   isDrawerOpen = false;
   isBulkUploadOpen = false;
   selectedEmployee: Employee | null = null;
@@ -259,10 +280,56 @@ export class EmployeeListComponentV2 implements OnInit {
     sortable: true
   };
 
-  paginationPageSize = 100;
+  paginationPageSize = 20;
   paginationPageSizeSelector = [20, 50, 100, 200];
 
+  /** Joined within (12 Nov 2026), the same date filter as the other Employee pages. */
+  datePreset: DatePreset = 'ALL';
+  dateRange: DateRange = null;
+  /** "+ Filters" panel and the chips under the bar (12 Nov 2026). */
+  moreOpen = false;
+  moreFilterCount(): number {
+    return [this.filterDesignationId, this.filterRole, this.filterOffboardingStatus].filter(v => !!v).length;
+  }
+  activeChips(): { id: string; key: string; value: string }[] {
+    const name = (opts: { id: any; name: string }[], v: any) => opts.find(o => String(o.id) === String(v))?.name ?? String(v);
+    const chips: { id: string; key: string; value: string }[] = [];
+    if (this.filterDepartmentId) chips.push({ id: 'dept', key: 'Department', value: name(this.departmentOptions(), this.filterDepartmentId) });
+    if (this.dateRange) chips.push({ id: 'joined', key: 'Joined', value: this.joinedLabel() });
+    if (this.filterDesignationId) chips.push({ id: 'desig', key: 'Designation', value: name(this.designationOptions(), this.filterDesignationId) });
+    if (this.filterRole) chips.push({ id: 'role', key: 'Role', value: name(this.roleOptions, this.filterRole) });
+    if (this.filterOnboardingStatus) chips.push({ id: 'onb', key: 'Onboarding', value: name(this.onboardingStatusOptions, this.filterOnboardingStatus) });
+    if (this.filterOffboardingStatus) chips.push({ id: 'offb', key: 'Offboarding', value: name(this.offboardingStatusOptions, this.filterOffboardingStatus) });
+    if (this.filterEmploymentStatus) chips.push({ id: 'emp', key: 'Employment', value: name(this.employmentStatusOptions, this.filterEmploymentStatus) });
+    return chips;
+  }
+  private joinedLabel(): string {
+    const r = this.dateRange!;
+    const f = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return f(r.from) === f(r.to) ? f(r.from) : `${f(r.from)} – ${f(r.to)}`;
+  }
+  removeChip(id: string) {
+    if (id === 'dept') this.filterDepartmentId = null;
+    if (id === 'desig') this.filterDesignationId = null;
+    if (id === 'role') this.filterRole = null;
+    if (id === 'onb') this.filterOnboardingStatus = null;
+    if (id === 'offb') this.filterOffboardingStatus = null;
+    if (id === 'emp') this.filterEmploymentStatus = null;
+    if (id === 'joined') { this.datePreset = 'ALL'; this.dateRange = null; }
+    this.applyFilters();
+    this.gridApi?.onFilterChanged();
+  }
+
+  onDateRange(r: DateRange) {
+    this.dateRange = r;
+    this.gridApi?.onFilterChanged();
+  }
+
   gridOptions = {
+    isExternalFilterPresent: () => !!this.dateRange || !!this.filterAccountStatus,
+    doesExternalFilterPass: (node: any) =>
+      inDateRange(node.data?.joiningDate, this.dateRange) &&
+      (!this.filterAccountStatus || this.accountStatus(node.data) === this.filterAccountStatus),
     headerHeight: 44,
     rowHeight: 72,
     // Keep every directory column at a readable width.  On a narrow viewport
@@ -274,20 +341,6 @@ export class EmployeeListComponentV2 implements OnInit {
       'offboarded-employee-row': (params: any) => params.data?.offboardingStatus === 'SEPARATED',
       'deactivated-employee-row': (params: any) =>
         ['SUSPENDED', 'INACTIVE', 'BLOCKED'].includes(String(params.data?.user?.status || '').toUpperCase()),
-    },
-    selectionColumnDef: {
-      width: 52,
-      minWidth: 52,
-      maxWidth: 52,
-      sortable: false,
-      resizable: false,
-      suppressHeaderMenuButton: true,
-    },
-    rowSelection: {
-      mode: 'multiRow' as const,
-      checkboxes: true,
-      headerCheckbox: true,
-      enableClickSelection: false
     },
     // Clicking anywhere in the row (or view profile) redirects to their profile page.
     onCellClicked: (e: any) => {
@@ -578,6 +631,9 @@ export class EmployeeListComponentV2 implements OnInit {
     if (this.filterEmploymentStatus) {
       list = list.filter(e => this.employmentStatus(e) === this.filterEmploymentStatus);
     }
+    if (this.filterAccountStatus) {
+      list = list.filter(e => this.accountStatus(e) === this.filterAccountStatus);
+    }
     if (this.searchText && this.searchText.trim()) {
       const q = this.searchText.toLowerCase().trim();
       list = list.filter(e =>
@@ -702,6 +758,8 @@ export class EmployeeListComponentV2 implements OnInit {
     if (this.filterOnboardingStatus) count++;
     if (this.filterOffboardingStatus) count++;
     if (this.filterEmploymentStatus) count++;
+    if (this.filterAccountStatus !== 'ACTIVE') count++;
+    if (this.dateRange) count++;
     return count;
   }
 
@@ -717,9 +775,15 @@ export class EmployeeListComponentV2 implements OnInit {
     this.filterOnboardingStatus = null;
     this.filterOffboardingStatus = null;
     this.filterEmploymentStatus = null;
+    this.filterAccountStatus = 'ACTIVE';
+    this.datePreset = 'ALL';
+    this.dateRange = null;
     this.onSearch();
     if (this.gridApi) {
       this.gridApi.setFilterModel(null);
+      // The date filter is an external filter: setFilterModel(null) does not
+      // re-run it when the column filters were already empty.
+      this.gridApi.onFilterChanged();
     }
   }
 

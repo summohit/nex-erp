@@ -28,6 +28,68 @@
 .topbar-left {
   display: flex;
   align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.btn-sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.btn-sidebar-toggle:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.btn-sidebar-toggle:active {
+  background: #f1f5f9;
+  transform: scale(0.97);
+}
+
+.header-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.crumb-section {
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: -0.01em;
+}
+
+.crumb-separator {
+  color: #94a3b8;
+  font-size: 13px;
+  user-select: none;
+}
+
+.crumb-page {
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 960px) {
+  .header-breadcrumbs {
+    display: none;
+  }
 }
 
 .page-title {

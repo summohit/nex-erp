@@ -24,6 +24,7 @@ import { EmployeeService, Employee } from '../../services/employee.service';
 import { LeavesService } from '../../services/leaves';
 import { ShiftsService, RosterShift } from '../../services/shifts.service';
 import { AuthService } from '../../services/auth.service';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDatePreset } from '../../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 
 export interface DayMatrixStatus {
@@ -64,6 +65,7 @@ interface WorkLocationBreakdown {
   selector: 'app-all-attendance',
   standalone: true,
   imports: [
+    PageHeaderComponent,
     AttendanceFilterDrawerComponent,
     CommonModule, FormsModule,
     LucideCalendarClock, LucideRotateCcw, LucideSearch, LucideX,
@@ -173,6 +175,11 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   changeShiftOptions = signal<RosterShift[]>([]);
   changeShiftId = signal<number | null>(null);
   changeShiftScope = signal<'day' | 'permanent'>('day');
+  changeShiftStep = signal<'scope' | 'shift'>('scope');
+  dayTab = signal<'attendance' | 'correct' | 'shift'>('attendance');
+  dayReasonError = signal('');
+  shiftError = signal('');
+  isLoadingShifts = signal(false);
   isSavingShift = signal(false);
   isChangeDayOpen = signal(false);
   changeDayStatus = signal<'PRESENT' | 'HALF_DAY' | 'ABSENT'>('PRESENT');
@@ -807,15 +814,16 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
           tooltip = record.clockIn ? 'Half Day' : 'Half Day (set from Team Timeline)';
           countsPresent = true;
           countsWorking = !isDayOff && !holiday;
+        } else if (record && record.fieldVisit && !record.clockIn) {
+          // A scheduled field visit is Absent until the person clocks in (12 Nov 2026).
+          status = 'Absent';
+          tooltip = `Field visit at ${record.fieldVisit.location || 'site'} — not clocked in`;
+          countsWorking = !isDayOff && !holiday;
         } else if (record?.status === 'PRESENT' && !record.clockIn) {
           status = 'Present';
           tooltip = 'Present (set from Team Timeline)';
           countsPresent = true;
           countsWorking = !isDayOff && !holiday;
-        } else if (record && record.fieldVisit && !record.clockIn) {
-          status = 'Present';
-          tooltip = `Scheduled field visit at ${record.fieldVisit.location || 'site'}`;
-          countsWorking = true;
         } else if (record && record.clockIn) {
           if (this.clockOutHalfDay(record)) {
             // 19 Oct 2026, HR's rule: until the clock-out is approved the day
@@ -1553,6 +1561,14 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     return 'indigo';
   }
 
+  /** Half day / held-absent marker for a pop-up row (Today rows carry `status`, table rows `dayStatus`). */
+  kpiDayKind(r: any): 'half' | 'absent' | null {
+    const st = String(r?.status ?? r?.dayStatus ?? '').toUpperCase().replace(/\s+/g, '_');
+    if (st === 'HALF_DAY') return 'half';
+    if (st === 'ABSENT') return 'absent';
+    return null;
+  }
+
   openTodayKpi(key: string, title: string) {
     const rows = this.today()?.lists?.[key] ?? [];
     this.resetKpiModalFilters();
@@ -1764,9 +1780,9 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     if (this.isPendingVisit(r)) return 'On Meeting';
     if (r.status === 'ABSENT') return 'Absent';
     if (r.status === 'HALF_DAY') return 'Half Day';
+    // A planned field visit with no clock-in is Absent until they clock in.
+    if (!r.clockIn && (r as any).fieldVisit) return 'Absent';
     if (r.status === 'PRESENT' && !r.clockIn) return 'Present';
-    // A planned field visit with no clock-in, as the grid shows it.
-    if (!r.clockIn && (r as any).fieldVisit) return 'Present';
     if (r.clockIn) {
       if (this.clockOutHalfDay(r)) return 'Half Day';
       if (r.clockOutApproval === 'APPROVED') return 'Present';
@@ -1799,6 +1815,10 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     if (status === 'On Meeting') {
       const why = (r as any)?.clockInOutsideReason || (r as any)?.clockOutOutsideReason;
       return `Out-of-office visit awaiting Super Admin approval${why ? ' — ' + why : ''}. Present once approved.`;
+    }
+    if (status === 'Absent' && r?.fieldVisit && !r.clockIn) {
+      const fv = r.fieldVisit;
+      return `Field Visit ${fv.requestNumber || ''} at ${fv.location || 'site'} — not clocked in yet`;
     }
     if (status === 'Absent') return 'No clock-in recorded on a working day';
     if (!r) return '';
@@ -2018,6 +2038,8 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
 
   // Open Detailed Session Modal (Screenshot 3)
   openDayDetails(emp: any, day: any, record?: AttendanceRecord) {
+    this.dayTab.set('attendance');
+    this.isChangeDayOpen.set(false);
     if (day.isFuture) return;
     this.hoveredTooltip.set(null);
 
@@ -2175,6 +2197,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     const current = details.status === 'Half Day' ? 'HALF_DAY' : details.status === 'Absent' ? 'ABSENT' : 'PRESENT';
     this.changeDayStatus.set(current);
     this.changeDayReason.set('');
+    this.dayReasonError.set('');
     this.isChangeDayOpen.set(true);
   }
 
@@ -2182,7 +2205,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     const details = this.selectedDayDetails();
     const note = this.changeDayReason().trim();
     if (!details?.employeeId || !note || this.isSavingDayChange()) {
-      if (!note) this.toast.error('Please provide a reason for this change');
+      if (!note) this.dayReasonError.set('Reason is required.');
       return;
     }
     this.isSavingDayChange.set(true);
@@ -2198,35 +2221,48 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Tabs in the day pop-up: Attendance, Correct day, Change shift. */
+  selectDayTab(tab: 'attendance' | 'correct' | 'shift'): void {
+    if (tab === this.dayTab()) return;
+    this.dayTab.set(tab);
+    this.isChangeDayOpen.set(tab === 'correct');
+    if (tab === 'correct') this.openChangeDay();
+    if (tab === 'shift') this.openChangeShift();
+  }
+
   openChangeShift(): void {
     const details = this.selectedDayDetails();
     if (!details?.employeeId) return;
+    this.dayTab.set('shift');
     this.changeShiftOptions.set([]);
     this.changeShiftId.set(null);
     this.changeShiftScope.set('day');
-    // This is a replacement dialog, not a nested dialog. Keeping the day card
-    // open created a second backdrop and made the roster picker appear behind it.
-    this.isDetailsModalOpen.set(false);
-    if (this.activeDurationTick) {
-      clearInterval(this.activeDurationTick);
-      this.activeDurationTick = null;
-    }
-    this.isChangeShiftOpen.set(true);
+    this.shiftError.set('');
+    this.isLoadingShifts.set(true);
     const date = this.getBackendDateString(details.date);
     this.shiftsService.getRoster({ start: date, end: date, employeeId: details.employeeId }).subscribe({
       next: grid => {
+        this.isLoadingShifts.set(false);
         this.changeShiftOptions.set(grid.shifts || []);
         const cell = grid.rows[0]?.cells[0];
-        this.changeShiftId.set(cell?.shift?.id ?? grid.shifts?.[0]?.id ?? null);
+        this.changeShiftId.set(cell?.shift?.id ?? null);
       },
-      error: () => this.toast.error('Could not load shifts'),
+      error: () => { this.isLoadingShifts.set(false); this.shiftError.set('Could not load shifts.'); },
     });
+  }
+
+  /** Step 2 goes back to step 1; step 1 closes and reopens the day pop-up. */
+  changeShiftBack(): void {
+    if (this.changeShiftStep() === 'shift') { this.changeShiftStep.set('scope'); return; }
+    this.isChangeShiftOpen.set(false);
+    if (this.selectedDayDetails()) this.isDetailsModalOpen.set(true);
   }
 
   saveShiftChange(): void {
     const details = this.selectedDayDetails();
     const shiftId = this.changeShiftId();
-    if (!details?.employeeId || !shiftId || this.isSavingShift()) return;
+    if (!shiftId) { this.shiftError.set('Select a shift.'); return; }
+    if (!details?.employeeId || this.isSavingShift()) return;
     this.isSavingShift.set(true);
     const request = this.changeShiftScope() === 'permanent'
       ? this.shiftsService.assignPermanent({ employeeId: details.employeeId, shiftId })
@@ -2235,12 +2271,13 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
       next: () => {
         this.isSavingShift.set(false);
         this.isChangeShiftOpen.set(false);
+        this.dayTab.set('attendance');
         this.toast.success(this.changeShiftScope() === 'permanent' ? 'Standing shift updated' : 'Shift changed for this day');
         this.load();
       },
       error: (error: any) => {
         this.isSavingShift.set(false);
-        this.toast.error(error?.error?.message || 'Could not change shift');
+        this.shiftError.set(error?.error?.message || 'Could not change shift.');
       },
     });
   }

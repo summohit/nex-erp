@@ -154,7 +154,7 @@ export class FieldVisitEarlyReleaseService {
     const r = await this.prisma.fieldVisitEarlyRelease.findFirst({ where: { id, companyId: v.companyId } });
     if (!r) throw new NotFoundException('Request not found');
     if (r.status !== 'PENDING') throw new BadRequestException('This request is already decided');
-    if (r.employeeId === v.employeeId) throw new ForbiddenException('You cannot decide your own request');
+    if (r.employeeId === v.employeeId && v.role !== 'SUPERADMIN') throw new ForbiddenException('You cannot decide your own request');
     if (!(await this.mayDecide(v, r.requestId))) throw new ForbiddenException("Only the project's manager or the super admin can decide this");
     const note = String(body?.note ?? '').trim() || null;
     const visit = await this.prisma.fieldVisitRequest.findUnique({ where: { id: r.requestId }, select: { requestNumber: true } });

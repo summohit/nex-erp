@@ -51,6 +51,9 @@ export interface SidebarModule {
   items: SidebarSubItem[];
 }
 
+// The self-service attendance routes attendanceLandingGuard sends Super Admin and HR on to /attendance/all.
+const ATTENDANCE_SELF_ROUTES = new Set(['/attendance/attendance', '/attendance/my-attendance', '/attendance/timesheets']);
+
 @Component({
   selector: 'app-sidebar-v2',
   standalone: true,
@@ -109,7 +112,11 @@ export class SidebarComponentV2 implements OnInit {
       for (const sub of mod.items) {
         if (!sub.route || sub.external) continue;
         const hit = path === sub.route || path.startsWith(sub.route + '/')
-          || (sub.id === 'attendance/leaves' && LEAVE_MENU_ROUTES.has(path));
+          || (sub.id === 'attendance/leaves' && LEAVE_MENU_ROUTES.has(path))
+          // Super Admin and HR are sent from the Attendance item's own route to
+          // the company-wide /attendance/all, so that item must light up there
+          // too (12 Nov 2026; the v1 sidebar already did this).
+          || (path === '/attendance/all' && ATTENDANCE_SELF_ROUTES.has(sub.route));
         if (hit && (!best || sub.route.length > best.route.length)) best = sub;
       }
     }
@@ -141,6 +148,12 @@ export class SidebarComponentV2 implements OnInit {
   /** The panel shows only when open and the module has pages to list (or the all-modules view is on). */
   drawerVisible = computed(() => !this.isDrawerCollapsed()
     && (this.viewMode() === 'tree' || !!this.currentActiveModule()?.items.length));
+
+  /** Tell the header whether there is a sub-menu to toggle (12 Nov 2026). */
+  private subMenuSync = effect(() => {
+    const items = this.currentActiveModule()?.items ?? [];
+    this.layout.hasSubMenu.set(items.length > 1 || (items.length === 1 && !!items[0].external));
+  });
 
   private bodyClassSync = effect(() => {
     document.body.classList.toggle('sidebar-collapsed', !this.drawerVisible());
@@ -221,6 +234,10 @@ export class SidebarComponentV2 implements OnInit {
     if (localStorage.getItem('sidebar_collapsed') === 'false') this.isDrawerCollapsed.set(false);
     this.currentPath.set(this.router.url.split('?')[0]);
 
+    window.addEventListener('sidebar-toggle', (e: any) => {
+      this.isDrawerCollapsed.set(e.detail?.collapsed ?? true);
+    });
+
     this.router.events.pipe(
       filter(event => event instanceof NavigationEnd)
     ).subscribe((event: any) => {
@@ -257,6 +274,11 @@ export class SidebarComponentV2 implements OnInit {
     this.activeModuleId.set(mod.id);
     this.viewMode.set('single');
     this.setDrawer(false);
+    // Open the module's first page too (12 Nov 2026), unless we are already on
+    // one of its pages.
+    const onOwnPage = mod.items.some(s => s.id === this.activeSubId());
+    const first = mod.items.find(s => !s.external && s.route && s.route !== '/careers');
+    if (!onOwnPage && first?.route) this.router.navigate([first.route]);
   }
 
   toggleDrawer() {
@@ -279,6 +301,9 @@ export class SidebarComponentV2 implements OnInit {
 
   onItemClick(item: SidebarSubItem, event: Event) {
     if (item.external || item.route === '/careers') {
+      // Stop the link's own navigation, or this tab follows it too while the
+      // new tab opens (12 Nov 2026).
+      event.preventDefault();
       let route = item.route;
       // The public careers page is addressed by the company id.
       if (item.route === '/careers' && this.user()?.companyId) route = `/careers/${btoa(String(this.user().companyId))}`;

@@ -1,69 +1,23 @@
 <div class="page-container">
-  <!-- TOP BREADCRUMB & CONTEXT NAVIGATION -->
-  <div class="ats-breadcrumb-bar">
-    <div class="breadcrumb-left">
-      <a routerLink="/recruitment/candidates" class="btn-back-to-job">
-        <svg lucideArrowLeft size="14"></svg>
-        <span>Back to Candidates</span>
-      </a>
-
-      <!-- Breadcrumbs Trail -->
-      <nav class="ats-breadcrumbs">
-        <a class="crumb-link" routerLink="/recruitment/job-postings">Recruitment</a>
-        <svg lucideChevronRight size="13" class="crumb-sep"></svg>
-        <a class="crumb-link" routerLink="/recruitment/candidates">Candidates (ATS)</a>
-        <svg lucideChevronRight size="13" class="crumb-sep"></svg>
-        <span class="crumb-current">My Interviews</span>
-      </nav>
-    </div>
-  </div>
-
-  <!-- ── 1. Compact Horizontal Hero Banner ──────────────────────────────────── -->
-  <div class="iv-hero-banner">
-    <div class="iv-hero-left">
-      <div class="iv-hero-icon">
-        <svg lucideCalendar size="22"></svg>
-      </div>
-      <div class="iv-hero-text">
-        <div class="iv-title-row">
-          <h1>My Interviews</h1>
-          <span class="iv-status-pill assigned">{{ stats().total }} Assigned</span>
-          <span class="iv-status-pill review" *ngIf="stats().needsReview > 0">
-            {{ stats().needsReview }} Needs Feedback
-          </span>
-          <span class="iv-status-pill upcoming" *ngIf="stats().upcoming > 0">
-            {{ stats().upcoming }} Upcoming
-          </span>
-        </div>
-        <p class="iv-subtitle">
-          Review candidate profiles, access interview links, and submit scorecard evaluations.
-        </p>
-      </div>
-    </div>
-
-    <div class="iv-hero-right">
-      <div class="iv-date-pills">
-        <span class="date-pills-label">Period</span>
-        <button type="button" class="date-pill" [class.active]="dateFilter() === 'all'" (click)="onDateFilterChange('all')">All</button>
-        <button type="button" class="date-pill" [class.active]="dateFilter() === 'today'" (click)="onDateFilterChange('today')">Today</button>
-        <button type="button" class="date-pill" [class.active]="dateFilter() === 'this_week'" (click)="onDateFilterChange('this_week')">Week</button>
-        <button type="button" class="date-pill" [class.active]="dateFilter() === 'last_30'" (click)="onDateFilterChange('last_30')">30d</button>
-        <button type="button" class="date-pill" [class.active]="dateFilter() === 'last_90'" (click)="onDateFilterChange('last_90')">90d</button>
-      </div>
-
-      <button type="button" class="iv-btn-refresh" (click)="fetchMyInterviews()" [disabled]="isLoading()">
-        <svg lucideRotateCcw size="14" [class.spin-anim]="isLoading()"></svg>
-        <span>Refresh</span>
+  <!-- Page header (12 Nov 2026): the shared header, as on the other recruitment pages -->
+  <app-page-header icon="calendar" section="Recruitment" heading="My Interviews"
+    [subtitle]="stats().total + ' assigned' + (stats().needsReview ? ' · ' + stats().needsReview + ' need feedback' : '')"
+    [showBack]="true" backLabel="Back to Candidates (ATS)" (back)="goToCandidates()">
+    <div class="view-switch-pills">
+      <button type="button" class="pill-btn" [class.active]="viewMode() === 'cards'" (click)="setViewMode('cards')" title="Board view">
+        <svg lucideLayoutGrid size="14"></svg><span>Board</span>
       </button>
-      <div class="iv-view-switch" role="group" aria-label="Interview layout">
-        <button type="button" [class.active]="viewMode() === 'cards'" (click)="setViewMode('cards')">Cards</button>
-        <button type="button" [class.active]="viewMode() === 'table'" (click)="setViewMode('table')">Table</button>
-      </div>
-      <button type="button" class="iv-btn-add" (click)="openScheduleInterview()">
-        <span>+</span> Add Interview
+      <button type="button" class="pill-btn" [class.active]="viewMode() === 'table'" (click)="setViewMode('table')" title="Table view">
+        <svg lucideTable size="14"></svg><span>Table</span>
       </button>
     </div>
-  </div>
+    <button type="button" class="iv-btn-refresh" (click)="fetchMyInterviews()" [disabled]="isLoading()">
+      <svg lucideRotateCcw size="14" [class.spin-anim]="isLoading()"></svg><span>Refresh</span>
+    </button>
+    <button type="button" class="iv-btn-add" (click)="openScheduleInterview()">
+      <span>+</span> Add interview
+    </button>
+  </app-page-header>
 
   <!-- ── 2. Interactive KPI Strip ───────────────────────────────────────────── -->
   <div class="iv-kpi-strip">
@@ -129,10 +83,10 @@
 
     <button
       type="button"
-      class="iv-kpi-card tone-slate"
+      class="iv-kpi-card tone-rose"
       [class.active]="activeTab() === 'cancelled'"
       (click)="setTab('cancelled')">
-      <div class="kpi-icon-box"><svg lucideX size="19"></svg></div>
+      <div class="kpi-icon-box"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></div>
       <div class="kpi-meta">
         <span class="kpi-label">Cancelled</span>
         <strong class="kpi-val">{{ stats().cancelled }}</strong>
@@ -141,146 +95,31 @@
     </button>
   </div>
 
-  <!-- ── 3. Unified Search & Filter Toolbar Card ────────────────────────────── -->
-  <div class="iv-toolbar-card">
-    <div class="iv-toolbar-top">
-      <!-- Search Input -->
-      <div class="iv-search-box">
-        <svg lucideSearch size="15" class="search-ico"></svg>
-        <input
-          type="text"
-          placeholder="Search candidate name, email, job title, or round…"
-          [ngModel]="searchText()"
-          (ngModelChange)="searchText.set($event)" />
-        <button *ngIf="searchText()" type="button" class="btn-clear-search" (click)="clearSearch()" title="Clear search">
-          <svg lucideX size="14"></svg>
-        </button>
-      </div>
-
-      <!-- Status Filter Pills -->
-      <div class="iv-filter-pills">
-        <button type="button" class="iv-pill" [class.on]="activeTab() === 'all'" (click)="setTab('all')">
-          <span>All</span>
-          <span class="pill-count">{{ stats().total }}</span>
-        </button>
-        <button type="button" class="iv-pill" [class.on]="activeTab() === 'upcoming'" (click)="setTab('upcoming')">
-          <span>Upcoming</span>
-          <span class="pill-count">{{ stats().upcoming }}</span>
-        </button>
-        <button type="button" class="iv-pill" [class.on]="activeTab() === 'needs-review'" (click)="setTab('needs-review')">
-          <span>Needs Feedback</span>
-          <span class="pill-count">{{ stats().needsReview }}</span>
-        </button>
-        <button type="button" class="iv-pill" [class.on]="activeTab() === 'completed'" (click)="setTab('completed')">
-          <span>Completed</span>
-          <span class="pill-count">{{ stats().completed }}</span>
-        </button>
-        <button type="button" class="iv-pill" [class.on]="activeTab() === 'cancelled'" (click)="setTab('cancelled')">
-          <span>Cancelled</span>
-          <span class="pill-count">{{ stats().cancelled }}</span>
-        </button>
-      </div>
+  <!-- Filters (12 Nov 2026): one standard row; the status cards above are the tabs -->
+  <div class="iv-toolbar-card iv-filter-row">
+    <div class="iv-search-box">
+      <svg lucideSearch size="15" class="search-ico"></svg>
+      <input type="text" placeholder="Search candidate, job or round" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
     </div>
-
-    <div class="iv-toolbar-bottom">
-      <div class="iv-filters-left">
-        <!-- Date Period Select -->
-        <select
-          class="iv-select"
-          [ngModel]="dateFilter()"
-          (ngModelChange)="onDateFilterChange($event)"
-          aria-label="Filter by period">
-          <option value="all">All Dates</option>
-          <option value="today">Today</option>
-          <option value="this_week">This Week</option>
-          <option value="this_month">This Month</option>
-          <option value="last_month">Last Month</option>
-          <option value="last_30">Last 30 Days</option>
-          <option value="last_90">Last 90 Days</option>
-          <option value="this_year">This Year</option>
-          <option value="last_year">Last Year</option>
-          <option value="custom">Custom Range</option>
-        </select>
-
-        <!-- Custom Date Range Picker (From -> To) -->
-        <div class="iv-date-range-box" [class.has-dates]="customStartDate() || customEndDate()">
-          <svg lucideCalendar size="14" class="date-range-ico"></svg>
-          <span class="date-range-lbl">From</span>
-          <input
-            type="date"
-            class="date-range-input"
-            [ngModel]="customStartDate()"
-            (ngModelChange)="onStartDateChange($event)"
-            [max]="customEndDate() || ''"
-            aria-label="From date" />
-          <span class="date-range-sep">→</span>
-          <span class="date-range-lbl">To</span>
-          <input
-            type="date"
-            class="date-range-input"
-            [ngModel]="customEndDate()"
-            (ngModelChange)="onEndDateChange($event)"
-            [min]="customStartDate() || ''"
-            aria-label="To date" />
-          <button
-            type="button"
-            class="btn-clear-dates"
-            *ngIf="customStartDate() || customEndDate()"
-            (click)="clearCustomDates()"
-            title="Clear date range">
-            <svg lucideX size="13"></svg>
-          </button>
-        </div>
-
-        <select class="iv-select" [ngModel]="interviewerFilter()" (ngModelChange)="interviewerFilter.set($event)" aria-label="Filter by interviewer">
-          <option value="">All interviewers</option>
-          <option *ngFor="let interviewer of availableInterviewers()" [value]="interviewer.id">{{ interviewer.name }}</option>
-        </select>
-
-        <!-- Job Role Filter -->
-        <select
-          class="iv-select"
-          [ngModel]="jobFilter()"
-          (ngModelChange)="jobFilter.set($event)"
-          aria-label="Filter by job role">
-          <option value="">All Job Roles</option>
-          <option *ngFor="let j of availableJobs()" [value]="j">{{ j }}</option>
-        </select>
-
-        <!-- Interview Round Filter -->
-        <select
-          class="iv-select"
-          [ngModel]="roundFilter()"
-          (ngModelChange)="roundFilter.set($event)"
-          aria-label="Filter by interview round">
-          <option value="">All Rounds</option>
-          <option *ngFor="let r of availableRounds()" [value]="r">{{ r }}</option>
-        </select>
-
-        <!-- Sort Button (Newest First / Oldest First) -->
-        <button type="button" class="iv-btn-sort" (click)="toggleSort()" title="Toggle sort order">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m21 16-4 4-4-4"></path>
-            <path d="M17 20V4"></path>
-            <path d="m3 8 4-4 4 4"></path>
-            <path d="M7 4v16"></path>
-          </svg>
-          <span>{{ sortOrder() === 'NEWEST' ? 'Newest First' : 'Oldest First' }}</span>
-        </button>
-
-        <!-- Reset All Filters -->
-        <button type="button" class="iv-btn-reset" *ngIf="hasActiveFilters()" (click)="resetAllFilters()">
-          <svg lucideRotateCcw size="13"></svg>
-          <span>Reset Filters</span>
-        </button>
-      </div>
-
-      <div class="iv-toolbar-right">
-        <span class="iv-showing-label">
-          Showing <strong>{{ filteredInterviews().length }}</strong> of <strong>{{ stats().total }}</strong>
-        </span>
-      </div>
+    <div class="iv-field">
+      <app-searchable-select [options]="interviewerOptions()" placeholder="All interviewers"
+        [value]="interviewerFilter() || null" [clearable]="true" (valueChange)="interviewerFilter.set($event || '')"></app-searchable-select>
     </div>
+    <div class="iv-field">
+      <app-searchable-select [options]="jobOptions()" placeholder="All job roles"
+        [value]="jobFilter() || null" [clearable]="true" (valueChange)="jobFilter.set($event || '')"></app-searchable-select>
+    </div>
+    <div class="iv-field">
+      <app-searchable-select [options]="roundOptions()" placeholder="All rounds"
+        [value]="roundFilter() || null" [clearable]="true" (valueChange)="roundFilter.set($event || '')"></app-searchable-select>
+    </div>
+    <app-date-preset-filter label="Scheduled" [preset]="datePreset()" (presetChange)="datePreset.set($event)" (rangeChange)="onDateRange($event)"></app-date-preset-filter>
+    <button type="button" class="iv-btn-sort" (click)="toggleSort()" title="Toggle sort order">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg>
+      <span>{{ sortOrder() === 'NEWEST' ? 'Newest first' : 'Oldest first' }}</span>
+    </button>
+    <button type="button" class="clear-all-filters" *ngIf="hasActiveFilters()" (click)="resetAllFilters(); datePreset.set('ALL')">Clear all</button>
+    <span class="iv-showing-label">Showing <strong>{{ filteredInterviews().length }}</strong> of <strong>{{ stats().total }}</strong></span>
   </div>
 
   <!-- Main Content Grid -->
@@ -419,34 +258,20 @@
       </div>
     </div>
 
-    <div class="interviews-table-wrap" *ngIf="filteredInterviews().length > 0 && viewMode() === 'table'">
-      <table class="interviews-table">
-        <thead>
-          <tr>
-            <th>Scheduled</th>
-            <th>Candidate</th>
-            <th>Job</th>
-            <th>Round</th>
-            <th>Interviewer</th>
-            <th>Duration</th>
-            <th>Status</th>
-            <th class="table-action-head">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let interview of filteredInterviews()" (click)="openCandidateDetails(interview)" tabindex="0" (keydown.enter)="openCandidateDetails(interview)">
-            <td class="table-date"><strong>{{ interview.scheduledAt | date:'dd MMM yyyy':'Asia/Kolkata' }}</strong><span>{{ interview.scheduledAt | date:'shortTime':'Asia/Kolkata' }} IST</span></td>
-            <td><button type="button" class="table-candidate" (click)="openCandidateDetails(interview); $event.stopPropagation()"><span class="table-avatar" [style.backgroundColor]="getAvatarBg(interview.application?.fullName)">{{ getInitials(interview.application?.fullName) }}</span><span><strong>{{ interview.application?.fullName || 'Candidate' }}</strong><small>{{ interview.application?.email }}</small></span></button></td>
-            <td><button type="button" class="table-job-link" (click)="openJobDetails(interview); $event.stopPropagation()">{{ interview.application?.job?.title || '—' }}</button></td>
-            <td>{{ interview.title || 'Technical Evaluation' }}</td>
-            <td>{{ interview.interviewer?.firstName }} {{ interview.interviewer?.lastName }}</td>
-            <td>{{ interview.durationMins || 30 }} mins</td>
-            <td><span class="table-status" [ngClass]="interviewStatus(interview).toLowerCase().replace('_', '-')">{{ interviewStatusLabel(interview) }}</span></td>
-            <td class="table-actions"><a *ngIf="interview.locationUrl" [href]="interview.locationUrl.startsWith('http') ? interview.locationUrl : 'https://' + interview.locationUrl" target="_blank" (click)="$event.stopPropagation()">Join</a><button type="button" (click)="openFeedbackModal(interview); $event.stopPropagation()">{{ interview.rating ? 'Edit feedback' : 'Feedback' }}</button></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <!-- Table (12 Nov 2026): the same grid as the Employee Directory — sortable,
+         filterable and resizable columns, pinned headings, page sizes. -->
+    <ag-grid-angular *ngIf="filteredInterviews().length > 0 && viewMode() === 'table'"
+      class="ag-theme-quartz iv-grid"
+      style="width: 100%; height: calc(100vh - 230px); min-height: 480px;"
+      [rowData]="filteredInterviews()"
+      [columnDefs]="gridColumns"
+      [defaultColDef]="gridDefaultColDef"
+      [pagination]="true"
+      [paginationPageSize]="gridPageSize"
+      [paginationPageSizeSelector]="gridPageSizes"
+      [gridOptions]="gridOptions"
+      [theme]="'legacy'">
+    </ag-grid-angular>
 
     <!-- Empty State -->
     <div class="empty-state-card" *ngIf="filteredInterviews().length === 0">
@@ -607,3 +432,6 @@
     </div>
   </div>
 </div>
+
+<!-- Application Details drawer (12 Nov 2026): the Candidates (ATS) drawer, opened in place -->
+<app-candidates *ngIf="drawerAppId() as appId" [drawerOnly]="true" [openApplicationId]="appId" (drawerClosed)="drawerAppId.set(null); fetchMyInterviews()"></app-candidates>

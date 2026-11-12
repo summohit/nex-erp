@@ -2,7 +2,7 @@
   min-height: 100vh;
   background-color: #f8fafc;
   color: #0f172a;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   display: flex;
   flex-direction: column;
 }

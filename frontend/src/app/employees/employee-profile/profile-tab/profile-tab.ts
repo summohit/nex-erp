@@ -258,7 +258,12 @@ export class ProfileTabComponent implements OnInit {
     return shift?.startTime && shift?.endTime ? `${shift.startTime} – ${shift.endTime}` : 'Use Change shift to assign one';
   }
 
+  shiftPickError = '';
+  shiftDateError = '';
+
   openShiftChange() {
+    this.shiftPickError = '';
+    this.shiftDateError = '';
     const current = this.employeeData?.shift;
     const matchingShift = this.companyShifts.find(s =>
       String(s.id) === String(current?.id) || (!!current?.name && s.name === current.name)
@@ -274,8 +279,11 @@ export class ProfileTabComponent implements OnInit {
   saveShiftChange() {
     const employeeId = this.employeeData?.id;
     const { shiftId, mode, start, end } = this.shiftChange;
-    if (!employeeId || !shiftId) { this.toast.error('Please choose a shift'); return; }
-    if (mode === 'DATES' && (!start || !end || start > end)) { this.toast.error('Choose a valid start and end date'); return; }
+    this.shiftPickError = shiftId ? '' : 'Select a shift.';
+    this.shiftDateError = mode !== 'DATES' ? ''
+      : (!start || !end) ? 'Choose both From and To dates.'
+      : start > end ? 'To date must be on or after From date.' : '';
+    if (!employeeId || !shiftId || this.shiftPickError || this.shiftDateError) return;
     this.shiftSaving = true;
     const request = mode === 'PERMANENT'
       ? this.shiftsService.assignPermanent({ employeeId, shiftId })
@@ -288,7 +296,7 @@ export class ProfileTabComponent implements OnInit {
         this.isShiftChangeOpen = false;
         this.refreshProfile.emit();
       },
-      error: () => { this.shiftSaving = false; this.toast.error('Unable to update shift. Please try again.'); }
+      error: (err: any) => { this.shiftSaving = false; this.shiftPickError = err?.error?.message || 'Unable to update shift. Please try again.'; }
     });
   }
 

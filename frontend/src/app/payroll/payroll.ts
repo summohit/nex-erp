@@ -15,6 +15,7 @@ import { ActionCellRendererComponent } from '../shared/components/action-cell-re
 import { ExpenseActionCellRendererComponent } from '../shared/components/expense-action-cell-renderer.component';
 import { ExpenseStatusCellRendererComponent } from '../shared/components/expense-status-cell-renderer.component';
 import { SearchableSelectComponent, SearchableSelectOption } from '../shared/components/searchable-select/searchable-select.component';
+import { PageHeaderComponent } from '../shared/components/page-header/page-header';
 import { UploadService } from '../services/upload.service';
 import { 
   LucideFilter, 
@@ -40,6 +41,7 @@ import { ExpenseReceiptCellRendererComponent } from '../shared/components/expens
     LucideX,
     MatMenuModule,
     SearchableSelectComponent,
+    PageHeaderComponent,
     ExpenseStatusCellRendererComponent,
     ExpenseActionCellRendererComponent,
     ExpenseReceiptCellRendererComponent
@@ -70,6 +72,66 @@ export class PayrollComponent implements OnInit {
   ];
 
   years = [2024, 2025, 2026, 2027];
+
+  monthOptions = computed<SearchableSelectOption[]>(() =>
+    this.months.map(m => ({ id: m.id, name: m.name }))
+  );
+
+  yearOptions: SearchableSelectOption[] = this.years.map(y => ({ id: y, name: String(y) }));
+
+  onSelectMonth(val: any) {
+    if (!val) return;
+    this.selectedMonth.set(+val);
+    this.onPeriodChange();
+  }
+
+  onSelectYear(val: any) {
+    if (!val) return;
+    this.selectedYear.set(+val);
+    this.onPeriodChange();
+  }
+
+  expenseStatusOptions: SearchableSelectOption[] = [
+    { id: 'ALL', name: 'All Statuses' },
+    { id: 'PENDING', name: 'Pending' },
+    { id: 'APPROVED', name: 'Approved' },
+    { id: 'PAID', name: 'Paid' },
+    { id: 'REJECTED', name: 'Rejected' }
+  ];
+
+  processingFiltersOpen = signal<boolean>(false);
+  processingExtraFilterCount = computed(() =>
+    (this.processingDesigFilter() !== 'ALL' ? 1 : 0) +
+    (this.processingGroupFilter() !== 'ALL' ? 1 : 0) +
+    (this.processingLopFilter() !== 'ALL' ? 1 : 0)
+  );
+
+  hasActiveStructureFilters = computed(() =>
+    this.salaryTableSearchQuery().trim() !== '' ||
+    this.salaryTableDeptFilter() !== 'ALL' ||
+    this.salaryTableDesigFilter() !== 'ALL' ||
+    this.salaryTableStatusFilter() !== 'ALL' ||
+    this.salaryTableGradeFilter() !== 'ALL'
+  );
+
+  clearStructureFilters() {
+    this.salaryTableSearchQuery.set('');
+    this.salaryTableDeptFilter.set('ALL');
+    this.salaryTableDesigFilter.set('ALL');
+    this.salaryTableStatusFilter.set('ALL');
+    this.salaryTableGradeFilter.set('ALL');
+  }
+
+  formatStatusLabel(status?: string): string {
+    const s = (status || 'DRAFT').toUpperCase();
+    if (s === 'DRAFT') return 'Draft';
+    if (s === 'FINALIZED') return 'Finalized';
+    if (s === 'PAID') return 'Paid';
+    if (s === 'PENDING') return 'Pending';
+    if (s === 'APPROVED') return 'Approved';
+    if (s === 'REJECTED') return 'Rejected';
+    return status || 'Draft';
+  }
 
   // Data signals
   payslips = signal<Payslip[]>([]);

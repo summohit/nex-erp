@@ -334,7 +334,7 @@ type StatusFilter = 'ALL' | 'APPROVED' | 'PENDING' | 'ASSIGNED' | 'REJECTED';
   styles: [`
     .wfh-page {
       padding: 24px;
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
       display: flex;
       flex-direction: column;
       gap: 18px;

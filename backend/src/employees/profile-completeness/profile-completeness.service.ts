@@ -31,7 +31,7 @@ export interface Completeness {
 export interface ProfileLock { enabled: boolean; from: string | null; active: boolean }
 
 const SELECT = {
-  id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true,
+  id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true, joiningDate: true,
   phone: true, gender: true, dateOfBirth: true, address: true,
   employmentType: true, firstJob: true, profileExempt: true,
   user: { select: { email: true, status: true } },
@@ -116,7 +116,7 @@ export class ProfileCompletenessService {
 
   /** HR, admins and the super admin turn the lock on or off and set its start date. */
   async setLock(companyId: number, role: string, body: { enabled?: boolean; from?: string | null }): Promise<ProfileLock> {
-    if (!isHrAdmin(role)) throw new ForbiddenException('Only HR and admins can change the profile lock');
+    if (role !== 'SUPERADMIN') throw new ForbiddenException('Only the Super Admin can change the profile lock');
     const from = body?.from && /^\d{4}-\d{2}-\d{2}$/.test(body.from)
       // The date in IST: the lock starts at midnight India time on that day.
       ? new Date(`${body.from}T00:00:00+05:30`)
@@ -134,7 +134,7 @@ export class ProfileCompletenessService {
    * EXEMPT_EMAILS, plus anyone HR has excused from the Profile Completion page.
    */
   async listExempt(companyId: number, role: string) {
-    if (!isHrAdmin(role)) throw new ForbiddenException('Only HR and admins can manage exemptions');
+    if (role !== 'SUPERADMIN') throw new ForbiddenException('Only the Super Admin can manage exemptions');
     const emps = await this.prisma.employee.findMany({
       where: { companyId, OR: [{ profileExempt: true }, { user: { email: { in: [...EXEMPT_EMAILS], mode: 'insensitive' } } }] },
       select: {
@@ -152,7 +152,7 @@ export class ProfileCompletenessService {
   }
 
   async setExempt(companyId: number, role: string, employeeId: number, exempt: boolean) {
-    if (!isHrAdmin(role)) throw new ForbiddenException('Only HR and admins can manage exemptions');
+    if (role !== 'SUPERADMIN') throw new ForbiddenException('Only the Super Admin can manage exemptions');
     const res = await this.prisma.employee.updateMany({ where: { id: employeeId, companyId }, data: { profileExempt: !!exempt } });
     if (!res.count) throw new BadRequestException('Employee not found');
     return this.listExempt(companyId, role);
@@ -167,7 +167,7 @@ export class ProfileCompletenessService {
 
   /** Everyone's status, for HR: who is incomplete, what is missing, their manager. */
   async report(companyId: number, role: string) {
-    if (!isHrAdmin(role)) throw new ForbiddenException('Only HR and admins can see profile completion');
+    if (role !== 'SUPERADMIN') throw new ForbiddenException('Only the Super Admin can see profile completion');
     const emps = await this.prisma.employee.findMany({
       where: { companyId, user: { status: { not: 'SUSPENDED' } } },
       select: SELECT,
@@ -180,6 +180,7 @@ export class ProfileCompletenessService {
           id: e.id, firstName: e.firstName, lastName: e.lastName, employeeCode: e.employeeCode,
           email: e.user?.email, department: e.department?.name ?? null, designation: e.designation?.name ?? null,
           avatarUrl: e.avatarUrl ?? null,
+          joiningDate: (e as any).joiningDate ?? null,
         },
         manager: e.manager ? `${e.manager.firstName} ${e.manager.lastName ?? ''}`.trim() : null,
         exempt: c.exempt, complete: c.complete, firstJob: c.firstJob,

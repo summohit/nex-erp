@@ -1,234 +1,455 @@
-<div class="appreciation-container">
-  <!-- Top Banner Header -->
-  <div class="page-header-card">
-    <div class="header-title-group">
-      <h2>Appreciation & Awards</h2>
-      <p>Recognize employee excellence, celebrate company achievements, and manage award honors.</p>
-    </div>
-  </div>
+<div class="page-container">
 
-  <!-- KPI Summary Cards -->
-  <div class="kpi-grid">
-    <div class="kpi-card">
-      <div class="kpi-icon bg-orange">
-        <svg lucideTrophy size="22"></svg>
-      </div>
-      <div class="kpi-info">
-        <div class="kpi-title">Total Appreciations</div>
-        <div class="kpi-value">{{ appreciations().length }}</div>
-        <div class="kpi-subtext">Awarded Honors</div>
-      </div>
-    </div>
+  <!-- ── 1. Standard MIRA Page Header ────────────────────────────────────── -->
+  <app-page-header 
+    icon="trophy" 
+    section="HR & Team" 
+    heading="Appreciation & Awards" 
+    subtitle="Recognize employee excellence, celebrate company achievements, and manage award honors.">
 
-    <div class="kpi-card">
-      <div class="kpi-icon bg-purple">
-        <svg lucideRibbon size="22"></svg>
-      </div>
-      <div class="kpi-info">
-        <div class="kpi-title">Award Categories</div>
-        <div class="kpi-value">{{ awardTypes().length }}</div>
-        <div class="kpi-subtext">Active Categories</div>
-      </div>
-    </div>
-
-    <div class="kpi-card">
-      <div class="kpi-icon bg-green">
-        <svg lucideStar size="22"></svg>
-      </div>
-      <div class="kpi-info">
-        <div class="kpi-title">Latest Honoree</div>
-        <div class="kpi-value" style="font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-          {{ appreciations()[0]?.employee?.firstName || 'None' }} {{ appreciations()[0]?.employee?.lastName || '' }}
-        </div>
-        <div class="kpi-subtext">{{ appreciations()[0]?.awardType?.title || 'No awards yet' }}</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Directory Header Row -->
-  <div class="directory-header" style="justify-content: flex-end;">
-    <div class="header-actions-group">
-      <!-- Pill Switch -->
-      <div class="pill-toggle">
-        <button [class.active]="activeTab() === 'list'" (click)="setTab('list')">
-          <svg lucideTrophy size="16"></svg>
-          <span>Appreciations</span>
-        </button>
-        <button [class.active]="activeTab() === 'types'" (click)="setTab('types')">
-          <svg lucideRibbon size="16"></svg>
-          <span>Categories</span>
-        </button>
-      </div>
-
-      <!-- Export Button (Compact) -->
-      <button class="btn btn-outline" (click)="exportToCsv()" style="display: flex; align-items: center; gap: 6px;">
-        <svg lucideDownload size="15"></svg>
-        <span>Export</span>
+    <!-- View switch: Appreciations | Categories pills -->
+    <div class="view-switch-pills">
+      <button 
+        type="button" 
+        class="pill-btn" 
+        [class.active]="activeTab() === 'list'" 
+        (click)="setTab('list')" 
+        title="Appreciations">
+        <svg lucideTrophy size="14"></svg>
+        <span>Appreciations</span>
       </button>
-
-      <!-- Admin Actions -->
-      <button *ngIf="isAdmin() && activeTab() === 'list'" class="btn-primary-sm" (click)="openGiveModal()">
-        <svg lucidePlus size="16"></svg>
-        <span>Give Appreciation</span>
-      </button>
-
-      <button *ngIf="isAdmin() && activeTab() === 'types'" class="btn-primary-sm" (click)="openAddTypeModal()">
-        <svg lucidePlus size="16"></svg>
-        <span>Add Category</span>
+      <button 
+        type="button" 
+        class="pill-btn" 
+        [class.active]="activeTab() === 'types'" 
+        (click)="setTab('types')" 
+        title="Categories">
+        <svg lucideRibbon size="14"></svg>
+        <span>Categories</span>
       </button>
     </div>
-  </div>
 
-  <!-- MAIN CARD CONTAINER -->
-  <div class="widget-card" style="padding: 0;">
-    <!-- TAB 1: APPRECIATIONS LIST AG GRID -->
-    <div *ngIf="activeTab() === 'list'" style="width: 100%; height: 520px;" class="grid-wrapper">
-      <ag-grid-angular
-        class="ag-theme-quartz"
-        [theme]="'legacy'"
-        style="width: 100%; height: 100%;"
-        [rowData]="appreciations()"
-        [columnDefs]="appreciationColDefs"
-        [defaultColDef]="defaultColDef"
-        [rowHeight]="56"
-        [headerHeight]="48"
-        (cellClicked)="onCellClicked($event)">
-      </ag-grid-angular>
+    <!-- Outlined secondary buttons -->
+    <button type="button" class="btn-secondary" (click)="exportToCsv()" title="Export CSV" [disabled]="isLoading()">
+      <svg lucideDownload size="15"></svg>
+      <span>Export</span>
+    </button>
+
+    <!-- Rightmost blue primary button -->
+    <button 
+      type="button" 
+      *ngIf="isAdmin() && activeTab() === 'list'" 
+      class="btn-primary" 
+      (click)="openGiveModal()">
+      <svg lucidePlus size="16"></svg>
+      <span>Give Appreciation</span>
+    </button>
+
+    <button 
+      type="button" 
+      *ngIf="isAdmin() && activeTab() === 'types'" 
+      class="btn-primary" 
+      (click)="openAddTypeModal()">
+      <svg lucidePlus size="16"></svg>
+      <span>Add Category</span>
+    </button>
+  </app-page-header>
+
+  <!-- ── 2. KPI Summary Cards ─────────────────────────────────────────────── -->
+  <section class="appr-kpi-grid">
+    <!-- Card 1: Total Appreciations -->
+    <article
+      class="appr-kpi-card"
+      [class.active]="activeTab() === 'list' && filterAwardTypeId() === null"
+      (click)="setTab('list'); filterAwardTypeId.set(null)"
+      tabindex="0"
+      role="button"
+      aria-label="View all appreciations">
+      <div class="kpi-icon-box tone-blue">
+        <svg lucideTrophy size="20"></svg>
+      </div>
+      <div class="kpi-body">
+        <span class="kpi-label">TOTAL APPRECIATIONS</span>
+        <strong class="kpi-num">{{ appreciations().length }}</strong>
+        <span class="kpi-sub">Awarded Honors</span>
+      </div>
+    </article>
+
+    <!-- Card 2: Award Categories -->
+    <article
+      class="appr-kpi-card"
+      [class.active]="activeTab() === 'types'"
+      (click)="setTab('types')"
+      tabindex="0"
+      role="button"
+      aria-label="View award categories">
+      <div class="kpi-icon-box tone-purple">
+        <svg lucideRibbon size="20"></svg>
+      </div>
+      <div class="kpi-body">
+        <span class="kpi-label">AWARD CATEGORIES</span>
+        <strong class="kpi-num">{{ awardTypes().length }}</strong>
+        <span class="kpi-sub">Active Categories</span>
+      </div>
+    </article>
+
+    <!-- Card 3: Latest Honoree -->
+    <article
+      class="appr-kpi-card"
+      [class.clickable]="appreciations().length > 0"
+      (click)="appreciations().length > 0 && openDetailModal(appreciations()[0])"
+      tabindex="0"
+      role="button"
+      aria-label="View latest honoree">
+      <div class="kpi-icon-box tone-emerald">
+        <svg lucideStar size="20"></svg>
+      </div>
+      <div class="kpi-body">
+        <span class="kpi-label">LATEST HONOREE</span>
+        <strong class="kpi-num honoree-name" [title]="latestHonoreeName()">{{ latestHonoreeName() }}</strong>
+        <span class="kpi-sub">{{ latestHonoreeAward() }}</span>
+      </div>
+    </article>
+  </section>
+
+  <!-- ── 3. Single-Row Filter Bar ─────────────────────────────────────────── -->
+  <!-- Tab 1 Filters: Appreciations List -->
+  <div class="filter-card" *ngIf="activeTab() === 'list'">
+    <!-- 1. Search (always first) -->
+    <div class="filter-group search-group">
+      <svg lucideSearch size="15" class="search-icon"></svg>
+      <input
+        type="search"
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+        placeholder="Search employee, award or keyword..."
+        aria-label="Search appreciations"
+      />
+      <button 
+        type="button" 
+        class="btn-clear-search" 
+        *ngIf="searchQuery()" 
+        (click)="searchQuery.set('')" 
+        title="Clear search">
+        <svg lucideX size="13"></svg>
+      </button>
     </div>
 
-    <!-- TAB 2: AWARD TYPES AG GRID -->
-    <div *ngIf="activeTab() === 'types'" style="width: 100%; height: 520px;" class="grid-wrapper">
-      <ag-grid-angular
-        class="ag-theme-quartz"
-        [theme]="'legacy'"
-        style="width: 100%; height: 100%;"
-        [rowData]="awardTypes()"
-        [columnDefs]="awardTypeColDefs"
-        [defaultColDef]="defaultColDef"
-        [rowHeight]="56"
-        [headerHeight]="48"
-        (cellClicked)="onCellClicked($event)">
-      </ag-grid-angular>
+    <!-- 2. Award Category Dropdown -->
+    <div class="filter-group select-group">
+      <app-searchable-select
+        [options]="awardTypeOptions()"
+        placeholder="All award categories"
+        [clearable]="true"
+        [value]="filterAwardTypeId()"
+        (valueChange)="filterAwardTypeId.set($event)">
+      </app-searchable-select>
+    </div>
+
+    <!-- 3. Department Dropdown -->
+    <div class="filter-group select-group">
+      <app-searchable-select
+        [options]="departmentOptions()"
+        placeholder="All departments"
+        [clearable]="true"
+        [value]="filterDepartmentId()"
+        (valueChange)="filterDepartmentId.set($event)">
+      </app-searchable-select>
+    </div>
+
+    <!-- 4. Date Preset Filter -->
+    <app-date-preset-filter
+      label="Given"
+      [preset]="datePreset()"
+      (presetChange)="datePreset.set($event)"
+      (rangeChange)="onDateRange($event)">
+    </app-date-preset-filter>
+
+    <!-- 5. Clear all -->
+    <button 
+      type="button" 
+      class="clear-all-filters" 
+      *ngIf="hasActiveFilters()" 
+      (click)="clearFilters()">
+      Clear all
+    </button>
+
+    <!-- 6. Showing count pushed right -->
+    <div class="showing-count">
+      Showing <strong>{{ filteredAppreciations().length }}</strong> of <strong>{{ appreciations().length }}</strong>
     </div>
   </div>
 
-  <!-- APPRECIATION DETAILS DRAWER -->
+  <!-- Tab 2 Filters: Award Categories -->
+  <div class="filter-card" *ngIf="activeTab() === 'types'">
+    <!-- 1. Search (always first) -->
+    <div class="filter-group search-group">
+      <svg lucideSearch size="15" class="search-icon"></svg>
+      <input
+        type="search"
+        [ngModel]="searchCategoryQuery()"
+        (ngModelChange)="searchCategoryQuery.set($event)"
+        placeholder="Search award categories..."
+        aria-label="Search categories"
+      />
+      <button 
+        type="button" 
+        class="btn-clear-search" 
+        *ngIf="searchCategoryQuery()" 
+        (click)="searchCategoryQuery.set('')" 
+        title="Clear search">
+        <svg lucideX size="13"></svg>
+      </button>
+    </div>
+
+    <!-- 2. Status Dropdown -->
+    <div class="filter-group select-group">
+      <app-searchable-select
+        [options]="statusOptions"
+        placeholder="All statuses"
+        [clearable]="true"
+        [value]="filterCategoryStatus()"
+        (valueChange)="filterCategoryStatus.set($event)">
+      </app-searchable-select>
+    </div>
+
+    <!-- 3. Color Dropdown -->
+    <div class="filter-group select-group">
+      <app-searchable-select
+        [options]="colorOptions"
+        placeholder="All colors"
+        [clearable]="true"
+        [value]="filterCategoryColor()"
+        (valueChange)="filterCategoryColor.set($event)">
+      </app-searchable-select>
+    </div>
+
+    <!-- 4. Clear all -->
+    <button 
+      type="button" 
+      class="clear-all-filters" 
+      *ngIf="hasActiveCategoryFilters()" 
+      (click)="clearCategoryFilters()">
+      Clear all
+    </button>
+
+    <!-- 5. Showing count pushed right -->
+    <div class="showing-count">
+      Showing <strong>{{ filteredAwardTypes().length }}</strong> of <strong>{{ awardTypes().length }}</strong>
+    </div>
+  </div>
+
+  <!-- ── 4. Main Data Grid (AG Grid Quartz) ────────────────────────────────── -->
+  <div class="appr-grid-card">
+    <!-- Tab 1: Appreciations AG Grid -->
+    <ag-grid-angular
+      *ngIf="activeTab() === 'list'"
+      class="ag-theme-quartz appr-ag-grid"
+      style="width: 100%; height: calc(100vh - 230px); min-height: 480px;"
+      [rowData]="filteredAppreciations()"
+      [columnDefs]="appreciationColDefs"
+      [defaultColDef]="defaultColDef"
+      [pagination]="true"
+      [paginationPageSize]="paginationPageSize"
+      [paginationPageSizeSelector]="paginationPageSizeSelector"
+      [gridOptions]="gridOptions"
+      [theme]="'legacy'"
+      (cellClicked)="onCellClicked($event)">
+    </ag-grid-angular>
+
+    <!-- Tab 2: Award Types AG Grid -->
+    <ag-grid-angular
+      *ngIf="activeTab() === 'types'"
+      class="ag-theme-quartz appr-ag-grid"
+      style="width: 100%; height: calc(100vh - 230px); min-height: 480px;"
+      [rowData]="filteredAwardTypes()"
+      [columnDefs]="awardTypeColDefs"
+      [defaultColDef]="defaultColDef"
+      [pagination]="true"
+      [paginationPageSize]="paginationPageSize"
+      [paginationPageSizeSelector]="paginationPageSizeSelector"
+      [gridOptions]="gridOptions"
+      [theme]="'legacy'"
+      (cellClicked)="onCellClicked($event)">
+    </ag-grid-angular>
+  </div>
+
+  <!-- ── 5. Appreciation Details Modal / Drawer ───────────────────────────── -->
   <div class="drawer-overlay" *ngIf="isDetailModalOpen()" (click)="closeDetailModal()">
-    <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 600px;">
+    <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 580px;">
       <div class="drawer-header">
-        <h2>Appreciation Details</h2>
-        <button class="btn-icon" (click)="closeDetailModal()">
-          <svg lucideX size="20"></svg>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="drawer-header-icon tone-blue">
+            <svg lucideTrophy size="20"></svg>
+          </div>
+          <div>
+            <h2>Appreciation Details</h2>
+            <p class="drawer-sub">Official employee honor and recognition record</p>
+          </div>
+        </div>
+        <button type="button" class="btn-icon" (click)="closeDetailModal()" aria-label="Close drawer">
+          <svg lucideX size="18"></svg>
         </button>
       </div>
 
       <div class="drawer-body" *ngIf="selectedAppreciation()">
-        <div class="detail-group">
-          <label class="detail-label">Award</label>
-          <div class="award-cell" style="margin-top: 4px;">
-            <div class="award-icon-box" [ngClass]="'color-' + (selectedAppreciation()?.awardType?.color || 'orange')">
-              <svg lucideTrophy size="18"></svg>
+        <!-- Honoree Card (No designation) -->
+        <div class="detail-card-panel">
+          <div class="detail-label">Honoree</div>
+          <div class="user-info-row">
+            <img 
+              *ngIf="selectedAppreciation()?.employee?.avatarUrl" 
+              [src]="selectedAppreciation()?.employee?.avatarUrl" 
+              class="avatar-lg" 
+              alt="Avatar"
+              onerror="this.onerror=null; this.src='assets/default-avatar.png';">
+            <div 
+              *ngIf="!selectedAppreciation()?.employee?.avatarUrl" 
+              class="avatar-fallback-lg" 
+              [style.background]="getAvatarColor((selectedAppreciation()?.employee?.firstName || '') + ' ' + (selectedAppreciation()?.employee?.lastName || '')).bg"
+              [style.color]="getAvatarColor((selectedAppreciation()?.employee?.firstName || '') + ' ' + (selectedAppreciation()?.employee?.lastName || '')).text">
+              {{ getInitials((selectedAppreciation()?.employee?.firstName || '') + ' ' + (selectedAppreciation()?.employee?.lastName || '')) }}
             </div>
-            <span style="font-size: 16px; font-weight: 700; color: #0F172A;">{{ selectedAppreciation()?.awardType?.title }}</span>
-          </div>
-        </div>
-
-        <div class="detail-group">
-          <label class="detail-label">Award Date</label>
-          <div style="font-size: 14px; font-weight: 600; color: #334155;">{{ selectedAppreciation()?.givenDate | date:'dd-MM-yyyy' }}</div>
-        </div>
-
-        <div class="detail-group">
-          <label class="detail-label">Summary</label>
-          <div style="font-weight: 700; font-size: 15px; color: #0F172A; margin-bottom: 6px;">
-            {{ selectedAppreciation()?.awardType?.title }}
-          </div>
-          <p style="font-size: 13.5px; color: #475569; line-height: 1.6; margin: 0;">
-            {{ selectedAppreciation()?.summary }}
-          </p>
-        </div>
-
-        <div class="detail-group">
-          <label class="detail-label">Given To</label>
-          <div class="user-info-cell" style="margin-top: 4px;">
-            <img [src]="selectedAppreciation()?.employee?.avatarUrl || 'assets/default-avatar.png'" class="avatar-md" alt="Avatar">
             <div>
-              <div class="emp-name" style="font-size: 15px;">{{ selectedAppreciation()?.employee?.firstName }} {{ selectedAppreciation()?.employee?.lastName }}</div>
-              <div class="emp-sub">{{ selectedAppreciation()?.employee?.designation?.name || 'Project Team Member' }}</div>
+              <div class="emp-name-lg">
+                {{ selectedAppreciation()?.employee?.firstName }} {{ selectedAppreciation()?.employee?.lastName }}
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="detail-group" *ngIf="selectedAppreciation()?.photoUrl">
-          <label class="detail-label">Photo / Certificate</label>
-          <div class="certificate-preview-card">
-            <img [src]="selectedAppreciation()?.photoUrl" alt="Certificate" class="certificate-img">
+        <!-- Award Category & Date -->
+        <div class="detail-row-flex">
+          <div class="detail-group flex-1">
+            <label class="detail-label">Award Category</label>
+            <div class="award-cell" style="margin-top: 6px;">
+              <div class="award-icon-box" [ngClass]="'color-' + (selectedAppreciation()?.awardType?.color || 'orange')">
+                <svg lucideTrophy size="18"></svg>
+              </div>
+              <span class="award-title-strong">{{ selectedAppreciation()?.awardType?.title }}</span>
+            </div>
+          </div>
+
+          <div class="detail-group">
+            <label class="detail-label">Award Date</label>
+            <div class="detail-val-date">
+              <svg lucideCalendar size="15"></svg>
+              <span>{{ formatDisplayDate(selectedAppreciation()?.givenDate) }}</span>
+            </div>
           </div>
         </div>
+
+        <!-- Full Recognition Summary -->
+        <div class="detail-group">
+          <label class="detail-label">Recognition Summary</label>
+          <div class="summary-callout">
+            <p>{{ selectedAppreciation()?.summary }}</p>
+          </div>
+        </div>
+
+        <!-- Certificate / Photo -->
+        <div class="detail-group" *ngIf="selectedAppreciation()?.photoUrl">
+          <label class="detail-label">Attached Certificate / Photo</label>
+          <div class="certificate-preview-card">
+            <a [href]="selectedAppreciation()?.photoUrl" target="_blank" rel="noopener noreferrer" title="Click to view full image">
+              <img [src]="selectedAppreciation()?.photoUrl" alt="Certificate" class="certificate-img">
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer-footer">
+        <button 
+          type="button" 
+          *ngIf="isAdmin() && selectedAppreciation()" 
+          class="btn-danger-outline" 
+          (click)="deleteAppreciation(selectedAppreciation()!.id, $event); closeDetailModal()">
+          <svg lucideTrash2 size="15"></svg>
+          <span>Delete Record</span>
+        </button>
+        <button type="button" class="btn-secondary" (click)="closeDetailModal()">
+          Close
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- GIVE APPRECIATION DRAWER (RIGHT SLIDE-IN DRAWER) -->
+  <!-- ── 6. Give Appreciation Drawer (Enhanced UI) ────────────────────────── -->
   <div class="drawer-overlay" *ngIf="isGiveModalOpen()" (click)="closeGiveModal()">
-    <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 550px;">
+    <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 560px;">
       <div class="drawer-header">
-        <div>
-          <h2 style="font-size: 19px; font-weight: 800; color: #0F172A; margin: 0 0 2px 0;">Give Appreciation</h2>
-          <p style="font-size: 12.5px; color: #64748B; margin: 0;">Grant an official company award to recognize employee performance.</p>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="drawer-header-icon tone-blue">
+            <svg lucideTrophy size="20"></svg>
+          </div>
+          <div>
+            <h2>Give Appreciation</h2>
+            <p class="drawer-sub">Grant an official company award to recognize employee performance.</p>
+          </div>
         </div>
-        <button class="btn-icon" (click)="closeGiveModal()">
-          <svg lucideX size="20"></svg>
+        <button type="button" class="btn-icon" (click)="closeGiveModal()" aria-label="Close drawer">
+          <svg lucideX size="18"></svg>
         </button>
       </div>
 
-      <form (ngSubmit)="saveGiveAppreciation()">
+      <form (ngSubmit)="saveGiveAppreciation()" class="drawer-form-wrapper">
         <div class="drawer-body">
+          <!-- Select Employee -->
           <div class="form-group mb-4">
-            <label style="font-size: 12.5px; font-weight: 700; color: #475569; margin-bottom: 6px; display: block;">Select Employee <span class="text-danger">*</span></label>
-            <select 
-              class="styled-select" 
-              [class.is-invalid]="giveSubmitted() && !giveForm.employeeId"
-              [(ngModel)]="giveForm.employeeId" 
-              name="employeeId">
-              <option value="">Select Employee...</option>
-              <option *ngFor="let e of employees()" [value]="e.id">{{ e.firstName }} {{ e.lastName }} ({{ e.designation?.name || 'Employee' }})</option>
-            </select>
+            <label class="form-label">Select Employee <span class="text-danger">*</span></label>
+            <div class="select-field-wrapper" [class.is-invalid]="giveSubmitted() && !giveForm.employeeId">
+              <select 
+                class="styled-select" 
+                [(ngModel)]="giveForm.employeeId" 
+                name="employeeId">
+                <option value="">Select Employee...</option>
+                <option *ngFor="let e of employees()" [value]="e.id">
+                  {{ e.firstName }} {{ e.lastName }}
+                </option>
+              </select>
+              <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
             <div class="error-msg" *ngIf="giveSubmitted() && !giveForm.employeeId">
               * Please select an employee
             </div>
           </div>
 
+          <!-- Award Category -->
           <div class="form-group mb-4">
-            <label style="font-size: 12.5px; font-weight: 700; color: #475569; margin-bottom: 6px; display: block;">Award Category <span class="text-danger">*</span></label>
-            <select 
-              class="styled-select" 
-              [class.is-invalid]="giveSubmitted() && !giveForm.awardTypeId"
-              [(ngModel)]="giveForm.awardTypeId" 
-              name="awardTypeId">
-              <option value="">Select Award Category...</option>
-              <option *ngFor="let t of awardTypes()" [value]="t.id">{{ t.title }}</option>
-            </select>
+            <label class="form-label">Award Category <span class="text-danger">*</span></label>
+            <div class="select-field-wrapper" [class.is-invalid]="giveSubmitted() && !giveForm.awardTypeId">
+              <select 
+                class="styled-select" 
+                [(ngModel)]="giveForm.awardTypeId" 
+                name="awardTypeId">
+                <option value="">Select Award Category...</option>
+                <option *ngFor="let t of awardTypes()" [value]="t.id">{{ t.title }}</option>
+              </select>
+              <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
             <div class="error-msg" *ngIf="giveSubmitted() && !giveForm.awardTypeId">
               * Please select an award category
             </div>
           </div>
 
+          <!-- Award Date -->
           <div class="form-group mb-4">
-            <label style="font-size: 12.5px; font-weight: 700; color: #475569; margin-bottom: 6px; display: block;">Award Date <span class="text-danger">*</span></label>
-            <input 
-              type="date" 
-              class="styled-input" 
-              [class.is-invalid]="giveSubmitted() && !giveForm.givenDate"
-              [(ngModel)]="giveForm.givenDate" 
-              name="givenDate">
+            <label class="form-label">Award Date <span class="text-danger">*</span></label>
+            <div class="input-field-wrapper" [class.is-invalid]="giveSubmitted() && !giveForm.givenDate">
+              <input 
+                type="date" 
+                class="styled-input" 
+                [(ngModel)]="giveForm.givenDate" 
+                name="givenDate">
+            </div>
             <div class="error-msg" *ngIf="giveSubmitted() && !giveForm.givenDate">
               * Award date is required
             </div>
           </div>
 
+          <!-- Recognition Summary -->
           <div class="form-group mb-4">
-            <label style="font-size: 12.5px; font-weight: 700; color: #475569; margin-bottom: 6px; display: block;">Recognition Summary / Appreciation Note <span class="text-danger">*</span></label>
+            <label class="form-label">Recognition Summary / Appreciation Note <span class="text-danger">*</span></label>
             <textarea 
               class="styled-textarea" 
               rows="4" 
@@ -241,77 +462,132 @@
             </div>
           </div>
 
+          <!-- Certificate / Photo Dropzone -->
           <div class="form-group mb-2">
-            <label style="font-size: 12.5px; font-weight: 700; color: #475569; margin-bottom: 6px; display: block;">Certificate / Photo Attachment (Optional)</label>
-            <div class="file-upload-dropzone">
+            <label class="form-label">Certificate / Photo Attachment (Optional)</label>
+            
+            <!-- Empty Dropzone State -->
+            <div class="file-upload-dropzone" *ngIf="!giveForm.photoUrl">
               <input type="file" (change)="onFileSelected($event)" accept="image/*" id="certFile">
               <label for="certFile" class="file-drop-label">
-                <svg lucideUploadCloud size="24"></svg>
-                <span>{{ selectedFile ? selectedFile.name : 'Click to browse & upload certificate image' }}</span>
+                <div class="upload-icon-circle">
+                  <svg lucideUploadCloud size="22"></svg>
+                </div>
+                <div class="upload-text-primary">Click to browse or drop certificate image</div>
+                <div class="upload-text-sub">PNG, JPG or JPEG (Max 10MB)</div>
               </label>
+            </div>
+
+            <!-- Attached File Preview State -->
+            <div class="file-attached-card" *ngIf="giveForm.photoUrl">
+              <img [src]="giveForm.photoUrl" class="attached-thumb" alt="Preview">
+              <div class="attached-info">
+                <span class="attached-name">{{ selectedFile ? selectedFile.name : 'Certificate attached' }}</span>
+                <span class="attached-status">Image uploaded successfully</span>
+              </div>
+              <button type="button" class="btn-remove-attachment" (click)="removeUploadedFile($event)" title="Remove attachment">
+                <svg lucideX size="16"></svg>
+              </button>
             </div>
           </div>
         </div>
 
-        <div class="drawer-footer" style="display: flex; justify-content: flex-end; gap: 12px;">
-          <button type="button" class="btn btn-outline" (click)="closeGiveModal()">Cancel</button>
-          <button type="submit" class="btn-primary-sm" [disabled]="isSubmittingGive()" style="padding: 0 24px;">Grant Appreciation</button>
+        <div class="drawer-footer">
+          <button type="button" class="btn-secondary" (click)="closeGiveModal()">Cancel</button>
+          <button type="submit" class="btn-primary" [disabled]="isSubmittingGive()">
+            {{ isSubmittingGive() ? 'Granting...' : 'Grant Appreciation' }}
+          </button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- ADD / EDIT AWARD CATEGORY MODAL -->
+  <!-- ── 7. Add / Edit Award Category Modal (Enhanced UI) ──────────────────── -->
   <div class="modal-backdrop-blur" *ngIf="isTypeModalOpen()" (click)="closeTypeModal()">
     <div class="modal-card-styled" (click)="$event.stopPropagation()" style="max-width: 480px;">
       <div class="modal-card-header">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div class="modal-header-icon bg-purple">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="modal-header-icon tone-purple">
             <svg lucideRibbon size="20"></svg>
           </div>
           <div>
             <h3>{{ typeForm.id ? 'Edit Award Category' : 'Add Award Category' }}</h3>
-            <p>Define award category name, color theme, and status.</p>
+            <p>Define award category title, theme color, and status.</p>
           </div>
         </div>
-        <button class="btn-close-sm" (click)="closeTypeModal()">
+        <button type="button" class="btn-close-sm" (click)="closeTypeModal()" aria-label="Close modal">
           <svg lucideX size="18"></svg>
         </button>
       </div>
 
       <form (ngSubmit)="saveAwardType()">
         <div class="modal-card-body">
+          <!-- Award Title -->
           <div class="form-group mb-4">
-            <label>Award Title *</label>
-            <input type="text" class="styled-input" [(ngModel)]="typeForm.title" name="title" required placeholder="e.g. Employee of the Month">
+            <label class="form-label">Award Title <span class="text-danger">*</span></label>
+            <input 
+              type="text" 
+              class="styled-input" 
+              [(ngModel)]="typeForm.title" 
+              name="title" 
+              required 
+              placeholder="e.g. Employee of the Month">
           </div>
 
+          <!-- Color Theme Selection Pills -->
           <div class="form-group mb-4">
-            <label>Color Theme</label>
-            <select class="styled-select" [(ngModel)]="typeForm.color" name="color">
-              <option value="orange">Orange (Primary)</option>
-              <option value="blue">Blue</option>
-              <option value="green">Green</option>
-              <option value="purple">Purple</option>
-              <option value="red">Red</option>
-              <option value="yellow">Yellow</option>
-            </select>
+            <label class="form-label">Theme Color</label>
+            <div class="color-options-grid">
+              <label 
+                *ngFor="let c of colorThemes" 
+                class="color-pill-item" 
+                [class.selected]="typeForm.color === c.id">
+                <input 
+                  type="radio" 
+                  [(ngModel)]="typeForm.color" 
+                  name="color" 
+                  [value]="c.id" 
+                  class="sr-only">
+                <span class="color-swatch" [style.background]="c.bg" [style.border-color]="c.border">
+                  <span class="color-swatch-dot" [style.background]="c.dot"></span>
+                </span>
+                <span class="color-name">{{ c.label }}</span>
+              </label>
+            </div>
           </div>
 
+          <!-- Status Segmented Control -->
           <div class="form-group mb-4">
-            <label>Status</label>
-            <select class="styled-select" [(ngModel)]="typeForm.status" name="status">
-              <option [ngValue]="true">Active</option>
-              <option [ngValue]="false">Inactive</option>
-            </select>
+            <label class="form-label">Status</label>
+            <div class="status-segmented-control">
+              <button 
+                type="button" 
+                class="segment-btn" 
+                [class.active]="typeForm.status === true" 
+                (click)="typeForm.status = true">
+                <span class="status-dot-active"></span>
+                <span>Active</span>
+              </button>
+              <button 
+                type="button" 
+                class="segment-btn" 
+                [class.active]="typeForm.status === false" 
+                (click)="typeForm.status = false">
+                <span class="status-dot-inactive"></span>
+                <span>Inactive</span>
+              </button>
+            </div>
           </div>
         </div>
 
         <div class="modal-card-footer">
-          <button type="button" class="btn btn-outline" (click)="closeTypeModal()">Cancel</button>
-          <button type="submit" class="btn-primary-sm" [disabled]="isSubmittingType()" style="padding: 0 24px;">Save Category</button>
+          <button type="button" class="btn-secondary" (click)="closeTypeModal()">Cancel</button>
+          <button type="submit" class="btn-primary" [disabled]="isSubmittingType()">
+            {{ isSubmittingType() ? 'Saving...' : 'Save Category' }}
+          </button>
         </div>
       </form>
     </div>
   </div>
+
 </div>

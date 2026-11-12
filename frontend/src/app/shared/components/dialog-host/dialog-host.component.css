@@ -28,7 +28,7 @@
               0 0 0 1px rgba(226, 232, 240, 0.9);
   padding: 28px 24px 22px;
   text-align: center;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   animation: dlgScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
 }

@@ -1,218 +1,334 @@
-<div class="page-container">
-  <div class="page-header">
-    <div class="header-content">
-      <h1>Offboarding & Exit Management</h1>
-      <p>Manage resignations, clearance tasks, and exit interviews.</p>
-    </div>
-    <div class="header-actions">
-      <button class="btn-primary" (click)="openResignModal()" *ngIf="activeTab() === 'resignations'">
-        Submit Resignation
+<div class="offb-page-container">
+
+  <!-- ── 1. Standard MIRA Page Header ──────────────────────────────────────── -->
+  <app-page-header
+    icon="offboarding"
+    section="HR & Team"
+    heading="Offboarding & Exit Management"
+    subtitle="Manage resignations, clearance tasks, and exit interviews.">
+
+    <!-- View switch pills first -->
+    <div class="view-switch-pills" role="group" aria-label="Offboarding sections">
+      <button
+        type="button"
+        class="pill-btn"
+        [class.active]="activeTab() === 'resignations'"
+        (click)="setTab('resignations')">
+        <svg lucideDoorOpen size="14"></svg>
+        <span>Resignations</span>
+      </button>
+      <button
+        type="button"
+        class="pill-btn"
+        *ngIf="canClearTasks()"
+        [class.active]="activeTab() === 'tasks'"
+        (click)="setTab('tasks')">
+        <svg lucideCheckCircle2 size="14"></svg>
+        <span>Clearance Tasks</span>
       </button>
     </div>
-  </div>
 
-  <div class="tabs-container">
-    <button class="tab-btn" [class.active]="activeTab() === 'resignations'" (click)="setTab('resignations')">
-      <svg lucideDoorOpen size="18"></svg>
-      Resignations
+    <!-- Outlined secondary button next -->
+    <button
+      type="button"
+      class="btn-secondary"
+      (click)="loadData()"
+      title="Refresh records"
+      aria-label="Refresh records">
+      <svg lucideRefreshCw size="14"></svg>
+      <span>Refresh</span>
     </button>
-    <button class="tab-btn" [class.active]="activeTab() === 'tasks'" (click)="setTab('tasks')" *ngIf="canClearTasks()">
-      <svg lucideCheckCircle2 size="18"></svg>
-      Clearance Tasks
-    </button>
-  </div>
 
-  <!-- Resignations Tab -->
-  <div class="tab-content" *ngIf="activeTab() === 'resignations'">
-    <div class="resignation-overview" *ngIf="resignations().length">
-      <div class="overview-copy">
-        <span class="overview-kicker">Resignation register</span>
-        <p>Click any row to view the complete request, dates, remarks, and approval history.</p>
-      </div>
-      <div class="overview-stats" aria-label="Resignation summary">
-        <div class="overview-stat"><strong>{{ resignations().length }}</strong><span>Total</span></div>
-        <div class="overview-stat is-pending"><strong>{{ pendingResignationCount() }}</strong><span>Pending</span></div>
-        <div class="overview-stat is-approved"><strong>{{ approvedResignationCount() }}</strong><span>Approved</span></div>
-      </div>
-    </div>
-    <section class="table-tools" aria-label="Resignation filters">
-      <div class="table-tools-copy">
-        <span class="table-tools-icon"><svg lucideDoorOpen size="18"></svg></span>
-        <div>
-          <span class="table-tools-kicker">Resignation register</span>
-          <h2>Resignation requests</h2>
+    <!-- Blue primary button last (rightmost) -->
+    <button
+      type="button"
+      class="btn-primary"
+      *ngIf="activeTab() === 'resignations'"
+      (click)="openResignModal()">
+      <svg lucidePlus size="16"></svg>
+      <span>Submit Resignation</span>
+    </button>
+  </app-page-header>
+
+  <!-- ════════════════════════════════════════════════════════════════════════
+       TAB 1: RESIGNATIONS
+       ════════════════════════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="activeTab() === 'resignations'">
+    <!-- ── 2A. Single-Row KPI Stat Cards ─────────────────────────────────── -->
+    <section class="offb-kpi-grid" aria-label="Resignation summary metrics">
+      <article
+        class="offb-kpi-card"
+        [class.active]="resignationStatusFilter() === 'ALL'"
+        (click)="updateResignationStatusFilter('ALL')"
+        tabindex="0"
+        role="button"
+        aria-label="Show all resignations">
+        <div class="offb-kpi-icon bg-blue-soft">
+          <svg lucideDoorOpen size="20"></svg>
         </div>
-        <span class="request-count-pill">{{ filteredResignations().length }} of {{ resignations().length }}</span>
-      </div>
-      <div class="filter-controls">
-        <label class="search-control">
-          <span class="search-symbol" aria-hidden="true">⌕</span>
-          <input type="search" [ngModel]="resignationSearch()" (ngModelChange)="updateResignationSearch($event)" placeholder="Search employee, reason or approver" aria-label="Search resignation requests" />
-        </label>
-        <label class="status-filter-control">
-          <span class="sr-only">Filter by status</span>
-          <span class="filter-label">Status</span>
-          <select [ngModel]="resignationStatusFilter()" (ngModelChange)="updateResignationStatusFilter($event)" aria-label="Filter by status">
-            <option value="ALL">All statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="WITHDRAWN">Withdrawn</option>
-          </select>
-        </label>
-        <button type="button" class="clear-filters-btn" *ngIf="resignationSearch() || resignationStatusFilter() !== 'ALL'" (click)="clearResignationFilters()">Clear filters</button>
-      </div>
+        <div class="offb-kpi-content">
+          <span class="offb-kpi-label">Total Requests</span>
+          <span class="offb-kpi-value">{{ resignations().length }}</span>
+          <span class="offb-kpi-sub">All resignation records</span>
+        </div>
+      </article>
+
+      <article
+        class="offb-kpi-card"
+        [class.active]="resignationStatusFilter() === 'PENDING'"
+        (click)="updateResignationStatusFilter('PENDING')"
+        tabindex="0"
+        role="button"
+        aria-label="Show pending resignations">
+        <div class="offb-kpi-icon bg-amber-soft">
+          <svg lucideClock size="20"></svg>
+        </div>
+        <div class="offb-kpi-content">
+          <span class="offb-kpi-label">Pending Review</span>
+          <span class="offb-kpi-value">{{ pendingResignationCount() }}</span>
+          <span class="offb-kpi-sub">Awaiting decision</span>
+        </div>
+      </article>
+
+      <article
+        class="offb-kpi-card"
+        [class.active]="resignationStatusFilter() === 'APPROVED'"
+        (click)="updateResignationStatusFilter('APPROVED')"
+        tabindex="0"
+        role="button"
+        aria-label="Show approved resignations">
+        <div class="offb-kpi-icon bg-emerald-soft">
+          <svg lucideCheckCircle2 size="20"></svg>
+        </div>
+        <div class="offb-kpi-content">
+          <span class="offb-kpi-label">Approved</span>
+          <span class="offb-kpi-value">{{ approvedResignationCount() }}</span>
+          <span class="offb-kpi-sub">Confirmed exits</span>
+        </div>
+      </article>
+
+      <article
+        class="offb-kpi-card"
+        [class.active]="resignationStatusFilter() === 'WITHDRAWN'"
+        (click)="updateResignationStatusFilter('WITHDRAWN')"
+        tabindex="0"
+        role="button"
+        aria-label="Show withdrawn resignations">
+        <div class="offb-kpi-icon bg-slate-soft">
+          <svg lucideXCircle size="20"></svg>
+        </div>
+        <div class="offb-kpi-content">
+          <span class="offb-kpi-label">Withdrawn</span>
+          <span class="offb-kpi-value">{{ withdrawnResignationCount() }}</span>
+          <span class="offb-kpi-sub">Retained or cancelled</span>
+        </div>
+      </article>
     </section>
-    <div class="table-container">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Employee</th>
-            <th>Employee ID</th>
-            <th>Email</th>
-            <th>Reason</th>
-            <th>Intended LWD</th>
-            <th>Approved LWD</th>
-            <th>Status</th>
-            <th>Approver</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let res of pagedResignations()" class="clickable-row" tabindex="0"
-              (click)="openResignationDetails(res)"
-              (keydown.enter)="openResignationDetails(res)"
-              (keydown.space)="$event.preventDefault(); openResignationDetails(res)">
-            <td>
-              <div class="employee-cell">
-                <span class="employee-avatar">
-                  <img *ngIf="res.employee?.avatarUrl"
-                       [src]="res.employee?.avatarUrl"
-                       [alt]="(res.employee?.user?.email || 'Employee') + ' profile photo'"
-                       (error)="handleAvatarError(res)" />
-                  <span *ngIf="!res.employee?.avatarUrl">{{ (res.employee?.user?.email || '?').charAt(0).toUpperCase() }}</span>
-                </span>
-                <span>{{ employeeName(res) }}</span>
-              </div>
-            </td>
-            <td><span class="employee-id-chip">{{ employeeIdentifier(res) }}</span></td>
-            <td class="employee-email">{{ res.employee?.user?.email || '—' }}</td>
-            <td class="truncate">{{ res.reason }}</td>
-            <td>{{ res.intendedLastWorkingDay | date:'dd-MM-yyyy' }}</td>
-            <td>{{ res.approvedLastWorkingDay ? (res.approvedLastWorkingDay | date:'dd-MM-yyyy') : '-' }}</td>
-            <td class="status-cell">
-              <div *ngIf="isManagerOrAdmin(); else readOnlyStatus" class="status-dropdown" (click)="$event.stopPropagation()">
-                <button type="button" class="status-trigger" [ngClass]="'status-' + res.status.toLowerCase()" [disabled]="inlineStatusBusy() === res.id" (click)="toggleStatusDropdown(res.id, $event)" [attr.aria-expanded]="openStatusDropdownId() === res.id">
-                  <span>{{ res.status }}</span><span class="status-caret" aria-hidden="true"></span>
-                </button>
-                <div class="status-menu" *ngIf="openStatusDropdownId() === res.id" role="menu">
-                  <button type="button" class="status-option status-pending" [class.is-selected]="res.status === 'PENDING'" (click)="selectInlineStatus(res, 'PENDING', $event)">Pending</button>
-                  <button type="button" class="status-option status-approved" [class.is-selected]="res.status === 'APPROVED'" (click)="selectInlineStatus(res, 'APPROVED', $event)">Approved</button>
-                  <button type="button" class="status-option status-rejected" [class.is-selected]="res.status === 'REJECTED'" (click)="selectInlineStatus(res, 'REJECTED', $event)">Rejected</button>
-                  <button type="button" class="status-option status-withdrawn" [class.is-selected]="res.status === 'WITHDRAWN'" (click)="selectInlineStatus(res, 'WITHDRAWN', $event)">Withdrawn</button>
-                </div>
-              </div>
-              <ng-template #readOnlyStatus><span class="badge" [ngClass]="'badge-' + res.status.toLowerCase()">{{ res.status }}</span></ng-template>
-            </td>
-            <td>{{ res.approver?.email || '-' }}</td>
-            <td class="actions-cell">
-              <button class="btn-sm btn-outline" (click)="$event.stopPropagation(); openApproveModal(res)" *ngIf="res.status === 'PENDING' && isManagerOrAdmin()">
-                Review
-              </button>
-              <div class="action-menu" (click)="$event.stopPropagation()">
-                <button type="button" class="action-menu-trigger" (click)="toggleActionMenu(res.id, $event)" [attr.aria-expanded]="openActionMenuId() === res.id" aria-label="Open resignation actions">⋮</button>
-                <div class="action-menu-popover" *ngIf="openActionMenuId() === res.id" role="menu">
-                  <button type="button" (click)="openResignationDetails(res)"><svg lucideEye size="16"></svg> View details</button>
-                </div>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <footer class="table-pagination" *ngIf="filteredResignations().length">
-        <label class="page-size-control">
-          <span>Rows per page</span>
-          <select [ngModel]="resignationPageSize()" (ngModelChange)="setResignationPageSize($event)" aria-label="Rows per page">
-            <option *ngFor="let size of resignationPageSizeOptions" [value]="size">{{ size }}</option>
-          </select>
-        </label>
-        <span class="page-range">{{ resignationRangeStart() }}–{{ resignationRangeEnd() }} of {{ filteredResignations().length }}</span>
-        <nav class="page-actions" aria-label="Resignation table pages">
-          <button type="button" (click)="setResignationPage(1)" [disabled]="resignationPage() === 1" aria-label="First page">«</button>
-          <button type="button" (click)="setResignationPage(resignationPage() - 1)" [disabled]="resignationPage() === 1" aria-label="Previous page">‹</button>
-          <span class="page-number">Page {{ resignationPage() }} of {{ resignationPageCount() }}</span>
-          <button type="button" (click)="setResignationPage(resignationPage() + 1)" [disabled]="resignationPage() === resignationPageCount()" aria-label="Next page">›</button>
-          <button type="button" (click)="setResignationPage(resignationPageCount())" [disabled]="resignationPage() === resignationPageCount()" aria-label="Last page">»</button>
-        </nav>
-      </footer>
-      <div class="empty-state" *ngIf="resignations().length === 0">
-        <svg lucideDoorOpen size="48" style="color: #94A3B8; margin-bottom: 16px;"></svg>
-        <h3>No resignations found</h3>
+
+    <!-- ── 3A. Single-Row Filter Bar ─────────────────────────────────────── -->
+    <div class="filter-card">
+      <!-- 1. Search (always first) -->
+      <div class="offb-search-wrap">
+        <svg lucideSearch size="15" class="offb-search-icon"></svg>
+        <input
+          type="search"
+          [ngModel]="resignationSearch()"
+          (ngModelChange)="updateResignationSearch($event)"
+          placeholder="Search employee, reason or approver…"
+          aria-label="Search resignation requests" />
+        <button
+          type="button"
+          class="offb-search-clear"
+          *ngIf="resignationSearch()"
+          (click)="updateResignationSearch('')"
+          title="Clear search">
+          <svg lucideX size="13"></svg>
+        </button>
       </div>
-      <div class="empty-state filtered-empty-state" *ngIf="resignations().length > 0 && filteredResignations().length === 0">
-        <div class="empty-filter-icon">⌕</div>
-        <h3>No matching requests</h3>
-        <p>Try a different employee, reason, approver, or status.</p>
-        <button type="button" class="btn-outline" (click)="clearResignationFilters()">Clear filters</button>
+
+      <!-- 2. Status Dropdown -->
+      <div class="offb-select-group">
+        <app-searchable-select
+          [options]="resignationStatusOptions"
+          placeholder="All statuses"
+          [clearable]="true"
+          [value]="resignationStatusFilter() === 'ALL' ? null : resignationStatusFilter()"
+          (valueChange)="updateResignationStatusFilter($event || 'ALL')">
+        </app-searchable-select>
+      </div>
+
+      <!-- 3. Date Preset Filter -->
+      <app-date-preset-filter
+        label="Intended LWD"
+        [preset]="resignationDatePreset()"
+        (presetChange)="resignationDatePreset.set($event)"
+        (rangeChange)="onResignationDateRange($event)">
+      </app-date-preset-filter>
+
+      <!-- 4. Clear all -->
+      <button
+        type="button"
+        class="clear-all-filters"
+        *ngIf="hasActiveResignationFilters()"
+        (click)="clearResignationFilters()">
+        Clear all
+      </button>
+
+      <!-- 5. Showing X of Y pushed right -->
+      <div class="offb-showing-count">
+        Showing <strong>{{ filteredResignations().length }}</strong> of <strong>{{ resignations().length }}</strong>
       </div>
     </div>
-  </div>
 
-  <!-- Tasks Tab -->
-  <div class="tab-content" *ngIf="activeTab() === 'tasks' && canClearTasks()">
-    <section class="clearance-overview" *ngIf="tasks().length">
-      <div class="clearance-overview-copy">
-        <span class="clearance-overview-icon"><svg lucideClipboardCheck size="20"></svg></span>
-        <div><span class="overview-kicker">Clearance worklist</span><h2>Complete each team handover before the employee’s exit.</h2><p>Open tasks are grouped by the responsible department and can be cleared when finished.</p></div>
-      </div>
-      <div class="clearance-stats" aria-label="Clearance task summary">
-        <div class="clearance-stat"><strong>{{ tasks().length }}</strong><span>Total tasks</span></div>
-        <div class="clearance-stat is-open"><strong>{{ pendingTaskCount() }}</strong><span>Open</span></div>
-        <div class="clearance-stat is-cleared"><strong>{{ clearedTaskCount() }}</strong><span>Cleared</span></div>
-      </div>
+    <!-- ── 4A. AG Grid Resignations Table ────────────────────────────────── -->
+    <div class="offb-grid-card" (change)="onResignationGridChange($event)">
+      <ag-grid-angular
+        class="ag-theme-quartz offb-ag-grid"
+        [theme]="'legacy'"
+        [rowData]="filteredResignations()"
+        [columnDefs]="resignationColDefs()"
+        [defaultColDef]="defaultColDef"
+        [gridOptions]="resignationGridOptions"
+        [pagination]="true"
+        [paginationPageSize]="paginationPageSize"
+        [paginationPageSizeSelector]="paginationPageSizeSelector">
+      </ag-grid-angular>
+    </div>
+  </ng-container>
+
+  <!-- ════════════════════════════════════════════════════════════════════════
+       TAB 2: CLEARANCE TASKS
+       ════════════════════════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="activeTab() === 'tasks' && canClearTasks()">
+    <!-- ── 2B. Single-Row KPI Stat Cards ─────────────────────────────────── -->
+    <section class="offb-kpi-grid" aria-label="Clearance task summary metrics">
+      <article
+        class="offb-kpi-card"
+        [class.active]="taskStatusFilter() === 'ALL'"
+        (click)="taskStatusFilter.set('ALL')"
+        tabindex="0"
+        role="button"
+        aria-label="Show all clearance tasks">
+        <div class="offb-kpi-icon bg-blue-soft">
+          <svg lucideClipboardCheck size="20"></svg>
+        </div>
+        <div class="offb-kpi-content">
+          <span class="offb-kpi-label">Total Tasks</span>
+          <span class="offb-kpi-value">{{ tasks().length }}</span>
+          <span class="offb-kpi-sub">All handover items</span>
+        </div>
+      </article>
+
+      <article
+        class="offb-kpi-card"
+        [class.active]="taskStatusFilter() === 'PENDING'"
+        (click)="taskStatusFilter.set('PENDING')"
+        tabindex="0"
+        role="button"
+        aria-label="Show pending clearance tasks">
+        <div class="offb-kpi-icon bg-amber-soft">
+          <svg lucideClock size="20"></svg>
+        </div>
+        <div class="offb-kpi-content">
+          <span class="offb-kpi-label">Open Tasks</span>
+          <span class="offb-kpi-value">{{ pendingTaskCount() }}</span>
+          <span class="offb-kpi-sub">Pending department sign-off</span>
+        </div>
+      </article>
+
+      <article
+        class="offb-kpi-card"
+        [class.active]="taskStatusFilter() === 'CLEARED'"
+        (click)="taskStatusFilter.set('CLEARED')"
+        tabindex="0"
+        role="button"
+        aria-label="Show cleared tasks">
+        <div class="offb-kpi-icon bg-emerald-soft">
+          <svg lucideCheckCircle2 size="20"></svg>
+        </div>
+        <div class="offb-kpi-content">
+          <span class="offb-kpi-label">Cleared Tasks</span>
+          <span class="offb-kpi-value">{{ clearedTaskCount() }}</span>
+          <span class="offb-kpi-sub">Completed handovers</span>
+        </div>
+      </article>
     </section>
-    <div class="table-container clearance-table-container">
-      <table class="data-table clearance-table">
-        <thead>
-          <tr>
-            <th>Employee (User ID)</th>
-            <th>Department</th>
-            <th>Task Name</th>
-            <th>Status</th>
-            <th>Cleared By</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let task of tasks()" class="clearance-row">
-            <td><span class="task-employee-id">#{{ task.employee?.userId }}</span></td>
-            <td><span class="badge badge-department">{{ task.department }}</span></td>
-            <td class="task-name-cell">
-              <div>{{ task.taskName }}</div>
-              <div>{{ task.description }}</div>
-            </td>
-            <td>
-              <span class="badge" [ngClass]="'badge-' + task.status.toLowerCase()">
-                {{ task.status }}
-              </span>
-            </td>
-            <td>{{ task.clearedBy?.email || '-' }}</td>
-            <td>
-              <button class="btn-sm clear-task-btn" (click)="openTaskModal(task)" *ngIf="task.status === 'PENDING'">
-                <svg lucideCheckCircle2 size="15"></svg> Clear task
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="empty-state" *ngIf="tasks().length === 0">
-        <svg lucideCheckCircle2 size="48" style="color: #94A3B8; margin-bottom: 16px;"></svg>
-        <h3>No tasks pending</h3>
+
+    <!-- ── 3B. Single-Row Filter Bar ─────────────────────────────────────── -->
+    <div class="filter-card">
+      <!-- 1. Search -->
+      <div class="offb-search-wrap">
+        <svg lucideSearch size="15" class="offb-search-icon"></svg>
+        <input
+          type="search"
+          [ngModel]="taskSearch()"
+          (ngModelChange)="taskSearch.set($event)"
+          placeholder="Search task, department, employee or cleared by…"
+          aria-label="Search clearance tasks" />
+        <button
+          type="button"
+          class="offb-search-clear"
+          *ngIf="taskSearch()"
+          (click)="taskSearch.set('')"
+          title="Clear search">
+          <svg lucideX size="13"></svg>
+        </button>
+      </div>
+
+      <!-- 2. Status Dropdown -->
+      <div class="offb-select-group">
+        <app-searchable-select
+          [options]="taskStatusOptions"
+          placeholder="All statuses"
+          [clearable]="true"
+          [value]="taskStatusFilter() === 'ALL' ? null : taskStatusFilter()"
+          (valueChange)="taskStatusFilter.set($event || 'ALL')">
+        </app-searchable-select>
+      </div>
+
+      <!-- 3. Department Dropdown -->
+      <div class="offb-select-group">
+        <app-searchable-select
+          [options]="taskDepartmentOptions()"
+          placeholder="All departments"
+          [clearable]="true"
+          [value]="taskDepartmentFilter()"
+          (valueChange)="taskDepartmentFilter.set($event || null)">
+        </app-searchable-select>
+      </div>
+
+      <!-- 4. Clear all -->
+      <button
+        type="button"
+        class="clear-all-filters"
+        *ngIf="hasActiveTaskFilters()"
+        (click)="clearTaskFilters()">
+        Clear all
+      </button>
+
+      <!-- 5. Showing X of Y -->
+      <div class="offb-showing-count">
+        Showing <strong>{{ filteredTasks().length }}</strong> of <strong>{{ tasks().length }}</strong>
       </div>
     </div>
-  </div>
 
-  <!-- Exit Interviews Tab -->
+    <!-- ── 4B. AG Grid Clearance Tasks Table ─────────────────────────────── -->
+    <div class="offb-grid-card">
+      <ag-grid-angular
+        class="ag-theme-quartz offb-ag-grid"
+        [theme]="'legacy'"
+        [rowData]="filteredTasks()"
+        [columnDefs]="taskColDefs()"
+        [defaultColDef]="defaultColDef"
+        [gridOptions]="taskGridOptions"
+        [pagination]="true"
+        [paginationPageSize]="paginationPageSize"
+        [paginationPageSizeSelector]="paginationPageSizeSelector">
+      </ag-grid-angular>
+    </div>
+  </ng-container>
+
+  <!-- Exit Interviews Tab (if triggered) -->
   <div class="tab-content" *ngIf="activeTab() === 'exit' && isAdminOrHr()">
     <div class="table-container">
       <table class="data-table">
@@ -228,7 +344,7 @@
         <tbody>
           <tr *ngFor="let item of interviews()">
             <td>{{ item.employee?.id }}</td>
-            <td>{{ item.completedAt | date:'dd-MM-yyyy' }}</td>
+            <td>{{ item.completedAt | date:'d MMM yyyy' }}</td>
             <td>{{ item.rating }}</td>
             <td>{{ item.interviewer?.email }}</td>
             <td class="truncate">{{ item.feedback }}</td>
@@ -243,7 +359,7 @@
   </div>
 </div>
 
-<!-- Resignation details -->
+<!-- ── Resignation Details Modal ──────────────────────────────────────────── -->
 <div class="modal-overlay" *ngIf="showResignationDetails()" (click)="closeResignationDetails()">
   <div class="modal-content resignation-details-modal" (click)="$event.stopPropagation()" *ngIf="selectedResignation() as res">
     <div class="modal-header details-header">
@@ -266,7 +382,7 @@
           <span class="detail-label">Current status</span>
           <div *ngIf="isManagerOrAdmin(); else detailReadOnlyStatus" class="status-dropdown detail-status-dropdown">
             <button type="button" class="status-trigger detail-status-trigger" [ngClass]="'status-' + res.status.toLowerCase()" [disabled]="inlineStatusBusy() === res.id" (click)="toggleStatusDropdown(res.id, $event)" [attr.aria-expanded]="openStatusDropdownId() === res.id">
-              <span>{{ res.status }}</span><span class="status-caret" aria-hidden="true"></span>
+              <span>{{ statusSentenceCase(res.status) }}</span><span class="status-caret" aria-hidden="true"></span>
             </button>
             <div class="status-menu" *ngIf="openStatusDropdownId() === res.id" role="menu">
               <button type="button" class="status-option status-pending" [class.is-selected]="res.status === 'PENDING'" (click)="selectInlineStatus(res, 'PENDING', $event)">Pending</button>
@@ -275,15 +391,15 @@
               <button type="button" class="status-option status-withdrawn" [class.is-selected]="res.status === 'WITHDRAWN'" (click)="selectInlineStatus(res, 'WITHDRAWN', $event)">Withdrawn</button>
             </div>
           </div>
-          <ng-template #detailReadOnlyStatus><span class="badge" [ngClass]="'badge-' + res.status.toLowerCase()">{{ res.status }}</span></ng-template>
+          <ng-template #detailReadOnlyStatus><span class="badge" [ngClass]="'badge-' + res.status.toLowerCase()">{{ statusSentenceCase(res.status) }}</span></ng-template>
         </div>
-        <span class="request-id">Submitted {{ res.createdAt | date:'dd MMM yyyy' }}</span>
+        <span class="request-id">Submitted {{ res.createdAt | date:'d MMM yyyy' }}</span>
       </div>
       <div class="details-grid">
-        <div class="detail-item"><svg lucideMail size="16"></svg><div><span>Employee</span><strong>{{ employeeName(res) }}</strong><small>{{ res.employee?.user?.email || '-' }} · {{ employeeIdentifier(res) }}</small></div></div>
+        <div class="detail-item"><svg lucideMail size="16"></svg><div><span>Employee</span><strong>{{ employeeName(res) }}</strong><small>{{ res.employee?.user?.email || '—' }} · {{ employeeIdentifier(res) }}</small></div></div>
         <div class="detail-item"><svg lucideUserRound size="16"></svg><div><span>Approver</span><strong>{{ res.approver?.email || 'Not assigned' }}</strong></div></div>
-        <div class="detail-item"><svg lucideCalendarDays size="16"></svg><div><span>Intended last working day</span><strong>{{ res.intendedLastWorkingDay | date:'dd MMM yyyy' }}</strong></div></div>
-        <div class="detail-item"><svg lucideCalendarDays size="16"></svg><div><span>Approved last working day</span><strong>{{ res.approvedLastWorkingDay ? (res.approvedLastWorkingDay | date:'dd MMM yyyy') : 'Not set' }}</strong></div></div>
+        <div class="detail-item"><svg lucideCalendarDays size="16"></svg><div><span>Intended last working day</span><strong>{{ res.intendedLastWorkingDay | date:'d MMM yyyy' }}</strong></div></div>
+        <div class="detail-item"><svg lucideCalendarDays size="16"></svg><div><span>Approved last working day</span><strong>{{ res.approvedLastWorkingDay ? (res.approvedLastWorkingDay | date:'d MMM yyyy') : 'Not set' }}</strong></div></div>
       </div>
       <div class="detail-note"><span><svg lucideMessageSquare size="16"></svg> Reason for leaving</span><p>{{ res.reason || 'No reason provided.' }}</p></div>
       <div class="detail-note" *ngIf="res.remarks"><span><svg lucideMessageSquare size="16"></svg> Review remarks</span><p>{{ res.remarks }}</p></div>
@@ -295,7 +411,7 @@
   </div>
 </div>
 
-<!-- Resign Modal -->
+<!-- ── Submit Resignation Modal ───────────────────────────────────────────── -->
 <div class="modal-overlay" *ngIf="showResignModal()">
   <div class="modal-content resign-modal">
     <div class="modal-header resign-header">
@@ -308,8 +424,8 @@
         <div><strong>Your request stays with HR and your manager.</strong><span>You can add a reason now and they will confirm your final working day.</span></div>
       </div>
       <div class="form-group full-width">
-        <label>Reason for leaving <span class="optional-label">Optional</span></label>
-        <textarea [(ngModel)]="resignForm.reason" rows="4" class="form-control reason-control" placeholder="Add a short explanation, if you would like to share one..."></textarea>
+        <label>Reason for leaving <span class="required-mark">*</span></label>
+        <textarea [(ngModel)]="resignForm.reason" rows="4" class="form-control reason-control" placeholder="Add a short explanation for your resignation..."></textarea>
         <span class="field-help">This is shared with your reviewer to help them process the request.</span>
       </div>
       <div class="form-group full-width resign-date-section">
@@ -319,12 +435,12 @@
     </div>
     <div class="modal-footer resign-footer">
       <button class="btn-outline" (click)="closeResignModal()">Cancel</button>
-      <button class="btn-danger" (click)="submitResignation()"><svg lucideDoorOpen size="16"></svg> Submit request</button>
+      <button class="btn-primary" (click)="submitResignation()"><svg lucideDoorOpen size="16"></svg> Submit request</button>
     </div>
   </div>
 </div>
 
-<!-- Approve Resignation Modal -->
+<!-- ── Approve / Review Resignation Modal ─────────────────────────────────── -->
 <div class="modal-overlay" *ngIf="showApproveModal()">
   <div class="modal-content">
     <div class="modal-header">
@@ -356,7 +472,7 @@
   </div>
 </div>
 
-<!-- Clear Task Modal -->
+<!-- ── Clear Task Modal ───────────────────────────────────────────────────── -->
 <div class="modal-overlay" *ngIf="showTaskModal()">
   <div class="modal-content" style="max-width: 400px;">
     <div class="modal-header">
@@ -376,7 +492,7 @@
   </div>
 </div>
 
-<!-- Record Interview Modal -->
+<!-- ── Record Interview Modal ─────────────────────────────────────────────── -->
 <div class="modal-overlay" *ngIf="showInterviewModal()">
   <div class="modal-content">
     <div class="modal-header">

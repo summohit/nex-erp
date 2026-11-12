@@ -1,20 +1,8 @@
 <div class="all-attendance-container page-container">
 
-  <!-- Enhanced Page Header Card -->
-  <div class="page-header-card">
-    <div class="header-title-group">
-      <div class="header-title-row">
-        <h1>All People Attendance</h1>
-        <span class="attendance-count-pill">{{ filteredRecords().length }} Record{{ filteredRecords().length === 1 ? '' : 's' }}</span>
-      </div>
-      <p>Company-wide attendance tracking, work hours, late arrival flags, and monthly logs</p>
-    </div>
-
-    <div class="header-actions-group">
-      <input #attendanceImport type="file" accept=".csv,text/csv" hidden (change)="importAttendanceCsv($event)">
-      <button class="btn-header-secondary" (click)="attendanceImport.click()" title="Import attendance from CSV">
-        <span>Import CSV</span>
-      </button>
+  <!-- Page header (12 Nov 2026): the shared header, as on the Employee Directory -->
+  <app-page-header icon="calendar" section="Attendance & Leave" heading="All People Attendance"
+    [subtitle]="isLoading() ? 'Company-wide attendance, work hours and late arrivals' : filteredRecords().length + ' records · company-wide attendance, work hours and late arrivals'">
       <!-- View Mode Toggle -->
       <div class="view-mode-toggle-group">
         <button type="button" class="btn-toggle-view" [class.active]="viewMode() === 'grid'" (click)="viewMode.set('grid')" title="Monthly Matrix Grid View">
@@ -26,20 +14,8 @@
           <span>Table</span>
         </button>
       </div>
+  </app-page-header>
 
-      <!-- Export CSV Button -->
-      <button class="btn-header-secondary" (click)="exportToCsv()" [disabled]="filteredRecords().length === 0" title="Export current attendance records to CSV">
-        <svg lucideDownload [size]="15"></svg>
-        <span>Export CSV</span>
-      </button>
-
-      <!-- Refresh Button -->
-      <button class="btn-header-secondary" (click)="load()" title="Refresh attendance data">
-        <svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoading()"></svg>
-        <span>Refresh</span>
-      </button>
-    </div>
-  </div>
   <app-attendance-filter-drawer
     [open]="filterDrawerOpen()"
     title="Attendance filters"
@@ -78,12 +54,6 @@
           <option value="">All departments</option>
           <option *ngFor="let d of departments()" [value]="d.id">{{ d.name }}</option>
         </select>
-      </div>
-      <div class="today-head-actions">
-        <button type="button" class="today-refresh-btn" (click)="loadToday()" title="Refresh today's numbers">
-          <svg lucideRotateCcw [size]="13"></svg>
-          <span>Refresh</span>
-        </button>
       </div>
     </div>
 
@@ -320,11 +290,16 @@
           <svg lucideList [size]="15"></svg>
           Performance List
         </button>
-        <span class="ph-pill"><svg lucideSparkles [size]="14"></svg> Top 3 Recognition</span>
       </div>
     </div>
 
-    <div class="ph-empty" *ngIf="performersPeriod() === 'year' && yearLoading()">Loading {{ filterYear }} attendance…</div>
+    <!-- Placeholder cards while the year loads (12 Nov 2026) -->
+    <div class="sk-champions" *ngIf="performersPeriod() === 'year' && yearLoading()" [attr.aria-label]="'Loading ' + filterYear + ' attendance'">
+      <div class="sk-champ" *ngFor="let i of [1,2,3]">
+        <div class="sk-row"><span class="sk sk-circle"></span><span class="sk-col"><span class="sk sk-line w60"></span><span class="sk sk-line w40"></span></span></div>
+        <div class="sk-row"><span class="sk sk-box"></span><span class="sk sk-box"></span></div>
+      </div>
+    </div>
     <div class="ph-empty" *ngIf="performersPeriod() === 'year' && !yearLoading() && topPerformers().length === 0">No attendance recorded in {{ filterYear }} for these filters.</div>
 
     <div class="performers-grid" *ngIf="!(performersPeriod() === 'year' && yearLoading())">
@@ -408,9 +383,8 @@
         Filters
         <span class="filters-active-dot" *ngIf="hasActiveFilters()" aria-label="Filters active"></span>
       </button>
-      <button type="button" class="btn-attendance-filters btn-attendance-reset" *ngIf="hasActiveFilters()" (click)="resetFilters()" title="Reset all filters">
-        <svg lucideRotateCcw [size]="15"></svg>
-        Reset Filters
+      <button type="button" class="clear-all-filters att-clear-all" *ngIf="hasActiveFilters()" (click)="resetFilters()" title="Reset all filters">
+        Clear all
       </button>
       <!-- Filter Searchable Dropdowns -->
       <div class="filter-dropdowns-group">
@@ -459,7 +433,7 @@
         </div>
 
         <!-- 2b. Exact Date Filter -->
-        <div class="date-filter-wrapper" [class.has-selection]="filterDate">
+        <div class="ff-in-drawer date-filter-wrapper" [class.has-selection]="filterDate">
           <svg lucideCalendarDays [size]="14" class="trigger-prefix-icon"></svg>
           <input
             type="date"
@@ -618,11 +592,6 @@
           <div class="dropdown-backdrop-transparent" *ngIf="showFlagDropdown" (click)="showFlagDropdown = false"></div>
         </div>
 
-        <!-- Reset All Filters Button -->
-        <button class="btn-reset-filters" *ngIf="hasActiveFilters()" (click)="resetFilters()" title="Reset all filters">
-          <svg lucideRotateCcw [size]="13"></svg>
-          <span>Reset</span>
-        </button>
       </div>
     </div>
 
@@ -966,13 +935,6 @@
           <span class="session-emp-role session-emp-email" *ngIf="selectedDayDetails()?.employeeEmail">
             {{ selectedDayDetails()?.employeeEmail }}
           </span>
-          <span class="session-emp-role">
-            <span *ngIf="selectedDayDetails()?.employeeDesignation" class="session-emp-desig">{{ selectedDayDetails()?.employeeDesignation }}</span>
-            <span *ngIf="selectedDayDetails()?.employeeDesignation && (selectedDayDetails()?.employeeDept || selectedDayDetails()?.employeeRole)"> · </span>
-            <span *ngIf="selectedDayDetails()?.employeeDept">{{ selectedDayDetails()?.employeeDept }}</span>
-            <span *ngIf="selectedDayDetails()?.employeeDept && selectedDayDetails()?.employeeRole"> · </span>
-            <span *ngIf="selectedDayDetails()?.employeeRole">{{ selectedDayDetails()?.employeeRole }}</span>
-          </span>
         </div>
       </div>
       <button type="button" class="btn-modal-close" (click)="closeDayDetailsModal()" title="Close details">
@@ -980,8 +942,15 @@
       </button>
     </div>
 
+    <div class="day-tabs" role="tablist" *ngIf="canChangeDay() || canChangeShift()">
+      <button type="button" role="tab" class="day-tab" [class.active]="dayTab() === 'attendance'" (click)="selectDayTab('attendance')">Attendance</button>
+      <button *ngIf="canChangeDay()" type="button" role="tab" class="day-tab" [class.active]="dayTab() === 'correct'" (click)="selectDayTab('correct')">Correct day</button>
+      <button *ngIf="canChangeShift()" type="button" role="tab" class="day-tab" [class.active]="dayTab() === 'shift'" (click)="selectDayTab('shift')">Change shift</button>
+    </div>
+
     <!-- Modal Body -->
     <div class="session-modal-body">
+      <ng-container *ngIf="dayTab() === 'attendance'">
       <!-- Date & Status Bar -->
       <div class="session-date-status-bar">
         <div class="date-info">
@@ -1099,26 +1068,40 @@
         <span class="duration-highlight">{{ displayedDuration(selectedDayDetails()) }}</span>
       </div>
 
-      <section class="inline-change-day" *ngIf="isChangeDayOpen()">
+      </ng-container>
+
+      <section class="inline-change-day" *ngIf="dayTab() === 'correct'">
         <p class="change-day-label">Set the day to</p>
         <label class="change-day-choice" [class.selected]="changeDayStatus() === 'PRESENT'"><input type="radio" name="attendanceDayStatus" [checked]="changeDayStatus() === 'PRESENT'" (change)="changeDayStatus.set('PRESENT')"><span class="change-day-dot present"></span><span><b>Present</b><small>Full day at office timing (shift start to end)</small></span></label>
         <label class="change-day-choice" [class.selected]="changeDayStatus() === 'HALF_DAY'"><input type="radio" name="attendanceDayStatus" [checked]="changeDayStatus() === 'HALF_DAY'" (change)="changeDayStatus.set('HALF_DAY')"><span class="change-day-dot half"></span><span><b>Half Day</b><small>First half of the shift; half a day's pay</small></span></label>
         <label class="change-day-choice" [class.selected]="changeDayStatus() === 'ABSENT'"><input type="radio" name="attendanceDayStatus" [checked]="changeDayStatus() === 'ABSENT'" (change)="changeDayStatus.set('ABSENT')"><span class="change-day-dot absent"></span><span><b>Absent</b><small>No attendance; counted as loss of pay</small></span></label>
         <label class="change-day-label" for="attendance-change-reason">Reason <b>*</b></label>
-        <textarea id="attendance-change-reason" class="change-day-reason" [value]="changeDayReason()" (input)="changeDayReason.set($any($event.target).value)" maxlength="500" placeholder="e.g. Was in office — biometric missed; leave withdrawn by employee…"></textarea>
-        <small class="change-day-help">Visible to the employee in their notification.</small>
+        <textarea id="attendance-change-reason" class="change-day-reason" [class.field-invalid]="dayReasonError()" [value]="changeDayReason()" (input)="changeDayReason.set($any($event.target).value); dayReasonError.set('')" maxlength="500" placeholder="e.g. Was in office — biometric missed; leave withdrawn by employee…"></textarea>
+        <small class="field-error" *ngIf="dayReasonError()">{{ dayReasonError() }}</small>
+        <small class="change-day-help" *ngIf="!dayReasonError()">Visible to the employee in their notification.</small>
+      </section>
+
+      <section class="inline-change-shift" *ngIf="dayTab() === 'shift'">
+        <p class="change-day-label">Apply to</p>
+        <label class="shift-scope"><input type="radio" name="shiftScopeTab" [checked]="changeShiftScope() === 'day'" (change)="changeShiftScope.set('day')"><span><b>This day only</b><small>Creates a roster entry for this date.</small></span></label>
+        <label class="shift-scope"><input type="radio" name="shiftScopeTab" [checked]="changeShiftScope() === 'permanent'" (change)="changeShiftScope.set('permanent')"><span><b>Permanently</b><small>Updates the standing shift; dated roster entries stay unchanged.</small></span></label>
+        <p class="change-day-label">Shift <b>*</b></p>
+        <div class="shift-tab-list" [class.field-invalid]="shiftError()">
+          <label *ngFor="let shift of changeShiftOptions()" class="shift-choice">
+            <input type="radio" name="attendanceShiftTab" [checked]="changeShiftId() === shift.id" (change)="changeShiftId.set(shift.id); shiftError.set('')">
+            <span class="attendance-shift-dot" [style.background]="shift.colorCode || '#94A3B8'"></span>
+            <span><b>{{ shift.name }}</b><small *ngIf="shift.startTime && shift.endTime">{{ shift.startTime }} – {{ shift.endTime }}</small></span>
+          </label>
+          <p class="shift-empty" *ngIf="!changeShiftOptions().length">{{ isLoadingShifts() ? 'Loading shifts…' : 'No shifts are configured.' }}</p>
+        </div>
+        <small class="field-error" *ngIf="shiftError()">{{ shiftError() }}</small>
       </section>
     </div>
     <!-- Modal Footer -->
     <div class="session-modal-footer">
-      <button *ngIf="canChangeDay() && !isChangeDayOpen()" type="button" class="btn btn-outline change-day-action" (click)="openChangeDay()">Change this day</button>
-      <button *ngIf="canChangeShift() && !isChangeDayOpen()" type="button" class="btn btn-outline change-shift-action" (click)="openChangeShift()">
-        <span class="footer-action-icon"><svg lucideRepeat [size]="15"></svg></span>
-        <span><small>Schedule</small>Change shift</span>
-      </button>
-      <button *ngIf="isChangeDayOpen()" type="button" class="btn btn-outline close-log-action" (click)="isChangeDayOpen.set(false)">Back</button>
-      <button *ngIf="isChangeDayOpen()" type="button" class="btn btn-primary apply-day-change" [disabled]="isSavingDayChange()" (click)="saveDayChange()">{{ isSavingDayChange() ? 'Applying…' : 'Apply change' }}</button>
-      <button type="button" class="btn btn-outline close-log-action" (click)="closeDayDetailsModal()">{{ isChangeDayOpen() ? 'Close Log' : 'Close' }}</button>
+      <button *ngIf="dayTab() === 'correct'" type="button" class="btn btn-primary apply-day-change" [disabled]="isSavingDayChange()" (click)="saveDayChange()">{{ isSavingDayChange() ? 'Applying…' : 'Apply change' }}</button>
+      <button *ngIf="dayTab() === 'shift'" type="button" class="btn btn-primary apply-day-change" [disabled]="isSavingShift()" (click)="saveShiftChange()">{{ isSavingShift() ? 'Saving…' : 'Save shift' }}</button>
+      <button type="button" class="btn btn-outline close-log-action" (click)="closeDayDetailsModal()">Close</button>
     </div>
   </div>
 </div>
@@ -1140,23 +1123,29 @@
 
 <div class="shift-change-overlay" *ngIf="isChangeShiftOpen()" (click)="isChangeShiftOpen.set(false)">
   <div class="shift-change-dialog" (click)="$event.stopPropagation()">
-    <div class="shift-change-header">
-      <div><h3>Change shift</h3><p>{{ selectedDayDetails()?.employeeName }} · {{ selectedDayDetails()?.date | date:'d MMM y' }}</p></div>
+    <div class="shift-change-header shift-step-header">
+      <button type="button" class="shift-back-btn" (click)="changeShiftBack()" aria-label="Back" title="Back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </button>
+      <div><h3>{{ changeShiftStep() === 'scope' ? 'Change shift' : 'Choose a shift' }}</h3><p>{{ selectedDayDetails()?.employeeName }} · {{ selectedDayDetails()?.date | date:'d MMM y' }}<ng-container *ngIf="changeShiftStep() === 'shift'"> · {{ changeShiftScope() === 'permanent' ? 'Permanently' : 'This day only' }}</ng-container></p></div>
       <button type="button" class="btn-modal-close" (click)="isChangeShiftOpen.set(false)"><svg lucideX [size]="18"></svg></button>
     </div>
-    <div class="shift-change-body">
+    <div class="shift-change-body" *ngIf="changeShiftStep() === 'scope'">
+      <label class="shift-scope"><input type="radio" name="shiftScope" [checked]="changeShiftScope() === 'day'" (change)="changeShiftScope.set('day')"><span><b>This day only</b><small>Creates a roster entry for this date.</small></span></label>
+      <label class="shift-scope"><input type="radio" name="shiftScope" [checked]="changeShiftScope() === 'permanent'" (change)="changeShiftScope.set('permanent')"><span><b>Permanently</b><small>Updates the standing shift; dated roster entries stay unchanged.</small></span></label>
+    </div>
+    <div class="shift-change-body" *ngIf="changeShiftStep() === 'shift'">
       <label *ngFor="let shift of changeShiftOptions()" class="shift-choice">
         <input type="radio" name="attendanceShift" [checked]="changeShiftId() === shift.id" (change)="changeShiftId.set(shift.id)">
         <span class="attendance-shift-dot" [style.background]="shift.colorCode || '#94A3B8'"></span>
         <span><b>{{ shift.name }}</b><small *ngIf="shift.startTime && shift.endTime">{{ shift.startTime }} – {{ shift.endTime }}</small></span>
       </label>
       <p class="shift-empty" *ngIf="!changeShiftOptions().length">No shifts are configured.</p>
-      <label class="shift-scope"><input type="radio" name="shiftScope" [checked]="changeShiftScope() === 'day'" (change)="changeShiftScope.set('day')"><span><b>This day only</b><small>Creates a roster entry for this date.</small></span></label>
-      <label class="shift-scope"><input type="radio" name="shiftScope" [checked]="changeShiftScope() === 'permanent'" (change)="changeShiftScope.set('permanent')"><span><b>Permanently</b><small>Updates the standing shift; dated roster entries stay unchanged.</small></span></label>
     </div>
     <div class="shift-change-footer">
       <button type="button" class="btn btn-outline" (click)="isChangeShiftOpen.set(false)">Cancel</button>
-      <button type="button" class="btn btn-primary" [disabled]="!changeShiftId() || isSavingShift()" (click)="saveShiftChange()">{{ isSavingShift() ? 'Saving…' : 'Save shift' }}</button>
+      <button *ngIf="changeShiftStep() === 'scope'" type="button" class="btn btn-primary" (click)="changeShiftStep.set('shift')">Next</button>
+      <button *ngIf="changeShiftStep() === 'shift'" type="button" class="btn btn-primary" [disabled]="!changeShiftId() || isSavingShift()" (click)="saveShiftChange()">{{ isSavingShift() ? 'Saving…' : 'Save shift' }}</button>
     </div>
   </div>
 </div>
@@ -1444,6 +1433,10 @@
               <span>{{ r.clockOut ? 'Out ' + (r.clockOut | date:'h:mm a') : 'Still working' }}</span>
             </span>
           </div>
+
+          <!-- What the day was saved as, when it isn't a plain Present (12 Nov 2026) -->
+          <span class="kpi-chip day-half" *ngIf="r.clockIn && kpiDayKind(r) === 'half'" title="Saved as a half day: clocked in after the shift's half-day time">Half day</span>
+          <span class="kpi-chip day-absent" *ngIf="r.clockIn && kpiDayKind(r) === 'absent'" title="Clocked in outside the office; held as Absent until an admin approves it">Absent · pending approval</span>
 
           <!-- Work Location Badge -->
           <span

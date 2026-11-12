@@ -3282,3 +3282,36 @@
 .pw-spin { display: inline-block; width: 13px; height: 13px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: pw-spin .7s linear infinite; vertical-align: -2px; }
 @keyframes pw-spin { to { transform: rotate(360deg); } }
 .pw-btn[disabled] { opacity: .65; cursor: progress; }
+
+/* Standard look (12 Nov 2026): search, chips and primary button match other pages. */
+.pw-table-search input { height: 38px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 13px; }
+.pw-table-search input:focus { background: #fff; border-color: #2563eb; }
+.pw-chip { border-radius: 999px; }
+.pw-chip.active { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+.pw-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+
+/* ── Compact stat cards (12 Nov 2026), same size as the other KPI strips ──
+   Icon left, number + label beside it, the small tag top-right, meta under. */
+.pw-stats { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important; gap: 12px !important; margin-bottom: 16px !important; }
+.pw-stat {
+  display: grid !important; grid-template-columns: 40px 1fr auto; grid-template-areas: "icon num badge" "icon label badge" "icon meta meta";
+  column-gap: 12px; row-gap: 0; align-items: center; text-align: left;
+  min-height: 0 !important; padding: 12px 14px !important; border-radius: 12px !important; box-shadow: none !important;
+}
+.pw-stat .pw-stat-top { display: contents; }
+.pw-stat .pw-stat-icon-bubble { grid-area: icon; align-self: center; width: 40px !important; height: 40px !important; border-radius: 10px !important; margin: 0 !important; }
+.pw-stat .pw-stat-icon-bubble svg { width: 18px; height: 18px; }
+.pw-stat .pw-stat-badge { grid-area: badge; align-self: start; font-size: 10px !important; padding: 2px 8px !important; }
+.pw-stat .pw-stat-num { grid-area: num; font-family: var(--font-heading); font-size: 20px !important; line-height: 1.15 !important; margin: 0 !important; }
+.pw-stat .pw-stat-label { grid-area: label; font-size: 11px !important; font-weight: 700 !important; letter-spacing: .05em; text-transform: uppercase; color: #64748b !important; margin: 0 !important; }
+.pw-stat .pw-stat-meta { grid-area: meta; font-size: 12px !important; color: #94a3b8 !important; margin: 2px 0 0 !important; }
+.pw-stat.on { border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37, 99, 235, .12) !important; }
+
+/* Section head: one standard row (title left; search, buttons right). */
+.pw-head-actions { gap: 10px; align-items: center; }
+.pw-table-search { min-width: 240px; }
+.pw-filter-bar { padding: 10px 16px !important; }
+
+/* Selected chip keeps its coloured dot (12 Nov 2026). */
+.pw-chip.active .chip-dot.red { background: #dc2626; } .pw-chip.active .chip-dot.amber { background: #f59e0b; }
+.pw-chip.active .chip-dot.green { background: #10b981; } .pw-chip.active .chip-dot.purple { background: #8b5cf6; }

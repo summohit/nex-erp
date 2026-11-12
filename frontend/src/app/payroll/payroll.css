@@ -4,7 +4,7 @@
   padding: 24px;
   max-width: 1400px;
   margin: 0 auto;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 /* Multi-file dropzone & Lightbox Modal styles */
@@ -6253,3 +6253,412 @@
 
 /* Payment date under the PAID badge (19 Oct 2026) */
 .paid-on-note { margin-top: 4px; font-size: 11.5px; font-weight: 600; color: #64748b; white-space: nowrap; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MIRA STANDARD LAYOUT OVERRIDES (Page Header Actions, KPI Strip, Filter Bar,
+   Tables & Sentence-Case Status Badges)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.payroll-container {
+  overflow: visible;
+}
+
+/* 1. Page Header Buttons & View Switcher */
+.mira-view-switch {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.mira-view-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.mira-view-pill:hover {
+  color: #0f172a;
+}
+
+.mira-view-pill.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.mira-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.mira-btn-secondary:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.mira-btn-secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mira-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.18);
+}
+
+.mira-btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.mira-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 2. Single-Row KPI / Stat Strip */
+.kpi-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.kpi-summary-grid > .kpi-card {
+  border: 1px solid #e6ebf5;
+  border-radius: 14px;
+  padding: 16px 18px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.kpi-summary-grid > .kpi-card.kpi-active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb, 0 4px 12px rgba(37, 99, 235, 0.08);
+}
+
+.expense-kpi-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+  margin-bottom: 16px !important;
+}
+
+.expense-stat-card.stat-active {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 1px #2563eb, 0 4px 12px rgba(37, 99, 235, 0.08) !important;
+}
+
+@media (max-width: 1100px) {
+  .kpi-summary-grid,
+  .expense-kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* 3. Single-Row MIRA Filter Bar */
+.mira-filter-bar {
+  position: relative;
+  z-index: 30;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: #ffffff;
+  border: 1px solid #e6ebf5;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.mira-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 300px;
+  height: 38px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0 10px 0 34px;
+  transition: all 0.15s ease;
+}
+
+.mira-search-box:focus-within {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.mira-search-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.mira-search-input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+}
+
+.mira-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.mira-search-clear {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+}
+
+.mira-search-clear:hover {
+  color: #334155;
+}
+
+.mira-select-wrap {
+  flex-shrink: 0;
+}
+
+.mira-select-md {
+  width: 195px;
+}
+
+.mira-select-sm {
+  width: 155px;
+}
+
+.mira-select-xs {
+  width: 110px;
+}
+
+/* Filters Popover Button + Panel (>5 filters) */
+.mira-filters-popover-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.mira-filters-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.mira-filters-btn:hover,
+.mira-filters-btn.active {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.mira-filters-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mira-filters-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: 280px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mira-filters-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.mira-filters-close {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.mira-filters-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.mira-filters-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.mira-lop-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.mira-lop-pill {
+  flex: 1;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mira-lop-pill.active {
+  background: #eff6ff;
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.mira-showing-count {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: #64748b;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mira-showing-count strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+/* 4. Sentence-Case Status Badges & Outlined 32px Row Action Buttons */
+.status-pill,
+.status-round {
+  text-transform: none !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+}
+
+.g-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.g-icon-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #2563eb;
+}
+
+.g-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.widget-card {
+  overflow: visible;
+}
+
+@media (max-width: 1024px) {
+  .mira-filter-bar {
+    flex-wrap: wrap;
+  }
+}

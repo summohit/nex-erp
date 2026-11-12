@@ -1002,11 +1002,23 @@
 
 .personal-cards-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
 }
 
-@media (max-width: 1024px) {
+@media (min-width: 1600px) {
+  .personal-cards-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1100px) {
+  .personal-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
   .personal-cards-grid {
     grid-template-columns: 1fr;
   }
@@ -1966,3 +1978,16 @@ select.form-control:disabled {
 .profile-change-shift-btn { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; padding: 9px 12px; border: 1px solid #2563eb; border-radius: 8px; color: #fff; background: #2563eb; font: 650 12.5px inherit; cursor: pointer; box-shadow: 0 2px 5px rgba(37,99,235,.18); }.profile-change-shift-btn:hover { background: #1d4ed8; }
 .shift-change-modal { max-width: 500px; }.shift-change-header { align-items: flex-start; background: linear-gradient(135deg,#fff,#f8fbff); }.shift-change-header h2 { margin-top: 4px; }.shift-change-header p { margin: 4px 0 0; color: #64748b; font-size: 12.5px; }.shift-change-body { gap: 18px; }.profile-shift-picker { display: grid; gap: 8px; max-height: 286px; padding: 3px; overflow-y: auto; }.profile-shift-option { display: flex; align-items: center; width: 100%; gap: 11px; padding: 11px 12px; border: 1px solid #dce5ef; border-radius: 10px; color: #1e293b; background: #fff; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }.profile-shift-option:hover { border-color: #93c5fd; background: #f8fbff; }.profile-shift-option.selected { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 2px rgba(37,99,235,.12); }.profile-shift-dot { width: 11px; height: 11px; flex: 0 0 11px; border-radius: 4px; }.profile-shift-option-copy { display: grid; gap: 2px; min-width: 0; flex: 1; }.profile-shift-option-copy strong { overflow: hidden; color: #1e293b; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }.profile-shift-option-copy small { color: #64748b; font-size: 12px; font-variant-numeric: tabular-nums; }.profile-shift-selected-mark { display: grid; place-items: center; color: #2563eb; }.shift-scope-options { display: grid; gap: 9px; }.shift-scope-options label { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; cursor: pointer; transition: .15s ease; }.shift-scope-options label.selected { border-color: #93c5fd; background: #eff6ff; box-shadow: inset 0 0 0 1px #bfdbfe; }.shift-scope-options input { margin: 3px 0 0; accent-color: #2563eb; }.shift-scope-options span { display: grid; gap: 3px; }.shift-scope-options strong { color: #1e293b; font-size: 13px; }.shift-scope-options small { color: #64748b; font-size: 12px; line-height: 1.35; }
 @media (max-width: 520px) { .profile-shift-summary { align-items: stretch; flex-direction: column; }.profile-change-shift-btn { justify-content: center; }.shift-change-modal .form-grid-2 { grid-template-columns: 1fr; gap: 12px; } }
+
+/* Change shift pop-up: scope first, inline field errors, Google-style footer. */
+.shift-change-body .req { color: #dc2626; font-weight: 600; }
+.shift-change-body .field-error { display: block; margin-top: 6px; color: #dc2626; font-size: 12px; font-weight: 500; }
+.shift-change-body .form-control.field-invalid { border-color: #ef4444 !important; box-shadow: 0 0 0 3px rgba(239,68,68,.12) !important; }
+.profile-shift-picker.field-invalid { outline: 1px solid #ef4444; outline-offset: 3px; border-radius: 10px; }
+.shift-change-body .shift-scope-options { margin-bottom: 14px; }
+.shift-change-footer { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid #eef2f6; }
+.shift-btn-text { height: 36px; padding: 0 16px; border: 0; border-radius: 18px; background: transparent; color: #1d4ed8; font-size: 14px; font-weight: 500; cursor: pointer; }
+.shift-btn-text:hover:not(:disabled) { background: #eff6ff; }
+.shift-btn-primary { height: 36px; padding: 0 22px; border: 0; border-radius: 18px; background: #2563eb; color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; transition: background .15s, box-shadow .15s; }
+.shift-btn-primary:hover:not(:disabled) { background: #1d4ed8; box-shadow: 0 1px 3px rgba(37,99,235,.35); }
+.shift-btn-primary:disabled { background: #e2e8f0; color: #94a3b8; cursor: default; }

@@ -1,226 +1,251 @@
 <div class="nb-page-container">
-  <!-- Top Navigation & Actions Bar -->
-  <div class="nb-top-nav">
-    <div class="nb-breadcrumbs">
-      <span class="crumb-link">Administration</span>
-      <span class="crumb-sep">/</span>
-      <span class="crumb-current">Notice Board</span>
-    </div>
-    <div class="nb-nav-actions">
-      <button type="button" class="nb-btn-refresh" (click)="load()" [disabled]="loading()" title="Refresh notices">
-        <svg lucideRefreshCw size="14" [class.nb-spinning]="loading()"></svg>
-        <span>Refresh</span>
+
+  <!-- ── 1. Standard MIRA Page Header ──────────────────────────────────────── -->
+  <app-page-header
+    icon="megaphone"
+    section="Administration"
+    heading="Notice Board"
+    [subtitle]="canPost()
+      ? 'Broadcast announcements to employee dashboards, send email alerts, and manage company notices.'
+      : 'Stay informed with official company announcements, policy updates, and important notices.'">
+
+    <!-- View switch pills first -->
+    <div class="view-switch-pills" role="group" aria-label="View mode">
+      <button
+        type="button"
+        class="pill-btn"
+        [class.active]="viewMode() === 'CARDS'"
+        (click)="setViewMode('CARDS')"
+        title="Cards view">
+        <svg lucideLayoutGrid size="14"></svg>
+        <span>Cards</span>
+      </button>
+      <button
+        type="button"
+        class="pill-btn"
+        [class.active]="viewMode() === 'TABLE'"
+        (click)="setViewMode('TABLE')"
+        title="Table view">
+        <svg lucideTable2 size="14"></svg>
+        <span>Table</span>
       </button>
     </div>
-  </div>
 
-  <!-- Hero Header Banner -->
-  <div class="nb-hero-card">
-    <div class="nb-hero-left">
-      <div class="nb-hero-icon-wrap">
-        <svg lucideMegaphone size="26"></svg>
-      </div>
-      <div class="nb-hero-text">
-        <div class="nb-hero-title-row">
-          <h1>Notice Board</h1>
-          <span class="nb-live-pill" *ngIf="activeCount() > 0">
-            <span class="nb-pulse-dot"></span>
-            {{ activeCount() }} Active {{ activeCount() === 1 ? 'Notice' : 'Notices' }}
-          </span>
-        </div>
-        <p>{{ canPost()
-          ? 'Broadcast announcements to all employee dashboards, send instant email alerts, and manage company records.'
-          : 'Stay informed with official company announcements, policy updates, and important notices.' }}</p>
-      </div>
-    </div>
-    <div class="nb-hero-right" *ngIf="canPost()">
-      <button type="button" class="btn-primary nb-btn-post" (click)="openNew()">
-        <svg lucidePlus size="16"></svg>
-        <span>Post a Notice</span>
-      </button>
-    </div>
-  </div>
+    <!-- Outlined secondary buttons next -->
+    <button
+      type="button"
+      class="btn-secondary"
+      (click)="load()"
+      [disabled]="loading()"
+      title="Refresh notices">
+      <svg lucideRefreshCw size="14" [class.nb-spinning]="loading()"></svg>
+      <span>Refresh</span>
+    </button>
 
-  <!-- KPI Summary Metrics Grid -->
-  <div class="nb-kpi-grid">
-    <div class="nb-kpi-card kpi-emerald" [class.active]="statusFilter() === 'ACTIVE'" (click)="setStatusFilter('ACTIVE')">
-      <div class="nb-kpi-icon-wrap bg-emerald-soft">
-        <svg lucideCheckCircle2 size="20"></svg>
-      </div>
-      <div class="nb-kpi-content">
-        <span class="nb-kpi-label">Active Notices</span>
-        <div class="nb-kpi-num-row">
-          <span class="nb-kpi-value text-emerald">{{ activeCount() }}</span>
-          <span class="nb-kpi-badge badge-emerald">Live Now</span>
-        </div>
-        <span class="nb-kpi-sub">Visible on dashboards</span>
-      </div>
-    </div>
+    <!-- Blue primary button last (rightmost) -->
+    <button
+      type="button"
+      *ngIf="canPost()"
+      class="btn-primary"
+      (click)="openNew()">
+      <svg lucidePlus size="16"></svg>
+      <span>Post a Notice</span>
+    </button>
+  </app-page-header>
 
-    <div class="nb-kpi-card kpi-rose" [class.active]="statusFilter() === 'HIGH'" (click)="setStatusFilter('HIGH')">
-      <div class="nb-kpi-icon-wrap bg-rose-soft">
-        <svg lucideAlertTriangle size="20"></svg>
-      </div>
-      <div class="nb-kpi-content">
-        <span class="nb-kpi-label">High Priority</span>
-        <div class="nb-kpi-num-row">
-          <span class="nb-kpi-value text-rose">{{ highPriorityCount() }}</span>
-          <span class="nb-kpi-badge badge-rose">Urgent</span>
-        </div>
-        <span class="nb-kpi-sub">Priority attention</span>
-      </div>
-    </div>
-
-    <div class="nb-kpi-card kpi-blue" [class.active]="statusFilter() === 'ALL'" (click)="setStatusFilter('ALL')">
+  <!-- ── 2. KPI Summary Cards (Single Row) ─────────────────────────────────── -->
+  <section class="nb-kpi-grid" aria-label="Notice summary metrics">
+    <article
+      class="nb-kpi-card"
+      [class.active]="statusFilter() === 'ALL'"
+      (click)="setStatusFilter('ALL')"
+      tabindex="0"
+      role="button"
+      aria-label="Show all notices">
       <div class="nb-kpi-icon-wrap bg-blue-soft">
         <svg lucideMegaphone size="20"></svg>
       </div>
       <div class="nb-kpi-content">
         <span class="nb-kpi-label">Total Notices</span>
         <div class="nb-kpi-num-row">
-          <span class="nb-kpi-value text-blue">{{ totalCount() }}</span>
-          <span class="nb-kpi-badge badge-blue">Records</span>
+          <span class="nb-kpi-value">{{ totalCount() }}</span>
         </div>
         <span class="nb-kpi-sub">All announcements</span>
       </div>
-    </div>
+    </article>
 
-    <!-- 4th Metric: Expired/Archived for Admins, Attachments for Employees -->
-    <div class="nb-kpi-card kpi-slate" *ngIf="canPost()" [class.active]="statusFilter() === 'EXPIRED'" (click)="setStatusFilter('EXPIRED')">
+    <article
+      class="nb-kpi-card"
+      [class.active]="statusFilter() === 'ACTIVE'"
+      (click)="setStatusFilter('ACTIVE')"
+      tabindex="0"
+      role="button"
+      aria-label="Show active notices">
+      <div class="nb-kpi-icon-wrap bg-emerald-soft">
+        <svg lucideCheckCircle2 size="20"></svg>
+      </div>
+      <div class="nb-kpi-content">
+        <span class="nb-kpi-label">Active Notices</span>
+        <div class="nb-kpi-num-row">
+          <span class="nb-kpi-value">{{ activeCount() }}</span>
+        </div>
+        <span class="nb-kpi-sub">Visible on dashboards</span>
+      </div>
+    </article>
+
+    <article
+      class="nb-kpi-card"
+      [class.active]="statusFilter() === 'HIGH'"
+      (click)="setStatusFilter('HIGH')"
+      tabindex="0"
+      role="button"
+      aria-label="Show high priority notices">
+      <div class="nb-kpi-icon-wrap bg-rose-soft">
+        <svg lucideAlertTriangle size="20"></svg>
+      </div>
+      <div class="nb-kpi-content">
+        <span class="nb-kpi-label">High Priority</span>
+        <div class="nb-kpi-num-row">
+          <span class="nb-kpi-value">{{ highPriorityCount() }}</span>
+        </div>
+        <span class="nb-kpi-sub">Urgent attention</span>
+      </div>
+    </article>
+
+    <article
+      class="nb-kpi-card"
+      [class.active]="statusFilter() === 'ATTACHMENTS'"
+      (click)="setStatusFilter('ATTACHMENTS')"
+      tabindex="0"
+      role="button"
+      aria-label="Show notices with files">
+      <div class="nb-kpi-icon-wrap bg-purple-soft">
+        <svg lucidePaperclip size="20"></svg>
+      </div>
+      <div class="nb-kpi-content">
+        <span class="nb-kpi-label">With Files</span>
+        <div class="nb-kpi-num-row">
+          <span class="nb-kpi-value">{{ withAttachmentsCount() }}</span>
+        </div>
+        <span class="nb-kpi-sub">Attached documents</span>
+      </div>
+    </article>
+
+    <article
+      class="nb-kpi-card"
+      *ngIf="canPost() && scheduledCount() > 0"
+      [class.active]="statusFilter() === 'SCHEDULED'"
+      (click)="setStatusFilter('SCHEDULED')"
+      tabindex="0"
+      role="button"
+      aria-label="Show scheduled notices">
+      <div class="nb-kpi-icon-wrap bg-amber-soft">
+        <svg lucideCalendar size="20"></svg>
+      </div>
+      <div class="nb-kpi-content">
+        <span class="nb-kpi-label">Scheduled</span>
+        <div class="nb-kpi-num-row">
+          <span class="nb-kpi-value">{{ scheduledCount() }}</span>
+        </div>
+        <span class="nb-kpi-sub">Upcoming broadcasts</span>
+      </div>
+    </article>
+
+    <article
+      class="nb-kpi-card"
+      *ngIf="canPost()"
+      [class.active]="statusFilter() === 'EXPIRED'"
+      (click)="setStatusFilter('EXPIRED')"
+      tabindex="0"
+      role="button"
+      aria-label="Show expired or archived notices">
       <div class="nb-kpi-icon-wrap bg-slate-soft">
         <svg lucideArchive size="20"></svg>
       </div>
       <div class="nb-kpi-content">
         <span class="nb-kpi-label">Past / Expired</span>
         <div class="nb-kpi-num-row">
-          <span class="nb-kpi-value text-slate">{{ expiredCount() }}</span>
-          <span class="nb-kpi-badge badge-slate">Archived</span>
+          <span class="nb-kpi-value">{{ expiredCount() }}</span>
         </div>
-        <span class="nb-kpi-sub">Inactive records</span>
+        <span class="nb-kpi-sub">Archived records</span>
       </div>
-    </div>
+    </article>
+  </section>
 
-    <div class="nb-kpi-card kpi-purple" *ngIf="!canPost()" [class.active]="statusFilter() === 'ATTACHMENTS'" (click)="setStatusFilter('ATTACHMENTS')">
-      <div class="nb-kpi-icon-wrap bg-purple-soft">
-        <svg lucidePaperclip size="20"></svg>
-      </div>
-      <div class="nb-kpi-content">
-        <span class="nb-kpi-label">Documents</span>
-        <div class="nb-kpi-num-row">
-          <span class="nb-kpi-value text-purple">{{ withAttachmentsCount() }}</span>
-          <span class="nb-kpi-badge badge-purple">Files</span>
-        </div>
-        <span class="nb-kpi-sub">Notices with files</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Search, Filter & Controls Toolbar -->
-  <div class="nb-controls-card">
-    <div class="nb-tabs-row">
-      <button type="button" class="nb-tab-btn" [class.active]="statusFilter() === 'ALL'" (click)="setStatusFilter('ALL')">
-        <span>All Notices</span>
-        <span class="nb-tab-count">{{ totalCount() }}</span>
-      </button>
-
-      <button type="button" class="nb-tab-btn" [class.active]="statusFilter() === 'ACTIVE'" (click)="setStatusFilter('ACTIVE')">
-        <span class="nb-mini-dot dot-emerald"></span>
-        <span>Active</span>
-        <span class="nb-tab-count">{{ activeCount() }}</span>
-      </button>
-
-      <button type="button" class="nb-tab-btn" [class.active]="statusFilter() === 'HIGH'" (click)="setStatusFilter('HIGH')">
-        <span class="nb-mini-dot dot-rose"></span>
-        <span>High Priority</span>
-        <span class="nb-tab-count">{{ highPriorityCount() }}</span>
-      </button>
-
-      <button type="button" class="nb-tab-btn" [class.active]="statusFilter() === 'ATTACHMENTS'" (click)="setStatusFilter('ATTACHMENTS')">
-        <svg lucidePaperclip size="13"></svg>
-        <span>With Files</span>
-        <span class="nb-tab-count">{{ withAttachmentsCount() }}</span>
-      </button>
-
-      <button type="button" class="nb-tab-btn" *ngIf="canPost() && scheduledCount() > 0"
-              [class.active]="statusFilter() === 'SCHEDULED'" (click)="setStatusFilter('SCHEDULED')">
-        <svg lucideCalendar size="13"></svg>
-        <span>Scheduled</span>
-        <span class="nb-tab-count">{{ scheduledCount() }}</span>
-      </button>
-
-      <button type="button" class="nb-tab-btn" *ngIf="canPost()"
-              [class.active]="statusFilter() === 'EXPIRED'" (click)="setStatusFilter('EXPIRED')">
-        <svg lucideArchive size="13"></svg>
-        <span>Expired / Archived</span>
-        <span class="nb-tab-count">{{ expiredCount() }}</span>
-      </button>
-    </div>
-
-    <div class="nb-filter-bar">
-      <!-- Search input -->
-      <div class="nb-search-wrap">
-        <svg lucideSearch size="16" class="nb-search-icon"></svg>
-        <input type="text"
-               placeholder="Search notices by title, content, or author…"
-               [ngModel]="searchQuery()"
-               (ngModelChange)="searchQuery.set($event)" />
-        <button type="button" class="nb-search-clear" *ngIf="searchQuery()" (click)="searchQuery.set('')" title="Clear search">
-          <svg lucideX size="14"></svg>
-        </button>
-      </div>
-
-      <!-- Priority Filter Dropdown -->
-      <div class="nb-dropdown-wrap">
-        <select [ngModel]="priorityFilter()" (ngModelChange)="priorityFilter.set($event)">
-          <option value="ALL">All Priorities</option>
-          <option value="HIGH">High Priority Only</option>
-          <option value="NORMAL">Normal Priority Only</option>
-          <option value="LOW">Low Priority Only</option>
-        </select>
-        <svg lucideChevronDown size="14" class="nb-dropdown-icon"></svg>
-      </div>
-
-      <!-- Posted date range -->
-      <div class="nb-dropdown-wrap">
-        <select [ngModel]="dateRange()" (ngModelChange)="dateRange.set($event)" aria-label="Posted within">
-          <option value="ALL">Any Date</option>
-          <option value="7">Last 1 Week</option>
-          <option value="30">Last 30 Days</option>
-          <option value="60">Last 60 Days</option>
-          <option value="CUSTOM">Custom Range</option>
-        </select>
-        <svg lucideChevronDown size="14" class="nb-dropdown-icon"></svg>
-      </div>
-      <ng-container *ngIf="dateRange() === 'CUSTOM'">
-        <input type="date" class="nb-date-input" aria-label="From date" [ngModel]="customFrom()" (ngModelChange)="customFrom.set($event)" />
-        <input type="date" class="nb-date-input" aria-label="To date" [ngModel]="customTo()" (ngModelChange)="customTo.set($event)" />
-      </ng-container>
-
-      <!-- Sort Dropdown -->
-      <div class="nb-dropdown-wrap">
-        <select [ngModel]="sortBy()" (ngModelChange)="sortBy.set($event)">
-          <option value="NEWEST">Newest First</option>
-          <option value="OLDEST">Oldest First</option>
-          <option value="PRIORITY">Highest Priority First</option>
-        </select>
-        <svg lucideChevronDown size="14" class="nb-dropdown-icon"></svg>
-      </div>
-
-      <div class="nb-date-filter">
-        <svg lucideCalendar size="14"></svg>
-        <input type="date" [ngModel]="dateFilter()" (ngModelChange)="dateFilter.set($event)" aria-label="Filter notices by posted date">
-      </div>
-
-      <div class="nb-view-toggle" aria-label="Notice view">
-        <button type="button" [class.active]="viewMode() === 'CARDS'" (click)="setViewMode('CARDS')"><svg lucideLayoutGrid size="15"></svg><span>Cards</span></button>
-        <button type="button" [class.active]="viewMode() === 'TABLE'" (click)="setViewMode('TABLE')"><svg lucideTable2 size="15"></svg><span>Table</span></button>
-      </div>
-
-      <!-- Clear All Filters Button -->
-      <button type="button" class="nb-btn-clear" *ngIf="hasActiveFilters()" (click)="clearAllFilters()" title="Reset all filters">
+  <!-- ── 3. Single-Row Filter Bar ──────────────────────────────────────────── -->
+  <div class="filter-card">
+    <!-- 1. Search (always first) -->
+    <div class="nb-search-wrap">
+      <svg lucideSearch size="15" class="nb-search-icon"></svg>
+      <input
+        type="search"
+        placeholder="Search notices by title, content, or author…"
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+        aria-label="Search notices" />
+      <button
+        type="button"
+        class="nb-search-clear"
+        *ngIf="searchQuery()"
+        (click)="searchQuery.set('')"
+        title="Clear search">
         <svg lucideX size="13"></svg>
-        <span>Reset Filters</span>
       </button>
+    </div>
+
+    <!-- 2. Status Dropdown -->
+    <div class="nb-select-group">
+      <app-searchable-select
+        [options]="statusSelectOptions()"
+        placeholder="All statuses"
+        [clearable]="true"
+        [value]="statusFilter() === 'ALL' ? null : statusFilter()"
+        (valueChange)="setStatusFilter($event || 'ALL')">
+      </app-searchable-select>
+    </div>
+
+    <!-- 3. Priority Dropdown -->
+    <div class="nb-select-group">
+      <app-searchable-select
+        [options]="prioritySelectOptions"
+        placeholder="All priorities"
+        [clearable]="true"
+        [value]="priorityFilter() === 'ALL' ? null : priorityFilter()"
+        (valueChange)="priorityFilter.set($event || 'ALL')">
+      </app-searchable-select>
+    </div>
+
+    <!-- 4. Sort Dropdown -->
+    <div class="nb-select-group">
+      <app-searchable-select
+        [options]="sortSelectOptions"
+        placeholder="Sort: Newest first"
+        [clearable]="false"
+        [value]="sortBy()"
+        (valueChange)="sortBy.set($event || 'NEWEST')">
+      </app-searchable-select>
+    </div>
+
+    <!-- 5. Date Preset Filter -->
+    <app-date-preset-filter
+      label="Posted"
+      [preset]="datePreset()"
+      (presetChange)="datePreset.set($event)"
+      (rangeChange)="onDateRangeChange($event)">
+    </app-date-preset-filter>
+
+    <!-- 6. Clear all -->
+    <button
+      type="button"
+      class="clear-all-filters"
+      *ngIf="hasActiveFilters()"
+      (click)="clearAllFilters()">
+      Clear all
+    </button>
+
+    <!-- 7. Showing X of Y pushed to right -->
+    <div class="nb-showing-count" *ngIf="!loading()">
+      Showing <strong>{{ filteredNotices().length }}</strong> of <strong>{{ notices().length }}</strong>
     </div>
   </div>
 
@@ -257,7 +282,7 @@
       </p>
     </div>
     <div class="nb-empty-actions">
-      <button type="button" class="nb-btn-secondary" *ngIf="hasActiveFilters()" (click)="clearAllFilters()">
+      <button type="button" class="btn-secondary" *ngIf="hasActiveFilters()" (click)="clearAllFilters()">
         Clear all filters
       </button>
       <button type="button" class="btn-primary" *ngIf="canPost() && notices().length === 0" (click)="openNew()">
@@ -266,137 +291,47 @@
     </div>
   </div>
 
-  <!-- Notices List -->
+  <!-- ── 4A. AG Grid Table View (Default) ──────────────────────────────────── -->
+  <div class="nb-grid-card" *ngIf="!loading() && filteredNotices().length > 0 && viewMode() === 'TABLE'">
+    <ag-grid-angular
+      class="ag-theme-quartz nb-ag-grid"
+      [theme]="'legacy'"
+      [rowData]="filteredNotices()"
+      [columnDefs]="noticeColDefs()"
+      [defaultColDef]="defaultColDef"
+      [gridOptions]="gridOptions"
+      [pagination]="true"
+      [paginationPageSize]="paginationPageSize"
+      [paginationPageSizeSelector]="paginationPageSizeSelector">
+    </ag-grid-angular>
+  </div>
+
+  <!-- ── 4B. Cards / Board View (3 Cards per Row) ──────────────────────────── -->
   <div class="nb-list" *ngIf="!loading() && filteredNotices().length > 0 && viewMode() === 'CARDS'">
     <article class="nb-card"
              *ngFor="let n of filteredNotices()"
              [class.high-priority]="n.priority === 'HIGH'"
              [class.normal-priority]="n.priority === 'NORMAL'"
              [class.low-priority]="n.priority === 'LOW'"
-             [class.retired]="!n.isActive || hasExpired(n)">
+             [class.retired]="!n.isActive || hasExpired(n)"
+             (click)="openNotice(n)"
+             tabindex="0"
+             role="button"
+             [attr.aria-label]="n.title">
 
-      <!-- Card Top Ribbon / Badges -->
-      <div class="nb-card-head">
-        <div class="nb-badge-group">
-          <!-- Priority Pill -->
-          <span class="nb-priority-badge" [class]="'p-' + n.priority.toLowerCase()">
-            <svg *ngIf="n.priority === 'HIGH'" lucideAlertTriangle size="12"></svg>
-            <svg *ngIf="n.priority === 'NORMAL'" lucideBell size="12"></svg>
-            <svg *ngIf="n.priority === 'LOW'" lucideFileText size="12"></svg>
-            <span>{{ n.priority === 'HIGH' ? 'High Priority' : (n.priority === 'NORMAL' ? 'Normal' : 'Info') }}</span>
-          </span>
+      <!-- Row 1: Card Title -->
+      <h2 class="nb-card-title" [title]="n.title">{{ n.title }}</h2>
 
-          <!-- Active Status Pill -->
-          <span class="nb-status-pill live" *ngIf="n.isActive && !hasExpired(n) && !isScheduled(n)">
-            <span class="nb-live-dot-green"></span>
-            <span>Live Now</span>
-          </span>
-
-          <!-- Scheduled Status Pill -->
-          <span class="nb-status-pill scheduled" *ngIf="n.isActive && isScheduled(n)">
-            <svg lucideCalendar size="12"></svg>
-            <span>Scheduled (not live yet)</span>
-          </span>
-
-          <!-- Expired Status Pill -->
-          <span class="nb-status-pill expired" *ngIf="hasExpired(n)">
-            <svg lucideClock size="12"></svg>
-            <span>Expired</span>
-          </span>
-
-          <!-- Retired Status Pill -->
-          <span class="nb-status-pill retired-tag" *ngIf="!n.isActive">
-            <svg lucideArchive size="12"></svg>
-            <span>Retired</span>
-          </span>
-
-          <!-- Emailed Pill -->
-          <span class="nb-status-pill emailed" *ngIf="n.emailSentAt" title="Broadcasted via company email">
-            <svg lucideMail size="12"></svg>
-            <span>Sent via Email</span>
-          </span>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="nb-card-actions">
-          <button type="button" class="nb-btn-action" (click)="copyNoticeText(n)"
-                  [title]="copiedNoticeId() === n.id ? 'Copied to clipboard!' : 'Copy announcement text'">
-            <svg *ngIf="copiedNoticeId() !== n.id" lucideShare2 size="14"></svg>
-            <svg *ngIf="copiedNoticeId() === n.id" lucideCheck size="14" class="text-emerald"></svg>
-          </button>
-
-          <ng-container *ngIf="canPost()">
-            <button type="button" class="nb-btn-action" (click)="openEdit(n)" title="Edit Notice">
-              <svg lucideEdit2 size="14"></svg>
-            </button>
-            <button type="button" class="nb-btn-action nb-btn-retire" *ngIf="n.isActive"
-                    (click)="openRetireModal(n)" title="Retire Notice">
-              <svg lucideArchive size="14"></svg>
-            </button>
-          </ng-container>
-        </div>
-      </div>
-
-      <!-- Card Title -->
-      <h2 class="nb-card-title">{{ n.title }}</h2>
-
-      <!-- Card Body Content with Read More Toggle -->
+      <!-- Row 2: Short Details + Read More -->
       <div class="nb-body-wrap">
-        <div class="nb-card-body nb-rich" [class.collapsed]="isLongBody(n.body) && !isExpanded(n.id)"
-             [innerHTML]="bodyHtml(n.body)"></div>
-        <button type="button" class="nb-btn-expand" *ngIf="isLongBody(n.body)" (click)="toggleExpand(n.id)">
-          <span>{{ isExpanded(n.id) ? 'Show less' : 'Read full notice' }}</span>
-          <svg *ngIf="!isExpanded(n.id)" lucideChevronDown size="14"></svg>
-          <svg *ngIf="isExpanded(n.id)" lucideChevronUp size="14"></svg>
+        <p class="nb-card-summary">{{ bodyText(n.body) }}</p>
+        <button type="button" class="nb-card-read-more" (click)="openNotice(n); $event.stopPropagation()">
+          <span>Read more</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </button>
       </div>
 
-      <!-- Audience & who has seen it — for whoever posts -->
-      <div class="nb-audience-row" *ngIf="canPost()">
-        <span class="nb-audience-chip" [title]="audienceSummary(n.audience)">
-          <svg lucideUsers size="13"></svg>
-          <span>{{ audienceSummary(n.audience) }}</span>
-        </span>
-        <button type="button" class="nb-views-btn" (click)="openViews(n)">
-          <svg lucideEye size="13"></svg>
-          @if (n._count?.recipients) {
-            <span>Viewed by {{ n._count?.reads }} of {{ n._count?.recipients }}</span>
-            <span class="nb-views-bar"><span [style.width.%]="viewedPercent(n)"></span></span>
-          } @else {
-            <span>Who has seen it</span>
-          }
-        </button>
-      </div>
-
-      <!-- Attachments Section -->
-      <div class="nb-attachments-section" *ngIf="n.attachments && n.attachments.length > 0">
-        <div class="nb-attachments-title">
-          <svg lucidePaperclip size="13"></svg>
-          <span>Attached Documents ({{ n.attachments.length }})</span>
-        </div>
-        <div class="nb-attachments-grid">
-          <a class="nb-attachment-card"
-             *ngFor="let a of n.attachments"
-             [href]="a.fileUrl"
-             target="_blank"
-             rel="noopener"
-             [title]="a.fileName">
-            <div class="nb-file-icon-box" [class]="'file-' + getFileType(a.fileName)">
-              <svg *ngIf="getFileType(a.fileName) === 'pdf'" lucideFileText size="16"></svg>
-              <svg *ngIf="getFileType(a.fileName) === 'image'" lucideImage size="16"></svg>
-              <svg *ngIf="getFileType(a.fileName) === 'spreadsheet'" lucideFileSpreadsheet size="16"></svg>
-              <svg *ngIf="getFileType(a.fileName) === 'doc' || getFileType(a.fileName) === 'other'" lucideFile size="16"></svg>
-            </div>
-            <div class="nb-attachment-info">
-              <span class="nb-attachment-name">{{ a.fileName }}</span>
-              <span class="nb-attachment-size" *ngIf="a.fileSize">{{ fileSize(a.fileSize) }}</span>
-            </div>
-            <svg lucideExternalLink size="13" class="nb-attachment-arrow"></svg>
-          </a>
-        </div>
-      </div>
-
-      <!-- Card Footer: Author Profile & Timeline -->
+      <!-- Row 3: Who Posted with Date -->
       <div class="nb-card-footer">
         <div class="nb-author-row">
           <img *ngIf="n.createdBy?.avatarUrl" [src]="n.createdBy?.avatarUrl"
@@ -406,56 +341,46 @@
           </div>
           <div class="nb-author-meta">
             <span class="nb-author-name">
-              {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'CES Tech Administration' }}
+              {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'Administration' }}
             </span>
-            <div class="nb-timeline-meta">
-              <span class="nb-meta-item">
-                <svg lucideCalendar size="12"></svg>
-                <span>Posted {{ n.publishedAt | date:'dd-MM-yyyy' }}</span>
-              </span>
-              <span class="nb-meta-sep" *ngIf="n.expiresAt">·</span>
-              <span class="nb-meta-item" *ngIf="n.expiresAt">
-                <svg lucideClock size="12"></svg>
-                <span>Valid until {{ n.expiresAt | date:'dd-MM-yyyy' }}</span>
-              </span>
-            </div>
+            <span class="nb-card-date">{{ (n.publishedAt || n.createdAt) | date:'d MMM yyyy' }}</span>
           </div>
         </div>
       </div>
     </article>
   </div>
 
-  <div class="nb-table-wrap" *ngIf="!loading() && filteredNotices().length > 0 && viewMode() === 'TABLE'">
-    <table class="nb-table">
-      <thead><tr><th class="nb-serial-col">S.No.</th><th>Title</th><th>Priority</th><th>Posted by</th><th>Posted on</th><th>Expires</th><th>Audience</th><th>Attachments</th><th>Actions</th></tr></thead>
-      <tbody>
-        <tr *ngFor="let n of filteredNotices(); let i = index" class="nb-table-row" (click)="openNotice(n)">
-          <td class="nb-serial-col"><span>{{ i + 1 }}</span></td>
-          <td><strong>{{ n.title }}</strong><small class="nb-table-status" *ngIf="!n.isActive || hasExpired(n)">{{ !n.isActive ? 'Retired' : 'Expired' }}</small></td>
-          <td><span class="nb-priority-badge" [class]="'p-' + n.priority.toLowerCase()">{{ n.priority }}</span></td>
-          <td>{{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'CES Tech Administration' }}</td>
-          <td>{{ n.publishedAt | date:'dd MMM y' }}</td>
-          <td>{{ n.expiresAt ? (n.expiresAt | date:'dd MMM y') : '—' }}</td>
-          <td><span class="nb-table-audience" [title]="audienceSummary(n.audience)">{{ audienceSummary(n.audience) }}</span></td>
-          <td><span class="nb-attachment-count"><svg lucidePaperclip size="13"></svg>{{ n.attachments?.length || 0 }}</span></td>
-          <td><div class="nb-table-actions" (click)="$event.stopPropagation()"><button type="button" class="nb-btn-action" (click)="copyNoticeText(n)" title="Copy notice"><svg lucideShare2 size="14"></svg></button><button type="button" class="nb-btn-action" *ngIf="canPost()" (click)="openEdit(n)" title="Edit notice"><svg lucideEdit2 size="14"></svg></button><button type="button" class="nb-btn-action nb-btn-retire" *ngIf="canPost() && n.isActive" (click)="openRetireModal(n)" title="Retire notice"><svg lucideArchive size="14"></svg></button></div></td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
+  <!-- ── 5. Notice Detail Modal ────────────────────────────────────────────── -->
   <div class="nb-modal-backdrop nb-notice-detail-backdrop" *ngIf="selectedNotice() as n" (click)="closeNotice()">
     <article class="nb-notice-detail-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" [attr.aria-label]="n.title">
       <header class="nb-notice-detail-head">
-        <div><div class="nb-notice-detail-topline"><span class="nb-priority-badge" [class]="'p-' + n.priority.toLowerCase()">{{ n.priority }}</span><span class="nb-detail-status" [class.is-live]="n.isActive && !hasExpired(n) && !isScheduled(n)" [class.is-expired]="hasExpired(n)" [class.is-scheduled]="isScheduled(n)" [class.is-inactive]="!n.isActive"><svg lucideCheckCircle2 size="13" *ngIf="n.isActive && !hasExpired(n) && !isScheduled(n)"></svg><svg lucideClock size="13" *ngIf="isScheduled(n)"></svg><svg lucideArchive size="13" *ngIf="hasExpired(n) || !n.isActive"></svg>{{ !n.isActive ? 'Archived' : (hasExpired(n) ? 'Expired' : (isScheduled(n) ? 'Scheduled' : 'Live')) }}</span></div><h2>{{ n.title }}</h2><p>Notice #{{ n.id }} · Posted by {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'CES Tech Administration' }}</p></div>
+        <div>
+          <div class="nb-notice-detail-topline">
+            <span class="nb-priority-badge" [class]="'p-' + n.priority.toLowerCase()">
+              {{ n.priority === 'HIGH' ? 'High priority' : (n.priority === 'NORMAL' ? 'Normal' : 'Low') }}
+            </span>
+            <span class="nb-detail-status"
+                  [class.is-live]="n.isActive && !hasExpired(n) && !isScheduled(n)"
+                  [class.is-expired]="hasExpired(n)"
+                  [class.is-scheduled]="isScheduled(n)"
+                  [class.is-inactive]="!n.isActive">
+              <svg lucideCheckCircle2 size="13" *ngIf="n.isActive && !hasExpired(n) && !isScheduled(n)"></svg>
+              <svg lucideClock size="13" *ngIf="isScheduled(n)"></svg>
+              <svg lucideArchive size="13" *ngIf="hasExpired(n) || !n.isActive"></svg>
+              {{ !n.isActive ? 'Archived' : (hasExpired(n) ? 'Expired' : (isScheduled(n) ? 'Scheduled' : 'Active')) }}
+            </span>
+          </div>
+          <h2>{{ n.title }}</h2>
+          <p>Notice #{{ n.id }} · Posted by {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'Administration' }}</p>
+        </div>
         <button type="button" class="nb-btn-close" (click)="closeNotice()" aria-label="Close notice"><svg lucideX size="18"></svg></button>
       </header>
       <div class="nb-notice-detail-body">
         <section class="nb-notice-detail-facts" aria-label="Notice details">
-          <div><span>Posted on</span><strong><svg lucideCalendar size="15"></svg>{{ n.publishedAt | date:'dd MMM y, h:mm a' }}</strong></div>
-          <div><span>Expires</span><strong><svg lucideClock size="15"></svg>{{ n.expiresAt ? (n.expiresAt | date:'dd MMM y, h:mm a') : 'No expiry date' }}</strong></div>
+          <div><span>Posted on</span><strong><svg lucideCalendar size="15"></svg>{{ n.publishedAt | date:'d MMM yyyy, h:mm a' }}</strong></div>
+          <div><span>Expires</span><strong><svg lucideClock size="15"></svg>{{ n.expiresAt ? (n.expiresAt | date:'d MMM yyyy, h:mm a') : 'No expiry date' }}</strong></div>
           <div><span>Audience</span><strong><svg lucideUsers size="15"></svg>{{ audienceSummary(n.audience) }}</strong></div>
-          <div><span>Email delivery</span><strong><svg lucideMail size="15"></svg>{{ n.emailSentAt ? ('Sent ' + (n.emailSentAt | date:'dd MMM y, h:mm a')) : 'Not sent by email' }}</strong></div>
+          <div><span>Email delivery</span><strong><svg lucideMail size="15"></svg>{{ n.emailSentAt ? ('Sent ' + (n.emailSentAt | date:'d MMM yyyy, h:mm a')) : 'Not sent by email' }}</strong></div>
         </section>
 
         <section class="nb-notice-detail-section">
@@ -464,21 +389,39 @@
         </section>
 
         <section class="nb-notice-reader-progress" *ngIf="n._count">
-          <div><span>Reader progress</span><strong>{{ n._count.reads }} of {{ n._count.recipients }} recipients viewed this notice</strong></div>
+          <div>
+            <span>Reader progress</span>
+            <strong>{{ n._count.reads }} of {{ n._count.recipients }} recipients viewed this notice</strong>
+          </div>
           <div class="nb-reader-progress-track"><i [style.width.%]="viewedPercent(n)"></i></div>
           <small>{{ viewedPercent(n) }}% viewed</small>
         </section>
 
         <section class="nb-notice-detail-files" *ngIf="n.attachments?.length">
-          <h3>Attachments <span>{{ n.attachments.length }}</span></h3>
-          <a *ngFor="let a of n.attachments" [href]="a.fileUrl" target="_blank" rel="noopener"><span class="nb-detail-file-icon"><svg lucideFileText size="17"></svg></span><span class="nb-detail-file-name">{{ a.fileName }}<small>{{ a.fileSize ? fileSize(a.fileSize) : 'Attachment' }}</small></span><svg lucideDownload size="16"></svg></a>
+          <h3>Attachments <span>{{ n.attachments?.length }}</span></h3>
+          <a *ngFor="let a of n.attachments" [href]="a.fileUrl" target="_blank" rel="noopener">
+            <span class="nb-detail-file-icon"><svg lucideFileText size="17"></svg></span>
+            <span class="nb-detail-file-name">{{ a.fileName }}<small>{{ a.fileSize ? fileSize(a.fileSize) : 'Attachment' }}</small></span>
+            <svg lucideDownload size="16"></svg>
+          </a>
         </section>
       </div>
-      <footer class="nb-notice-detail-foot"><button type="button" class="nb-btn-secondary" (click)="closeNotice()">Close</button></footer>
+      <footer class="nb-notice-detail-foot">
+        <button type="button" class="btn-secondary" *ngIf="canPost() && n._count?.recipients" (click)="openViews(n)">
+          <svg lucideUsers size="14"></svg>
+          <span>Who has seen it ({{ n._count?.reads }}/{{ n._count?.recipients }})</span>
+        </button>
+        <button type="button" class="btn-secondary" (click)="copyNoticeText(n)">
+          <svg *ngIf="copiedNoticeId() !== n.id" lucideShare2 size="14"></svg>
+          <svg *ngIf="copiedNoticeId() === n.id" lucideCheck size="14" class="text-emerald"></svg>
+          <span>{{ copiedNoticeId() === n.id ? 'Copied!' : 'Copy text' }}</span>
+        </button>
+        <button type="button" class="nb-btn-secondary" (click)="closeNotice()">Close</button>
+      </footer>
     </article>
   </div>
 
-  <!-- Compose / Edit Modal -->
+  <!-- ── 6. Compose / Edit Modal ───────────────────────────────────────────── -->
   <div class="nb-modal-backdrop" *ngIf="formOpen()">
     <div class="nb-modal-dialog" (click)="$event.stopPropagation()">
       <!-- Modal Header -->
@@ -771,7 +714,7 @@
     </div>
   </div>
 
-  <!-- Who has seen it -->
+  <!-- ── 7. Who Has Seen It Modal ──────────────────────────────────────────── -->
   @if (viewsFor(); as vn) {
     <div class="nb-modal-backdrop" (click)="closeViews()">
       <div class="nb-views-dialog" (click)="$event.stopPropagation()">
@@ -827,7 +770,7 @@
     </div>
   }
 
-  <!-- Custom In-App Retire Confirmation Modal -->
+  <!-- ── 8. Retire Confirmation Modal ──────────────────────────────────────── -->
   <div class="nb-modal-backdrop" *ngIf="retiringNotice()" (click)="closeRetireModal()">
     <div class="nb-retire-dialog" (click)="$event.stopPropagation()">
       <div class="nb-retire-icon-wrap">

@@ -1,93 +1,121 @@
-<div class="documents-container">
-  <!-- Header -->
-  <div class="documents-header">
-    <div class="header-left">
-      <h1 class="page-title">Employee Documents Center</h1>
-    </div>
-
-    <div class="header-action-group">
-      <a class="btn-doc-secondary btn-profile-comp" routerLink="/employees/profile-completion" title="Audit employee profile and document completion">
-        <svg lucideUserCheck size="16"></svg>
-        <span>Profile Completion</span>
-        <span class="btn-audit-pill">Audit</span>
-      </a>
-      <button class="btn-doc-secondary" (click)="downloadAllAsZip()" [disabled]="isZipping() || filteredDocuments().length === 0">
-        <svg lucideArchive size="16" *ngIf="!isZipping()"></svg>
+<div class="documents-page-wrapper">
+  
+  <!-- Page header (12 Nov 2026): same layout on every Employee page -->
+  <app-page-header icon="documents" section="Employees" heading="Documents" subtitle="Every employee document, with type and upload date">
+      <button class="btn-download-zip" (click)="downloadAllAsZip()" [disabled]="isZipping() || filteredDocuments().length === 0" title="Download all filtered documents as a ZIP archive">
+        <svg lucideDownload size="15"></svg>
         <span>{{ isZipping() ? 'Zipping...' : 'Download All (ZIP)' }}</span>
       </button>
-      <button class="btn-primary" (click)="openUploadModal()">
-        <svg lucideUploadCloud size="16"></svg>
+
+      <button class="btn-upload-primary" (click)="openUploadModal()" title="Upload a new employee document">
+        <svg lucideUpload size="15"></svg>
         <span>Upload Document</span>
       </button>
+  </app-page-header>
+
+  <!-- Primary Tab Switcher & Automated Compliance Status -->
+  <div class="subnav-tabs-bar">
+    <div class="tabs-nav-group">
+      <button class="tab-pill active" type="button">
+        <svg lucideFileText size="15"></svg>
+        <span>Employee Documents Center</span>
+        <span class="tab-count-chip">{{ allDocuments().length }}</span>
+      </button>
+
+      <a class="tab-pill" *ngIf="isSuperAdmin()" routerLink="/employees/profile-completion" title="Profile Completion & Statutory Audit">
+        <svg lucideClock size="15"></svg>
+        <span>Profile Completion & Statutory Audit</span>
+        <span class="tab-pending-chip">{{ pendingAuditCount() }} Pending</span>
+      </a>
+    </div>
+
+  </div>
+
+  <!-- 4 Metrics / Stats Cards -->
+  <div class="stats-cards-grid">
+    <!-- Card 1: Total Documents -->
+    <div class="metric-card">
+      <div class="metric-squircle squircle-blue">
+        <svg lucideFileText size="18"></svg>
+      </div>
+      <div class="metric-content">
+        <div class="metric-number">{{ totalDocsCount() }}</div>
+        <div class="metric-label">TOTAL DOCUMENTS</div>
+        <div class="metric-subtext">Across all files</div>
+      </div>
+    </div>
+
+    <!-- Card 2: Staff With Files -->
+    <div class="metric-card">
+      <div class="metric-squircle squircle-green">
+        <svg lucideFileCheck size="18"></svg>
+      </div>
+      <div class="metric-content">
+        <div class="metric-number">{{ employeesWithDocsCount() }} / {{ employees().length }}</div>
+        <div class="metric-label">STAFF WITH FILES</div>
+        <div class="metric-subtext">{{ staffCoveragePct() }}% coverage</div>
+      </div>
+    </div>
+
+    <!-- Card 3: Departments -->
+    <div class="metric-card">
+      <div class="metric-squircle squircle-purple">
+        <svg lucideBuilding size="18"></svg>
+      </div>
+      <div class="metric-content">
+        <div class="metric-number">{{ departments().length }}</div>
+        <div class="metric-label">DEPARTMENTS</div>
+        <div class="metric-subtext">All active</div>
+      </div>
+    </div>
+
+    <!-- Card 4: Verified Today -->
+    <div class="metric-card">
+      <div class="metric-squircle squircle-amber">
+        <svg lucideClock size="18"></svg>
+      </div>
+      <div class="metric-content">
+        <div class="metric-number">{{ verifiedTodayCount() }}</div>
+        <div class="metric-label">VERIFIED TODAY</div>
+        <div class="metric-subtext">Statutory checks</div>
+      </div>
     </div>
   </div>
 
-  <!-- Stats Grid -->
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-icon bg-blue-50 text-blue-600">
-        <svg lucideFileText size="20"></svg>
-      </div>
-      <div class="stat-info">
-        <span class="stat-label">{{ hasActiveFilters() ? 'Matching Documents' : 'Total Documents' }}</span>
-        <span class="stat-value">{{ totalDocsCount() }}</span>
-        <span class="stat-hint" *ngIf="hasActiveFilters()">of {{ allDocuments().length }} total</span>
-      </div>
-    </div>
-
-    <div class="stat-card">
-      <div class="stat-icon bg-emerald-50 text-emerald-600">
-        <svg lucideFileCheck size="20"></svg>
-      </div>
-      <div class="stat-info">
-        <span class="stat-label">Employees with Files</span>
-        <span class="stat-value">{{ employeesWithDocsCount() }} / {{ employees().length }}</span>
-        <span class="stat-hint" *ngIf="hasActiveFilters()">in current results</span>
-      </div>
-    </div>
-
-    <div class="stat-card">
-      <div class="stat-icon bg-indigo-50 text-indigo-600">
-        <svg lucideFolder size="20"></svg>
-      </div>
-      <div class="stat-info">
-        <span class="stat-label">Active Departments</span>
-        <span class="stat-value">{{ activeDeptCount() }}</span>
-        <span class="stat-hint" *ngIf="hasActiveFilters()">of {{ departments().length }} total</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Search & Filter Controls -->
-  <div class="controls-bar">
-    <div class="search-box">
-      <svg lucideSearch size="16" class="search-icon"></svg>
-      <input type="text" 
+  <!-- Filter Strip -->
+  <div class="filters-panel">
+    <div class="filter-search-box">
+      <svg lucideSearch size="14" class="filter-search-icon"></svg>
+      <input type="text"
              [ngModel]="searchQuery()" 
              (ngModelChange)="searchQuery.set($event)" 
-             placeholder="Search by document, name, email, phone or employee ID...">
+             placeholder="Search by file, employee, ID...">
     </div>
 
-    <div class="filter-box">
-      <svg lucideFilter size="16" class="filter-icon"></svg>
-      <select [ngModel]="selectedDepartment()" (ngModelChange)="selectedDepartment.set($event)">
+    <div class="filter-dropdown-wrapper">
+      <select [ngModel]="selectedDepartment()" (ngModelChange)="selectedDepartment.set($event)" class="filter-select">
         <option value="ALL">All Departments</option>
         <option *ngFor="let dept of departments()" [value]="dept">{{ dept }}</option>
       </select>
     </div>
 
-    <app-searchable-select
-      [options]="employeeFilterOptions()"
-      placeholder="All Employees"
-      [value]="selectedEmployeeFilterId()"
-      (valueChange)="selectedEmployeeFilterId.set($event)">
-    </app-searchable-select>
+    <div class="filter-dropdown-wrapper">
+      <select [ngModel]="selectedDocType()" (ngModelChange)="selectedDocType.set($event)" class="filter-select">
+        <option value="ALL">All Document Types</option>
+        <option value="RESUME / CV">Resume / CV</option>
+        <option value="OFFER LETTER">Offer Letter</option>
+        <option value="GOVT ID CARD">Govt ID Card</option>
+        <option value="DEGREE CERTIFICATE">Degree Certificate</option>
+        <option value="MARKSHEET">Marksheet</option>
+        <option value="PAYSLIP">Payslip</option>
+        <option value="RELIEVING LETTER">Relieving Letter</option>
+        <option value="OTHER">Other Documents</option>
+      </select>
+    </div>
 
-    <!-- Only offered once something is actually filtered. -->
-    <button type="button" class="btn-reset-filters" *ngIf="hasActiveFilters()" (click)="resetFilters()" title="Clear all filters">
-      <svg lucideX size="15"></svg>
-      <span>Reset</span>
-    </button>
+    <app-date-preset-filter label="Uploaded" [preset]="datePreset()" (presetChange)="datePreset.set($event)" (rangeChange)="dateRange.set($event)"></app-date-preset-filter>
+
+    <button type="button" class="clear-all-filters" *ngIf="hasActiveFilters()" (click)="resetFilters()">Clear all</button>
   </div>
 
   <!-- Loading State -->
@@ -96,50 +124,50 @@
     <span>Loading employee documents...</span>
   </div>
 
-  <!-- Documents Grid -->
+  <!-- Documents Grid Section -->
   <div class="documents-grid-section" *ngIf="!isLoading()">
-    <div class="documents-grid" *ngIf="filteredDocuments().length > 0">
-      <div class="doc-card" *ngFor="let doc of filteredDocuments()">
-        <div class="doc-card-header">
-          <div class="doc-type-badge">
-            {{ getFileExtension(doc.fileName) }}
+    <div class="documents-cards-grid" *ngIf="filteredDocuments().length > 0">
+      <div class="doc-item-card" *ngFor="let doc of filteredDocuments()">
+        
+        <!-- Header: Extension & Category & Title & Size -->
+        <div class="doc-card-top">
+          <div class="doc-meta-tags">
+            <span class="ext-badge" [ngClass]="getExtClass(doc.fileName)">{{ getFileExtension(doc.fileName) }}</span>
+            <span class="category-badge">{{ getDocumentCategory(doc) }}</span>
           </div>
-
-          <button class="btn-delete" (click)="deleteDocument(doc)" title="Delete document">
-            <svg lucideTrash2 size="14"></svg>
-          </button>
+          <h3 class="doc-filename" [title]="doc.fileName">{{ doc.fileName }}</h3>
+          <span class="doc-filesize">{{ getFileSize(doc) }}</span>
         </div>
 
-        <div class="doc-body">
-          <h3 class="doc-name" [title]="doc.fileName">{{ doc.fileName }}</h3>
-          
-          <!-- Employee Info -->
-          <div class="doc-employee-info">
-            <div class="avatar-small">
+        <!-- Middle: Employee Strip -->
+        <div class="doc-card-employee">
+          <div class="emp-profile-left">
+            <div class="emp-avatar-circle" [style.background]="getAvatarStyle(doc.employee).bg" [style.color]="getAvatarStyle(doc.employee).text">
               <img *ngIf="doc.employee?.avatarUrl" [src]="doc.employee.avatarUrl" [alt]="doc.employee.firstName">
-              <span *ngIf="!doc.employee?.avatarUrl">{{ (doc.employee?.firstName || 'E').charAt(0) }}</span>
+              <span *ngIf="!doc.employee?.avatarUrl">{{ getInitials(doc.employee) }}</span>
             </div>
-            <div class="employee-text">
-              <span class="emp-name">{{ doc.employee?.firstName }} {{ doc.employee?.lastName }}</span>
-              <span class="emp-dept">{{ doc.employee?.department?.name || 'No Dept' }}</span>
-            </div>
+            <span class="emp-fullname" [title]="(doc.employee?.firstName || '') + ' ' + (doc.employee?.lastName || '')">{{ doc.employee?.firstName }} {{ doc.employee?.lastName }}</span>
           </div>
+          <span class="emp-deptname" [title]="doc.employee?.department?.name || 'General'">{{ doc.employee?.department?.name || 'General' }}</span>
         </div>
 
-        <div class="doc-footer">
-          <span class="doc-date" *ngIf="doc.createdAt">Uploaded {{ doc.createdAt | date:'dd-MM-yyyy' }}</span>
-
-          <div class="flex items-center gap-2">
-            <a [href]="doc.fileUrl" target="_blank" class="btn-view-doc" title="Open file in a new tab">
-              <svg lucideExternalLink size="13"></svg>
-              <span>View</span>
+        <!-- Footer: Upload Date & Action Buttons -->
+        <div class="doc-card-bottom">
+          <span class="doc-upload-time">{{ formatUploadDate(doc.createdAt) }}</span>
+          
+          <div class="doc-actions-inline">
+            <a [href]="doc.fileUrl" target="_blank" class="action-btn" title="View document">
+              <svg lucideEye size="14"></svg>
             </a>
-            <button type="button" class="btn-view-doc" (click)="downloadDocument(doc)" title="Download file">
-              <svg lucideDownload size="13"></svg>
-              <span>Download</span>
+            <button type="button" class="action-btn" (click)="downloadDocument(doc)" title="Download file">
+              <svg lucideDownload size="14"></svg>
+            </button>
+            <button type="button" class="action-btn action-delete" (click)="deleteDocument(doc)" title="Delete document">
+              <svg lucideTrash2 size="14"></svg>
             </button>
           </div>
         </div>
+
       </div>
     </div>
 

@@ -10,6 +10,7 @@ export interface Shift {
   startTime: string;
   endTime: string;
   bufferTimeMinutes: number;
+  colorCode?: string;
 }
 
 export interface AttendanceRecord {

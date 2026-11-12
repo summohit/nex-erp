@@ -3,7 +3,7 @@
   padding: 24px;
   max-width: 1320px;
   margin: 0 auto;
-  font-family: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: #0f172a;
   display: flex;
   flex-direction: column;
@@ -1785,3 +1785,100 @@
 .share-posting-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; min-width: 190px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 12px 28px rgba(15,23,42,.16); padding: 6px; display: flex; flex-direction: column; }
 .share-posting-menu button { text-align: left; border: 0; background: transparent; padding: 10px 12px; border-radius: 8px; font-size: 14px; color: #0f172a; cursor: pointer; }
 .share-posting-menu button:hover { background: #eff6ff; color: #1d4ed8; }
+
+/* Shared look (12 Nov 2026): Board | Table pills, count, filter row. */
+.view-switch-pills { display: inline-flex; background: #f1f5f9; padding: 3px; border-radius: 8px; border: 1px solid #e2e8f0; }
+.pill-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: none; background: transparent; color: #64748b; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.pill-btn:hover { color: #0f172a; }
+.pill-btn.active { background: #fff; color: #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,.08), inset 0 -2px 0 #2563eb; }
+.jd-count { font-size: 13px; color: #64748b; white-space: nowrap; }
+.toolbar-left { flex-wrap: wrap; gap: 10px; }
+
+/* Table fills the screen and pages like the Employee Directory (12 Nov 2026). */
+.table-responsive-wrapper { max-height: calc(100vh - 330px); min-height: 380px; overflow: auto; }
+.applicants-modern-table thead th { position: sticky; top: 0; z-index: 1; background: #f8fafc; }
+.jd-pager { display: flex; align-items: center; justify-content: flex-end; gap: 24px; padding: 10px 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #334155; }
+.jd-pager b { font-weight: 600; color: #0f172a; }
+.jd-pager .pg-size select { margin-left: 6px; height: 30px; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; background: #fff; }
+.jd-pager .pg-nav { display: inline-flex; align-items: center; gap: 6px; }
+.jd-pager .pg-nav button { width: 28px; height: 28px; border: 0; background: transparent; border-radius: 6px; font-size: 16px; color: #475569; cursor: pointer; }
+.jd-pager .pg-nav button:hover:not(:disabled) { background: #f1f5f9; }
+.jd-pager .pg-nav button:disabled { color: #cbd5e1; cursor: default; }
+@media (max-width: 640px) { .jd-pager { flex-wrap: wrap; justify-content: center; gap: 12px; } }
+
+.spec-posted-by .val { display: inline-flex; align-items: center; gap: 8px; }
+.spec-poster-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
+
+/* ── Same colours as the Employee Directory (12 Nov 2026) ─────────────── */
+.btn-nav-action.btn-nav-primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+.btn-nav-action.btn-nav-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+
+/* Stage tabs: one calm style; the active tab is a blue tonal pill, not a solid colour per stage. */
+.stage-pill-btn { background: #fff; border: 1px solid #e2e8f0; color: #334155; }
+.stage-pill-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+.stage-pill-btn.active,
+.stage-pill-btn.active[class*="stage-"] { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; box-shadow: none; }
+.stage-pill-btn .stage-count-badge { background: #f1f5f9; color: #475569; }
+.stage-pill-btn.active .stage-count-badge { background: #2563eb; color: #fff; }
+
+/* ── Stage chip + menu (Google Material style) ───────────────────────── */
+.stage-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px 0 10px; border-radius: 999px; border: 1px solid transparent; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: box-shadow .12s ease, border-color .12s ease; }
+.stage-chip:hover { border-color: currentColor; }
+.stage-chip svg { opacity: .7; }
+.chip-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+.tone-applied        { background: #eff6ff; color: #1d4ed8; }
+.tone-phone_screening{ background: #f5f3ff; color: #6d28d9; }
+.tone-interview      { background: #fffbeb; color: #b45309; }
+.tone-negotiation    { background: #fff7ed; color: #c2410c; }
+.tone-offered        { background: #f0fdfa; color: #0f766e; }
+.tone-hired          { background: #ecfdf5; color: #047857; }
+.tone-onboarded      { background: #f0fdf4; color: #15803d; }
+.tone-on_hold        { background: #f1f5f9; color: #475569; }
+.tone-rejected       { background: #fef2f2; color: #b91c1c; }
+.stage-menu .chip-dot.tone-applied { background: #2563eb; }
+.stage-menu .chip-dot.tone-phone_screening { background: #7c3aed; }
+.stage-menu .chip-dot.tone-interview { background: #d97706; }
+.stage-menu .chip-dot.tone-negotiation { background: #ea580c; }
+.stage-menu .chip-dot.tone-offered { background: #0d9488; }
+.stage-menu .chip-dot.tone-hired { background: #059669; }
+.stage-menu .chip-dot.tone-onboarded { background: #16a34a; }
+.stage-menu .chip-dot.tone-on_hold { background: #94a3b8; }
+.stage-menu .chip-dot.tone-rejected { background: #dc2626; }
+
+.stage-menu-backdrop { position: fixed; inset: 0; z-index: 999; }
+.stage-menu { position: fixed; z-index: 1000; width: 232px; padding: 6px; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(60,64,67,.15), 0 8px 24px rgba(60,64,67,.18); }
+.stage-menu-title { padding: 8px 12px 6px; font-size: 12px; font-weight: 600; color: #64748b; }
+.stage-menu-item { display: flex; align-items: center; gap: 10px; width: 100%; height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #1f2937; font-size: 13.5px; font-weight: 500; text-align: left; cursor: pointer; }
+.stage-menu-item:hover { background: #f1f5f9; }
+.stage-menu-item.current { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+.stage-menu-label { flex: 1; }
+.stage-menu-divider { height: 1px; margin: 6px 4px; background: #eef2f7; }
+.stage-chip.static { cursor: default; padding-right: 10px; }
+.stage-chip.static:hover { border-color: transparent; }
+.hero-poster-avatar { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; }
+
+/* Job card (12 Nov 2026), same design as the profile card */
+.jc { display: flex; align-items: flex-start; gap: 24px; padding: 22px 24px; margin-bottom: 16px; background: #fff; border: 1px solid #e6ebf5; border-radius: 16px; box-shadow: 0 1px 3px rgba(15, 23, 42, .05); }
+.jc-icon { flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; background: #e0e9ff; color: #2563eb; display: flex; align-items: center; justify-content: center; }
+.jc-main { flex: 1; min-width: 0; padding-left: 24px; border-left: 1px solid #e2e8f0; }
+.jc-name-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.jc-name-row h2 { margin: 0; font-family: var(--font-heading); font-size: 20px; font-weight: 700; letter-spacing: -0.2px; color: #0f172a; }
+.jc-chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569; }
+.jc-chip i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.jc-chip.st-open { background: #ecfdf5; color: #16a34a; }
+.jc-chip.st-closed { background: #f1f5f9; color: #64748b; }
+.jc-chip.st-draft { background: #fffbeb; color: #b45309; }
+.jc-chip.type { background: #eff6ff; color: #1d4ed8; }
+.jc-sub { margin: 4px 0 0; font-size: 13.5px; color: #64748b; }
+.jc-facts { display: flex; flex-wrap: wrap; margin: 16px 0 0; padding: 0; row-gap: 12px; }
+.jc-facts > div { padding: 0 28px; border-left: 1px solid #e2e8f0; }
+.jc-facts > div:first-child { padding-left: 0; border-left: 0; }
+.jc-facts dt { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #94a3b8; margin: 0 0 4px; }
+.jc-facts dd { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 500; color: #0f172a; white-space: nowrap; }
+.jc-facts dd svg { color: #64748b; flex-shrink: 0; }
+.jc-avatar { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
+.jc-actions { flex-shrink: 0; }
+.jc-btn { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; color: #0f172a; font-size: 13px; font-weight: 600; cursor: pointer; }
+.jc-btn:hover { background: #f8fafc; }
+@media (max-width: 760px) { .jc { flex-wrap: wrap; padding: 16px; } .jc-main { padding-left: 0; border-left: 0; } .jc-facts > div { padding: 0 16px 0 0; border-left: 0; } }

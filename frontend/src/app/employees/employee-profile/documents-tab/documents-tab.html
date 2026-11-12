@@ -1,58 +1,84 @@
 <div class="documents-tab-container">
   
-  <div class="header-actions">
-    <button class="btn-primary" (click)="openModal()">
-      <svg lucidePlus size="16"></svg>
-      Add Files
+  <!-- Header Bar matching Figma SS -->
+  <div class="documents-header-bar">
+    <div class="documents-header-titles">
+      <h2 class="documents-main-title">Personal Verified Documents</h2>
+      <p class="documents-sub-title">Confidential employee records, contracts, and certifications.</p>
+    </div>
+    <button type="button" class="btn-add-documents" (click)="openModal()">
+      <svg lucideUpload size="15"></svg>
+      <span>Add Files</span>
     </button>
   </div>
 
-  <div class="documents-grid">
-    <div class="document-card" *ngFor="let doc of employeeData?.documents">
-      <div class="doc-icon">
-        <!-- Display image if it's a data url of image type -->
-        <img *ngIf="doc.fileUrl.startsWith('data:image')" [src]="doc.fileUrl" class="doc-thumbnail" [alt]="doc.fileName">
-        <!-- Display video -->
-        <video *ngIf="doc.fileUrl.startsWith('data:video')" [src]="doc.fileUrl" class="doc-thumbnail" muted loop playsinline></video>
-        <!-- Otherwise show file icon -->
-        <svg *ngIf="!doc.fileUrl.startsWith('data:image') && !doc.fileUrl.startsWith('data:video')" lucideFileText size="32"></svg>
-      </div>
-      <div class="doc-info">
-        <span class="doc-badge">{{ doc.documentType || 'Document' }}</span>
-        <h3>{{ doc.fileName }}</h3>
-        <p>{{ timeAgo(doc.createdAt) }}</p>
-        <!-- Any file can be re-filed: an "Other" upload, or one picked wrongly. -->
-        <div class="doc-retype">
-          <span class="doc-retype-note" *ngIf="doc.documentType === 'Other'">Saved as Other — what is this file?</span>
-          <!-- Each option marks itself selected: binding [value] on the select runs
-               before *ngFor has rendered the options, so every card showed the
-               first one ("Resume / CV") whatever the file really was. -->
-          <select class="doc-retype-select" [class.doc-retype-quiet]="doc.documentType !== 'Other'"
-                  (change)="retype(doc, $any($event.target).value)" aria-label="Change document type">
-            <option value="" disabled [selected]="doc.documentType === 'Other' || !documentTypes.includes(doc.documentType)">
-              {{ doc.documentType === 'Other' ? 'Set type…' : 'Change type…' }}
-            </option>
-            <option *ngFor="let type of documentTypes" [value]="type" [disabled]="type === 'Other'"
-                    [selected]="type === doc.documentType">{{ type }}</option>
-          </select>
+  <!-- Documents Cards Responsive Grid -->
+  <div class="documents-cards-grid">
+    <div class="doc-card" *ngFor="let doc of employeeData?.documents" [class.uncategorized]="doc.documentType === 'Other'">
+      
+      <!-- Top Row: Icon + Category Badge -->
+      <div class="doc-card-top">
+        <div class="doc-icon-badge" [ngClass]="doc.documentType === 'Other' ? 'amber' : (isImageDoc(doc) ? 'blue' : 'red')">
+          <svg *ngIf="doc.documentType === 'Other'" lucideClock size="18"></svg>
+          <svg *ngIf="doc.documentType !== 'Other' && isImageDoc(doc)" lucideImage size="18"></svg>
+          <svg *ngIf="doc.documentType !== 'Other' && !isImageDoc(doc)" lucideFileText size="18"></svg>
         </div>
+
+        <span class="doc-type-pill" [class.uncategorized-pill]="doc.documentType === 'Other'">
+          {{ getDocBadgeLabel(doc.documentType) }}
+        </span>
       </div>
-      <div class="card-actions">
-        <button class="action-btn view-btn" (click)="viewDocument(doc.fileUrl)" title="View File">
-          <svg lucideEye size="14"></svg>
-        </button>
-        <button class="action-btn delete-btn" (click)="deleteDocument(doc.id)" title="Delete File">
-          <svg lucideTrash2 size="14"></svg>
-        </button>
+
+      <!-- Middle: File Name and Upload Date -->
+      <div class="doc-card-body">
+        <h3 class="doc-file-name" [title]="doc.fileName">{{ doc.fileName }}</h3>
+        <p class="doc-upload-time">Uploaded {{ timeAgo(doc.createdAt) }}</p>
+      </div>
+
+      <!-- Bottom Row: Type selector / Change Type + Action Buttons -->
+      <div class="doc-card-footer">
+        <div class="doc-footer-left">
+          <!-- Normal Categorized File -->
+          <div class="doc-retype-wrap" *ngIf="doc.documentType !== 'Other'">
+            <select class="doc-change-type-select" (change)="retype(doc, $any($event.target).value)" aria-label="Change document type">
+              <option value="" disabled selected>Change type… ▾</option>
+              <option *ngFor="let type of documentTypes" [value]="type" [disabled]="type === 'Other'"
+                      [selected]="type === doc.documentType">{{ type }}</option>
+            </select>
+          </div>
+
+          <!-- Uncategorized "Other" File -->
+          <div class="doc-uncategorized-prompt" *ngIf="doc.documentType === 'Other'">
+            <span class="prompt-text">What is this file?</span>
+            <select class="doc-set-type-select" (change)="retype(doc, $any($event.target).value)" aria-label="Set document type">
+              <option value="" disabled selected>Set type… ▾</option>
+              <option *ngFor="let type of documentTypes" [value]="type" [disabled]="type === 'Other'">{{ type }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="doc-footer-actions">
+          <button type="button" class="doc-action-btn view-btn" (click)="viewDocument(doc.fileUrl)" title="View File">
+            <svg lucideEye size="14"></svg>
+          </button>
+          <button type="button" class="doc-action-btn delete-btn" (click)="deleteDocument(doc.id)" title="Delete File">
+            <svg lucideTrash2 size="14"></svg>
+          </button>
+        </div>
       </div>
     </div>
 
-    <div class="empty-state" *ngIf="!employeeData?.documents?.length">
-      <div class="empty-state-icon">
-        <svg lucideFolderOpen size="48"></svg>
+    <!-- Empty State -->
+    <div class="empty-docs-state" *ngIf="!employeeData?.documents?.length">
+      <div class="empty-docs-icon">
+        <svg lucideFolderOpen size="44"></svg>
       </div>
       <h3>No Documents Found</h3>
       <p>There are no personal documents uploaded for this employee yet.</p>
+      <button type="button" class="btn-add-documents mt-3" (click)="openModal()">
+        <svg lucideUpload size="15"></svg>
+        <span>Upload First Document</span>
+      </button>
     </div>
   </div>
 </div>

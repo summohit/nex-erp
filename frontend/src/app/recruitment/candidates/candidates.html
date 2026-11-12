@@ -1,90 +1,24 @@
-<div class="page-container" style="padding: 24px;">
+<div class="page-container" style="padding: 24px;" [class.drawer-only-host]="drawerOnly">
 
-  <!-- TOP BREADCRUMB & CONTEXT NAVIGATION -->
-  <div class="ats-breadcrumb-bar">
-    <div class="breadcrumb-left">
-      <!-- Back to Job Pill (when job filter is active) -->
-      <a *ngIf="selectedJob() as selJob" [routerLink]="['/recruitment/jobs', selJob.id]" class="btn-back-to-job">
-        <svg lucideArrowLeft size="15"></svg>
-        <span>Back to {{ selJob.title }}</span>
-      </a>
-
-      <!-- Breadcrumbs Trail -->
-      <nav class="ats-breadcrumbs">
-        <span class="crumb-link" routerLink="/recruitment/job-postings">Recruitment</span>
-        <svg lucideChevronRight size="13" class="crumb-sep"></svg>
-        <span class="crumb-link" routerLink="/recruitment/job-postings">Job Postings</span>
-        <ng-container *ngIf="selectedJob() as selJob">
-          <svg lucideChevronRight size="13" class="crumb-sep"></svg>
-          <a [routerLink]="['/recruitment/jobs', selJob.id]" class="crumb-link crumb-job">{{ selJob.title }}</a>
-        </ng-container>
-        <svg lucideChevronRight size="13" class="crumb-sep"></svg>
-        <span class="crumb-current">Candidates (ATS)</span>
-      </nav>
+  <!-- Page header (12 Nov 2026): the shared header, as on Job Postings and the Employee pages -->
+  <app-page-header icon="users" section="Recruitment" heading="Candidates (ATS)"
+    [showBack]="!!selectedJob()" backLabel="Back to the job" (back)="goBackToJob()"
+    [subtitle]="selectedJob() ? 'Candidates for ' + selectedJob()!.title : 'Every applicant, by pipeline stage'">
+    <div class="view-switch-pills">
+      <button type="button" class="pill-btn" [class.active]="viewMode() === 'KANBAN'" (click)="setViewMode('KANBAN')" title="Board view">
+        <svg lucideLayoutGrid size="14"></svg><span>Board</span>
+      </button>
+      <button type="button" class="pill-btn" [class.active]="viewMode() === 'TABLE'" (click)="setViewMode('TABLE')" title="Table view">
+        <svg lucideTable size="14"></svg><span>Table</span>
+      </button>
     </div>
+    <a class="btn-primary" routerLink="/recruitment/reports" title="Recruitment reports">
+      <svg lucideFileText size="15"></svg><span>Hiring reports</span>
+    </a>
+  </app-page-header>
 
-    <div class="breadcrumb-right" *ngIf="selectedJob() as selJob">
-      <div class="active-filter-pill">
-        <svg lucideFilter size="13"></svg>
-        <span>Filtered: <strong>{{ selJob.title }}</strong></span>
-        <button class="btn-clear-filter-pill" (click)="clearJobFilter()" title="Clear Job Filter">
-          <svg lucideX size="13"></svg>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ENHANCED HEADER CARD -->
-  <div class="page-header-card">
-    <!-- Top Row: Title & Global Actions -->
-    <div class="header-top-row">
-      <div class="header-title-group">
-        <div class="header-title-row">
-          <h1>Candidates (ATS)</h1>
-          <ng-container *ngIf="isLoadingApplications()">
-            <app-skeleton width="95px" height="24px" radius="12px"></app-skeleton>
-          </ng-container>
-          <ng-container *ngIf="!isLoadingApplications()">
-            <span class="candidates-count-pill">{{ applications().length }} Candidate{{ applications().length === 1 ? '' : 's' }}</span>
-            <span class="filtered-badge" *ngIf="hasToolbarFilters() && filteredApplications().length !== applications().length">
-              {{ filteredApplications().length }} matching
-            </span>
-          </ng-container>
-        </div>
-        <p>Manage, review and transition candidate applications across pipeline stages</p>
-      </div>
-
-      <div class="header-top-actions">
-        <button class="btn-secondary" (click)="exportCSV()" title="Export candidate data as CSV">
-          <svg lucideDownload size="15"></svg>
-          <span>Export CSV</span>
-        </button>
-
-        <a class="btn-secondary" routerLink="/recruitment/reports" title="View Recruitment Reports">
-          <svg lucideFileText size="15"></svg>
-          <span>Hiring Reports</span>
-        </a>
-
-        <button class="btn-primary" (click)="openAnalytics()" title="Open Recruitment Analytics">
-          <svg lucideSparkles size="15"></svg>
-          <span>Analytics</span>
-        </button>
-
-        <div class="view-toggles">
-          <button [class.active]="viewMode() === 'KANBAN'" (click)="setViewMode('KANBAN')" class="toggle-btn" title="Kanban View">
-            <svg lucideLayoutGrid size="15"></svg>
-            <span>Kanban</span>
-          </button>
-          <button [class.active]="viewMode() === 'TABLE'" (click)="setViewMode('TABLE')" class="toggle-btn" title="Table View">
-            <svg lucideTable size="15"></svg>
-            <span>Table</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Filter Divider -->
-    <div class="filter-toolbar-divider"></div>
+  <!-- Filters -->
+  <div class="page-header-card ats-filter-card">
 
     <!-- Second Row: Dedicated Filter Toolbar -->
     <div class="ats-filter-toolbar">
@@ -119,6 +53,55 @@
           </app-searchable-select>
         </div>
 
+        <!-- Stage Filter -->
+        <div class="filter-searchable-pill" [class.filter-active]="!!filterStatus()">
+          <app-searchable-select
+            [options]="stageSelectOptions()"
+            placeholder="All Stages"
+            [value]="filterStatus()"
+            [clearable]="true"
+            (valueChange)="filterStatus.set($event || '')">
+            <svg prefix lucideFilter size="13.5"></svg>
+          </app-searchable-select>
+        </div>
+
+        <!-- Department (12 Nov 2026) -->
+        <div class="filter-searchable-pill" [class.filter-active]="!!filterDepartment()">
+          <app-searchable-select [options]="departmentSelectOptions()" placeholder="All departments"
+            [value]="filterDepartment() || null" [clearable]="true" (valueChange)="filterDepartment.set($event || '')">
+            <svg prefix lucideBuilding size="13.5"></svg>
+          </app-searchable-select>
+        </div>
+
+        <!-- Notice Period Filter -->
+        <div class="filter-searchable-pill" [class.filter-active]="!!filterNotice()">
+          <app-searchable-select
+            [options]="noticeSelectOptions()"
+            placeholder="Any Notice"
+            [value]="filterNotice()"
+            [clearable]="true"
+            (valueChange)="filterNotice.set($event || '')">
+            <svg prefix lucideClock size="13.5"></svg>
+          </app-searchable-select>
+        </div>
+
+        <!-- Applied date: the shared dropdown -->
+        <app-date-preset-filter label="Applied" [preset]="appliedPreset()" (presetChange)="appliedPreset.set($event)" (rangeChange)="appliedRange.set($event)"></app-date-preset-filter>
+
+        <!-- Follow-up date (12 Nov 2026): same dropdown as Applied -->
+        <app-date-preset-filter label="Follow-up" [preset]="followUpPreset()" (presetChange)="followUpPreset.set($event)" (rangeChange)="followUpRange.set($event)"></app-date-preset-filter>
+
+        <!-- Less-used filters behind one button (12 Nov 2026) -->
+        <div class="more-filters">
+          <button type="button" class="btn-more-filters" [class.on]="moreFilterCount() > 0" (click)="moreOpen = !moreOpen" [attr.aria-expanded]="moreOpen">
+            <svg lucideFilter size="14"></svg><span>Filters</span>
+            <span class="more-count" *ngIf="moreFilterCount() > 0">{{ moreFilterCount() }}</span>
+          </button>
+          <div class="more-backdrop" *ngIf="moreOpen" (click)="moreOpen = false"></div>
+          <div class="more-panel" *ngIf="moreOpen">
+            <div class="more-panel-head"><span>More filters</span>
+              <button type="button" class="more-close" (click)="moreOpen = false" aria-label="Close filters"><svg lucideX size="14"></svg></button>
+            </div>
         <!-- Assigned HR filter: a candidate inherits the recruiter assigned to their job. -->
         <div class="filter-searchable-pill" [class.filter-active]="!!filterAssignedHr()">
           <app-searchable-select
@@ -143,18 +126,6 @@
           </app-searchable-select>
         </div>
 
-        <!-- Stage Filter -->
-        <div class="filter-searchable-pill" [class.filter-active]="!!filterStatus()">
-          <app-searchable-select
-            [options]="stageSelectOptions()"
-            placeholder="All Stages"
-            [value]="filterStatus()"
-            [clearable]="true"
-            (valueChange)="filterStatus.set($event || '')">
-            <svg prefix lucideFilter size="13.5"></svg>
-          </app-searchable-select>
-        </div>
-
         <div class="filter-searchable-pill" [class.filter-active]="!!filterFollowUpStatus()">
           <app-searchable-select [options]="followUpStatusOptions" placeholder="Follow-up status" [value]="filterFollowUpStatus()" [clearable]="true" (valueChange)="filterFollowUpStatus.set($event || '')"><svg prefix lucideClock size="13.5"></svg></app-searchable-select>
         </div>
@@ -168,18 +139,6 @@
             [clearable]="true"
             (valueChange)="filterLocation.set($event || '')">
             <svg prefix lucideMapPin size="13.5"></svg>
-          </app-searchable-select>
-        </div>
-
-        <!-- Notice Period Filter -->
-        <div class="filter-searchable-pill" [class.filter-active]="!!filterNotice()">
-          <app-searchable-select
-            [options]="noticeSelectOptions()"
-            placeholder="Any Notice"
-            [value]="filterNotice()"
-            [clearable]="true"
-            (valueChange)="filterNotice.set($event || '')">
-            <svg prefix lucideClock size="13.5"></svg>
           </app-searchable-select>
         </div>
 
@@ -198,11 +157,10 @@
           </button>
         </div>
 
-        <!-- Clear All Filters Button -->
-        <button class="btn-clear-all-filters" *ngIf="hasToolbarFilters()" (click)="clearToolbarFilters()" title="Reset all filters">
-          <svg lucideRotateCcw size="12"></svg>
-          <span>Reset ({{ activeFilterCount() }})</span>
-        </button>
+          </div>
+        </div>
+
+        <button type="button" class="clear-all-filters" *ngIf="hasToolbarFilters() || appliedPreset() !== 'ALL' || followUpPreset() !== 'ALL'" (click)="clearAllFilters()">Clear all</button>
       </div>
     </div>
   </div>
@@ -286,8 +244,12 @@
 
     <!-- Real KPI Cards -->
     <ng-container *ngIf="!isLoadingApplications()">
-      <div class="kpi-card" *ngFor="let s of STAGES" (click)="scrollToColumn(s.key)">
-        <div class="kpi-icon" [ngClass]="'icon-' + s.tone"><svg lucideInbox size="20"></svg></div>
+      <div class="kpi-card" *ngFor="let s of STAGES" [class.kpi-active]="focusedStage() === s.key" (click)="scrollToColumn(s.key)">
+        <div class="kpi-icon" [ngClass]="'icon-' + s.tone">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path *ngFor="let d of stageIcon(s.key)" [attr.d]="d"></path>
+          </svg>
+        </div>
         <div class="kpi-details">
           <div class="kpi-value" [ngClass]="'text-' + s.tone">{{ stageApps(s.key).length }}</div>
           <div class="kpi-title">{{ s.label }}</div>
@@ -328,7 +290,7 @@
 
     <!-- Actual Kanban Columns -->
     <ng-container *ngIf="!isLoadingApplications()">
-      <div class="kanban-col" *ngFor="let s of STAGES" [ngClass]="'kanban-col-' + s.tone" [attr.data-stage]="s.key">
+      <div class="kanban-col" *ngFor="let s of STAGES" [ngClass]="'kanban-col-' + s.tone" [class.col-focus]="focusedStage() === s.key" [attr.data-stage]="s.key">
         <div class="col-header">
           <h3>{{ s.label }} <span>{{ stageApps(s.key).length }}</span></h3>
         </div>
@@ -338,9 +300,17 @@
         <div class="col-body" cdkDropList [cdkDropListData]="stageApps(s.key)"
              [cdkDropListEnterPredicate]="stageDropPredicate(s.key)"
              (cdkDropListDropped)="drop($event, s.key)">
-          <div class="kanban-card" *ngFor="let item of stageApps(s.key)" cdkDrag [cdkDragData]="item" (click)="openApplication(item)">
-            <div class="card-title">{{item.fullName}}</div>
+          <div class="kanban-card" [ngClass]="'card-' + s.tone" *ngFor="let item of stageApps(s.key)" cdkDrag [cdkDragData]="item" (click)="openApplication(item)">
+            <div class="card-top">
+              <div class="card-title">{{ displayName(item.fullName) }}</div>
+              <span class="card-notice" *ngIf="item.noticePeriod">{{ item.noticePeriod }}</span>
+            </div>
             <div class="card-meta">{{item.job?.title}}</div>
+            <!-- Quick facts as chips, as in the board design (12 Nov 2026) -->
+            <div class="card-tags" *ngIf="item.expectedCtc || item.experienceYears">
+              <span class="card-tag" *ngIf="item.expectedCtc">CTC: {{ formatCtc(item.expectedCtc) }}</span>
+              <span class="card-tag" *ngIf="item.experienceYears">Exp: {{ item.experienceYears }}</span>
+            </div>
             <!-- The candidate is held here, not moved, until the extra payment
                  is signed off — so the card says which move is waiting. -->
             <div class="approval-badge" *ngIf="item.approvalStatus === 'PENDING_APPROVAL'">

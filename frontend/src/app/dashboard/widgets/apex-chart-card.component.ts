@@ -471,7 +471,7 @@ export class ApexChartCardComponent
     return {
       ...raw,
       chart: {
-        fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
         toolbar: { show: false },
         zoom: { enabled: false },
         background: 'transparent',
@@ -508,7 +508,7 @@ export class ApexChartCardComponent
         style: {
           fontSize: '12px',
           fontFamily:
-            "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif",
+            "'Inter', system-ui, -apple-system, sans-serif",
         },
         ...(raw['tooltip'] || {}),
       },

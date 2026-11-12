@@ -2,6 +2,12 @@ import { Component, signal, computed, OnInit, inject } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { AgGridAngular } from 'ag-grid-angular';
+import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
+import { CandidatesComponent } from '../candidates/candidates';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
+import { SearchableSelectComponent } from '../../shared/components/searchable-select/searchable-select.component';
+import { DatePresetFilterComponent, DatePreset, DateRange } from '../../shared/components/date-preset-filter/date-preset-filter';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { HotToastService } from '@ngneat/hot-toast';
@@ -18,6 +24,8 @@ import {
   LucideAlertCircle,
   LucideExternalLink,
   LucideRotateCcw,
+  LucideLayoutGrid,
+  LucideTable,
   LucideX,
   LucideArrowLeft,
   LucideChevronRight,
@@ -25,10 +33,13 @@ import {
 
 export type InterviewTab = 'all' | 'upcoming' | 'needs-review' | 'completed' | 'cancelled';
 
+ModuleRegistry.registerModules([AllCommunityModule]);
+
 @Component({
   selector: 'app-interviews',
   standalone: true,
   imports: [
+    AgGridAngular, CandidatesComponent, PageHeaderComponent, SearchableSelectComponent, DatePresetFilterComponent,
     CommonModule,
     FormsModule,
     DatePipe,
@@ -45,6 +56,8 @@ export type InterviewTab = 'all' | 'upcoming' | 'needs-review' | 'completed' | '
     LucideAlertCircle,
     LucideExternalLink,
     LucideRotateCcw,
+    LucideLayoutGrid,
+    LucideTable,
     LucideX,
     LucideArrowLeft,
     LucideChevronRight,
@@ -77,7 +90,7 @@ export class InterviewsComponent implements OnInit {
   jobFilter = signal<string>('');
   roundFilter = signal<string>('');
   sortOrder = signal<'NEWEST' | 'OLDEST'>('NEWEST');
-  viewMode = signal<'cards' | 'table'>('cards');
+  viewMode = signal<'cards' | 'table'>('table');
 
   // Quick feedback tags
   readonly feedbackTags = [
@@ -373,6 +386,115 @@ export class InterviewsComponent implements OnInit {
     this.searchText.set('');
   }
 
+  /** Shared dropdowns and the "Scheduled ▾" date filter (12 Nov 2026). */
+  interviewerOptions = computed(() => this.availableInterviewers().map((i: any) => ({ id: String(i.id), name: i.name })));
+  jobOptions = computed(() => this.availableJobs().map((j: any) => ({ id: j, name: j })));
+  roundOptions = computed(() => this.availableRounds().map((r: any) => ({ id: r, name: r })));
+  datePreset = signal<DatePreset>('ALL');
+  onDateRange(r: DateRange) {
+    if (!r) { this.clearCustomDates(); return; }
+    const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    this.customStartDate.set(ymd(r.from));
+    this.customEndDate.set(ymd(r.to));
+    this.dateFilter.set('custom');
+  }
+  // ── Table: the same grid as the Employee Directory (12 Nov 2026) ─────────
+  readonly gridPageSize = 20;
+  readonly gridPageSizes = [20, 50, 100, 200];
+  readonly gridDefaultColDef: ColDef = { minWidth: 110, filter: true, sortable: true, resizable: true };
+  readonly gridOptions = {
+    headerHeight: 44,
+    rowHeight: 64,
+    suppressHorizontalScroll: false,
+    onCellClicked: (e: any) => {
+      const t = e.event?.target as HTMLElement | undefined;
+      const action = t?.closest('[data-act]')?.getAttribute('data-act');
+      if (action === 'feedback') { this.openFeedbackModal(e.data); return; }
+      if (action === 'join' || action === 'job') {
+        if (action === 'job') this.openJobDetails(e.data);
+        return;
+      }
+      this.openCandidateDetails(e.data);
+    },
+  };
+  private esc(v: any): string {
+    return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[c]);
+  }
+  readonly gridColumns: ColDef[] = [
+    {
+      headerName: 'Scheduled', colId: 'scheduled', minWidth: 150, flex: 0.9, sort: 'desc',
+      valueGetter: (p: any) => p.data?.scheduledAt ? new Date(p.data.scheduledAt).getTime() : 0,
+      filter: 'agNumberColumnFilter',
+      cellRenderer: (p: any) => {
+        if (!p.data?.scheduledAt) return '—';
+        const d = new Date(p.data.scheduledAt);
+        const day = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+        const time = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+        return `<div class="g-two"><strong>${day}</strong><span>${time} IST</span></div>`;
+      },
+    },
+    {
+      headerName: 'Candidate', colId: 'candidate', minWidth: 230, flex: 1.4,
+      valueGetter: (p: any) => p.data?.application?.fullName || 'Candidate',
+      cellRenderer: (p: any) => {
+        const a = p.data?.application || {};
+        // Photo when the candidate has one (as on the cards), initials otherwise.
+        const initials = `<span class="g-avatar" style="background:${this.getAvatarBg(a.fullName)}">${this.esc(this.getInitials(a.fullName))}</span>`;
+        // Photo when present; if it fails to load it swaps itself for the initials.
+        const face = a.photoUrl
+          ? `<img class="g-avatar g-photo" src="${this.esc(a.photoUrl)}" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;display:block"`
+            + ` onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">`
+            + initials.replace('class="g-avatar"', 'class="g-avatar" hidden-fallback').replace('style="', 'style="display:none;')
+          : initials;
+        return `<div class="g-person">${face}`
+          + `<div class="g-two"><strong>${this.esc(a.fullName || 'Candidate')}</strong><span>${this.esc(a.email || '')}</span></div></div>`;
+      },
+    },
+    {
+      headerName: 'Job', colId: 'job', minWidth: 180, flex: 1.1,
+      valueGetter: (p: any) => p.data?.application?.job?.title || '—',
+      cellRenderer: (p: any) => `<span class="g-link" data-act="job">${this.esc(p.value)}</span>`,
+    },
+    { headerName: 'Round', colId: 'round', minWidth: 150, flex: 1, valueGetter: (p: any) => p.data?.title || 'Technical Evaluation' },
+    {
+      headerName: 'Interviewer', colId: 'interviewer', minWidth: 150, flex: 1,
+      valueGetter: (p: any) => `${p.data?.interviewer?.firstName || ''} ${p.data?.interviewer?.lastName || ''}`.trim() || '—',
+    },
+    { headerName: 'Duration', colId: 'duration', minWidth: 110, flex: 0.6, filter: 'agNumberColumnFilter',
+      valueGetter: (p: any) => p.data?.durationMins || 30, valueFormatter: (p: any) => `${p.value} mins` },
+    {
+      headerName: 'Status', colId: 'status', minWidth: 140, flex: 0.8,
+      valueGetter: (p: any) => this.interviewStatusLabel(p.data),
+      cellRenderer: (p: any) => {
+        const pill = `<span class="table-status ${this.interviewStatus(p.data).toLowerCase().replace('_', '-')}">${this.esc(p.value)}</span>`;
+        // The interview status, plus a note when the candidate has since been rejected.
+        const note = this.candidateRejected(p.data) && this.interviewStatus(p.data) !== 'CANCELLED'
+          ? '<span class="g-rejected">Candidate rejected</span>' : '';
+        return `<div class="g-two" style="gap:4px">${pill}${note}</div>`;
+      },
+    },
+    {
+      headerName: 'Actions', colId: 'actions', minWidth: 110, maxWidth: 130, sortable: false, filter: false,
+      cellRenderer: (p: any) => {
+        // Icon buttons with tooltips (12 Nov 2026): join meeting, feedback.
+        const url = p.data?.locationUrl;
+        const href = url ? (url.startsWith('http') ? url : 'https://' + url) : '';
+        const video = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>';
+        const pen = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+        const fbLabel = p.data?.rating ? 'Edit feedback' : 'Give feedback';
+        const join = url
+          ? `<a class="g-icon-btn" data-act="join" href="${this.esc(href)}" target="_blank" rel="noopener" title="Join meeting" aria-label="Join meeting">${video}</a>`
+          : `<span class="g-icon-btn is-off" title="No meeting link" aria-label="No meeting link">${video}</span>`;
+        return `<div class="g-actions">${join}<button type="button" class="g-icon-btn${p.data?.rating ? ' is-done' : ''}" data-act="feedback" title="${fbLabel}" aria-label="${fbLabel}">${pen}</button></div>`;
+      },
+    },
+  ];
+
+  /** Application shown in the embedded candidate drawer, or null. */
+  drawerAppId = signal<number | null>(null);
+
+  goToCandidates() { this.router.navigate(['/recruitment/candidates']); }
+
   resetAllFilters() {
     this.searchText.set('');
     this.activeTab.set('all');
@@ -392,7 +514,8 @@ export class InterviewsComponent implements OnInit {
       this.toast.error('Candidate details are unavailable for this interview');
       return;
     }
-    this.router.navigate(['/recruitment/candidates'], { queryParams: { applicationId } });
+    // Same Application Details drawer as Candidates (ATS), opened right here (12 Nov 2026).
+    this.drawerAppId.set(applicationId);
   }
 
   /** Opens the detail page for the job associated with this interview. */
@@ -474,7 +597,13 @@ export class InterviewsComponent implements OnInit {
   interviewStatus(interview: any, now = new Date()): 'UPCOMING' | 'NEEDS_REVIEW' | 'COMPLETED' | 'CANCELLED' {
     if (interview?.status === 'CANCELLED') return 'CANCELLED';
     if (interview?.status === 'COMPLETED' || interview?.rating) return 'COMPLETED';
+    // A rejected candidate's interview that never took place is off (12 Nov 2026).
+    if (this.candidateRejected(interview)) return 'CANCELLED';
     return new Date(interview?.scheduledAt) >= now ? 'UPCOMING' : 'NEEDS_REVIEW';
+  }
+
+  candidateRejected(interview: any): boolean {
+    return String(interview?.application?.status || '').toUpperCase() === 'REJECTED';
   }
 
   interviewStatusLabel(interview: any): string {

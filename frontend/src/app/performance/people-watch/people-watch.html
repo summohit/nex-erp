@@ -112,68 +112,6 @@
       </button>
     </div>
 
-    <!-- Top KPI Stat Metric Cards (Notice & PIP mode) -->
-    <div class="pw-stats pw-notice-pip-stats" *ngIf="mode !== 'probation'">
-      <!-- 1. Probation Card -->
-      <!-- Probation hidden for now (19 Oct 2026): it gets its own flow later. -->
-      <button 
-        *ngIf="showProbation"
-        type="button" 
-        class="pw-stat" 
-        [class.on]="section() === 'probation'" 
-        (click)="section.set('probation')">
-        <div class="pw-stat-top">
-          <div class="pw-stat-icon-bubble probation-bubble">
-            <svg lucideUserCheck size="20"></svg>
-          </div>
-          <span class="pw-stat-badge probation-badge">Probation</span>
-        </div>
-        <div class="pw-stat-num">{{ d.probation.length }}</div>
-        <div class="pw-stat-label">On probation</div>
-        <div class="pw-stat-meta">
-          <span>{{ d.probation.length === 1 ? '1 team member' : d.probation.length + ' team members' }}</span>
-        </div>
-      </button>
-
-      <!-- 2. Notice Period Card -->
-      <button 
-        type="button" 
-        class="pw-stat" 
-        [class.on]="section() === 'notice'" 
-        (click)="section.set('notice')">
-        <div class="pw-stat-top">
-          <div class="pw-stat-icon-bubble notice-bubble">
-            <svg lucideClock size="20"></svg>
-          </div>
-          <span class="pw-stat-badge notice-badge">Notice</span>
-        </div>
-        <div class="pw-stat-num">{{ d.notice.length }}</div>
-        <div class="pw-stat-label">On notice period</div>
-        <div class="pw-stat-meta">
-          <span>{{ d.notice.length === 1 ? '1 resignation' : d.notice.length + ' resignations' }}</span>
-        </div>
-      </button>
-
-      <!-- 3. Open PIPs Card -->
-      <button 
-        type="button" 
-        class="pw-stat" 
-        [class.on]="section() === 'pip'" 
-        (click)="section.set('pip')">
-        <div class="pw-stat-top">
-          <div class="pw-stat-icon-bubble pip-bubble">
-            <svg lucideTarget size="20"></svg>
-          </div>
-          <span class="pw-stat-badge pip-badge">PIPs</span>
-        </div>
-        <div class="pw-stat-num">{{ d.pips.length }}</div>
-        <div class="pw-stat-label">Open PIPs</div>
-        <div class="pw-stat-meta">
-          <span>{{ d.pips.length === 1 ? '1 active plan' : d.pips.length + ' active plans' }}</span>
-        </div>
-      </button>
-    </div>
-
     <!-- Section 1: Probation -->
     <section class="pw-card" *ngIf="showProbation && section() === 'probation'">
       <div class="pw-card-head">
@@ -204,40 +142,6 @@
               <svg lucideX size="12"></svg>
             </button>
           </div>
-
-          <button type="button" class="pw-btn btn-policy" *ngIf="d.canManageProbation" (click)="openPolicy()" title="Probation length, extensions, reminders, leave rounding">
-            <svg lucideCalendar size="15"></svg>
-            <span>Policy</span>
-          </button>
-          <button 
-            type="button" 
-            class="pw-btn primary btn-add-main" 
-            *ngIf="d.canManageProbation" 
-            (click)="openProbation()">
-            <svg lucidePlus size="15"></svg>
-            <span>Add to probation</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Quick Filter Bar -->
-      <div class="pw-filter-bar">
-        <div class="pw-filter-chips">
-          <button type="button" class="pw-chip" [class.active]="probationFilter() === 'all'" (click)="probationFilter.set('all')">
-            All ({{ probationStats().total }})
-          </button>
-          <button type="button" class="pw-chip chip-overdue" [class.active]="probationFilter() === 'overdue'" (click)="probationFilter.set('overdue')">
-            <span class="chip-dot red"></span> Overdue ({{ probationStats().overdue }})
-          </button>
-          <button type="button" class="pw-chip chip-soon" [class.active]="probationFilter() === 'ending_soon'" (click)="probationFilter.set('ending_soon')">
-            <span class="chip-dot amber"></span> Soon ({{ probationStats().endingSoon }})
-          </button>
-          <button type="button" class="pw-chip chip-track" [class.active]="probationFilter() === 'on_track'" (click)="probationFilter.set('on_track')">
-            <span class="chip-dot green"></span> On Track ({{ probationStats().onTrack }})
-          </button>
-          <button type="button" class="pw-chip chip-pending" [class.active]="probationFilter() === 'pending_review'" (click)="probationFilter.set('pending_review')">
-            <span class="chip-dot purple"></span> Review Pending ({{ probationStats().pendingReview }})
-          </button>
         </div>
       </div>
 
@@ -523,14 +427,6 @@
         </div>
 
         <div class="pw-head-actions">
-          <button type="button" class="pw-btn btn-sm" (click)="loadHistory()">
-            <svg lucideClock size="13"></svg>
-            <span>{{ showHistory() ? 'Hide closed' : 'Show closed history' }}</span>
-          </button>
-          <button type="button" class="pw-btn primary btn-sm" (click)="openPipForm()">
-            <svg lucidePlus size="14"></svg>
-            <span>Start a PIP</span>
-          </button>
         </div>
       </div>
 

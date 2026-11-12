@@ -1,41 +1,24 @@
 <div class="reports-page-container" *ngIf="!isLoading() && data() as d">
   
-  <!-- TOP BREADCRUMB & CONTEXT BAR -->
-  <div class="reports-top-bar">
-    <div class="bar-left">
-      <button class="btn-back-pill" routerLink="/recruitment/candidates">
-        <svg lucideArrowLeft size="15"></svg>
-        <span>Back to ATS</span>
+  <!-- Page header (12 Nov 2026): the shared header, as on Candidates (ATS) -->
+  <app-page-header icon="chart" section="Recruitment" heading="Hiring Reports"
+    subtitle="Applications, conversion and time to hire, by job and by recruiter"
+    [showBack]="true" backLabel="Back to Candidates (ATS)" (back)="goToAts()">
+    <div class="view-switch-pills">
+      <button type="button" class="pill-btn" [class.active]="activeTab() === 'JOB'" (click)="activeTab.set('JOB')">
+        <svg lucideBriefcase size="14"></svg><span>By job ({{ filteredJobs().length }})</span>
       </button>
-      <nav class="reports-breadcrumbs">
-        <span class="crumb-link" routerLink="/recruitment/job-postings">Recruitment</span>
-        <svg lucideChevronRight size="13" class="crumb-sep"></svg>
-        <span class="crumb-current">Hiring Reports & Analytics</span>
-      </nav>
-    </div>
-
-    <div class="bar-right">
-      <button class="btn-top-action" (click)="exportReportCSV()" title="Export Hiring Report CSV">
-        <svg lucideDownload size="15"></svg>
-        <span>Export CSV</span>
+      <button type="button" class="pill-btn" [class.active]="activeTab() === 'RECRUITER'" (click)="activeTab.set('RECRUITER')">
+        <svg lucideUsers size="14"></svg><span>By recruiter ({{ filteredRecruiters().length }})</span>
       </button>
-      <a class="btn-top-action btn-top-primary" routerLink="/recruitment/candidates" title="Open Candidates ATS Pipeline">
-        <svg lucideUsers size="15"></svg>
-        <span>Open ATS Pipeline</span>
-      </a>
     </div>
-  </div>
-
-  <!-- HERO TITLE CARD -->
-  <div class="reports-hero-card">
-    <div class="hero-icon-circle">
-      <svg lucideBarChart3 size="24"></svg>
-    </div>
-    <div class="hero-text">
-      <h2>Hiring Reports & Pipeline Breakdown</h2>
-      <p>Analyze applicant throughput, conversion rates, and recruitment velocity across all open job requisitions.</p>
-    </div>
-  </div>
+    <button type="button" class="btn-top-action" (click)="exportReportCSV()" title="Export the report as CSV">
+      <svg lucideDownload size="15"></svg><span>Export CSV</span>
+    </button>
+    <a class="btn-top-action btn-top-primary" routerLink="/recruitment/candidates" title="Open the ATS pipeline">
+      <svg lucideUsers size="15"></svg><span>Open ATS pipeline</span>
+    </a>
+  </app-page-header>
 
   <!-- KPI SUMMARY GRID (4 METRICS) -->
   <div class="kpi-summary-grid" *ngIf="kpiSummary() as kpi">
@@ -92,110 +75,40 @@
     </div>
   </div>
 
-  <!-- FILTERS & CONTROLS TOOLBAR -->
-  <div class="filters-card">
-    <div class="filters-top-row">
-      
-      <!-- Search Input -->
-      <div class="filter-search-box">
-        <svg lucideSearch size="16" class="search-icon"></svg>
-        <input 
-          type="text" 
-          [ngModel]="searchQuery()" 
-          (ngModelChange)="searchQuery.set($event)" 
-          placeholder="Search job title, location, or department..." />
-        <button class="btn-clear-search" *ngIf="searchQuery()" (click)="searchQuery.set('')">
-          <svg lucideX size="14"></svg>
-        </button>
-      </div>
-
-      <!-- Department Filter -->
-      <div class="filter-select-group" *ngIf="departments().length > 0">
-        <label>Dept:</label>
-        <select class="filter-select" [ngModel]="selectedDepartment()" (ngModelChange)="selectedDepartment.set($event)">
-          <option value="ALL">All Departments</option>
-          <option *ngFor="let d of departments()" [value]="d">{{ d }}</option>
-        </select>
-      </div>
-
-      <!-- Location / Branch Filter -->
-      <div class="filter-select-group" *ngIf="branches().length > 0">
-        <label>Location:</label>
-        <select class="filter-select" [ngModel]="selectedBranch()" (ngModelChange)="selectedBranch.set($event)">
-          <option value="ALL">All Locations</option>
-          <option *ngFor="let b of branches()" [value]="b">{{ b }}</option>
-        </select>
-      </div>
-
-      <!-- Application Volume Filter -->
-      <div class="filter-select-group">
-        <label>Volume:</label>
-        <select class="filter-select" [ngModel]="selectedVolume()" (ngModelChange)="selectedVolume.set($event)">
-          <option value="ALL">All Volumes</option>
-          <option value="HIGH">High Volume (20+ Apps)</option>
-          <option value="MEDIUM">Medium (5 - 19 Apps)</option>
-          <option value="LOW">Low (1 - 4 Apps)</option>
-        </select>
-      </div>
-
-      <!-- Pipeline Outcome Filter -->
-      <div class="filter-select-group">
-        <label>Outcome:</label>
-        <select class="filter-select" [ngModel]="selectedStageFilter()" (ngModelChange)="selectedStageFilter.set($event)">
-          <option value="ALL">All Outcomes</option>
-          <option value="HAS_HIRES">Has Hires / Offers</option>
-          <option value="HAS_OFFERS">Has Offers Extended</option>
-          <option value="HAS_REJECTIONS">Has Rejections</option>
-          <option value="ALL_NEW">All In New / Untriaged</option>
-        </select>
-      </div>
-
-      <!-- Sort By -->
-      <div class="filter-select-group">
-        <label>Sort:</label>
-        <select class="filter-select" [ngModel]="sortBy()" (ngModelChange)="sortBy.set($event)">
-          <option value="TOTAL_DESC">Total Apps (High → Low)</option>
-          <option value="TOTAL_ASC">Total Apps (Low → High)</option>
-          <option value="HIRED_DESC">Most Hires</option>
-          <option value="REJECTED_DESC">Most Rejected</option>
-          <option value="TITLE_ASC">Job Title (A → Z)</option>
-        </select>
-      </div>
-
-      <!-- Reset Filters Button -->
-      <button 
-        class="btn-reset-filters" 
-        *ngIf="searchQuery() || selectedDepartment() !== 'ALL' || selectedBranch() !== 'ALL' || selectedVolume() !== 'ALL' || selectedStageFilter() !== 'ALL' || sortBy() !== 'TOTAL_DESC'"
-        (click)="resetFilters()">
-        <svg lucideX size="14"></svg>
-        <span>Reset</span>
-      </button>
-
+  <!-- Filters (12 Nov 2026): one standard row, same dropdowns as the other pages -->
+  <div class="filters-card rp-filter-row">
+    <div class="filter-search-box">
+      <svg lucideSearch size="16" class="search-icon"></svg>
+      <input type="text" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Search job, location or department" />
     </div>
-
-    <!-- Active Filter Summary & Tab Switcher -->
-    <div class="filters-bottom-row">
-      <div class="results-count">
-        <span>Showing <strong>{{ activeTab() === 'JOB' ? filteredJobs().length : filteredRecruiters().length }}</strong> {{ activeTab() === 'JOB' ? 'positions' : 'recruiters' }}</span>
-      </div>
-
-      <div class="report-tab-toggles">
-        <button 
-          class="tab-btn" 
-          [class.active]="activeTab() === 'JOB'" 
-          (click)="activeTab.set('JOB')">
-          <svg lucideBriefcase size="15"></svg>
-          <span>By Job Position ({{ filteredJobs().length }})</span>
-        </button>
-        <button 
-          class="tab-btn" 
-          [class.active]="activeTab() === 'RECRUITER'" 
-          (click)="activeTab.set('RECRUITER')">
-          <svg lucideUsers size="15"></svg>
-          <span>By Recruiter ({{ filteredRecruiters().length }})</span>
-        </button>
-      </div>
+    <div class="rp-field" *ngIf="departments().length > 0">
+      <app-searchable-select [options]="deptOptions()" placeholder="All departments"
+        [value]="selectedDepartment() === 'ALL' ? null : selectedDepartment()" [clearable]="true"
+        (valueChange)="selectedDepartment.set($event || 'ALL')"></app-searchable-select>
     </div>
+    <div class="rp-field" *ngIf="branches().length > 0">
+      <app-searchable-select [options]="branchOptions()" placeholder="All locations"
+        [value]="selectedBranch() === 'ALL' ? null : selectedBranch()" [clearable]="true"
+        (valueChange)="selectedBranch.set($event || 'ALL')"></app-searchable-select>
+    </div>
+    <div class="rp-field">
+      <app-searchable-select [options]="volumeOptions" placeholder="All volumes"
+        [value]="selectedVolume() === 'ALL' ? null : selectedVolume()" [clearable]="true"
+        (valueChange)="selectedVolume.set($event || 'ALL')"></app-searchable-select>
+    </div>
+    <div class="rp-field">
+      <app-searchable-select [options]="outcomeOptions" placeholder="All outcomes"
+        [value]="selectedStageFilter() === 'ALL' ? null : selectedStageFilter()" [clearable]="true"
+        (valueChange)="selectedStageFilter.set($event || 'ALL')"></app-searchable-select>
+    </div>
+    <div class="rp-field">
+      <app-searchable-select [options]="sortOptions" placeholder="Sort"
+        [value]="sortBy()" (valueChange)="sortBy.set($event || 'TOTAL_DESC')"></app-searchable-select>
+    </div>
+    <button type="button" class="clear-all-filters"
+      *ngIf="searchQuery() || selectedDepartment() !== 'ALL' || selectedBranch() !== 'ALL' || selectedVolume() !== 'ALL' || selectedStageFilter() !== 'ALL' || sortBy() !== 'TOTAL_DESC'"
+      (click)="resetFilters()">Clear all</button>
+    <span class="rp-count">Showing <strong>{{ activeTab() === 'JOB' ? filteredJobs().length : filteredRecruiters().length }}</strong> {{ activeTab() === 'JOB' ? 'positions' : 'recruiters' }}</span>
   </div>
 
   <!-- NOTE ON AVERAGE TIME TO HIRE -->

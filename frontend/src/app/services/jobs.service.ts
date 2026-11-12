@@ -30,6 +30,7 @@ export interface Job {
   recruiter?: { id: number; firstName: string; lastName: string; avatarUrl?: string | null } | null;
   workLocationType?: string;
   // frontend mapping fields
+  jobId?: string;
   location?: string;
   address?: string;
   applicants?: number;

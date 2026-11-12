@@ -58,7 +58,7 @@ export const permissionGuard: CanActivateFn = (route: ActivatedRouteSnapshot) =>
 
     // HR's profile-completion report: HR and admins, as the server allows.
     if (targetModule === 'employees/profile-completion') {
-      return of(['ADMIN', 'HR'].includes(userRole));
+      return of(false); // Super Admin only (returned true above), 12 Nov 2026
     }
 
     return permissionsService.getAllPermissions(userRole).pipe(

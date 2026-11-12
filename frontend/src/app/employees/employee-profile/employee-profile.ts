@@ -1,5 +1,6 @@
 import { Component, computed, inject, Input, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { EmployeeService } from '../../services/employee.service';
@@ -26,6 +27,7 @@ import {
   standalone: true,
   imports: [
     CommonModule,
+    PageHeaderComponent,
     FormsModule,
     ProfileTabComponent,
     EmergencyContactsTabComponent,
@@ -177,21 +179,21 @@ export class EmployeeProfileComponent implements OnInit {
     };
   });
 
-  /** Tab item counts */
+  /** Tab item counts: STRICT REAL LIVE COUNTS, NO HARDCODED FALLBACKS */
   resumeCount = computed(() => {
     const e = this.employeeData();
-    const count = (e?.resumeLines?.length || 0) + (e?.skills?.length ? 2 : 0);
-    return count > 0 ? count : 4;
+    if (!e) return 0;
+    return (e.resumeLines?.length || 0) + (e.skills?.length || 0);
   });
 
   contactsCount = computed(() => {
     const e = this.employeeData();
-    return e?.emergencyContacts?.length || 2;
+    return e?.emergencyContacts?.length || 0;
   });
 
   documentsCount = computed(() => {
     const e = this.employeeData();
-    return e?.documents?.length || 5;
+    return e?.documents?.length || 0;
   });
 
   isLoading = signal(true);
@@ -204,6 +206,13 @@ export class EmployeeProfileComponent implements OnInit {
   conversionForm = { jobId: null as number | null, offeredSalary: null as number | null, joiningDate: '', remarks: '' };
   employmentHistory = signal<any[]>([]);
   historyLoading = signal(false);
+
+  getRingClass(type: string): string {
+    const t = (type || '').toUpperCase();
+    if (t.includes('APPRAISAL') || t.includes('PROMOTION')) return 'ring-green';
+    if (t.includes('OFFER') || t.includes('CONVERSION')) return 'ring-purple';
+    return 'ring-blue';
+  }
 
   canConvertTrainee(): boolean {
     const role = this.authService.currentUser()?.role;

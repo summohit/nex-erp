@@ -10,6 +10,8 @@ import { WfhService } from '../services/wfh.service';
 import { EarlyReleaseService } from '../services/early-release.service';
 import { ProfileModalService } from '../shared/profile-modal/profile-modal.service';
 import { DialogService } from '../shared/services/dialog.service';
+import { PageHeaderComponent } from '../shared/components/page-header/page-header';
+import { DatePresetFilterComponent, DatePreset, DateRange } from '../shared/components/date-preset-filter/date-preset-filter';
 
 /**
  * One inbox for everything waiting on my decision (19 Oct 2026), as in the
@@ -40,7 +42,7 @@ export interface ApprovalRow {
 @Component({
   selector: 'app-approvals',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [PageHeaderComponent, DatePresetFilterComponent, CommonModule, FormsModule, RouterLink],
   templateUrl: './approvals.html',
   styleUrls: ['./approvals.css'],
 })
@@ -56,10 +58,9 @@ export class ApprovalsComponent implements OnInit {
   readonly tabs: { kind: ApprovalKind; label: string; shortDesc: string; tone: string }[] = [
     { kind: 'LEAVE', label: 'Leave Requests', shortDesc: 'Time-off & half-day', tone: 'violet' },
     { kind: 'WFH', label: 'Work From Home', shortDesc: 'Remote work days', tone: 'emerald' },
-    { kind: 'REG', label: 'Regularization', shortDesc: 'Attendance corrections', tone: 'blue' },
-    { kind: 'CLOCKOUT', label: 'Late Clock-out', shortDesc: 'Closed on later day', tone: 'amber' },
-    { kind: 'VISITS', label: 'Visits', shortDesc: 'Out-of-geo attendance requests', tone: 'rose' },
-    { kind: 'RELEASE', label: 'Early Release', shortDesc: 'Field visit done early', tone: 'blue' },
+    { kind: 'REG', label: 'Regularization', shortDesc: 'Attendance punch fixes', tone: 'blue' },
+    { kind: 'CLOCKOUT', label: 'Late Clock-out', shortDesc: 'Closed on next day', tone: 'amber' },
+    { kind: 'VISITS', label: 'Visits & Field', shortDesc: 'Out-of-geo punches', tone: 'rose' },
   ];
 
   loading = signal(true);
@@ -188,9 +189,60 @@ export class ApprovalsComponent implements OnInit {
   });
 
   ngOnInit() {
-    this.setQuickRange('YESTERDAY');
+    this.setQuickRange('ALL');
     this.loadWfhMonth();
     this.load();
+  }
+
+  getStageLabel(r: ApprovalRow): string {
+    if (r.kind === 'LEAVE') {
+      return r.raw?.status === 'PENDING_HR' ? 'Pending HR Final Approval' : 'Pending Manager Decision';
+    }
+    if (r.kind === 'WFH') {
+      return r.raw?.status === 'PENDING_HR' ? 'Pending HR Final Approval' : 'Pending Manager Decision';
+    }
+    if (r.kind === 'REG') {
+      return 'Pending Manager Decision';
+    }
+    if (r.kind === 'CLOCKOUT') {
+      return r.badge ? r.badge : 'Night Production Maintenance';
+    }
+    if (r.kind === 'VISITS') {
+      return 'Out-of-Geo Punch Request';
+    }
+    return 'Pending Review';
+  }
+
+  getUrgencyBadge(r: ApprovalRow): { text: string; tone: 'urgent' | 'waiting' | 'yesterday' | 'today' } {
+    const days = this.waitingDays(r);
+    if (days >= 7) {
+      return { text: `Urgent · ${days}d`, tone: 'urgent' };
+    }
+    if (days === 0) {
+      return { text: 'Today', tone: 'today' };
+    }
+    if (days === 1) {
+      return { text: 'Yesterday', tone: 'yesterday' };
+    }
+    return { text: `Waiting ${days}d`, tone: 'waiting' };
+  }
+
+  formatDateShort(value: string): string {
+    if (!value) return '—';
+    const d = new Date(value + (value.includes('T') ? '' : 'T00:00:00'));
+    if (isNaN(d.getTime())) return value;
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  getEvidenceName(r: ApprovalRow): string {
+    if (!r.proofUrl) return 'Attachment';
+    try {
+      const parts = r.proofUrl.split('/');
+      const last = parts[parts.length - 1];
+      return decodeURIComponent(last.split('?')[0]) || 'Attachment';
+    } catch {
+      return 'Attachment';
+    }
   }
 
   private ymd(d: Date): string {
@@ -314,7 +366,24 @@ export class ApprovalsComponent implements OnInit {
     this.page.set(1);
   }
 
+  /** The shared date dropdown (12 Nov 2026), same as the Employee pages. */
+  datePreset = signal<DatePreset>('ALL');
+  onDateRange(r: DateRange) {
+    if (!r) { this.clearDates(); return; }
+    this.fromDate.set(this.ymd(r.from));
+    this.toDate.set(this.ymd(r.to));
+    this.quickRange.set('CUSTOM');
+    this.page.set(1);
+  }
+  private clearDates() {
+    this.fromDate.set('');
+    this.toDate.set('');
+    this.quickRange.set('ALL');
+    this.page.set(1);
+  }
+
   resetFilters() {
+    this.datePreset.set('ALL');
     this.query.set('');
     this.departmentFilter.set('');
     this.fromDate.set('');
@@ -581,7 +650,9 @@ export class ApprovalsComponent implements OnInit {
       this.busy.set(null);
       this.selected.set(new Set());
       this.closeRejectModal();
-      this.toast.success(`Rejected ${ok} of ${list.length} requests`);
+      // A partial result is not a success: say how many were left (12 Nov 2026).
+      if (ok === list.length) this.toast.success(`Rejected ${ok} request${ok === 1 ? '' : 's'}`);
+      else this.toast.error(`Rejected ${ok} of ${list.length}; ${list.length - ok} could not be rejected and are still in the list`);
       return;
     }
 
@@ -648,6 +719,7 @@ export class ApprovalsComponent implements OnInit {
     }
     this.busy.set(null);
     this.selected.set(new Set());
-    this.toast.success(`${ok} of ${list.length} approved`);
+    if (ok === list.length) this.toast.success(`Approved ${ok} request${ok === 1 ? '' : 's'}`);
+    else this.toast.error(`Approved ${ok} of ${list.length}; ${list.length - ok} could not be approved and are still in the list`);
   }
 }

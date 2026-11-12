@@ -45,7 +45,7 @@
 }
 
 .page-header-card h1 {
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
   font-size: 22px !important;
   font-weight: 800 !important;
   color: #0f172a !important;
@@ -89,7 +89,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 9999px;
   padding: 8px 16px;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -4400,3 +4400,181 @@
 .shift-scope { min-height: 62px; align-items: center; margin-top: 0; border-color: #e2e8f0; background: #fff; transition: all .15s ease; }.shift-scope:hover { border-color: #cbd5e1; background: #f8fafc; }
 .shift-scope span { display: flex; flex-direction: column; gap: 3px; }.shift-scope b { color: #0f172a; font-size: 13px; }.shift-scope small { color: #64748b; font-size: 11px; font-weight: 500; line-height: 1.35; }.shift-scope:has(input:checked) b { color: #1373e5; }
 .shift-change-footer .btn { min-width: 116px; height: 44px; border-radius: 10px; font-weight: 700; }.shift-change-footer .btn-primary { box-shadow: 0 8px 18px rgba(19,115,229,.22); }
+
+/* Shimmer placeholders while data loads (12 Nov 2026) */
+.sk { display: inline-block; border-radius: 8px; background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%); background-size: 200% 100%; animation: sk-shimmer 1.2s ease-in-out infinite; }
+@keyframes sk-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.sk-pill { width: 92px; height: 26px; border-radius: 999px; vertical-align: middle; }
+.sk-champions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; }
+.sk-champ { display: flex; flex-direction: column; gap: 16px; padding: 18px; border: 1px solid #eef2f7; border-radius: 14px; }
+.sk-row { display: flex; align-items: center; gap: 12px; }
+.sk-col { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.sk-circle { width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0; }
+.sk-line { height: 12px; }
+.sk-line.w60 { width: 60%; } .sk-line.w40 { width: 40%; }
+.sk-box { flex: 1; height: 70px; border-radius: 12px; }
+@media (max-width: 900px) { .sk-champions { grid-template-columns: 1fr; } }
+
+/* ── 12 Nov 2026: header on one row, KPI labels in full ─────────────────── */
+.page-header-card { flex-wrap: nowrap !important; align-items: center !important; justify-content: space-between !important; gap: 16px !important; }
+.page-header-card .header-title-group { flex: 1 1 auto; min-width: 0; }
+.header-actions-group { flex: 0 0 auto; flex-wrap: nowrap !important; justify-content: flex-end; gap: 8px; }
+@media (max-width: 1100px) { .page-header-card { flex-wrap: wrap !important; } }
+
+/* Grid | Table: the same pill switch as every other page */
+.view-mode-toggle-group { display: inline-flex; background: #f1f5f9; padding: 3px; border-radius: 8px; border: 1px solid #e2e8f0; }
+.btn-toggle-view { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: none; background: transparent; color: #64748b; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.btn-toggle-view.active { background: #fff; color: #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,.08), inset 0 -2px 0 #2563eb; }
+
+/* KPI label in full; the % moves under it when space is tight */
+.today-kpi .kpi-header { flex-wrap: wrap; row-gap: 2px; }
+.today-kpi .kpi-label { white-space: normal; overflow: visible; text-overflow: clip; }
+
+/* ── One filter row (12 Nov 2026): Search → Month → Year → Employee →
+   Department → Status → Flags → Filters → Clear all. The exact date lives in
+   the Filters drawer. ─────────────────────────────────────────────────── */
+.filter-bar-card { display: flex !important; align-items: center !important; flex-wrap: nowrap !important; gap: 10px !important; position: relative; z-index: 30; overflow: visible !important; }
+.filter-bar-card .filter-bar-main-row,
+.filter-bar-card .filter-dropdowns-group { display: contents !important; }
+.filter-bar-card .search-input-wrapper { order: 1; flex: 1 1 200px; min-width: 160px; max-width: 280px; }
+.filter-bar-card .filter-dropdowns-group > * { order: 2; flex: 0 1 auto; min-width: 0; }
+.filter-bar-card .btn-attendance-filters { order: 8; flex-shrink: 0; }
+.filter-bar-card .btn-attendance-reset { order: 9; }
+.filter-bar-card .ff-in-drawer { display: none !important; }
+.filter-bar-card .filter-dropdown-trigger { max-width: 190px; }
+.filter-bar-card .filter-dropdown-trigger .trigger-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1200px) { .filter-bar-card { flex-wrap: wrap !important; } }
+
+/* Status chips: a compact legend that still filters on click */
+.status-legend { padding: 8px 12px !important; }
+.status-legend .legend-items-list { gap: 6px !important; flex-wrap: wrap; }
+.status-legend .legend-item { height: 30px; padding: 0 10px 0 6px !important; border: 1px solid transparent !important; border-radius: 999px !important; background: transparent !important; box-shadow: none !important; font-size: 12.5px !important; font-weight: 500 !important; color: #475569; }
+.status-legend .legend-item:hover { background: #f1f5f9 !important; }
+.status-legend .legend-item.active { background: #eff6ff !important; border-color: #bfdbfe !important; color: #1d4ed8; }
+.status-legend .legend-icon-wrapper { width: 20px !important; height: 20px !important; border-radius: 50% !important; }
+.status-legend .legend-icon-wrapper svg { width: 12px; height: 12px; }
+
+/* Champions header (12 Nov 2026): Year | Month as the standard pill switch,
+   Performance List as an outlined button (no solid blue). */
+.ph-period-toggle { display: inline-flex !important; background: #f1f5f9 !important; padding: 3px !important; border-radius: 8px !important; border: 1px solid #e2e8f0 !important; gap: 0 !important; }
+.ph-period-toggle button { padding: 6px 14px !important; border-radius: 6px !important; border: none !important; background: transparent !important; color: #64748b !important; font-size: 12.5px !important; font-weight: 600 !important; box-shadow: none !important; }
+.ph-period-toggle button.active { background: #fff !important; color: #2563eb !important; box-shadow: 0 1px 3px rgba(0,0,0,.08), inset 0 -2px 0 #2563eb !important; }
+.performance-list-button { display: inline-flex !important; align-items: center; gap: 8px; height: 38px !important; padding: 0 14px !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; background: #fff !important; color: #334155 !important; font-size: 13px !important; font-weight: 600 !important; box-shadow: none !important; }
+.performance-list-button:hover { background: #f8fafc !important; border-color: #cbd5e1 !important; }
+.filter-bar-card .clear-all-filters { order: 9; margin-left: 0; }
+
+/* The old card is a centred column; the filter row must be a left-aligned row,
+   in a card like the page header (12 Nov 2026). */
+.filter-bar-card {
+  flex-direction: row !important; justify-content: flex-start !important; align-items: center !important; text-align: left !important;
+  padding: 14px 16px !important; background: #fff !important; border: 1px solid #e2e8f0 !important; border-radius: 14px !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .04) !important; min-height: 0 !important;
+}
+.filter-bar-card > *, .filter-bar-card .filter-bar-main-row > *, .filter-bar-card .filter-dropdowns-group > * { margin: 0 !important; align-self: center !important; }
+.filter-bar-card .search-input-wrapper input { width: 100%; height: 38px; }
+.filter-bar-card .filter-dropdown-trigger { height: 38px; }
+
+/* ── KPI pop-up redesign (12 Nov 2026): same look as the rest of the app ── */
+.kpi-dialog { border-radius: 16px !important; overflow: hidden; box-shadow: 0 24px 64px rgba(15, 23, 42, .22) !important; }
+.kpi-top-accent { display: none !important; }
+.kpi-head { padding: 18px 22px !important; border-bottom: 1px solid #eef2f7 !important; background: linear-gradient(100deg, #f5f8ff 0%, #ffffff 45%) !important; }
+.kpi-head-icon { width: 48px !important; height: 48px !important; border-radius: 50% !important; background: #e8efff !important; color: #2563eb !important; border: 0 !important; box-shadow: none !important; }
+.kpi-title-row h2, .kpi-title-row h3 { font-family: var(--font-heading); font-size: 18px !important; font-weight: 700 !important; }
+.kpi-scope-pill, .kpi-count-pill { height: 24px; padding: 0 10px !important; border-radius: 999px !important; font-size: 12px !important; font-weight: 600 !important; border: 0 !important; }
+.kpi-scope-pill { background: #eff6ff !important; color: #1d4ed8 !important; }
+.kpi-count-pill { background: #f1f5f9 !important; color: #475569 !important; }
+.kpi-sub { font-size: 13px !important; color: #64748b !important; }
+.kpi-export-btn, .kpi-filter-btn { height: 38px !important; padding: 0 14px !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; background: #fff !important; color: #334155 !important; font-size: 13px !important; font-weight: 600 !important; box-shadow: none !important; }
+.kpi-export-btn:hover, .kpi-filter-btn:hover { background: #f8fafc !important; }
+.kpi-x { width: 38px !important; height: 38px !important; border-radius: 50% !important; border: 0 !important; background: transparent !important; color: #64748b !important; }
+.kpi-x:hover { background: #f1f5f9 !important; color: #0f172a !important; }
+
+.kpi-toolbar { padding: 14px 22px !important; background: #fff !important; border-bottom: 1px solid #eef2f7 !important; }
+.kpi-search-box input, .kpi-dept-select { height: 38px !important; border-radius: 8px !important; border: 1px solid #e2e8f0 !important; background: #f8fafc !important; font-size: 13px !important; }
+.kpi-search-box input:focus, .kpi-dept-select:focus { background: #fff !important; border-color: #2563eb !important; }
+
+/* Quick chips: the selected one is soft blue, not black */
+.kpi-qchip { height: 32px !important; padding: 0 12px !important; border-radius: 999px !important; border: 1px solid #e2e8f0 !important; background: #fff !important; color: #334155 !important; font-size: 12.5px !important; font-weight: 600 !important; box-shadow: none !important; }
+.kpi-qchip b { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #f1f5f9 !important; color: #475569 !important; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.kpi-qchip:hover { background: #f8fafc !important; }
+.kpi-qchip.active { background: #eff6ff !important; border-color: #bfdbfe !important; color: #1d4ed8 !important; }
+.kpi-qchip.active b { background: #2563eb !important; color: #fff !important; }
+
+/* Rows: lighter cards, tighter spacing */
+.kpi-row { padding: 12px 16px !important; border: 1px solid #eef2f7 !important; border-radius: 12px !important; box-shadow: none !important; margin-bottom: 8px !important; }
+.kpi-row:hover { border-color: #bfdbfe !important; background: #fbfdff !important; }
+.kpi-time, .kpi-chip { height: 26px !important; border-radius: 999px !important; font-size: 12px !important; }
+
+/* Footer: outlined secondary, blue primary (no black) */
+.kpi-foot { padding: 12px 22px !important; border-top: 1px solid #eef2f7 !important; background: #fff !important; }
+.kpi-foot-btn { height: 38px !important; padding: 0 16px !important; border-radius: 8px !important; font-size: 13px !important; font-weight: 600 !important; box-shadow: none !important; }
+.kpi-foot-btn.secondary { background: #fff !important; border: 1px solid #e2e8f0 !important; color: #334155 !important; }
+.kpi-foot-btn.primary { background: #2563eb !important; border: 1px solid #2563eb !important; color: #fff !important; }
+.kpi-foot-btn.primary:hover { background: #1d4ed8 !important; }
+
+.kpi-chip.day-half { background: #fef2f2 !important; color: #b91c1c !important; border: 1px solid #fecaca !important; padding: 0 10px; font-weight: 600; display: inline-flex; align-items: center; white-space: nowrap; }
+.kpi-chip.day-absent { background: #fff7ed !important; color: #c2410c !important; border: 1px solid #fed7aa !important; padding: 0 10px; font-weight: 600; display: inline-flex; align-items: center; white-space: nowrap; }
+
+/* ── Filter row tidy-up (12 Nov 2026) ─────────────────────────────────────
+   Even gaps, every control the same height and shape, one blue "Clear all". */
+.filter-bar-card .searchable-filter-dropdown { margin: 0 !important; flex: 0 1 auto; min-width: 0; }
+.filter-bar-card .filter-dropdown-trigger { margin: 0 !important; height: 38px !important; border-radius: 8px !important; padding: 0 12px !important; gap: 8px; background: #fff !important; }
+.filter-bar-card .search-input-wrapper { flex: 0 1 240px !important; }
+.filter-bar-card .att-clear-all { order: 9; color: #2563eb !important; background: transparent !important; border: 0 !important; }
+.filter-bar-card .att-clear-all:hover { background: #eff6ff !important; }
+.filter-bar-card .btn-attendance-filters { margin-left: auto; }
+
+/* ── Day details pop-up footer (12 Nov 2026): standard buttons ──────────── */
+.session-modal-footer { display: flex !important; align-items: center !important; gap: 10px !important; padding: 14px 22px !important; border-top: 1px solid #eef2f7 !important; }
+.session-modal-footer .btn { display: inline-flex !important; align-items: center; justify-content: center; gap: 8px; height: 40px !important; padding: 0 16px !important; border-radius: 8px !important; font-size: 13px !important; font-weight: 600 !important; box-shadow: none !important; }
+.session-modal-footer .btn-outline { background: #fff !important; border: 1px solid #e2e8f0 !important; color: #334155 !important; }
+.session-modal-footer .btn-outline:hover { background: #f8fafc !important; border-color: #cbd5e1 !important; }
+.session-modal-footer .change-day-action, .session-modal-footer .change-shift-action { color: #1d4ed8 !important; }
+.session-modal-footer .close-log-action:last-child { margin-left: auto; }
+.session-modal-footer .btn-primary { background: #2563eb !important; border: 1px solid #2563eb !important; color: #fff !important; }
+
+/* Change shift: two steps (when → which shift) with a back button. */
+.shift-step-header { display: flex; align-items: flex-start; gap: 10px; }
+.shift-step-header > div { flex: 1; min-width: 0; }
+.shift-change-header h3::before, .shift-change-header h3::after { display: none !important; content: none !important; }
+.shift-change-header h3 { font-size: 18px !important; }
+.shift-change-header p { padding-left: 0 !important; }
+.shift-back-btn { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; border-radius: 50%; border: 1px solid #e2e8f0; background: #fff; color: #334155; cursor: pointer; }
+.shift-back-btn:hover { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+
+/* Day pop-up tabs: Attendance · Correct day · Change shift */
+.day-tabs { display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid #e2e8f0; background: #fff; }
+.day-tab { position: relative; height: 42px; padding: 0 14px; border: 0; background: none; color: #64748b; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.day-tab:hover { color: #1e293b; }
+.day-tab.active { color: #1d4ed8; }
+.day-tab.active::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: #2563eb; }
+.inline-change-shift { display: flex; flex-direction: column; gap: 8px; }
+.shift-tab-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; border-radius: 10px; }
+.shift-tab-list.field-invalid { outline: 1px solid #ef4444; outline-offset: 3px; }
+.change-day-reason.field-invalid { border-color: #ef4444 !important; box-shadow: 0 0 0 3px rgba(239,68,68,.12) !important; }
+.field-error { color: #dc2626; font-size: 12px; font-weight: 500; }
+.session-modal-footer { justify-content: flex-end; }
+
+/* Day pop-up footer, Google-dialog style: right-aligned, text Close then filled action. */
+.session-modal-footer { display: flex !important; justify-content: flex-end !important; align-items: center; gap: 8px !important; padding: 12px 20px !important; border-top: 1px solid #eef2f6; background: #fff; }
+.session-modal-footer .close-log-action { order: 1; margin-left: 0 !important; height: 36px !important; padding: 0 16px !important; border: 0 !important; border-radius: 18px !important; background: transparent !important; color: #1d4ed8 !important; font-size: 14px !important; font-weight: 500 !important; box-shadow: none !important; }
+.session-modal-footer .close-log-action:hover { background: #eff6ff !important; }
+.session-modal-footer .apply-day-change { order: 2; min-width: 0 !important; height: 36px !important; padding: 0 22px !important; border: 0 !important; border-radius: 18px !important; background: #2563eb !important; color: #fff !important; font-size: 14px !important; font-weight: 500 !important; box-shadow: none !important; transition: background .15s, box-shadow .15s; }
+.session-modal-footer .apply-day-change:hover:not(:disabled) { background: #1d4ed8 !important; box-shadow: 0 1px 3px rgba(37,99,235,.35) !important; }
+.session-modal-footer .apply-day-change:disabled { background: #e2e8f0 !important; color: #94a3b8 !important; }
+
+/* One scroll area: the shift list grows with the body instead of scrolling inside it. */
+.shift-tab-list { max-height: none; overflow: visible; }
+
+/* Lighter, smaller placeholder text. */
+.change-day-reason::placeholder { font-size: 12.5px; color: #a3aebd; font-weight: 400; }
+.change-day-reason { font-size: 13.5px; }
+
+/* Filter row: never squeeze filters into each other. When the sidebar is open
+   (or the screen is narrow) the filters that don't fit move to a second line. */
+.filter-bar-card { flex-wrap: wrap !important; row-gap: 10px !important; }
+.filter-bar-card .search-input-wrapper { flex: 1 1 220px !important; min-width: 200px !important; max-width: 320px !important; }
+.filter-bar-card .filter-dropdowns-group > *,
+.filter-bar-card .btn-attendance-filters,
+.filter-bar-card .att-clear-all { flex: 0 0 auto !important; min-width: max-content !important; }
+.filter-bar-card .filter-dropdown-trigger { max-width: none !important; white-space: nowrap; }

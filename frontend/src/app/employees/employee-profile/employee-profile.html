@@ -1,87 +1,51 @@
 <div class="page-container" [class.embedded]="embedded">
   <div class="profile-layout" *ngIf="!isLoading()">
     
-    <!-- Hero Header Profile Card -->
-    <div class="hero-profile-card" *ngIf="!embedded">
-      <div class="hero-main-row">
-        <!-- Left: Avatar, Name, Code, Designation, Department, Location, Badges -->
-        <div class="hero-left-section">
-          <div class="hero-avatar-wrapper">
-            <div class="hero-avatar" *ngIf="!employeeData()?.avatarUrl">
-              <span>{{ employeeInitials() }}</span>
-            </div>
-            <img *ngIf="employeeData()?.avatarUrl" [src]="employeeData()?.avatarUrl" class="hero-avatar-img" alt="Avatar" />
-            <span class="hero-status-dot" [class.active]="employeeData()?.user?.status !== 'DEACTIVATED'"></span>
-          </div>
+    <!-- Page header (12 Nov 2026): same as every Employee page -->
+    <app-page-header *ngIf="!embedded" icon="profile" section="Employees" heading="Profile Settings"
+      [subtitle]="(employeeData()?.firstName || '') + ' ' + (employeeData()?.lastName || '') + ' · ' + employeeCodeBadge()"></app-page-header>
 
-          <div class="hero-info">
-            <div class="hero-title-row">
-              <h1 class="hero-name">{{ employeeData()?.firstName }} {{ employeeData()?.lastName }}</h1>
-              <span class="hero-code-badge">{{ employeeCodeBadge() }}</span>
-            </div>
+    <!-- Profile header (12 Nov 2026): one calm row, Google-style. Name is the
+         one strong element; facts sit right under it; status is a small chip.
+         The long banner shows only when something needs action. -->
+    <section class="ph2" *ngIf="!embedded">
+      <div class="ph2-avatar">
+        <img *ngIf="employeeData()?.avatarUrl; else ph2Initials" [src]="employeeData()?.avatarUrl" alt="">
+        <ng-template #ph2Initials><span>{{ employeeInitials() }}</span></ng-template>
+        <span class="ph2-dot" [class.off]="employeeData()?.user?.status === 'DEACTIVATED'"></span>
+      </div>
 
-            <p class="hero-subtitle">
-              <span>{{ employeeData()?.designation?.name || 'Full Stack Engineer' }}</span>
-              <span class="subtitle-bullet">•</span>
-              <span>{{ employeeData()?.department?.name || 'Engineering & Tech' }}</span>
-              <span class="subtitle-bullet">•</span>
-              <span>{{ employeeData()?.branch?.name || employeeData()?.workLocation || 'Sector 135, Noida HQ' }}</span>
-            </p>
-
-            <div class="hero-pills-row">
-              <span class="hero-pill employment">
-                <svg lucideCheck size="13" class="inline-icon"></svg>
-                <span>{{ employmentCategoryLabel() }} Employee</span>
-              </span>
-
-              <span class="hero-pill probation" [ngClass]="probationPillClass()">
-                <span>{{ probationPillText() }}</span>
-              </span>
-
-              <span class="hero-pill account" [class.deactivated]="employeeData()?.user?.status === 'DEACTIVATED'">
-                <span>{{ employeeData()?.user?.status === 'DEACTIVATED' ? 'Deactivated Account' : 'Active Account' }}</span>
-              </span>
-            </div>
-          </div>
+      <div class="ph2-main">
+        <div class="ph2-name-row">
+          <h1>{{ employeeData()?.firstName }} {{ employeeData()?.lastName }}</h1>
+          <span class="ph2-chip" [class.off]="employeeData()?.user?.status === 'DEACTIVATED'">
+            <i></i>{{ employeeData()?.user?.status === 'DEACTIVATED' ? 'Deactivated' : 'Active' }}
+          </span>
+          <span class="ph2-chip probation" [ngClass]="heroBannerData().type" *ngIf="heroBannerData().type !== 'confirmed'"
+                [attr.title]="heroBannerData().message">{{ heroBannerData().tag | titlecase }}</span>
         </div>
-
-        <!-- Right: 3 Key Metrics Columns -->
-        <div class="hero-right-section">
-          <div class="hero-stat-col">
-            <span class="stat-label">JOINING DATE</span>
-            <span class="stat-value">{{ joiningDateFormatted() }}</span>
-          </div>
-
-          <div class="hero-stat-col">
-            <span class="stat-label">REPORTS TO</span>
-            <span class="stat-value manager-link">
-              <svg lucideUsers size="14" class="stat-icon"></svg>
-              <span>{{ managerName() }}</span>
-            </span>
-          </div>
-
-          <div class="hero-stat-col">
-            <span class="stat-label">SHIFT POLICY</span>
-            <span class="stat-value">{{ shiftPolicyText() }}</span>
-          </div>
-
-          <button type="button" class="btn-convert-trainee-hero" *ngIf="canConvertTrainee()" (click)="openConversion()">
-            Convert to Employee
-          </button>
+        <p class="ph2-role">
+          {{ employeeData()?.designation?.name || 'No designation' }}<ng-container *ngIf="employeeData()?.department?.name"> · {{ employeeData()?.department?.name }}</ng-container><ng-container *ngIf="employeeData()?.branch?.name || employeeData()?.workLocation"> · {{ employeeData()?.branch?.name || employeeData()?.workLocation }}</ng-container>
+        </p>
+        <dl class="ph2-facts">
+          <div><dt>Employee ID</dt><dd><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M7 11h10"/></svg><span>{{ employeeCodeBadge() }}</span></dd></div>
+          <div><dt>Joined</dt><dd><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span>{{ joiningDateFormatted() }}</span></dd></div>
+          <div><dt>Reports to</dt><dd><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>{{ managerName() }}</span></dd></div>
+          <div><dt>Shift</dt><dd><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><span>{{ shiftPolicyText() }}</span></dd></div>
+        </dl>
+        <div class="ph2-note" *ngIf="heroBannerData().type !== 'confirmed'" [ngClass]="heroBannerData().type">
+          <span>{{ heroBannerData().message }}</span>
         </div>
       </div>
 
-      <!-- Bottom Banner inside Hero Card -->
-      <div class="hero-banner" [ngClass]="heroBannerData().type">
-        <div class="hero-banner-content">
-          <span class="hero-banner-tag">{{ heroBannerData().tag }}</span>
-          <span class="hero-banner-message">{{ heroBannerData().message }}</span>
-        </div>
-        <button type="button" class="hero-banner-btn" (click)="setTab('history')">
-          View Timeline
+      <div class="ph2-actions">
+        <button type="button" class="ph2-btn primary" *ngIf="canConvertTrainee()" (click)="openConversion()">Convert to employee</button>
+        <button type="button" class="ph2-btn" (click)="setTab('history')">
+          View timeline
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
         </button>
       </div>
-    </div>
+    </section>
 
     <!-- Modern Pill Tabs Navigation Bar -->
     <div class="tabs-container">
@@ -142,14 +106,33 @@
         (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')">
       </app-documents-tab>
 
-      <section *ngIf="activeTab() === 'history'" class="employment-history">
-        <div class="history-heading"><h2>Employment History</h2><p>History remains attached to this same profile after trainee conversion.</p></div>
-        <p class="history-loading" *ngIf="historyLoading()">Loading history…</p>
-        <div class="history-timeline" *ngIf="!historyLoading()">
-          <article class="history-event" *ngFor="let event of employmentHistory()">
-            <span class="history-dot"></span><div><strong>{{ event.label }}</strong><p *ngIf="event.detail">{{ event.detail }}</p><dl class="history-facts" *ngIf="event.facts?.length"><ng-container *ngFor="let fact of event.facts"><dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd></ng-container></dl><time>{{ event.at | date:'dd MMM yyyy, h:mm a' }}</time></div>
+      <section *ngIf="activeTab() === 'history'" class="employment-history-card">
+        <div class="history-heading">
+          <h2>Employment Lifecycle Timeline</h2>
+          <p>Immutable record of promotions, conversions, compensation revisions, and milestones.</p>
+        </div>
+        <p class="history-loading" *ngIf="historyLoading()">Loading timeline events…</p>
+        <div class="lifecycle-timeline" *ngIf="!historyLoading()">
+          <article class="lifecycle-event" *ngFor="let event of employmentHistory()">
+            <span class="lifecycle-ring" [ngClass]="getRingClass(event.type)"></span>
+            <div class="lifecycle-event-body">
+              <h3 class="lifecycle-title">{{ event.label }}</h3>
+              <p class="lifecycle-detail" *ngIf="event.detail">{{ event.detail }}</p>
+              
+              <!-- Facts box -->
+              <div class="lifecycle-facts-box" *ngIf="event.facts?.length">
+                <div class="fact-item" *ngFor="let fact of event.facts">
+                  <span class="fact-label">{{ fact.label }}</span>
+                  <span class="fact-value">{{ fact.value }}</span>
+                </div>
+              </div>
+
+              <time class="lifecycle-time">{{ event.at | date:'dd MMM yyyy, hh:mm a' }}</time>
+            </div>
           </article>
-          <p class="history-loading" *ngIf="!employmentHistory().length">No employment events recorded yet.</p>
+          <div class="empty-history-state" *ngIf="!employmentHistory().length">
+            <p>No employment lifecycle events recorded yet.</p>
+          </div>
         </div>
       </section>
     </div>

@@ -89,7 +89,7 @@ export interface ActionCellParams extends ICellRendererParams {
       align-items: center;
       font-size: 13px !important;
       font-weight: 600 !important;
-      font-family: 'Plus Jakarta Sans', sans-serif !important;
+      font-family: 'Inter', sans-serif !important;
       height: 34px !important;
       min-height: 34px !important;
       padding: 0 14px !important;

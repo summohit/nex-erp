@@ -1,8 +1,10 @@
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { DatePresetFilterComponent, DatePreset, DateRange, inDateRange } from '../../shared/components/date-preset-filter/date-preset-filter';
 import { EmployeeService, ExemptEmployee, ProfileCompletenessReport, ProfileLock } from '../../services/employee.service';
 import {
   LucideArrowLeft,
@@ -20,6 +22,8 @@ import {
   LucideBuilding,
   LucideUserCheck,
   LucideLock,
+  LucideFileText,
+  LucideClock
 } from '@lucide/angular';
 
 /**
@@ -32,8 +36,10 @@ import {
   standalone: true,
   imports: [
     CommonModule,
+    PageHeaderComponent,
     FormsModule,
     RouterModule,
+    DatePresetFilterComponent,
     LucideArrowLeft,
     LucideRefreshCw,
     LucideDownload,
@@ -49,6 +55,8 @@ import {
     LucideBuilding,
     LucideUserCheck,
     LucideLock,
+    LucideFileText,
+    LucideClock
   ],
   templateUrl: './profile-completion.html',
   styleUrl: './profile-completion.css',
@@ -63,6 +71,9 @@ export class ProfileCompletionComponent implements OnInit {
   filter = signal<'INCOMPLETE' | 'COMPLETE' | 'ALL'>('INCOMPLETE');
   selectedDepartment = signal<string>('ALL');
   query = signal('');
+  /** Joined within (12 Nov 2026), same date filter as the other Employee pages. */
+  datePreset = signal<DatePreset>('ALL');
+  dateRange = signal<DateRange>(null);
   expandedRows = signal<Set<number>>(new Set<number>());
   allExpanded = signal<boolean>(false);
 
@@ -93,8 +104,10 @@ export class ProfileCompletionComponent implements OnInit {
     if (!r) return [];
     const q = this.query().trim().toLowerCase();
     const dept = this.selectedDepartment();
+    const range = this.dateRange();
 
     return r.rows.filter((row) => {
+      if (!inDateRange(row.employee.joiningDate, range)) return false;
       if (this.filter() === 'INCOMPLETE' && row.complete) return false;
       if (this.filter() === 'COMPLETE' && !row.complete) return false;
       if (dept !== 'ALL' && row.employee.department !== dept) return false;
@@ -105,6 +118,16 @@ export class ProfileCompletionComponent implements OnInit {
       return searchable.includes(q);
     });
   });
+
+  /** Paging, like the Directory's table: 20 a page by default (12 Nov 2026). */
+  readonly pageSizes = [20, 50, 100, 200];
+  page = signal(0);
+  pageSize = signal(20);
+  pageCount = computed(() => Math.max(1, Math.ceil(this.rows().length / this.pageSize())));
+  pageStart = computed(() => Math.min(this.page(), this.pageCount() - 1) * this.pageSize());
+  pageEnd = computed(() => Math.min(this.pageStart() + this.pageSize(), this.rows().length));
+  pagedRows = computed(() => this.rows().slice(this.pageStart(), this.pageEnd()));
+  setPageSize(n: number) { this.pageSize.set(Number(n)); this.page.set(0); }
 
   /**
    * HR's document lock (17 Oct 2026): when on (from the start date, or at once),
@@ -133,6 +156,20 @@ export class ProfileCompletionComponent implements OnInit {
       .filter((e) => !taken.has(e.id))
       .filter((e) => `${e.firstName || ''} ${e.lastName || ''} ${e.employeeCode || ''} ${e.email || ''}`.toLowerCase().includes(q))
       .slice(0, 8);
+  });
+
+  uniqueExempt = computed(() => {
+    const list = this.exempt();
+    const seen = new Set<string>();
+    const out: ExemptEmployee[] = [];
+    for (const item of list) {
+      const key = `${item.firstName || ''}_${item.lastName || ''}`.toLowerCase().trim();
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(item);
+      }
+    }
+    return out;
   });
 
   loadExempt() {
@@ -259,10 +296,16 @@ export class ProfileCompletionComponent implements OnInit {
     return colors[Math.abs(id) % colors.length];
   }
 
+  getAvatarColor(id: number): string {
+    return '#ffffff';
+  }
+
   clearFilters() {
     this.query.set('');
     this.selectedDepartment.set('ALL');
     this.filter.set('INCOMPLETE');
+    this.datePreset.set('ALL');
+    this.dateRange.set(null);
   }
 
   /** CSV for HR to share with managers. */

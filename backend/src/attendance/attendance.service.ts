@@ -1589,7 +1589,8 @@ export class AttendanceService {
     }
 
     // Nobody rules on their own forgotten clock-out, whatever list they are on.
-    if (approverEmployeeId != null && record.employeeId === approverEmployeeId) {
+    // Super Admin is the top of the chain, so may decide their own (12 Nov 2026).
+    if (approverEmployeeId != null && record.employeeId === approverEmployeeId && role !== 'SUPERADMIN') {
       throw new ForbiddenException('You cannot approve your own clock-out.');
     }
 
@@ -1822,7 +1823,7 @@ export class AttendanceService {
     subject: { companyId: number; id: number },
   ) {
     if (subject.companyId !== companyId) throw new ForbiddenException('Not your company');
-    if (approverEmployeeId && subject.id === approverEmployeeId) {
+    if (approverEmployeeId && subject.id === approverEmployeeId && role !== 'SUPERADMIN') {
       throw new ForbiddenException('You cannot approve your own regularization.');
     }
     if (isHrAdmin(role)) return;

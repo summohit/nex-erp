@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDrag, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
@@ -32,6 +32,8 @@ type AnnexureGroup = 'EARNINGS' | 'DEDUCTIONS' | 'EMPLOYEE_DEDUCTIONS';
 import { ColDef, AllCommunityModule, ModuleRegistry, RowClassRules, GridOptions, GridApi } from 'ag-grid-community';
 import { SearchableSelectComponent, SearchableSelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
+import { DatePresetFilterComponent, DatePreset, DateRange, inDateRange } from '../../shared/components/date-preset-filter/date-preset-filter';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -39,6 +41,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
   selector: 'app-candidates',
   standalone: true,
   imports: [
+    PageHeaderComponent, DatePresetFilterComponent,
     CommonModule, FormsModule, DragDropModule, AgGridAngular, DatePipe, RouterLink, QuillModule,
     LucideX, LucideLayoutGrid, LucideTable, LucideFileText,
     LucideMail, LucidePhone, LucideLink, LucideGlobe, LucideBriefcase,
@@ -100,6 +103,26 @@ export class CandidatesComponent implements OnInit {
     { key: 'ON_HOLD',         label: 'On Hold',         tone: 'slate'   },
     { key: 'REJECTED',        label: 'Rejected',        tone: 'red'     },
   ];
+
+  /** One icon per stage for the stat strip (12 Nov 2026). */
+  stageIcon(key: string): string[] {
+    switch (key) {
+      case 'APPLIED': return ['M22 12h-6l-2 3h-4l-2-3H2', 'M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'];
+      case 'PHONE_SCREENING': return ['M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z'];
+      case 'INTERVIEW': return ['M8 2v4', 'M16 2v4', 'M3 10h18', 'M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', 'm9 16 2 2 4-4'];
+      case 'NEGOTIATION': return ['M12 2v20', 'M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'];
+      case 'OFFERED': return ['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z', 'M14 2v6h6', 'M16 13H8', 'M16 17H8'];
+      case 'HIRED': return ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'm16 11 2 2 4-4'];
+      case 'ONBOARDED': return ['M22 11.08V12a10 10 0 1 1-5.93-9.14', 'M22 4 12 14.01l-3-3'];
+      case 'ON_HOLD': return ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M10 15V9', 'M14 15V9'];
+      case 'REJECTED': return ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'm15 9-6 6', 'm9 9 6 6'];
+      default: return [];
+    }
+  }
+  /** "Pritish Agnihotri", not "PRITISH AGNIHOTRI". */
+  displayName(n: string | null | undefined): string {
+    return (n || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  }
 
   /** Applications grouped by stage key, so the board renders from one loop. */
   byStage = computed<Record<string, JobApplication[]>>(() => {
@@ -841,7 +864,27 @@ export class CandidatesComponent implements OnInit {
     }
   }
 
+  /**
+   * Drawer-only mode (12 Nov 2026): another page (My Interviews) embeds this
+   * component to show the same Application Details drawer without leaving the
+   * page. Only the drawer and its pop-ups render; the board does not load.
+   */
+  @Input() drawerOnly = false;
+  @Input() set openApplicationId(id: number | null | undefined) {
+    if (!id) return;
+    this.candidatesService.getApplication(+id).subscribe({
+      next: (app) => this.openApplication(app),
+      error: () => { this.toast.error('Application not found'); this.drawerClosed.emit(); },
+    });
+  }
+  @Output() drawerClosed = new EventEmitter<void>();
+
   ngOnInit() {
+    if (this.drawerOnly) {
+      this.loadJobs();
+      this.http.get<any[]>(`${environment.apiUrl}/employees`).subscribe({ next: emps => this.employees.set(emps || []), error: () => {} });
+      return;
+    }
     this.loadJobs();
     this.http.get<any[]>(`${environment.apiUrl}/employees`).subscribe({ next: emps => this.employees.set(emps || []), error: () => {} });
     // Company-wide, not per-job: an approver should see everything waiting on
@@ -1150,6 +1193,7 @@ export class CandidatesComponent implements OnInit {
   }
 
   closeDrawer() {
+    if (this.drawerOnly) this.drawerClosed.emit();
     this.selectedApp.set(null);
     this.offeredSalaryInput.set(null);
     this.offerLetter.set(null);
@@ -1986,6 +2030,33 @@ export class CandidatesComponent implements OnInit {
 
   hasToolbarFilters = computed(() => this.activeFilterCount() > 0);
 
+  /** Applied-date dropdown and the "Filters" panel (12 Nov 2026). */
+  appliedPreset = signal<DatePreset>('ALL');
+  appliedRange = signal<DateRange>(null);
+  moreOpen = false;
+  moreFilterCount = computed(() => [this.filterAssignedHr(), this.filterPosition(), this.filterFollowUpStatus(), this.filterLocation(),
+    this.filterMinCtc() || this.filterMaxCtc()].filter(v => !!v).length);
+
+  /** Department and follow-up date, matching the table's columns (12 Nov 2026). */
+  filterDepartment = signal('');
+  departmentSelectOptions = computed(() =>
+    [...new Set(this.applications().map(a => a.job?.department?.name).filter(Boolean) as string[])].sort()
+      .map(n => ({ id: n, name: n })));
+  followUpPreset = signal<DatePreset>('ALL');
+  followUpRange = signal<DateRange>(null);
+
+  clearAllFilters() {
+    this.clearToolbarFilters();
+    this.filterDepartment.set('');
+    this.appliedPreset.set('ALL'); this.appliedRange.set(null);
+    this.followUpPreset.set('ALL'); this.followUpRange.set(null);
+  }
+
+  goBackToJob() {
+    const j = this.selectedJob();
+    if (j) this.router.navigate(['/recruitment/jobs', j.id]);
+  }
+
   clearToolbarFilters() {
     this.searchQuery.set('');
     this.selectedJobId.set(null);
@@ -2007,7 +2078,13 @@ export class CandidatesComponent implements OnInit {
     const st = this.filterStatus(), followUpStatus = this.filterFollowUpStatus();
     const assignedHr = this.filterAssignedHr();
     const min = parseFloat(this.filterMinCtc()), max = parseFloat(this.filterMaxCtc());
+    const range = this.appliedRange();
+    const fuRange = this.followUpRange();
+    const dept = this.filterDepartment();
     return this.applications().filter(a => {
+      if (range && !inDateRange((a as any).createdAt, range)) return false;
+      if (dept && (a.job?.department?.name || '') !== dept) return false;
+      if (fuRange && !inDateRange(this.nextFollowUp(a)?.scheduledAt, fuRange)) return false;
       if (q) {
         const matchName = (a.fullName || '').toLowerCase().includes(q);
         const matchEmail = (a.email || '').toLowerCase().includes(q);
@@ -2162,7 +2239,16 @@ export class CandidatesComponent implements OnInit {
     return `<span class="tbl-status-pill status-${tone}"><span class="status-dot"></span><span class="status-text">${label}</span></span>`;
   }
 
+  /** The stage just jumped to: its card and column flash for a moment (12 Nov 2026). */
+  focusedStage = signal<string | null>(null);
+  private focusTimer: any;
+
   scrollToColumn(stageKey: string) {
+    this.focusedStage.set(null);
+    clearTimeout(this.focusTimer);
+    // Re-set on the next frame so clicking the same card again replays the animation.
+    requestAnimationFrame(() => this.focusedStage.set(stageKey));
+    this.focusTimer = setTimeout(() => this.focusedStage.set(null), 1800);
     // Columns are keyed by data-stage; the CSS class carries the colour tone.
     const element = document.querySelector(`.kanban-col[data-stage="${stageKey}"]`) as HTMLElement;
     if (element) {

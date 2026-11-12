@@ -33,7 +33,7 @@
     linear-gradient(180deg, #f3f6fb 0%, #f4f8f6 100%);
   padding: 40px 16px;
   box-sizing: border-box;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: var(--auth-text);
 }
 
@@ -296,7 +296,7 @@
   color: #ffffff !important;
   border: none !important;
   border-radius: 10px !important;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
   font-size: 14px !important;
   font-weight: 500 !important;
   letter-spacing: 0 !important;

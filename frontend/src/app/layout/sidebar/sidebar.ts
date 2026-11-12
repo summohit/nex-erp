@@ -166,6 +166,10 @@ export class SidebarComponent implements OnInit {
 
     // Check initially
     this.checkExpandedMenu(this.router.url);
+
+    window.addEventListener('sidebar-toggle', (e: any) => {
+      this.isCollapsed.set(e.detail?.collapsed ?? false);
+    });
     
     // Subscribe to router changes so if they navigate, it expands automatically
     this.router.events.pipe(

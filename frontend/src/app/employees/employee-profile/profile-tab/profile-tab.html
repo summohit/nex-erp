@@ -423,7 +423,6 @@
             <div class="avatar-download-options" *ngIf="isDownloadMenuOpen">
               <button type="button" (click)="downloadOriginalPhoto()"><strong>Original photo</strong><small>Full-size uploaded image</small></button>
               <button type="button" (click)="downloadSmallPhoto()"><strong>Small photo</strong><small>Optimized 256 px JPG</small></button>
-              <button type="button" (click)="downloadProfilePdf()"><strong>Profile as PDF</strong><small>Employee summary document</small></button>
             </div>
           </div>
           <button type="button" class="avatar-action" *ngIf="canEditPersonalDetails" (click)="avatarInput.click()" [disabled]="isUploadingAvatar || isSavingAvatar"><svg lucideEdit2 size="15"></svg> Change</button>
@@ -856,26 +855,29 @@
       <button type="button" class="close-btn" (click)="closeShiftChange()" aria-label="Close"><svg lucideX size="18"></svg></button>
     </div>
     <div class="modal-body shift-change-body">
+      <label class="modal-label">Apply to</label>
+      <div class="shift-scope-options">
+        <label [class.selected]="shiftChange.mode === 'PERMANENT'"><input type="radio" name="profile-shift-scope" value="PERMANENT" [(ngModel)]="shiftChange.mode" (ngModelChange)="shiftDateError = ''"><span><strong>Permanently</strong><small>Sets this employee's standing shift for future roster days.</small></span></label>
+        <label [class.selected]="shiftChange.mode === 'DATES'"><input type="radio" name="profile-shift-scope" value="DATES" [(ngModel)]="shiftChange.mode"><span><strong>Selected dates</strong><small>Creates roster entries only for the date range below.</small></span></label>
+      </div>
+      <div class="form-grid-2" *ngIf="shiftChange.mode === 'DATES'">
+        <div class="modal-field-group"><label class="modal-label" for="profile-shift-start">From <b class="req">*</b></label><input id="profile-shift-start" type="date" class="form-control" [class.field-invalid]="shiftDateError && !shiftChange.start" [(ngModel)]="shiftChange.start" (ngModelChange)="shiftDateError = ''"></div>
+        <div class="modal-field-group"><label class="modal-label" for="profile-shift-end">To <b class="req">*</b></label><input id="profile-shift-end" type="date" class="form-control" [class.field-invalid]="shiftDateError && (!shiftChange.end || shiftChange.start > shiftChange.end)" [(ngModel)]="shiftChange.end" [min]="shiftChange.start" (ngModelChange)="shiftDateError = ''"></div>
+      </div>
+      <small class="field-error" *ngIf="shiftDateError">{{ shiftDateError }}</small>
       <div class="modal-field-group">
-        <label class="modal-label">Choose shift</label>
-        <div class="profile-shift-picker" role="radiogroup" aria-label="Choose shift">
-          <button type="button" *ngFor="let s of companyShifts" class="profile-shift-option" [class.selected]="shiftChange.shiftId === s.id" (click)="shiftChange.shiftId = s.id" role="radio" [attr.aria-checked]="shiftChange.shiftId === s.id">
+        <label class="modal-label">Shift <b class="req">*</b></label>
+        <div class="profile-shift-picker" [class.field-invalid]="shiftPickError" role="radiogroup" aria-label="Choose shift">
+          <button type="button" *ngFor="let s of companyShifts" class="profile-shift-option" [class.selected]="shiftChange.shiftId === s.id" (click)="shiftChange.shiftId = s.id; shiftPickError = ''" role="radio" [attr.aria-checked]="shiftChange.shiftId === s.id">
             <span class="profile-shift-dot" [style.background]="s.colorCode || '#2563eb'"></span>
             <span class="profile-shift-option-copy"><strong>{{ s.name }}</strong><small>{{ s.startTime }} – {{ s.endTime }}</small></span>
             <span class="profile-shift-selected-mark" *ngIf="shiftChange.shiftId === s.id"><svg lucideCheckCircle2 size="17"></svg></span>
           </button>
         </div>
-      </div>
-      <div class="shift-scope-options">
-        <label [class.selected]="shiftChange.mode === 'PERMANENT'"><input type="radio" name="profile-shift-scope" value="PERMANENT" [(ngModel)]="shiftChange.mode"><span><strong>Permanently</strong><small>Sets this employee's standing shift for future roster days.</small></span></label>
-        <label [class.selected]="shiftChange.mode === 'DATES'"><input type="radio" name="profile-shift-scope" value="DATES" [(ngModel)]="shiftChange.mode"><span><strong>Selected dates</strong><small>Creates roster entries only for the date range below.</small></span></label>
-      </div>
-      <div class="form-grid-2" *ngIf="shiftChange.mode === 'DATES'">
-        <div class="modal-field-group"><label class="modal-label" for="profile-shift-start">From</label><input id="profile-shift-start" type="date" class="form-control" [(ngModel)]="shiftChange.start"></div>
-        <div class="modal-field-group"><label class="modal-label" for="profile-shift-end">To</label><input id="profile-shift-end" type="date" class="form-control" [(ngModel)]="shiftChange.end" [min]="shiftChange.start"></div>
+        <small class="field-error" *ngIf="shiftPickError">{{ shiftPickError }}</small>
       </div>
     </div>
-    <div class="modal-footer"><button type="button" class="btn-discard" (click)="closeShiftChange()" [disabled]="shiftSaving">Cancel</button><button type="button" class="btn-primary-purple" (click)="saveShiftChange()" [disabled]="shiftSaving"><span *ngIf="!shiftSaving">Save shift</span><span *ngIf="shiftSaving">Saving…</span></button></div>
+    <div class="modal-footer shift-change-footer"><button type="button" class="shift-btn-text" (click)="closeShiftChange()" [disabled]="shiftSaving">Cancel</button><button type="button" class="shift-btn-primary" (click)="saveShiftChange()" [disabled]="shiftSaving"><span *ngIf="!shiftSaving">Save shift</span><span *ngIf="shiftSaving">Saving…</span></button></div>
   </div>
 </div>
 <!-- ==================== UPDATE SKILLS MODAL (SCREENSHOT 5) ==================== -->

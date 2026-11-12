@@ -2,15 +2,19 @@
   <!-- Spotlight Search Component -->
   <app-spotlight-search></app-spotlight-search>
 
-  <!-- Phone navigation. Hidden on desktop, where the rail is always visible. -->
-  <button
-    type="button"
-    class="btn-mobile-nav"
-    (click)="layout.toggleMobileNav()"
-    [attr.aria-expanded]="layout.isMobileNavOpen()"
-    aria-label="Menu">
-    <svg lucideMenu size="20"></svg>
-  </button>
+  <!-- Left: Sidebar Hamburger Toggle + Breadcrumbs -->
+  <div class="topbar-left">
+    <button
+      type="button"
+      class="btn-sidebar-toggle"
+      (click)="layout.toggleSidebar()"
+      [attr.aria-expanded]="layout.isMobileNavOpen() || !layout.isSidebarCollapsed()"
+      aria-label="Toggle Sidebar"
+      title="Toggle Sidebar">
+      <svg lucideMenu size="18"></svg>
+    </button>
+
+  </div>
 
   <!-- Global Search Input Trigger -->
   <div class="global-search-container" (click)="openSpotlight()">

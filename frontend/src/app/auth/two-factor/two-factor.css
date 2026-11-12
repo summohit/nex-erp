@@ -14,7 +14,7 @@
   overflow-x: hidden;
   padding: 2.5rem 1.25rem;
   box-sizing: border-box;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 /* Ambient dynamic background glows matching /login */
@@ -302,7 +302,7 @@
   color: #ffffff !important;
   border: none !important;
   border-radius: 12px !important;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
   font-size: 14.5px !important;
   font-weight: 700 !important;
   letter-spacing: 0.1px !important;

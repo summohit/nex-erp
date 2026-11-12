@@ -11,6 +11,8 @@ import {
 } from '@lucide/angular';
 import { CandidatesService } from '../../services/candidates.service';
 import { HotToastService } from '@ngneat/hot-toast';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
+import { SearchableSelectComponent } from '../../shared/components/searchable-select/searchable-select.component';
 
 export interface JobReportItem {
   jobId: number;
@@ -39,6 +41,7 @@ export interface RecruiterReportItem {
   selector: 'app-hiring-reports',
   standalone: true,
   imports: [
+    PageHeaderComponent, SearchableSelectComponent,
     CommonModule, FormsModule, RouterLink,
     LucideBarChart3, LucideClock, LucideUsers, LucideArrowLeft,
     LucideSearch, LucideDownload,
@@ -240,6 +243,29 @@ export class HiringReportsComponent implements OnInit {
     const count = pipeline?.[key] || 0;
     return Math.round((count / total) * 100);
   }
+
+  /** Options for the shared dropdowns (12 Nov 2026). */
+  deptOptions = computed(() => this.departments().map(d => ({ id: d, name: d })));
+  branchOptions = computed(() => this.branches().map(b => ({ id: b, name: b })));
+  readonly volumeOptions = [
+    { id: 'HIGH', name: 'High volume (20+ applications)' },
+    { id: 'MEDIUM', name: 'Medium (5–19 applications)' },
+    { id: 'LOW', name: 'Low (1–4 applications)' },
+  ];
+  readonly outcomeOptions = [
+    { id: 'HAS_HIRES', name: 'Has hires / offers' },
+    { id: 'HAS_OFFERS', name: 'Has offers extended' },
+    { id: 'HAS_REJECTIONS', name: 'Has rejections' },
+    { id: 'ALL_NEW', name: 'All still new / untriaged' },
+  ];
+  readonly sortOptions = [
+    { id: 'TOTAL_DESC', name: 'Most applications first' },
+    { id: 'TOTAL_ASC', name: 'Fewest applications first' },
+    { id: 'HIRED_DESC', name: 'Most hires first' },
+    { id: 'REJECTED_DESC', name: 'Most rejected first' },
+    { id: 'TITLE_ASC', name: 'Job title (A–Z)' },
+  ];
+  goToAts() { this.router.navigate(['/recruitment/candidates']); }
 
   resetFilters() {
     this.searchQuery.set('');

@@ -1,269 +1,469 @@
-<div class="page-container">
-  <div class="page-header">
-    <div class="header-content">
-      <h1>Onboarding Board</h1>
-      <p>Track new hire progress through their onboarding checklists.</p>
-    </div>
-    <div class="header-actions">
-      <div class="search-wrap">
-        <input type="text" class="form-control" placeholder="Search by name or designation..." [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)">
-      </div>
-      <div class="view-toggle">
-        <button [class.active]="viewMode() === 'KANBAN'" (click)="viewMode.set('KANBAN')" title="Kanban View">
-          <svg lucideLayoutGrid size="16"></svg>
+<div class="onboarding-page-wrapper">
+
+  <!-- Page header (12 Nov 2026): same layout on every Employee page -->
+  <app-page-header icon="onboarding" section="Employees" heading="Onboarding" subtitle="New hires and their onboarding checklists">
+      <!-- View Switcher -->
+      <div class="view-switch-pills">
+        <button type="button"
+                class="pill-btn"
+                [class.active]="viewMode() === 'KANBAN'"
+                (click)="viewMode.set('KANBAN')"
+                title="Kanban Board View">
+          <svg lucideLayoutGrid size="14"></svg>
+          <span>Board</span>
         </button>
-        <button [class.active]="viewMode() === 'TABLE'" (click)="viewMode.set('TABLE')" title="Table View">
-          <svg lucideTable size="16"></svg>
+        <button type="button"
+                class="pill-btn"
+                [class.active]="viewMode() === 'TABLE'"
+                (click)="viewMode.set('TABLE')"
+                title="Table View">
+          <svg lucideTable size="14"></svg>
+          <span>Table</span>
         </button>
       </div>
-      <button class="btn-primary" (click)="openTemplateModal()">
-        <svg lucideSettings size="16"></svg>
-        Manage Templates
+
+      <!-- Refresh -->
+      <button type="button" class="btn-refresh" (click)="loadBoard()" [disabled]="isLoading()" title="Refresh board">
+        <svg lucideRefreshCw size="14" [class.spin-anim]="isLoading()"></svg>
+        <span>Refresh</span>
       </button>
+
+      <!-- Manage Templates -->
+      <button type="button" class="btn-manage-templates" (click)="openTemplateModal()">
+        <svg lucideSettings size="14"></svg>
+        <span>Manage Templates</span>
+      </button>
+  </app-page-header>
+
+  <!-- Metric Stat Cards Grid (Cohesive with Documents & Profile Completion) -->
+  <div class="onboarding-stats-grid">
+    <!-- Card 1: Total Pipeline -->
+    <div class="metric-stat-card">
+      <div class="squircle-icon-badge squircle-blue">
+        <svg lucideUsers size="20"></svg>
+      </div>
+      <div class="metric-card-content">
+        <div class="metric-big-num">{{ totalCount() }}</div>
+        <div class="metric-card-label">TOTAL WORKFORCE IN PIPELINE</div>
+        <div class="metric-card-sub">Active new hire records</div>
+      </div>
+    </div>
+
+    <!-- Card 2: Not Started -->
+    <div class="metric-stat-card">
+      <div class="squircle-icon-badge squircle-amber">
+        <svg lucideListTodo size="20"></svg>
+      </div>
+      <div class="metric-card-content">
+        <div class="metric-big-num">{{ pendingCount() }}</div>
+        <div class="metric-card-label">NOT STARTED</div>
+        <div class="metric-card-sub">Checklists uninitiated</div>
+      </div>
+    </div>
+
+    <!-- Card 3: In Progress -->
+    <div class="metric-stat-card">
+      <div class="squircle-icon-badge squircle-sky">
+        <svg lucideClock size="20"></svg>
+      </div>
+      <div class="metric-card-content">
+        <div class="metric-big-num">{{ inProgressCount() }}</div>
+        <div class="metric-card-label">IN PROGRESS</div>
+        <div class="metric-card-sub">Tasks actively underway</div>
+      </div>
+    </div>
+
+    <!-- Card 4: Completed -->
+    <div class="metric-stat-card">
+      <div class="squircle-icon-badge squircle-green">
+        <svg lucideCheckCircle2 size="20"></svg>
+      </div>
+      <div class="metric-card-content">
+        <div class="metric-big-num">{{ completedCount() }}</div>
+        <div class="metric-card-label">COMPLETED</div>
+        <div class="metric-card-sub">{{ completionRate() }}% pipeline completion rate</div>
+      </div>
     </div>
   </div>
 
-  <div class="kanban-board" cdkDropListGroup *ngIf="viewMode() === 'KANBAN'">
-    <!-- PENDING COLUMN -->
-    <div class="kanban-column">
-      <div class="column-header pending">
-        <div class="column-title">
-          <svg lucideListTodo size="16"></svg>
-          <h3>Not Started</h3>
+  <!-- Filters (12 Nov 2026): Search → Department → Joining date → Reset, as on the other Employee pages -->
+  <div class="filters-panel">
+    <div class="filter-search-box">
+      <svg lucideSearch size="14" class="filter-search-icon"></svg>
+      <input type="text" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)"
+             placeholder="Search new hire, code, designation...">
+    </div>
+
+    <div class="filter-dropdown-wrapper" *ngIf="departments().length > 1">
+      <select class="filter-select" [ngModel]="selectedDepartment()" (ngModelChange)="selectedDepartment.set($event)">
+        <option value="ALL">All Departments</option>
+        <option *ngFor="let d of departments()" [value]="d">{{ d }}</option>
+      </select>
+    </div>
+
+    <app-date-preset-filter label="Joined" [preset]="datePreset()" (presetChange)="datePreset.set($event)" (rangeChange)="dateRange.set($event)"></app-date-preset-filter>
+
+    <button type="button" class="clear-all-filters" *ngIf="searchTerm() || selectedDepartment() !== 'ALL' || datePreset() !== 'ALL'" (click)="resetFilters()">Clear all</button>
+  </div>
+
+  <!-- KANBAN VIEW -->
+  <div class="kanban-board-container" cdkDropListGroup *ngIf="viewMode() === 'KANBAN'">
+
+    <!-- COLUMN 1: NOT STARTED / PENDING -->
+    <div class="kanban-column column-pending">
+      <div class="column-header">
+        <div class="col-title-group">
+          <span class="status-indicator-dot dot-amber"></span>
+          <svg lucideListTodo size="15" class="col-icon text-amber"></svg>
+          <h3 class="col-title">Not Started</h3>
         </div>
-        <span class="count-badge">{{ filteredBoardData().pending.length }}</span>
+        <span class="column-count-pill badge-amber">{{ filteredBoardData().pending.length }}</span>
       </div>
-      
-      <div class="kanban-cards"
+
+      <div class="kanban-cards-track"
            id="pendingList"
            cdkDropList
            [cdkDropListData]="filteredBoardData().pending"
            (cdkDropListDropped)="drop($event)">
-           
-        <div class="empty-column-state" *ngIf="!isLoading() && !filteredBoardData().pending.length">
-          Drop cards here
+
+        <!-- Empty state -->
+        <div class="empty-drop-zone" *ngIf="!isLoading() && !filteredBoardData().pending.length">
+          <svg lucideListTodo size="20" class="empty-icon"></svg>
+          <span>Drop new hires here</span>
         </div>
 
+        <!-- Skeleton -->
         <ng-container *ngIf="isLoading()">
-          <div class="skeleton-card" *ngFor="let i of [1,2]">
-            <div class="skeleton-avatar skeleton-anim"></div>
-            <div class="skeleton-details">
-              <div class="skeleton-line skeleton-anim" style="width: 70%;"></div>
-              <div class="skeleton-line skeleton-anim" style="width: 40%; margin-bottom: 8px;"></div>
-              <div class="skeleton-line skeleton-anim" style="width: 100%;"></div>
+          <div class="skeleton-card" *ngFor="let i of [1, 2]">
+            <div class="skeleton-avatar skeleton-shimmer"></div>
+            <div class="skeleton-lines">
+              <div class="skeleton-line skeleton-shimmer" style="width: 60%;"></div>
+              <div class="skeleton-line skeleton-shimmer" style="width: 40%;"></div>
+              <div class="skeleton-line skeleton-shimmer" style="width: 100%; height: 6px; margin-top: 8px;"></div>
             </div>
           </div>
         </ng-container>
 
+        <!-- Cards -->
         <ng-container *ngIf="!isLoading()">
+          <div class="board-card card-pending"
+               *ngFor="let emp of filteredBoardData().pending"
+               cdkDrag
+               (click)="openChecklist(emp)">
 
-        <div class="kanban-card" *ngFor="let emp of filteredBoardData().pending" cdkDrag (click)="openChecklist(emp)">
-          <div class="card-drag-handle" cdkDragHandle>
-            <svg lucideGripVertical size="16"></svg>
-          </div>
-          <div class="card-content-wrapper">
-            <div class="card-header">
-              <div class="avatar-chip">{{ getInitials(emp.firstName, emp.lastName) }}</div>
-              <div class="emp-info">
-                <h4>{{ emp.firstName }} {{ emp.lastName }}</h4>
-                <span class="designation">{{ emp.designation?.name || 'No Designation' }}</span>
+            <div class="card-drag-grip" cdkDragHandle title="Drag to change status">
+              <svg lucideGripVertical size="14"></svg>
+            </div>
+
+            <div class="card-inner">
+              <div class="card-header-row">
+                <div class="card-avatar-wrap">
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" [alt]="emp.firstName" class="card-avatar-img" (error)="emp.avatarUrl = null" />
+                  <div *ngIf="!emp.avatarUrl" class="card-avatar-circle" [style.background]="getAvatarBg(emp.id)">
+                    {{ getInitials(emp.firstName, emp.lastName) }}
+                  </div>
+                </div>
+
+                <div class="card-emp-info">
+                  <div class="emp-name-line">
+                    <span class="emp-name" [title]="emp.firstName + ' ' + (emp.lastName || '')">{{ emp.firstName }} {{ emp.lastName || '' }}</span>
+                    <button type="button" class="btn-profile-shortcut" (click)="openUserProfile(emp.id, $event)" title="View Profile">
+                      <svg lucideExternalLink size="12"></svg>
+                    </button>
+                  </div>
+                  <div class="emp-sub-line">
+                    <span class="emp-code">#{{ emp.employeeCode || 'N/A' }}</span>
+                    <span class="emp-desig" *ngIf="emp.designation?.name" [title]="emp.designation.name">• {{ emp.designation.name }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Department badge -->
+              <div class="card-badge-row" *ngIf="emp.department?.name">
+                <span class="dept-badge">{{ emp.department.name }}</span>
+              </div>
+
+              <!-- Progress bar -->
+              <div class="card-progress-section">
+                <div class="progress-info-row">
+                  <span class="progress-pct pct-amber">0% Complete</span>
+                  <span class="progress-task-count">0 / {{ emp.onboardingTasks?.length || 0 }}</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill fill-amber" [style.width]="'0%'"></div>
+                </div>
               </div>
             </div>
-            <div class="card-progress">
-              <div class="progress-stats">
-                <span>0% Complete</span>
-                <span>0 / {{ emp.onboardingTasks?.length || 0 }}</span>
-              </div>
-              <div class="progress-bar-bg">
-                <div class="progress-bar-fill" [style.width]="'0%'"></div>
-              </div>
-            </div>
-          </div>
           </div>
         </ng-container>
+
       </div>
     </div>
 
-    <!-- IN PROGRESS COLUMN -->
-    <div class="kanban-column">
-      <div class="column-header in-progress">
-        <div class="column-title">
-          <svg lucideClock size="16"></svg>
-          <h3>In Progress</h3>
+    <!-- COLUMN 2: IN PROGRESS -->
+    <div class="kanban-column column-inprogress">
+      <div class="column-header">
+        <div class="col-title-group">
+          <span class="status-indicator-dot dot-blue"></span>
+          <svg lucideClock size="15" class="col-icon text-blue"></svg>
+          <h3 class="col-title">In Progress</h3>
         </div>
-        <span class="count-badge">{{ filteredBoardData().inProgress.length }}</span>
+        <span class="column-count-pill badge-blue">{{ filteredBoardData().inProgress.length }}</span>
       </div>
-      
-      <div class="kanban-cards"
+
+      <div class="kanban-cards-track"
            id="inProgressList"
            cdkDropList
            [cdkDropListData]="filteredBoardData().inProgress"
            (cdkDropListDropped)="drop($event)">
-           
-        <div class="empty-column-state" *ngIf="!isLoading() && !filteredBoardData().inProgress.length">
-          Drop cards here
+
+        <!-- Empty state -->
+        <div class="empty-drop-zone" *ngIf="!isLoading() && !filteredBoardData().inProgress.length">
+          <svg lucideClock size="20" class="empty-icon"></svg>
+          <span>Drop active cards here</span>
         </div>
 
+        <!-- Skeleton -->
         <ng-container *ngIf="isLoading()">
-          <div class="skeleton-card" *ngFor="let i of [1,2]">
-            <div class="skeleton-avatar skeleton-anim"></div>
-            <div class="skeleton-details">
-              <div class="skeleton-line skeleton-anim" style="width: 70%;"></div>
-              <div class="skeleton-line skeleton-anim" style="width: 40%; margin-bottom: 8px;"></div>
-              <div class="skeleton-line skeleton-anim" style="width: 100%;"></div>
+          <div class="skeleton-card" *ngFor="let i of [1]">
+            <div class="skeleton-avatar skeleton-shimmer"></div>
+            <div class="skeleton-lines">
+              <div class="skeleton-line skeleton-shimmer" style="width: 60%;"></div>
+              <div class="skeleton-line skeleton-shimmer" style="width: 40%;"></div>
+              <div class="skeleton-line skeleton-shimmer" style="width: 100%; height: 6px; margin-top: 8px;"></div>
             </div>
           </div>
         </ng-container>
 
+        <!-- Cards -->
         <ng-container *ngIf="!isLoading()">
+          <div class="board-card card-inprogress"
+               *ngFor="let emp of filteredBoardData().inProgress"
+               cdkDrag
+               (click)="openChecklist(emp)">
 
-        <div class="kanban-card" *ngFor="let emp of filteredBoardData().inProgress" cdkDrag (click)="openChecklist(emp)">
-          <div class="card-drag-handle" cdkDragHandle>
-            <svg lucideGripVertical size="16"></svg>
-          </div>
-          <div class="card-content-wrapper">
-            <div class="card-header">
-              <div class="avatar-chip in-progress-chip">{{ getInitials(emp.firstName, emp.lastName) }}</div>
-              <div class="emp-info">
-                <h4>{{ emp.firstName }} {{ emp.lastName }}</h4>
-                <span class="designation">{{ emp.designation?.name || 'No Designation' }}</span>
+            <div class="card-drag-grip" cdkDragHandle title="Drag to change status">
+              <svg lucideGripVertical size="14"></svg>
+            </div>
+
+            <div class="card-inner">
+              <div class="card-header-row">
+                <div class="card-avatar-wrap">
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" [alt]="emp.firstName" class="card-avatar-img" (error)="emp.avatarUrl = null" />
+                  <div *ngIf="!emp.avatarUrl" class="card-avatar-circle" [style.background]="getAvatarBg(emp.id)">
+                    {{ getInitials(emp.firstName, emp.lastName) }}
+                  </div>
+                </div>
+
+                <div class="card-emp-info">
+                  <div class="emp-name-line">
+                    <span class="emp-name" [title]="emp.firstName + ' ' + (emp.lastName || '')">{{ emp.firstName }} {{ emp.lastName || '' }}</span>
+                    <button type="button" class="btn-profile-shortcut" (click)="openUserProfile(emp.id, $event)" title="View Profile">
+                      <svg lucideExternalLink size="12"></svg>
+                    </button>
+                  </div>
+                  <div class="emp-sub-line">
+                    <span class="emp-code">#{{ emp.employeeCode || 'N/A' }}</span>
+                    <span class="emp-desig" *ngIf="emp.designation?.name" [title]="emp.designation.name">• {{ emp.designation.name }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Department badge -->
+              <div class="card-badge-row" *ngIf="emp.department?.name">
+                <span class="dept-badge">{{ emp.department.name }}</span>
+              </div>
+
+              <!-- Progress bar -->
+              <div class="card-progress-section">
+                <div class="progress-info-row">
+                  <span class="progress-pct pct-blue">{{ getProgressPercentage(emp.onboardingTasks) }}% Complete</span>
+                  <span class="progress-task-count">{{ getCompletedCount(emp.onboardingTasks) }} / {{ emp.onboardingTasks?.length || 0 }}</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill fill-blue" [style.width]="getProgressPercentage(emp.onboardingTasks) + '%'"></div>
+                </div>
               </div>
             </div>
-            <div class="card-progress">
-              <div class="progress-stats">
-                <span>{{ getProgressPercentage(emp.onboardingTasks) }}% Complete</span>
-                <span>{{ getCompletedCount(emp.onboardingTasks) }} / {{ emp.onboardingTasks?.length }}</span>
-              </div>
-              <div class="progress-bar-bg">
-                <div class="progress-bar-fill in-progress-fill" [style.width]="getProgressPercentage(emp.onboardingTasks) + '%'"></div>
-              </div>
-            </div>
-          </div>
           </div>
         </ng-container>
+
       </div>
     </div>
 
-    <!-- COMPLETED COLUMN -->
-    <div class="kanban-column">
-      <div class="column-header completed">
-        <div class="column-title">
-          <svg lucideCheckCircle2 size="16"></svg>
-          <h3>Completed</h3>
+    <!-- COLUMN 3: COMPLETED -->
+    <div class="kanban-column column-completed">
+      <div class="column-header">
+        <div class="col-title-group">
+          <span class="status-indicator-dot dot-green"></span>
+          <svg lucideCheckCircle2 size="15" class="col-icon text-green"></svg>
+          <h3 class="col-title">Completed</h3>
         </div>
-        <span class="count-badge">{{ filteredBoardData().completed.length }}</span>
+        <span class="column-count-pill badge-green">{{ filteredBoardData().completed.length }}</span>
       </div>
-      
-      <div class="kanban-cards"
+
+      <div class="kanban-cards-track"
            id="completedList"
            cdkDropList
            [cdkDropListData]="filteredBoardData().completed"
            (cdkDropListDropped)="drop($event)">
-           
-        <div class="empty-column-state" *ngIf="!isLoading() && !filteredBoardData().completed.length">
-          Drop cards here
+
+        <!-- Empty state -->
+        <div class="empty-drop-zone" *ngIf="!isLoading() && !filteredBoardData().completed.length">
+          <svg lucideCheckCircle2 size="20" class="empty-icon"></svg>
+          <span>Drop completed hires here</span>
         </div>
 
+        <!-- Skeleton -->
         <ng-container *ngIf="isLoading()">
-          <div class="skeleton-card" *ngFor="let i of [1,2]">
-            <div class="skeleton-avatar skeleton-anim"></div>
-            <div class="skeleton-details">
-              <div class="skeleton-line skeleton-anim" style="width: 70%;"></div>
-              <div class="skeleton-line skeleton-anim" style="width: 40%; margin-bottom: 8px;"></div>
-              <div class="skeleton-line skeleton-anim" style="width: 100%;"></div>
+          <div class="skeleton-card" *ngFor="let i of [1, 2, 3]">
+            <div class="skeleton-avatar skeleton-shimmer"></div>
+            <div class="skeleton-lines">
+              <div class="skeleton-line skeleton-shimmer" style="width: 60%;"></div>
+              <div class="skeleton-line skeleton-shimmer" style="width: 40%;"></div>
+              <div class="skeleton-line skeleton-shimmer" style="width: 100%; height: 6px; margin-top: 8px;"></div>
             </div>
           </div>
         </ng-container>
 
+        <!-- Cards -->
         <ng-container *ngIf="!isLoading()">
+          <div class="board-card card-completed"
+               *ngFor="let emp of filteredBoardData().completed"
+               cdkDrag
+               (click)="openChecklist(emp)">
 
-        <div class="kanban-card" *ngFor="let emp of filteredBoardData().completed" cdkDrag (click)="openChecklist(emp)">
-          <div class="card-drag-handle" cdkDragHandle>
-            <svg lucideGripVertical size="16"></svg>
-          </div>
-          <div class="card-content-wrapper">
-            <div class="card-header">
-              <div class="avatar-chip completed-chip">{{ getInitials(emp.firstName, emp.lastName) }}</div>
-              <div class="emp-info">
-                <h4>{{ emp.firstName }} {{ emp.lastName }}</h4>
-                <span class="designation">{{ emp.designation?.name || 'No Designation' }}</span>
+            <div class="card-drag-grip" cdkDragHandle title="Drag to change status">
+              <svg lucideGripVertical size="14"></svg>
+            </div>
+
+            <div class="card-inner">
+              <div class="card-header-row">
+                <div class="card-avatar-wrap">
+                  <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" [alt]="emp.firstName" class="card-avatar-img" (error)="emp.avatarUrl = null" />
+                  <div *ngIf="!emp.avatarUrl" class="card-avatar-circle" [style.background]="getAvatarBg(emp.id)">
+                    {{ getInitials(emp.firstName, emp.lastName) }}
+                  </div>
+                </div>
+
+                <div class="card-emp-info">
+                  <div class="emp-name-line">
+                    <span class="emp-name" [title]="emp.firstName + ' ' + (emp.lastName || '')">{{ emp.firstName }} {{ emp.lastName || '' }}</span>
+                    <button type="button" class="btn-profile-shortcut" (click)="openUserProfile(emp.id, $event)" title="View Profile">
+                      <svg lucideExternalLink size="12"></svg>
+                    </button>
+                  </div>
+                  <div class="emp-sub-line">
+                    <span class="emp-code">#{{ emp.employeeCode || 'N/A' }}</span>
+                    <span class="emp-desig" *ngIf="emp.designation?.name" [title]="emp.designation.name">• {{ emp.designation.name }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Department badge -->
+              <div class="card-badge-row" *ngIf="emp.department?.name">
+                <span class="dept-badge">{{ emp.department.name }}</span>
+              </div>
+
+              <!-- Progress bar -->
+              <div class="card-progress-section">
+                <div class="progress-info-row">
+                  <span class="progress-pct pct-green">100% Complete</span>
+                  <span class="progress-task-count">{{ emp.onboardingTasks?.length || 0 }} / {{ emp.onboardingTasks?.length || 0 }}</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill fill-green" [style.width]="'100%'"></div>
+                </div>
               </div>
             </div>
-            <div class="card-progress">
-              <div class="progress-stats">
-                <span class="text-success">100% Complete</span>
-                <span>{{ emp.onboardingTasks?.length }} / {{ emp.onboardingTasks?.length }}</span>
-              </div>
-              <div class="progress-bar-bg">
-                <div class="progress-bar-fill completed-fill" [style.width]="'100%'"></div>
-              </div>
-            </div>
-          </div>
           </div>
         </ng-container>
+
       </div>
     </div>
+
   </div>
 
-  <!-- Table View -->
-  <div class="table-container" *ngIf="viewMode() === 'TABLE'">
+  <!-- TABLE VIEW -->
+  <div class="table-container-card" *ngIf="viewMode() === 'TABLE'">
     <ag-grid-angular
-      style="width: 100%; height: 100%;"
+      style="width: 100%; height: calc(100vh - 230px); min-height: 480px;"
       class="ag-theme-quartz"
       [rowData]="tableData()"
       [columnDefs]="colDefs"
       [defaultColDef]="defaultColDef"
       [pagination]="true"
       [paginationPageSize]="20"
+      [paginationPageSizeSelector]="[20, 50, 100, 200]"
       [theme]="'legacy'">
     </ag-grid-angular>
   </div>
+
 </div>
 
 <!-- Template Manager Modal -->
-<div class="modal-overlay" *ngIf="isTemplateModalOpen()">
-  <div class="modal-content slide-in" style="max-width: 600px;">
+<div class="modal-overlay" *ngIf="isTemplateModalOpen()" (click)="closeTemplateModal()">
+  <div class="modal-window slide-up" style="max-width: 580px;" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <div class="header-titles">
-        <h2>Onboarding Checklist Templates</h2>
-        <p class="subtitle">These tasks are automatically assigned to all new hires.</p>
+      <div class="modal-title-group">
+        <div class="modal-icon-badge">
+          <svg lucideSettings size="18"></svg>
+        </div>
+        <div>
+          <h2 class="modal-title">Onboarding Checklist Templates</h2>
+          <p class="modal-sub">These tasks are automatically assigned to all incoming new hires.</p>
+        </div>
       </div>
-      <button class="btn-icon close-btn" (click)="closeTemplateModal()">
+      <button class="btn-close-modal" (click)="closeTemplateModal()" title="Close">
         <svg lucideX size="18"></svg>
       </button>
     </div>
-    
+
     <div class="modal-body">
-      <!-- Add New Template -->
-      <div class="add-template-box">
+      <!-- Add New Template Form -->
+      <div class="add-template-card">
+        <h4 class="form-section-title">Add New Checklist Item</h4>
         <div class="form-group">
-          <label>Task Title</label>
-          <input type="text" class="form-control" [(ngModel)]="newTemplate.title" placeholder="e.g., Sign NDA">
+          <label>Task Title <span class="required-star">*</span></label>
+          <input type="text"
+                 class="form-input"
+                 [(ngModel)]="newTemplate.title"
+                 placeholder="e.g., Set up company email & Slack">
         </div>
-        <div class="form-group mt-2">
+        <div class="form-group mt-3">
           <label>Description (Optional)</label>
-          <input type="text" class="form-control" [(ngModel)]="newTemplate.description" placeholder="e.g., Please review and sign the attached NDA document.">
+          <input type="text"
+                 class="form-input"
+                 [(ngModel)]="newTemplate.description"
+                 placeholder="e.g., Provide login credentials and workspace invite links">
         </div>
-        <button class="btn-black mt-3 w-100" (click)="addTemplate()" [disabled]="isSaving()">
-          {{ isSaving() ? 'Adding...' : 'Add to Default Checklist' }}
+        <button class="btn-add-task" (click)="addTemplate()" [disabled]="isSaving()">
+          <svg lucidePlus size="15" *ngIf="!isSaving()"></svg>
+          <svg lucideRefreshCw size="15" class="spin-anim" *ngIf="isSaving()"></svg>
+          <span>{{ isSaving() ? 'Saving Task...' : 'Add to Default Checklist' }}</span>
         </button>
       </div>
 
-      <!-- List Existing Templates -->
-      <div class="template-list mt-4">
-        <h4 class="list-title">Current Default Tasks ({{ templates().length }})</h4>
-        
-        <div class="empty-state" *ngIf="templates().length === 0">
-          No default tasks configured yet. Add some above!
+      <!-- Current Default Tasks List -->
+      <div class="templates-list-section">
+        <div class="list-section-header">
+          <h4 class="list-section-title">Current Default Tasks</h4>
+          <span class="tasks-count-pill">{{ templates().length }} Active</span>
         </div>
 
-        <div class="template-item" *ngFor="let t of templates()">
-          <div class="template-info">
-            <p class="template-name">{{ t.title }}</p>
-            <p class="template-desc" *ngIf="t.description">{{ t.description }}</p>
+        <div class="empty-templates-state" *ngIf="templates().length === 0">
+          <svg lucideListTodo size="24" class="text-slate-400"></svg>
+          <p>No default tasks configured yet. Add your first task above.</p>
+        </div>
+
+        <div class="template-item-row" *ngFor="let t of templates(); let idx = index">
+          <div class="template-index-pill">{{ idx + 1 }}</div>
+          <div class="template-details">
+            <div class="template-title">{{ t.title }}</div>
+            <div class="template-desc" *ngIf="t.description">{{ t.description }}</div>
           </div>
-          <button class="btn-icon text-danger" (click)="deleteTemplate(t.id)" title="Remove">
-            <svg lucideX size="16"></svg>
+          <button class="btn-delete-template" (click)="deleteTemplate(t.id)" title="Remove task">
+            <svg lucideTrash2 size="15"></svg>
           </button>
         </div>
       </div>
@@ -271,51 +471,120 @@
   </div>
 </div>
 
-<!-- Employee Checklist Slide-over -->
+<!-- Employee Checklist Slide-over Drawer -->
 <div class="slide-over-overlay" *ngIf="isChecklistPanelOpen()" (click)="closeChecklist()">
-  <div class="slide-over-panel slide-in-right" (click)="$event.stopPropagation()">
+  <div class="slide-over-container slide-in-right" (click)="$event.stopPropagation()">
+
+    <!-- Drawer Header with Rich User Profile -->
     <div class="slide-over-header">
-      <div class="emp-profile-header">
-        <div class="avatar-chip lg-chip">{{ getInitials(selectedEmployee().firstName, selectedEmployee().lastName) }}</div>
-        <div>
-          <h2>{{ selectedEmployee().firstName }} {{ selectedEmployee().lastName }}</h2>
-          <p class="designation">{{ selectedEmployee().designation?.name || 'No Designation' }}</p>
-        </div>
-      </div>
-      <button class="btn-icon close-btn" (click)="closeChecklist()">
-        <svg lucideX size="20"></svg>
-      </button>
-    </div>
-
-    <div class="slide-over-body">
-      <div class="progress-section">
-        <div class="progress-stats">
-          <span>{{ getProgressPercentage(selectedEmployee().onboardingTasks) }}% Complete</span>
-          <span>{{ getCompletedCount(selectedEmployee().onboardingTasks) }} / {{ selectedEmployee().onboardingTasks?.length || 0 }} Tasks</span>
-        </div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill in-progress-fill" [style.width]="getProgressPercentage(selectedEmployee().onboardingTasks) + '%'"></div>
-        </div>
-      </div>
-
-      <div class="checklist-section">
-        <h3>Onboarding Checklist</h3>
-        
-        <div class="empty-state" *ngIf="!selectedEmployee().onboardingTasks?.length">
-          No tasks assigned to this employee.
+      <div class="drawer-profile-top">
+        <div class="drawer-avatar-wrap">
+          <img *ngIf="selectedEmployee().avatarUrl" [src]="selectedEmployee().avatarUrl" [alt]="selectedEmployee().firstName" class="drawer-avatar-img" (error)="selectedEmployee().avatarUrl = null" />
+          <div *ngIf="!selectedEmployee().avatarUrl" class="drawer-avatar-circle" [style.background]="getAvatarBg(selectedEmployee().id)">
+            {{ getInitials(selectedEmployee().firstName, selectedEmployee().lastName) }}
+          </div>
         </div>
 
-        <div class="checklist-item" *ngFor="let task of selectedEmployee().onboardingTasks" [class.completed]="task.isCompleted">
-          <label class="custom-checkbox">
-            <input type="checkbox" [checked]="task.isCompleted" (change)="toggleTask(task)">
-            <span class="checkmark"></span>
-          </label>
-          <div class="task-details">
-            <span class="task-title">{{ task.title }}</span>
-            <span class="task-desc" *ngIf="task.description">{{ task.description }}</span>
+        <div class="drawer-profile-info">
+          <h2 class="drawer-emp-name">{{ selectedEmployee().firstName }} {{ selectedEmployee().lastName || '' }}</h2>
+          <div class="drawer-meta-line">
+            <span class="drawer-code">#{{ selectedEmployee().employeeCode || 'N/A' }}</span>
+            <span class="drawer-dot">•</span>
+            <span class="drawer-desig">{{ selectedEmployee().designation?.name || 'No Designation' }}</span>
+          </div>
+          <div class="drawer-chips-row">
+            <span class="drawer-dept-chip" *ngIf="selectedEmployee().department?.name">
+              {{ selectedEmployee().department.name }}
+            </span>
+            <span class="drawer-status-chip" [ngClass]="selectedEmployee().onboardingStatus?.toLowerCase()">
+              {{ selectedEmployee().onboardingStatus === 'COMPLETED' ? 'Onboarded' : (selectedEmployee().onboardingStatus === 'IN_PROGRESS' ? 'In Progress' : 'Pending') }}
+            </span>
           </div>
         </div>
       </div>
+
+      <div class="drawer-header-actions">
+        <button type="button" class="btn-drawer-profile" (click)="openUserProfile(selectedEmployee().id, $event)" title="View Full Employee Profile">
+          <svg lucideUser size="14"></svg>
+          <span>View Profile</span>
+        </button>
+        <button class="btn-close-drawer" (click)="closeChecklist()" title="Close drawer">
+          <svg lucideX size="18"></svg>
+        </button>
+      </div>
     </div>
+
+    <!-- Drawer Body -->
+    <div class="slide-over-body">
+
+      <!-- Progress Overview Card -->
+      <div class="drawer-progress-card">
+        <div class="progress-card-top">
+          <div>
+            <div class="progress-title">Onboarding Progression</div>
+            <div class="progress-subtitle">
+              {{ getCompletedCount(selectedEmployee().onboardingTasks) }} of {{ selectedEmployee().onboardingTasks?.length || 0 }} tasks finished
+            </div>
+          </div>
+          <div class="progress-pct-badge" [class.pct-done]="getProgressPercentage(selectedEmployee().onboardingTasks) === 100">
+            {{ getProgressPercentage(selectedEmployee().onboardingTasks) }}%
+          </div>
+        </div>
+        <div class="progress-track lg-track">
+          <div class="progress-fill"
+               [class.fill-green]="getProgressPercentage(selectedEmployee().onboardingTasks) === 100"
+               [class.fill-blue]="getProgressPercentage(selectedEmployee().onboardingTasks) > 0 && getProgressPercentage(selectedEmployee().onboardingTasks) < 100"
+               [class.fill-amber]="getProgressPercentage(selectedEmployee().onboardingTasks) === 0"
+               [style.width]="getProgressPercentage(selectedEmployee().onboardingTasks) + '%'">
+          </div>
+        </div>
+      </div>
+
+      <!-- Checklist Section -->
+      <div class="drawer-checklist-section">
+        <div class="checklist-header-row">
+          <h3 class="checklist-heading">MANDATORY ONBOARDING TASKS</h3>
+          <span class="checklist-count-tag">{{ selectedEmployee().onboardingTasks?.length || 0 }} Items</span>
+        </div>
+
+        <div class="empty-tasks-state" *ngIf="!selectedEmployee().onboardingTasks?.length">
+          <svg lucideCheckCircle2 size="32" class="text-slate-300"></svg>
+          <p>No onboarding tasks assigned to this employee yet.</p>
+        </div>
+
+        <div class="checklist-item-card"
+             *ngFor="let task of selectedEmployee().onboardingTasks"
+             [class.is-done]="task.isCompleted">
+
+          <label class="custom-check-wrap">
+            <input type="checkbox" [checked]="task.isCompleted" (change)="toggleTask(task)">
+            <span class="custom-checkmark">
+              <svg lucideCheck size="13" class="check-svg" *ngIf="task.isCompleted"></svg>
+            </span>
+          </label>
+
+          <div class="task-info-block">
+            <div class="task-title" [class.line-through]="task.isCompleted">{{ task.title }}</div>
+            <div class="task-desc" *ngIf="task.description">{{ task.description }}</div>
+            <div class="task-meta-tag" *ngIf="task.isCompleted">
+              <span class="tag-done">✓ Completed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Drawer Footer -->
+    <div class="slide-over-footer">
+      <button type="button" class="btn-footer-profile" (click)="openUserProfile(selectedEmployee().id, $event)">
+        <svg lucideExternalLink size="14"></svg>
+        <span>Open Employee Profile in Modal</span>
+      </button>
+      <button type="button" class="btn-footer-done" (click)="closeChecklist()">
+        Done
+      </button>
+    </div>
+
   </div>
 </div>

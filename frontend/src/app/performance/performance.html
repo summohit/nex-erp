@@ -1,10 +1,6 @@
 <div class="performance-container">
-  <div class="page-header">
-    <div>
-      <h1>Performance & Appraisals</h1>
-      <p>Set goals, track progress, and review performance</p>
-    </div>
-    <div class="header-actions">
+  <!-- Page header (12 Nov 2026): the shared header used on every redesigned page -->
+  <app-page-header icon="target" heading="Performance & Appraisals" subtitle="Goals, appraisals, OKRs, probation and PIPs">
       <button class="btn-primary" *ngIf="activeTab() === 'goals'" (click)="openGoalModal()">
         <svg lucidePlus size="20"></svg> New Goal
       </button>
@@ -17,8 +13,32 @@
       <button class="btn-primary" *ngIf="activeTab() === 'cycles' && isHR()" (click)="openCycleModal()">
         <svg lucidePlus size="20"></svg> New Cycle
       </button>
-    </div>
-  </div>
+      <!-- Probation / PIP buttons, moved up from the section (12 Nov 2026) -->
+      <ng-container *ngIf="activeTab() === 'probation' && pw()?.data()?.canManageProbation">
+        <button class="btn-secondary" (click)="pw()?.openPolicy()" title="Probation length, extensions, reminders, leave rounding">
+          <svg lucideCalendar size="18"></svg> Policy
+        </button>
+        <button class="btn-primary" (click)="pw()?.openProbation()">
+          <svg lucidePlus size="20"></svg> Add to probation
+        </button>
+      </ng-container>
+      <ng-container *ngIf="activeTab() === 'people' && pw()">
+        <div class="view-switch-pills" role="group" aria-label="Notice period or PIPs">
+          <button type="button" class="pill-btn" [class.active]="pw()?.section() === 'notice'" (click)="pw()?.section.set('notice')">
+            Notice period <span class="pill-count">{{ pw()?.data()?.notice?.length || 0 }}</span>
+          </button>
+          <button type="button" class="pill-btn" [class.active]="pw()?.section() === 'pip'" (click)="pw()?.section.set('pip')">
+            PIPs <span class="pill-count">{{ pw()?.data()?.pips?.length || 0 }}</span>
+          </button>
+        </div>
+        <button class="btn-secondary" *ngIf="pw()?.section() === 'pip'" (click)="pw()?.loadHistory()">
+          <svg lucideClock size="18"></svg> {{ pw()?.showHistory() ? 'Hide closed' : 'Show closed history' }}
+        </button>
+        <button class="btn-primary" *ngIf="pw()?.section() === 'pip'" (click)="pw()?.openPipForm()">
+          <svg lucidePlus size="20"></svg> Start a PIP
+        </button>
+      </ng-container>
+  </app-page-header>
 
   <div class="tabs-container">
     <button class="tab-btn" [class.active]="activeTab() === 'goals'" (click)="setTab('goals')">
@@ -47,8 +67,16 @@
 
   <!-- Goals Tab -->
   <div *ngIf="activeTab() === 'goals'">
+    <div class="pf-filter-row" *ngIf="myGoals().length > 0">
+      <div class="pf-search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="search" placeholder="Search goals" [ngModel]="goalSearch()" (ngModelChange)="goalSearch.set($event)"></div>
+      <div class="pf-field"><app-searchable-select [options]="goalStatusOptions" placeholder="All statuses" [clearable]="true"
+        [value]="goalStatus() || null" (valueChange)="goalStatus.set($event || '')"></app-searchable-select></div>
+      <button type="button" class="clear-all-filters" *ngIf="goalSearch() || goalStatus()" (click)="goalSearch.set(''); goalStatus.set('')">Clear all</button>
+      <span class="pf-count">Showing <strong>{{ filteredGoals().length }}</strong> of <strong>{{ myGoals().length }}</strong></span>
+    </div>
     <div class="goals-grid" *ngIf="myGoals().length > 0; else noGoals">
-      <div class="goal-card" *ngFor="let goal of myGoals()">
+      <div class="goal-card" *ngFor="let goal of filteredGoals()">
         <div class="goal-card-header">
           <span class="status-badge" [ngClass]="goal.status.toLowerCase()">
             {{ goal.status.replace('_', ' ') }}
@@ -103,98 +131,48 @@
 
   <!-- Reviews Tab -->
   <div *ngIf="activeTab() === 'reviews'" class="reviews-section">
-    <!-- My Reviews (Received) -->
-    <div class="reviews-table-container">
-      <h2>My Appraisals</h2>
-      <table class="table" *ngIf="myReviews().length > 0; else noMyReviews">
-        <thead>
-          <tr>
-            <th>Cycle</th>
-            <th>Reviewer</th>
-            <th>Rating</th>
-            <th>Status / Workflow</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let rev of myReviews()">
-            <td style="font-weight: 600;">{{ rev.cycleName }}</td>
-            <td>{{ rev.reviewer?.firstName }} {{ rev.reviewer?.lastName }}</td>
-            <td>
-              <span *ngIf="rev.rating" style="display: flex; gap: 2px;">
-                <svg lucideAward size="16" style="color: #0f4f9c;" *ngFor="let _ of [].constructor(rev.rating)"></svg>
-              </span>
-              <span *ngIf="!rev.rating">-</span>
-            </td>
-            <td>
-               <!-- Workflow Stepper visualization could go here, or just a detailed badge -->
-              <span class="workflow-badge" [ngClass]="rev.status.toLowerCase()">
-                 {{ rev.status.replace(/_/g, ' ') }}
-              </span>
-            </td>
-            <td>
-               <button *ngIf="rev.status === 'PENDING_SELF_REVIEW'" class="btn-primary btn-sm" (click)="openSelfAppraisal(rev)">
-                 Complete Self Review
-               </button>
-               <button *ngIf="rev.status === 'MANAGER_REVIEWED'" class="btn-primary btn-sm" (click)="signoff(rev.id, 'EMPLOYEE', 'ACKNOWLEDGED')">
-                 Acknowledge
-               </button>
-               <button class="btn-secondary btn-sm" (click)="openReviewModal(rev)">View</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <ng-template #noMyReviews>
-        <div class="empty-state">No appraisals received yet.</div>
-      </ng-template>
+    <!-- Filters (12 Nov 2026): one standard row for both tables -->
+    <div class="pf-filter-row">
+      <div class="pf-search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="search" placeholder="Search name, cycle or reviewer" [ngModel]="reviewSearch()" (ngModelChange)="reviewSearch.set($event)"></div>
+      <div class="pf-field"><app-searchable-select [options]="reviewCycleOptions()" placeholder="All cycles" [clearable]="true"
+        [value]="reviewCycle() || null" (valueChange)="reviewCycle.set($event || '')"></app-searchable-select></div>
+      <div class="pf-field"><app-searchable-select [options]="reviewStatusOptions" placeholder="All statuses" [clearable]="true"
+        [value]="reviewStatus() || null" (valueChange)="reviewStatus.set($event || '')"></app-searchable-select></div>
+      <button type="button" class="clear-all-filters" *ngIf="reviewSearch() || reviewCycle() || reviewStatus()" (click)="reviewSearch.set(''); reviewCycle.set(''); reviewStatus.set('')">Clear all</button>
     </div>
 
-    <!-- Team Reviews (Given by me) -->
-    <div class="reviews-table-container" *ngIf="isManager()">
-      <h2>Team Appraisals</h2>
-      <table class="table" *ngIf="teamReviews().length > 0; else noTeamReviews">
-        <thead>
-          <tr>
-            <th>Employee</th>
-            <th>Cycle</th>
-            <th>Rating</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let rev of teamReviews()">
-            <td style="display: flex; align-items: center; gap: 12px;">
-              <img [src]="rev.employee?.avatarUrl || 'assets/default-avatar.png'" class="avatar-sm" />
-              <span style="font-weight: 600;">{{ rev.employee?.firstName }} {{ rev.employee?.lastName }}</span>
-            </td>
-            <td>{{ rev.cycleName }}</td>
-            <td>{{ rev.rating || '-' }} / 5</td>
-            <td>
-              <span class="workflow-badge" [ngClass]="rev.status.toLowerCase()">{{ rev.status.replace(/_/g, ' ') }}</span>
-            </td>
-            <td>
-              <button *ngIf="rev.status === 'SELF_REVIEWED'" class="btn-primary btn-sm" (click)="openReviewModal(rev)">Give Feedback</button>
-              <button *ngIf="rev.status !== 'SELF_REVIEWED'" class="btn-secondary btn-sm" (click)="openReviewModal(rev)">View/Edit</button>
-              
-              <!-- HR Approval if Manager is also HR -->
-              <button *ngIf="isHR() && rev.status === 'ACKNOWLEDGED'" class="btn-primary btn-sm ml-2" (click)="signoff(rev.id, 'HR', 'APPROVED')">
-                HR Approve
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <ng-template #noTeamReviews>
-        <div class="empty-state">No team appraisals created yet.</div>
-      </ng-template>
+    <div class="pf-section">
+      <h2>My appraisals <span class="pf-badge">{{ filteredMyReviews().length }}</span></h2>
+      <ag-grid-angular *ngIf="myReviews().length > 0; else noMyReviews" class="ag-theme-quartz pf-grid"
+        style="width: 100%; height: 360px;" [rowData]="filteredMyReviews()" [columnDefs]="myReviewCols"
+        [defaultColDef]="gridDefaultColDef" [pagination]="true" [paginationPageSize]="20"
+        [paginationPageSizeSelector]="[20, 50, 100, 200]" [gridOptions]="myReviewGridOptions" [theme]="'legacy'"></ag-grid-angular>
+      <ng-template #noMyReviews><div class="empty-state">No appraisals received yet.</div></ng-template>
+    </div>
+
+    <div class="pf-section" *ngIf="isManager()">
+      <h2>Team appraisals <span class="pf-badge">{{ filteredTeamReviews().length }}</span></h2>
+      <ag-grid-angular *ngIf="teamReviews().length > 0; else noTeamReviews" class="ag-theme-quartz pf-grid"
+        style="width: 100%; height: calc(100vh - 300px); min-height: 420px;" [rowData]="filteredTeamReviews()" [columnDefs]="teamReviewCols"
+        [defaultColDef]="gridDefaultColDef" [pagination]="true" [paginationPageSize]="20"
+        [paginationPageSizeSelector]="[20, 50, 100, 200]" [gridOptions]="teamReviewGridOptions" [theme]="'legacy'"></ag-grid-angular>
+      <ng-template #noTeamReviews><div class="empty-state">No team appraisals created yet.</div></ng-template>
     </div>
   </div>
 
   <!-- OKRs Tab -->
   <div *ngIf="activeTab() === 'okrs'">
+    <div class="pf-filter-row" *ngIf="companyOKRs().length > 0">
+      <div class="pf-search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="search" placeholder="Search objectives" [ngModel]="okrSearch()" (ngModelChange)="okrSearch.set($event)"></div>
+      <div class="pf-field"><app-searchable-select [options]="okrPeriodOptions()" placeholder="All periods" [clearable]="true"
+        [value]="okrPeriod() || null" (valueChange)="okrPeriod.set($event || '')"></app-searchable-select></div>
+      <button type="button" class="clear-all-filters" *ngIf="okrSearch() || okrPeriod()" (click)="okrSearch.set(''); okrPeriod.set('')">Clear all</button>
+      <span class="pf-count">Showing <strong>{{ filteredOkrs().length }}</strong> of <strong>{{ companyOKRs().length }}</strong></span>
+    </div>
     <div class="okr-grid" *ngIf="companyOKRs().length > 0; else noOkrs">
-       <div class="okr-card" *ngFor="let okr of companyOKRs()">
+       <div class="okr-card" *ngFor="let okr of filteredOkrs()">
           <div class="okr-header">
             <h3>{{ okr.title }}</h3>
             <span class="status-badge" [ngClass]="okr.status.toLowerCase()">{{ okr.status }}</span>
@@ -227,30 +205,17 @@
 
   <!-- Cycles Tab -->
   <div *ngIf="activeTab() === 'cycles'">
-    <div class="reviews-table-container">
-       <h2>Appraisal Cycles</h2>
-       <table class="table" *ngIf="appraisalCycles().length > 0; else noCycles">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Start Date</th>
-              <th>End Date</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let cycle of appraisalCycles()">
-               <td style="font-weight:600">{{ cycle.name }}</td>
-               <td>{{ cycle.startDate | date }}</td>
-               <td>{{ cycle.endDate | date }}</td>
-               <td><span class="status-badge" [ngClass]="cycle.status.toLowerCase()">{{ cycle.status }}</span></td>
-            </tr>
-          </tbody>
-       </table>
-       <ng-template #noCycles>
-          <div class="empty-state">No appraisal cycles found.</div>
-       </ng-template>
+    <div class="pf-filter-row" *ngIf="appraisalCycles().length > 0">
+      <div class="pf-search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="search" placeholder="Search cycles" [ngModel]="cycleSearch()" (ngModelChange)="cycleSearch.set($event)"></div>
+      <button type="button" class="clear-all-filters" *ngIf="cycleSearch()" (click)="cycleSearch.set('')">Clear all</button>
+      <span class="pf-count">Showing <strong>{{ filteredCycles().length }}</strong> of <strong>{{ appraisalCycles().length }}</strong></span>
     </div>
+    <ag-grid-angular *ngIf="appraisalCycles().length > 0; else noCycles" class="ag-theme-quartz pf-grid"
+      style="width: 100%; height: calc(100vh - 300px); min-height: 420px;" [rowData]="filteredCycles()" [columnDefs]="cycleCols"
+      [defaultColDef]="gridDefaultColDef" [pagination]="true" [paginationPageSize]="20"
+      [paginationPageSizeSelector]="[20, 50, 100, 200]" [theme]="'legacy'"></ag-grid-angular>
+    <ng-template #noCycles><div class="empty-state">No appraisal cycles found.</div></ng-template>
   </div>
 
 </div>

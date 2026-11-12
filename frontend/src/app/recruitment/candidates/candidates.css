@@ -2227,7 +2227,7 @@
 }
 
 .rating-donut-text {
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 10px;
   font-weight: 800;
   text-anchor: middle;
@@ -5118,3 +5118,107 @@
 .offer-group-select { width: 100%; height: 42px; border: 1px solid #cbd5e1; border-radius: 10px; padding: 0 12px; background: #fff; font-size: 14px; }
 .offer-group-select.is-invalid { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, .12); }
 .offer-field-error { color: #dc2626; font-size: 12px; }
+
+/* ── Candidates (ATS), board redesign (12 Nov 2026) ─────────────────────── */
+.view-switch-pills { display: inline-flex; background: #f1f5f9; padding: 3px; border-radius: 8px; border: 1px solid #e2e8f0; }
+.pill-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: none; background: transparent; color: #64748b; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.pill-btn:hover { color: #0f172a; }
+.pill-btn.active { background: #fff; color: #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,.08), inset 0 -2px 0 #2563eb; }
+
+.ats-filter-card { padding: 14px 16px; }
+.ats-filter-card .ats-filter-toolbar { margin: 0; padding: 0; }
+.ats-filter-card .filter-controls-group { flex-wrap: wrap; align-items: center; }
+.more-filters { position: relative; }
+.btn-more-filters { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #334155; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-more-filters.on { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.more-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #2563eb; color: #fff; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.more-backdrop { position: fixed; inset: 0; z-index: 40; }
+.more-panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 41; width: 320px; padding: 12px; display: grid; gap: 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 12px 32px rgba(15, 23, 42, .14); }
+.more-panel .filter-searchable-pill, .more-panel .filter-ctc-pill { width: 100%; }
+.more-panel-head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 700; color: #0f172a; }
+.more-close { border: 0; background: transparent; color: #64748b; cursor: pointer; padding: 4px; border-radius: 6px; display: inline-flex; }
+
+/* Stage stat strip: one row, compact, icon + number + label */
+.kpi-row { display: flex !important; flex-wrap: nowrap !important; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px; }
+.kpi-row .kpi-card { flex: 1 0 140px; display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #fff; border: 1px solid #e6ebf5; border-radius: 12px; box-shadow: none; cursor: pointer; min-height: 0; }
+.kpi-row .kpi-card:hover { border-color: #cbd5e1; }
+.kpi-row .kpi-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.kpi-row .kpi-value { font-family: var(--font-heading); font-size: 20px; font-weight: 700; line-height: 1.1; }
+.kpi-row .kpi-title { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64748b; white-space: nowrap; }
+.icon-blue { background: #eff6ff; color: #2563eb; }   .text-blue { color: #2563eb; }
+.icon-purple { background: #f5f3ff; color: #7c3aed; } .text-purple { color: #7c3aed; }
+.icon-amber { background: #fffbeb; color: #d97706; }  .text-amber { color: #d97706; }
+.icon-orange { background: #fff7ed; color: #ea580c; } .text-orange { color: #ea580c; }
+.icon-emerald { background: #ecfdf5; color: #059669; } .text-emerald { color: #059669; }
+.icon-green { background: #f0fdf4; color: #16a34a; }  .text-green { color: #16a34a; }
+.icon-teal { background: #f0fdfa; color: #0d9488; }   .text-teal { color: #0d9488; }
+.icon-slate { background: #f1f5f9; color: #475569; }  .text-slate { color: #475569; }
+.icon-red { background: #fef2f2; color: #dc2626; }    .text-red { color: #dc2626; }
+
+/* Board columns: coloured title and count, light grey body */
+.kanban-col { background: #f8fafc; border: 1px solid #e6ebf5; border-radius: 14px; }
+.kanban-col .col-header { background: #fff; border-bottom: 1px solid #eef2f7; border-radius: 14px 14px 0 0; padding: 14px 16px; }
+.kanban-col .col-header h3 { display: flex; align-items: center; justify-content: space-between; margin: 0; font-family: var(--font-heading); font-size: 15px; font-weight: 600; }
+.kanban-col .col-header h3 span { min-width: 26px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.kanban-col-blue .col-header h3 { color: #2563eb; }    .kanban-col-blue .col-header h3 span { background: #eff6ff; color: #2563eb; }
+.kanban-col-purple .col-header h3 { color: #7c3aed; }  .kanban-col-purple .col-header h3 span { background: #f5f3ff; color: #7c3aed; }
+.kanban-col-amber .col-header h3 { color: #d97706; }   .kanban-col-amber .col-header h3 span { background: #fffbeb; color: #d97706; }
+.kanban-col-orange .col-header h3 { color: #ea580c; }  .kanban-col-orange .col-header h3 span { background: #fff7ed; color: #ea580c; }
+.kanban-col-emerald .col-header h3 { color: #059669; } .kanban-col-emerald .col-header h3 span { background: #ecfdf5; color: #059669; }
+.kanban-col-green .col-header h3 { color: #16a34a; }   .kanban-col-green .col-header h3 span { background: #f0fdf4; color: #16a34a; }
+.kanban-col-teal .col-header h3 { color: #0d9488; }    .kanban-col-teal .col-header h3 span { background: #f0fdfa; color: #0d9488; }
+.kanban-col-slate .col-header h3 { color: #475569; }   .kanban-col-slate .col-header h3 span { background: #f1f5f9; color: #475569; }
+.kanban-col-red .col-header h3 { color: #dc2626; }     .kanban-col-red .col-header h3 span { background: #fef2f2; color: #dc2626; }
+
+/* Cards: white, stage-coloured left edge, chips, divider above the footer */
+.kanban-card { background: #fff; border: 1px solid #e6ebf5; border-left: 4px solid #cbd5e1; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+.kanban-card:hover { box-shadow: 0 4px 12px rgba(15,23,42,.08); }
+.card-blue { border-left-color: #2563eb; }   .card-purple { border-left-color: #7c3aed; } .card-amber { border-left-color: #f59e0b; }
+.card-orange { border-left-color: #ea580c; } .card-emerald { border-left-color: #059669; } .card-green { border-left-color: #16a34a; }
+.card-teal { border-left-color: #0d9488; }   .card-slate { border-left-color: #94a3b8; }  .card-red { border-left-color: #dc2626; }
+.kanban-card .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.kanban-card .card-title { font-size: 15px; font-weight: 600; color: #0f172a; text-transform: none; }
+.kanban-card .card-notice { flex-shrink: 0; height: 22px; padding: 0 8px; border-radius: 6px; background: #f1f5f9; color: #475569; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; white-space: nowrap; }
+.kanban-card .card-meta { font-size: 13px; color: #64748b; margin-top: 4px; }
+.kanban-card .card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.kanban-card .card-tag { height: 24px; padding: 0 8px; border-radius: 6px; background: #f1f5f9; color: #334155; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; }
+.kanban-card .card-footer-row { margin-top: 12px; padding-top: 10px; border-top: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+.kanban-card .approval-badge { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 12px; font-weight: 600; }
+
+/* Dropdowns open above the table, not under it (12 Nov 2026). */
+.ats-filter-card { position: relative; z-index: 30; overflow: visible !important; }
+.ats-filter-card .ats-filter-toolbar, .ats-filter-card .filter-controls-group { overflow: visible !important; }
+
+/* Clicking a stage card: the card stays highlighted and its column pulses so
+   you can see where the board scrolled to. */
+.kpi-row .kpi-card.kpi-active { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .15); }
+.kanban-col.col-focus { animation: col-focus-pulse 1.6s ease-out; }
+@keyframes col-focus-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(37, 99, 235, .55); border-color: #2563eb; }
+  35%  { box-shadow: 0 0 0 6px rgba(37, 99, 235, .25); border-color: #2563eb; }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .kanban-col.col-focus { animation: none; outline: 2px solid #2563eb; } }
+
+/* The page wrapper clipped anything past its edge, cutting open dropdowns off
+   at the bottom (12 Nov 2026). The board keeps its own horizontal scroll. */
+.page-container { overflow: visible !important; }
+
+/* One filter row that never breaks: search shrinks first, each dropdown has a
+   fixed width and long names end in "…" (full name in the menu). */
+.ats-filter-card .ats-filter-toolbar { display: flex; flex-wrap: nowrap !important; align-items: center; gap: 10px; }
+.ats-filter-card .filter-item-search { flex: 1 1 200px; min-width: 160px; max-width: 280px; }
+.ats-filter-card .filter-controls-group { flex: 0 1 auto; flex-wrap: nowrap !important; gap: 10px; min-width: 0; }
+.ats-filter-card .filter-searchable-pill { flex: 0 1 200px; min-width: 140px; max-width: 220px; }
+:host ::ng-deep .ats-filter-card .filter-searchable-pill .select-trigger,
+:host ::ng-deep .ats-filter-card .filter-searchable-pill .select-trigger-content,
+:host ::ng-deep .ats-filter-card .filter-searchable-pill .select-text-group { min-width: 0; max-width: 100%; overflow: hidden; }
+:host ::ng-deep .ats-filter-card .filter-searchable-pill .select-text-group * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:host ::ng-deep .ats-filter-card .filter-searchable-pill .select-dropdown,
+:host ::ng-deep .ats-filter-card .filter-searchable-pill [class*="dropdown-panel"] { min-width: 300px; }
+.ats-filter-card app-date-preset-filter, .ats-filter-card .more-filters, .ats-filter-card .clear-all-filters { flex-shrink: 0; }
+@media (max-width: 1100px) { .ats-filter-card .ats-filter-toolbar, .ats-filter-card .filter-controls-group { flex-wrap: wrap !important; } }
+
+/* Drawer-only mode: hide the page itself, keep the follow-up pop-up (12 Nov 2026). */
+.page-container.drawer-only-host { padding: 0 !important; min-height: 0 !important; background: transparent !important; }
+.page-container.drawer-only-host > *:not(.candidate-followup-overlay) { display: none !important; }

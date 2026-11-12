@@ -1,19 +1,14 @@
 <div class="page-container">
-  <div class="page-header">
-    <div class="header-content">
-      <h1>Employee Directory</h1>
-      <p>Everyone in the company, with their department, role and status</p>
-    </div>
-    <div class="header-actions">
-      <!-- View mode toggle -->
-      <div class="view-mode-toggle">
-        <button type="button" class="btn-view-toggle" [class.active]="viewMode() === 'table'" (click)="viewMode.set('table')" title="Table View">
-          <svg lucideList size="15"></svg>
-          <span>Table</span>
+  <app-page-header icon="users" section="Employees" heading="Employee Directory" subtitle="Everyone in the company, with their department, role and status">
+      <!-- View switch: same Board | Table pills as every Employee page; Table first by default (12 Nov 2026) -->
+      <div class="view-switch-pills">
+        <button type="button" class="pill-btn" [class.active]="viewMode() === 'cards'" (click)="viewMode.set('cards')" title="Board view">
+          <svg lucideLayoutGrid size="14"></svg>
+          <span>Board</span>
         </button>
-        <button type="button" class="btn-view-toggle" [class.active]="viewMode() === 'cards'" (click)="viewMode.set('cards')" title="Card View">
-          <svg lucideLayoutGrid size="15"></svg>
-          <span>Cards</span>
+        <button type="button" class="pill-btn" [class.active]="viewMode() === 'table'" (click)="viewMode.set('table')" title="Table view">
+          <svg lucideTable size="14"></svg>
+          <span>Table</span>
         </button>
       </div>
 
@@ -25,8 +20,7 @@
         <svg lucidePlus size="16"></svg>
         <span>Add employee</span>
       </button>
-    </div>
-  </div>
+  </app-page-header>
 
   <app-bulk-upload-modal 
     *ngIf="isBulkUploadOpen" 
@@ -181,24 +175,6 @@
 
     <div class="filter-group">
       <app-searchable-select
-        [options]="designationOptions()"
-        placeholder="All designations"
-        [value]="filterDesignationId"
-        (valueChange)="filterDesignationId = $event; applyFilters()">
-      </app-searchable-select>
-    </div>
-
-    <div class="filter-group">
-      <app-searchable-select
-        [options]="roleOptions"
-        placeholder="All roles"
-        [value]="filterRole"
-        (valueChange)="filterRole = $event; applyFilters()">
-      </app-searchable-select>
-    </div>
-
-    <div class="filter-group">
-      <app-searchable-select
         [options]="onboardingStatusOptions"
         placeholder="Any onboarding status"
         [value]="filterOnboardingStatus"
@@ -208,10 +184,11 @@
 
     <div class="filter-group">
       <app-searchable-select
-        [options]="offboardingStatusOptions"
-        placeholder="Any offboarding status"
-        [value]="filterOffboardingStatus"
-        (valueChange)="filterOffboardingStatus = $event; applyFilters()">
+        [options]="accountStatusOptions"
+        placeholder="All employees"
+        [clearable]="true"
+        [value]="filterAccountStatus"
+        (valueChange)="filterAccountStatus = $event; applyFilters()">
       </app-searchable-select>
     </div>
 
@@ -224,21 +201,63 @@
       </app-searchable-select>
     </div>
 
-    <button
-      type="button"
-      class="btn-clear-filters"
-      (click)="clearFilters()"
-      *ngIf="hasActiveFilters()"
-      title="Clear all active filters"
-    >
-      <span class="clear-filter-icon">
-        <svg lucideRotateCcw size="13"></svg>
-      </span>
-      <span>Clear filters</span>
-      <span class="clear-count-badge" *ngIf="getActiveFilterCount() > 0">
-        {{ getActiveFilterCount() }}
-      </span>
-    </button>
+    <app-date-preset-filter label="Joined" [preset]="datePreset" (presetChange)="datePreset = $event" (rangeChange)="onDateRange($event)"></app-date-preset-filter>
+
+    <!-- More filters (12 Nov 2026): the less-used five sit in one panel, as in
+         Google / HubSpot / Zoho, so the bar stays one row on every page. -->
+    <div class="more-filters">
+      <button type="button" class="btn-more-filters" [class.on]="moreFilterCount() > 0" (click)="moreOpen = !moreOpen" [attr.aria-expanded]="moreOpen">
+        <svg lucideFilter size="14"></svg>
+        <span>Filters</span>
+        <span class="more-count" *ngIf="moreFilterCount() > 0">{{ moreFilterCount() }}</span>
+      </button>
+      <div class="more-backdrop" *ngIf="moreOpen" (click)="moreOpen = false"></div>
+      <div class="more-panel" *ngIf="moreOpen">
+        <div class="more-panel-head">
+          <span>More filters</span>
+          <button type="button" class="more-close" (click)="moreOpen = false" aria-label="Close filters"><svg lucideX size="14"></svg></button>
+        </div>
+    <div class="filter-group more-field">
+      <app-searchable-select
+        [options]="designationOptions()"
+        placeholder="All designations"
+        [value]="filterDesignationId"
+        (valueChange)="filterDesignationId = $event; applyFilters()">
+      </app-searchable-select>
+    </div>
+
+    <div class="filter-group more-field">
+      <app-searchable-select
+        [options]="roleOptions"
+        placeholder="All roles"
+        [value]="filterRole"
+        (valueChange)="filterRole = $event; applyFilters()">
+      </app-searchable-select>
+    </div>
+
+
+    <div class="filter-group more-field">
+      <app-searchable-select
+        [options]="offboardingStatusOptions"
+        placeholder="Any offboarding status"
+        [value]="filterOffboardingStatus"
+        (valueChange)="filterOffboardingStatus = $event; applyFilters()">
+      </app-searchable-select>
+    </div>
+
+
+      </div>
+    </div>
+
+    <button type="button" class="clear-all-filters" (click)="clearFilters()" *ngIf="hasActiveFilters()">Clear all</button>
+  </div>
+
+  <!-- Active filters as chips; ✕ removes one (12 Nov 2026) -->
+  <div class="active-chips" *ngIf="activeChips().length">
+    <span class="active-chip" *ngFor="let c of activeChips()">
+      <span class="chip-key">{{ c.key }}:</span> {{ c.value }}
+      <button type="button" (click)="removeChip(c.id)" [attr.aria-label]="'Remove ' + c.key + ' filter'"><svg lucideX size="12"></svg></button>
+    </span>
   </div>
 
   <!-- Cards View (for mobile or toggle) -->
@@ -309,7 +328,7 @@
 
     <!-- Skeleton Loader -->
     <ng-container *ngIf="isLoading()">
-      <div style="background: white; border-radius: 8px; padding: 0; border: 1px solid #e2e8f0; width: 100%; height: 600px; overflow: hidden;">
+      <div style="background: white; border-radius: 8px; padding: 0; border: 1px solid #e2e8f0; width: 100%; height: calc(100vh - 230px); min-height: 480px; overflow: hidden;">
         <!-- Header -->
         <div style="display: flex; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; background: #f8fafc;">
           <div class="skeleton-line shimmer" style="width: 24px; height: 16px; margin-right: 16px;"></div>
@@ -344,7 +363,7 @@
 
     <ag-grid-angular
       *ngIf="!isLoading()"
-      style="width: 100%; height: 600px;"
+      style="width: 100%; height: calc(100vh - 230px); min-height: 480px;"
       class="ag-theme-quartz"
       [rowData]="employees()"
       [columnDefs]="colDefs"

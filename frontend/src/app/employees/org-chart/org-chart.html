@@ -1,61 +1,7 @@
 <div class="org-page-container">
   
-  <!-- Page Header Card -->
-  <div class="page-header-card">
-    <div class="header-main-info">
-      <div class="header-badge">
-        <svg lucideNetwork size="15"></svg>
-        <span>Organization Hierarchy</span>
-      </div>
-      <div class="header-text-block">
-        <h1 class="page-title">Organization Chart</h1>
-        <p class="page-subtitle">Visualize workforce reporting lines, management tiers, and team structures.</p>
-      </div>
-    </div>
-
-    <!-- Quick Stats Strip -->
-    <div class="header-stats-strip" *ngIf="!isLoading && totalEmployees > 0">
-      <div class="stat-pill">
-        <div class="stat-icon-circle stat-blue">
-          <svg lucideUsers size="16"></svg>
-        </div>
-        <div class="stat-data">
-          <span class="stat-count">{{ totalEmployees }}</span>
-          <span class="stat-name">Members</span>
-        </div>
-      </div>
-
-      <div class="stat-pill">
-        <div class="stat-icon-circle stat-purple">
-          <svg lucideBuilding size="16"></svg>
-        </div>
-        <div class="stat-data">
-          <span class="stat-count">{{ totalDepartments }}</span>
-          <span class="stat-name">Departments</span>
-        </div>
-      </div>
-
-      <div class="stat-pill">
-        <div class="stat-icon-circle stat-emerald">
-          <svg lucideLayers size="16"></svg>
-        </div>
-        <div class="stat-data">
-          <span class="stat-count">{{ maxDepth }}</span>
-          <span class="stat-name">Tier Depth</span>
-        </div>
-      </div>
-
-      <div class="stat-pill">
-        <div class="stat-icon-circle stat-amber">
-          <svg lucideCrown size="16"></svg>
-        </div>
-        <div class="stat-data">
-          <span class="stat-count">{{ rootCount }}</span>
-          <span class="stat-name">Leadership</span>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- Page header (12 Nov 2026): same layout on every Employee page -->
+  <app-page-header icon="org" section="Employees" heading="Organization Chart" subtitle="Who reports to whom, by team and level"></app-page-header>
 
   <!-- Interactive Control Bar -->
   <div class="chart-control-bar" *ngIf="!isLoading && totalEmployees > 0">

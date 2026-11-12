@@ -486,7 +486,8 @@ export class MenusService implements OnModuleInit {
 
     // Who has documents or details missing: the report HR and admins follow
     // up with (the endpoint allows the same roles).
-    if (['ADMIN', 'HR'].includes(roleName)) allowedModules.add('employees/profile-completion');
+    // Super Admin only since 12 Nov 2026 (the super admin sees every module anyway).
+    allowedModules.delete('employees/profile-completion');
     // Pay profiles: Finance and admins change them, HR looks (the API enforces which).
     if (['ADMIN', 'HR', 'FINANCE'].includes(roleName)) allowedModules.add('payroll/pay-profiles');
 

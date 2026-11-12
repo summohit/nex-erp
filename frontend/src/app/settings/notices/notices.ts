@@ -2,6 +2,8 @@ import { Component, inject, signal, computed } from "@angular/core";
 import { CommonModule, DatePipe } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { HotToastService } from "@ngneat/hot-toast";
+import { AgGridAngular } from "ag-grid-angular";
+import { ColDef, AllCommunityModule, ModuleRegistry, GridOptions } from "ag-grid-community";
 import {
   LucideMegaphone, LucidePlus, LucideX, LucideMail, LucideArchive, LucideEdit2,
   LucidePaperclip, LucideUploadCloud, LucideFileText, LucideLoader2, LucideSearch,
@@ -18,6 +20,11 @@ import {
   noticeBodyHtml, noticeBodyText,
 } from "../../services/notices";
 import { UploadService } from "../../services/upload.service";
+import { PageHeaderComponent } from "../../shared/components/page-header/page-header";
+import { SearchableSelectComponent, SearchableSelectOption } from "../../shared/components/searchable-select/searchable-select.component";
+import { DatePresetFilterComponent, DatePreset, DateRange } from "../../shared/components/date-preset-filter/date-preset-filter";
+
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 /**
  * Company Notice Board Component.
@@ -27,7 +34,8 @@ import { UploadService } from "../../services/upload.service";
   selector: "app-notices",
   standalone: true,
   imports: [
-    CommonModule, FormsModule, DatePipe,
+    CommonModule, FormsModule, DatePipe, AgGridAngular,
+    PageHeaderComponent, SearchableSelectComponent, DatePresetFilterComponent,
     LucideMegaphone, LucidePlus, LucideX, LucideMail, LucideArchive, LucideEdit2,
     LucidePaperclip, LucideUploadCloud, LucideFileText, LucideLoader2, LucideSearch,
     LucideFilter, LucideAlertTriangle, LucideCheckCircle2, LucideClock, LucideCalendar,
@@ -61,8 +69,55 @@ export class NoticesComponent {
   customFrom = signal("");
   customTo = signal("");
   dateFilter = signal("");
+  datePreset = signal<DatePreset>("ALL");
   viewMode = signal<"CARDS" | "TABLE">(this.readViewMode());
   selectedNotice = signal<Notice | null>(null);
+
+  // Pagination config
+  paginationPageSize = 20;
+  paginationPageSizeSelector = [20, 50, 100, 200];
+
+  // Searchable select options for MIRA filter bar
+  statusSelectOptions = computed<SearchableSelectOption[]>(() => {
+    const opts: SearchableSelectOption[] = [
+      { id: "ACTIVE", name: "Active notices" },
+      { id: "HIGH", name: "High priority" },
+      { id: "ATTACHMENTS", name: "With attachments" },
+    ];
+    if (this.canPost() && this.scheduledCount() > 0) {
+      opts.push({ id: "SCHEDULED", name: "Scheduled" });
+    }
+    if (this.canPost()) {
+      opts.push({ id: "EXPIRED", name: "Expired / Archived" });
+    }
+    return opts;
+  });
+
+  readonly prioritySelectOptions: SearchableSelectOption[] = [
+    { id: "HIGH", name: "High priority" },
+    { id: "NORMAL", name: "Normal priority" },
+    { id: "LOW", name: "Low priority" },
+  ];
+
+  readonly sortSelectOptions: SearchableSelectOption[] = [
+    { id: "NEWEST", name: "Sort: Newest first" },
+    { id: "OLDEST", name: "Sort: Oldest first" },
+    { id: "PRIORITY", name: "Sort: Priority first" },
+  ];
+
+  onDateRangeChange(r: DateRange) {
+    if (!r) {
+      this.dateRange.set("ALL");
+      this.customFrom.set("");
+      this.customTo.set("");
+      return;
+    }
+    const ymd = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    this.dateRange.set("CUSTOM");
+    this.customFrom.set(ymd(r.from));
+    this.customTo.set(ymd(r.to));
+  }
 
   // Expanded cards state (for long bodies)
   expandedNoticeIds = signal<Set<number>>(new Set());
@@ -298,6 +353,7 @@ export class NoticesComponent {
       this.searchQuery().trim().length > 0 ||
       this.statusFilter() !== "ALL" ||
       this.priorityFilter() !== "ALL" ||
+      this.datePreset() !== "ALL" ||
       this.dateRange() !== "ALL" ||
       this.dateFilter() !== "" ||
       this.sortBy() !== "NEWEST"
@@ -379,13 +435,199 @@ export class NoticesComponent {
     return list;
   });
 
+  // ─── AG Grid Configuration (Employee Directory Standard) ────────────────
+  readonly defaultColDef: ColDef = {
+    sortable: true,
+    filter: true,
+    resizable: true,
+  };
+
+  readonly gridOptions: GridOptions = {
+    headerHeight: 44,
+    rowHeight: 58,
+    suppressCellFocus: true,
+    enableCellTextSelection: true,
+    onCellClicked: (event: any) => this.onGridCellClicked(event),
+  };
+
+  private esc(v: any): string {
+    return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as any)[c]);
+  }
+
+  formatDisplayDate(val?: string | null): string {
+    if (!val) return "—";
+    const d = new Date(val);
+    if (Number.isNaN(d.getTime())) return "—";
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  private statusDot(label: string, tone: "good" | "wait" | "blue" | "bad" | "off", title = ""): string {
+    const [dot, bg, text] = {
+      good: ["#059669", "#ecfdf5", "#047857"],
+      wait: ["#d97706", "#fffbeb", "#b45309"],
+      blue: ["#2563eb", "#eff6ff", "#1d4ed8"],
+      bad: ["#dc2626", "#fef2f2", "#b91c1c"],
+      off: ["#94a3b8", "#f1f5f9", "#475569"],
+    }[tone];
+    return `<span title="${this.esc(title)}" style="display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 8px; border-radius:6px; background:${bg}; font-size:12px; font-weight:500; color:${text}; white-space:nowrap;">`
+      + `<span style="width:6px; height:6px; border-radius:50%; background:${dot}; flex-shrink:0;"></span>${this.esc(label)}</span>`;
+  }
+
+  noticeColDefs = computed<ColDef[]>(() => {
+    const canManage = this.canPost();
+    // Touch audienceOptions so audience column refreshes when loaded
+    this.audienceOptions();
+    this.copiedNoticeId();
+
+    return [
+      {
+        field: "title",
+        headerName: "Title",
+        minWidth: 280,
+        flex: 2.2,
+        cellRenderer: (params: any) => {
+          const n: Notice = params.data;
+          if (!n) return "";
+          const title = this.esc(n.title || "Untitled Notice");
+          return `<div class="nb-grid-title" style="font-weight:600; color:#0f172a; font-size:13.5px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; transition:color .15s ease;" title="${title}">${title}</div>`;
+        },
+      },
+      {
+        field: "priority",
+        headerName: "Priority",
+        width: 130,
+        minWidth: 120,
+        flex: 0,
+        cellRenderer: (params: any) => {
+          const p = params.value as Notice["priority"];
+          if (p === "HIGH") return this.statusDot("High priority", "bad", "Urgent / high priority");
+          if (p === "NORMAL") return this.statusDot("Normal", "blue", "Standard announcement");
+          return this.statusDot("Low", "off", "Informational notice");
+        },
+      },
+      {
+        colId: "author",
+        headerName: "Posted By",
+        minWidth: 180,
+        flex: 1.2,
+        valueGetter: (params: any) => {
+          const n: Notice = params.data;
+          return n?.createdBy ? `${n.createdBy.firstName} ${n.createdBy.lastName}` : "Administration";
+        },
+        cellRenderer: (params: any) => {
+          const n: Notice = params.data;
+          const fn = n?.createdBy?.firstName || "";
+          const ln = n?.createdBy?.lastName || "";
+          const fullName = n?.createdBy ? `${fn} ${ln}`.trim() : "Administration";
+          const initials = this.esc(this.getInitials(fn, ln));
+          const avatarUrl = n?.createdBy?.avatarUrl;
+          const avatarHtml = avatarUrl
+            ? `<img src="${this.esc(avatarUrl)}" alt="" style="width:32px; height:32px; border-radius:50%; object-fit:cover; flex-shrink:0; box-shadow:0 0 0 1px rgba(15,23,42,.08);" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" />`
+              + `<span style="display:none; width:32px; height:32px; border-radius:50%; background:#e0e9ff; color:#2563eb; font-weight:700; font-size:12px; align-items:center; justify-content:center; flex-shrink:0;">${initials}</span>`
+            : `<span style="display:inline-flex; width:32px; height:32px; border-radius:50%; background:#e0e9ff; color:#2563eb; font-weight:700; font-size:12px; align-items:center; justify-content:center; flex-shrink:0;">${initials}</span>`;
+          return `
+            <div style="display:flex; align-items:center; gap:10px; min-width:0; width:100%; overflow:hidden;">
+              ${avatarHtml}
+              <span style="font-weight:600; color:#0f172a; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${this.esc(fullName)}</span>
+            </div>
+          `;
+        },
+      },
+      {
+        field: "publishedAt",
+        headerName: "Posted On",
+        width: 125,
+        minWidth: 115,
+        flex: 0,
+        cellRenderer: (params: any) => {
+          const d = this.formatDisplayDate(params.value || params.data?.createdAt);
+          return `<span style="color:#475569; font-size:12.5px; font-weight:500; font-variant-numeric:tabular-nums; white-space:nowrap;">${this.esc(d)}</span>`;
+        },
+      },
+      {
+        field: "expiresAt",
+        headerName: "Expires",
+        width: 125,
+        minWidth: 115,
+        flex: 0,
+        cellRenderer: (params: any) => {
+          const d = params.value ? this.formatDisplayDate(params.value) : "—";
+          return `<span style="color:${params.value ? "#475569" : "#94a3b8"}; font-size:12.5px; font-weight:500; font-variant-numeric:tabular-nums; white-space:nowrap;">${this.esc(d)}</span>`;
+        },
+      },
+      {
+        colId: "status",
+        headerName: "Status",
+        width: 115,
+        minWidth: 105,
+        flex: 0,
+        valueGetter: (params: any) => {
+          const n: Notice = params.data;
+          if (!n) return "";
+          if (!n.isActive) return "Retired";
+          if (this.hasExpired(n)) return "Expired";
+          if (this.isScheduled(n)) return "Scheduled";
+          return "Active";
+        },
+        cellRenderer: (params: any) => {
+          const st = params.value;
+          if (st === "Active") return this.statusDot("Active", "good", "Live on dashboards");
+          if (st === "Scheduled") return this.statusDot("Scheduled", "wait", "Scheduled for later");
+          if (st === "Expired") return this.statusDot("Expired", "wait", "Past expiration date");
+          return this.statusDot("Retired", "off", "Archived notice");
+        },
+      },
+      {
+        colId: "actions",
+        headerName: "Actions",
+        width: canManage ? 104 : 68,
+        minWidth: canManage ? 104 : 68,
+        flex: 0,
+        sortable: false,
+        filter: false,
+        resizable: false,
+        cellRenderer: (params: any) => {
+          const n: Notice = params.data;
+          if (!n) return "";
+          if (!canManage) {
+            return `<div style="display:flex; align-items:center; gap:6px;"><button type="button" class="g-icon-btn" data-act="view" title="View notice" aria-label="View notice"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>`;
+          }
+          const editBtn = `<button type="button" class="g-icon-btn" data-act="edit" title="Edit notice" aria-label="Edit notice"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>`;
+          const retireBtn = n.isActive
+            ? `<button type="button" class="g-icon-btn g-icon-warn" data-act="retire" title="Retire notice" aria-label="Retire notice"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>`
+            : "";
+          return `<div style="display:flex; align-items:center; gap:6px;">${editBtn}${retireBtn}</div>`;
+        },
+      },
+    ];
+  });
+
+  onGridCellClicked(event: any) {
+    const n: Notice | undefined = event?.data;
+    if (!n) return;
+    const target = event?.event?.target as HTMLElement | null;
+    const actEl = target?.closest("[data-act]") as HTMLElement | null;
+    if (actEl) {
+      const act = actEl.getAttribute("data-act");
+      if (act === "view") this.openNotice(n);
+      else if (act === "views") this.openViews(n);
+      else if (act === "copy") this.copyNoticeText(n);
+      else if (act === "edit") this.openEdit(n);
+      else if (act === "retire") this.openRetireModal(n);
+      return;
+    }
+    if (event.colDef?.colId === "actions") return;
+    this.openNotice(n);
+  }
+
   constructor() {
     this.load();
   }
 
   private readViewMode(): "CARDS" | "TABLE" {
-    try { return localStorage.getItem("notice-board-view") === "TABLE" ? "TABLE" : "CARDS"; }
-    catch { return "CARDS"; }
+    try { return localStorage.getItem("notice-board-view") === "CARDS" ? "CARDS" : "TABLE"; }
+    catch { return "TABLE"; }
   }
 
   setViewMode(view: "CARDS" | "TABLE") {
@@ -558,6 +800,7 @@ export class NoticesComponent {
     this.searchQuery.set("");
     this.statusFilter.set("ALL");
     this.priorityFilter.set("ALL");
+    this.datePreset.set("ALL");
     this.dateRange.set("ALL");
     this.customFrom.set("");
     this.customTo.set("");

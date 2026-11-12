@@ -1307,3 +1307,66 @@
 .employment-badge.emp-probation { --dot: #d97706; --chip: #fffbeb; --chip-text: #b45309; }
 .employment-badge.emp-overdue { --dot: #dc2626; --chip: #fef2f2; --chip-text: #b91c1c; }
 .employment-badge.emp-confirmed { --dot: #059669; --chip: #ecfdf5; --chip-text: #047857; }
+
+/* Standard filter bar (12 Nov 2026): one row, "+ Filters" panel, chips. */
+.more-filters { position: relative; }
+.btn-more-filters { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #334155; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-more-filters:hover { border-color: #cbd5e1; }
+.btn-more-filters.on { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.more-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #2563eb; color: #fff; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.more-backdrop { position: fixed; inset: 0; z-index: 40; }
+.more-panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 41; width: 300px; padding: 12px; display: grid; gap: 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 12px 32px rgba(15, 23, 42, .14); }
+.more-panel-head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 700; color: #0f172a; }
+.more-close { border: 0; background: transparent; color: #64748b; cursor: pointer; padding: 4px; border-radius: 6px; display: inline-flex; }
+.more-close:hover { background: #f1f5f9; }
+.more-panel .more-field { width: 100% !important; max-width: 100% !important; }
+.btn-clear-all { border: 0; background: transparent; color: #2563eb; font-size: 13px; font-weight: 600; cursor: pointer; padding: 6px 8px; border-radius: 6px; }
+.btn-clear-all:hover { background: #eff6ff; }
+.active-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -6px 0 16px; }
+.active-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px 0 10px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 12.5px; }
+.chip-key { color: #64748b; }
+.active-chip button { border: 0; background: transparent; color: #1e40af; cursor: pointer; display: inline-flex; padding: 3px; border-radius: 999px; }
+.active-chip button:hover { background: #dbeafe; }
+@media (max-width: 760px) { .more-panel { left: 0; right: auto; width: min(300px, calc(100vw - 32px)); } }
+
+/* Board | Table switch, same as Onboarding (12 Nov 2026). */
+.view-switch-pills {
+  display: inline-flex;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pill-btn:hover {
+  color: #0f172a;
+}
+.pill-btn.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Active view gets a blue underline, as in the header design (12 Nov 2026). */
+.view-switch-pills .pill-btn.active { box-shadow: 0 1px 3px rgba(0,0,0,.08), inset 0 -2px 0 #2563eb; }
+
+/* Header buttons, sizes from the design (12 Nov 2026). */
+.page-container .btn-primary { height: 36px; padding: 0 16px !important; border-radius: 8px !important; font-size: 12px !important; font-weight: 500 !important; box-shadow: none !important; transition: background-color 0.15s ease, transform 0.1s ease !important; }
+.btn-secondary { background: #ffffff; border: 1px solid #e2e8f0; color: #334155; font-weight: 500; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 8px; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease; }
+
+/* The box fits the table, which sizes itself to the screen (12 Nov 2026);
+   a fixed 650px left a grey gap under it. */
+.grid-container { height: auto; }

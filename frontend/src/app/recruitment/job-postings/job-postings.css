@@ -1,183 +1,773 @@
-.page-container {
-  padding: 0;
-  min-height: calc(100vh - 120px);
-  height: auto;
+/* ══════════════════════════════════════════════════════════════════════════
+   JOB POSTINGS — REDESIGNED ERP COMMAND CENTER UI
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.jp-page-container {
+  padding: 24px;
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
 }
 
-.page-header {
+/* ── 1. Compact Hero Header Card ────────────────────────────────────────── */
+
+.jp-hero-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px 24px;
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-xl);
-  background: #fff;
-  padding: 1rem;
-  border: 1px solid #eee;
-  border-radius: 10px;
-}
-
-.header-content h1 {
-  font-size: calc(var(--fs-2xl) - 5px);
-  font-weight: 700;
-  color: #111827;
-  margin: 0 0 5px 0;
-}
-
-.header-content p {
-  color: #6b7280;
-  margin: 0;
-  font-size: calc(var(--fs-base, 14px) - 4px);
-}
-
-.filter-bar {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  margin-bottom: 20px;
   gap: 16px;
   flex-wrap: wrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
-.period-filter {
+.jp-hero-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.jp-title-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.period-filter .form-control {
-  min-width: 132px;
-}
-
-.search-group {
-  position: relative;
-  flex: 1;
-  min-width: 250px;
-  max-width: 400px;
-}
-
-.date-range-group,
-.top-recruiter-filter {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 42px;
-  color: #475569;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.duration-select {
-  width: 136px;
-  height: 52px;
-  padding: 0 32px 0 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  color: #1e293b;
-  background-color: #fff;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 9px center;
-  appearance: none;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 400;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.duration-select:hover {
-  border-color: #94a3b8;
-  background-color: #f8fafc;
-}
-
-.duration-select:focus {
-  outline: none;
-  border-color: #2563eb;
-  background-color: #fff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-
-.duration-select option {
-  color: #334155;
-  background: #fff;
-}
-
-.range-separator {
-  color: #94a3b8;
-  font-weight: 500;
-}
-
-.date-range-group .date-filter {
-  width: 142px;
-}
-
-.top-recruiter-filter {
-  border-left: 1px solid #e2e8f0;
-  padding-left: 14px;
-}
-
-.top-recruiter-filter .form-control {
-  width: 220px;
-  height: 52px;
-  border-color: #cbd5e1;
-  font-size: 14px;
-  color: #1e293b;
-  background-color: #fff;
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.top-recruiter-filter .form-control:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
-}
-
-.top-recruiter-filter .form-control option {
-  padding: 10px;
-  color: #1e293b;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #9ca3af;
-}
-
-.pl-9 {
-  padding-left: 36px !important;
-}
-
-.filter-group {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  margin-left: auto;
 }
 
-.filter-group .form-control {
-  width: 160px;
+.jp-title-row h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
-.filter-group .date-filter {
-  width: 145px;
-}
-
-.btn-filter {
+.jp-status-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
-  color: #334155;
-  border-color: #cbd5e1;
-  background: #fff;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 9999px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
 }
 
-.btn-filter:hover { background: #f8fafc; }
+.pill-dot {
+  font-size: 9px;
+  line-height: 1;
+  color: #10b981;
+}
+
+.jp-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.jp-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-export-csv {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-export-csv:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.btn-create-job {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #2563eb;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
+.btn-create-job:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+/* ── 2. 4 KPI Summary Cards ────────────────────────────────────────────── */
+
+.jp-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .jp-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.jp-kpi-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.jp-kpi-card:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+}
+
+.jp-kpi-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.jp-kpi-icon-box.tone-blue {
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #2563eb;
+}
+
+.jp-kpi-icon-box.tone-emerald {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #059669;
+}
+
+.jp-kpi-icon-box.tone-purple {
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  color: #7c3aed;
+}
+
+.jp-kpi-icon-box.tone-amber {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #d97706;
+}
+
+.jp-kpi-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.jp-kpi-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.jp-kpi-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+/* ── 3. Filters / Control Bar ───────────────────────────────────────────── */
+
+.jp-toolbar-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .jp-toolbar-card {
+    flex-wrap: wrap;
+  }
+}
+
+.jp-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .jp-toolbar-left {
+    flex-wrap: wrap;
+  }
+}
+
+.jp-select-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.jp-select {
+  height: 36px;
+  padding: 0 28px 0 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #1e293b;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.jp-select:hover {
+  border-color: #94a3b8;
+}
+
+.jp-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.jp-date-range-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.jp-date-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1e293b;
+  font-family: inherit;
+  padding: 0;
+  width: 105px;
+}
+
+.jp-date-sep {
+  color: #94a3b8;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.jp-search-wrapper {
+  position: relative;
+  min-width: 140px;
+  flex: 1;
+  max-width: 260px;
+}
+
+.jp-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.jp-search-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px 0 30px;
+  font-size: 12.5px;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.jp-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.jp-search-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.jp-btn-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.jp-btn-reset:hover {
+  background: #fee2e2;
+}
+
+.jp-toolbar-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.jp-count-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+/* ── 4. Bespoke Data Table ──────────────────────────────────────────────── */
+
+.jp-table-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.jp-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.jp-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.jp-table th {
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 12px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.jp-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  font-size: 12.5px;
+  color: #0f172a;
+}
+
+.jp-table tbody tr {
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.jp-table tbody tr:hover {
+  background: #fbfcfe;
+}
+
+.jp-table tbody tr.row-highlight-green {
+  background: #f0fdf4;
+}
+
+.jp-table tbody tr.row-highlight-green:hover {
+  background: #e6f9ed;
+}
+
+.jp-table tbody tr.row-highlight-blue {
+  background: #f8fafc;
+}
+
+.jp-table tbody tr.row-highlight-blue:hover {
+  background: #f1f5f9;
+}
+
+/* Cell specifics */
+
+.td-job-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.jp-id-link {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+  white-space: nowrap;
+}
+
+.jp-id-link:hover {
+  text-decoration: underline;
+}
+
+.jp-title-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.jp-title-main {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jp-title-exp {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  margin-left: 4px;
+}
+
+.jp-title-sub {
+  font-size: 11.5px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jp-sub-dot {
+  color: #94a3b8;
+}
+
+.td-exp {
+  color: #334155;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.td-type {
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.jp-type-pill {
+  font-size: 12px;
+  color: #334155;
+  font-weight: 500;
+  display: inline-block;
+  max-width: 55px;
+  word-break: break-word;
+}
+
+.td-loc {
+  color: #334155;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.td-status {
+  white-space: nowrap;
+}
+
+.jp-status-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.jp-status-tag.tag-open {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.jp-status-tag.tag-closed {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.jp-status-tag.tag-draft {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.td-recruiter {
+  white-space: nowrap;
+  padding-right: 12px;
+}
+
+.jp-recruiter-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.jp-recruiter-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.jp-recruiter-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.jp-recruiter-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.td-openings {
+  white-space: nowrap;
+  padding-left: 8px;
+}
+
+.jp-openings-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.td-date {
+  color: #334155;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.td-actions {
+  white-space: nowrap;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.jp-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.jp-btn-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.jp-btn-icon:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+/* Pagination Footer */
+
+.jp-table-footer {
+  padding: 12px 20px;
+  background: #ffffff;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.jp-pager-info {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.jp-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-pager {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-pager:hover:not(:disabled) {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.btn-pager:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pager-indicator {
+  font-size: 12px;
+  color: #64748b;
+  padding: 0 4px;
+}
+
+/* Empty State */
+
+.jp-empty-cell {
+  padding: 48px 16px !important;
+  text-align: center;
+}
+
+.jp-empty-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.jp-empty-icon {
+  font-size: 32px;
+}
+
+.jp-empty-wrap h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.jp-empty-wrap p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.btn-create-job-sm {
+  margin-top: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Loading Shimmer */
+
+.jp-sk-row td {
+  padding: 18px 14px;
+}
+
+.jp-sk-shimmer {
+  height: 18px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: jp-shimmer 1.5s infinite;
+}
+
+@keyframes jp-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 .filter-drawer-overlay {
   position: fixed;
@@ -1594,3 +2184,28 @@ select.form-control:disabled {
   border-radius: 8px;
 }
 
+
+/* Standard table look (12 Nov 2026): fills the screen, same pager as the Employee tables. */
+.jp-table-scroll { max-height: calc(100vh - 300px); min-height: 420px; overflow: auto; }
+.jp-dates { display: flex; flex-direction: column; gap: 2px; line-height: 1.3; }
+.jp-dates-end { font-size: 12px; color: #64748b; }
+.jp-dates-end.open-ended { color: #047857; font-weight: 500; }
+.jp-std-pager { display: flex; align-items: center; justify-content: flex-end; gap: 24px; padding: 10px 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #334155; background: #fff; }
+.jp-std-pager b { font-weight: 600; color: #0f172a; }
+.jp-std-pager .pg-size select { margin-left: 6px; height: 30px; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; background: #fff; }
+.jp-std-pager .pg-nav { display: inline-flex; align-items: center; gap: 6px; }
+.jp-std-pager .pg-nav button { width: 28px; height: 28px; border: 0; background: transparent; border-radius: 6px; font-size: 16px; color: #475569; cursor: pointer; }
+.jp-std-pager .pg-nav button:hover:not(:disabled) { background: #f1f5f9; }
+.jp-std-pager .pg-nav button:disabled { color: #cbd5e1; cursor: default; }
+.jp-toolbar-left { flex-wrap: wrap; flex: 1; }
+.jp-search-wrapper { flex: 1 1 240px; min-width: 220px; }
+@media (max-width: 640px) { .jp-std-pager { flex-wrap: wrap; justify-content: center; gap: 12px; } }
+
+/* Job title: 80px narrower, long titles wrap onto the next line (12 Nov 2026). */
+.td-job-title, .td-job-title .jp-title-main, .td-job-title .jp-title-sub { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; overflow: visible; }
+
+/* Filter fields match the Employee pages' searchable dropdowns (12 Nov 2026). */
+.jp-filter-field { min-width: 180px; }
+
+/* Type / experience / status stay on one line (12 Nov 2026). */
+.td-type, .td-exp, .td-status, .td-openings { white-space: nowrap; }

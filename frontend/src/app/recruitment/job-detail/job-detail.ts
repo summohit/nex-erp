@@ -1,5 +1,7 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { jobPublicUrl, shareJobOnWhatsApp, copyText } from '../job-share';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
+import { DatePresetFilterComponent, DatePreset, DateRange, inDateRange } from '../../shared/components/date-preset-filter/date-preset-filter';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -21,6 +23,7 @@ import { CandidatesService, JobApplication } from '../../services/candidates.ser
   selector: 'app-job-detail',
   standalone: true,
   imports: [
+    PageHeaderComponent, DatePresetFilterComponent,
     CommonModule, FormsModule, DatePipe,
     LucideArrowLeft, LucideSearch, LucideUsers, LucideCalendarClock,
     LucideBriefcase, LucideMapPin, LucideBuilding, LucideEye,
@@ -47,6 +50,15 @@ export class JobDetailComponent implements OnInit {
   isLoading = signal(true);
 
   searchQuery = signal('');
+  /** Applied-date dropdown (12 Nov 2026), shared with the Employee pages. */
+  appliedPreset = signal<DatePreset>('ALL');
+  appliedRange = signal<DateRange>(null);
+  hasActiveFilters = computed(() => !!this.searchQuery().trim() || this.appliedPreset() !== 'ALL');
+  clearFilters() {
+    this.searchQuery.set('');
+    this.appliedPreset.set('ALL');
+    this.appliedRange.set(null);
+  }
   statusFilter = signal('ALL');
   viewMode = signal<'TABLE' | 'CARDS'>('TABLE');
   
@@ -115,6 +127,8 @@ export class JobDetailComponent implements OnInit {
     let list = this.applications();
     const q = this.searchQuery().trim().toLowerCase();
     const status = this.statusFilter();
+    const range = this.appliedRange();
+    if (range) list = list.filter(a => inDateRange(a.createdAt, range));
 
     if (status && status !== 'ALL') {
       list = list.filter(a => (a.status || '').toUpperCase() === status);
@@ -130,6 +144,16 @@ export class JobDetailComponent implements OnInit {
     }
     return list;
   });
+
+  /** Paging, same as the Employee Directory: 20 a page (12 Nov 2026). */
+  readonly pageSizes = [20, 50, 100, 200];
+  page = signal(0);
+  pageSize = signal(20);
+  pageCount = computed(() => Math.max(1, Math.ceil(this.filteredApplications().length / this.pageSize())));
+  pageStart = computed(() => Math.min(this.page(), this.pageCount() - 1) * this.pageSize());
+  pageEnd = computed(() => Math.min(this.pageStart() + this.pageSize(), this.filteredApplications().length));
+  pagedApplications = computed(() => this.filteredApplications().slice(this.pageStart(), this.pageEnd()));
+  setPageSize(n: number) { this.pageSize.set(Number(n)); this.page.set(0); }
 
   ngOnInit() {
     this.route.params.subscribe(params => {
@@ -207,13 +231,36 @@ export class JobDetailComponent implements OnInit {
     });
   }
 
+  /** "Phone screening", not "PHONE_SCREENING" (12 Nov 2026). */
+  stageLabel(key: string | null | undefined): string {
+    const k = (key || 'APPLIED').toUpperCase();
+    const label = this.statusStages.find(s => s.key === k)?.label ?? k.replace(/_/g, ' ').toLowerCase();
+    return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+  }
+  /** Pipeline stages first, then the side exits (on hold, rejected) after a divider. */
+  readonly PIPELINE_KEYS = ['APPLIED','PHONE_SCREENING','INTERVIEW','NEGOTIATION','OFFERED','HIRED','ONBOARDED'];
+  readonly EXIT_KEYS = ['ON_HOLD','REJECTED'];
+
+  /**
+   * The menu floats over the page (fixed), so the scrolling table can't clip
+   * it; it opens upward when there isn't room below (12 Nov 2026).
+   */
+  statusMenuPos = signal<{ top: number; left: number } | null>(null);
+  private closeMenuOnScroll = () => { this.activeStatusMenuId.set(null); document.removeEventListener('scroll', this.closeMenuOnScroll, true); };
+
   toggleStatusMenu(appId: number, event: Event) {
     event.stopPropagation();
     if (this.activeStatusMenuId() === appId) {
       this.activeStatusMenuId.set(null);
-    } else {
-      this.activeStatusMenuId.set(appId);
+      return;
     }
+    const r = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const h = 400, w = 232;
+    const top = r.bottom + 6 + h > window.innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6;
+    const left = Math.min(r.left, window.innerWidth - w - 8);
+    this.statusMenuPos.set({ top, left });
+    this.activeStatusMenuId.set(appId);
+    document.addEventListener('scroll', this.closeMenuOnScroll, true);
   }
 
   closeStatusMenu() {

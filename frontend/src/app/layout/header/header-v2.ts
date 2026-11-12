@@ -67,7 +67,8 @@ export class HeaderComponentV2 implements OnInit, OnDestroy {
   @ViewChild(SpotlightSearchComponent) spotlightSearch!: SpotlightSearchComponent;
 
   currentUser = this.authService.currentUser;
-  pageTitle = signal<string>('Dashboard');
+  pageTitle = signal<string>('Employee Directory');
+  moduleName = signal<string>('HR & Team');
 
   isNotificationOpen = signal<boolean>(false);
   isProfileMenuOpen = signal<boolean>(false);
@@ -425,28 +426,55 @@ export class HeaderComponentV2 implements OnInit, OnDestroy {
 
   private updateTitle(url: string) {
     if (url.includes('/payroll')) {
+      this.moduleName.set('Payroll');
       this.pageTitle.set('Payroll & Compensation');
+    } else if (url.includes('/approvals')) {
+      this.moduleName.set('HR & Team');
+      this.pageTitle.set('Approvals Inbox');
     } else if (url.includes('/employees/directory')) {
+      this.moduleName.set('HR & Team');
       this.pageTitle.set('Employee Directory');
     } else if (url.includes('/employees/onboarding')) {
+      this.moduleName.set('HR & Team');
       this.pageTitle.set('Onboarding');
     } else if (url.includes('/employees/org-chart')) {
+      this.moduleName.set('HR & Team');
       this.pageTitle.set('Organization Chart');
     } else if (url.includes('/employees/documents')) {
+      this.moduleName.set('HR & Team');
       this.pageTitle.set('Employee Documents Center');
+    } else if (url.includes('/employees/profile-completion')) {
+      this.moduleName.set('HR & Team');
+      this.pageTitle.set('Profile Completion');
     } else if (url.includes('/employees/') && url.includes('/profile')) {
-      this.pageTitle.set('Employee Profile');
+      this.moduleName.set('HR & Team');
+      this.pageTitle.set('Profile Settings');
     } else if (url.includes('/attendance')) {
+      this.moduleName.set('HR & Team');
       this.pageTitle.set('Attendance & Leave Management');
     } else if (url.includes('/settings/master-data')) {
+      this.moduleName.set('Settings');
       this.pageTitle.set('Master Data Management');
     } else if (url.includes('/settings/company')) {
+      this.moduleName.set('Settings');
       this.pageTitle.set('Company Profile');
     } else if (url.includes('/appreciation')) {
+      this.moduleName.set('HR & Team');
       this.pageTitle.set('Appreciation & Awards');
     } else if (url.includes('/settings/permissions')) {
+      this.moduleName.set('Settings');
       this.pageTitle.set('Roles & Permissions');
+    } else if (url.includes('/recruitment')) {
+      this.moduleName.set('Recruitment');
+      this.pageTitle.set('Talent Acquisition');
+    } else if (url.includes('/projects')) {
+      this.moduleName.set('Projects');
+      this.pageTitle.set('Project Management');
+    } else if (url.includes('/crm')) {
+      this.moduleName.set('CRM');
+      this.pageTitle.set('CRM & Tickets');
     } else {
+      this.moduleName.set('Workspace');
       this.pageTitle.set('Dashboard');
     }
   }

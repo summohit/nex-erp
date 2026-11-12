@@ -28,6 +28,68 @@
 .topbar-left {
   display: flex;
   align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.btn-sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.btn-sidebar-toggle:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.btn-sidebar-toggle:active {
+  background: #f1f5f9;
+  transform: scale(0.97);
+}
+
+.header-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.crumb-section {
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: -0.01em;
+}
+
+.crumb-separator {
+  color: #94a3b8;
+  font-size: 13px;
+  user-select: none;
+}
+
+.crumb-page {
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 960px) {
+  .header-breadcrumbs {
+    display: none;
+  }
 }
 
 .page-title {
@@ -1142,3 +1204,35 @@ button.menu-link {
 .task-timer-stop { border: 1px solid #15803d; color: #fff; background: #16a34a; }
 .task-timer-cancel { width: 100%; margin-top: 12px; border: 0; color: #64748b; background: transparent; }
 .task-timer-clockout-actions button:disabled, .task-timer-cancel:disabled { opacity: .55; cursor: wait; }
+
+/* ── Google-style top bar (12 Nov 2026) ─────────────────────────────────
+   Google Admin pattern: a flat bar, no box around every control. One grey
+   pill search, round icon buttons, one blue primary action (Clock in). */
+.topbar { background: #fff; border-bottom: 1px solid #edf0f2; box-shadow: none; }
+.btn-sidebar-toggle { width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #444746; }
+.btn-sidebar-toggle:hover { background: #f1f3f4; }
+
+.global-search-container { height: 44px; border: 0; border-radius: 999px; background: #f1f3f4; box-shadow: none; padding: 0 16px; transition: background-color .15s ease, box-shadow .15s ease; }
+.global-search-container:hover { background: #e9eef6; }
+.global-search-container:focus-within { background: #fff; box-shadow: 0 1px 3px rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15); }
+.global-search-input { background: transparent; font-size: 14px; }
+.search-kbd { border: 0; background: #fff; color: #5f6368; border-radius: 6px; font-size: 11px; padding: 2px 6px; }
+
+.clock-systray-widget { border: 0; background: transparent; box-shadow: none; padding: 0; gap: 10px; }
+.clock-divider { display: none; }
+.timer-digits { color: #444746; font-weight: 500; }
+.btn-clock-action { height: 36px; border-radius: 999px; padding: 0 18px; font-weight: 600; box-shadow: none; }
+
+.btn-header-tickets { height: 36px; border: 0; border-radius: 999px; background: transparent; color: #444746; padding: 0 12px; box-shadow: none; }
+.btn-header-tickets:hover { background: #f1f3f4; }
+.ticket-count-badge { background: #e8f0fe; color: #0b57d0; border: 0; border-radius: 999px; padding: 0 7px; font-weight: 600; }
+
+.btn-header-icon { width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #444746; box-shadow: none; }
+.btn-header-icon:hover { background: #f1f3f4; }
+
+.user-profile-trigger { border: 0; border-radius: 999px; background: transparent; padding: 4px 8px 4px 4px; }
+.user-profile-trigger:hover { background: #f1f3f4; }
+
+/* Nothing to open on single pages (Approvals etc.) on desktop; on a phone the
+   button still opens the rail itself (12 Nov 2026). */
+@media (min-width: 1025px) { .btn-sidebar-toggle.no-submenu { display: none; } }

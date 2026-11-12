@@ -234,7 +234,7 @@ export class WfhService {
     }
     if (!or.length) return [];
     return this.prisma.wfhRequest.findMany({
-      where: { companyId: v.companyId, OR: or, ...(v.employeeId ? { employeeId: { not: v.employeeId } } : {}) },
+      where: { companyId: v.companyId, OR: or, ...(v.employeeId && v.role !== 'SUPERADMIN' ? { employeeId: { not: v.employeeId } } : {}) },
       include: { employee: { select: PERSON } },
       orderBy: { date: 'desc' },
     });
@@ -252,7 +252,7 @@ export class WfhService {
       where: { id, companyId: v.companyId }, include: { employee: { select: { id: true, managerId: true } } },
     });
     if (!r) throw new NotFoundException('Request not found');
-    if (r.employeeId === v.employeeId) throw new ForbiddenException('You cannot decide your own request');
+    if (r.employeeId === v.employeeId && v.role !== 'SUPERADMIN') throw new ForbiddenException('You cannot decide your own request');
     if (!OPEN.includes(r.status as any)) throw new BadRequestException('This request is already decided');
 
     const superAdmin = isSuperAdmin(v.role);

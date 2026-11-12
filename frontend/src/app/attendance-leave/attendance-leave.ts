@@ -79,11 +79,13 @@ export interface DayStatus {
 import { OutsideOfficeAnswer, OutsideOfficeService } from '../shared/services/outside-office.service';
 import { GeolocationService } from '../shared/services/geolocation.service';
 import { isRestDay } from '../shared/utils/weekly-offs';
+import { PageHeaderComponent } from '../shared/components/page-header/page-header';
 import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDatePreset } from '../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 @Component({
   selector: 'app-attendance-leave',
   standalone: true,
   imports: [
+    PageHeaderComponent,
     CompOffHistoryComponent,
     CommonModule, RouterLink,
     FormsModule, 
@@ -1522,6 +1524,16 @@ export class AttendanceLeaveComponent implements OnInit {
   rejectedLeaveCount = computed(() => this.leaveApplicationsList().filter(r => r.status === 'REJECTED').length);
   cancelledLeaveCount = computed(() => this.leaveApplicationsList().filter(r => r.status === 'CANCELLED').length);
   pendingCount = computed(() => this.pendingLeaveCount());
+
+  /** Status dropdown in the filter row (replaces the KPI cards). */
+  get leaveStatusOptions(): SearchableSelectOption[] {
+    return [
+      { id: 'PENDING', name: `Pending (${this.pendingLeaveCount()})` },
+      { id: 'APPROVED', name: `Approved (${this.approvedLeaveCount()})` },
+      { id: 'REJECTED', name: `Rejected (${this.rejectedLeaveCount()})` },
+      { id: 'CANCELLED', name: `Cancelled (${this.cancelledLeaveCount()})` },
+    ] as any;
+  }
 
   setApprovalFilter(status: 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED') {
     this.approvalStatusFilter.set(status);
@@ -3186,7 +3198,7 @@ export class AttendanceLeaveComponent implements OnInit {
   };
 
   // Leave lists run to hundreds of rows once historic leave is imported.
-  leavePageSizes = [10, 25, 50, 100];
+  leavePageSizes = [20, 50, 100, 200];
 
   // Grid / UI State
   viewMode = signal<'grid' | 'list'>('grid');

@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "run", "start"],
       "port": 4200
+    },
+    {
+      "name": "ces-website",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "../CES-website-ng", "run", "start", "--", "--port", "4300"],
+      "port": 4300
     }
   ]
 }

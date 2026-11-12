@@ -1,147 +1,309 @@
-<div class="page-container">
-  <div class="page-header">
-    <div class="header-content">
-      <h1>Job Postings</h1>
-      <p>Manage open positions, generate AI job descriptions, and set screening questions.</p>
-    </div>
-    <div class="header-actions">
-      <button class="btn-primary" (click)="openCreateModal()">
-        <svg lucidePlus size="16"></svg>
-        Create New Job
-      </button>
-    </div>
-  </div>
+<div class="jp-page-container">
 
-  <div class="filter-bar">
-    <div class="date-range-group">
-      <select class="duration-select" [(ngModel)]="filterDuration" (change)="onDurationChange()" aria-label="Duration">
-        <option value="">Duration</option>
-        <option value="today">Today</option>
-        <option value="last30">Last 30 Days</option>
-        <option value="thisMonth">This Month</option>
-        <option value="lastMonth">Last Month</option>
-        <option value="last90">Last 90 Days</option>
-        <option value="last6Months">Last 6 Months</option>
-        <option value="lastYear">Last 1 Year</option>
-        <option value="custom">Custom Range</option>
-      </select>
-      <input type="date" class="form-control date-filter" aria-label="Start date" [(ngModel)]="filterPostedFrom" (change)="onCustomDateChange()">
-      <span class="range-separator">to</span>
-      <input type="date" class="form-control date-filter" aria-label="End date" [(ngModel)]="filterPostedTo" (change)="onCustomDateChange()">
-    </div>
-    <div class="period-filter">
-      <select class="form-control" [(ngModel)]="filterMonth" (change)="applyFilters()" aria-label="Filter by posting month">
-        <option value="">All months</option>
-        <option *ngFor="let month of months" [value]="month.value">{{ month.label }}</option>
-      </select>
-      <select class="form-control" [(ngModel)]="filterYear" (change)="applyFilters()" aria-label="Filter by posting year">
-        <option value="">All years</option>
-        <option *ngFor="let year of postingYears" [value]="year">{{ year }}</option>
-      </select>
-    </div>
-    <div class="top-recruiter-filter">
-      <span>Recruiter</span>
-      <select class="form-control" [(ngModel)]="filterRecruiter" (change)="applyFilters()" aria-label="Filter by recruiter">
-        <option value="">All recruiters</option>
-        <option *ngFor="let hr of hrEmployees()" [value]="hr.id">{{ hr.firstName }} {{ hr.lastName }}</option>
-      </select>
-    </div>
-    <div class="search-group">
-      <svg lucideSearch size="16" class="search-icon"></svg>
-      <input type="text" class="form-control pl-9" placeholder="Search jobs..." [(ngModel)]="searchText" (input)="onSearch()">
-    </div>
-    <div class="filter-group">
-      <button class="btn-outline btn-clear" (click)="clearFilters()" *ngIf="searchText || filterStatus || filterDepartment || filterRecruiter || filterLocation || filterWorkLocationType || filterEmploymentType || filterPostedFrom || filterPostedTo || filterMonth || filterYear">
-        <svg lucideX size="14"></svg> Clear
+  <!-- Page header (12 Nov 2026): the same shared header as the Employee pages -->
+  <app-page-header icon="jobs" section="Recruitment" heading="Job Postings"
+    subtitle="Open positions, job descriptions and screening questions">
+      <button type="button" class="btn-export-csv" (click)="exportCsv()" [disabled]="isLoading()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Export CSV</span>
       </button>
-      <button class="btn-outline btn-filter" (click)="openFilterDrawer()">
-        <svg lucideSlidersHorizontal size="15"></svg> Filters
+      <button type="button" class="btn-create-job" (click)="openCreateModal()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Create New Job</span>
       </button>
-    </div>
-  </div>
+  </app-page-header>
 
-  <div class="filter-drawer-overlay" [class.open]="isFilterDrawerOpen()" (click)="closeFilterDrawer()"></div>
-  <aside class="filter-drawer" [class.open]="isFilterDrawerOpen()" aria-label="Job posting filters">
-    <div class="filter-drawer-header">
-      <h2>Filters</h2>
-      <button class="btn-icon-sm" type="button" aria-label="Close filters" (click)="closeFilterDrawer()"><svg lucideX size="18"></svg></button>
-    </div>
-    <div class="filter-drawer-body">
-      <label class="filter-field">
-        <span>Department</span>
-        <select class="form-control" [(ngModel)]="filterDepartment" (change)="applyFilters()">
-          <option value="">All</option>
-          <option *ngFor="let dept of departments()" [value]="dept.name">{{ dept.name }}</option>
-        </select>
-      </label>
-      <label class="filter-field">
-        <span>Status</span>
-        <select class="form-control" [(ngModel)]="filterStatus" (change)="applyFilters()">
-          <option value="">All</option>
-          <option value="Open">Open</option>
-          <option value="Draft">Draft</option>
-          <option value="Closed">Closed</option>
-        </select>
-      </label>
-      <label class="filter-field">
-        <span>Location</span>
-        <select class="form-control" [(ngModel)]="filterLocation" (change)="applyFilters()">
-          <option value="">All</option>
-          <option *ngFor="let location of postingLocations" [value]="location">{{ location }}</option>
-        </select>
-      </label>
-      <label class="filter-field">
-        <span>Work Mode</span>
-        <select class="form-control" [(ngModel)]="filterWorkLocationType" (change)="applyFilters()">
-          <option value="">All</option>
-          <option value="On-site">On-site</option>
-          <option value="Remote">Remote</option>
-          <option value="Hybrid">Hybrid</option>
-        </select>
-      </label>
-      <label class="filter-field">
-        <span>Employment Type</span>
-        <select class="form-control" [(ngModel)]="filterEmploymentType" (change)="applyFilters()">
-          <option value="">All</option>
-          <option *ngFor="let type of postingEmploymentTypes" [value]="type">{{ type }}</option>
-        </select>
-      </label>
-    </div>
-    <div class="filter-drawer-footer">
-      <button class="btn-outline btn-clear" (click)="clearFilters()">Clear</button>
-    </div>
-  </aside>
-
-  <!-- Skeleton mirrors the grid's columns so the layout does not shift -->
-  <div class="grid-container" *ngIf="isLoading()">
-    <div class="sk-job-head">
-      <app-skeleton *ngFor="let h of [1,2,3,4,5,6]" width="84px" height="10px"></app-skeleton>
-    </div>
-    <div class="sk-job-row" *ngFor="let r of [1,2,3,4,5,6,7]">
-      <div class="sk-stack">
-        <app-skeleton width="70%" height="12px"></app-skeleton>
-        <app-skeleton width="46%" height="10px"></app-skeleton>
+  <!-- ── 2. 4 KPI Summary Cards ────────────────────────────────────────────── -->
+  <div class="jp-kpi-grid">
+    <!-- Card 1: Total Openings -->
+    <div class="jp-kpi-card">
+      <div class="jp-kpi-icon-box tone-blue">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+        </svg>
       </div>
-      <app-skeleton width="86px" height="12px"></app-skeleton>
-      <app-skeleton width="72px" height="12px"></app-skeleton>
-      <app-skeleton width="64px" height="20px" radius="9px"></app-skeleton>
-      <app-skeleton width="52px" height="12px"></app-skeleton>
-      <app-skeleton width="70px" height="12px"></app-skeleton>
+      <div class="jp-kpi-content">
+        <span class="jp-kpi-label">Total Openings</span>
+        <strong class="jp-kpi-value">{{ totalOpeningsCount() }} Positions</strong>
+      </div>
+    </div>
+
+    <!-- Card 2: Active Postings -->
+    <div class="jp-kpi-card">
+      <div class="jp-kpi-icon-box tone-emerald">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      </div>
+      <div class="jp-kpi-content">
+        <span class="jp-kpi-label">Active Postings</span>
+        <strong class="jp-kpi-value">{{ activeCount() }} Live</strong>
+      </div>
+    </div>
+
+    <!-- Card 3: Candidates Applied -->
+    <div class="jp-kpi-card">
+      <div class="jp-kpi-icon-box tone-purple">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      </div>
+      <div class="jp-kpi-content">
+        <span class="jp-kpi-label">Candidates Applied</span>
+        <strong class="jp-kpi-value">{{ totalApplicantsCount() }} Applicants</strong>
+      </div>
+    </div>
+
+    <!-- Card 4: Interviews Active -->
+    <div class="jp-kpi-card">
+      <div class="jp-kpi-icon-box tone-amber">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+      </div>
+      <div class="jp-kpi-content">
+        <span class="jp-kpi-label">Interviews Active</span>
+        <strong class="jp-kpi-value">{{ activeInterviewsCount() }} Scheduled</strong>
+      </div>
     </div>
   </div>
 
-  <div class="grid-container" [hidden]="isLoading()">
-    <ag-grid-angular
-      style="width: 100%;"
-      class="ag-theme-quartz"
-      [theme]="'legacy'"
-      [rowData]="jobs()"
-      [columnDefs]="colDefs"
-      [defaultColDef]="defaultColDef"
-      [gridOptions]="gridOptions"
-      (gridReady)="onGridReady($event)"
-      (rowClicked)="onRowClicked($event)">
-    </ag-grid-angular>
+  <!-- ── 3. Filters / Control Bar ───────────────────────────────────────────── -->
+  <div class="jp-toolbar-card">
+    <div class="jp-toolbar-left">
+      <!-- Search Input -->
+      <div class="jp-search-wrapper">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="jp-search-icon">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input
+          type="text"
+          class="jp-search-input"
+          placeholder="Search jobs by title or keyword..."
+          [(ngModel)]="searchText"
+          (input)="onSearchInput()"
+          aria-label="Search jobs" />
+      </div>
+
+      <!-- Work mode: the same searchable dropdown as the Employee pages -->
+      <div class="jp-filter-field">
+        <app-searchable-select [options]="modeOptions" placeholder="All work modes"
+          [value]="filterWorkLocationType || null" (valueChange)="setMode($event)"></app-searchable-select>
+      </div>
+
+      <!-- Recruiter (12 Nov 2026) -->
+      <div class="jp-filter-field">
+        <app-searchable-select [options]="recruiterOptions()" placeholder="All recruiters"
+          [value]="filterRecruiter || null" (valueChange)="setRecruiter($event)"></app-searchable-select>
+      </div>
+
+      <!-- Posted (12 Nov 2026): the shared date dropdown, as on the Employee pages -->
+      <app-date-preset-filter label="Posted" [preset]="datePreset" (presetChange)="datePreset = $event" (rangeChange)="onDateRange($event)"></app-date-preset-filter>
+
+      <button type="button" class="clear-all-filters" *ngIf="hasActiveFilters()" (click)="clearFilters()">Clear all</button>
+    </div>
+
+    <div class="jp-toolbar-right">
+      <span class="jp-count-label">Showing {{ rangeLabel() }} of {{ totalFilteredJobs() }} jobs</span>
+    </div>
+  </div>
+
+  <!-- ── 4. Bespoke Data Table ──────────────────────────────────────────────── -->
+  <div class="jp-table-card">
+    <div class="jp-table-scroll">
+      <table class="jp-table">
+        <colgroup>
+          <col style="width: 110px;">
+          <col style="width: 280px;">
+          <col style="width: 95px;">
+          <col style="width: 100px;">
+          <col style="width: 75px;">
+          <col style="width: 140px;">
+          <col style="width: 75px;">
+          <col style="width: 150px;">
+          <col style="width: 70px;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>JOB ID</th>
+            <th>JOB TITLE</th>
+            <th>EXPERIENCE</th>
+            <th>TYPE</th>
+            <th>STATUS</th>
+            <th>RECRUITER</th>
+            <th>OPENINGS</th>
+            <th>DATES</th>
+            <th class="text-right">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Loading skeleton rows -->
+          <ng-container *ngIf="isLoading()">
+            <tr *ngFor="let s of [1,2,3,4,5,6]" class="jp-sk-row">
+              <td colspan="9">
+                <div class="jp-sk-shimmer"></div>
+              </td>
+            </tr>
+          </ng-container>
+
+          <!-- Empty state -->
+          <tr *ngIf="!isLoading() && pagedJobs().length === 0">
+            <td colspan="9" class="jp-empty-cell">
+              <div class="jp-empty-wrap">
+                <div class="jp-empty-icon">📂</div>
+                <h3>No job postings found</h3>
+                <p>Try adjusting your search query, filters, or duration.</p>
+                <button type="button" class="clear-all-filters" (click)="clearFilters()">Clear all</button>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Data rows -->
+          <tr
+            *ngFor="let j of pagedJobs(); let idx = index"
+            [class.row-highlight-green]="(j.status || '').toLowerCase() === 'open' && idx === 2"
+            [class.row-highlight-blue]="(j.status || '').toLowerCase() === 'closed'"
+            (click)="viewJobDetails(j)">
+            
+            <!-- Job ID -->
+            <td class="td-job-id" (click)="$event.stopPropagation(); viewJobDetails(j)">
+              <span class="jp-id-link">{{ j.jobId }}</span>
+            </td>
+
+            <!-- Job Title -->
+            <td class="td-job-title" (click)="$event.stopPropagation(); viewJobDetails(j)">
+              <div class="jp-title-cell">
+                <div class="jp-title-main">
+                  {{ j.title }}
+                  <span class="jp-title-exp" *ngIf="j.experienceYears">({{ j.experienceYears }})</span>
+                </div>
+                <div class="jp-title-sub">
+                  <span>{{ j.department }}</span>
+                  <span class="jp-sub-dot"> &middot; </span>
+                  <span>{{ j.type || j.workLocationType || 'Full Time' }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Experience -->
+            <td class="td-exp">{{ j.experienceYears || '0-1 Years' }}</td>
+
+            <!-- Type -->
+            <td class="td-type">
+              <span class="jp-type-pill">{{ j.type || 'Full Time' }}</span>
+            </td>
+
+            <!-- Status -->
+            <td class="td-status">
+              <span
+                class="jp-status-tag"
+                [class.tag-open]="(j.status || '').toLowerCase() === 'open'"
+                [class.tag-closed]="(j.status || '').toLowerCase() === 'closed'"
+                [class.tag-draft]="(j.status || '').toLowerCase() === 'draft'">
+                {{ (j.status || 'OPEN').toUpperCase() }}
+              </span>
+            </td>
+
+            <!-- Recruiter -->
+            <td class="td-recruiter">
+              <div class="jp-recruiter-cell">
+                <div class="jp-recruiter-avatar" [style.background-color]="getRecruiterAvatarColor(j)">
+                  <img *ngIf="j.recruiter?.avatarUrl" [src]="j.recruiter?.avatarUrl" [alt]="getRecruiterName(j)" />
+                  <span *ngIf="!j.recruiter?.avatarUrl">{{ getRecruiterInitials(j) }}</span>
+                </div>
+                <span class="jp-recruiter-name">{{ getRecruiterName(j) }}</span>
+              </div>
+            </td>
+
+            <!-- Openings -->
+            <td class="td-openings">
+              <strong class="jp-openings-val">{{ j.applicants || 0 }} / {{ j.totalOpenings || 1 }}</strong>
+            </td>
+
+            <!-- Posted Date -->
+            <!-- Start → end; a job with no end date says so (12 Nov 2026) -->
+            <td class="td-date">
+              <div class="jp-dates">
+                <span>{{ formatTableDate($any(j).startDate || j.postedDate || j.createdAt) }}</span>
+                <span class="jp-dates-end" [class.open-ended]="!$any(j).endDate || $any(j).neverExpires">
+                  {{ (!$any(j).endDate || $any(j).neverExpires) ? 'No closing date' : 'to ' + formatTableDate($any(j).endDate) }}
+                </span>
+              </div>
+            </td>
+
+            <!-- Actions -->
+            <td class="td-actions text-right" (click)="$event.stopPropagation()">
+              <div class="jp-row-actions">
+                <button
+                  type="button"
+                  class="jp-btn-icon"
+                  title="Edit Job"
+                  (click)="editJob(j)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                </button>
+                <button
+                  *ngIf="(j.status || '').toLowerCase() === 'open'"
+                  type="button"
+                  class="jp-btn-icon"
+                  title="Share Job Link"
+                  (click)="shareJob(j, 'copy')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="18" cy="5" r="3"></circle>
+                    <circle cx="6" cy="12" r="3"></circle>
+                    <circle cx="18" cy="19" r="3"></circle>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                  </svg>
+                </button>
+                <button
+                  *ngIf="(j.status || '').toLowerCase() !== 'open'"
+                  type="button"
+                  class="jp-btn-icon"
+                  title="View Details"
+                  (click)="viewJobDetails(j)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination (12 Nov 2026): same layout as the Employee tables -->
+    <div class="jp-table-footer jp-std-pager">
+      <label class="pg-size">Page Size:
+        <select [ngModel]="pageSize()" (ngModelChange)="setPageSize($event)">
+          <option *ngFor="let n of pageSizes" [ngValue]="n">{{ n }}</option>
+        </select>
+      </label>
+      <span class="pg-range">{{ rangeLabel() }} of <b>{{ totalFilteredJobs() }}</b></span>
+      <span class="pg-nav">
+        <button type="button" (click)="goPage(1)" [disabled]="page() <= 1" aria-label="First page">«</button>
+        <button type="button" (click)="goPage(page() - 1)" [disabled]="page() <= 1" aria-label="Previous page">‹</button>
+        <span>Page <b>{{ page() }}</b> of <b>{{ pageCount() }}</b></span>
+        <button type="button" (click)="goPage(page() + 1)" [disabled]="page() >= pageCount()" aria-label="Next page">›</button>
+        <button type="button" (click)="goPage(pageCount())" [disabled]="page() >= pageCount()" aria-label="Last page">»</button>
+      </span>
+    </div>
   </div>
 </div>
 

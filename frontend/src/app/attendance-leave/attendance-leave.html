@@ -1,10 +1,11 @@
 <div class="attendance-container">
-  <div class="page-header">
-    <div class="header-content">
-      <h2>Attendance & Leave</h2>
-      <p>Manage your time, view logs, and request leaves.</p>
-    </div>
-  </div>
+  <app-page-header icon="calendar" section="Attendance & Leave"
+    [heading]="activeTab() === 'leave' ? 'Leaves' : 'My Attendance'"
+    [subtitle]="activeTab() === 'leave' ? 'Leave requests, regularizations and balances.' : 'Manage your time, view logs, and request leaves.'">
+    <ng-container *ngIf="activeTab() === 'leave' && leaveSection() !== 'balances' && leaveSection() !== 'regularizations'">
+      <button type="button" class="lv-hdr-btn primary" (click)="openRequestModal()"><svg lucidePlus [size]="16"></svg>New leave</button>
+    </ng-container>
+  </app-page-header>
 
   <!-- ATTENDANCE VIEW TAB -->
   <div class="tab-content" *ngIf="activeTab() === 'attendance'">
@@ -322,7 +323,7 @@
           [rowHeight]="64"
           [headerHeight]="48"
           [pagination]="true"
-          [paginationPageSize]="10"
+          [paginationPageSize]="20"
           [paginationPageSizeSelector]="leavePageSizes"
           [gridOptions]="gridOptions"
           (cellClicked)="onRegularizationCellClicked($event)"
@@ -334,79 +335,7 @@
 
   <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() !== 'balances' && leaveSection() !== 'regularizations'">
     <!-- Executive KPI Metric Cards -->
-    <div class="leave-kpi-grid" *ngIf="isAdmin() || isManager() || managerRequests().length > 0">
-      <div class="leave-kpi-card" [class.active]="approvalStatusFilter() === 'ALL'" (click)="setApprovalFilter('ALL')">
-        <div class="leave-kpi-header">
-          <span class="leave-kpi-label">Total Applications</span>
-          <div class="leave-kpi-icon-wrap total">
-            <svg lucideFile [size]="17"></svg>
-          </div>
-        </div>
-        <div class="leave-kpi-value-row">
-          <span class="leave-kpi-number">{{ totalLeaveCount() }}</span>
-          <span class="leave-kpi-subtext">All requests</span>
-        </div>
-      </div>
-
-      <div class="leave-kpi-card pending" [class.active]="approvalStatusFilter() === 'PENDING'" (click)="setApprovalFilter('PENDING')">
-        <div class="leave-kpi-header">
-          <span class="leave-kpi-label">Pending Review</span>
-          <div class="leave-kpi-icon-wrap pending">
-            <svg lucideClock [size]="17"></svg>
-          </div>
-        </div>
-        <div class="leave-kpi-value-row">
-          <span class="leave-kpi-number text-amber">{{ pendingLeaveCount() }}</span>
-          <span class="leave-kpi-badge pending" *ngIf="pendingLeaveCount() > 0">Needs Attention</span>
-          <span class="leave-kpi-subtext" *ngIf="pendingLeaveCount() === 0">All caught up</span>
-        </div>
-      </div>
-
-      <div class="leave-kpi-card approved" [class.active]="approvalStatusFilter() === 'APPROVED'" (click)="setApprovalFilter('APPROVED')">
-        <div class="leave-kpi-header">
-          <span class="leave-kpi-label">Approved</span>
-          <div class="leave-kpi-icon-wrap approved">
-            <svg lucideCheck [size]="17"></svg>
-          </div>
-        </div>
-        <div class="leave-kpi-value-row">
-          <span class="leave-kpi-number text-emerald">{{ approvedLeaveCount() }}</span>
-          <span class="leave-kpi-subtext">Active leaves</span>
-        </div>
-      </div>
-
-      <div class="leave-kpi-card rejected" [class.active]="approvalStatusFilter() === 'REJECTED'" (click)="setApprovalFilter('REJECTED')">
-        <div class="leave-kpi-header">
-          <span class="leave-kpi-label">Rejected</span>
-          <div class="leave-kpi-icon-wrap rejected">
-            <svg lucideX [size]="17"></svg>
-          </div>
-        </div>
-        <div class="leave-kpi-value-row">
-          <span class="leave-kpi-number text-rose">{{ rejectedLeaveCount() }}</span>
-          <span class="leave-kpi-subtext" *ngIf="cancelledLeaveCount() > 0">{{ cancelledLeaveCount() }} cancelled</span>
-          <span class="leave-kpi-subtext" *ngIf="cancelledLeaveCount() === 0">Declined requests</span>
-        </div>
-      </div>
-    </div>
-
     <div class="leave-list-toolbar">
-      <div class="leave-list-actions">
-        <button type="button" class="btn btn-primary leave-new-button" (click)="openRequestModal()">
-          <svg lucidePlus [size]="16"></svg>
-          New Leave
-        </button>
-        <input *ngIf="isAdmin()" id="leave-request-import" type="file" accept=".csv,text/csv" hidden (change)="importLeaveRequestsCsv($event)">
-        <label *ngIf="isAdmin()" for="leave-request-import" class="btn btn-outline leave-export-button">
-          <svg lucideUploadCloud [size]="15"></svg>
-          Import
-        </label>
-        <button type="button" class="btn btn-outline leave-export-button" (click)="exportLeaveRequestsCsv()">
-          <svg lucideFile [size]="15"></svg>
-          Export
-        </button>
-      </div>
-
       <div class="leave-search-filter-wrap">
         <label class="leave-application-search">
           <svg lucideSearch [size]="16" aria-hidden="true"></svg>
@@ -420,27 +349,22 @@
                   (click)="leaveApplicationsSearch.set('')">×</button>
         </label>
 
+        <app-searchable-select *ngIf="isAdmin()" class="lv-status-select"
+          [options]="leaveStatusOptions"
+          placeholder="All statuses"
+          [clearable]="true"
+          [value]="approvalStatusFilter() === 'ALL' ? null : approvalStatusFilter()"
+          (valueChange)="setApprovalFilter($event || 'ALL')">
+        </app-searchable-select>
+
         <button type="button" class="btn btn-outline leave-filter-btn" (click)="openLeaveFilters()" title="Advanced filters">
           <svg lucideFilter [size]="15"></svg>
           <span>Filters</span>
           <span class="leave-filter-active-dot" *ngIf="hasActiveLeaveFilters()" aria-label="Filters active"></span>
         </button>
+        <button type="button" class="clear-all-filters" *ngIf="hasActiveLeaveFilters()" (click)="clearAllLeaveFilters()">Clear all</button>
       </div>
 
-      <div class="leave-view-toggle" role="group" aria-label="Leave request view">
-        <button type="button" [class.active]="leaveViewMode() === 'list'" [attr.aria-pressed]="leaveViewMode() === 'list'"
-                aria-label="List view" title="List view" (click)="leaveViewMode.set('list')">
-          <svg lucideList [size]="18"></svg>
-        </button>
-        <button type="button" [class.active]="leaveViewMode() === 'calendar'" [attr.aria-pressed]="leaveViewMode() === 'calendar'"
-                aria-label="Calendar view" title="Calendar view" (click)="leaveViewMode.set('calendar')">
-          <svg lucideCalendar [size]="18"></svg>
-        </button>
-        <button type="button" [class.active]="leaveViewMode() === 'employee'" [attr.aria-pressed]="leaveViewMode() === 'employee'"
-                aria-label="Employee view" title="Employee view" (click)="leaveViewMode.set('employee')">
-          <svg lucideUser [size]="18"></svg>
-        </button>
-      </div>
     </div>
 
       <!-- Leave Requests -->
@@ -450,32 +374,6 @@
             <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #0f172a;">{{ leaveViewMode() === 'employee' ? 'My Leaves' : 'Leave Applications' }}</h3>
             <span class="leave-count-pill" *ngIf="isAdmin() && leaveViewMode() !== 'employee'">{{ filteredLeaveApplications().length }} applications</span>
           </div>
-          <button type="button" class="btn-clear-filters" *ngIf="hasActiveLeaveFilters()" (click)="clearAllLeaveFilters()">
-            <svg lucideX [size]="13"></svg>
-            <span>Reset filters</span>
-          </button>
-        </div>
-        <div class="approval-status-filters" *ngIf="isAdmin() && leaveViewMode() === 'list'">
-          <button type="button" class="status-filter-pill" [class.active]="approvalStatusFilter() === 'ALL'" (click)="setApprovalFilter('ALL')">
-            All
-            <span class="filter-count all">{{ totalLeaveCount() }}</span>
-          </button>
-          <button type="button" class="status-filter-pill pending" [class.active]="approvalStatusFilter() === 'PENDING'" (click)="setApprovalFilter('PENDING')">
-            <span class="filter-dot pending"></span> Pending
-            <span class="filter-count pending" *ngIf="pendingLeaveCount() > 0">{{ pendingLeaveCount() }}</span>
-          </button>
-          <button type="button" class="status-filter-pill approved" [class.active]="approvalStatusFilter() === 'APPROVED'" (click)="setApprovalFilter('APPROVED')">
-            <span class="filter-dot approved"></span> Approved
-            <span class="filter-count approved">{{ approvedLeaveCount() }}</span>
-          </button>
-          <button type="button" class="status-filter-pill rejected" [class.active]="approvalStatusFilter() === 'REJECTED'" (click)="setApprovalFilter('REJECTED')">
-            <span class="filter-dot rejected"></span> Rejected
-            <span class="filter-count rejected">{{ rejectedLeaveCount() }}</span>
-          </button>
-          <button type="button" class="status-filter-pill cancelled" [class.active]="approvalStatusFilter() === 'CANCELLED'" (click)="setApprovalFilter('CANCELLED')">
-            <span class="filter-dot cancelled"></span> Cancelled
-            <span class="filter-count cancelled">{{ cancelledLeaveCount() }}</span>
-          </button>
         </div>
         <!-- Skeleton Loader for Leave Requests -->
         <div class="table-container mt-4" *ngIf="isLoadingLeaveApplications()">
@@ -513,7 +411,7 @@
             [headerHeight]="48"
             [rowClassRules]="rowClassRules"
             [pagination]="true"
-            [paginationPageSize]="10"
+            [paginationPageSize]="20"
             [paginationPageSizeSelector]="leavePageSizes"
             [gridOptions]="gridOptions"
             (cellClicked)="onCellClicked($event)">
@@ -950,7 +848,7 @@
           [headerHeight]="48"
           [rowClassRules]="rowClassRules"
           [pagination]="true"
-          [paginationPageSize]="10"
+          [paginationPageSize]="20"
           [paginationPageSizeSelector]="leavePageSizes"
           [gridOptions]="gridOptions"
           [rowSelection]="approvalRowSelection"
@@ -1040,7 +938,7 @@
           [headerHeight]="48"
           [rowClassRules]="rowClassRules"
           [pagination]="true"
-          [paginationPageSize]="10"
+          [paginationPageSize]="20"
           [paginationPageSizeSelector]="leavePageSizes"
           [gridOptions]="gridOptions"
           (cellClicked)="onCellClicked($event)">
@@ -1090,155 +988,73 @@
     </div>
   </div>
 
-  <!-- LEAVE DETAIL MODAL -->
-  <!-- LEAVE DETAIL MODAL WITH USER PROFILE -->
-  <div class="drawer-overlay" *ngIf="isLeaveDetailOpen()" (click)="closeLeaveDetail()" style="display: flex; align-items: center; justify-content: center;">
-    <div class="widget-card" (click)="$event.stopPropagation()" style="width: 660px; max-width: 94vw; max-height: 90vh; overflow-y: auto; border-radius: 14px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); animation: fadeIn 0.2s;" *ngIf="selectedLeave() as leave">
-      <div class="widget-header" style="padding-bottom: 16px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between;">
-        <div>
-          <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #0f172a;">Leave Request & Profile</h3>
-          <p style="margin: 2px 0 0; font-size: 12.5px; color: #64748b;">Review employee profile and leave details</p>
+  <!-- LEAVE DETAIL MODAL (redesigned 12 Nov) -->
+  <div class="lr-overlay" *ngIf="isLeaveDetailOpen()" (click)="closeLeaveDetail()">
+    <div class="lr-dialog" role="dialog" aria-modal="true" aria-labelledby="lr-title" (click)="$event.stopPropagation()" *ngIf="selectedLeave() as leave">
+      <header class="lr-head">
+        <img [src]="leaveEmployeeAvatar(leave)" class="lr-avatar" alt="" (error)="onLeaveAvatarError($event, leave)" />
+        <div class="lr-who">
+          <div class="lr-name-row">
+            <h3 id="lr-title">{{ leaveEmployeeName(leave) }}</h3>
+            <span *ngIf="leave.employee?.employeeCode" class="lr-code">#{{ leave.employee.employeeCode }}</span>
+          </div>
+          <p>
+            <span *ngIf="leave.employee?.designation?.name">{{ leave.employee.designation.name }}</span>
+            <span *ngIf="leave.employee?.designation?.name && leave.employee?.department?.name"> · </span>
+            <span *ngIf="leave.employee?.department?.name">{{ leave.employee.department.name }}</span>
+          </p>
+          <a *ngIf="leaveEmployeeEmail(leave)" class="lr-mail" [href]="'mailto:' + leaveEmployeeEmail(leave)">{{ leaveEmployeeEmail(leave) }}</a>
         </div>
-        <button class="btn-icon" (click)="closeLeaveDetail()" title="Close">
-          <svg lucideX size="20"></svg>
-        </button>
+        <button type="button" class="lr-close" (click)="closeLeaveDetail()" aria-label="Close"><svg lucideX size="18"></svg></button>
+      </header>
+
+      <div class="lr-body">
+        <section class="lr-summary">
+          <div class="lr-summary-main">
+            <span class="lr-status" [ngClass]="'s-' + (leave.status || '').toLowerCase()">{{ leave.status | titlecase }}</span>
+            <div class="lr-type">{{ leave.leaveType?.name || 'Leave' }} <span class="lr-paid" [class.unpaid]="leave.leaveType?.isPaid === false">{{ leave.leaveType?.isPaid === false ? 'Unpaid' : 'Paid' }}</span></div>
+            <div class="lr-dates">
+              {{ leave.startDate | date: 'EEE, d MMM y' }}
+              <ng-container *ngIf="(leave.endDate | date:'yMd') !== (leave.startDate | date:'yMd')"> → {{ leave.endDate | date: 'EEE, d MMM y' }}</ng-container>
+            </div>
+          </div>
+          <div class="lr-duration">
+            <strong>{{ leaveDuration(leave) }}</strong>
+            <span>day{{ leaveDuration(leave) === 1 ? '' : 's' }}<ng-container *ngIf="leave.isHalfDay"> · Half ({{ leave.halfDayPeriod || 'AM' }})</ng-container></span>
+          </div>
+        </section>
+
+        <div class="lr-quota" *ngIf="selectedLeaveQuota() as quota">
+          <div class="lr-quota-text"><b>{{ quota.allocated - quota.used }}</b> of {{ quota.allocated }} days available</div>
+          <div class="lr-quota-bar"><span [style.width.%]="quota.allocated ? ((quota.allocated - quota.used) / quota.allocated) * 100 : 0"></span></div>
+        </div>
+
+        <dl class="lr-list">
+          <div><dt>Applied on</dt><dd>{{ leave.createdAt ? (leave.createdAt | date: 'd MMM y, h:mm a') : '—' }}</dd></div>
+          <div *ngIf="leave.approvedBy || leave.approvedById"><dt>{{ leave.status === 'REJECTED' ? 'Rejected by' : 'Approved by' }}</dt><dd>{{ leave.approvedBy?.employee?.firstName ? (leave.approvedBy.employee.firstName + ' ' + (leave.approvedBy.employee.lastName || '')) : (leave.approvedBy?.email || '—') }}</dd></div>
+          <div *ngIf="leave.attachmentUrl"><dt>Attachment</dt><dd><a [href]="leave.attachmentUrl" target="_blank" class="lr-link"><svg lucidePaperclip size="14"></svg>View attachment</a></dd></div>
+        </dl>
+
+        <section class="lr-block">
+          <h4>Reason</h4>
+          <p [class.muted]="!leave.reason">{{ leave.reason || 'No reason provided by employee' }}</p>
+        </section>
+
+        <section class="lr-block danger" *ngIf="leave.status === 'REJECTED' && leave.rejectionReason">
+          <h4>Rejection reason</h4>
+          <p>{{ leave.rejectionReason }}</p>
+        </section>
       </div>
 
-      <div class="modal-body" style="padding: 20px 0;">
-        <!-- Employee Profile Header Card -->
-        <div class="modal-profile-card">
-          <img [src]="leaveEmployeeAvatar(leave)" 
-               class="modal-profile-avatar" 
-               alt="Avatar"
-               (error)="onLeaveAvatarError($event, leave)" />
-          <div class="modal-profile-details">
-            <div class="modal-profile-top">
-              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <h4 class="modal-profile-name">{{ leaveEmployeeName(leave) }}</h4>
-                <span *ngIf="leave.employee?.employeeCode" class="table-emp-code">#{{ leave.employee.employeeCode }}</span>
-                <span *ngIf="leaveEmployeeRole(leave)" class="profile-chip role-chip">{{ leaveEmployeeRole(leave) }}</span>
-              </div>
-              <span class="status-badge" [ngClass]="leave.status.toLowerCase()">{{ leave.status }}</span>
-            </div>
-
-            <div class="modal-profile-meta">
-              <span class="meta-tag" *ngIf="leave.employee?.designation?.name">
-                <svg lucideBriefcase size="13"></svg>
-                <span>{{ leave.employee.designation.name }}</span>
-              </span>
-              <span class="meta-tag" *ngIf="leave.employee?.department?.name">
-                <svg lucideBuilding size="13"></svg>
-                <span>{{ leave.employee.department.name }}</span>
-              </span>
-              <span class="meta-tag" *ngIf="leaveEmployeeEmail(leave)">
-                <svg lucideMail size="13"></svg>
-                <span>{{ leaveEmployeeEmail(leave) }}</span>
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Quota & Balance Info Card -->
-        <div class="modal-quota-card" *ngIf="selectedLeaveQuota() as quota">
-          <div class="modal-quota-left">
-            <svg lucideCalendar size="18" style="color: #16a34a; flex-shrink: 0;"></svg>
-            <div>
-              <div class="modal-quota-label">{{ leave.leaveType?.name }} Quota</div>
-              <div class="modal-quota-value">
-                <strong>{{ quota.allocated - quota.used }} days available</strong> out of {{ quota.allocated }} allocated
-              </div>
-            </div>
-          </div>
-          <div class="modal-quota-stat">
-            Requested: {{ leaveDuration(leave) }} {{ leaveDuration(leave) === 1 ? 'day' : 'days' }}
-          </div>
-        </div>
-
-        <!-- Leave Details Grid -->
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;">
-          <div>
-            <div class="detail-label">Leave Type</div>
-            <div class="detail-value" style="font-weight: 600; color: #0f172a;">{{ leave.leaveType?.name || '—' }}</div>
-          </div>
-          <div>
-            <div class="detail-label">Compensation</div>
-            <div class="detail-value">{{ leave.leaveType?.isPaid === false ? 'Unpaid Leave' : 'Paid Leave' }}</div>
-          </div>
-          <div>
-            <div class="detail-label">From Date</div>
-            <div class="detail-value">{{ leave.startDate | date: 'EEE, dd-MM-yyyy' }}</div>
-          </div>
-          <div>
-            <div class="detail-label">To Date</div>
-            <div class="detail-value">{{ leave.endDate | date: 'EEE, dd-MM-yyyy' }}</div>
-          </div>
-          <div>
-            <div class="detail-label">Total Duration</div>
-            <div class="detail-value" style="font-weight: 600; color: #1e40af;">
-              {{ leaveDuration(leave) }} day{{ leaveDuration(leave) === 1 ? '' : 's' }}
-              <span *ngIf="leave.isHalfDay" style="color: #3b82f6;">· Half Day ({{ leave.halfDayPeriod || 'AM' }})</span>
-            </div>
-          </div>
-          <div>
-            <div class="detail-label">Applied On</div>
-            <div class="detail-value">{{ leave.createdAt ? (leave.createdAt | date: 'dd-MM-yyyy, h:mm a') : '—' }}</div>
-          </div>
-        </div>
-
-        <!-- Reason -->
-        <div style="padding-top: 16px;">
-          <div class="detail-label">Reason for Absence</div>
-          <div class="detail-value" style="white-space: pre-wrap; background: #ffffff; padding: 12px 14px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 6px; font-size: 13.5px; color: #334155; line-height: 1.5;">
-            {{ leave.reason || 'No reason provided by employee' }}
-          </div>
-        </div>
-
-        <!-- Rejection Reason if Rejected -->
-        <div style="padding-top: 16px;" *ngIf="leave.status === 'REJECTED' && leave.rejectionReason">
-          <div class="detail-label" style="color: #dc2626;">Rejection Reason</div>
-          <div class="detail-value" style="white-space: pre-wrap; background: #fef2f2; color: #991b1b; padding: 12px 14px; border-radius: 8px; border: 1px solid #fecaca; margin-top: 6px; font-size: 13.5px;">
-            {{ leave.rejectionReason }}
-          </div>
-        </div>
-
-        <!-- Approver/Rejecter Info -->
-        <div style="padding-top: 16px;" *ngIf="leave.approvedBy || leave.approvedById">
-          <div class="detail-label">{{ leave.status === 'REJECTED' ? 'Rejected By' : 'Approved By' }}</div>
-          <div class="detail-value" style="font-weight: 500; color: #334155; margin-top: 4px;">
-            {{ leave.approvedBy?.employee?.firstName ? (leave.approvedBy.employee.firstName + ' ' + (leave.approvedBy.employee.lastName || '')) : (leave.approvedBy?.email || '—') }}
-          </div>
-        </div>
-
-        <!-- Attachment Link -->
-        <div style="padding-top: 16px;" *ngIf="leave.attachmentUrl">
-          <div class="detail-label">Attached Document</div>
-          <a [href]="leave.attachmentUrl" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #2563eb; font-weight: 600; text-decoration: none; margin-top: 6px; padding: 8px 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
-            <svg lucidePaperclip size="15"></svg>
-            <span>View Attachment</span>
-          </a>
-        </div>
-      </div>
-
-      <!-- Modal Footer with Quick Approval Actions -->
-      <div class="modal-footer" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding-top: 16px; border-top: 1px solid #f1f5f9;">
-        <button class="btn btn-outline" (click)="closeLeaveDetail()" style="width: max-content; height: 38px;">Close</button>
-        
-        <button *ngIf="leave.status === 'PENDING' && canApproveLeaveApplication(leave)" 
-                class="btn btn-outline" 
-                (click)="closeLeaveDetail(); openRejectModal(leave.id)"
-                style="height: 38px; display: flex; align-items: center; gap: 6px; border-color: #fca5a5; color: #dc2626; background: #fff;">
-          <svg lucideX size="15"></svg>
-          Reject
-        </button>
-        
-        <button *ngIf="leave.status === 'PENDING' && canApproveLeaveApplication(leave)" 
-                class="btn btn-primary" 
-                (click)="closeLeaveDetail(); approveLeaveRequest(leave.id)"
-                style="height: 38px; display: flex; align-items: center; gap: 6px; background: #16a34a; border-color: #16a34a; color: white; font-weight: 600;">
-          <svg lucideCheck size="16"></svg>
-          Approve Leave
-        </button>
-      </div>
+      <footer class="lr-foot">
+        <ng-container *ngIf="leave.status === 'PENDING' && canApproveLeaveApplication(leave); else lrCloseOnly">
+          <button type="button" class="lr-btn" (click)="closeLeaveDetail()">Close</button>
+          <span class="lr-spacer"></span>
+          <button type="button" class="lr-btn danger" (click)="closeLeaveDetail(); openRejectModal(leave.id)">Reject</button>
+          <button type="button" class="lr-btn primary" (click)="closeLeaveDetail(); approveLeaveRequest(leave.id)"><svg lucideCheck size="15"></svg>Approve</button>
+        </ng-container>
+        <ng-template #lrCloseOnly><span class="lr-spacer"></span><button type="button" class="lr-btn" (click)="closeLeaveDetail()">Close</button></ng-template>
+      </footer>
     </div>
   </div>
 
@@ -1519,7 +1335,7 @@
             [rowHeight]="64"
             [headerHeight]="48"
             [pagination]="true"
-            [paginationPageSize]="10"
+            [paginationPageSize]="20"
             [paginationPageSizeSelector]="leavePageSizes"
             [gridOptions]="balanceGridOptions">
           </ag-grid-angular>

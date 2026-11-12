@@ -1,297 +1,264 @@
-<div class="pc-page">
-  <!-- Header -->
-  <div class="pc-header">
-    <div class="pc-header-left">
-      <a routerLink="/employees/documents" class="pc-back-btn">
-        <svg lucideArrowLeft size="15"></svg>
-        <span>Documents Center</span>
-      </a>
-      <div class="pc-title-row">
-        <h1 class="pc-title">Profile Completion</h1>
-        <span class="pc-live-badge">
-          <span class="pulse-dot"></span>
-          Live Audit
-        </span>
-      </div>
-      <p class="pc-subtitle">
-        Track document submissions and statutory compliance across all active employees. Incomplete profiles see automated MIRA reminders every 15 minutes.
-      </p>
-    </div>
-
-    <div class="pc-header-actions">
-      <button type="button" class="pc-btn pc-btn-secondary" (click)="load()" [disabled]="loading()">
+<div class="pc-page-wrapper">
+  
+  <!-- Page header (12 Nov 2026): same layout on every Employee page -->
+  <app-page-header icon="completion" section="Employees" heading="Profile Completion" subtitle="Who still has documents or details missing">
+      <button type="button" class="btn-download-zip" (click)="load()" [disabled]="loading()" title="Refresh audit records">
         <svg lucideRefreshCw size="15" [class.spin-anim]="loading()"></svg>
         <span>Refresh</span>
       </button>
-      <button type="button" class="pc-btn pc-btn-primary" (click)="download()" [disabled]="!rows().length">
+
+      <button type="button" class="btn-upload-primary" (click)="download()" [disabled]="!rows().length" title="Download completion report as CSV">
         <svg lucideDownload size="15"></svg>
         <span>Download CSV</span>
       </button>
-    </div>
-  </div>
+  </app-page-header>
 
-  <!-- HR's document lock -->
-  @if (lock(); as l) {
-    <div class="pc-lock" [class.on]="l.active" [class.scheduled]="l.enabled && !l.active">
-      <div class="pc-lock-icon"><svg lucideLock size="18"></svg></div>
-      <div class="pc-lock-main">
-        <div class="pc-lock-title">
-          Require documents before using MIRA
-          @if (l.active) { <span class="pc-lock-pill on">ON</span> }
-          @else if (l.enabled) { <span class="pc-lock-pill scheduled">Starts {{ l.from | date:'d MMM y' }}</span> }
-          @else { <span class="pc-lock-pill off">OFF</span> }
-        </div>
-        <p class="pc-lock-desc">
-          When on, employees with anything missing see the document reminder on the website with <b>no close or "Remind me later"</b>
-          until every required document and detail is uploaded. They can still open their own profile to fill in details.
-          Exempt accounts are never locked. The mobile app is not affected.
-        </p>
-        <div class="pc-lock-controls">
-          <label class="pc-switch">
-            <input type="checkbox" [(ngModel)]="lockEnabled" (ngModelChange)="lockSaved.set(false)" />
-            <span class="pc-switch-track"><span class="pc-switch-thumb"></span></span>
-            <span class="pc-switch-label">{{ lockEnabled ? 'Lock on' : 'Lock off' }}</span>
-          </label>
-          <label class="pc-lock-date">
-            <span>Start from</span>
-            <input type="date" [(ngModel)]="lockFrom" (ngModelChange)="lockSaved.set(false)" [disabled]="!lockEnabled" />
-            @if (lockFrom) { <button type="button" class="pc-lock-clear" (click)="lockFrom = ''; lockSaved.set(false)">Start now</button> }
-          </label>
-          <button type="button" class="pc-btn pc-btn-primary" (click)="saveLock()" [disabled]="savingLock() || !lockDirty">
-            {{ savingLock() ? 'Saving…' : 'Save' }}
-          </button>
-          @if (lockSaved() && !lockDirty) { <span class="pc-lock-saved">Saved</span> }
-        </div>
+  <!-- Primary Subnav Tabs (Identical to Documents Page!) -->
+  <div class="subnav-tabs-bar">
+    <div class="tabs-nav-group">
+      <a class="tab-pill" routerLink="/employees/documents" title="Employee Documents Center">
+        <svg lucideFileText size="15"></svg>
+        <span>Employee Documents Center</span>
+      </a>
 
-        <!-- Excused accounts: never see the reminder or the lock -->
-        <div class="pc-exempt">
-          <div class="pc-exempt-head">Excused from documents <span class="pc-exempt-count">{{ exempt().length }}</span></div>
-          <div class="pc-exempt-chips">
-            @for (e of exempt(); track e.id) {
-              <span class="pc-exempt-chip" [title]="e.email || ''">
-                {{ e.firstName }} {{ e.lastName }}
-                @if (e.fixed) { <span class="pc-exempt-fixed">built-in</span> }
-                @else {
-                  <button type="button" (click)="setExempt(e.id, false)" [disabled]="exemptBusy() === e.id" title="Remove">×</button>
-                }
-              </span>
-            }
-          </div>
-          <div class="pc-exempt-search">
-            <input type="text" placeholder="Search a person to excuse…" [ngModel]="exemptQuery()" (ngModelChange)="exemptQuery.set($event)" />
-            @if (exemptMatches().length) {
-              <div class="pc-exempt-results">
-                @for (m of exemptMatches(); track m.id) {
-                  <button type="button" (click)="setExempt(m.id, true)" [disabled]="exemptBusy() === m.id">
-                    <b>{{ m.firstName }} {{ m.lastName }}</b>
-                    <span>{{ m.employeeCode ? '#' + m.employeeCode + ' · ' : '' }}{{ m.email }}</span>
-                  </button>
-                }
-              </div>
-            } @else if (exemptQuery().trim()) {
-              <div class="pc-exempt-results"><div class="pc-exempt-none">No one found</div></div>
-            }
-          </div>
-        </div>
-      </div>
-    </div>
-  }
-
-  <!-- KPI Stats Grid -->
-  @if (report(); as r) {
-    <div class="pc-stats-grid">
-      <!-- Total Employees -->
-      <div class="pc-stat-card">
-        <div class="pc-stat-icon-wrap icon-blue">
-          <svg lucideUsers size="22"></svg>
-        </div>
-        <div class="pc-stat-content">
-          <span class="pc-stat-label">Total Workforce</span>
-          <div class="pc-stat-val-row">
-            <span class="pc-stat-val">{{ r.total }}</span>
-            <span class="pc-stat-unit">employees</span>
-          </div>
-          <span class="pc-stat-caption">Active accounts audited</span>
-        </div>
-      </div>
-
-      <!-- Incomplete Profiles -->
-      <div class="pc-stat-card card-warn">
-        <div class="pc-stat-icon-wrap icon-amber">
-          <svg lucideAlertCircle size="22"></svg>
-        </div>
-        <div class="pc-stat-content">
-          <span class="pc-stat-label">Incomplete Profiles</span>
-          <div class="pc-stat-val-row">
-            <span class="pc-stat-val text-amber-600">{{ r.incomplete }}</span>
-            <span class="pc-badge-pill badge-amber">{{ incompleteRate() }}% pending</span>
-          </div>
-          <span class="pc-stat-caption">Active reminder queue</span>
-        </div>
-      </div>
-
-      <!-- Complete Profiles -->
-      <div class="pc-stat-card card-ok">
-        <div class="pc-stat-icon-wrap icon-emerald">
-          <svg lucideCheckCircle2 size="22"></svg>
-        </div>
-        <div class="pc-stat-content">
-          <span class="pc-stat-label">Fully Completed</span>
-          <div class="pc-stat-val-row">
-            <span class="pc-stat-val text-emerald-600">{{ r.complete }}</span>
-            <span class="pc-badge-pill badge-emerald">Verified</span>
-          </div>
-          <span class="pc-stat-caption">All documents & info ready</span>
-        </div>
-      </div>
-
-      <!-- Compliance Rate -->
-      <div class="pc-stat-card">
-        <div class="pc-stat-icon-wrap icon-indigo">
-          <svg lucideSparkles size="22"></svg>
-        </div>
-        <div class="pc-stat-content">
-          <span class="pc-stat-label">Compliance Rate</span>
-          <div class="pc-stat-val-row">
-            <span class="pc-stat-val text-indigo-600">{{ completionRate() }}%</span>
-            <span class="pc-stat-ratio">{{ r.complete }}/{{ r.total }}</span>
-          </div>
-          <div class="pc-progress-track">
-            <div class="pc-progress-fill" [style.width.%]="completionRate()"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  }
-
-  <!-- Toolbar & Filters -->
-  <div class="pc-toolbar">
-    <div class="pc-toolbar-left">
-      <!-- Tabs -->
-      <div class="pc-tab-pills" role="tablist">
-        <button
-          type="button"
-          class="pc-tab-pill"
-          [class.active]="filter() === 'INCOMPLETE'"
-          (click)="filter.set('INCOMPLETE')"
-        >
-          <svg lucideAlertCircle size="14"></svg>
-          <span>Incomplete</span>
-          <span class="tab-badge" *ngIf="report()">{{ report()?.incomplete }}</span>
-        </button>
-
-        <button
-          type="button"
-          class="pc-tab-pill"
-          [class.active]="filter() === 'COMPLETE'"
-          (click)="filter.set('COMPLETE')"
-        >
-          <svg lucideCheckCircle2 size="14"></svg>
-          <span>Complete</span>
-          <span class="tab-badge" *ngIf="report()">{{ report()?.complete }}</span>
-        </button>
-
-        <button
-          type="button"
-          class="pc-tab-pill"
-          [class.active]="filter() === 'ALL'"
-          (click)="filter.set('ALL')"
-        >
-          <svg lucideUsers size="14"></svg>
-          <span>All</span>
-          <span class="tab-badge" *ngIf="report()">{{ report()?.total }}</span>
-        </button>
-      </div>
-
-      <!-- Department Filter -->
-      @if (departments().length > 1) {
-        <div class="pc-select-wrap">
-          <select
-            class="pc-select"
-            [ngModel]="selectedDepartment()"
-            (ngModelChange)="selectedDepartment.set($event)"
-          >
-            <option value="ALL">All Departments</option>
-            @for (dept of departments(); track dept) {
-              <option [value]="dept">{{ dept }}</option>
-            }
-          </select>
-        </div>
-      }
-    </div>
-
-    <div class="pc-toolbar-right">
-      <!-- Search Input -->
-      <div class="pc-search-box">
-        <svg lucideSearch size="15" class="pc-search-icon"></svg>
-        <input
-          type="search"
-          class="pc-search-input"
-          placeholder="Search name, code, dept, manager, or missing item..."
-          [ngModel]="query()"
-          (ngModelChange)="query.set($event)"
-          aria-label="Search employee records"
-        />
-        <button
-          type="button"
-          class="pc-clear-btn"
-          *ngIf="query()"
-          (click)="query.set('')"
-          title="Clear search query"
-        >
-          <svg lucideX size="13"></svg>
-        </button>
-      </div>
-
-      <!-- Expand / Collapse All Toggle -->
-      <button
-        type="button"
-        class="pc-expand-btn"
-        (click)="toggleAllExpanded()"
-        [title]="allExpanded() ? 'Collapse all missing item lists' : 'Expand all missing item lists'"
-      >
-        @if (allExpanded()) {
-          <svg lucideChevronUp size="14"></svg>
-        } @else {
-          <svg lucideChevronDown size="14"></svg>
-        }
-        <span>{{ allExpanded() ? 'Collapse All' : 'Expand All' }}</span>
+      <button class="tab-pill active" type="button">
+        <svg lucideClock size="15"></svg>
+        <span>Profile Completion & Statutory Audit</span>
+        <span class="tab-pending-chip">{{ report()?.incomplete || 0 }} Pending</span>
       </button>
     </div>
+
   </div>
 
-  <!-- Results Summary Bar -->
-  <div class="pc-results-bar">
-    <span class="pc-results-count">
-      Showing <strong>{{ rows().length }}</strong> of {{ report()?.rows?.length || 0 }} employees
-    </span>
+  <!-- Require Documents Before Using MIRA Lock Card -->
+  @if (lock(); as l) {
+    <div class="pc-lock-card">
+      <div class="lock-card-header">
+        <div class="lock-icon-squircle">
+          <svg lucideLock size="16"></svg>
+        </div>
+        <div class="lock-header-text">
+          <div class="lock-title-row">
+            <h3 class="lock-heading">Require documents before using MIRA</h3>
+            <span class="lock-status-badge" [class.badge-active]="l.active" [class.badge-sched]="l.enabled && !l.active">
+              {{ l.active ? 'ACTIVE' : (l.enabled ? ('STARTS ' + (l.from | date:'d MMM y')) : 'OFF') }}
+            </span>
+          </div>
+          <p class="lock-description">
+            When active, employees with missing mandatory documents see a permanent reminder until every required document is submitted. Exempt accounts are never locked.
+          </p>
+        </div>
+      </div>
+
+      <div class="lock-controls-row">
+        <label class="pc-switch-label-group">
+          <input type="checkbox" [(ngModel)]="lockEnabled" (ngModelChange)="lockSaved.set(false)" class="pc-switch-input" />
+          <span class="pc-switch-slider"></span>
+          <span class="pc-switch-text">{{ lockEnabled ? 'Lock on' : 'Lock off' }}</span>
+        </label>
+
+        <div class="pc-date-group">
+          <span class="date-label">Start from</span>
+          <input type="date" [(ngModel)]="lockFrom" (ngModelChange)="lockSaved.set(false)" [disabled]="!lockEnabled" class="pc-date-input" />
+          <button type="button" class="btn-clear-date" *ngIf="lockFrom" (click)="lockFrom = ''; lockSaved.set(false)">Start now</button>
+        </div>
+
+        <button type="button" class="btn-save-lock" (click)="saveLock()" [disabled]="savingLock() || !lockDirty">
+          {{ savingLock() ? 'Saving…' : 'Save Settings' }}
+        </button>
+        <span class="lock-saved-indicator" *ngIf="lockSaved() && !lockDirty">✓ Saved</span>
+      </div>
+
+      <!-- Excused Accounts -->
+      <div class="pc-exempt-section">
+        <div class="exempt-header-row">
+          <span class="exempt-title">Excused from documents ({{ uniqueExempt().length }})</span>
+        </div>
+
+        <div class="exempt-chips-flow">
+          @for (e of uniqueExempt(); track e.id) {
+            <span class="pc-exempt-item" [title]="e.email || ''">
+              <span class="exempt-name">{{ e.firstName }} {{ e.lastName }}</span>
+              @if (!e.fixed) {
+                <button type="button" class="btn-remove-exempt" (click)="setExempt(e.id, false)" [disabled]="exemptBusy() === e.id" title="Remove exemption">×</button>
+              }
+            </span>
+          }
+        </div>
+
+        <div class="exempt-search-wrapper">
+          <svg lucideSearch size="13" class="exempt-search-icon"></svg>
+          <input type="text" placeholder="Search person to excuse from mandatory documents…" [ngModel]="exemptQuery()" (ngModelChange)="exemptQuery.set($event)" class="exempt-search-input" />
+          @if (exemptMatches().length) {
+            <div class="exempt-dropdown-menu">
+              @for (m of exemptMatches(); track m.id) {
+                <button type="button" class="exempt-dropdown-item" (click)="setExempt(m.id, true)" [disabled]="exemptBusy() === m.id">
+                  <b>{{ m.firstName }} {{ m.lastName }}</b>
+                  <span class="text-xs text-slate-500">{{ m.employeeCode ? '#' + m.employeeCode + ' · ' : '' }}{{ m.email }}</span>
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- 4 Metrics / Stats Cards (Matching Documents Center!) -->
+  @if (report(); as r) {
+    <div class="stats-cards-grid">
+      <!-- Card 1: Total Workforce -->
+      <div class="metric-card">
+        <div class="metric-squircle squircle-blue">
+          <svg lucideUsers size="18"></svg>
+        </div>
+        <div class="metric-content">
+          <div class="metric-number">{{ r.total }}</div>
+          <div class="metric-label">TOTAL WORKFORCE</div>
+          <div class="metric-subtext">Active accounts audited</div>
+        </div>
+      </div>
+
+      <!-- Card 2: Incomplete Profiles -->
+      <div class="metric-card">
+        <div class="metric-squircle squircle-amber">
+          <svg lucideAlertCircle size="18"></svg>
+        </div>
+        <div class="metric-content">
+          <div class="metric-number">{{ r.incomplete }}</div>
+          <div class="metric-label">INCOMPLETE PROFILES</div>
+          <div class="metric-subtext">{{ incompleteRate() }}% pending queue</div>
+        </div>
+      </div>
+
+      <!-- Card 3: Fully Completed -->
+      <div class="metric-card">
+        <div class="metric-squircle squircle-green">
+          <svg lucideCheckCircle2 size="18"></svg>
+        </div>
+        <div class="metric-content">
+          <div class="metric-number">{{ r.complete }}</div>
+          <div class="metric-label">FULLY COMPLETED</div>
+          <div class="metric-subtext">All documents & info ready</div>
+        </div>
+      </div>
+
+      <!-- Card 4: Compliance Rate -->
+      <div class="metric-card">
+        <div class="metric-squircle squircle-purple">
+          <svg lucideSparkles size="18"></svg>
+        </div>
+        <div class="metric-content">
+          <div class="metric-number">{{ completionRate() }}%</div>
+          <div class="metric-label">COMPLIANCE RATE</div>
+          <div class="metric-subtext">{{ r.complete }}/{{ r.total }} employees</div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Filters Panel -->
+  <div class="filters-panel">
+    <!-- Search Input -->
+    <div class="filter-search-box">
+      <svg lucideSearch size="14" class="filter-search-icon"></svg>
+      <input
+        type="search"
+        placeholder="Search name, code, dept, manager, or missing item..."
+        [ngModel]="query()"
+        (ngModelChange)="query.set($event)"
+      />
+    </div>
+
+    <!-- Department Filter -->
+    <div class="filter-dropdown-wrapper" *ngIf="departments().length > 1">
+      <select
+        class="filter-select"
+        [ngModel]="selectedDepartment()"
+        (ngModelChange)="selectedDepartment.set($event)"
+      >
+        <option value="ALL">All Departments</option>
+        @for (dept of departments(); track dept) {
+          <option [value]="dept">{{ dept }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="tab-filters-pills">
+      <button
+        type="button"
+        class="filter-tab-pill"
+        [class.active]="filter() === 'INCOMPLETE'"
+        (click)="filter.set('INCOMPLETE')"
+      >
+        <svg lucideAlertCircle size="14"></svg>
+        <span>Incomplete</span>
+        <span class="tab-badge" *ngIf="report()">{{ report()?.incomplete }}</span>
+      </button>
+
+      <button
+        type="button"
+        class="filter-tab-pill"
+        [class.active]="filter() === 'COMPLETE'"
+        (click)="filter.set('COMPLETE')"
+      >
+        <svg lucideCheckCircle2 size="14"></svg>
+        <span>Complete</span>
+        <span class="tab-badge" *ngIf="report()">{{ report()?.complete }}</span>
+      </button>
+
+      <button
+        type="button"
+        class="filter-tab-pill"
+        [class.active]="filter() === 'ALL'"
+        (click)="filter.set('ALL')"
+      >
+        <svg lucideUsers size="14"></svg>
+        <span>All</span>
+        <span class="tab-badge" *ngIf="report()">{{ report()?.total }}</span>
+      </button>
+    </div>
+
+    <!-- Joined within (12 Nov 2026) -->
+    <app-date-preset-filter label="Joined" [preset]="datePreset()" (presetChange)="datePreset.set($event)" (rangeChange)="dateRange.set($event)"></app-date-preset-filter>
+
+    <!-- Expand / Collapse All -->
     <button
       type="button"
-      class="pc-reset-btn"
-      *ngIf="query() || selectedDepartment() !== 'ALL' || filter() !== 'INCOMPLETE'"
-      (click)="clearFilters()"
+      class="btn-expand-all"
+      (click)="toggleAllExpanded()"
+      [title]="allExpanded() ? 'Collapse all missing item lists' : 'Expand all missing item lists'"
     >
-      Reset Filters
+      @if (allExpanded()) {
+        <svg lucideChevronUp size="14"></svg>
+      } @else {
+        <svg lucideChevronDown size="14"></svg>
+      }
+      <span>{{ allExpanded() ? 'Collapse All' : 'Expand All' }}</span>
     </button>
+
+    <button type="button" class="clear-all-filters"
+      *ngIf="query() || selectedDepartment() !== 'ALL' || filter() !== 'INCOMPLETE' || datePreset() !== 'ALL'"
+      (click)="clearFilters()">Clear all</button>
   </div>
 
-  <!-- Content State -->
+  <!-- Loading State -->
   @if (loading()) {
-    <div class="pc-loading-card">
-      <div class="spinner-circle"></div>
-      <p class="pc-loading-text">Loading profile completion records...</p>
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <span>Loading profile completion records...</span>
     </div>
   } @else if (error()) {
-    <div class="pc-error-card">
+    <div class="error-state-card">
       <svg lucideAlertCircle size="24" class="text-rose-500"></svg>
-      <div class="pc-error-info">
-        <div class="pc-error-title">Failed to load completion report</div>
-        <div class="pc-error-desc">{{ error() }}</div>
+      <div class="error-info">
+        <div class="error-title">Failed to load completion report</div>
+        <div class="error-desc">{{ error() }}</div>
       </div>
-      <button type="button" class="pc-btn pc-btn-secondary" (click)="load()">Try Again</button>
+      <button type="button" class="btn-retry" (click)="load()">Try Again</button>
     </div>
   } @else {
-    <!-- Table -->
+    <!-- Table Card -->
     <div class="pc-table-card">
       <div class="pc-table-wrap">
         <table class="pc-table">
@@ -304,25 +271,22 @@
             </tr>
           </thead>
           <tbody>
-            @for (row of rows(); track row.employee.id) {
+            @for (row of pagedRows(); track row.employee.id) {
               <tr class="pc-table-row" [class.is-complete]="row.complete">
                 <!-- Employee Column -->
                 <td class="td-emp">
                   <div class="emp-profile-wrap">
-                    <div class="emp-avatar" [style.background-color]="!row.employee.avatarUrl ? getAvatarBg(row.employee.id) : '#f1f5f9'">
+                    <div class="emp-avatar-circle" [style.background]="getAvatarBg(row.employee.id)">
                       <img *ngIf="row.employee.avatarUrl" [src]="row.employee.avatarUrl" [alt]="row.employee.firstName" class="emp-avatar-img" (error)="row.employee.avatarUrl = null" />
                       <span *ngIf="!row.employee.avatarUrl">{{ getInitials(row.employee.firstName, row.employee.lastName) }}</span>
                     </div>
                     <div class="emp-meta">
-                      <a [routerLink]="['/employees', row.employee.id, 'profile']" (click)="$event.preventDefault(); profileModal.open(row.employee.id)" class="emp-name">
+                      <a [routerLink]="['/employees', row.employee.id, 'profile']" (click)="$event.preventDefault(); profileModal.open(row.employee.id)" class="emp-name" [title]="row.employee.firstName + ' ' + (row.employee.lastName || '')">
                         {{ row.employee.firstName }} {{ row.employee.lastName || '' }}
                       </a>
                       <div class="emp-sub-row">
                         <span class="emp-code">#{{ row.employee.employeeCode || 'N/A' }}</span>
-                        <span class="emp-designation" *ngIf="row.employee.designation">{{ row.employee.designation }}</span>
-                        <span class="emp-firstjob-pill" *ngIf="row.firstJob" title="First job (relieving letter not required)">
-                          First Job
-                        </span>
+                        <span class="emp-designation" *ngIf="row.employee.designation" [title]="row.employee.designation">{{ row.employee.designation }}</span>
                       </div>
                     </div>
                   </div>
@@ -330,7 +294,7 @@
 
                 <!-- Department Column -->
                 <td class="td-dept">
-                  <span class="dept-chip" *ngIf="row.employee.department; else noDept">
+                  <span class="dept-chip" *ngIf="row.employee.department; else noDept" [title]="row.employee.department">
                     {{ row.employee.department }}
                   </span>
                   <ng-template #noDept>
@@ -341,7 +305,7 @@
                 <!-- Manager Column -->
                 <td class="td-mgr">
                   <div class="mgr-wrap" *ngIf="row.manager; else noMgr">
-                    <span class="mgr-name">{{ row.manager }}</span>
+                    <span class="mgr-name" [title]="row.manager">{{ row.manager }}</span>
                   </div>
                   <ng-template #noMgr>
                     <span class="unassigned-chip">Unassigned</span>
@@ -434,11 +398,11 @@
                     </p>
                     <button
                       type="button"
-                      class="pc-btn pc-btn-secondary mt-2"
+                      class="btn-reset-filters mt-2"
                       *ngIf="query() || selectedDepartment() !== 'ALL' || filter() !== 'INCOMPLETE'"
                       (click)="clearFilters()"
                     >
-                      Clear Filters
+                      Clear all
                     </button>
                   </div>
                 </td>
@@ -446,6 +410,23 @@
             }
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination (12 Nov 2026): same layout as the Directory and Onboarding tables -->
+      <div class="pc-pager" *ngIf="rows().length">
+        <label class="pc-pager-size">Page Size:
+          <select [ngModel]="pageSize()" (ngModelChange)="setPageSize($event)">
+            <option *ngFor="let n of pageSizes" [ngValue]="n">{{ n }}</option>
+          </select>
+        </label>
+        <span class="pc-pager-range"><b>{{ pageStart() + 1 }}</b> to <b>{{ pageEnd() }}</b> of <b>{{ rows().length }}</b></span>
+        <span class="pc-pager-nav">
+          <button type="button" (click)="page.set(0)" [disabled]="page() === 0" aria-label="First page">«</button>
+          <button type="button" (click)="page.set(page() - 1)" [disabled]="page() === 0" aria-label="Previous page">‹</button>
+          <span>Page <b>{{ page() + 1 }}</b> of <b>{{ pageCount() }}</b></span>
+          <button type="button" (click)="page.set(page() + 1)" [disabled]="page() >= pageCount() - 1" aria-label="Next page">›</button>
+          <button type="button" (click)="page.set(pageCount() - 1)" [disabled]="page() >= pageCount() - 1" aria-label="Last page">»</button>
+        </span>
       </div>
     </div>
   }

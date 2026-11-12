@@ -324,7 +324,7 @@ export interface ProfileCompletenessReport {
   complete: number;
   incomplete: number;
   rows: {
-    employee: { id: number; firstName: string; lastName?: string | null; employeeCode?: string | null; email?: string; department: string | null; designation: string | null; avatarUrl?: string | null };
+    employee: { id: number; firstName: string; lastName?: string | null; employeeCode?: string | null; email?: string; department: string | null; designation: string | null; avatarUrl?: string | null; joiningDate?: string | null };
     manager: string | null;
     complete: boolean;
     firstJob: boolean;
