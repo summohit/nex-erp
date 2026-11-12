@@ -402,17 +402,17 @@
             <span>Only the employee or an authorised profile editor can update this</span>
           </div>
         </div>
-        <div class="avatar-actions" *ngIf="formData.avatarUrl">
+        <div class="avatar-actions">
           <div class="avatar-download-menu">
             <button type="button" class="avatar-action" (click)="toggleDownloadMenu()" [attr.aria-expanded]="isDownloadMenuOpen"><svg lucideDownload size="15"></svg> Download</button>
             <div class="avatar-download-options" *ngIf="isDownloadMenuOpen">
-              <button type="button" (click)="downloadOriginalPhoto()"><strong>Original photo</strong><small>Full-size uploaded image</small></button>
-              <button type="button" (click)="downloadSmallPhoto()"><strong>Small photo</strong><small>Optimized 256 px JPG</small></button>
+              <button type="button" (click)="downloadOriginalPhoto()" [disabled]="!formData.avatarUrl"><strong>Original uploaded photo</strong><small>{{ formData.avatarUrl ? 'The employee’s original uploaded file' : 'Upload a profile photo first' }}</small></button>
+              <button type="button" (click)="downloadSmallPhoto()" [disabled]="!formData.avatarUrl"><strong>Small photo</strong><small>{{ formData.avatarUrl ? 'Optimized 256 px JPG' : 'Upload a profile photo first' }}</small></button>
               <button type="button" (click)="downloadProfilePdf()"><strong>Profile as PDF</strong><small>Employee summary document</small></button>
             </div>
           </div>
-          <button type="button" class="avatar-action" *ngIf="canEditPersonalDetails" (click)="avatarInput.click()" [disabled]="isUploadingAvatar || isSavingAvatar"><svg lucideEdit2 size="15"></svg> Change</button>
-          <button type="button" class="avatar-action danger" *ngIf="canEditPersonalDetails" (click)="removeAvatar()" [disabled]="isSavingAvatar"><svg lucideTrash2 size="15"></svg> Delete</button>
+          <button type="button" class="avatar-action" *ngIf="canEditPersonalDetails && formData.avatarUrl" (click)="avatarInput.click()" [disabled]="isUploadingAvatar || isSavingAvatar"><svg lucideEdit2 size="15"></svg> Change</button>
+          <button type="button" class="avatar-action danger" *ngIf="canEditPersonalDetails && formData.avatarUrl" (click)="removeAvatar()" [disabled]="isSavingAvatar"><svg lucideTrash2 size="15"></svg> Delete</button>
         </div>
       </div>
     </div>

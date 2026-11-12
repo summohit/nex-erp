@@ -332,7 +332,10 @@ export class ProfileTabComponent implements OnInit {
         maritalStatus: this.employeeData.maritalStatus || 'Single',
         address: this.employeeData.address || '',
         about: this.employeeData.about || '',
-        avatarUrl: this.employeeData.avatarUrl || '',
+        // The directory API may expose the uploaded portrait on either the
+        // employee record or its linked user. Preserve either source so the
+        // preview, photo downloads, and PDF all use the employee's real photo.
+        avatarUrl: this.employeeData.avatarUrl || this.employeeData.user?.avatarUrl || '',
 
         // Work fields from screenshot 1 & 2
         departmentId: this.employeeData.departmentId || this.employeeData.department?.id || null,
@@ -724,23 +727,22 @@ export class ProfileTabComponent implements OnInit {
     this.isDownloadMenuOpen = !this.isDownloadMenuOpen;
   }
 
-  downloadOriginalPhoto() {
+  async downloadOriginalPhoto() {
     this.isDownloadMenuOpen = false;
-    const url = this.formData.avatarUrl;
+    const url = this.avatarForDownload();
     if (!url) return;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${this.formData.firstName || 'employee'}-${this.formData.lastName || 'photo'}-profile-photo`;
-    link.target = '_blank';
-    link.rel = 'noopener';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Photo download failed');
+      const blob = await response.blob();
+      const extension = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+      this.downloadBlob(blob, `${this.profileFilePrefix()}-original-profile-photo.${extension}`);
+    } catch { this.toast.error('Could not download the original profile photo'); }
   }
 
   async downloadSmallPhoto() {
     this.isDownloadMenuOpen = false;
-    const url = this.formData.avatarUrl;
+    const url = this.avatarForDownload();
     if (!url) return;
     try {
       const response = await fetch(url);
@@ -764,24 +766,94 @@ export class ProfileTabComponent implements OnInit {
     } catch { this.toast.error('Could not download the profile photo'); }
   }
 
-  downloadProfilePdf() {
+  async downloadProfilePdf() {
     this.isDownloadMenuOpen = false;
-    const lines = [
-      'EMPLOYEE PROFILE', '',
-      `Name: ${this.formData.firstName || ''} ${this.formData.lastName || ''}`.trim(),
-      `Employee ID: ${this.employeeData?.employeeCode || 'Not assigned'}`,
-      `Email: ${this.formData.email || this.employeeData?.user?.email || 'Not provided'}`,
-      `Department: ${this.employeeData?.department?.name || 'Unassigned'}`,
-      `Designation: ${this.employeeData?.designation?.name || 'Unassigned'}`,
-      `Phone: ${this.formData.phone || 'Not provided'}`,
-      `Generated: ${new Date().toLocaleString('en-IN')}`,
+    try {
+      const photo = await this.profilePhotoForPdf();
+      this.downloadBlob(this.buildProfilePdf(photo), `${this.profileFilePrefix()}-profile-summary.pdf`);
+    } catch {
+      this.toast.error('Could not create the profile PDF');
+    }
+  }
+
+  private profileSections(): Array<{ title: string; rows: Array<[string, any]> }> {
+    const d = this.employeeData || {}; const f = this.formData || {};
+    const name = `${f.firstName || d.firstName || ''} ${f.lastName || d.lastName || ''}`.trim();
+    const contactNames = (d.emergencyContacts || []).map((c: any) => `${c.name} (${c.relationship || 'Contact'}: ${c.mobile || '—'})`).join('; ');
+    return [
+      { title: 'Employee details', rows: [['Full name', name], ['Employee ID', d.employeeCode], ['Email', f.email || d.user?.email], ['Phone', f.phone], ['Department', d.department?.name], ['Designation', d.designation?.name], ['Role', d.user?.role || d.role], ['Employment', d.employmentCategory || 'Permanent'], ['Joining date', f.joiningDate || d.joiningDate]] },
+      { title: 'Work & reporting', rows: [['Manager', d.manager ? `${d.manager.firstName || ''} ${d.manager.lastName || ''}`.trim() : 'Not assigned'], ['Branch', d.branch?.name], ['Work location', f.workLocation || d.workLocation], ['Standing shift', d.shift?.name], ['Shift timing', d.shift?.startTime && d.shift?.endTime ? `${d.shift.startTime} – ${d.shift.endTime}` : 'Not assigned'], ['Weekly off', f.weeklyOffs || d.weeklyOffs], ['Next appraisal', f.nextAppraisalDate || d.nextAppraisalDate]] },
+      { title: 'Personal & contact', rows: [['Date of birth', f.dateOfBirth || d.dateOfBirth], ['Gender', f.gender || d.gender], ['Marital status', f.maritalStatus || d.maritalStatus], ['Nationality', f.nationality || d.nationality], ['Address', f.address || d.address], ['City', f.city || d.city], ['State', f.state || d.state], ['Country', f.country || d.country], ['Emergency contacts', contactNames]] },
+      { title: 'Identity & payroll', rows: [['PF number', f.pfNumber || d.pfNumber], ['ESI number', f.esiNumber || d.esiNumber], ['Bank name', f.bankName || d.bankName], ['Bank account', f.bankAccountNumber || d.bankAccountNumber], ['IFSC code', f.ifscCode || d.ifscCode], ['Identification number', f.identificationNo || d.identificationNo], ['Passport number', f.passportNo || d.passportNo], ['Visa number', f.visaNo || d.visaNo], ['Work permit', f.workPermitNo || d.workPermitNo]] },
+      { title: 'Additional information', rows: [['About', f.about || d.about], ['Skills', (d.skills || f.skills || []).map((s: any) => typeof s === 'string' ? s : `${s.name || ''}${s.level ? ` (${s.level})` : ''}`).join(', ')], ['Notes', f.workNotes || d.workNotes]] },
     ];
-    const text = lines.map((line, i) => `BT /F1 ${i === 0 ? 18 : 11} Tf 50 ${790 - i * 25} Td (${this.escapePdf(line)}) Tj ET`).join('\n');
-    const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>', `<< /Length ${text.length} >>\nstream\n${text}\nendstream`];
-    let pdf = '%PDF-1.4\n'; const offsets = [0];
-    objects.forEach((object, index) => { offsets.push(pdf.length); pdf += `${index + 1} 0 obj\n${object}\nendobj\n`; });
-    const xref = pdf.length; pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map(o => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-    this.downloadBlob(new Blob([pdf], { type: 'application/pdf' }), `${this.profileFilePrefix()}-profile-summary.pdf`);
+  }
+
+  private avatarForDownload(): string {
+    return this.formData.avatarUrl || this.employeeData?.avatarUrl || this.employeeData?.user?.avatarUrl || '';
+  }
+
+  private async profilePhotoForPdf(): Promise<{ hex: string; width: number; height: number } | null> {
+    const avatarUrl = this.avatarForDownload();
+    if (!avatarUrl) return null;
+    try {
+      const response = await fetch(avatarUrl);
+      if (!response.ok) throw new Error('Photo download failed');
+      const blob = await response.blob();
+      const source = URL.createObjectURL(blob); const image = new Image();
+      await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(); image.src = source; });
+      const canvas = document.createElement('canvas'); canvas.width = 160; canvas.height = 160;
+      const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 160, 160);
+      const scale = Math.min(160 / image.width, 160 / image.height); const w = image.width * scale; const h = image.height * scale;
+      ctx.drawImage(image, (160 - w) / 2, (160 - h) / 2, w, h); URL.revokeObjectURL(source);
+      const data = canvas.toDataURL('image/jpeg', .88).split(',')[1];
+      return { hex: Array.from(atob(data), c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('').toUpperCase(), width: 160, height: 160 };
+    } catch { return null; }
+  }
+
+  private buildProfilePdf(photo: { hex: string; width: number; height: number } | null): Blob {
+    const objects: string[] = []; const add = (v: string) => (objects.push(v), objects.length);
+    const catalog = add(''); const pages = add(''); const regular = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'); const bold = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
+    const image = photo ? add(`<< /Type /XObject /Subtype /Image /Width ${photo.width} /Height ${photo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /DCTDecode] /Length ${photo.hex.length + 1} >>\nstream\n${photo.hex}>\nendstream`) : 0;
+    const pageIds: number[] = []; const cmds: string[] = []; let y = 676; let page = 0;
+    const esc = (v: any) => this.escapePdf(v || 'Not provided');
+    const text = (x: number, yy: number, size: number, value: any, font = 'F1', color = '0.16 0.22 0.33') => `BT /${font} ${size} Tf ${color} rg ${x} ${yy} Td (${esc(value)}) Tj ET`;
+    const line = (value: any, max = 38) => {
+      const words = String(value || 'Not provided').split(/\s+/); const out: string[] = []; let current = '';
+      for (let word of words) {
+        while (word.length > max) { if (current) { out.push(current); current = ''; } out.push(word.slice(0, max)); word = word.slice(max); }
+        if ((current + ' ' + word).trim().length > max) { if (current) out.push(current); current = word; } else current = `${current} ${word}`.trim();
+      }
+      if (current) out.push(current); return out.slice(0, 4);
+    };
+    const startPage = () => { if (cmds.length) { const stream = cmds.join('\n'); const content = add(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`); const resources = `/Font << /F1 ${regular} 0 R /F2 ${bold} 0 R >>${image ? ` /XObject << /Im1 ${image} 0 R >>` : ''}`; pageIds.push(add(`<< /Type /Page /Parent ${pages} 0 R /MediaBox [0 0 595 842] /Resources << ${resources} >> /Contents ${content} 0 R >>`)); cmds.length = 0; }
+      page++; y = 676; cmds.push('0.12 0.32 0.65 rg 0 772 595 70 re f', text(38, 805, 20, 'EMPLOYEE PROFILE', 'F2', '1 1 1'), text(38, 785, 10, `${this.formData.firstName || ''} ${this.formData.lastName || ''}  •  Generated ${new Date().toLocaleDateString('en-IN')}`, 'F1', '0.88 0.94 1'));
+      // Keep the employee's actual uploaded photo prominent in the first-page
+      // header. It is embedded in the PDF, so it remains visible offline.
+      if (page === 1 && photo) cmds.push('1 1 1 rg 492 778 62 62 re f', `q 58 0 0 58 494 780 cm /Im1 Do Q`);
+      if (page === 1) cmds.push(text(38, 744, 16, `${this.formData.firstName || ''} ${this.formData.lastName || ''}`.trim(), 'F2'), text(38, 726, 10, this.employeeData?.employeeCode || 'Employee profile')); };
+    startPage();
+    for (const section of this.profileSections()) {
+      const rows = section.rows.filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '');
+      if (!rows.length) continue;
+      if (y < 120) startPage();
+      cmds.push(`0.12 0.32 0.65 rg 38 ${y - 5} 519 22 re f`, text(48, y + 2, 11, section.title.toUpperCase(), 'F2', '1 1 1')); y -= 27;
+      for (let i = 0; i < rows.length; i += 2) {
+        const pair = rows.slice(i, i + 2); const wrapped = pair.map(([, v]) => line(v));
+        // Label baseline + value baseline(s) + bottom padding. This prevents a
+        // section header from being drawn over the final table row.
+        const height = Math.max(...wrapped.map(v => v.length)) * 14 + 32;
+        if (y - height < 52) { startPage(); cmds.push(`0.12 0.32 0.65 rg 38 ${y - 5} 519 22 re f`, text(48, y + 2, 11, section.title.toUpperCase(), 'F2', '1 1 1')); y -= 27; }
+        pair.forEach(([label, value], col) => { const x = 38 + col * 260; cmds.push('0.97 0.98 1 rg', `${x} ${y - height} 259 ${height} re f`, '0.84 0.88 0.94 RG', `${x} ${y - height} 259 ${height} re S`, text(x + 10, y - 14, 8.5, label.toUpperCase(), 'F2', '0.35 0.43 0.55')); line(value).forEach((v, j) => cmds.push(text(x + 10, y - 28 - j * 13, 9.5, v))); });
+        y -= height;
+      }
+      y -= 12;
+    }
+    startPage();
+    objects[pages - 1] = `<< /Type /Pages /Kids [${pageIds.map(id => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`; objects[catalog - 1] = `<< /Type /Catalog /Pages ${pages} 0 R >>`;
+    let pdf = '%PDF-1.4\n'; const offsets = [0]; objects.forEach((obj, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\n${obj}\nendobj\n`; }); const xref = pdf.length;
+    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map(o => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objects.length + 1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF`;
+    return new Blob([pdf], { type: 'application/pdf' });
   }
 
   private profileFilePrefix() { return `${this.formData.firstName || 'employee'}-${this.formData.lastName || 'profile'}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
