@@ -38,6 +38,16 @@ export class ShiftsController {
     return this.rosterService.assign(req.user.companyId, data);
   }
 
+  @Post('roster/permanent')
+  @Permissions('attendance/shifts')
+  assignPermanent(@Request() req, @Body() data: any) {
+    if (Array.isArray(data?.employeeIds)) {
+      if (!isSuperAdmin(req.user.role)) throw new ForbiddenException('Only a Super Admin can change shifts permanently');
+      return this.rosterService.setPermanentShift(req.user.companyId, data);
+    }
+    return this.rosterService.assignPermanent(req.user.companyId, data, req.user.role);
+  }
+
   @Post('roster/bulk')
   @Permissions('attendance/shifts')
   bulkAssignRoster(@Request() req, @Body() data: any) {
@@ -49,17 +59,6 @@ export class ShiftsController {
   @Permissions('attendance/shifts')
   copyPreviousMonth(@Request() req, @Body() data: any) {
     return this.rosterService.copyPreviousMonth(req.user.companyId, data);
-  }
-
-  /**
-   * Change the standing shift of many people at once (11 Nov 2026). Super Admin
-   * only: this is permanent, unlike the roster, which is per day.
-   */
-  @Post('roster/permanent')
-  @Permissions('attendance/shifts')
-  setPermanentShift(@Request() req, @Body() data: { employeeIds: number[]; shiftId: number; clearFutureRoster?: boolean }) {
-    if (!isSuperAdmin(req.user.role)) throw new ForbiddenException('Only a Super Admin can change shifts permanently');
-    return this.rosterService.setPermanentShift(req.user.companyId, data);
   }
 
   @Post('roster/clear')

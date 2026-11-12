@@ -43,19 +43,20 @@
 }
 
 .search-group input {
-  padding: 8px 12px 8px 36px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  height: 40px;
+  padding: 8px 12px 8px 38px;
+  border: 1px solid #dbe3ee;
+  border-radius: 9px;
   font-size: 13px;
-  width: 250px;
+  width: 265px;
   outline: none;
   transition: all 0.2s;
-  background: white;
+  background: rgba(255, 255, 255, .92);
 }
 
 .search-group input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(19, 115, 229, 0.1);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .employee-search-dropdown {
@@ -122,13 +123,17 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 16px;
-  background: #f9fafb;
-  padding: 12px 16px;
-  border-radius: 8px;
-  border: 1px solid #eee;
+  gap: 10px 12px;
+  background: linear-gradient(135deg, #fbfdff 0%, #f8fafc 100%);
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, .025);
   margin-bottom: var(--space-xl);
 }
+
+.filter-toolbar-label { display: inline-flex; align-items: center; gap: 7px; margin-right: 4px; color: #334155; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.filter-toolbar-icon { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid #dbeafe; border-radius: 8px; color: #2563eb; background: #eff6ff; }
 
 .filter-group {
   position: relative;
@@ -160,17 +165,18 @@
 }
 
 .btn-clear-filters {
-  background: transparent;
-  border: none;
+  height: 38px;
+  background: #fff;
+  border: 1px solid #dbe3ee;
   color: #475569;
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 650;
   display: flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 6px 11px;
+  border-radius: 8px;
   transition: all 0.2s;
   margin-left: auto;
   white-space: nowrap;
@@ -178,9 +184,19 @@
 }
 
 .btn-clear-filters:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
 }
+
+/* Keep reusable filter selects visually aligned with this toolbar only. */
+:host ::ng-deep .filter-card app-searchable-select { display: block; min-width: 176px; }
+:host ::ng-deep .filter-card app-searchable-select button { min-height: 40px; border-radius: 9px !important; border-color: #dbe3ee !important; background: rgba(255,255,255,.92) !important; box-shadow: none !important; }
+:host ::ng-deep .filter-card app-searchable-select button:hover { border-color: #bfdbfe !important; background: #fff !important; }
+:host ::ng-deep .filter-card app-searchable-select button:focus-visible { outline: none; border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12) !important; }
+
+@media (max-width: 1100px) { .filter-toolbar-label { width: 100%; }.btn-clear-filters { margin-left: 0; } }
+@media (max-width: 640px) { .filter-card { display: grid; grid-template-columns: 1fr; padding: 13px; }.filter-group, .search-group input, :host ::ng-deep .filter-card app-searchable-select { width: 100%; }.btn-clear-filters { width: fit-content; } }
 
 .btn-icon {
   background: white;
@@ -528,23 +544,21 @@
 }
 
 .grid-container {
-  height: 650px;
+  /* 10 × 70px rows + header + pagination: every page is fully visible. */
+  height: 806px;
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
 /* AG Grid renders separate scrollbar components as well as scrollable
    viewports. Remove both layers so neither rail is visible in the directory. */
 :host ::ng-deep .grid-container .ag-body-horizontal-scroll,
-:host ::ng-deep .grid-container .ag-body-vertical-scroll {
+:host ::ng-deep .grid-container .ag-body-horizontal-scroll {
   display: none !important;
 }
 
 :host ::ng-deep .grid-container .ag-body-horizontal-scroll::-webkit-scrollbar,
-:host ::ng-deep .grid-container .ag-body-vertical-scroll::-webkit-scrollbar,
 .grid-container .ag-center-cols-viewport::-webkit-scrollbar,
-.grid-container .ag-body-viewport::-webkit-scrollbar,
 .grid-container::-webkit-scrollbar {
   width: 0 !important;
   height: 0 !important;
@@ -552,11 +566,19 @@
 }
 
 :host ::ng-deep .grid-container .ag-center-cols-viewport,
-:host ::ng-deep .grid-container .ag-body-viewport,
-:host ::ng-deep .grid-container .ag-body-horizontal-scroll-viewport,
-:host ::ng-deep .grid-container .ag-body-vertical-scroll-viewport {
+:host ::ng-deep .grid-container .ag-body-horizontal-scroll-viewport {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
+}
+
+/* Keep the complete pagination bar in view; AG Grid's page controls can
+   otherwise be clipped when the table is fitted after a resize. */
+:host ::ng-deep .grid-container .ag-paging-panel {
+  min-height: 52px;
+  min-width: 0;
+  padding: 8px 16px;
+  overflow: visible;
+  border-top: 1px solid #e2e8f0;
 }
 
 /* Keep the directory readable at every width: long department and designation

@@ -142,6 +142,13 @@ export class EmployeeService {
     });
   }
 
+  updateContact(id: number | string, contactId: number, data: any): Observable<any> {
+    const token = getAccessToken();
+    return this.http.put<any>(`${this.apiUrl}/${id}/contacts/${contactId}`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   deleteContact(id: number | string, contactId: number): Observable<any> {
     const token = getAccessToken();
     return this.http.delete<any>(`${this.apiUrl}/${id}/contacts/${contactId}`, {

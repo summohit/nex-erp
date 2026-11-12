@@ -88,7 +88,27 @@
           </div>
         </div>
 
-        <!-- SECTION: OFFICE & LOCATION -->
+        <!-- SECTION: SHIFT (Super Admin / HR) -->
+        <div class="field-section profile-shift-section" *ngIf="canEditWorkDetails">
+          <div class="section-header-bar">
+            <div class="card-icon-badge blue">
+              <svg lucideClock size="16"></svg>
+            </div>
+            <h3 class="section-title">SHIFT</h3>
+          </div>
+          <div class="profile-shift-summary">
+            <div>
+              <span class="profile-shift-label">Current shift</span>
+              <strong>{{ currentShiftName() }}</strong>
+              <small>{{ currentShiftTiming() }}</small>
+            </div>
+            <button type="button" class="profile-change-shift-btn" (click)="openShiftChange()">
+              <svg lucideClock size="15"></svg> Change shift
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION: LOCATION -->
         <div class="field-section">
           <div class="section-header-bar">
             <div class="card-icon-badge blue">
@@ -144,40 +164,7 @@
           </div>
         </div>
 
-        <!-- SECTION: USUAL WEEKLY SCHEDULE -->
-        <div class="field-section">
-          <div class="section-header-bar">
-            <div class="card-icon-badge green">
-              <svg lucideClock size="16"></svg>
-            </div>
-            <h3 class="section-title">USUAL WEEKLY SCHEDULE</h3>
-          </div>
-          <div class="form-grid-stack">
-            <!-- One row per day: where they work, and which shift applies. -->
-            <div class="form-row-item schedule-row-item" *ngFor="let d of weekDays">
-              <label class="item-label">{{ d.label }}</label>
-              <div class="item-value day-schedule-row">
-                <select class="form-control select-location"
-                        [(ngModel)]="formData.usualWorkLocation[d.key]"
-                        [disabled]="!canEditWorkDetails">
-                  <option *ngFor="let opt of dynamicLocationOptions" [value]="opt">{{ opt }}</option>
-                </select>
-
-                <div class="day-shift-wrap">
-                  <select class="form-control select-shift"
-                          [(ngModel)]="formData.usualWorkLocation.shifts[d.key]"
-                          [disabled]="!canEditWorkDetails">
-                    <option [ngValue]="undefined">{{ defaultShiftLabel() }}</option>
-                    <option *ngFor="let s of companyShifts" [ngValue]="s.id">{{ s.name }}</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- SECTION: INTERNAL NOTES -->
+        <!-- SECTION: NOTE -->
         <div class="field-section">
           <div class="section-header-bar">
             <div class="card-icon-badge purple">
@@ -431,7 +418,14 @@
           </div>
         </div>
         <div class="avatar-actions" *ngIf="formData.avatarUrl">
-          <button type="button" class="avatar-action" (click)="downloadAvatar()"><svg lucideDownload size="15"></svg> Download</button>
+          <div class="avatar-download-menu">
+            <button type="button" class="avatar-action" (click)="toggleDownloadMenu()" [attr.aria-expanded]="isDownloadMenuOpen"><svg lucideDownload size="15"></svg> Download</button>
+            <div class="avatar-download-options" *ngIf="isDownloadMenuOpen">
+              <button type="button" (click)="downloadOriginalPhoto()"><strong>Original photo</strong><small>Full-size uploaded image</small></button>
+              <button type="button" (click)="downloadSmallPhoto()"><strong>Small photo</strong><small>Optimized 256 px JPG</small></button>
+              <button type="button" (click)="downloadProfilePdf()"><strong>Profile as PDF</strong><small>Employee summary document</small></button>
+            </div>
+          </div>
           <button type="button" class="avatar-action" *ngIf="canEditPersonalDetails" (click)="avatarInput.click()" [disabled]="isUploadingAvatar || isSavingAvatar"><svg lucideEdit2 size="15"></svg> Change</button>
           <button type="button" class="avatar-action danger" *ngIf="canEditPersonalDetails" (click)="removeAvatar()" [disabled]="isSavingAvatar"><svg lucideTrash2 size="15"></svg> Delete</button>
         </div>
@@ -851,6 +845,37 @@
       <span *ngIf="isSaving" class="btn-spinner btn-spinner-light"></span>
       <span *ngIf="isSaving">Saving...</span>
     </button>
+  </div>
+</div>
+
+<!-- Change shift modal -->
+<div class="modal-backdrop shift-change-backdrop" *ngIf="isShiftChangeOpen" (click)="closeShiftChange()">
+  <div class="modal-box shift-change-modal" role="dialog" aria-modal="true" aria-labelledby="shift-change-title" (click)="$event.stopPropagation()">
+    <div class="modal-header shift-change-header">
+      <div><span class="shift-modal-kicker">SHIFT ROSTER</span><h2 id="shift-change-title">Change shift</h2><p>{{ employeeData?.firstName }} {{ employeeData?.lastName }} · {{ currentShiftName() }}</p></div>
+      <button type="button" class="close-btn" (click)="closeShiftChange()" aria-label="Close"><svg lucideX size="18"></svg></button>
+    </div>
+    <div class="modal-body shift-change-body">
+      <div class="modal-field-group">
+        <label class="modal-label">Choose shift</label>
+        <div class="profile-shift-picker" role="radiogroup" aria-label="Choose shift">
+          <button type="button" *ngFor="let s of companyShifts" class="profile-shift-option" [class.selected]="shiftChange.shiftId === s.id" (click)="shiftChange.shiftId = s.id" role="radio" [attr.aria-checked]="shiftChange.shiftId === s.id">
+            <span class="profile-shift-dot" [style.background]="s.colorCode || '#2563eb'"></span>
+            <span class="profile-shift-option-copy"><strong>{{ s.name }}</strong><small>{{ s.startTime }} – {{ s.endTime }}</small></span>
+            <span class="profile-shift-selected-mark" *ngIf="shiftChange.shiftId === s.id"><svg lucideCheckCircle2 size="17"></svg></span>
+          </button>
+        </div>
+      </div>
+      <div class="shift-scope-options">
+        <label [class.selected]="shiftChange.mode === 'PERMANENT'"><input type="radio" name="profile-shift-scope" value="PERMANENT" [(ngModel)]="shiftChange.mode"><span><strong>Permanently</strong><small>Sets this employee's standing shift for future roster days.</small></span></label>
+        <label [class.selected]="shiftChange.mode === 'DATES'"><input type="radio" name="profile-shift-scope" value="DATES" [(ngModel)]="shiftChange.mode"><span><strong>Selected dates</strong><small>Creates roster entries only for the date range below.</small></span></label>
+      </div>
+      <div class="form-grid-2" *ngIf="shiftChange.mode === 'DATES'">
+        <div class="modal-field-group"><label class="modal-label" for="profile-shift-start">From</label><input id="profile-shift-start" type="date" class="form-control" [(ngModel)]="shiftChange.start"></div>
+        <div class="modal-field-group"><label class="modal-label" for="profile-shift-end">To</label><input id="profile-shift-end" type="date" class="form-control" [(ngModel)]="shiftChange.end" [min]="shiftChange.start"></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn-discard" (click)="closeShiftChange()" [disabled]="shiftSaving">Cancel</button><button type="button" class="btn-primary-purple" (click)="saveShiftChange()" [disabled]="shiftSaving"><span *ngIf="!shiftSaving">Save shift</span><span *ngIf="shiftSaving">Saving…</span></button></div>
   </div>
 </div>
 <!-- ==================== UPDATE SKILLS MODAL (SCREENSHOT 5) ==================== -->

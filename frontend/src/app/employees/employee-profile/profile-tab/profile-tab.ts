@@ -9,7 +9,7 @@ import {
   LucideCreditCard, LucideUser, LucideShieldCheck, LucideGraduationCap,
   LucidePlane, LucideUsers, LucideSettings, LucideEdit2, LucidePaperclip, LucideMapPin,
   LucideUploadCloud, LucideFileText, LucideCheckCircle2, LucideMail,
-  LucideBriefcase, LucideCalendar, LucideClock, LucideCircleHelp, LucideImage
+  LucideBriefcase, LucideCalendar, LucideClock, LucideCircleHelp, LucideImage, LucideDownload
 } from '@lucide/angular';
 import { EmployeeService, Employee } from '../../../services/employee.service';
 import { MasterDataService, Branch, Department, Designation } from '../../../services/master-data.service';
@@ -77,7 +77,8 @@ export interface ProfileFormErrors {
     LucideCalendar,
     LucideClock,
     LucideCircleHelp,
-    LucideImage
+    LucideImage,
+    LucideDownload
   ],
   templateUrl: './profile-tab.html',
   styleUrls: ['./profile-tab.css']
@@ -124,7 +125,6 @@ export class ProfileTabComponent implements OnInit {
   companyBranches: Branch[] = [];
   companyDepartments: Department[] = [];
   companyDesignations: Designation[] = [];
-  dynamicLocationOptions: string[] = ['Unspecified', 'Home', 'Other'];
 
   get canEditWorkDetails(): boolean {
     const token = getAccessToken();
@@ -146,6 +146,12 @@ export class ProfileTabComponent implements OnInit {
   get canSaveProfile(): boolean {
     return this.isOwner || this.canEditWorkDetails;
   }
+
+  isShiftChangeOpen = false;
+  shiftSaving = false;
+  shiftChange: { shiftId: number | null; mode: 'PERMANENT' | 'DATES'; start: string; end: string } = {
+    shiftId: null, mode: 'PERMANENT', start: '', end: ''
+  };
 
   countries = Country.getAllCountries();
   states: any[] = [];
@@ -228,31 +234,7 @@ export class ProfileTabComponent implements OnInit {
     });
   }
 
-  readonly weekDays = [
-    { key: 'monday',    label: 'Monday' },
-    { key: 'tuesday',   label: 'Tuesday' },
-    { key: 'wednesday', label: 'Wednesday' },
-    { key: 'thursday',  label: 'Thursday' },
-    { key: 'friday',    label: 'Friday' },
-    { key: 'saturday',  label: 'Saturday' },
-    { key: 'sunday',    label: 'Sunday' },
-  ];
-
   companyShifts: Shift[] = [];
-
-  /**
-   * Older records stored only `{ monday: 'Home', ... }`. Bring them forward by
-   * adding the `shifts` map rather than rewriting the shape, so nothing that
-   * already reads the day keys breaks.
-   */
-  private normaliseWorkLocation(raw: any) {
-    const base: any = raw && typeof raw === 'object' ? { ...raw } : {};
-    for (const d of this.weekDays) {
-      if (!base[d.key]) base[d.key] = 'Unspecified';
-    }
-    base.shifts = base.shifts && typeof base.shifts === 'object' ? { ...base.shifts } : {};
-    return base;
-  }
 
   loadShifts() {
     this.shiftsService.getShifts().subscribe({
@@ -261,28 +243,59 @@ export class ProfileTabComponent implements OnInit {
     });
   }
 
-  /** Label for the "use the employee's default" option. */
-  defaultShiftLabel(): string {
-    const s = this.employeeData?.shift;
-    return s?.name ? `Default (${s.name})` : 'Default shift';
-  }
-
   /** Time range shown under a day when an override is picked. */
   shiftTimeRange(shiftId: any): string {
     const s = this.companyShifts.find(x => String(x.id) === String(shiftId));
     return s ? `${s.startTime} – ${s.endTime}` : '';
   }
 
+  currentShiftName(): string {
+    return this.employeeData?.shift?.name || 'No standing shift assigned';
+  }
+
+  currentShiftTiming(): string {
+    const shift = this.employeeData?.shift;
+    return shift?.startTime && shift?.endTime ? `${shift.startTime} – ${shift.endTime}` : 'Use Change shift to assign one';
+  }
+
+  openShiftChange() {
+    const current = this.employeeData?.shift;
+    const matchingShift = this.companyShifts.find(s =>
+      String(s.id) === String(current?.id) || (!!current?.name && s.name === current.name)
+    );
+    this.shiftChange = { shiftId: matchingShift?.id ?? null, mode: 'PERMANENT', start: '', end: '' };
+    this.isShiftChangeOpen = true;
+  }
+
+  closeShiftChange() {
+    if (!this.shiftSaving) this.isShiftChangeOpen = false;
+  }
+
+  saveShiftChange() {
+    const employeeId = this.employeeData?.id;
+    const { shiftId, mode, start, end } = this.shiftChange;
+    if (!employeeId || !shiftId) { this.toast.error('Please choose a shift'); return; }
+    if (mode === 'DATES' && (!start || !end || start > end)) { this.toast.error('Choose a valid start and end date'); return; }
+    this.shiftSaving = true;
+    const request = mode === 'PERMANENT'
+      ? this.shiftsService.assignPermanent({ employeeId, shiftId })
+      : this.shiftsService.bulkAssignRoster({ employeeIds: [employeeId], start, end, shiftId, overwriteExisting: true });
+    request.subscribe({
+      next: () => {
+        if (mode === 'PERMANENT') this.employeeData.shift = this.companyShifts.find(s => s.id === shiftId) || { id: shiftId, name: 'Assigned shift' };
+        this.toast.success(mode === 'PERMANENT' ? 'Standing shift updated' : 'Shift assigned for the selected dates');
+        this.shiftSaving = false;
+        this.isShiftChangeOpen = false;
+        this.refreshProfile.emit();
+      },
+      error: () => { this.shiftSaving = false; this.toast.error('Unable to update shift. Please try again.'); }
+    });
+  }
+
   loadBranches() {
     this.masterDataService.getBranches().subscribe({
       next: (branches) => {
         this.companyBranches = branches || [];
-        this.dynamicLocationOptions = [
-          'Unspecified', 
-          'Home', 
-          ...this.companyBranches.map(b => b.name), 
-          'Other'
-        ];
       },
       error: (err) => console.error('Failed to load branches', err)
     });
@@ -333,9 +346,6 @@ export class ProfileTabComponent implements OnInit {
           ? new Date(this.employeeData.nextAppraisalDate).toISOString().split('T')[0]
           : '',
 
-        // Usual work location mapping per day. Per-day shift overrides live in a
-        // nested `shifts` key so records saved before this existed still load.
-        usualWorkLocation: this.normaliseWorkLocation(this.employeeData.usualWorkLocation),
         workLocation: this.employeeData.workLocation || null,
         weeklyOffs: this.employeeData.weeklyOffs || '',
         workNotes: this.employeeData.workNotes || '',
@@ -775,6 +785,7 @@ export class ProfileTabComponent implements OnInit {
 
   isUploadingAvatar = false;
   isSavingAvatar = false;
+  isDownloadMenuOpen = false;
 
   private saveAvatarUrl(avatarUrl: string, successMessage: string) {
     if (!this.employeeData?.id) return;
@@ -792,7 +803,12 @@ export class ProfileTabComponent implements OnInit {
     });
   }
 
-  downloadAvatar() {
+  toggleDownloadMenu() {
+    this.isDownloadMenuOpen = !this.isDownloadMenuOpen;
+  }
+
+  downloadOriginalPhoto() {
+    this.isDownloadMenuOpen = false;
     const url = this.formData.avatarUrl;
     if (!url) return;
     const link = document.createElement('a');
@@ -804,6 +820,56 @@ export class ProfileTabComponent implements OnInit {
     link.click();
     link.remove();
   }
+
+  async downloadSmallPhoto() {
+    this.isDownloadMenuOpen = false;
+    const url = this.formData.avatarUrl;
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      const source = URL.createObjectURL(await response.blob());
+      const image = new Image();
+      image.onload = () => {
+        const edge = 256;
+        const scale = Math.min(edge / image.width, edge / image.height, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+          URL.revokeObjectURL(source);
+          if (!blob) return;
+          this.downloadBlob(blob, `${this.profileFilePrefix()}-profile-photo-small.jpg`);
+        }, 'image/jpeg', .88);
+      };
+      image.onerror = () => { URL.revokeObjectURL(source); this.toast.error('Could not create the small photo'); };
+      image.src = source;
+    } catch { this.toast.error('Could not download the profile photo'); }
+  }
+
+  downloadProfilePdf() {
+    this.isDownloadMenuOpen = false;
+    const lines = [
+      'EMPLOYEE PROFILE', '',
+      `Name: ${this.formData.firstName || ''} ${this.formData.lastName || ''}`.trim(),
+      `Employee ID: ${this.employeeData?.employeeCode || 'Not assigned'}`,
+      `Email: ${this.formData.email || this.employeeData?.user?.email || 'Not provided'}`,
+      `Department: ${this.employeeData?.department?.name || 'Unassigned'}`,
+      `Designation: ${this.employeeData?.designation?.name || 'Unassigned'}`,
+      `Phone: ${this.formData.phone || 'Not provided'}`,
+      `Generated: ${new Date().toLocaleString('en-IN')}`,
+    ];
+    const text = lines.map((line, i) => `BT /F1 ${i === 0 ? 18 : 11} Tf 50 ${790 - i * 25} Td (${this.escapePdf(line)}) Tj ET`).join('\n');
+    const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>', `<< /Length ${text.length} >>\nstream\n${text}\nendstream`];
+    let pdf = '%PDF-1.4\n'; const offsets = [0];
+    objects.forEach((object, index) => { offsets.push(pdf.length); pdf += `${index + 1} 0 obj\n${object}\nendobj\n`; });
+    const xref = pdf.length; pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map(o => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+    this.downloadBlob(new Blob([pdf], { type: 'application/pdf' }), `${this.profileFilePrefix()}-profile-summary.pdf`);
+  }
+
+  private profileFilePrefix() { return `${this.formData.firstName || 'employee'}-${this.formData.lastName || 'profile'}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+  private escapePdf(value: string) { return String(value).replace(/\\/g, '\\\\').replace(/[()]/g, '\\$&').replace(/[^\x20-\x7E]/g, ''); }
+  private downloadBlob(blob: Blob, fileName: string) { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = fileName; link.click(); URL.revokeObjectURL(url); }
 
   removeAvatar() {
     if (!this.canEditPersonalDetails || !this.formData.avatarUrl || this.isSavingAvatar) return;

@@ -688,6 +688,21 @@ export class ShiftRosterService {
     });
   }
 
+  /** Update an employee's standing shift without overwriting dated roster entries. */
+  async assignPermanent(
+    companyId: number,
+    data: { employeeId: number; shiftId: number },
+    actorRole?: string,
+  ) {
+    if (!['SUPERADMIN', 'SUPER_ADMIN'].includes(actorRole ?? '')) {
+      throw new ForbiddenException('Only a Super Admin can change a standing shift');
+    }
+    const employee = await this.assertEmployee(companyId, data.employeeId);
+    const shift = await this.assertShift(companyId, data.shiftId);
+    await this.prisma.employee.update({ where: { id: employee.id }, data: { shiftId: shift.id } });
+    return { employeeId: employee.id, shiftId: shift.id, shiftName: shift.name };
+  }
+
   /**
    * Roster a shift across a date range for many employees at once — the
    * equivalent of Workway's "Automate Shifts". Days the shift does not operate

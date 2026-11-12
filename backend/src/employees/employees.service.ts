@@ -960,8 +960,16 @@ export class EmployeesService {
     return this.prisma.employeeResume.delete({ where: { id: lineId } });
   }
 
+  /** Emergency contacts are private: employees manage their own and a Super Admin may manage any profile. */
+  private async checkEmergencyContactPermission(employeeId: number, companyId: number, currentUserId: number, role: string) {
+    const employee = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId } });
+    if (!employee) throw new NotFoundException('Employee not found');
+    if (employee.userId === currentUserId || role === 'SUPERADMIN') return employee;
+    throw new ForbiddenException('You can only manage your own emergency contacts.');
+  }
+
   async addContact(id: number, companyId: number, currentUserId: number, role: string, data: any) {
-    const employee = await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+    const employee = await this.checkEmergencyContactPermission(id, companyId, currentUserId, role);
 
     if (!data.name || !data.mobile) {
       throw new BadRequestException('Name and Mobile are required');
@@ -989,10 +997,27 @@ export class EmployeesService {
   }
 
   async deleteContact(id: number, contactId: number, companyId: number, currentUserId: number, role: string) {
-    const employee = await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+    await this.checkEmergencyContactPermission(id, companyId, currentUserId, role);
+    const contact = await this.prisma.emergencyContact.findFirst({ where: { id: contactId, employeeId: id } });
+    if (!contact) throw new NotFoundException('Emergency contact not found');
 
     return this.prisma.emergencyContact.delete({
       where: { id: contactId }
+    });
+  }
+
+  async updateContact(id: number, contactId: number, companyId: number, currentUserId: number, role: string, data: any) {
+    await this.checkEmergencyContactPermission(id, companyId, currentUserId, role);
+    const contact = await this.prisma.emergencyContact.findFirst({ where: { id: contactId, employeeId: id } });
+    if (!contact) throw new NotFoundException('Emergency contact not found');
+    if (!data.name || !data.mobile) throw new BadRequestException('Name and Mobile are required');
+    const nameRegex = /^[a-zA-Z\s.'-]+$/;
+    const phoneRegex = /^\+?[0-9\s\-()]{7,15}$/;
+    if (!nameRegex.test(data.name.trim())) throw new BadRequestException('Invalid name format. Name should contain only letters and spaces.');
+    if (!phoneRegex.test(data.mobile)) throw new BadRequestException('Invalid mobile number format. Must be 7-15 digits, optionally starting with +');
+    return this.prisma.emergencyContact.update({
+      where: { id: contactId },
+      data: { name: data.name, email: data.email || null, mobile: data.mobile, relationship: data.relationship || null }
     });
   }
 
