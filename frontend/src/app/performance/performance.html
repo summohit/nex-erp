@@ -24,10 +24,10 @@
       </ng-container>
       <ng-container *ngIf="activeTab() === 'people' && pw()">
         <div class="view-switch-pills" role="group" aria-label="Notice period or PIPs">
-          <button type="button" class="pill-btn" [class.active]="pw()?.section() === 'notice'" (click)="pw()?.section.set('notice')">
+          <button type="button" class="pill-btn" [class.active]="pw()?.section() === 'notice'" (click)="setPwSection('notice')">
             Notice period <span class="pill-count">{{ pw()?.data()?.notice?.length || 0 }}</span>
           </button>
-          <button type="button" class="pill-btn" [class.active]="pw()?.section() === 'pip'" (click)="pw()?.section.set('pip')">
+          <button type="button" class="pill-btn" [class.active]="pw()?.section() === 'pip'" (click)="setPwSection('pip')">
             PIPs <span class="pill-count">{{ pw()?.data()?.pips?.length || 0 }}</span>
           </button>
         </div>

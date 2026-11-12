@@ -81,6 +81,7 @@ export class PerformanceComponent implements OnInit {
   companyOKRs = signal<CompanyOKR[]>([]);
   /** The Probation / PIP tab's list, so its buttons can live in the page header (12 Nov 2026). */
   pw = viewChild(PeopleWatchComponent);
+  setPwSection(section: any): void { this.pw()?.section.set(section); }
 
   // ── Filters on every tab (12 Nov 2026) ─────────────────────────────────────
   goalSearch = signal(''); goalStatus = signal('');
