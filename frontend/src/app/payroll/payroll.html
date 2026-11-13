@@ -4,7 +4,7 @@
     icon="wallet"
     section="Payroll &amp; Expenses"
     heading="Payroll &amp; Compensation"
-    subtitle="Configure salary structures, process monthly payslips, and manage employee reimbursement claims.">
+    subtitle="Salaries, monthly payslips and expense claims.">
 
     <!-- Salary Structure View Switch (First) -->
     <div class="mira-view-switch" *ngIf="activeTab() === 'structure' && isAdmin()">
@@ -28,19 +28,26 @@
 
     <!-- Outlined Secondary Buttons (Middle) -->
     <ng-container *ngIf="activeTab() === 'processing' && isAdmin()">
-      <button type="button" class="mira-btn-secondary" (click)="exportPayslipsExcel()" [disabled]="payslips().length === 0 || exportingExcel()" title="Download this month's salary register as Excel">
+      <!-- Less-used actions sit behind "More" (13 Nov 2026); the next workflow step stays visible. -->
+      <div class="pr-more">
+        <button type="button" class="mira-btn-secondary" (click)="prMoreOpen = !prMoreOpen" [attr.aria-expanded]="prMoreOpen">More ▾</button>
+        <div class="pr-more-backdrop" *ngIf="prMoreOpen" (click)="prMoreOpen = false"></div>
+        <div class="pr-more-menu" *ngIf="prMoreOpen">
+      <button type="button" class="pr-more-item" (click)="prMoreOpen = false; exportPayslipsExcel()" [disabled]="payslips().length === 0 || exportingExcel()" title="Download this month's salary register as Excel">
         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         {{ exportingExcel() ? 'Exporting…' : 'Export Excel' }}
       </button>
-      <button type="button" class="mira-btn-secondary" (click)="sendBulkPayslipEmails()" [disabled]="payslips().length === 0" title="Send email with PDF attached to employees">
+      <button type="button" class="pr-more-item" (click)="prMoreOpen = false; sendBulkPayslipEmails()" [disabled]="payslips().length === 0" title="Send email with PDF attached to employees">
         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
         Send Email Payslips
       </button>
-      <button type="button" class="mira-btn-secondary" (click)="batchFinalize()" [disabled]="processingCounts().draft === 0">
+        </div>
+      </div>
+      <button *ngIf="processingCounts().draft > 0" type="button" class="mira-btn-secondary" (click)="batchFinalize()" [disabled]="processingCounts().draft === 0">
         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
         Finalize Period
       </button>
-      <button type="button" class="mira-btn-secondary" (click)="markPaid()" [disabled]="processingCounts().finalized === 0">
+      <button *ngIf="processingCounts().draft === 0 && processingCounts().finalized > 0" type="button" class="mira-btn-secondary" (click)="markPaid()" [disabled]="processingCounts().finalized === 0">
         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
         Mark as Paid
       </button>
@@ -113,19 +120,11 @@
         <div class="kpi-info">
           <span class="kpi-value text-rose">₹{{ deductionBreakdown().total | number:'1.0-0' }}</span>
           <span class="kpi-label">Deductions</span>
-          <div class="kpi-chips" *ngIf="deductionBreakdown().rows.length; else noDed">
-            <span class="kpi-chip" *ngFor="let r of deductionBreakdown().rows">
-              {{ r.label }} <strong>₹{{ r.amount | number:'1.0-0' }}</strong>
-            </span>
-          </div>
-          <ng-template #noDed><span class="kpi-subtext">{{ periodLabel() }}</span></ng-template>
-          <span class="kpi-subtext kpi-company-cost" *ngIf="deductionBreakdown().employerPf > 0 || deductionBreakdown().gst > 0"
-                title="Company costs, not deducted from pay">
-            Company:
-            <ng-container *ngIf="deductionBreakdown().employerPf > 0">Employer PF ₹{{ deductionBreakdown().employerPf | number:'1.0-0' }}</ng-container>
-            <ng-container *ngIf="deductionBreakdown().employerPf > 0 && deductionBreakdown().gst > 0"> · </ng-container>
-            <ng-container *ngIf="deductionBreakdown().gst > 0">GST ₹{{ deductionBreakdown().gst | number:'1.0-0' }}</ng-container>
+          <span class="kpi-subtext" *ngIf="deductionBreakdown().rows.length; else noDed"
+                [title]="'Company costs, not deducted from pay: Employer PF ₹' + (deductionBreakdown().employerPf | number:'1.0-0') + ' · GST ₹' + (deductionBreakdown().gst | number:'1.0-0')">
+            <ng-container *ngFor="let r of deductionBreakdown().rows; let last = last">{{ r.label }} ₹{{ r.amount | number:'1.0-0' }}<ng-container *ngIf="!last"> · </ng-container></ng-container>
           </span>
+          <ng-template #noDed><span class="kpi-subtext">{{ periodLabel() }}</span></ng-template>
         </div>
       </div>
 
@@ -190,6 +189,33 @@
     </ng-container>
   </div>
 
+  <!-- Deductions breakdown (13 Nov 2026): each deduction with its share of the total -->
+  <section class="ded-panel" *ngIf="isAdmin() && (activeTab() === 'processing' || activeTab() === 'payslips') && deductionBreakdown().rows.length">
+    <header class="ded-head">
+      <span class="ded-head-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h2M12 10h2M16 10h0M8 14h2M12 14h2M8 18h2M12 18h4"/></svg></span>
+      <div><h3>Deductions</h3><p>Breakdown of all deductions for {{ periodLabel() }}</p></div>
+      <button type="button" class="ded-toggle" (click)="dedOpen = !dedOpen" [attr.aria-expanded]="dedOpen">
+        {{ dedOpen ? 'Hide breakdown' : 'Show breakdown' }}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" [style.transform]="dedOpen ? 'rotate(180deg)' : 'none'"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </header>
+    <div class="ded-body" *ngIf="dedOpen">
+      <div class="ded-item" *ngFor="let r of deductionBreakdown().rows; let i = index" [attr.data-tone]="i % 5">
+        <span class="ded-item-icon">{{ r.label === 'PF' ? 'PF' : r.label === 'ESI' ? 'ESI' : r.label === 'TDS' ? 'TDS' : r.label === 'Professional Tax' ? 'PT' : '•••' }}</span>
+        <div>
+          <span class="ded-item-label">{{ r.label === 'PF' ? 'PF (Employee)' : r.label }}</span>
+          <strong>₹{{ r.amount | number:'1.0-0' }}</strong>
+          <small>{{ deductionBreakdown().total ? ((r.amount / deductionBreakdown().total) * 100 | number:'1.0-1') : 0 }}% of deductions</small>
+        </div>
+      </div>
+      <div class="ded-total">
+        <span>Total deductions</span>
+        <strong>₹{{ deductionBreakdown().total | number:'1.0-0' }}</strong>
+        <em>{{ periodGross() ? ((deductionBreakdown().total / periodGross()) * 100 | number:'1.0-1') : 0 }}% of gross payroll</em>
+      </div>
+    </div>
+  </section>
+
   <!-- 3. Segmented Tab Bar + Period Status Summary Chips -->
   <div class="segmented-tabs-wrapper">
     <div class="segmented-tabs">
@@ -232,20 +258,6 @@
       </button>
     </div>
 
-    <div class="period-status-chips" *ngIf="isAdmin() && (activeTab() === 'processing' || activeTab() === 'payslips') && payslips().length > 0">
-      <span class="status-chip chip-total" title="Total Employees in Run">
-        {{ payslips().length }} Staff
-      </span>
-      <span class="status-chip chip-draft" *ngIf="processingCounts().draft > 0" title="Draft Payslips">
-        <span class="dot dot-draft"></span>{{ processingCounts().draft }} Draft
-      </span>
-      <span class="status-chip chip-finalized" *ngIf="processingCounts().finalized > 0" title="Finalized Payslips">
-        <span class="dot dot-finalized"></span>{{ processingCounts().finalized }} Finalized
-      </span>
-      <span class="status-chip chip-paid" *ngIf="processingCounts().paid > 0" title="Paid Payslips">
-        <span class="dot dot-paid"></span>{{ processingCounts().paid }} Paid
-      </span>
-    </div>
   </div>
 
   <!-- ==================== TAB 1: SALARY PROCESSING ==================== -->
@@ -537,16 +549,6 @@
                 </div>
               </th>
 
-              <!-- 7. Expenses Reimbursed -->
-              <th class="th-sortable th-amount text-right" (click)="toggleProcessingSort('expenses')">
-                <div class="th-content th-right">
-                  <span>Expenses Reimbursed</span>
-                  <span class="sort-arrows" [class.active]="processingSortColumn() === 'expenses'">
-                    {{ processingSortColumn() === 'expenses' ? (processingSortDirection() === 'asc' ? '↑' : '↓') : '⇅' }}
-                  </span>
-                </div>
-              </th>
-
               <!-- 8. Net Pay -->
               <th class="th-sortable th-amount text-right" (click)="toggleProcessingSort('net')">
                 <div class="th-content th-right">
@@ -590,8 +592,7 @@
                 <td class="text-center"><div class="skeleton-line skeleton-shimmer mx-auto" style="width: 32px; height: 16px;"></div></td>
                 <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 75px; height: 16px;"></div></td>
                 <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 75px; height: 16px;"></div></td>
-                <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 50px; height: 16px;"></div></td>
-                <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 85px; height: 16px;"></div></td>
+                                <td class="text-right"><div class="skeleton-line skeleton-shimmer ms-auto" style="width: 85px; height: 16px;"></div></td>
                 <td class="text-center"><div class="skeleton-pill skeleton-shimmer mx-auto" style="width: 70px; height: 24px; border-radius: 12px;"></div></td>
                 <td class="text-center"><div class="skeleton-circle-btn skeleton-shimmer mx-auto"></div></td>
               </tr>
@@ -601,7 +602,7 @@
             <ng-container *ngIf="!isLoadingPayslips()">
               <!-- Empty state -->
               <tr *ngIf="filteredProcessingPayslips().length === 0">
-                <td colspan="10" class="text-center py-5">
+                <td colspan="9" class="text-center py-5">
                   <div class="empty-table-state">
                     <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                     <p class="mt-2 text-secondary font-medium">
@@ -669,11 +670,6 @@
                 <!-- 6. LOP (Deducted) -->
                 <td class="text-right td-num" [ngClass]="(p.lossOfPay || 0) > 0 ? 'text-amber font-bold' : 'text-slate-400'">
                   ₹{{ (p.lossOfPay || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
-                </td>
-
-                <!-- 7. Expenses Reimbursed -->
-                <td class="text-right font-medium td-num text-slate-600">
-                  ₹{{ (p.expenseAmount || 0).toLocaleString('en-IN') }}
                 </td>
 
                 <!-- 8. Net Pay -->

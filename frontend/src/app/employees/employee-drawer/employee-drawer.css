@@ -477,3 +477,8 @@
   color: #64748b;
   line-height: 1.4;
 }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr !important; }
+}

@@ -2022,3 +2022,142 @@ body.nav-scroll-lock {
 }
 .clear-all-filters:hover { background: #eff6ff; }
 .clear-all-filters:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+
+/* Settings page-header buttons (13 Nov) */
+.st-hdr-btn { display:inline-flex; align-items:center; gap:6px; height:40px; padding:0 16px; border:1px solid #d0d7e2; border-radius:8px; background:#fff; color:#334155; font:600 14px var(--font-body); cursor:pointer; white-space:nowrap; }
+.st-hdr-btn:hover:not(:disabled) { background:#f8fafc; border-color:#94a3b8; }
+.st-hdr-btn.primary { background:#2563eb; border-color:#2563eb; color:#fff; }
+.st-hdr-btn.primary:hover:not(:disabled) { background:#1d4ed8; }
+.st-hdr-btn:disabled { opacity:.6; cursor:not-allowed; }
+
+/* ── Whole-app responsive layer (13 Nov) ────────────────────────────────────
+   Safety net for every page: nothing may push the page wider than the screen.
+   Uses the shell breakpoints (1024 tablet, 640 phone) plus 768 for toolbars.
+   !important is needed because component styles carry [_ngcontent] specificity. */
+
+.content-area img,
+.content-area video,
+.content-area canvas,
+.content-area iframe { max-width: 100%; }
+
+/* Plain HTML tables scroll sideways inside their own box, never the page.
+   Phone/small tablet only, because a scroll box clips absolutely placed ⋯
+   menus near the last rows. */
+@media (max-width: 768px) {
+  .content-area :where(div, section):has(> table) {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+  .content-area :where(.table-container, .table-scroll, .table-card, .table-wrap, .table-wrapper, .data-table-wrap) {
+    overflow-x: auto !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 1024px) {
+
+  /* Tab rows: one line that swipes, instead of overflowing. */
+  .content-area :where(.tabs, .tabs-container, .tabs-nav-group, .tab-nav, .tab-bar, .subnav-tabs-bar,
+    .segmented-nav, .view-tabs, [role="tablist"]) {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    max-width: 100% !important;
+    scrollbar-width: none;
+  }
+  .content-area :where(.tabs, .tabs-container, .tabs-nav-group, .tab-nav, .tab-bar, .subnav-tabs-bar,
+    .segmented-nav, .view-tabs, [role="tablist"]) > * { flex-shrink: 0 !important; }
+}
+
+@media (max-width: 768px) {
+  /* Filter and toolbar rows wrap; every control takes a full or half line. */
+  .content-area :where(.mira-filter-bar, .filter-bar, .filter-bar-card, .filter-card, .filter-bar-main-row,
+    .filters-row, .filter-row, .toolbar, .toolbar-card, .toolbar-box, .toolbar-left, .toolbar-right,
+    .table-toolbar, .controls-bar, .controls-row) {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    height: auto !important;
+  }
+  .content-area :where(.mira-filter-bar, .filter-bar, .filter-bar-card, .filter-card, .filter-bar-main-row,
+    .filters-row, .filter-row, .toolbar, .toolbar-card, .toolbar-left, .table-toolbar) > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .content-area :where(.mira-filter-bar, .filter-bar, .filter-bar-card, .filter-card, .filter-bar-main-row,
+    .filters-row, .filter-row, .toolbar-left, .table-toolbar) :where(app-searchable-select, app-date-preset-filter, select) {
+    flex: 1 1 calc(50% - 8px) !important;
+    width: auto !important;
+    min-width: 140px !important;
+  }
+  .content-area :where(.search-box, .search-input-wrap, .filter-search-box, .search-wrapper, .search-container, .mira-search) {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Pop-ups: fit the screen, scroll inside. */
+  :where(.modal-card, .modal-content, .modal-container, .modal-box, .modal-dialog, .modal-panel, .modal-card-md, .modal-card-lg) {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100dvh - 24px) !important;
+    overflow-y: auto !important;
+    margin: 0 auto !important;
+  }
+  :where(.modal-overlay, .modal-backdrop) { padding: 12px !important; align-items: center !important; }
+  :where(.modal-body) :where(.form-grid, .form-row, .grid-2, .two-col, .row-2) {
+    grid-template-columns: 1fr !important;
+    flex-direction: column !important;
+  }
+  :where(.modal-footer, .drawer-footer) { flex-wrap: wrap !important; gap: 8px !important; }
+
+  /* Side drawers become full-width sheets. */
+  :where(.drawer-content, .drawer-panel, .side-drawer, .drawer) {
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
+
+  /* Page-level two-pane layouts stack. */
+  .content-area :where(.split-layout, .two-pane, .layout-grid, .content-grid, .main-grid, .detail-layout, .profile-layout) {
+    grid-template-columns: 1fr !important;
+    flex-direction: column !important;
+  }
+
+  /* Shared header buttons share the row. */
+  app-page-header .ph-actions > :where(button, a) { flex: 1 1 auto; justify-content: center; }
+}
+
+@media (max-width: 640px) {
+  /* Tables: tighter cells so more fits before scrolling. */
+  .content-area table :where(th, td) { padding: 8px 10px !important; font-size: 12.5px; }
+  .content-area :where(h1) { font-size: 18px; }
+  .content-area :where(.btn, button) { min-height: 36px; }
+}
+
+/* Spots found in the 13 Nov phone sweep. */
+@media (max-width: 768px) {
+  .content-area :where(.nav-tabs, .tabs-nav, .ci-tabs) {
+    display: flex !important;
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    max-width: 100% !important;
+    scrollbar-width: none;
+  }
+  .content-area :where(.nav-tabs, .tabs-nav, .ci-tabs) > * { flex-shrink: 0 !important; }
+  app-page-header .ci-tabs { width: 100%; }
+  .content-area .ci-kb-container { display: flex !important; flex-direction: column !important; grid-template-columns: 1fr !important; }
+  .content-area :where(.ci-kb-sidebar, .ci-kb-main) { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+  .content-area .footer-totals { flex-wrap: wrap !important; row-gap: 4px !important; }
+}
+@media (max-width: 640px) {
+  /* Stat cards in a 2-up row: icon above the number, so values aren't squeezed. */
+  .content-area .kpi-card:has(> .kpi-icon-wrapper) {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    padding: 12px !important;
+    min-width: 0 !important;
+  }
+  .content-area .kpi-card > .kpi-icon-wrapper { width: 34px !important; height: 34px !important; }
+  .content-area .kpi-card .kpi-info { min-width: 0 !important; width: 100%; }
+  .content-area .kpi-card .kpi-value { font-size: 20px !important; }
+}

@@ -1,3 +1,4 @@
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ProfileCompletenessService } from './profile-completeness/profile-completeness.service';
 import { Module } from '@nestjs/common';
 import { EmployeesController } from './employees.controller';
@@ -9,7 +10,7 @@ import { MailModule } from '../mail/mail.module';
 import { PayrollModule } from '../payroll/payroll.module';
 
 @Module({
-  imports: [PrismaModule, PermissionsModule, MailModule, PayrollModule],
+  imports: [PrismaModule, PermissionsModule, MailModule, PayrollModule, NotificationsModule],
   controllers: [EmployeesController],
   providers: [EmployeesService, EmployeesImportService, ProfileCompletenessService],
   exports: [EmployeesService]

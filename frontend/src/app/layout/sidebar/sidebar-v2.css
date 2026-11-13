@@ -601,6 +601,11 @@
     z-index: 1000;
   }
 
+  /* Open on a phone: above the sticky top bar and the floating AI prompt. */
+  :host-context(body.sidebar-mobile-open) {
+    z-index: 1200 !important;
+  }
+
   :host-context(body.sidebar-mobile-open) .sidebar-wrapper {
     transform: translateX(0);
     box-shadow: 0 10px 40px rgba(15, 23, 42, 0.3);

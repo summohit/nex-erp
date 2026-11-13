@@ -146,8 +146,11 @@ export class SidebarComponentV2 implements OnInit {
   });
 
   /** The panel shows only when open and the module has pages to list (or the all-modules view is on). */
-  drawerVisible = computed(() => !this.isDrawerCollapsed()
-    && (this.viewMode() === 'tree' || !!this.currentActiveModule()?.items.length));
+  /** On a phone the open menu always lists every module with its name (13 Nov 2026). */
+  mode = computed(() => this.layout.isMobileNavOpen() ? 'tree' : this.viewMode());
+
+  drawerVisible = computed(() => this.layout.isMobileNavOpen() || (!this.isDrawerCollapsed()
+    && (this.viewMode() === 'tree' || !!this.currentActiveModule()?.items.length)));
 
   /** Tell the header whether there is a sub-menu to toggle (12 Nov 2026). */
   private subMenuSync = effect(() => {

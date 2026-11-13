@@ -1,14 +1,10 @@
 <div class="page-container">
-  <div class="page-header">
-    <div class="header-content">
-      <h1>Master Data</h1>
-      <p>Manage your company's departments and designations</p>
-    </div>
-    <button class="btn-primary" *ngIf="activeTab() !== 'task-locations'" (click)="openModal('create')">
+  <app-page-header icon="org" section="Settings" heading="Master data" subtitle="Departments, designations, branches and the other lists used across MIRA.">
+    <button class="st-hdr-btn primary" *ngIf="activeTab() !== 'task-locations'" (click)="openModal('create')">
       <svg lucidePlus size="18"></svg>
       Add {{ activeTab() === 'departments' ? 'Department' : activeTab() === 'designations' ? 'Designation' : activeTab() === 'branches' ? 'Branch' : activeTab() === 'leave-types' ? 'Leave Type' : activeTab() === 'task-types' ? 'Task Type' : activeTab() === 'project-phases' ? 'Phase' : activeTab() === 'default-project-tasks' ? 'Default Task' : activeTab() === 'visit-locations' ? 'Visit Location' : activeTab() === 'shifts' ? 'Shift' : 'Holiday' }}
     </button>
-  </div>
+  </app-page-header>
 
   <div class="tabs" role="tablist" aria-label="Master data tabs">
     <button 

@@ -21,10 +21,11 @@ interface CartItem {
   total: number;
 }
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-pos',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule, FormsModule,
     LucideShoppingCart, LucidePlus, LucideTrash2, LucideCreditCard,
     LucidePackage, LucideUser, LucidePercent, LucideFileText,

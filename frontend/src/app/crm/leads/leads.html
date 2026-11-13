@@ -1,71 +1,37 @@
 <div class="leads-container page-container">
-  <!-- Enhanced Page Header Card -->
-  <div class="page-header-card" *ngIf="activeMainTab !== 'contacts'">
-    <div class="header-title-group">
-      <div class="header-title-row">
-        <h1>{{ boardFlow === 'PRE_SALES' ? 'CRM Pre-Sales Board' : 'CRM Leads Board' }}</h1>
-        <span class="leads-count-pill">{{ leads.length }} Deal{{ leads.length === 1 ? '' : 's' }}</span>
-      </div>
-      <p>{{ boardFlow === 'PRE_SALES' ? 'Track, evaluate, and hand deals to Sales once validated' : 'Manage, track, and convert sales pipeline opportunities' }}</p>
+  <!-- Shared page header (13 Nov 2026) -->
+  <app-page-header *ngIf="activeMainTab !== 'contacts'" icon="target" section="CRM"
+    [heading]="boardFlow === 'PRE_SALES' ? 'Pre-sales board' : 'Leads'"
+    [subtitle]="leads.length + (leads.length === 1 ? ' deal' : ' deals') + ' · pipeline ' + (getTotalPipelineValue() | currency:'INR':'symbol':'1.0-0')">
+    <div class="ld-view-pills" *ngIf="boardFlow !== 'PRE_SALES' && activeMainTab === 'leads'" role="group" aria-label="View">
+      <button type="button" [class.active]="viewMode === 'kanban'" (click)="viewMode = 'kanban'">Board</button>
+      <button type="button" [class.active]="viewMode === 'table'" (click)="viewMode = 'table'">Table</button>
     </div>
-    
-    <div class="header-actions-group">
-      <!-- Total Pipeline Value KPI Widget -->
-      <div class="pipeline-kpi-badge">
-        <div class="kpi-icon-circle">
-          <svg lucideTrendingUp size="16"></svg>
-        </div>
-        <div class="kpi-info-col">
-          <span class="kpi-label">{{ boardFlow === 'PRE_SALES' ? 'Pre-Sales Pipeline Value' : 'Total Pipeline Value' }}</span>
-          <span class="kpi-amount">{{ getTotalPipelineValue() | currency:'INR' }}</span>
-        </div>
+    <button type="button" class="ld-hdr-btn" *ngIf="(auth.currentUser()?.role === 'ADMIN' || auth.currentUser()?.role === 'SUPERADMIN') && boardFlow === 'SALES'" (click)="goToLeadsDashboard()" title="View AI & pipeline analytics">
+      <svg lucideSparkles size="15"></svg>Insights
+    </button>
+    <button type="button" class="ld-hdr-btn" *ngIf="isAdminOrSuperAdmin" (click)="openPreSalesRequestsModal()" title="Pre-sales requests awaiting approval">
+      <svg lucideUserPlus size="15"></svg>Pre-sales requests<span class="ld-hdr-badge" *ngIf="pendingPreSalesRequests.length">{{ pendingPreSalesRequests.length }}</span>
+    </button>
+    <div class="ld-more">
+      <button type="button" class="ld-hdr-btn" (click)="ldMoreOpen = !ldMoreOpen" [attr.aria-expanded]="ldMoreOpen">More ▾</button>
+      <div class="ld-more-backdrop" *ngIf="ldMoreOpen" (click)="ldMoreOpen = false"></div>
+      <div class="ld-more-menu" *ngIf="ldMoreOpen">
+        <button type="button" (click)="ldMoreOpen = false; openLeadContactModal()"><svg lucideUserCheck size="15"></svg>Add lead contact</button>
+        <button type="button" (click)="ldMoreOpen = false; leadCsvInput.click()" [disabled]="leadCsvImporting"><svg lucideUpload size="15"></svg>{{ leadCsvImporting ? 'Importing…' : 'Import leads' }}</button>
+        <button type="button" (click)="ldMoreOpen = false; exportLeadsCsv()"><svg lucideDownload size="15"></svg>Export leads</button>
       </div>
-
-      <!-- Lead Insights Button (Admin only, sales board) -->
-      <button
-        class="btn-header-insights"
-        *ngIf="(auth.currentUser()?.role === 'ADMIN' || auth.currentUser()?.role === 'SUPERADMIN') && boardFlow === 'SALES'"
-        (click)="goToLeadsDashboard()"
-        title="View AI & Pipeline Analytics">
-        <svg lucideSparkles size="15"></svg>
-        <span>Lead Insights</span>
-      </button>
-
-      <!-- Pre-Sales approval queue. Admins only; the badge is the only prompt
-           they get that someone is waiting on them. -->
-      <button
-        class="btn-header-secondary ps-queue-btn"
-        *ngIf="isAdminOrSuperAdmin"
-        (click)="openPreSalesRequestsModal()"
-        title="Pre-sales requests awaiting approval">
-        <svg lucideUserPlus size="15"></svg>
-        <span>Pre-Sales Requests</span>
-        <span class="ps-queue-badge" *ngIf="pendingPreSalesRequests.length">{{ pendingPreSalesRequests.length }}</span>
-      </button>
-
-      <!-- Lead Contact Button -->
-      <button class="btn-header-secondary" (click)="openLeadContactModal()" title="Add / Manage External Lead Contact">
-        <svg lucideUserCheck size="15"></svg>
-        <span>Add Lead Contact</span>
-      </button>
-
-      <input type="file" #leadCsvInput accept=".csv,text/csv" (change)="onLeadCsvImportSelected($event)" style="display:none" />
-      <button class="btn-header-secondary" (click)="leadCsvInput.click()" [disabled]="leadCsvImporting" title="Import lead records from CSV">
-        <svg lucideUpload size="15"></svg>
-        <span>{{ leadCsvImporting ? 'Importing...' : 'Import Leads' }}</span>
-      </button>
-      <button class="btn-header-secondary" (click)="exportLeadsCsv()" title="Export the leads currently shown by your filters">
-        <svg lucideDownload size="15"></svg>
-        <span>Export Leads</span>
-      </button>
-
-      <!-- New Deal Button (Primary) -->
-      <button class="btn-header-primary" (click)="openModal()" title="{{ boardFlow === 'PRE_SALES' ? 'Create New Pre-Sales Deal' : 'Create New Lead Opportunity' }}">
-        <svg lucidePlus size="16"></svg>
-        <span>{{ boardFlow === 'PRE_SALES' ? 'New Pre-Sales Deal' : 'New Lead' }}</span>
-      </button>
     </div>
-  </div>
+    <input type="file" #leadCsvInput accept=".csv,text/csv" (change)="onLeadCsvImportSelected($event)" style="display:none" />
+    <button type="button" class="ld-hdr-btn primary" (click)="openModal()" [title]="boardFlow === 'PRE_SALES' ? 'Create new pre-sales deal' : 'Create new lead'">
+      <svg lucidePlus size="16"></svg>{{ boardFlow === 'PRE_SALES' ? 'New pre-sales deal' : 'New lead' }}
+    </button>
+  </app-page-header>
+
+  <app-page-header *ngIf="activeMainTab === 'contacts'" icon="users" section="CRM" heading="Lead contacts"
+    [subtitle]="leadContacts.length + (leadContacts.length === 1 ? ' contact' : ' contacts') + ' · people at client companies'">
+    <button type="button" class="ld-hdr-btn primary" (click)="openLeadContactModal()"><svg lucidePlus size="16"></svg>Add lead contact</button>
+  </app-page-header>
 
   <!-- Main Tab Switcher -->
   <div class="main-tab-switcher">
@@ -105,18 +71,6 @@
       </div>
 
       <div class="filter-controls">
-        <!-- VIEW TOGGLE -->
-        <div class="view-toggle" *ngIf="boardFlow !== 'PRE_SALES'">
-          <button [class.active]="viewMode === 'kanban'" (click)="viewMode = 'kanban'" title="Kanban Board View">
-            <svg lucideLayoutGrid size="15"></svg>
-            <span>Kanban</span>
-          </button>
-          <button [class.active]="viewMode === 'table'" (click)="viewMode = 'table'" title="Table List View">
-            <svg lucideList size="15"></svg>
-            <span>Table</span>
-          </button>
-        </div>
-
         <!-- LEAD CATEGORY QUICK FILTER -->
         <div class="custom-select-wrapper category-select-wrapper">
           <svg lucideTag size="14" class="select-prefix-icon"></svg>

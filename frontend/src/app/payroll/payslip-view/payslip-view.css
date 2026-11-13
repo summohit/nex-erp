@@ -373,3 +373,8 @@
   .payslip-sticky-footer .payslip-actions .btn { flex: 1 1 auto; justify-content: center; }
 }
 .status-chip.chip-preview { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .employee-meta-grid { grid-template-columns: 1fr !important; }
+}

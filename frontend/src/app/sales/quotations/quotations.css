@@ -761,3 +761,28 @@
 }
 
 .btn-quote-move:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Sales tables in the MIRA standard (13 Nov 2026) ── */
+.page-container { display: flex; flex-direction: column; gap: 16px; }
+.table-container.glass-panel { padding: 0 !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; box-shadow: none !important; background: #fff !important; overflow: visible !important; }
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table thead th { padding: 11px 14px !important; background: #f8fafc !important; border-bottom: 1px solid #e2e8f0 !important; text-transform: none !important; letter-spacing: 0 !important; font-size: 12.5px !important; font-weight: 600 !important; color: #475569 !important; white-space: nowrap; }
+.data-table thead th:first-child { border-top-left-radius: 12px; }
+.data-table thead th:last-child { border-top-right-radius: 12px; }
+.data-table tbody td { padding: 11px 14px !important; border-bottom: 1px solid #f1f5f9 !important; font-size: 13.5px; vertical-align: middle; }
+.data-table tbody tr:hover td { background: #f8fbff; }
+.data-table .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px !important; border-radius: 999px !important; font-size: 12px !important; font-weight: 600 !important; text-transform: none !important; letter-spacing: 0 !important; white-space: nowrap; }
+.data-table .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.sl-nowrap { white-space: nowrap; }
+.sl-hdr-btn { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #334155; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.sl-hdr-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+.sl-hdr-btn.primary:hover { background: #1d4ed8; }
+.sl-menu { position: relative; display: inline-block; }
+.sl-menu-btn { width: 32px; height: 32px; display: inline-grid; place-items: center; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; font-size: 16px; font-weight: 700; line-height: 1; cursor: pointer; }
+.sl-menu-btn:hover { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+.sl-menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+.sl-menu-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 180px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; box-shadow: 0 12px 32px -8px rgba(15,23,42,.22); text-align: left; }
+.sl-menu-pop button { display: block; width: 100%; height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #1e293b; font-size: 13.5px; font-weight: 500; text-align: left; cursor: pointer; }
+.sl-menu-pop button:hover:not(:disabled) { background: #f1f5f9; }
+.sl-menu-pop button.approve { color: #15803d; font-weight: 600; }
+.sl-menu-pop button.reject { color: #b91c1c; border-top: 1px solid #eef2f6; border-radius: 0 0 8px 8px; }

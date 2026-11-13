@@ -1,15 +1,8 @@
 <div class="page-container">
-  <div class="page-header">
-    <div class="header-title">
-      <h2>Quotations & Proposals</h2>
-      <p>Manage quotes, send proposals, and convert them to sales orders.</p>
-    </div>
-    <div class="header-actions">
-      <button class="btn-primary" (click)="openModal()">
-        <svg lucidePlus size="16"></svg> Create Quote
-      </button>
-    </div>
-  </div>
+  <app-page-header icon="documents" section="Sales" heading="Quotations"
+    [subtitle]="quotations.length + (quotations.length === 1 ? ' quote' : ' quotes') + ' · send proposals and convert them to sales orders'">
+    <button type="button" class="sl-hdr-btn primary" (click)="openModal()"><svg lucidePlus size="16"></svg>Create quote</button>
+  </app-page-header>
 
   <div class="table-container glass-panel">
     <table class="data-table">
@@ -32,14 +25,14 @@
           <td><span class="fw-semibold">{{q.quoteNumber}}</span></td>
           <!-- A deal-only quote has no client; fall back to what it recorded. -->
           <td>{{ q.client?.name || q.billingCompanyName || q.lead?.companyName || q.lead?.title || '—' }}</td>
-          <td>{{q.date | date}}</td>
+          <td class="sl-nowrap">{{ q.date | date:'d MMM y' }}</td>
           <td>₹{{q.total | number:'1.2-2'}}</td>
           <td>
             <span class="badge" [ngClass]="{
               'badge-warning': q.approvalStatus === 'PENDING',
               'badge-success': q.approvalStatus === 'APPROVED',
               'badge-danger': q.approvalStatus === 'REJECTED'
-            }">{{q.approvalStatus}}</span>
+            }">{{ statusLabel(q.approvalStatus) }}</span>
           </td>
           <td>
             <span class="badge" [ngClass]="{
@@ -48,33 +41,21 @@
               'badge-success': q.status === 'ACCEPTED',
               'badge-warning': q.status === 'PENDING_APPROVAL',
               'badge-danger': q.status === 'REJECTED'
-            }">{{q.status}}</span>
+            }">{{ statusLabel(q.status) }}</span>
           </td>
           <td class="actions-cell text-right">
-            <button class="btn-icon" *ngIf="q.approvalStatus === 'PENDING'" (click)="approveQuote(q.id)" title="Approve">
-              <svg lucideCheck size="16" class="text-success"></svg>
-            </button>
-            <button class="btn-action" *ngIf="q.approvalStatus === 'APPROVED' && q.status !== 'ACCEPTED'" (click)="convertToOrder(q.id)">
-              Convert to Order <svg lucideArrowRight size="14"></svg>
-            </button>
-
-            <!-- SENT and REJECTED were unreachable until now. -->
-            <button
-              *ngFor="let st of nextQuoteStatuses(q)"
-              class="btn-quote-move"
-              [class.is-reject]="st === 'REJECTED'"
-              [disabled]="busyQuoteId === q.id"
-              (click)="setQuoteStatus(q, st)">
-              {{ st === 'REJECTED' ? 'Reject' : st === 'DRAFT' ? 'Reopen' : 'Mark ' + (st | titlecase) }}
-            </button>
-
-            <button
-              *ngIf="canDeleteQuote(q)"
-              class="btn-quote-move is-reject"
-              [disabled]="busyQuoteId === q.id"
-              (click)="deleteQuote(q)">
-              Delete
-            </button>
+            <div class="sl-menu">
+              <button type="button" class="sl-menu-btn" title="Actions" aria-label="Actions" (click)="toggleRowMenu(q.id)">⋯</button>
+              <div class="sl-menu-backdrop" *ngIf="openRowMenu === q.id" (click)="openRowMenu = null"></div>
+              <div class="sl-menu-pop" *ngIf="openRowMenu === q.id">
+                <button *ngIf="q.approvalStatus === 'PENDING'" class="approve" (click)="openRowMenu = null; approveQuote(q.id)">Approve</button>
+                <button *ngIf="q.approvalStatus === 'APPROVED' && q.status !== 'ACCEPTED'" (click)="openRowMenu = null; convertToOrder(q.id)">Convert to order</button>
+                <button *ngFor="let st of nextQuoteStatuses(q)" [class.reject]="st === 'REJECTED'" [disabled]="busyQuoteId === q.id" (click)="openRowMenu = null; setQuoteStatus(q, st)">
+                  {{ st === 'REJECTED' ? 'Reject' : st === 'DRAFT' ? 'Reopen' : 'Mark ' + (st | lowercase) }}
+                </button>
+                <button *ngIf="canDeleteQuote(q)" class="reject" [disabled]="busyQuoteId === q.id" (click)="openRowMenu = null; deleteQuote(q)">Delete</button>
+              </div>
+            </div>
           </td>
         </tr>
       </tbody>

@@ -1838,3 +1838,7 @@
   font-weight: 700 !important;
 }
 
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .discussion-stat-grid { grid-template-columns: 1fr !important; }
+}

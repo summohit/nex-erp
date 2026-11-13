@@ -2209,3 +2209,12 @@ select.form-control:disabled {
 
 /* Type / experience / status stay on one line (12 Nov 2026). */
 .td-type, .td-exp, .td-status, .td-openings { white-space: nowrap; }
+
+.jp-status-tag.tag-overdue { background: #fee2e2 !important; color: #b91c1c !important; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr !important; }
+  .view-stats-grid { grid-template-columns: 1fr !important; }
+  .salary-inputs-row { grid-template-columns: 1fr !important; }
+}

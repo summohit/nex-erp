@@ -535,6 +535,13 @@ export class NoticesComponent {
         },
       },
       {
+        colId: "department",
+        headerName: "Department",
+        minWidth: 140,
+        flex: 1,
+        valueGetter: (params: any) => (params.data as any)?.createdBy?.department?.name || "—",
+      },
+      {
         field: "publishedAt",
         headerName: "Posted On",
         width: 125,

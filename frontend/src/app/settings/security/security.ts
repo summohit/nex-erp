@@ -29,10 +29,11 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { AuthService } from '../../services/auth.service';
 import { RoleService } from '../../services/role.service';
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-security-settings',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule,
     FormsModule,
     LucideShieldCheck,

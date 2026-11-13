@@ -14,14 +14,14 @@
 
   <!-- ── 2. Interactive 6 Queue KPI Cards ───────────────────────────────────── -->
   <div class="ap-kpi-grid">
-    <!-- Card 1: All Queues -->
+    <!-- Card 1: All Requests -->
     <button
       type="button"
       class="ap-kpi-card"
       [class.active]="tab() === 'ALL'"
       (click)="setTab('ALL')">
       <div class="kpi-top">
-        <span class="kpi-label">All Queues</span>
+        <span class="kpi-label">All Requests</span>
         <div class="kpi-icon-squircle tone-blue">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
@@ -254,7 +254,7 @@
     </div>
     <h3>{{ hasActiveFilters() ? 'No matching requests in this view' : 'You’re all caught up!' }}</h3>
     <p *ngIf="!hasActiveFilters()">
-      Every pending request across leave, WFH, regularization, and attendance queues has been settled.
+      Every pending leave, WFH, regularization and attendance request has been settled.
     </p>
     <p *ngIf="hasActiveFilters()">
       No pending requests match your current search or filter criteria.
@@ -286,7 +286,7 @@
                 aria-label="Select all on this page" />
             </th>
             <th class="th-emp">EMPLOYEE</th>
-            <th class="th-type">QUEUE &amp; STAGE</th>
+            <th class="th-type">REQUEST &amp; STAGE</th>
             <th class="th-date">SCHEDULE &amp; URGENCY</th>
             <th class="th-reason">STATED REASON &amp; EVIDENCE</th>
             <th class="th-actions text-right">ACTIONS</th>
@@ -322,7 +322,7 @@
               </button>
             </td>
 
-            <!-- Queue & Stage -->
+            <!-- Request & Stage -->
             <td class="td-type">
               <div class="ap-type-stack">
                 <span class="ap-kind-badge k-{{ r.kind }}">

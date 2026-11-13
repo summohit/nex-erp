@@ -2780,3 +2780,11 @@ input:checked + .slider:before {
   font-size:12px; color:#64748b; line-height:1.45; }
 .loc-foot a { flex:none; display:inline-flex; align-items:center; gap:4px; color:#4f46e5; font-weight:600; text-decoration:none; }
 @media (max-width:600px) { .loc-row, .loc-foot { flex-direction:column; } .loc-grid { grid-template-columns:1fr; } }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr !important; }
+  .shift-type-cards { grid-template-columns: 1fr !important; }
+  .shift-two-cols { grid-template-columns: 1fr !important; }
+  .gps-coords-grid { grid-template-columns: 1fr !important; }
+}

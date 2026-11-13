@@ -704,3 +704,8 @@
   .resign-date-section { align-items: flex-start; flex-direction: column; }
   .resign-date-section .form-control { width: 100%; }
 }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr !important; }
+}

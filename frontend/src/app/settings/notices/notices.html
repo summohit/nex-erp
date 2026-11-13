@@ -16,9 +16,9 @@
         class="pill-btn"
         [class.active]="viewMode() === 'CARDS'"
         (click)="setViewMode('CARDS')"
-        title="Cards view">
+        title="Board view">
         <svg lucideLayoutGrid size="14"></svg>
-        <span>Cards</span>
+        <span>Board</span>
       </button>
       <button
         type="button"
@@ -204,28 +204,6 @@
       </app-searchable-select>
     </div>
 
-    <!-- 3. Priority Dropdown -->
-    <div class="nb-select-group">
-      <app-searchable-select
-        [options]="prioritySelectOptions"
-        placeholder="All priorities"
-        [clearable]="true"
-        [value]="priorityFilter() === 'ALL' ? null : priorityFilter()"
-        (valueChange)="priorityFilter.set($event || 'ALL')">
-      </app-searchable-select>
-    </div>
-
-    <!-- 4. Sort Dropdown -->
-    <div class="nb-select-group">
-      <app-searchable-select
-        [options]="sortSelectOptions"
-        placeholder="Sort: Newest first"
-        [clearable]="false"
-        [value]="sortBy()"
-        (valueChange)="sortBy.set($event || 'NEWEST')">
-      </app-searchable-select>
-    </div>
-
     <!-- 5. Date Preset Filter -->
     <app-date-preset-filter
       label="Posted"
@@ -343,7 +321,7 @@
             <span class="nb-author-name">
               {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'Administration' }}
             </span>
-            <span class="nb-card-date">{{ (n.publishedAt || n.createdAt) | date:'d MMM yyyy' }}</span>
+            <span class="nb-card-date"><span class="nb-dept" *ngIf="n.createdBy?.department?.name">{{ n.createdBy.department.name }} · </span>{{ (n.publishedAt || n.createdAt) | date:'d MMM yyyy' }}</span>
           </div>
         </div>
       </div>
@@ -371,7 +349,7 @@
             </span>
           </div>
           <h2>{{ n.title }}</h2>
-          <p>Notice #{{ n.id }} · Posted by {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'Administration' }}</p>
+          <p>Notice #{{ n.id }} · Posted by {{ n.createdBy ? (n.createdBy.firstName + ' ' + n.createdBy.lastName) : 'Administration' }}<ng-container *ngIf="n.createdBy?.department?.name"> · {{ n.createdBy.department.name }}</ng-container></p>
         </div>
         <button type="button" class="nb-btn-close" (click)="closeNotice()" aria-label="Close notice"><svg lucideX size="18"></svg></button>
       </header>

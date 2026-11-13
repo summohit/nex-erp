@@ -28,14 +28,21 @@ interface SalesOrder {
   items?: SalesOrderItem[];
 }
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-orders',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucidePackage],
+  imports: [PageHeaderComponent, CommonModule, FormsModule, LucidePackage],
   templateUrl: './orders.html',
   styleUrls: ['./orders.css']
 })
 export class OrdersComponent implements OnInit {
+  /** Readable status label, e.g. IN_PROGRESS -> In progress (13 Nov 2026). */
+  statusLabel(v: string | null | undefined): string {
+    const t = String(v || '').replace(/_/g, ' ').toLowerCase();
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : '—';
+  }
+
   /** Mirrors the server's transition rules so the UI only offers valid moves. */
   private readonly statusFlow: Record<string, string[]> = {
     DRAFT: ['CONFIRMED', 'CANCELLED'],

@@ -181,3 +181,8 @@
   background: #f9fafb;
   border-color: #9ca3af;
 }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .modal-body { grid-template-columns: 1fr !important; }
+}

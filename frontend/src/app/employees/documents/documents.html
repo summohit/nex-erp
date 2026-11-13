@@ -162,6 +162,9 @@
             <button type="button" class="action-btn" (click)="downloadDocument(doc)" title="Download file">
               <svg lucideDownload size="14"></svg>
             </button>
+            <button type="button" class="action-btn" *ngIf="isSuperAdmin()" (click)="openRename(doc)" title="Rename document" aria-label="Rename document">
+              <svg lucidePencil size="14"></svg>
+            </button>
             <button type="button" class="action-btn action-delete" (click)="deleteDocument(doc)" title="Delete document">
               <svg lucideTrash2 size="14"></svg>
             </button>
@@ -279,6 +282,22 @@
       <button class="btn-primary" (click)="submitUpload()" [disabled]="isUploading()">
         {{ isUploading() ? 'Uploading...' : 'Upload Document' + (selectedFiles().length > 1 ? 's' : '') }}
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Rename document (Super Admin) -->
+<div class="rn-overlay" *ngIf="renamingDoc() as d" (click)="closeRename()">
+  <div class="rn-dialog" role="dialog" aria-modal="true" aria-labelledby="rn-title" (click)="$event.stopPropagation()">
+    <h3 id="rn-title">Rename document</h3>
+    <p class="rn-sub">The file itself is not changed, only the name people see.</p>
+    <label class="rn-label" for="rn-input">Name <b>*</b></label>
+    <input id="rn-input" class="rn-input" [class.invalid]="renameError()" [value]="renameValue()" maxlength="200"
+           (input)="renameValue.set($any($event.target).value); renameError.set('')" (keydown.enter)="saveRename()" />
+    <small class="rn-error" *ngIf="renameError()">{{ renameError() }}</small>
+    <div class="rn-foot">
+      <button type="button" class="rn-btn" (click)="closeRename()" [disabled]="isRenaming()">Cancel</button>
+      <button type="button" class="rn-btn primary" (click)="saveRename()" [disabled]="isRenaming()">{{ isRenaming() ? 'Saving…' : 'Save' }}</button>
     </div>
   </div>
 </div>

@@ -1107,14 +1107,14 @@ export class IssuesService {
 
     // Filtered in code rather than SQL: whether somebody may rule on a task
     // depends on their role ON THAT PROJECT, which is a per-project lookup.
-    const out: any[] = [];
-    for (const issue of issues) {
-      const viewer = await resolveProjectViewer(
-        this.prisma as any, companyId, issue.projectId, actorEmployeeId, role,
-      );
-      if (decideApproval(issue.approvalState, viewer).allowed) out.push(issue);
-    }
-    return out;
+    // One viewer lookup per PROJECT, all at once (13 Nov 2026). It used to run
+    // one after another per task: 27 tasks = 27+ sequential round-trips.
+    const projectIds = Array.from(new Set(issues.map(i => i.projectId)));
+    const viewers = new Map(await Promise.all(projectIds.map(async pid => [
+      pid,
+      await resolveProjectViewer(this.prisma as any, companyId, pid, actorEmployeeId, role),
+    ] as const)));
+    return issues.filter(issue => decideApproval(issue.approvalState, viewers.get(issue.projectId) as any).allowed);
   }
 
   /**

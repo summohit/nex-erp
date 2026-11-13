@@ -100,6 +100,16 @@ export class JobPostingsComponent implements OnInit {
   setMode(v: string | null) { this.filterWorkLocationType = v || ''; this.onFilterChange(); }
   setRecruiter(v: string | null) { this.filterRecruiter = v || ''; this.onFilterChange(); }
 
+  /** Job state (13 Nov 2026): Overdue = closing date passed, openings still unfilled. */
+  filterJobState = '';
+  readonly jobStateOptions = [
+    { id: 'OPEN', name: 'Open' },
+    { id: 'OVERDUE', name: 'Overdue' },
+    { id: 'CLOSED', name: 'Closed' },
+    { id: 'DRAFT', name: 'Draft' },
+  ];
+  setJobState(v: string | null) { this.filterJobState = v || ''; this.onFilterChange(); }
+
   /** Posted-date dropdown (12 Nov 2026), shared with the Employee pages. */
   datePreset: DatePreset = 'ALL';
   onDateRange(r: DateRange) {
@@ -130,6 +140,15 @@ export class JobPostingsComponent implements OnInit {
         (j.experienceYears || '').toLowerCase().includes(query) ||
         (this.getRecruiterName(j) || '').toLowerCase().includes(query)
       );
+    }
+    if (this.filterJobState) {
+      const st = this.filterJobState;
+      list = list.filter(j => {
+        const s = String(j.status || '').toUpperCase();
+        if (st === 'OVERDUE') return !!(j as any).isOverdue;
+        if (st === 'OPEN') return s === 'OPEN' && !(j as any).isOverdue;
+        return s === st;
+      });
     }
     // Recruiter filter (12 Nov 2026).
     if (this.filterRecruiter) {
@@ -381,8 +400,9 @@ export class JobPostingsComponent implements OnInit {
       width: 120,
       flex: 0,
       cellRenderer: (params: any) => {
-        const val = params.value;
+        const val = params.data?.isOverdue ? 'Overdue' : params.value;
         let bg = '#F1F5F9', color = '#475569';
+        if (val === 'Overdue') { bg = '#FEE2E2'; color = '#B91C1C'; }
         if (val === 'Open') { bg = '#DCFCE7'; color = '#166534'; }
         if (val === 'Closed') { bg = '#dbeafe'; color = '#595a5b'; }
         if (val === 'Draft') { bg = '#f3efff'; color = '#4f2aa7'; }
@@ -555,6 +575,7 @@ export class JobPostingsComponent implements OnInit {
     this.filterStatus = '';
     this.filterDepartment = '';
     this.filterRecruiter = '';
+    this.filterJobState = '';
     this.filterLocation = '';
     this.filterWorkLocationType = '';
     this.filterEmploymentType = '';
@@ -650,6 +671,7 @@ export class JobPostingsComponent implements OnInit {
     return !!(
       this.searchText ||
       this.filterRecruiter ||
+      this.filterJobState ||
       this.filterWorkLocationType ||
       (this.filterDuration && this.filterDuration !== 'all') ||
       this.filterStatus ||

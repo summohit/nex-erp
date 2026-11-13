@@ -1,3 +1,4 @@
+import { NotificationsService } from '../notifications/notifications.service';
 import { normalisePolicy, probationEndFrom, probationMonthsFor } from '../lifecycle/probation-policy';
 import { lockJobCapacity, closeFilledJobs } from '../recruitment/job-capacity';
 import { ALL_DOCUMENT_TYPES } from './profile-completeness/profile-documents';
@@ -17,6 +18,7 @@ export class EmployeesService {
     private permissions: PermissionsService,
     private mailService: MailService,
     private payrollService: PayrollService,
+    private notifications: NotificationsService,
   ) {}
 
   /**
@@ -1063,15 +1065,52 @@ export class EmployeesService {
     // whoever owns the document id in the URL.
     const doc = await this.prisma.employeeDocument.findFirst({ where: { id: documentId, employeeId: employee.id } });
     if (!doc) throw new NotFoundException('Document not found');
-    return this.prisma.employeeDocument.delete({ where: { id: doc.id } });
+    const deleted = await this.prisma.employeeDocument.delete({ where: { id: doc.id } });
+    await this.notifyDocumentDeleted(companyId, currentUserId, employee.id, doc.fileName, doc.documentType);
+    return deleted;
+  }
+
+  /**
+   * Super Admin and HR hear about every deleted document (13 Nov 2026):
+   * who deleted it, which file, whose it was. A failed notification never
+   * undoes the delete.
+   */
+  private async notifyDocumentDeleted(companyId: number, actorUserId: number, employeeId: number, fileName: string, documentType?: string | null) {
+    try {
+      const [actor, owner, recipients] = await Promise.all([
+        this.prisma.user.findUnique({ where: { id: actorUserId }, select: { email: true, employee: { select: { firstName: true, lastName: true } } } }),
+        this.prisma.employee.findUnique({ where: { id: employeeId }, select: { firstName: true, lastName: true, employeeCode: true } }),
+        this.prisma.user.findMany({ where: { companyId, role: { in: ['SUPERADMIN', 'HR'] }, status: { not: 'SUSPENDED' } }, select: { id: true } }),
+      ]);
+      const who = actor?.employee ? `${actor.employee.firstName} ${actor.employee.lastName ?? ''}`.trim() : (actor?.email || 'Someone');
+      const whose = owner ? `${owner.firstName} ${owner.lastName ?? ''}`.trim() + (owner.employeeCode ? ` (${owner.employeeCode})` : '') : 'an employee';
+      const what = `${fileName}${documentType ? ` · ${documentType}` : ''}`;
+      const when = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
+      for (const r of recipients) {
+        if (r.id === actorUserId) continue;
+        await this.notifications.createNotification(r.id, 'Document deleted', `${who} deleted "${what}" from ${whose}'s documents on ${when}.`, 'WARNING', `/employees/${employeeId}/profile`, companyId);
+      }
+    } catch {
+      // Notification is best-effort.
+    }
   }
 
   /**
    * Change what a document is filed as, e.g. a resume uploaded as "Other"
    * (16 Oct 2026). Same permission as uploading it.
    */
-  async updateDocumentType(id: number, documentId: number, companyId: number, currentUserId: number, role: string, documentType: string) {
+  async updateDocumentType(id: number, documentId: number, companyId: number, currentUserId: number, role: string, documentType: string, fileName?: string) {
     const employee = await this.checkProfileEditPermission(id, companyId, currentUserId, role);
+    // Rename (13 Nov 2026): Super Admin only; changes the name shown, never the stored file.
+    if (fileName !== undefined) {
+      if (role !== 'SUPERADMIN') throw new ForbiddenException('Only the Super Admin can rename documents');
+      const name = String(fileName ?? '').trim();
+      if (!name) throw new BadRequestException('Document name cannot be empty');
+      if (name.length > 200) throw new BadRequestException('Document name is too long');
+      const doc = await this.prisma.employeeDocument.findFirst({ where: { id: documentId, employeeId: employee.id } });
+      if (!doc) throw new NotFoundException('Document not found');
+      return this.prisma.employeeDocument.update({ where: { id: doc.id }, data: { fileName: name } });
+    }
     const type = String(documentType ?? '').trim();
     if (!(ALL_DOCUMENT_TYPES as readonly string[]).includes(type)) throw new BadRequestException('Pick a document type from the list');
     const doc = await this.prisma.employeeDocument.findFirst({ where: { id: documentId, employeeId: employee.id } });

@@ -11868,3 +11868,8 @@ input[type=text], input[type=email], input[type=password] {
 .sp-budget-table tr:not(:first-child):hover td { background: #F8FAFC; }
 .sp-budget-note { display: flex; gap: 8px; align-items: center; font-size: 13px; color: #475569; margin: 10px 0; }
 .sp-budget-note a { color: var(--color-primary, #1373E5); font-weight: 600; text-decoration: none; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .health-stat-pill-grid { grid-template-columns: 1fr !important; }
+}

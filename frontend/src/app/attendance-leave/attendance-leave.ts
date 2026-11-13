@@ -2050,8 +2050,32 @@ export class AttendanceLeaveComponent implements OnInit {
       const id = String(employee.id ?? '');
       return (!query || name.includes(query) || id.includes(query))
         && (!department || employee.department?.name === department);
+    }).filter((employee) => {
+      // Status (13 Nov 2026): people with at least one such day in the range.
+      const want = this.timelineStatusFilter();
+      if (!want) return true;
+      return this.timelineDays().some(day => this.getTimelineStatus(employee, day.date)?.type === want);
     });
   });
+
+  /** Team Timeline dropdowns (13 Nov 2026). */
+  timelineStatusFilter = signal('');
+  readonly timelineStatusOptions = [
+    { id: 'absent', name: 'Has an absence' },
+    { id: 'late', name: 'Was late' },
+    { id: 'half-day', name: 'Has a half day' },
+    { id: 'leave', name: 'Was on leave' },
+  ];
+  timelineDepartmentOptions = computed(() => {
+    const names = new Set<string>();
+    for (const e of this.timelineEmployees()) if (e.department?.name) names.add(e.department.name);
+    return Array.from(names).sort().map(n => ({ id: n, name: n }));
+  });
+  clearTimelineFilters(): void {
+    this.timelineEmployeeQuery.set('');
+    this.timelineDepartmentFilter.set('');
+    this.timelineStatusFilter.set('');
+  }
 
   // Holiday Tab Signals & State
   selectedHolidayYear = signal<number>(new Date().getFullYear());
@@ -2072,8 +2096,22 @@ export class AttendanceLeaveComponent implements OnInit {
       { value: 'past', label: 'Past' },
     ],
   }];
+  /** Holiday timing dropdown in the filter row (13 Nov 2026): same values as the drawer. */
+  readonly holidayTimingOptions = [
+    { id: 'upcoming', name: 'Upcoming' },
+    { id: 'today', name: 'Today' },
+    { id: 'past', name: 'Past' },
+  ];
   get holidayFilterValues(): Record<string, string> {
     return { status: this.holidayStatusFilter() };
+  }
+  /** Show field errors under the inputs once Save is pressed (13 Nov 2026). */
+  holidayTried = signal(false);
+  submitHolidayForm(): void {
+    this.holidayTried.set(true);
+    if (!String(this.holidayForm.name || '').trim() || !this.holidayForm.date) return;
+    this.holidayTried.set(false);
+    this.saveHoliday();
   }
   isHolidayModalOpen = signal<boolean>(false);
   isSavingHoliday = signal<boolean>(false);
@@ -4352,6 +4390,7 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   closeHolidayModal() {
+    this.holidayTried.set(false);
     this.isHolidayModalOpen.set(false);
   }
 
@@ -4683,6 +4722,7 @@ export class AttendanceLeaveComponent implements OnInit {
       if (holiday && record.clockIn) {
         return { type: 'present', label: `Worked on holiday (${holiday.name}) — In: ${new Date(record.clockIn).toLocaleTimeString()}` };
       }
+      if (record.status === 'WEEKLY_OFF') return { type: 'empty', label: 'Day off' };
       if (record.status === 'ABSENT') return { type: 'absent', label: 'Absent' };
       if (record.status === 'HALF_DAY') return { type: 'half-day', label: `Half Day (In: ${record.clockIn ? new Date(record.clockIn).toLocaleTimeString() : 'N/A'}, Out: ${record.clockOut ? new Date(record.clockOut).toLocaleTimeString() : 'N/A'})` };
       if (record.status === 'PRESENT') {

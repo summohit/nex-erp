@@ -93,10 +93,11 @@ import { LocationPickerComponent } from '../shared/components/task-locations/loc
 import { LocationExecutionsComponent } from '../shared/components/task-locations/location-executions';
 import { TaskLocationsService, TaskLocation, ProjectCity, ProjectSite, LOCATION_TRACKING_ENABLED } from '../services/task-locations.service';
 import { ProjectLocationsEditorComponent } from '../shared/components/task-locations/project-locations-editor';
+import { PageHeaderComponent } from '../shared/components/page-header/page-header';
 @Component({
   selector: 'app-projects',
   standalone: true,
-  imports: [TaskTransferComponent, LocationPickerComponent, LocationExecutionsComponent, ProjectLocationsEditorComponent, 
+  imports: [PageHeaderComponent, TaskTransferComponent, LocationPickerComponent, LocationExecutionsComponent, ProjectLocationsEditorComponent, 
     CommonModule, FormsModule, RouterModule, LucidePlus, LucideKanban,
     LucideX, LucideUser, LucideChevronLeft, LucideBrainCircuit,
     LucideCheck, LucideStar, LucideSearch, LucideClock, LucideEdit2, LucideArchive, LucideRotateCcw,

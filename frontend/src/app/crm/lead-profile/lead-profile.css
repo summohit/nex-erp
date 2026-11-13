@@ -6213,3 +6213,8 @@ select.modern-form-control.input-error {
   font-size: 12.5px;
   padding: 0 10px;
 }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .form-grid-2col { grid-template-columns: 1fr !important; }
+}

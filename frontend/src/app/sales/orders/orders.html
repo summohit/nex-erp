@@ -1,10 +1,5 @@
 <div class="page-container">
-  <div class="page-header">
-    <div class="header-title">
-      <h2>Sales Orders</h2>
-      <p>View confirmed sales orders generated from accepted quotations or POS.</p>
-    </div>
-  </div>
+  <app-page-header icon="documents" section="Sales" heading="Sales orders" subtitle="Confirmed orders from accepted quotations or point of sale."></app-page-header>
 
   <div class="table-container glass-panel">
     <table class="data-table">
@@ -25,7 +20,7 @@
         <tr *ngFor="let o of orders">
           <td><span class="fw-semibold">{{o.orderNumber}}</span></td>
           <td>{{o.client.name}}</td>
-          <td>{{o.date | date}}</td>
+          <td>{{o.date | date:'d MMM y' }}</td>
           <td>₹{{o.total | number:'1.0-2'}}</td>
           <td>
             <span class="badge" [ngClass]="{
@@ -33,7 +28,7 @@
               'badge-info': o.status === 'CONFIRMED',
               'badge-success': o.status === 'DELIVERED',
               'badge-danger': o.status === 'CANCELLED'
-            }">{{o.status}}</span>
+            }">{{ statusLabel(o.status) }}</span>
             <span class="badge badge-rental" *ngIf="o.isRental && o.rentalStatus"
                   [class.badge-danger]="o.rentalStatus === 'OVERDUE'">{{ o.rentalStatus }}</span>
           </td>
@@ -85,7 +80,7 @@
         </div>
         <div class="form-group">
           <label>Date</label>
-          <div class="fw-semibold">{{selectedOrder.date | date}}</div>
+          <div class="fw-semibold">{{selectedOrder.date | date:'d MMM y' }}</div>
         </div>
         <div class="form-group">
           <label>Status</label>

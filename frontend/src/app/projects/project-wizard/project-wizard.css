@@ -2672,3 +2672,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .gate-summary-grid { grid-template-columns: 1fr !important; }
+  .resource-form-grid { grid-template-columns: 1fr !important; }
+}

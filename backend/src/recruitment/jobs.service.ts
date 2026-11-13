@@ -23,8 +23,9 @@ export class JobsService {
         _count: {
           select: { applications: true }
         },
+        // Filled openings = candidates marked Hired (or already onboarded), 13 Nov 2026.
         applications: {
-          where: { status: 'ONBOARDED' },
+          where: { status: { in: ['HIRED', 'ONBOARDED'] } },
           select: { id: true, updatedAt: true }
         }
       },
@@ -34,28 +35,24 @@ export class JobsService {
       ],
     });
 
-    // Preserve the existing expiry behaviour; capacity is reconciled above.
+    // Openings filled vs closing date (13 Nov 2026):
+    //  - every opening has a Hired candidate -> the posting is Closed;
+    //  - the closing date has passed with openings still unfilled -> Overdue
+    //    (it stays Open so recruiting can continue). No closing date = never Overdue.
+    const now = new Date();
+    const result: any[] = [];
     for (const job of jobs) {
-      // Only a live posting can lapse. A draft is not published, so flipping it
-      // to Closed would be a state change nobody asked for.
-      if (job.status !== 'Open') continue;
-
-      // Nothing has touched this posting since...
-      const untouchedSince = job.updatedAt;
-
-      // ...its end date passed.
-      const expiredUntouched =
-        !!job.endDate &&
-        new Date(job.endDate) < new Date() &&
-        untouchedSince <= new Date(job.endDate);
-
-      if (expiredUntouched) {
+      const hiredCount = job.applications.length;
+      const openings = job.totalOpenings || 1;
+      if (job.status === 'Open' && hiredCount >= openings) {
         await this.prisma.job.update({ where: { id: job.id }, data: { status: 'Closed' } });
         job.status = 'Closed';
       }
+      const isOverdue = job.status === 'Open' && !!job.endDate && new Date(job.endDate) < now && hiredCount < openings;
+      result.push({ ...job, hiredCount, isOverdue });
     }
 
-    return jobs;
+    return result;
   }
 
   async findOne(id: number, companyId: number) {

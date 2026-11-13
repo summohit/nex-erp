@@ -3802,3 +3802,9 @@ app-page-header .btn-action-primary:hover { background: #1d4ed8 !important; }
 .shift-option.selected { border-color: #1967d2 !important; background: #e8f0fe !important; box-shadow: 0 0 0 1px #1967d2 inset !important; }
 .shift-option.selected .option-name { color: #1967d2 !important; }
 .option-current { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: #1967d2; color: #fff; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .range-inputs-grid,
+  .time-inputs-grid { grid-template-columns: 1fr !important; }
+}

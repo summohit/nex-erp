@@ -2462,3 +2462,103 @@
 .pp-switcher-item:hover { background: #f1f5f9; }
 .pp-switcher-item.on { background: #eff6ff; }
 .pp-switcher-empty { padding: 10px; color: #94a3b8; font-size: 13px; }
+
+/* ── Pay Profiles in the MIRA standard (13 Nov) ── */
+.pp-page { display: flex; flex-direction: column; gap: 16px; }
+.pp-page > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+.pp-header { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 16px; flex-wrap: wrap; padding: 14px 18px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; background: #fff !important; box-shadow: none !important; }
+.pp-title-row { margin: 0 !important; }
+.pp-main-title, .pp-tab-title { font-family: var(--font-heading); font-size: 18px !important; margin: 0 !important; }
+.pp-header-desc { margin: 2px 0 0 !important; font-size: 13px !important; color: #64748b !important; max-width: 560px; }
+.pp-header-actions { display: flex !important; gap: 8px !important; flex-wrap: wrap; }
+.pp-btn { display: inline-flex !important; align-items: center; gap: 7px; height: 38px !important; padding: 0 14px !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; background: #fff !important; color: #334155 !important; font-size: 13.5px !important; font-weight: 600 !important; text-decoration: none !important; box-shadow: none !important; }
+.pp-btn:hover { background: #f8fafc !important; border-color: #cbd5e1 !important; }
+.pp-btn.pp-btn-primary { background: #2563eb !important; border-color: #2563eb !important; color: #fff !important; }
+.pp-btn.pp-btn-primary:hover { background: #1d4ed8 !important; }
+
+/* Stat cards: compact, label then number */
+.pp-stats-grid { display: grid !important; grid-template-columns: repeat(4, minmax(180px, 1fr)) !important; gap: 12px !important; overflow-x: auto; }
+.pp-stat-card { padding: 14px 16px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; box-shadow: none !important; min-height: 0 !important; text-align: left; }
+.pp-stat-card.on { border-color: #2563eb !important; box-shadow: 0 0 0 1px #2563eb !important; background: #fff !important; }
+
+/* Table card */
+.pp-table-card { padding: 0 !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; box-shadow: none !important; overflow: hidden; }
+.pp-search-input { height: 40px !important; border: 1px solid #d0d7e2 !important; border-radius: 8px !important; font-size: 13.5px !important; box-shadow: none !important; }
+.pp-search-input:focus { border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12) !important; }
+.pp-table th { text-transform: none !important; letter-spacing: 0 !important; font-size: 12.5px !important; font-weight: 600 !important; color: #475569 !important; background: #f8fafc !important; padding: 11px 14px !important; }
+.pp-table td { padding: 11px 14px !important; border-bottom: 1px solid #f1f5f9 !important; vertical-align: middle; }
+.pp-table tbody tr:hover td { background: #f8fbff; }
+/* Salary group: readable chip instead of a loud code block */
+.pp-group-code { padding: 3px 9px !important; border: 1px solid #e2e8f0 !important; border-radius: 999px !important; background: #f8fafc !important; color: #334155 !important; font-family: var(--font-body) !important; font-size: 12px !important; font-weight: 600 !important; letter-spacing: 0 !important; }
+
+/* ── Pay profile detail (13 Nov 2026) ── */
+/* ── Shared header (13 Nov) ── */
+
+.pp-hdr-primary { display: inline-flex !important; align-items: center; gap: 7px; height: 38px !important; padding: 0 16px !important; border-radius: 8px !important; background: #2563eb !important; color: #fff !important; box-shadow: none !important; font-size: 13.5px !important; font-weight: 600 !important; }
+.pp-hdr-primary:hover { background: #1d4ed8 !important; }
+app-page-header .pp-switcher { position: relative; }
+app-page-header .pp-switcher-btn { height: 40px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; box-shadow: none; }
+app-page-header .pp-switcher-menu { z-index: 60; }
+.pp-chip-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: -4px; }
+.pp-chip-row .pp-profile-link { font-size: 13px; font-weight: 600; color: #2563eb; text-decoration: none; }
+
+/* ── Detail cards, standard look (13 Nov) ── */
+.pp-card-header { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 16px; flex-wrap: nowrap !important; margin-bottom: 16px !important; }
+.pp-card-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.pp-card-title { font-family: var(--font-heading); font-size: 16px !important; margin: 0 !important; }
+.pp-card-subtitle { margin: 2px 0 0 !important; font-size: 12.5px !important; color: #64748b !important; }
+.pp-header-icon-badge { width: 40px !important; height: 40px !important; border-radius: 10px !important; flex: 0 0 40px; }
+.pp-card-header > .btn-primary { flex: 0 0 auto; height: 38px !important; padding: 0 16px !important; border-radius: 8px !important; background: #2563eb !important; box-shadow: none !important; font-size: 13.5px !important; font-weight: 600 !important; display: inline-flex; align-items: center; gap: 7px; }
+
+/* Right card: every field the same 40px box, on an even two-column grid */
+.pp-detail-section { padding: 16px 0 !important; border-top: 1px solid #eef2f6; }
+.section-badge-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px !important; }
+.section-badge-title { display: flex; align-items: center; gap: 8px; font-size: 14px !important; font-weight: 600 !important; color: #0f172a; }
+.detail-inputs-grid, .form-grid-2 { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 14px 16px !important; align-items: start !important; }
+.detail-inputs-grid.cols-3, .pp-bank-grid { grid-template-columns: 1fr 1fr 1fr !important; }
+.pp-gst-group { grid-column: 1 / -1; }
+.form-group { margin: 0 !important; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.form-label, .label-with-meta { display: flex !important; align-items: center !important; justify-content: space-between; gap: 8px; min-height: 20px; margin: 0 !important; font-size: 12.5px !important; font-weight: 600 !important; color: #475569 !important; }
+.form-control { height: 40px !important; box-sizing: border-box; padding: 0 12px !important; border: 1px solid #d0d7e2 !important; border-radius: 8px !important; font-size: 13.5px !important; box-shadow: none !important; background: #fff !important; }
+.form-control:focus { border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12) !important; outline: none; }
+.form-control::placeholder { color: #94a3b8; font-size: 13px; }
+.pp-doc-pill { align-self: flex-start; height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 999px; font-size: 12.5px !important; }
+.verify-pill { font-size: 11.5px !important; padding: 2px 8px !important; border-radius: 999px !important; }
+.pp-gst-toggle { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid #eef2f6; border-radius: 10px; background: #f8fafc; }
+
+/* Left card: calmer summary strip and table */
+.pp-card { border: 1px solid #e2e8f0 !important; border-radius: 12px !important; box-shadow: none !important; }
+.pp-page [class*="metric"] [class*="label"], .pp-page [class*="stat"] [class*="label"] { text-transform: none !important; letter-spacing: 0 !important; font-size: 12.5px !important; font-weight: 600 !important; color: #64748b !important; }
+.pp-page table th, .pp-page table thead td, .pp-page .pp-breakdown-head { text-transform: none !important; letter-spacing: 0 !important; font-size: 12.5px !important; font-weight: 600 !important; color: #475569 !important; }
+.pp-page table td { padding-top: 9px !important; padding-bottom: 9px !important; font-size: 13.5px; }
+.pp-group-code { padding: 3px 9px !important; border: 1px solid #e2e8f0 !important; border-radius: 999px !important; background: #f8fafc !important; color: #334155 !important; font-family: var(--font-body) !important; font-size: 12px !important; letter-spacing: 0 !important; }
+
+.comp-tile-label { text-transform: none !important; letter-spacing: 0 !important; font-size: 12.5px !important; font-weight: 600 !important; color: #64748b !important; }
+
+/* ── New version modal (13 Nov) ── */
+.pp-form-pane .form-grid-2 { gap: 16px 18px !important; }
+.pp-form-pane .form-group { gap: 6px; }
+.pp-form-pane .form-label { justify-content: flex-start !important; gap: 3px; }
+.pp-form-pane .form-label .text-rose-500 { color: #dc2626; margin-left: 2px; }
+.pp-form-pane select.form-control { padding-right: 32px !important; }
+/* ₹ sits inside the box with its own room, never on top of the number */
+.input-currency-wrapper { position: relative; display: flex; align-items: center; }
+.input-currency-wrapper .currency-prefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 13.5px; pointer-events: none; z-index: 1; }
+.input-currency-wrapper .currency-input { width: 100%; padding-left: 28px !important; }
+.field-hint-text { margin: 0 !important; font-size: 12px !important; line-height: 1.45; color: #94a3b8 !important; }
+.field-error { margin: 0 !important; font-size: 12px !important; color: #dc2626 !important; }
+.field-warn { margin: 0 !important; font-size: 12px !important; color: #b45309 !important; }
+.pp-form-pane .pp-gst-toggle { align-items: center; }
+.pp-form-pane .pp-gst-toggle input[type="checkbox"] { width: 16px; height: 16px; flex: 0 0 16px; margin: 0; accent-color: #2563eb; }
+.pp-overrides-card { padding: 14px 16px !important; border: 1px solid #eef2f6 !important; border-radius: 12px !important; background: #f8fafc !important; }
+.pp-overrides-header, .pp-overrides-header * { font-size: 14px !important; }
+.pp-overrides-header .text-xs, .pp-overrides-header p { font-size: 12px !important; color: #64748b !important; font-weight: 400 !important; }
+/* Preview side: sentence-case labels */
+.pp-version-grid [class*="label"], .pp-version-grid th { text-transform: none !important; letter-spacing: 0 !important; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .fintech-summary-grid { grid-template-columns: 1fr !important; }
+  .detail-inputs-grid.cols-3,
+  .pp-bank-grid { grid-template-columns: 1fr !important; }
+}

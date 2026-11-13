@@ -4,15 +4,10 @@
   </div>
 
   <ng-container *ngIf="data() as d">
-    <!-- Breadcrumb & Employee Hero Header -->
-    <header class="pp-detail-header">
-      <div class="pp-breadcrumb-row">
-        <button type="button" class="pp-back-pill" (click)="back()">
-          <svg lucideArrowLeft [size]="14"></svg>
-          <span>Back to Pay Profiles</span>
-        </button>
-
-        <!-- Switch person without going back to the list -->
+    <!-- Shared page header (13 Nov 2026): back, name, switcher and the one primary action -->
+    <app-page-header icon="wallet" section="Pay profiles" [heading]="d.employee.firstName + ' ' + (d.employee.lastName || '')"
+      [subtitle]="headerSubtitle(d)"
+      [showBack]="true" backLabel="Back to Pay Profiles" (back)="back()">
         <div class="pp-switcher">
           <button type="button" class="pp-switcher-btn" (click)="switcherOpen.set(!switcherOpen())" [attr.aria-expanded]="switcherOpen()">
             <ng-container *ngIf="currentPerson() as c; else noPerson">
@@ -36,15 +31,12 @@
             </div>
           </div>
         </div>
-      </div>
-      <div class="pp-employee-hero">
-        <div class="pp-hero-avatar" [style.background]="getAvatarBg(d.employee.firstName + ' ' + d.employee.lastName)">
-          <img *ngIf="d.employee.avatarUrl" class="pp-avatar-img" [src]="d.employee.avatarUrl" [alt]="d.employee.firstName" (error)="d.employee.avatarUrl = null">
-          <ng-container *ngIf="!d.employee.avatarUrl">{{ getInitials(d.employee.firstName + ' ' + d.employee.lastName) }}</ng-container>
-        </div>
-        <div class="pp-hero-info">
-          <div class="pp-hero-name-row">
-            <h1 class="pp-hero-name">{{ d.employee.firstName }} {{ d.employee.lastName }}</h1>
+      <button type="button" class="btn-primary pp-hdr-primary" *ngIf="canEditSalary() && !formOpen()" (click)="openNewVersion()">
+        <svg lucidePlus [size]="15"></svg>
+        <span>{{ d.versions.length ? 'New version' : 'Create pay profile' }}</span>
+      </button>
+    </app-page-header>
+    <div class="pp-chip-row">
             <a class="pp-profile-link" [routerLink]="['/employees', d.employee.id, 'profile']">
               {{ d.employee.employeeCode ? d.employee.employeeCode + ' · ' : '' }}View employee profile ↗
             </a>
@@ -59,28 +51,7 @@
               <svg lucideAlertCircle [size]="12"></svg>
               <span>Setup Required</span>
             </span>
-          </div>
-          <div class="pp-hero-meta">
-            <span *ngIf="d.employee.designation?.name || d.employee.employmentType">
-              {{ d.employee.designation?.name || d.employee.employmentType }}
-            </span>
-            <span class="dot-sep" *ngIf="d.employee.department?.name">·</span>
-            <span *ngIf="d.employee.department?.name">{{ d.employee.department?.name }}</span>
-            <span class="dot-sep" *ngIf="d.employee.joiningDate">·</span>
-            <span *ngIf="d.employee.joiningDate" class="pp-join-date">
-              <svg lucideCalendarDays [size]="13"></svg>
-              Joined {{ d.employee.joiningDate | date: 'd MMM y' }}
-            </span>
-          </div>
-        </div>
-        <div class="pp-hero-action">
-          <button type="button" class="btn-primary" *ngIf="canEditSalary() && !formOpen()" (click)="openNewVersion()">
-            <svg lucidePlus [size]="15"></svg>
-            <span>{{ d.versions.length ? 'New Version (Revision)' : 'Create Pay Profile' }}</span>
-          </button>
-        </div>
-      </div>
-    </header>
+    </div>
 
     <!-- Notice banner when no profile exists yet -->
     <div class="pp-notice-banner" *ngIf="!current() && !formOpen()">

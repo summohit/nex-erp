@@ -5222,3 +5222,15 @@
 /* Drawer-only mode: hide the page itself, keep the follow-up pop-up (12 Nov 2026). */
 .page-container.drawer-only-host { padding: 0 !important; min-height: 0 !important; background: transparent !important; }
 .page-container.drawer-only-host > *:not(.candidate-followup-overlay) { display: none !important; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 1024px) {
+  .analytics-charts-row { grid-template-columns: 1fr !important; }
+  .annexure-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 640px) {
+  .info-grid { grid-template-columns: 1fr !important; }
+  .form-row { grid-template-columns: 1fr !important; }
+  .stats-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .annexure-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}

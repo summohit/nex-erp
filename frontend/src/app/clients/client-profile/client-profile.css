@@ -1351,3 +1351,8 @@ input:checked + .toggle-slider:before {
 .btn-remove-logo:hover {
   background: #dbeafe;
 }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .form-grid-2col { grid-template-columns: 1fr !important; }
+}

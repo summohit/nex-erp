@@ -20,7 +20,7 @@ export interface Notice {
   emailSentAt: string | null;
   createdAt: string;
   updatedAt: string;
-  createdBy: { id: number; firstName: string; lastName: string; avatarUrl: string | null } | null;
+  createdBy: { id: number; firstName: string; lastName: string; avatarUrl: string | null; department?: { name: string } | null } | null;
   attachments?: NoticeAttachment[];
   /** For a reader: whether they have seen it. */
   isRead?: boolean;

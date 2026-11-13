@@ -46,10 +46,11 @@ const DEFAULT_TERMS = `1. Validity: This quotation is valid for the period state
 7. Acceptance: This proposal is subject to our standard terms of sale and acceptance of a Purchase Order.
 8. Governing Law: This proposal shall be governed by the laws of India and subject to jurisdiction of the courts.`;
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-quotations',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule, FormsModule,
     LucidePlus, LucideCheck, LucideTrash2, LucideArrowRight, LucideX,
     LucideUpload,
@@ -59,6 +60,14 @@ const DEFAULT_TERMS = `1. Validity: This quotation is valid for the period state
   styleUrls: ['./quotations.css']
 })
 export class QuotationsComponent implements OnInit {
+  /** Row ⋯ menu and readable status labels (13 Nov 2026). */
+  openRowMenu: number | null = null;
+  toggleRowMenu(id: number) { this.openRowMenu = this.openRowMenu === id ? null : id; }
+  statusLabel(v: string | null | undefined): string {
+    const t = String(v || '').replace(/_/g, ' ').toLowerCase();
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : '—';
+  }
+
   private clientsService = inject(ClientsService);
   private dialog = inject(DialogService);
   constructor(private http: HttpClient) {}

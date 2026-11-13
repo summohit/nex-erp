@@ -15,7 +15,7 @@ import {
   LucideZap, LucideExternalLink, LucideTrophy, LucideAward,
   LucideRoute, LucideCar, LucideHouse, LucideRepeat
 } from '@lucide/angular';
-import { forkJoin, firstValueFrom } from 'rxjs';
+import { forkJoin, firstValueFrom, switchMap } from 'rxjs';
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
 import { AttendanceService, AttendanceRecord } from '../../services/attendance';
 import { isRestDay } from '../../shared/utils/weekly-offs';
@@ -182,7 +182,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   isLoadingShifts = signal(false);
   isSavingShift = signal(false);
   isChangeDayOpen = signal(false);
-  changeDayStatus = signal<'PRESENT' | 'HALF_DAY' | 'ABSENT'>('PRESENT');
+  changeDayStatus = signal<'PRESENT' | 'HALF_DAY' | 'ABSENT' | 'DAY_OFF'>('PRESENT');
   changeDayReason = signal('');
   isSavingDayChange = signal(false);
   /** Refreshes active-session durations while the day-detail modal stays open. */
@@ -1839,6 +1839,8 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
           : 'Half day — short of a full shift'
       );
     }
+    // Manual corrections are named, so they never read as a real punch (13 Nov 2026).
+    if (String(r.clockOutReviewNote || '').startsWith('Corrected to ')) parts.push(String(r.clockOutReviewNote));
     if (r.isLate) parts.push('Clocked in after shift start');
     if (r.isEarlyLeave) parts.push('Clocked out before shift end');
     if (r.clockOutReason) parts.push(`Missed clock-out — "${r.clockOutReason}"`);
@@ -2194,7 +2196,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   openChangeDay(): void {
     const details = this.selectedDayDetails();
     if (!details?.employeeId) return;
-    const current = details.status === 'Half Day' ? 'HALF_DAY' : details.status === 'Absent' ? 'ABSENT' : 'PRESENT';
+    const current = details.status === 'Half Day' ? 'HALF_DAY' : details.status === 'Absent' ? 'ABSENT' : details.status === 'Day Off' ? 'DAY_OFF' : 'PRESENT';
     this.changeDayStatus.set(current);
     this.changeDayReason.set('');
     this.dayReasonError.set('');
@@ -2209,7 +2211,15 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
       return;
     }
     this.isSavingDayChange.set(true);
-    this.attendanceService.overrideAttendance(details.employeeId, this.getBackendDateString(details.date), this.changeDayStatus(), note).subscribe({
+    const date = this.getBackendDateString(details.date);
+    const employeeId = details.employeeId;
+    // Day off (13 Nov 2026): the roster decides days off (and payroll follows
+    // it), so mark the roster first, then record the day as a weekly off.
+    const request = this.changeDayStatus() === 'DAY_OFF'
+      ? this.shiftsService.assignRoster({ employeeId, date, shiftId: null, isDayOff: true } as any).pipe(
+          switchMap(() => this.attendanceService.overrideAttendance(employeeId, date, 'WEEKLY_OFF', note)))
+      : this.attendanceService.overrideAttendance(employeeId, date, this.changeDayStatus(), note);
+    request.subscribe({
       next: () => {
         this.isSavingDayChange.set(false);
         this.isChangeDayOpen.set(false);

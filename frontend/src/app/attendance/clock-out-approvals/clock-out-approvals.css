@@ -2035,3 +2035,65 @@ th.sticky-actions-col {
 }
 
 .history-card{background:#fff;border:1px solid #e1e8f1;border-radius:14px;margin:20px 0;padding:24px;color:#24334b}.history-heading,.history-footer,.history-footer div{display:flex;align-items:center;justify-content:space-between;gap:14px}.history-heading h2{margin:0 0 6px;font-size:20px}.history-heading p,.history-note{margin:0;color:#77869b;font-size:12px}.history-card button{background:#fff;border:1px solid #dce5f0;border-radius:7px;padding:8px 12px;color:#365fbd;cursor:pointer}.history-card button:disabled{opacity:.4;cursor:default}.history-filters{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0}.history-filters label{display:flex;flex-direction:column;gap:6px;color:#6b7c91;font-size:12px;font-weight:600}.history-filters label:first-child{flex:1;min-width:200px}.history-filters input,.history-filters select{height:38px;border:1px solid #dce5f0;border-radius:7px;padding:0 10px;background:#fff;color:#283b55}.history-scroll{overflow:auto}.history-card table{border-collapse:collapse;width:100%;min-width:850px;text-align:left;font-size:13px}.history-card th{background:#f7f9fc;color:#7e8da1;font-size:11px;text-transform:uppercase}.history-card th,.history-card td{padding:13px;border-bottom:1px solid #edf1f6}.history-card td small{display:block;color:#97a4b5;margin-top:4px}.history-status{background:#e8f7ef;color:#168257;border-radius:20px;padding:5px 9px;font-size:11px;font-weight:700}.history-status.rejected{background:#fff0ef;color:#b94f4f}.history-message{text-align:center;padding:32px;color:#8796a9}.history-footer{padding:16px 0;font-size:12px;color:#748399}.history-note{margin-top:15px;line-height:1.5}@media(max-width:600px){.history-card{padding:16px}.history-heading,.history-footer{align-items:flex-start;flex-direction:column}.history-filters label{flex:1;min-width:140px}}
+
+/* ── MIRA UI standard (13 Nov) ── */
+.coa-page { padding: 0 !important; gap: 16px !important; background: transparent !important; display: flex; flex-direction: column; }
+.coa-page > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+
+/* Tabs: soft-blue active instead of black. */
+.coa-main-tab-btn { height: 38px !important; border-radius: 8px !important; font-size: 13.5px !important; font-weight: 600 !important; box-shadow: none !important; }
+.coa-main-tab-btn.active { background: #eff6ff !important; color: #1d4ed8 !important; border-color: #bfdbfe !important; }
+.coa-main-tab-btn.active .tab-badge { background: #2563eb !important; color: #fff !important; }
+.coa-top-command-bar { padding: 10px 12px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; box-shadow: none !important; gap: 10px !important; }
+
+/* Hero banners: drop the big title/description (the page header says it); keep their action buttons. */
+.coa-hero-banner { padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; justify-content: flex-end !important; min-height: 0 !important; }
+.coa-hero-left { display: none !important; }
+.coa-hero-banner .header-actions-group { gap: 8px !important; }
+.btn-header-secondary, .btn-header-primary, .btn-header-danger { height: 38px !important; border-radius: 8px !important; font-size: 13.5px !important; font-weight: 600 !important; box-shadow: none !important; }
+.btn-header-primary { background: #2563eb !important; border-color: #2563eb !important; color: #fff !important; }
+.btn-header-primary:hover:not(:disabled) { background: #1d4ed8 !important; }
+
+/* KPI cards: compact. */
+.coa-page [class*="kpi"][class*="card"] { padding: 14px 16px !important; border-radius: 12px !important; box-shadow: none !important; }
+
+/* Filter controls: one 40px size. */
+.coa-page input[type="search"], .coa-page input[type="text"], .coa-page input[type="date"], .coa-page select { height: 40px !important; box-sizing: border-box !important; border-radius: 8px !important; font-size: 13.5px !important; }
+
+/* Row actions: calm outlined Reject, blue Approve. */
+.coa-page button[class*="approve"]:not(.btn-header-primary) { background: #2563eb !important; border-color: #2563eb !important; color: #fff !important; box-shadow: none !important; border-radius: 8px !important; height: 32px !important; }
+.coa-page button[class*="approve"]:not(.btn-header-primary):hover:not(:disabled) { background: #1d4ed8 !important; }
+.coa-page button[class*="reject"] { background: #fff !important; color: #b91c1c !important; border: 1px solid #fecaca !important; box-shadow: none !important; border-radius: 8px !important; height: 32px !important; }
+.coa-page button[class*="reject"]:hover:not(:disabled) { background: #fef2f2 !important; }
+
+/* Never overflow when the sidebar is open: rows wrap neatly. */
+.coa-top-command-bar, .coa-top-right-controls, .coa-main-tabs { flex-wrap: wrap !important; min-width: 0; }
+.coa-page [class*="toolbar"], .coa-page [class*="filter-row"], .coa-page [class*="pills"] { flex-wrap: wrap !important; min-width: 0; row-gap: 8px; }
+.coa-page [class*="toolbar"] input[type="search"], .coa-page [class*="toolbar"] input[type="text"] { min-width: 200px; flex: 1 1 240px; }
+.coa-main-tab-btn { white-space: nowrap; }
+
+/* Out-of-office filters: one row — search, department, distance, sort, Clear all, count. */
+.coa-unified-toolbar .coa-toolbar-top-row { display: flex !important; align-items: center !important; flex-wrap: wrap !important; gap: 10px !important; }
+.coa-unified-toolbar .coa-search-box { flex: 1 1 240px !important; max-width: 340px; min-width: 200px; }
+.coa-unified-toolbar .coa-toolbar-filters-left { display: flex !important; align-items: center; gap: 10px; flex-wrap: wrap; }
+.coa-unified-toolbar .coa-toolbar-right { margin-left: auto; }
+
+/* Page actions live in the header now; the old in-page action rows are hidden. */
+.coa-hdr-btn { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #334155; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.coa-hdr-btn:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; }
+.coa-hdr-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+.coa-hdr-btn.primary:hover:not(:disabled) { background: #1d4ed8; }
+.coa-hdr-btn:disabled { opacity: .6; cursor: default; }
+.coa-hdr-badge { min-width: 18px; height: 18px; display: inline-grid; place-items: center; padding: 0 5px; border-radius: 999px; background: #2563eb; color: #fff; font-size: 11px; font-weight: 700; }
+.coa-hero-banner > .header-actions-group { display: none !important; }
+.coa-hero-banner:not(:has(app-attendance-filter-drawer)) { display: none !important; }
+
+/* History tab: no title block; one filter row; calmer table. */
+.history-card { padding: 14px 16px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; box-shadow: none !important; }
+.history-heading { display: none !important; }
+.history-filters { display: flex !important; align-items: center !important; gap: 10px !important; flex-wrap: wrap; margin-bottom: 14px !important; }
+.history-filters label { display: contents !important; font-size: 0 !important; }
+.history-filters input, .history-filters select { height: 40px !important; box-sizing: border-box; padding: 0 12px !important; border: 1px solid #d0d7e2 !important; border-radius: 8px !important; font-size: 13.5px !important; background-color: #fff !important; }
+.history-filters input { flex: 1 1 240px; max-width: 340px; }
+.history-filters select { flex: 0 0 180px; }
+.history-scroll th { text-transform: none !important; letter-spacing: 0 !important; font-size: 12.5px !important; font-weight: 600 !important; color: #475569 !important; background: #f8fafc !important; }

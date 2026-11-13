@@ -1688,3 +1688,14 @@
 .dash-approvals-head h3 { margin: 0; font-size: 16px; font-weight: 800; color: #0f172a; }
 .dash-approvals-link { font-size: 13px; font-weight: 700; color: #1373e5; text-decoration: none; }
 .dash-approvals-loading { padding: 32px; text-align: center; color: #94a3b8; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 1024px) {
+  .cmd-row-hero { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .grid-12 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 640px) {
+  .cmd-row-hero { grid-template-columns: 1fr !important; }
+  .quick-access-inline { grid-template-columns: 1fr !important; }
+  .grid-12 { grid-template-columns: 1fr !important; }
+}

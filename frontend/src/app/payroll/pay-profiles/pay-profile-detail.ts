@@ -43,10 +43,11 @@ import {
  * One employee's pay profile (Payroll plan W9): today's breakup from the
  * engine, every version, statutory details, and adding a new version.
  */
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-pay-profile-detail',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule,
     FormsModule,
     RouterModule,
@@ -76,6 +77,13 @@ import {
   styleUrls: ['./pay-profiles.css'],
 })
 export class PayProfileDetailComponent implements OnInit {
+  /** Designation · department · joined date, for the page header (13 Nov 2026). */
+  headerSubtitle(d: any): string {
+    const e = d?.employee || {};
+    const joined = e.joiningDate ? 'Joined ' + new Date(e.joiningDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    return [e.designation?.name || e.employmentType, e.department?.name, joined].filter(Boolean).join(' · ');
+  }
+
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private payroll = inject(PayrollService);

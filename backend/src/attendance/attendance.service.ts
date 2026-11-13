@@ -2098,6 +2098,7 @@ export class AttendanceService {
   async overrideAttendanceStatus(
     companyId: number,
     data: { employeeId: number; date: string; status: string; note?: string },
+    actorUserId?: number,
   ) {
     const employeeId = Number(data.employeeId);
     const date = String(data.date ?? '');
@@ -2130,7 +2131,9 @@ export class AttendanceService {
     let defaultClockIn: Date | null = null;
     let defaultClockOut: Date | null = null;
     let shiftId: number | null = existing?.shiftId ?? null;
-    if (status === 'PRESENT' || status === 'HALF_DAY') {
+    // A real punch is never overwritten (13 Nov 2026): shift times are only
+    // filled in when the person has no clock-in at all for the day.
+    if ((status === 'PRESENT' || status === 'HALF_DAY') && !existing?.clockIn) {
       const effective = this.workingWindow(await this.roster.getEffectiveShift(employeeId, attendanceDate));
       shiftId = effective.shift?.id ?? shiftId;
       if (effective.startTime && effective.endTime) {
@@ -2143,12 +2146,33 @@ export class AttendanceService {
       }
     }
 
+    // Who corrected the day, shown on hover so it never looks like a real punch.
+    const actor = actorUserId ? await this.prisma.user.findUnique({
+      where: { id: actorUserId }, select: { email: true, employee: { select: { firstName: true, lastName: true } } },
+    }) : null;
+    const actorName = actor?.employee ? `${actor.employee.firstName} ${actor.employee.lastName ?? ''}`.trim() : (actor?.email || 'an administrator');
+    const label = status === 'HALF_DAY' ? 'Half Day' : status === 'WEEKLY_OFF' ? 'Day off' : status.charAt(0) + status.slice(1).toLowerCase();
+    const note = String(data.note ?? '').trim().slice(0, 300);
+    const correction = `Corrected to ${label} by ${actorName}${note ? ': ' + note : ''}`;
+    if (actorUserId) {
+      await this.prisma.auditLog.create({
+        data: {
+          companyId, actorId: actorUserId, action: 'ATTENDANCE_CORRECTED', entityType: 'Attendance',
+          entityId: String(existing?.id ?? `${employeeId}:${date}`),
+          oldValue: existing ? JSON.stringify(existing) : null,
+          newValue: JSON.stringify({ status, note }),
+        } as any,
+      }).catch(() => undefined);
+    }
+
     return this.prisma.attendance.upsert({
       where: { employeeId_date: { employeeId, date: attendanceDate } },
       create: {
         employeeId,
         date: attendanceDate,
         status,
+        // Stored as a review note: clockOutReason drives half-day/payroll rules.
+        clockOutReviewNote: correction,
         clockIn: defaultClockIn,
         clockOut: defaultClockOut,
         shiftId,
@@ -2158,6 +2182,8 @@ export class AttendanceService {
       // This explicit correction must not still render as Late or Early Leave.
       update: {
         status,
+        // Stored as a review note: clockOutReason drives half-day/payroll rules.
+        clockOutReviewNote: correction,
         clockIn: existing?.clockIn ?? defaultClockIn,
         clockOut: existing?.clockOut ?? defaultClockOut,
         shiftId,

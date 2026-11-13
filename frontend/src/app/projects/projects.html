@@ -485,7 +485,7 @@
           class="view-toggle-btn"
           [class.active]="viewMode() === 'card'"
           (click)="setViewMode('card')"
-          title="Card view">
+          title="Board view">
           <svg lucideLayoutGrid size="16"></svg>
         </button>
         <button
@@ -1042,6 +1042,36 @@
 
   <!-- ✅ My Tasks — project, general and pre-sales work in one list -->
   <div class="section-container my-tasks-section" id="my-tasks-section" *ngIf="activeTab() === 'my-tasks'">
+    <app-page-header icon="target" section="Delivery"
+      [heading]="myTasksScope() === 'all' ? 'All tasks' : myTasksScope() === 'created' ? 'Tasks I created' : 'My tasks'"
+      [subtitle]="myTasksCount() + (myTasksCount() === 1 ? ' task' : ' tasks') + ' · project work, general tasks and pre-sales deals'">
+          <!-- Administrators only. Without this an admin with nothing assigned
+               to them saw an empty screen while the company had open work. -->
+          <!-- 'Created by me' is for anyone who hands out work — without it a PM
+               who assigns a task to someone else can never see it again. -->
+          <div class="scope-switch" *ngIf="taskCapabilities().canCreateTask || taskCapabilities().isAdmin">
+            <button type="button" class="scope-switch-btn" [class.active]="myTasksScope() === 'mine'"
+                    (click)="setMyTasksScope('mine')">
+              <svg lucideUser size="13"></svg>
+              <span>Assigned to me</span>
+            </button>
+            <button type="button" class="scope-switch-btn" [class.active]="myTasksScope() === 'created'"
+                    (click)="setMyTasksScope('created')">
+              <svg lucideCheckSquare size="13"></svg>
+              <span>Created by me</span>
+            </button>
+            <button type="button" *ngIf="taskCapabilities().isAdmin" class="scope-switch-btn" [class.active]="myTasksScope() === 'all'"
+                    (click)="setMyTasksScope('all')">
+              <svg lucideUsers size="13"></svg>
+              <span>Everyone</span>
+            </button>
+          </div>
+
+          <button type="button" class="btn-create-task-main mt-hdr-primary" *ngIf="taskCapabilities().canCreateTask" (click)="openCreateTask()">
+            <svg lucidePlus size="16"></svg>
+            <span>Add Task</span>
+          </button>
+    </app-page-header>
     <div class="my-tasks-header-card">
       <!-- Top Row: Title, Subtitle, Scope Switch & Add Task -->
       <div class="my-tasks-card-top">
@@ -1067,34 +1097,6 @@
           </div>
         </div>
 
-        <div class="my-tasks-card-actions">
-          <!-- Administrators only. Without this an admin with nothing assigned
-               to them saw an empty screen while the company had open work. -->
-          <!-- 'Created by me' is for anyone who hands out work — without it a PM
-               who assigns a task to someone else can never see it again. -->
-          <div class="scope-switch" *ngIf="taskCapabilities().canCreateTask || taskCapabilities().isAdmin">
-            <button type="button" class="scope-switch-btn" [class.active]="myTasksScope() === 'mine'"
-                    (click)="setMyTasksScope('mine')">
-              <svg lucideUser size="13"></svg>
-              <span>Assigned to me</span>
-            </button>
-            <button type="button" class="scope-switch-btn" [class.active]="myTasksScope() === 'created'"
-                    (click)="setMyTasksScope('created')">
-              <svg lucideCheckSquare size="13"></svg>
-              <span>Created by me</span>
-            </button>
-            <button type="button" *ngIf="taskCapabilities().isAdmin" class="scope-switch-btn" [class.active]="myTasksScope() === 'all'"
-                    (click)="setMyTasksScope('all')">
-              <svg lucideUsers size="13"></svg>
-              <span>Everyone</span>
-            </button>
-          </div>
-
-          <button type="button" class="btn-create-task-main" *ngIf="taskCapabilities().canCreateTask" (click)="openCreateTask()">
-            <svg lucidePlus size="16"></svg>
-            <span>Add Task</span>
-          </button>
-        </div>
       </div>
 
       <!-- Card Inner Divider -->

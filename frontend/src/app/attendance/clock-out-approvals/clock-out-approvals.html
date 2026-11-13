@@ -1,4 +1,21 @@
 <div class="coa-page page-container">
+  <app-page-header icon="calendar" section="Attendance & Leave" heading="Clock-out Approvals"
+    [subtitle]="activeQueueTab() === 'GEO' ? 'Clock-ins and clock-outs made outside the office radius.' : (activeQueueTab() === 'LATE' ? 'Late or missed clock-outs waiting for a decision.' : 'Decisions already made.')">
+    <ng-container *ngIf="activeQueueTab() === 'GEO'">
+      <button type="button" class="coa-hdr-btn" (click)="loadGeofence()" title="Reload out-of-office queue"><svg lucideRefreshCw [size]="15"></svg>Refresh</button>
+    </ng-container>
+    <ng-container *ngIf="activeQueueTab() === 'LATE'">
+      <button type="button" class="coa-hdr-btn" (click)="filterDrawerOpen.set(true)"><svg lucideFilter [size]="15"></svg>Filters<span class="coa-hdr-badge" *ngIf="activeApprovalFilterCount">{{ activeApprovalFilterCount }}</span></button>
+      <button type="button" class="coa-hdr-btn" (click)="load()" [disabled]="isLoading() || isBatchApproving()" title="Reload the approval queue"><svg lucideRefreshCw [size]="15" [class.spin-anim]="isLoading()"></svg>Refresh</button>
+      <button type="button" class="coa-hdr-btn primary" *ngIf="latePageRows().length > 1 && lateSelected().size === 0" (click)="approveAllVisible()"
+              [disabled]="isBatchApproving() || isLoading() || busyId() !== null" title="Approve all requests shown on this page">
+        <svg lucideCheckCheck [size]="15"></svg>{{ isBatchApproving() ? 'Approving…' : 'Approve page (' + latePageRows().length + ')' }}
+      </button>
+    </ng-container>
+    <ng-container *ngIf="activeQueueTab() === 'HISTORY'">
+      <button type="button" class="coa-hdr-btn" (click)="loadHistory()"><svg lucideRefreshCw [size]="15"></svg>Refresh</button>
+    </ng-container>
+  </app-page-header>
 
   <!-- ── Top Command Bar: Queue Switcher + Quick Date Filter + Habitual Late-Comers ── -->
   <div class="coa-top-command-bar" *ngIf="geoCanApprove() || canApprove() === true">
@@ -11,7 +28,7 @@
         [class.active]="activeQueueTab() === 'GEO'"
         (click)="switchTab('GEO')">
         <svg lucideMapPin [size]="16"></svg>
-        <span>Out-of-Office Approvals</span>
+        <span>Out of office</span>
         <span class="tab-badge warning" *ngIf="geoRows().length > 0">{{ geoRows().length }}</span>
         <span class="tab-badge" *ngIf="geoRows().length === 0">0</span>
       </button>
@@ -23,7 +40,7 @@
         [class.active]="activeQueueTab() === 'LATE'"
         (click)="switchTab('LATE')">
         <svg lucideClock [size]="16"></svg>
-        <span>Late Clock-out Approvals</span>
+        <span>Late clock-out</span>
         <span class="tab-badge danger" *ngIf="staleCount() > 0">{{ totalCount() }}</span>
         <span class="tab-badge info" *ngIf="staleCount() === 0 && totalCount() > 0">{{ totalCount() }}</span>
         <span class="tab-badge" *ngIf="totalCount() === 0">0</span>
@@ -35,24 +52,8 @@
 
     <!-- Right Controls: Quick Date Range + Habitual Late-Comers Trigger -->
     <div class="coa-top-right-controls">
-      <div class="coa-ranges">
-        <span class="coa-ranges-label">
-          <svg lucideCalendarDays [size]="13"></svg>
-          <span>Period</span>
-        </span>
-        <button type="button" class="coa-range" [class.on]="quickRange() === 'ALL'" (click)="setQuickRange('ALL')">All</button>
-        <button type="button" class="coa-range" [class.on]="quickRange() === 'TODAY'" (click)="setQuickRange('TODAY')">Today</button>
-        <button type="button" class="coa-range" [class.on]="quickRange() === 'YESTERDAY'" (click)="setQuickRange('YESTERDAY')">Yesterday</button>
-        <button type="button" class="coa-range" [class.on]="quickRange() === '30'" (click)="setQuickRange('30')">30d</button>
-        <button type="button" class="coa-range" [class.on]="quickRange() === '60'" (click)="setQuickRange('60')">60d</button>
-        <button type="button" class="coa-range" [class.on]="quickRange() === '90'" (click)="setQuickRange('90')">90d</button>
-        <button type="button" class="coa-range" [class.on]="quickRange() === 'CUSTOM'" (click)="setQuickRange('CUSTOM')">Custom</button>
-        <ng-container *ngIf="quickRange() === 'CUSTOM'">
-          <input type="date" class="coa-range-date" [ngModel]="customFrom()" (ngModelChange)="setCustomRange('from', $event)" aria-label="From date">
-          <span class="date-to">–</span>
-          <input type="date" class="coa-range-date" [ngModel]="customTo()" (ngModelChange)="setCustomRange('to', $event)" aria-label="To date">
-        </ng-container>
-      </div>
+      <!-- Period (13 Nov 2026): the shared date dropdown replaces the All / Today / 30d … pills -->
+      <app-date-preset-filter label="Period" [preset]="periodPreset" (presetChange)="periodPreset = $event" (rangeChange)="onPeriodRange($event)"></app-date-preset-filter>
 
       <button
         type="button"
@@ -76,7 +77,7 @@
     <div class="history-heading"><div><h2>Approval history</h2><p>Decided requests, filtered by attendance date using the period above.</p></div><button type="button" (click)="loadHistory()">Refresh</button></div>
     <div class="history-filters"><label>Search<input type="search" placeholder="Employee or reviewer" [ngModel]="historySearch()" (ngModelChange)="historySearch.set($event); historyPage.set(1)"></label><label>Request type<select [ngModel]="historyType()" (ngModelChange)="historyType.set($event); historyPage.set(1)"><option value="ALL">All types</option><option value="LATE">Late clock-out</option><option value="GEO">Out-of-office</option></select></label><label>Outcome<select [ngModel]="historyOutcome()" (ngModelChange)="historyOutcome.set($event); historyPage.set(1)"><option value="ALL">All outcomes</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select></label></div>
     <p class="history-message" *ngIf="historyLoading()">Loading history...</p><p class="history-message" *ngIf="historyError()">Could not load history. <button type="button" (click)="loadHistory()">Try again</button></p><p class="history-message" *ngIf="!historyLoading() && !historyError() && !historyFiltered().length">No decisions match these filters.</p>
-    <div class="history-scroll" *ngIf="!historyLoading() && !historyError() && historyFiltered().length"><table><thead><tr><th>Employee</th><th>Request</th><th>Attendance date</th><th>Outcome</th><th>Decided by</th><th>Decided on</th><th>Note</th></tr></thead><tbody><tr *ngFor="let row of historyPageRows()"><td><strong>{{ row.employee.firstName }} {{ row.employee.lastName }}</strong><small>{{ row.employee.employeeCode || row.employee.department?.name || '' }}</small></td><td>{{ row.type === 'LATE' ? 'Late clock-out' : 'Out-of-office' }}</td><td>{{ row.date | date:'mediumDate':'UTC' }}</td><td><span class="history-status" [class.rejected]="row.outcome === 'REJECTED'">{{ row.outcome | titlecase }}</span></td><td>{{ row.reviewer ? row.reviewer.firstName + ' ' + row.reviewer.lastName : 'Unavailable' }}</td><td>{{ row.decidedAt ? (row.decidedAt | date:'medium') : 'Unavailable' }}</td><td>{{ row.note || '?' }}</td></tr></tbody></table></div>
+    <div class="history-scroll" *ngIf="!historyLoading() && !historyError() && historyFiltered().length"><table><thead><tr><th>Employee</th><th>Request</th><th>Attendance date</th><th>Outcome</th><th>Decided by</th><th>Decided on</th><th>Note</th></tr></thead><tbody><tr *ngFor="let row of historyPageRows()"><td><strong>{{ row.employee.firstName }} {{ row.employee.lastName }}</strong><small>{{ row.employee.employeeCode || row.employee.department?.name || '' }}</small></td><td>{{ row.type === 'LATE' ? 'Late clock-out' : 'Out-of-office' }}</td><td>{{ row.date | date:'mediumDate':'UTC' }}</td><td><span class="history-status" [class.rejected]="row.outcome === 'REJECTED'">{{ row.outcome | titlecase }}</span></td><td>{{ row.reviewer ? row.reviewer.firstName + ' ' + row.reviewer.lastName : 'Unavailable' }}</td><td>{{ row.decidedAt ? (row.decidedAt | date:'medium') : 'Unavailable' }}</td><td>{{ row.note || '—' }}</td></tr></tbody></table></div>
     <div class="history-footer" *ngIf="!historyLoading() && !historyError() && historyFiltered().length"><span>{{ historyFiltered().length }} decisions</span><div><button type="button" [disabled]="historyPage() <= 1" (click)="historyPage.set(historyPage() - 1)">Previous</button><span>Page {{ historyPage() > historyPages() ? historyPages() : historyPage() }} of {{ historyPages() }}</span><button type="button" [disabled]="historyPage() >= historyPages()" (click)="historyPage.set(historyPage() + 1)">Next</button></div></div>
     <p class="history-note">This shows the current recorded decision for each attendance record; earlier decisions may not be retained if a request was reopened.</p>
   </section>
@@ -291,33 +292,6 @@
           </button>
         </div>
 
-        <!-- Category Filter Pills -->
-        <div class="coa-filter-pills">
-          <button type="button" class="filter-pill" [class.active]="geoTab() === 'ALL'" (click)="setGeoTab('ALL')">
-            <span>All</span>
-            <span class="count-badge">{{ visibleGeoRows().length }}</span>
-          </button>
-          <button type="button" class="filter-pill" [class.active]="geoTab() === 'IN'" (click)="setGeoTab('IN')">
-            <span>In Outside</span>
-            <span class="count-badge">{{ geoInCount() }}</span>
-          </button>
-          <button type="button" class="filter-pill" [class.active]="geoTab() === 'OUT'" (click)="setGeoTab('OUT')">
-            <span>Out Outside</span>
-            <span class="count-badge">{{ geoOutCount() }}</span>
-          </button>
-          <button type="button" class="filter-pill" [class.active]="geoTab() === 'BOTH'" (click)="setGeoTab('BOTH')">
-            <span>Both In &amp; Out</span>
-            <span class="count-badge">{{ geoBothCount() }}</span>
-          </button>
-          <button type="button" class="filter-pill pill-urgent" [class.active]="geoTab() === 'FAR'" (click)="setGeoTab('FAR')">
-            <span>&gt;100 km</span>
-            <span class="count-badge danger" *ngIf="geoFarCount() > 0">{{ geoFarCount() }}</span>
-            <span class="count-badge" *ngIf="geoFarCount() === 0">0</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="coa-toolbar-bottom-row">
         <div class="coa-toolbar-filters-left">
           <select class="geo-input geo-select" [ngModel]="geoDept()" (ngModelChange)="setGeoFilter('dept', $event)" aria-label="Filter by department">
             <option value="">All Departments</option>
@@ -333,27 +307,13 @@
             <option value="NOGPS">No GPS</option>
           </select>
 
-          <div class="geo-date-group">
-            <label class="geo-date">
-              <span>From</span>
-              <input class="geo-input geo-date-input" type="date" [ngModel]="geoFrom()" (ngModelChange)="setGeoFilter('from', $event)">
-            </label>
-            <label class="geo-date">
-              <span>To</span>
-              <input class="geo-input geo-date-input" type="date" [ngModel]="geoTo()" (ngModelChange)="setGeoFilter('to', $event)">
-            </label>
-          </div>
-
           <select class="geo-input geo-select" [ngModel]="geoSort()" (ngModelChange)="setGeoFilter('sort', $event)" aria-label="Sort order">
             <option value="NEWEST">Newest First</option>
             <option value="OLDEST">Oldest First</option>
             <option value="FARTHEST">Farthest First</option>
           </select>
 
-          <button type="button" class="btn-toolbar-reset" *ngIf="geoHasFilters()" (click)="resetGeoFilters()">
-            <svg lucideRefreshCw [size]="13"></svg>
-            <span>Reset</span>
-          </button>
+          <button type="button" class="clear-all-filters" *ngIf="geoHasFilters()" (click)="resetGeoFilters()">Clear all</button>
         </div>
 
         <div class="coa-toolbar-right">
@@ -761,48 +721,7 @@
             </button>
           </div>
 
-          <!-- Quick Status Pills -->
-          <div class="coa-filter-pills">
-            <button
-              type="button"
-              class="filter-pill"
-              [class.active]="filterTab() === 'ALL'"
-              (click)="setFilterTab('ALL')">
-              <span>All</span>
-              <span class="count-badge">{{ totalCount() }}</span>
-            </button>
 
-            <button
-              type="button"
-              class="filter-pill pill-urgent"
-              [class.active]="filterTab() === 'URGENT'"
-              (click)="setFilterTab('URGENT')">
-              <span>Urgent</span>
-              <span class="count-badge danger" *ngIf="staleCount() > 0">{{ staleCount() }}</span>
-              <span class="count-badge" *ngIf="staleCount() === 0">0</span>
-            </button>
-
-            <button
-              type="button"
-              class="filter-pill"
-              [class.active]="filterTab() === 'RECENT'"
-              (click)="setFilterTab('RECENT')">
-              <span>Recent</span>
-              <span class="count-badge">{{ recentCount() }}</span>
-            </button>
-
-            <button
-              type="button"
-              class="filter-pill"
-              [class.active]="filterTab() === 'HAS_PROOF'"
-              (click)="setFilterTab('HAS_PROOF')">
-              <span>With Proof</span>
-              <span class="count-badge">{{ proofCount() }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="coa-toolbar-bottom-row">
           <div class="coa-toolbar-filters-left">
             <!-- Department Filter Dropdown -->
             <select
@@ -824,16 +743,7 @@
               <span>{{ sortOrder() === 'OLDEST' ? 'Oldest First' : 'Newest First' }}</span>
             </button>
 
-            <!-- Reset Filters Button -->
-            <button
-              type="button"
-              class="btn-toolbar-reset"
-              *ngIf="hasActiveLateFilters()"
-              (click)="clearFilters()"
-              title="Reset search and filters">
-              <svg lucideRefreshCw [size]="13"></svg>
-              <span>Reset Filters</span>
-            </button>
+            <button type="button" class="clear-all-filters" *ngIf="hasActiveLateFilters()" (click)="clearFilters()">Clear all</button>
           </div>
 
           <div class="coa-toolbar-right">
@@ -842,20 +752,20 @@
               <button
                 type="button"
                 class="btn-view-toggle"
+                [class.active]="lateViewMode() === 'cards'"
+                (click)="lateViewMode.set('cards')"
+                title="Board view">
+                <svg lucideGrid [size]="14"></svg>
+                <span>Board</span>
+              </button>
+              <button
+                type="button"
+                class="btn-view-toggle"
                 [class.active]="lateViewMode() === 'table'"
                 (click)="lateViewMode.set('table')"
                 title="Table View">
                 <svg lucideList [size]="14"></svg>
                 <span>Table</span>
-              </button>
-              <button
-                type="button"
-                class="btn-view-toggle"
-                [class.active]="lateViewMode() === 'cards'"
-                (click)="lateViewMode.set('cards')"
-                title="Cards View">
-                <svg lucideGrid [size]="14"></svg>
-                <span>Cards</span>
               </button>
             </div>
 

@@ -50,10 +50,11 @@ export interface BlackoutDate {
   departmentId?: number | null;
 }
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-master-data',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule, FormsModule, LucidePlus, LucideX, LucideCalendar, LucideList, 
     LucideChevronLeft, LucideChevronRight, LucideClock, LucideSearch, LucideSliders, 
     LucideUsers, LucideCheck, LucideTag, LucideRotateCcw, 

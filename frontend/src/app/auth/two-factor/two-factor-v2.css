@@ -638,3 +638,8 @@
     height: 48px;
   }
 }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .codes-list-grid { grid-template-columns: 1fr !important; }
+}

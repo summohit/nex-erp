@@ -100,7 +100,7 @@
     <!-- Drawer Header -->
     <div class="drawer-header">
       <h3 class="drawer-title">
-        {{ viewMode() === 'tree' ? 'All modules' : currentActiveModule()?.title }}
+        {{ mode() === 'tree' ? 'All modules' : currentActiveModule()?.title }}
       </h3>
 
       <div class="drawer-header-actions">
@@ -108,9 +108,9 @@
         <button
           type="button"
           class="btn-drawer-tool"
-          [class.active]="viewMode() === 'tree'"
+          [class.active]="mode() === 'tree'"
           (click)="toggleViewMode()"
-          [attr.title]="viewMode() === 'tree' ? 'Switch to Single Module' : 'View All Modules Tree'">
+          [attr.title]="mode() === 'tree' ? 'Switch to Single Module' : 'View All Modules Tree'">
           <svg lucideList size="16"></svg>
         </button>
 
@@ -142,7 +142,7 @@
     <div class="drawer-scroll-body">
 
       <!-- VIEW A: SINGLE MODULE VIEW (Figma Image 1) -->
-      <ng-container *ngIf="viewMode() === 'single'">
+      <ng-container *ngIf="mode() === 'single'">
 
         <nav class="drawer-items-nav">
           <a
@@ -165,7 +165,7 @@
       </ng-container>
 
       <!-- VIEW B: ALL MODULES TREE VIEW (Figma Image 2) -->
-      <ng-container *ngIf="viewMode() === 'tree'">
+      <ng-container *ngIf="mode() === 'tree'">
         <div class="tree-container">
           <div *ngFor="let mod of filteredTreeModules()" class="tree-group">
             

@@ -578,3 +578,10 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   padding: 6px 9px;
   gap: 5px;
 }
+
+/* Header buttons (13 Nov 2026) */
+.lf-hdr-btn { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #334155; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.lf-hdr-btn:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; }
+.lf-hdr-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+.lf-hdr-btn.primary:hover:not(:disabled) { background: #1d4ed8; }
+.lead-forms-page { display: flex; flex-direction: column; gap: 16px; }

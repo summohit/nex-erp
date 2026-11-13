@@ -1,10 +1,5 @@
 <div class="page-container">
-  <div class="page-header">
-    <div class="header-content">
-      <h1>Roles & Permissions</h1>
-      <p>Configure what each role can access and map departments to default roles.</p>
-    </div>
-  </div>
+  <app-page-header icon="users" section="Settings" heading="Roles & permissions" subtitle="What each role can access, and the default role for each department."></app-page-header>
 
   <div class="tabs-container">
     <button class="tab-btn" [class.active]="activeTab === 'departments'" (click)="setTab('departments')">

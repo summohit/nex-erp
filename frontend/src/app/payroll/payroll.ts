@@ -50,6 +50,10 @@ import { ExpenseReceiptCellRendererComponent } from '../shared/components/expens
   styleUrls: ['./payroll.css']
 })
 export class PayrollComponent implements OnInit {
+  /** Header "More" menu (13 Nov 2026). */
+  prMoreOpen = false;
+  /** Deductions panel starts folded; the header row opens it (13 Nov 2026). */
+  dedOpen = false;
   activeTab = signal<string>('processing');
 
   // Month & Year selection

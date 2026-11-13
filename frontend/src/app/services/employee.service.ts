@@ -178,6 +178,14 @@ export class EmployeeService {
     });
   }
 
+  /** Super Admin only: change the name shown for a document (the stored file stays). */
+  renameDocument(id: number | string, documentId: number, fileName: string): Observable<any> {
+    const token = getAccessToken();
+    return this.http.put<any>(`${this.apiUrl}/${id}/documents/${documentId}`, { fileName }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   deleteDocument(id: number | string, documentId: number): Observable<any> {
     const token = getAccessToken();
     return this.http.delete<any>(`${this.apiUrl}/${id}/documents/${documentId}`, {

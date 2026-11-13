@@ -1992,3 +1992,9 @@ select.form-control:disabled {
 .shift-btn-primary { height: 36px; padding: 0 22px; border: 0; border-radius: 18px; background: #2563eb; color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; transition: background .15s, box-shadow .15s; }
 .shift-btn-primary:hover:not(:disabled) { background: #1d4ed8; box-shadow: 0 1px 3px rgba(37,99,235,.35); }
 .shift-btn-primary:disabled { background: #e2e8f0; color: #94a3b8; cursor: default; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .day-schedule-row { grid-template-columns: 1fr !important; }
+  .form-grid-2 { grid-template-columns: 1fr !important; }
+}

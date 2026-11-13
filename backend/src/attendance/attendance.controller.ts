@@ -186,7 +186,7 @@ export class AttendanceController {
     if (!isHrAdmin(req.user.role)) {
       throw new ForbiddenException('Only an administrator can change an employee attendance status.');
     }
-    return this.attendanceService.overrideAttendanceStatus(req.user.companyId, body);
+    return this.attendanceService.overrideAttendanceStatus(req.user.companyId, body, req.user.sub);
   }
 
   /** §Att7: attendance grouped by shift, for a week or a month. */

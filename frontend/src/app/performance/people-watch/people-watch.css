@@ -3315,3 +3315,9 @@
 /* Selected chip keeps its coloured dot (12 Nov 2026). */
 .pw-chip.active .chip-dot.red { background: #dc2626; } .pw-chip.active .chip-dot.amber { background: #f59e0b; }
 .pw-chip.active .chip-dot.green { background: #10b981; } .pw-chip.active .chip-dot.purple { background: #8b5cf6; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .pw-seg { grid-template-columns: 1fr !important; }
+  .pw-notice-pip-stats { grid-template-columns: 1fr !important; }
+}

@@ -2671,3 +2671,22 @@ button:disabled {
   margin-left: 3px;
 }
 
+
+/* ── MIRA UI standard (13 Nov) ── */
+.ts-container { display: flex; flex-direction: column; gap: 16px; }
+.ts-container > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+.ts-header { justify-content: flex-start !important; padding: 12px 14px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; background: #fff !important; box-shadow: none !important; }
+.ts-week-nav { display: flex !important; align-items: center !important; gap: 10px !important; flex-wrap: wrap; }
+.ts-nav-group, .ts-today-btn, .ts-range-picker { height: 40px !important; box-sizing: border-box; border: 1px solid #d0d7e2 !important; border-radius: 8px !important; box-shadow: none !important; background: #fff !important; }
+.ts-today-btn { padding: 0 14px !important; font-size: 13.5px !important; }
+.ts-range-picker { padding: 3px !important; border-color: #e2e8f0 !important; background: #f8fafc !important; border-radius: 10px !important; }
+.ts-range-btn { height: 32px !important; border-radius: 8px !important; font-size: 13px !important; font-weight: 600 !important; }
+.ts-range-btn.active { background: #fff !important; color: #1d4ed8 !important; box-shadow: 0 1px 2px rgba(15,23,42,.08) !important; }
+.ts-scope-tab { height: 36px !important; border-radius: 8px !important; font-size: 13.5px !important; box-shadow: none !important; }
+.ts-scope-tab.active { background: #eff6ff !important; color: #1d4ed8 !important; border-color: #bfdbfe !important; }
+.ts-scope-tab.active svg { color: #1d4ed8 !important; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .ts-detail-hours { grid-template-columns: 1fr !important; }
+}

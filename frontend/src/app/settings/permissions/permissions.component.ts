@@ -23,10 +23,11 @@ interface PermissionCategory extends PermissionNode {
   superadminOnly?: boolean;
 }
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-permissions',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule,
     FormsModule,
     LucideShield,

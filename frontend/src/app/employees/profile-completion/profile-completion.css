@@ -1090,3 +1090,11 @@
 @media (max-width: 640px) { .pc-pager { flex-wrap: wrap; justify-content: center; gap: 12px; } }
 /* Keep the search usable when the filter row is crowded (12 Nov 2026). */
 .filters-panel .filter-search-box { flex: 1 1 240px; min-width: 220px; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 1024px) {
+  .stats-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 640px) {
+  .stats-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}

@@ -1,23 +1,7 @@
 <div class="security-page">
 
-  <!-- ── Top Header Bar ──────────────────────────────────────────────── -->
-  <div class="settings-header-bar">
-    <div class="header-left">
-      <div class="header-badge">
-        <svg lucideShieldCheck size="15"></svg>
-        <span>Account Security</span>
-      </div>
-      <h2>Two-Factor Authentication (2FA)</h2>
-      <p>Protect your account with an extra layer of defense using Time-based One-Time Passwords (TOTP).</p>
-    </div>
-
-    <div class="header-right" *ngIf="status() as s">
-      <div class="security-posture-badge" [class.secure]="s.enabled" [class.unsecure]="!s.enabled">
-        <span class="pulse-dot"></span>
-        <span class="posture-text">{{ s.enabled ? 'High Security · 2FA Active' : 'Basic Security · Password Only' }}</span>
-      </div>
-    </div>
-  </div>
+  <app-page-header icon="profile" section="Settings" heading="Two-factor authentication"
+    [subtitle]="status()?.enabled ? '2FA is on for your account.' : 'Add a one-time code from an authenticator app to your sign-in.'"></app-page-header>
 
   <div class="security-layout-grid" *ngIf="!isLoading(); else loadingTpl">
 

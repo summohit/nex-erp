@@ -1,29 +1,7 @@
 <div class="payroll-admin-container">
-  <!-- Top Header Section (MIRA Global Pattern) -->
-  <div class="page-header">
-    <div class="header-content">
-      <div class="simple-breadcrumb">
-        <span>Settings</span>
-        <span class="crumb-sep">/</span>
-        <span class="crumb-current">Payroll</span>
-      </div>
-      <div class="title-with-badge">
-        <h1>Payroll Configuration & Engine Masters</h1>
-        <span class="status-pill live-pill">
-          <span class="live-dot"></span>
-          Engine Active · FY 2026-27
-        </span>
-      </div>
-      <p>Configurable salary components, versioned salary groups, Indian statutory compliance, and real-time CTC simulator.</p>
-    </div>
-
-    <div class="header-actions">
-      <button class="btn-refresh" (click)="loadAllMasters()" [disabled]="isLoading()" title="Reload Master Data">
-        <svg lucideRefreshCw [size]="14" [class.spin-anim]="isLoading()"></svg>
-        <span>Refresh</span>
-      </button>
-    </div>
-  </div>
+  <app-page-header icon="wallet" section="Settings" heading="Payroll rules" subtitle="Salary components, salary groups, statutory rules and the CTC simulator.">
+    <button type="button" class="st-hdr-btn" (click)="loadAllMasters()" [disabled]="isLoading()" title="Reload"><svg lucideRefreshCw [size]="14" [class.spin-anim]="isLoading()"></svg>Refresh</button>
+  </app-page-header>
 
   <!-- Navigation Tabs Bar -->
   <div class="tabs-nav-bar">

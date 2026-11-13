@@ -45,10 +45,11 @@ import { EmployeeService, Employee } from '../../services/employee.service';
 import { CompanyService } from '../../services/company';
 import { environment } from '../../../environments/environment';
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-system-settings',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule, 
     FormsModule, 
     LucideShieldAlert, 

@@ -1,106 +1,18 @@
 <div class="all-attendance-container page-container quota-page">
 
-  <!-- ── Enhanced Page Header Card ─────────────────────────────────────────── -->
-  <div class="page-header-card">
-    <div class="header-title-group">
-      <div class="header-title-row">
-        <h1>Leave Quota Report</h1>
-        <span class="attendance-count-pill">{{ summary().people }} {{ summary().people === 1 ? 'Employee' : 'Employees' }}</span>
-        <span *ngIf="report()?.scope === 'SELF'" class="scope-pill">Your own figures</span>
-      </div>
-      <p class="header-subtitle">
-        Annual leave allocations, carry-over balances, utilized time off, and remaining quota for {{ year() }}.
-      </p>
+  <app-page-header icon="calendar" section="Attendance & Leave" heading="Leave Quota Report"
+    [subtitle]="summary().people + (summary().people === 1 ? ' employee' : ' employees') + ' · allocated, used and remaining leave for ' + year() + (report()?.scope === 'SELF' ? ' · your own figures' : '')">
+    <div class="lq-view-pills" role="group" aria-label="Table view">
+      <button type="button" [class.active]="!showAllTypes()" (click)="showAllTypes.set(false)">Totals</button>
+      <button type="button" [class.active]="showAllTypes()" (click)="showAllTypes.set(true)">All breakdowns</button>
     </div>
-
-    <div class="header-actions-group">
-      <button class="btn-header-secondary" (click)="filterDrawerOpen.set(true)" title="Filter report results">
-        <svg lucideSearch [size]="15"></svg>
-        <span>Filters<span *ngIf="quotaFilterCount"> ({{ quotaFilterCount }})</span></span>
-      </button>
-      <!-- Export CSV Button -->
-      <button class="btn-header-primary" (click)="exportCsv()" [disabled]="loading() || !rows().length" title="Export current quota report to CSV">
-        <svg lucideDownload [size]="15"></svg>
-        <span>Export CSV</span>
-      </button>
-
-      <!-- Refresh Button -->
-      <button class="btn-header-secondary" (click)="load()" [disabled]="loading()" title="Reload report data">
-        <svg lucideRefreshCw [size]="15" [class.spin-anim]="loading()"></svg>
-        <span>Refresh</span>
-      </button>
-      <app-attendance-filter-drawer
-        [open]="filterDrawerOpen()"
-        title="Leave quota filters"
-        description="Find employees, focus a leave type, or surface balances that need attention."
-        [showDates]="false"
-        [filterGroups]="quotaFilterGroups"
-        [filterValues]="quotaFilterValues"
-        [employeeQuery]="search()"
-        employeeLabel="Employee name or ID"
-        employeeHint="Matches employee name, ID, code, department, or designation."
-        (closed)="filterDrawerOpen.set(false)"
-        (applied)="applyAttendanceFilters($event)">
-      </app-attendance-filter-drawer>
-    </div>
-  </div>
-
-  <!-- ── Alert Notices ─────────────────────────────────────────────────────── -->
-  <div class="notices-container" *ngIf="expiryPending() || encashmentSettled() || summary().missingBalances > 0">
-    <!-- Leave expires with the year -->
-    <div class="quota-notice-card warn" *ngIf="expiryPending()">
-      <div class="notice-icon-wrapper warn">
-        <svg lucideTriangleAlert [size]="18"></svg>
-      </div>
-      <div class="notice-content">
-        <div class="notice-title">{{ days(summary().remaining) }} days still unused for {{ year() }}</div>
-        <div class="notice-desc">
-          Leave does not carry into {{ year() + 1 }} — every year is allocated fresh.
-          <ng-container *ngIf="hasEncashableTypes()">
-            Whatever is left when December's payslips are generated is paid out with that month's salary for
-            encashable leave types; days on every other type simply lapse.
-          </ng-container>
-          <ng-container *ngIf="!hasEncashableTypes()">
-            No leave type is set to be encashed, so these days will lapse on 31 December.
-          </ng-container>
-        </div>
-      </div>
-    </div>
-
-    <!-- Year closed out -->
-    <div class="quota-notice-card" *ngIf="encashmentSettled()">
-      <div class="notice-icon-wrapper">
-        <svg lucideCalendarDays [size]="18"></svg>
-      </div>
-      <div class="notice-content">
-        <div class="notice-title">{{ year() }} has been settled</div>
-        <div class="notice-desc">
-          {{ days(summary().encashed) }} unused days were encashed with December's salary.
-          Any remaining days shown below lapsed with the year.
-        </div>
-      </div>
-    </div>
-
-    <!-- Missing Balances (Task callout) -->
-    <div class="quota-notice-card alert" *ngIf="summary().missingBalances > 0">
-      <div class="notice-icon-wrapper alert">
-        <svg lucideAlertCircle [size]="18"></svg>
-      </div>
-      <div class="notice-content">
-        <div class="notice-title">
-          {{ summary().missingBalances }} {{ summary().missingBalances === 1 ? 'person has' : 'people have' }}
-          no leave balance configured for {{ year() }}
-        </div>
-        <div class="notice-desc">
-          Employees without assigned quota rows cannot submit time-off requests until an allocation is established.
-        </div>
-      </div>
-      <a routerLink="/attendance/balances" class="notice-action-btn" title="Go to Leave Balances management">
-        <span>Manage Balances</span>
-        <svg lucideChevronRight [size]="14"></svg>
-      </a>
-    </div>
-  </div>
+    <button type="button" class="lq-hdr-btn" (click)="load()" [disabled]="loading()" title="Reload report data">
+      <svg lucideRefreshCw [size]="15" [class.spin-anim]="loading()"></svg>Refresh
+    </button>
+    <button type="button" class="lq-hdr-btn primary" (click)="exportCsv()" [disabled]="loading() || !rows().length" title="Export current quota report to CSV">
+      <svg lucideDownload [size]="15"></svg>Export CSV
+    </button>
+  </app-page-header>
 
   <!-- ── KPI / Summary Cards ───────────────────────────────────────────────── -->
   <div class="stats-row" *ngIf="!loading()">
@@ -177,129 +89,32 @@
     </div>
   </div>
 
-  <!-- ── Filter & Search Toolbar Card ─────────────────────────────────────── -->
-  <div class="filter-bar-card">
-    <div class="filter-bar-main-row">
-      <!-- Search Input -->
-      <div class="search-input-wrapper">
-        <svg lucideSearch [size]="16" class="search-icon"></svg>
-        <input
-          type="text"
-          placeholder="Search by name, code or department…"
-          [ngModel]="search()"
-          (ngModelChange)="search.set($event)"
-          aria-label="Search employees" />
-        <button
-          *ngIf="search()"
-          type="button"
-          class="btn-clear-search"
-          (click)="search.set('')"
-          title="Clear search">
-          <svg lucideX [size]="14"></svg>
-        </button>
-      </div>
-
-      <!-- Dropdown Filters Group -->
-      <div class="filter-dropdowns-group">
-        <!-- Year Select -->
-        <div class="filter-select-wrapper">
-          <svg lucideCalendarDays [size]="15" class="filter-select-icon"></svg>
-          <span class="filter-select-label">Year:</span>
-          <select 
-            class="custom-select" 
-            [ngModel]="year()" 
-            (ngModelChange)="onYearChange($event)">
-            <option *ngFor="let y of years()" [ngValue]="y">
-              {{ y }} {{ y === currentYear ? '(Current)' : '' }}
-            </option>
-          </select>
-        </div>
-
-        <!-- Leave Type Select -->
-        <div class="filter-select-wrapper">
-          <svg lucideFilter [size]="15" class="filter-select-icon"></svg>
-          <span class="filter-select-label">Type:</span>
-          <select
-            class="custom-select"
-            [ngModel]="leaveTypeId()"
-            (ngModelChange)="onLeaveTypeChange($event)">
-            <option [ngValue]="null">All leave types</option>
-            <option *ngFor="let t of report()?.leaveTypes || []" [ngValue]="t.id">{{ t.name }}</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- Quick Filter Chips Row -->
-    <div class="quick-filters-row">
-      <div class="chips-group">
-        <button
-          type="button"
-          class="filter-chip"
-          [class.active]="quickFilter() === 'ALL'"
-          (click)="setQuickFilter('ALL')">
-          <span>All Employees</span>
-          <span class="chip-count">{{ quickFilterCounts().all }}</span>
-        </button>
-
-        <button
-          type="button"
-          class="filter-chip chip-warning"
-          [class.active]="quickFilter() === 'LOW_REMAINING'"
-          (click)="setQuickFilter('LOW_REMAINING')">
-          <span class="chip-dot warning"></span>
-          <span>Low Balance (≤ 2d)</span>
-          <span class="chip-count">{{ quickFilterCounts().lowRemaining }}</span>
-        </button>
-
-        <button
-          type="button"
-          class="filter-chip chip-danger"
-          [class.active]="quickFilter() === 'HIGH_USED'"
-          (click)="setQuickFilter('HIGH_USED')">
-          <span class="chip-dot danger"></span>
-          <span>High Utilisation (≥ 75%)</span>
-          <span class="chip-count">{{ quickFilterCounts().highUsed }}</span>
-        </button>
-
-        <button
-          *ngIf="quickFilterCounts().unassigned > 0"
-          type="button"
-          class="filter-chip chip-purple"
-          [class.active]="quickFilter() === 'UNASSIGNED'"
-          (click)="setQuickFilter('UNASSIGNED')">
-          <span class="chip-dot purple"></span>
-          <span>No Balance Set</span>
-          <span class="chip-count">{{ quickFilterCounts().unassigned }}</span>
-        </button>
-      </div>
-
-      <div class="filter-status-info" *ngIf="search() || leaveTypeId() !== null || quickFilter() !== 'ALL'">
-        <span class="filter-match-count">
-          Showing <strong>{{ rows().length }}</strong> of {{ report()?.rows?.length || 0 }}
-        </span>
-        <button type="button" class="btn-reset-filters" (click)="clearFilters()">
-          <svg lucideX [size]="12"></svg>
-          <span>Reset Filters</span>
-        </button>
-      </div>
-    </div>
+  <!-- ── Filter row (13 Nov 2026): search, year, leave type, balance, Filters, Clear all, count ── -->
+  <div class="lq-bar">
+    <label class="lq-search">
+      <svg lucideSearch [size]="16" aria-hidden="true"></svg>
+      <input type="search" placeholder="Search by name, code or department" [ngModel]="search()" (ngModelChange)="search.set($event)" aria-label="Search employees">
+      <button type="button" *ngIf="search()" (click)="search.set('')" aria-label="Clear search"><svg lucideX [size]="14"></svg></button>
+    </label>
+    <select class="lq-select" aria-label="Year" [ngModel]="year()" (ngModelChange)="onYearChange($event)">
+      <option *ngFor="let y of years()" [ngValue]="y">{{ y }}{{ y === currentYear ? ' (current)' : '' }}</option>
+    </select>
+    <select class="lq-select wide" aria-label="Leave type" [ngModel]="leaveTypeId()" (ngModelChange)="onLeaveTypeChange($event)">
+      <option [ngValue]="null">All leave types</option>
+      <option *ngFor="let t of report()?.leaveTypes || []" [ngValue]="t.id">{{ t.name }}</option>
+    </select>
+    <select class="lq-select wide" aria-label="Balance" [ngModel]="quickFilter()" (ngModelChange)="setQuickFilter($event)">
+      <option value="ALL">All balances ({{ quickFilterCounts().all }})</option>
+      <option value="LOW_REMAINING">Low balance, ≤ 2 days ({{ quickFilterCounts().lowRemaining }})</option>
+      <option value="HIGH_USED">High use, ≥ 75% ({{ quickFilterCounts().highUsed }})</option>
+      <option value="UNASSIGNED" *ngIf="quickFilterCounts().unassigned > 0">No balance set ({{ quickFilterCounts().unassigned }})</option>
+    </select>
+    <button type="button" class="clear-all-filters" *ngIf="search() || leaveTypeId() !== null || quickFilter() !== 'ALL'" (click)="clearFilters()">Clear all</button>
+    <span class="lq-count">Showing {{ rows().length }} of {{ report()?.rows?.length || 0 }}</span>
   </div>
 
   <!-- ── Table Container Card ──────────────────────────────────────────────── -->
   <div class="card widget-card">
-    <div class="widget-header">
-      <div class="table-header-left">
-        <h3>Employee Leave Quota Balances</h3>
-        <span class="tag-mono">{{ selectedTypeName() }} · {{ year() }}</span>
-      </div>
-      <div class="table-header-right" *ngIf="!loading()">
-        <span class="text-muted" style="font-size: 13px; font-weight: 500;">
-          Showing <strong>{{ rows().length }}</strong> {{ rows().length === 1 ? 'employee' : 'employees' }}
-        </span>
-      </div>
-    </div>
-
     <!-- Loading State -->
     <div class="quota-loading" *ngIf="loading()">
       <div class="loading-spinner"></div>
@@ -326,17 +141,16 @@
       <ag-grid-angular
         class="ag-theme-quartz leave-quota-grid"
         [theme]="'legacy'"
-        style="width: 100%;"
-        [domLayout]="'autoHeight'"
-        [style.height]="null"
+        style="width: 100%; height: calc(100vh - 250px); min-height: 480px; display: block;"
         [rowData]="rows()"
-        [columnDefs]="columnDefs"
+        [columnDefs]="gridColumns()"
         [defaultColDef]="defaultColDef"
         [gridOptions]="gridOptions"
-        [rowHeight]="54"
-        [headerHeight]="46"
-        [pagination]="false"
-        [suppressPaginationPanel]="true"
+        [rowHeight]="60"
+        [headerHeight]="48"
+        [pagination]="true"
+        [paginationPageSize]="20"
+        [paginationPageSizeSelector]="[20, 50, 100, 200]"
         (gridReady)="onGridReady($event)">
       </ag-grid-angular>
     </div>

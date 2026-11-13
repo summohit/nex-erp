@@ -5529,3 +5529,148 @@ app-page-header { display: block; margin-bottom: 16px; }
 
 /* Breathing room between the page header and the tabs. */
 .tabs-nav.leave-section-nav { margin-top: 20px !important; }
+
+/* ── Team Timeline in the MIRA standard (13 Nov) ── */
+.tl-page { display: flex; flex-direction: column; gap: 0; }
+.tl-toolbar .leave-search-filter-wrap { flex-wrap: nowrap !important; }
+.tl-range { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; box-sizing: border-box; border: 1px solid #d0d7e2; border-radius: 8px; background: #fff; color: #64748b; }
+.tl-range:focus-within { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+.tl-range input[type="date"] { height: 100%; border: 0; outline: none; background: transparent; font-size: 13.5px; font-weight: 500; color: #0f172a; font-family: var(--font-body); }
+.tl-range-sep { color: #94a3b8; }
+.tl-count { color: #64748b; font-size: 13px; white-space: nowrap; }
+@media (max-width: 1100px) { .tl-toolbar .leave-search-filter-wrap { flex-wrap: wrap !important; } }
+
+.tl-card { padding: 14px 16px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; box-shadow: none !important; overflow-x: auto; }
+.tl-card .tl-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding: 0 2px 12px; margin-bottom: 12px; border-bottom: 1px solid #eef2f6; font-size: 12.5px; color: #475569; }
+.tl-card .tl-legend-hint { margin-left: auto; font-size: 12px; color: #94a3b8; }
+.tl-card .timeline-header { border-radius: 10px 10px 0 0; }
+.tl-card .timeline-day-header .day-num { font-family: var(--font-heading); font-size: 15px; color: #0f172a; }
+.tl-card .timeline-day-header .day-name { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+.tl-card .timeline-day-header.tl-today .day-num, .tl-card .timeline-day-header.tl-today .day-name { color: #1d4ed8; }
+.tl-card .tl-emp-name { font-size: 13.5px; font-weight: 600; color: #0f172a; }
+.tl-card .tl-emp-meta { font-size: 12px; color: #64748b; }
+
+.tl-dot.day-off { background: #94a3b8; }
+
+/* Filter rows wrap instead of overflowing when the sidebar is open; the count stays on the right. */
+.leave-list-toolbar .leave-search-filter-wrap, .tl-toolbar .leave-search-filter-wrap { flex-wrap: wrap !important; row-gap: 10px !important; }
+.leave-list-toolbar .leave-application-search { flex: 1 1 220px !important; max-width: 320px; }
+.tl-range input[type="date"] { width: 128px; }
+.lv-count-right { margin-left: auto; }
+.tl-count { margin-left: auto; }
+
+/* Team Timeline filter row: one tidy line that shares the width, instead of
+   breaking into ragged rows when the sidebar is open. */
+.tl-toolbar .leave-search-filter-wrap {
+  display: grid !important; grid-auto-flow: column; align-items: center; gap: 10px !important;
+  grid-template-columns: minmax(170px, 1.3fr) minmax(140px, 1fr) minmax(140px, 1fr);
+  grid-auto-columns: max-content;
+}
+.tl-toolbar .leave-search-filter-wrap > * { min-width: 0; max-width: none !important; margin: 0 !important; }
+.tl-toolbar .lv-spacer { display: none; }
+.tl-toolbar .lv-status-select { flex: none !important; width: 100%; }
+.tl-range input[type="date"] { width: 118px !important; min-width: 0; padding: 0; }
+@media (max-width: 1150px) {
+  .tl-toolbar .leave-search-filter-wrap { grid-auto-flow: row; grid-template-columns: 1fr 1fr; }
+  .tl-toolbar .tl-count { grid-column: 1 / -1; margin-left: 0; }
+}
+
+/* ── Holidays in the MIRA standard (13 Nov) ── */
+.hol-kpis { display: grid !important; grid-template-columns: repeat(3, minmax(220px, 1fr)) !important; gap: 12px !important; overflow-x: auto; margin-bottom: 16px !important; }
+.hol-kpis .kpi-card { padding: 14px 16px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; box-shadow: none !important; gap: 14px !important; align-items: center !important; }
+.hol-kpis .kpi-icon { width: 40px !important; height: 40px !important; border-radius: 10px !important; flex: 0 0 40px; }
+.hol-kpis .kpi-title { font-size: 11.5px !important; font-weight: 600 !important; color: #64748b !important; text-transform: uppercase; letter-spacing: .04em; }
+.hol-kpis .kpi-value { font-family: var(--font-heading); font-size: 24px !important; line-height: 1.15; color: #0f172a; }
+.hol-kpis .kpi-subtext { font-size: 12px !important; color: #94a3b8 !important; }
+.hol-toolbar { margin: 0 0 16px !important; padding: 0 0 14px !important; border: 0 !important; border-bottom: 1px solid #eef2f6 !important; border-radius: 0 !important; }
+.hol-year { height: 40px; padding: 0 30px 0 12px; border: 1px solid #d0d7e2; border-radius: 8px; background-color: #fff; font-size: 13.5px; font-weight: 500; color: #0f172a; }
+
+/* Holidays filter row: one line, shared width (same pattern as Team Timeline). */
+.hol-toolbar .leave-search-filter-wrap {
+  display: grid !important; grid-auto-flow: column; align-items: center; gap: 10px !important;
+  grid-template-columns: minmax(180px, 320px) minmax(160px, 220px);
+  grid-auto-columns: max-content; justify-content: start;
+}
+.hol-toolbar .leave-search-filter-wrap > * { min-width: 0; max-width: none !important; margin: 0 !important; }
+.hol-toolbar .lv-status-select { flex: none !important; width: 100%; }
+.hol-toolbar .tl-count { justify-self: end; }
+.hol-toolbar .leave-search-filter-wrap { grid-template-columns: minmax(180px, 320px) minmax(160px, 220px) auto auto auto 1fr; }
+.hol-toolbar .tl-count { grid-column: -2; }
+@media (max-width: 1050px) {
+  .hol-toolbar .leave-search-filter-wrap { grid-auto-flow: row; grid-template-columns: 1fr 1fr; }
+  .hol-toolbar .tl-count { grid-column: 1 / -1; justify-self: start; }
+}
+/* "None remaining" is a sentence, not a number. */
+.hol-kpis .kpi-card:nth-child(2) .kpi-value { font-size: 16px !important; font-family: var(--font-body); font-weight: 600; }
+
+/* Holidays filter row, final: plain flex line (the grid version overlapped). */
+.hol-toolbar .leave-search-filter-wrap { display: flex !important; flex-wrap: nowrap !important; align-items: center !important; gap: 10px !important; grid-template-columns: none !important; grid-auto-flow: initial !important; }
+.hol-toolbar .leave-application-search { flex: 0 1 300px !important; min-width: 180px; }
+.hol-toolbar .lv-status-select { flex: 0 0 210px !important; width: 210px !important; }
+.hol-toolbar .hol-year { flex: 0 0 100px; width: 100px; }
+.hol-toolbar .leave-filter-btn, .hol-toolbar .clear-all-filters { flex: 0 0 auto; }
+.hol-toolbar .tl-count { grid-column: auto !important; margin-left: auto !important; flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 1050px) { .hol-toolbar .leave-search-filter-wrap { flex-wrap: wrap !important; } }
+
+/* Holiday filter bar (rebuilt). */
+.hf-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 0 0 16px; margin-bottom: 16px; border-bottom: 1px solid #eef2f6; position: relative; z-index: 30; }
+.hf-search { flex: 1 1 220px; max-width: 300px; min-width: 200px; height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 12px; box-sizing: border-box; border: 1px solid #d0d7e2; border-radius: 8px; background: #fff; color: #94a3b8; }
+.hf-search:focus-within, .hf-range:focus-within { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+.hf-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; font-size: 13.5px; color: #0f172a; }
+.hf-search input::placeholder { color: #94a3b8; font-size: 13px; }
+.hf-search button { border: 0; background: none; color: #94a3b8; font-size: 18px; cursor: pointer; }
+.hf-seg { display: inline-flex; height: 40px; padding: 3px; box-sizing: border-box; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.hf-seg button { padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer; }
+.hf-seg button.on { background: #fff; color: #1d4ed8; box-shadow: 0 1px 2px rgba(15,23,42,.08); }
+.hf-select { height: 40px; padding: 0 28px 0 12px; border: 1px solid #d0d7e2; border-radius: 8px; background-color: #fff; font-size: 13.5px; font-weight: 500; color: #0f172a; }
+.hf-range { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 10px; box-sizing: border-box; border: 1px solid #d0d7e2; border-radius: 8px; background: #fff; color: #94a3b8; }
+.hf-range input { width: 118px; border: 0; outline: none; background: transparent; font-size: 13px; color: #0f172a; }
+.hf-count { margin-left: auto; color: #64748b; font-size: 13px; white-space: nowrap; }
+
+/* Add / Edit holiday dialog */
+.hd-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px; background: rgba(15,23,42,.45); }
+.hd-dialog { width: 460px; max-width: 100%; display: flex; flex-direction: column; border-radius: 12px; background: #fff; box-shadow: 0 24px 48px -12px rgba(15,23,42,.28); overflow: hidden; }
+.hd-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid #eef2f6; }
+.hd-icon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 10px; background: #eff6ff; color: #2563eb; }
+.hd-head > div { flex: 1; }
+.hd-head h3 { margin: 0; font-family: var(--font-heading); font-size: 17px; color: #0f172a; }
+.hd-head p { margin: 2px 0 0; font-size: 12.5px; color: #64748b; }
+.hd-close { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: #64748b; cursor: pointer; }
+.hd-close:hover { background: #f1f5f9; color: #0f172a; }
+.hd-body { padding: 18px 20px; display: flex; flex-direction: column; }
+.hd-label { margin: 0 0 6px; font-size: 12.5px; font-weight: 600; color: #475569; }
+.hd-label b { color: #dc2626; }
+.hd-input { height: 40px; padding: 0 12px; box-sizing: border-box; border: 1px solid #d0d7e2; border-radius: 8px; background: #fff; font-size: 13.5px; color: #0f172a; outline: none; }
+.hd-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+.hd-input::placeholder { color: #94a3b8; font-size: 13px; }
+.hd-help { margin: 4px 0 14px; text-align: right; font-size: 11.5px; color: #94a3b8; }
+.hd-preview { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 12px; border: 1px dashed #bfdbfe; border-radius: 10px; background: #f8fbff; }
+.hd-preview-date { width: 48px; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px; background: #fff; border: 1px solid #e2e8f0; color: #2563eb; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.hd-preview-date b { font-family: var(--font-heading); font-size: 18px; color: #0f172a; line-height: 1; }
+.hd-preview strong { display: block; font-size: 14px; color: #0f172a; }
+.hd-preview small { font-size: 12px; color: #64748b; }
+.hd-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid #eef2f6; background: #fafbfc; }
+.hd-btn { height: 36px; padding: 0 16px; border: 0; border-radius: 18px; background: transparent; color: #1d4ed8; font-size: 14px; font-weight: 500; cursor: pointer; }
+.hd-btn:hover:not(:disabled) { background: #eff6ff; }
+.hd-btn.primary { padding: 0 22px; background: #2563eb; color: #fff; }
+.hd-btn.primary:hover:not(:disabled) { background: #1d4ed8; }
+.hd-btn.primary:disabled { background: #e2e8f0; color: #94a3b8; }
+.hd-input.invalid { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.1); }
+.hd-row-help { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 4px 0 14px; }
+.hd-row-help .hd-help { margin: 0 0 0 auto; }
+.hd-error { margin-top: 4px; color: #dc2626; font-size: 12px; font-weight: 500; }
+
+/* Leave Applications filter row: keep the count on the same line. */
+.leave-list-toolbar:not(.tl-toolbar):not(.hol-toolbar) .leave-search-filter-wrap { flex-wrap: nowrap !important; }
+.leave-list-toolbar .lv-count-right { margin-left: auto !important; white-space: nowrap; }
+@media (max-width: 1050px) { .leave-list-toolbar:not(.tl-toolbar):not(.hol-toolbar) .leave-search-filter-wrap { flex-wrap: wrap !important; } }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 1024px) {
+  .dashboard-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 640px) {
+  .half-day-periods { grid-template-columns: 1fr !important; }
+  .reg-times-grid { grid-template-columns: 1fr !important; }
+  .reg-detail-grid { grid-template-columns: 1fr !important; }
+}

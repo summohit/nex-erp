@@ -24,10 +24,11 @@ import { ApprovalDelegatesService, ApprovalWorkflowGroup } from './approvals.ser
  * clock-outs, for instance — and that is not the Super Admin's to revoke, so it
  * is stated on screen rather than being editable here.
  */
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-approval-settings',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule, FormsModule, SearchableSelectComponent,
     LucideShieldCheck, LucideUserPlus, LucideX, LucideInfo, LucideRefreshCw,
   ],

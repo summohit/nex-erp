@@ -6662,3 +6662,102 @@
     flex-wrap: wrap;
   }
 }
+
+/* ── Processing table: fits the screen, readable employee column (13 Nov) ── */
+.salary-table-wrapper { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 12px; }
+.processing-table { width: 100% !important; min-width: 0 !important; table-layout: auto; }
+.processing-table thead th { padding: 11px 10px !important; background: #f8fafc !important; border-bottom: 1px solid #e2e8f0 !important; white-space: nowrap; }
+.processing-table thead th .th-content span:first-child { text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 600; color: #475569; }
+.processing-table tbody td { padding: 10px 10px !important; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.processing-table tbody tr:hover td { background: #f8fbff; }
+.processing-table .th-amount { min-width: 0 !important; }
+/* Employee: never sticky-overlapped; name on one line, role and department under it in grey. */
+.processing-table .th-emp, .processing-table .td-employee { position: static !important; left: auto !important; min-width: 200px !important; max-width: 260px; }
+.processing-table .td-employee .emp-name-stack { min-width: 0; }
+.processing-table .td-employee .emp-name-stack > * { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.processing-table .td-employee .emp-name-stack > :not(:first-child) { font-size: 12px; color: #64748b; }
+.processing-table th:last-child, .processing-table td:last-child { white-space: nowrap; }
+
+/* Header "More" menu */
+.pr-more { position: relative; }
+.pr-more-backdrop { position: fixed; inset: 0; z-index: 40; }
+.pr-more-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 41; min-width: 220px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; box-shadow: 0 12px 32px -8px rgba(15,23,42,.22); }
+.pr-more-item { display: flex; align-items: center; gap: 10px; width: 100%; height: 38px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #1e293b; font-size: 13.5px; font-weight: 500; text-align: left; cursor: pointer; }
+.pr-more-item:hover:not(:disabled) { background: #f1f5f9; }
+.pr-more-item:disabled { opacity: .5; cursor: default; }
+
+/* KPI cards: calmer and equal height */
+.kpi-summary-grid .kpi-card { padding: 14px 16px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; box-shadow: none !important; align-items: center !important; min-height: 0 !important; }
+.kpi-summary-grid .kpi-card.kpi-active { border-color: #2563eb !important; box-shadow: 0 0 0 1px #2563eb !important; }
+.kpi-summary-grid .kpi-value { font-family: var(--font-heading); font-size: 22px !important; line-height: 1.15; }
+.kpi-summary-grid .kpi-label { font-size: 11.5px !important; font-weight: 600 !important; color: #64748b !important; letter-spacing: .04em; }
+.kpi-summary-grid .kpi-subtext { font-size: 12px !important; color: #94a3b8 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.kpi-summary-grid .kpi-icon-wrapper { width: 40px !important; height: 40px !important; border-radius: 10px !important; }
+
+/* More menu must float above the KPI cards; the header must not clip it. */
+app-page-header, .payroll-container app-page-header { position: relative; z-index: 50; overflow: visible !important; }
+:host ::ng-deep app-page-header .mira-page-header, :host ::ng-deep app-page-header > div { overflow: visible !important; }
+.pr-more-menu { z-index: 60; }
+/* Deductions breakdown: wrap onto two lines instead of being cut off. */
+.kpi-summary-grid .kpi-deductions .kpi-subtext { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.45; color: #64748b !important; }
+
+/* KPI cards: label first, then the big number (matches the shared design) */
+.kpi-summary-grid .kpi-info { display: flex !important; flex-direction: column !important; gap: 2px; min-width: 0; }
+.kpi-summary-grid .kpi-label { order: -1; text-transform: none !important; letter-spacing: 0 !important; font-size: 13.5px !important; font-weight: 600 !important; color: #334155 !important; }
+.kpi-summary-grid .kpi-value { font-size: 26px !important; }
+.kpi-summary-grid .kpi-icon-wrapper { width: 52px !important; height: 52px !important; border-radius: 50% !important; flex: 0 0 52px; }
+.kpi-summary-grid .kpi-card { padding: 18px 20px !important; border-radius: 16px !important; gap: 16px !important; box-shadow: 0 1px 2px rgba(15,23,42,.04) !important; }
+
+/* Deductions breakdown panel */
+.ded-panel { margin: 16px 0; border: 1px solid #e2e8f0; border-radius: 16px; background: #fff; overflow: hidden; }
+.ded-head { display: flex; align-items: center; gap: 14px; padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #eef2f6; border-left: 3px solid #7c3aed; }
+.ded-head-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: #ede9fe; color: #7c3aed; }
+.ded-head h3 { margin: 0; font-family: var(--font-heading); font-size: 16px; color: #0f172a; }
+.ded-head p { margin: 2px 0 0; font-size: 13px; color: #64748b; }
+.ded-body { display: flex; gap: 12px; padding: 16px 20px; overflow-x: auto; align-items: stretch; }
+.ded-item { flex: 1 1 0; min-width: 170px; display: flex; gap: 12px; padding: 14px; border: 1px solid #eef2f6; border-radius: 12px; }
+.ded-item > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ded-item-icon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 10px; font-size: 10.5px; font-weight: 800; }
+.ded-item[data-tone="0"] .ded-item-icon { background: #e0edff; color: #1d4ed8; }
+.ded-item[data-tone="1"] .ded-item-icon { background: #dcfce7; color: #15803d; }
+.ded-item[data-tone="2"] .ded-item-icon { background: #ede9fe; color: #6d28d9; }
+.ded-item[data-tone="3"] .ded-item-icon { background: #ffedd5; color: #c2410c; }
+.ded-item[data-tone="4"] .ded-item-icon { background: #f1f5f9; color: #475569; }
+.ded-item-label { font-size: 12.5px; color: #64748b; }
+.ded-item strong { font-family: var(--font-heading); font-size: 18px; color: #0f172a; }
+.ded-item small { font-size: 12px; color: #94a3b8; }
+.ded-total { flex: 0 0 230px; display: flex; flex-direction: column; gap: 4px; padding: 6px 0 6px 20px; border-left: 1px solid #eef2f6; }
+.ded-total span { font-size: 14px; font-weight: 600; color: #0f172a; }
+.ded-total strong { font-family: var(--font-heading); font-size: 26px; color: #2563eb; }
+.ded-total em { align-self: flex-start; padding: 4px 10px; border-radius: 8px; background: #eff6ff; color: #1d4ed8; font-style: normal; font-size: 12.5px; }
+.ded-total small { font-size: 11.5px; color: #94a3b8; line-height: 1.4; }
+/* The breakdown now lives in the Deductions panel below, so the card stays clean. */
+.kpi-summary-grid .kpi-deductions .kpi-subtext { display: none !important; }
+
+/* ── Filter row, one clean line (13 Nov) ── */
+.mira-filter-bar { display: flex !important; align-items: center !important; flex-wrap: nowrap !important; gap: 10px !important; padding: 12px 14px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; background: #fff !important; box-shadow: none !important; position: relative; z-index: 30; overflow: visible !important; }
+@media (max-width: 1150px) { .mira-filter-bar { flex-wrap: wrap !important; } }
+.mira-filter-bar > * { margin: 0 !important; flex-shrink: 0; }
+/* Search: one border, icon inside. */
+.mira-filter-bar .mira-search-box { flex: 1 1 220px !important; min-width: 200px; max-width: 300px; height: 40px !important; display: flex; align-items: center; gap: 8px; padding: 0 12px !important; box-sizing: border-box; border: 1px solid #d0d7e2 !important; border-radius: 8px !important; background: #fff !important; box-shadow: none !important; position: relative; }
+.mira-filter-bar .mira-search-box:focus-within { border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12) !important; }
+.mira-filter-bar .mira-search-box .search-icon { position: static !important; color: #94a3b8; flex: 0 0 auto; }
+.mira-filter-bar .search-input-field { flex: 1; min-width: 0; height: 100% !important; padding: 0 !important; border: 0 !important; outline: none !important; box-shadow: none !important; background: transparent !important; font-size: 13.5px !important; }
+/* Dropdowns: fixed widths so they never overlap. */
+.mira-filter-bar .mira-select-xs { flex: 0 0 110px !important; width: 110px !important; }
+.mira-filter-bar .mira-select-sm { flex: 0 0 150px !important; width: 150px !important; }
+.mira-filter-bar .mira-select-md { flex: 0 0 200px !important; width: 200px !important; }
+.mira-filter-bar [class*="mira-select-"] { position: relative; min-width: 0; }
+:host ::ng-deep .mira-filter-bar .select-trigger { width: 100% !important; height: 40px !important; min-height: 40px !important; box-sizing: border-box; border: 1px solid #d0d7e2 !important; border-radius: 8px !important; box-shadow: none !important; font-size: 13.5px !important; padding-top: 0 !important; padding-bottom: 0 !important; display: flex !important; align-items: center !important; }
+.mira-filter-bar .mira-showing-count { margin-left: auto !important; white-space: nowrap; font-size: 13px; color: #64748b; }
+.ded-head { cursor: default; }
+.ded-toggle { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border: 1px solid #bfdbfe; border-radius: 8px; background: #fff; color: #1d4ed8; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.ded-toggle:hover { background: #eff6ff; }
+.ded-toggle svg { transition: transform .15s ease; }
+.ded-panel:not(:has(.ded-body)) .ded-head { border-bottom: 0; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .drawer-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .employee-meta-grid { grid-template-columns: 1fr !important; }
+}

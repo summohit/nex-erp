@@ -1,16 +1,15 @@
 <div class="ci-page">
-  <div class="ci-header">
-    <div>
-      <h1>Website Chat</h1>
-      <p>Chats from the careers page and ces-pl.com, the help articles the bot answers from, and the widget itself.</p>
-    </div>
+  <!-- Shared page header (13 Nov 2026); the section switch sits inside it -->
+  <app-page-header icon="megaphone" section="Website chat"
+    [heading]="tab === 'reports' ? 'Reports' : tab === 'kb' ? 'Knowledge base' : tab === 'widgets' ? 'Widgets' : 'Inbox'"
+    [subtitle]="tab === 'reports' ? 'How the chat is doing.' : tab === 'kb' ? 'Help articles the bot answers from.' : tab === 'widgets' ? 'The chat widget on the careers page and ces-pl.com.' : 'Chats from the careers page and ces-pl.com.'">
     <div class="ci-tabs">
       <button type="button" *ngIf="allowedTabs.has('inbox')" [class.on]="tab === 'inbox'" (click)="setTab('inbox')"><svg lucideMessageCircle size="15"></svg> Inbox</button>
       <button type="button" *ngIf="allowedTabs.has('inbox')" [class.on]="tab === 'reports'" (click)="setTab('reports')"><svg lucideLayers size="15"></svg> Reports</button>
       <button type="button" *ngIf="allowedTabs.has('kb')" [class.on]="tab === 'kb'" (click)="setTab('kb')"><svg lucideBookOpen size="15"></svg> Knowledge Base</button>
       <button type="button" *ngIf="allowedTabs.has('widgets')" [class.on]="tab === 'widgets'" (click)="setTab('widgets')"><svg lucideEdit2 size="15"></svg> Widgets</button>
     </div>
-  </div>
+  </app-page-header>
 
   <!-- ══════════════ REPORTS ══════════════ -->
   <div class="ci-reports" *ngIf="tab === 'reports'">

@@ -7,9 +7,9 @@
     <div class="header-actions">
       <!-- View mode toggle -->
       <div class="view-mode-toggle">
-        <button type="button" class="btn-view-toggle" [class.active]="viewMode() === 'cards'" (click)="viewMode.set('cards')" title="Card View">
+        <button type="button" class="btn-view-toggle" [class.active]="viewMode() === 'cards'" (click)="viewMode.set('cards')" title="Board view">
           <svg lucideLayoutGrid size="15"></svg>
-          <span>Cards</span>
+          <span>Board</span>
         </button>
         <button type="button" class="btn-view-toggle" [class.active]="viewMode() === 'table'" (click)="viewMode.set('table')" title="Table View">
           <svg lucideList size="15"></svg>

@@ -768,7 +768,8 @@ export class LeavesService {
     const actor = await this.prisma.user.findUnique({ where: { id: actorUserId }, select: { role: true, companyId: true } });
     if (!actor || !isSuperAdmin(actor.role)) throw new ForbiddenException('Only a Super Admin can override attendance.');
     const status = body.status === 'HALFDAY' ? 'HALF_DAY' : String(body.status || '').toUpperCase();
-    if (!['PRESENT', 'ABSENT', 'HALF_DAY'].includes(status)) throw new BadRequestException('Pick Present, Absent or Half Day.');
+    // DAY_OFF (13 Nov 2026): a rostered day off for this date; no loss of pay.
+    if (!['PRESENT', 'ABSENT', 'HALF_DAY', 'DAY_OFF'].includes(status)) throw new BadRequestException('Pick Present, Absent, Half Day or Day off.');
     const note = String(body.note || '').trim().slice(0, 500);
     if (!note) throw new BadRequestException('Give a reason for the override.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.date))) throw new BadRequestException('Pick a valid date.');
@@ -818,10 +819,19 @@ export class LeavesService {
         await this.fieldVisits.restoreStandingShiftAfterLeave(tx, { employeeId: employee.id, companyId: employee.companyId, from: day, to: day });
       }
 
+      // The roster decides days off (payroll follows it), so a Day off is written there first.
+      if (status === 'DAY_OFF') {
+        await tx.shiftRosterEntry.upsert({
+          where: { employeeId_date: { employeeId: employee.id, date: day } },
+          update: { shiftId: null, isDayOff: true, projectId: null, address: null, startTime: null, endTime: null, onsiteApprovalStatus: 'NONE', approvedByUserId: null, note: `Override by Super Admin: ${note}` },
+          create: { employeeId: employee.id, companyId: employee.companyId, date: day, shiftId: null, isDayOff: true, note: `Override by Super Admin: ${note}` },
+        });
+      }
+      const noTime = status === 'ABSENT' || status === 'DAY_OFF';
       const record = {
-        status,
-        clockIn: status === 'ABSENT' ? null : inAt,
-        clockOut: status === 'ABSENT' ? null : status === 'HALF_DAY' ? halfOut : outAt,
+        status: status === 'DAY_OFF' ? 'WEEKLY_OFF' : status,
+        clockIn: noTime ? null : inAt,
+        clockOut: noTime ? null : status === 'HALF_DAY' ? halfOut : outAt,
         isLate: false,
         isEarlyLeave: false,
         missedClockOut: false,
@@ -841,7 +851,7 @@ export class LeavesService {
     });
 
     if (employee.userId) {
-      const label = status === 'HALF_DAY' ? 'Half Day' : status === 'PRESENT' ? 'Present' : 'Absent';
+      const label = status === 'HALF_DAY' ? 'Half Day' : status === 'PRESENT' ? 'Present' : status === 'DAY_OFF' ? 'Day off' : 'Absent';
       await this.notificationsService.createNotification(
         employee.userId,
         'Attendance updated',

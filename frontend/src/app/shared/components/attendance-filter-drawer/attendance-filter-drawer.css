@@ -144,3 +144,9 @@
   .drawer-header, .drawer-body { padding-right: 18px; padding-left: 18px; }
   .drawer-footer { padding-right: 18px; padding-left: 18px; }
 }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .period-filter-fields { grid-template-columns: 1fr !important; }
+  .date-range-fields { grid-template-columns: 1fr !important; }
+}

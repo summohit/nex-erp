@@ -17,10 +17,11 @@ import { EmployeeService } from '../../services/employee.service';
 
 type Tab = 'templates' | 'issued';
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-letter-templates',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule, FormsModule, RouterLink, QuillModule, MatMenuModule, LucidePlus, LucideX, LucideSearch,
     LucideTrash2, LucideEye, LucideFileText, LucideSend, LucideCode,
     LucideArrowLeft, LucideChevronRight, LucideChevronDown, LucideEdit3, LucidePrinter,

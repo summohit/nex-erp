@@ -41,10 +41,11 @@ import { MasterDataService } from '../services/master-data.service';
  * decides for itself is which scope tabs to offer, and the server refuses a
  * scope the caller may not have anyway.
  */
+import { PageHeaderComponent } from '../shared/components/page-header/page-header';
 @Component({
   selector: 'app-timesheets',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule, FormsModule,
     LucideChevronLeft, LucideChevronRight, LucideClock, LucideUser, LucideUsers,
     LucideBuilding2, LucideCoins, LucideCheck, LucideX, LucideSend, LucideFilter,

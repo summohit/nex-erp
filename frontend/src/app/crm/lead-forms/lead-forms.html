@@ -1,26 +1,17 @@
 <div class="lead-forms-page">
-  <!-- PAGE HEADER -->
-  <div class="page-header-card lf-header">
-    <div class="lf-header-left">
-      <button type="button" class="btn-icon lf-back-btn" (click)="backToList()" *ngIf="mode === 'builder'" title="Back to Lead Forms">
-        <svg lucideChevronLeft size="18"></svg>
-      </button>
-      <div class="lf-header-title">
-        <h1>{{ mode === 'builder' ? (isNew ? 'New Lead Form' : 'Lead Form Builder') : 'Lead Forms' }}</h1>
-        <p *ngIf="mode === 'list'">Create and manage lead capture forms that generate Leads.</p>
-        <p *ngIf="mode === 'builder'">Configure fields, order, and requirements. The live preview updates as you edit.</p>
-      </div>
-    </div>
-    <div class="lf-header-actions">
+  <!-- Shared page header (13 Nov 2026) -->
+  <app-page-header icon="documents" section="CRM"
+    [heading]="mode === 'builder' ? (isNew ? 'New lead form' : 'Lead form builder') : 'Lead forms'"
+    [subtitle]="mode === 'builder' ? 'Fields, order and requirements; the preview updates as you edit.' : 'Lead capture forms that create leads.'"
+    [showBack]="mode === 'builder'" backLabel="Back to Lead Forms" (back)="backToList()">
       <ng-container *ngIf="mode === 'list'">
-        <button type="button" class="btn btn-outline-pill" (click)="newForm()"><svg lucidePlus size="15"></svg> <span>New Lead Form</span></button>
+        <button type="button" class="lf-hdr-btn primary" (click)="newForm()"><svg lucidePlus size="15"></svg> <span>New Lead Form</span></button>
       </ng-container>
       <ng-container *ngIf="mode === 'builder'">
-        <button type="button" class="btn btn-outline-pill" (click)="reset()"><svg lucideRotateCcw size="15"></svg> <span>Reset</span></button>
-        <button type="button" class="btn btn-primary-pill" (click)="save()" [disabled]="saving"><svg lucideSave size="15"></svg> <span>{{ saving ? 'Saving...' : 'Save' }}</span></button>
+        <button type="button" class="lf-hdr-btn" (click)="reset()"><svg lucideRotateCcw size="15"></svg> <span>Reset</span></button>
+        <button type="button" class="lf-hdr-btn primary" (click)="save()" [disabled]="saving"><svg lucideSave size="15"></svg> <span>{{ saving ? 'Saving...' : 'Save' }}</span></button>
       </ng-container>
-    </div>
-  </div>
+  </app-page-header>
 
   <!-- ══════════════ LIST VIEW ══════════════ -->
   <ng-container *ngIf="mode === 'list'">

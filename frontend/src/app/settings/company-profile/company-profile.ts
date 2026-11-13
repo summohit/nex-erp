@@ -27,10 +27,11 @@ import {
 
 export type CompanyTab = 'general' | 'statutory' | 'banking' | 'branding';
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-company-profile',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule,
     FormsModule,
     LucideBuilding2,

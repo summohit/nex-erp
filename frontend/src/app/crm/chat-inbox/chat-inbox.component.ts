@@ -23,10 +23,11 @@ import {
 
 type Tab = 'inbox' | 'kb' | 'widgets' | 'reports';
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-chat-inbox',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule, FormsModule, RouterModule,
     LucideMessageCircle, LucideSearch, LucidePlus, LucideTrash2, LucideSave, LucideCopy,
     LucideEdit2, LucideFileText, LucideChevronLeft, LucideExternalLink,

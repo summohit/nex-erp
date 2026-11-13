@@ -1882,3 +1882,12 @@
 .jc-btn { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; color: #0f172a; font-size: 13px; font-weight: 600; cursor: pointer; }
 .jc-btn:hover { background: #f8fafc; }
 @media (max-width: 760px) { .jc { flex-wrap: wrap; padding: 16px; } .jc-main { padding-left: 0; border-left: 0; } .jc-facts > div { padding: 0 16px 0 0; border-left: 0; } }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 1024px) {
+  .skeleton-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 640px) {
+  .quick-stage-buttons-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .skeleton-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}

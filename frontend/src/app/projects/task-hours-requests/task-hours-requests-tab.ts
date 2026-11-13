@@ -73,10 +73,11 @@ export type ProjectRequestType = 'HOURS' | 'TASKS' | 'BUDGET' | 'SCOPE' | 'VISIT
 export type RequestSortOption = 'newest' | 'oldest' | 'hours-desc' | 'hours-asc';
 export type ApprovalDateRange = 'ALL' | 'TODAY' | 'THIS_WEEK' | 'LAST_WEEK' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR' | 'LAST_YEAR' | 'CUSTOM';
 type QueueKpi = { label: string; value: string | number; detail: string; tone: 'amber' | 'emerald' | 'rose' | 'indigo' };
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-task-hours-requests-tab',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule,
     FormsModule,
     RouterModule,
@@ -773,6 +774,54 @@ export class TaskHoursRequestsTabComponent {
     this.approvedHoursDraft = null;
   }
 
+  /** Bulk approve / reject for requests waiting on this reviewer (13 Nov 2026). */
+  selectedHours = signal<Set<number>>(new Set());
+  bulkBusy = signal(false);
+  bulkRejectReason = '';
+  reviewableRows = computed(() => this.filteredRequests().filter((r: TaskHoursRequest) => this.canReview(r)));
+  allReviewableSelected = computed(() => {
+    const rows = this.reviewableRows();
+    return rows.length > 0 && rows.every((r: TaskHoursRequest) => this.selectedHours().has(r.id));
+  });
+  toggleHours(id: number) {
+    const next = new Set(this.selectedHours());
+    next.has(id) ? next.delete(id) : next.add(id);
+    this.selectedHours.set(next);
+  }
+  toggleAllHours(on: boolean) {
+    this.selectedHours.set(on ? new Set(this.reviewableRows().map((r: TaskHoursRequest) => r.id)) : new Set());
+  }
+  clearHoursSelection() { this.selectedHours.set(new Set()); this.bulkRejectReason = ''; }
+  async bulkApprove() {
+    const rows = this.reviewableRows().filter((r: TaskHoursRequest) => this.selectedHours().has(r.id));
+    if (!rows.length || !confirm(`Approve the requested hours on ${rows.length} request${rows.length === 1 ? '' : 's'}?`)) return;
+    await this.runBulk(rows, 'APPROVED');
+  }
+  async bulkReject() {
+    const reason = this.bulkRejectReason.trim();
+    if (!reason) { this.toast.error('Type a reason for rejecting first'); return; }
+    const rows = this.reviewableRows().filter((r: TaskHoursRequest) => this.selectedHours().has(r.id));
+    if (!rows.length) return;
+    await this.runBulk(rows, 'REJECTED', reason);
+  }
+  private async runBulk(rows: TaskHoursRequest[], decision: 'APPROVED' | 'REJECTED', reason?: string) {
+    this.bulkBusy.set(true);
+    let ok = 0;
+    for (const r of rows) {
+      try {
+        await firstValueFrom(this.api.review(r.id, decision, decision === 'APPROVED' ? { approvedHours: r.requestedHours } : { reason }));
+        ok++;
+      } catch { /* keep going */ }
+    }
+    this.bulkBusy.set(false);
+    this.clearHoursSelection();
+    this.timelines.set({});
+    this.load();
+    const label = decision === 'APPROVED' ? 'approved' : 'rejected';
+    if (ok === rows.length) this.toast.success(`${ok} request${ok === 1 ? '' : 's'} ${label}`);
+    else this.toast.error(`${ok} of ${rows.length} requests ${label}. Refresh and try the rest again.`);
+  }
+
   approve(r: TaskHoursRequest, approvedHours?: number | null) {
     const hoursToGrant = approvedHours !== undefined ? approvedHours : r.requestedHours;
     if (hoursToGrant != null && (isNaN(Number(hoursToGrant)) || Number(hoursToGrant) <= 0)) {
@@ -1427,6 +1476,67 @@ export class TaskHoursRequestsTabComponent {
       },
       error: (err) => this.toast.error(err?.error?.message || 'Could not save the decision'),
     });
+  }
+
+  /**
+   * Bulk approve / reject for Scope, Tickets, Visit locations and Field visits
+   * (13 Nov 2026). One confirmation, one reason for all; each request still
+   * goes through its own review endpoint, so the server's rules apply per row.
+   */
+  private bulkSel = signal<Record<string, Set<number>>>({});
+  bulkHas(type: string, id: number): boolean { return !!this.bulkSel()[type]?.has(id); }
+  bulkCount(type: string): number { return this.bulkSel()[type]?.size ?? 0; }
+  bulkCan(row: any): boolean {
+    return !['APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED', 'DECLINED'].includes(String(row?.status || '').toUpperCase());
+  }
+  bulkToggle(type: string, id: number) {
+    const all = { ...this.bulkSel() };
+    const set = new Set(all[type] ?? []);
+    set.has(id) ? set.delete(id) : set.add(id);
+    all[type] = set;
+    this.bulkSel.set(all);
+  }
+  bulkAllOn(type: string, rows: any[]): boolean {
+    const ok = rows.filter(r => this.bulkCan(r));
+    return ok.length > 0 && ok.every(r => this.bulkHas(type, r.id));
+  }
+  bulkToggleAll(type: string, rows: any[], on: boolean) {
+    this.bulkSel.set({ ...this.bulkSel(), [type]: new Set(on ? rows.filter(r => this.bulkCan(r)).map(r => r.id) : []) });
+  }
+  bulkClear(type: string) { this.bulkSel.set({ ...this.bulkSel(), [type]: new Set() }); }
+
+  async bulkDecide(type: 'SCOPE' | 'TICKETS' | 'VISIT_LOCATIONS' | 'FIELD_VISITS', decision: 'APPROVED' | 'REJECTED') {
+    const ids = Array.from(this.bulkSel()[type] ?? []);
+    if (!ids.length || this.bulkBusy()) return;
+    const noun = ids.length === 1 ? 'request' : 'requests';
+    let reason: string | undefined;
+    if (decision === 'REJECTED') {
+      const typed = await this.dialog.prompt(`Why are these ${ids.length} ${noun} being rejected?`, 'Reject selected', {
+        placeholder: 'One reason, sent with every rejection', confirmLabel: `Reject ${ids.length}`, required: true,
+      });
+      if (!typed || !typed.trim()) return;
+      reason = typed.trim();
+    } else {
+      const ok = await this.dialog.confirm(`Approve ${ids.length} selected ${noun}?`, 'Approve selected', 'Approve', 'Cancel');
+      if (!ok) return;
+    }
+    this.bulkBusy.set(true);
+    let done = 0;
+    for (const id of ids) {
+      try {
+        if (type === 'SCOPE') await firstValueFrom(this.projectsApi.reviewScopeRequest(id, decision, reason));
+        else if (type === 'TICKETS') await firstValueFrom(this.ticketsApi.review(id, decision, reason));
+        else if (type === 'VISIT_LOCATIONS') await firstValueFrom(this.locationApi.review(id, decision, reason));
+        else await firstValueFrom(decision === 'APPROVED' ? this.fieldVisitApi.approve(id) : this.fieldVisitApi.reject(id, reason!));
+        done++;
+      } catch { /* keep going */ }
+    }
+    this.bulkBusy.set(false);
+    this.bulkClear(type);
+    this.loadOthers(type as any);
+    const label = decision === 'APPROVED' ? 'approved' : 'rejected';
+    if (done === ids.length) this.toast.success(`${done} ${done === 1 ? 'request' : 'requests'} ${label}`);
+    else this.toast.error(`${done} of ${ids.length} requests ${label}. Refresh and try the rest again.`);
   }
 
   async decideScopeRequest(request: ScopeRequest, decision: 'APPROVED' | 'REJECTED') {

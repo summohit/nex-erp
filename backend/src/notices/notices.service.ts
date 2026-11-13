@@ -88,7 +88,7 @@ export class NoticesService {
     publishedAt: true, expiresAt: true, isActive: true, emailSentAt: true,
     createdAt: true, updatedAt: true, audience: true,
     _count: { select: { recipients: true, reads: true } },
-    createdBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+    createdBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, department: { select: { name: true } } } },
     attachments: {
       select: { id: true, fileName: true, fileUrl: true, fileSize: true },
       orderBy: { id: 'asc' as const },

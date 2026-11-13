@@ -103,6 +103,12 @@
           [value]="filterWorkLocationType || null" (valueChange)="setMode($event)"></app-searchable-select>
       </div>
 
+      <!-- Job state (13 Nov 2026): Open / Overdue / Closed / Draft -->
+      <div class="jp-filter-field">
+        <app-searchable-select [options]="jobStateOptions" placeholder="All statuses" [clearable]="true"
+          [value]="filterJobState || null" (valueChange)="setJobState($event)"></app-searchable-select>
+      </div>
+
       <!-- Recruiter (12 Nov 2026) -->
       <div class="jp-filter-field">
         <app-searchable-select [options]="recruiterOptions()" placeholder="All recruiters"
@@ -209,10 +215,11 @@
             <td class="td-status">
               <span
                 class="jp-status-tag"
-                [class.tag-open]="(j.status || '').toLowerCase() === 'open'"
+                [class.tag-overdue]="$any(j).isOverdue"
+                [class.tag-open]="(j.status || '').toLowerCase() === 'open' && !$any(j).isOverdue"
                 [class.tag-closed]="(j.status || '').toLowerCase() === 'closed'"
                 [class.tag-draft]="(j.status || '').toLowerCase() === 'draft'">
-                {{ (j.status || 'OPEN').toUpperCase() }}
+                {{ $any(j).isOverdue ? 'OVERDUE' : (j.status || 'OPEN').toUpperCase() }}
               </span>
             </td>
 

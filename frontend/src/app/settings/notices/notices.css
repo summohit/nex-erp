@@ -1769,3 +1769,10 @@
   height: 38px; padding: 0 10px; border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 8px; font-size: 13px; background: var(--bg-card, #fff); color: inherit;
 }
+
+.nb-dept { color: #2563eb; font-weight: 600; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .nb-views-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}

@@ -4582,3 +4582,12 @@
 /* Same outer spacing as the Leaves page: no extra page padding, 16px between sections. */
 .all-attendance-container { padding: 0 !important; gap: 16px !important; background: transparent !important; }
 .all-attendance-container > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+
+.change-day-dot.dayoff { background: #94a3b8; }
+.corrected-note { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; padding: 10px 12px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; color: #1e3a8a; font-size: 12.5px; line-height: 1.45; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .detail-metrics-grid { grid-template-columns: 1fr !important; }
+  .session-card-grid { grid-template-columns: 1fr !important; }
+}

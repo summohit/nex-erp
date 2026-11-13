@@ -90,10 +90,11 @@ interface Lead {
   preSalesTasks?: any[];
 }
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-leads',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     SkeletonComponent,
     CommonModule, 
     FormsModule, 
@@ -133,6 +134,9 @@ interface Lead {
   styleUrls: ['./leads.css']
 })
 export class LeadsComponent implements OnInit {
+  /** Header "More" menu (13 Nov 2026). */
+  ldMoreOpen = false;
+
   leads: Lead[] = [];
   isLoading = true;
   isSaving = false;

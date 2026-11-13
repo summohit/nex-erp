@@ -49,3 +49,7 @@ Reference pages that already follow the standard (copy their patterns): `employe
 - Tell me what changed, page by page, and anything you could not keep identical.
 
 Page to redesign:
+
+## 6. Wording
+- View switches always say **Board | Table** (never Grid, Cards, List or Kanban), in that order, as pills in the page header.
+- When the second view is a month calendar rather than a table, say **Board | Calendar** (e.g. Holidays).

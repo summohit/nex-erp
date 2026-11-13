@@ -603,3 +603,5 @@
   background: linear-gradient(180deg, #fafafa, #ffffff);
   border-bottom: 2px solid #dbeafe;
 }
+
+.pos-main app-page-header { display: block; }

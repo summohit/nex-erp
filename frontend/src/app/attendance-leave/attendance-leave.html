@@ -1,7 +1,7 @@
 <div class="attendance-container">
   <app-page-header icon="calendar" section="Attendance & Leave"
-    [heading]="activeTab() === 'leave' ? 'Leaves' : 'My Attendance'"
-    [subtitle]="activeTab() === 'leave' ? 'Leave requests, regularizations and balances.' : 'Manage your time, view logs, and request leaves.'">
+    [heading]="activeTab() === 'leave' ? 'Leaves' : (activeTab() === 'timeline' ? 'Team Timeline' : (activeTab() === 'holidays' ? 'Holidays' : 'My Attendance'))"
+    [subtitle]="activeTab() === 'leave' ? 'Leave requests, regularizations and balances.' : (activeTab() === 'timeline' ? 'Who was present, late, on leave or absent, day by day.' : (activeTab() === 'holidays' ? 'Official company holidays and non-working days.' : 'Manage your time, view logs, and request leaves.'))">
     <ng-container *ngIf="activeTab() === 'leave' && leaveSection() !== 'balances' && leaveSection() !== 'regularizations'">
       <button type="button" class="lv-hdr-btn primary" (click)="openRequestModal()"><svg lucidePlus [size]="16"></svg>New leave</button>
     </ng-container>
@@ -11,6 +11,16 @@
       <label for="leave-balance-import" class="lv-hdr-btn" role="button" tabindex="0"><svg lucideUpload size="15"></svg>Import</label>
       <button type="button" class="lv-hdr-btn" (click)="exportLeaveBalancesCsv()"><svg lucideDownload size="15"></svg>Export</button>
       <button type="button" class="lv-hdr-btn primary" (click)="isAssignModalOpen.set(true)"><svg lucidePlus [size]="16"></svg>Assign balance</button>
+    </ng-container>
+    <ng-container *ngIf="activeTab() === 'holidays'">
+      <div class="lv-view-pills" role="group" aria-label="Holiday view">
+        <button type="button" [class.active]="holidayViewMode() === 'cards'" (click)="holidayViewMode.set('cards')">Board</button>
+        <button type="button" [class.active]="holidayViewMode() === 'calendar'" (click)="holidayViewMode.set('calendar')">Calendar</button>
+      </div>
+      <input #holidayImport type="file" accept=".csv,text/csv" hidden (change)="importHolidaysCsv($event)">
+      <button *ngIf="isAdmin()" type="button" class="lv-hdr-btn" (click)="holidayImport.click()"><svg lucideUpload size="15"></svg>Import</button>
+      <button type="button" class="lv-hdr-btn" (click)="exportHolidaysCsv()"><svg lucideDownload size="15"></svg>Export</button>
+      <button *ngIf="isAdmin()" type="button" class="lv-hdr-btn primary" (click)="openAddHolidayModal()"><svg lucidePlus [size]="16"></svg>Add holiday</button>
     </ng-container>
   </app-page-header>
 
@@ -257,6 +267,7 @@
         <button type="button" class="clear-all-filters" *ngIf="regularizationSearch() || regularizationStatusFilter() !== 'ALL'"
                 (click)="regularizationSearch.set(''); setRegularizationStatusFilter('ALL')">Clear all</button>
         <span class="lv-spacer"></span>
+        <span class="tl-count">Showing {{ filteredPendingRegularizations().length }} of {{ allRegularizations().length }}</span>
         <button type="button" class="btn btn-outline reg-btn" (click)="exportPendingRegularizationsCsv()" [disabled]="allRegularizations().length === 0" title="Export list to CSV">
           <svg lucideDownload [size]="15"></svg><span>Export</span>
         </button>
@@ -351,6 +362,7 @@
           <span class="leave-filter-active-dot" *ngIf="hasActiveLeaveFilters()" aria-label="Filters active"></span>
         </button>
         <button type="button" class="clear-all-filters" *ngIf="hasActiveLeaveFilters()" (click)="clearAllLeaveFilters()">Clear all</button>
+        <span class="tl-count lv-count-right" *ngIf="leaveViewMode() !== 'employee'">Showing {{ filteredLeaveApplications().length }} of {{ totalLeaveCount() }}</span>
       </div>
 
     </div>
@@ -1370,27 +1382,33 @@
   </div>
 
   <!-- TEAM TIMELINE TAB -->
-  <div class="tab-content" *ngIf="activeTab() === 'timeline'">
-    <div class="widget-card logs-widget full-width-grid" style="overflow-x: auto; padding: 16px;">
-      <div class="widget-header grid-header" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
-        <h3 class="widget-title">Team Timeline</h3>
-        <div class="period-selectors" style="display: flex; gap: 8px; align-items: center;">
-          <span style="font-size: 12px; color: #64748b;">{{ timelineVisibleEmployees().length }} people</span>
-          <label class="attendance-search">
-            <svg lucideSearch [size]="16" aria-hidden="true"></svg>
-            <input type="search" aria-label="Search employee" placeholder="Search employee or ID..."
-                   [ngModel]="timelineEmployeeQuery()" (ngModelChange)="timelineEmployeeQuery.set($event)">
-          </label>
-          <input type="date" class="form-control" style="width: auto; font-size: 13px;"
-                 [value]="timelineStartDate()" (change)="onTimelineStartDate($event)"
-                 aria-label="Timeline start date">
-          <span style="font-size: 12px; color: #64748b;">to</span>
-          <input type="date" class="form-control" style="width: auto; font-size: 13px;"
-                 [value]="timelineEndDate()" (change)="onTimelineEndDate($event)"
-                 aria-label="Timeline end date">
+  <div class="tab-content tl-page" *ngIf="activeTab() === 'timeline'">
+    <!-- Filter card (13 Nov 2026): search, date range, people count -->
+    <div class="leave-list-toolbar tl-toolbar">
+      <div class="leave-search-filter-wrap">
+        <label class="leave-application-search">
+          <svg lucideSearch [size]="16" aria-hidden="true"></svg>
+          <input type="search" aria-label="Search employee" placeholder="Search employee or ID..."
+                 [ngModel]="timelineEmployeeQuery()" (ngModelChange)="timelineEmployeeQuery.set($event)">
+          <button type="button" *ngIf="timelineEmployeeQuery()" aria-label="Clear search" (click)="timelineEmployeeQuery.set('')">×</button>
+        </label>
+        <app-searchable-select class="lv-status-select" [options]="timelineDepartmentOptions()" placeholder="All departments" [clearable]="true"
+          [value]="timelineDepartmentFilter() || null" (valueChange)="timelineDepartmentFilter.set($event || '')"></app-searchable-select>
+        <app-searchable-select class="lv-status-select" [options]="timelineStatusOptions" placeholder="All statuses" [clearable]="true"
+          [value]="timelineStatusFilter() || null" (valueChange)="timelineStatusFilter.set($event || '')"></app-searchable-select>
+        <div class="tl-range" role="group" aria-label="Timeline dates">
+          <svg lucideCalendar [size]="15" aria-hidden="true"></svg>
+          <input type="date" [value]="timelineStartDate()" (change)="onTimelineStartDate($event)" aria-label="Timeline start date">
+          <span class="tl-range-sep">→</span>
+          <input type="date" [value]="timelineEndDate()" (change)="onTimelineEndDate($event)" aria-label="Timeline end date">
         </div>
+        <button type="button" class="clear-all-filters" *ngIf="timelineEmployeeQuery() || timelineDepartmentFilter() || timelineStatusFilter()" (click)="clearTimelineFilters()">Clear all</button>
+        <span class="lv-spacer"></span>
+        <span class="tl-count">Showing {{ timelineVisibleEmployees().length }} people</span>
       </div>
+    </div>
 
+    <div class="widget-card logs-widget full-width-grid tl-card">
       <div class="tl-legend">
         <span class="tl-legend-item" *ngFor="let l of timelineLegend"><span class="tl-dot {{ l.type }}"></span>{{ l.label }}</span>
         <span class="tl-legend-item"><span class="tl-dot empty"></span>No record / day off</span>
@@ -1467,7 +1485,7 @@
     </div>
 
     <!-- KPI Summary Row Data -->
-    <div class="kpi-grid mb-4" *ngIf="!isLoadingHolidays()">
+    <div class="kpi-grid mb-4 hol-kpis" *ngIf="!isLoadingHolidays()">
       <div class="kpi-card">
         <div class="kpi-icon bg-blue">
           <svg lucideCalendar size="20"></svg>
@@ -1475,7 +1493,7 @@
         <div class="kpi-info">
           <span class="kpi-title">Total Holidays ({{ selectedHolidayYear() }})</span>
           <span class="kpi-value">{{ filteredHolidays().length }}</span>
-          <span class="kpi-subtext">Declared Company Holidays</span>
+          <span class="kpi-subtext">Declared company holidays</span>
         </div>
       </div>
 
@@ -1511,45 +1529,30 @@
 
     <!-- Main Card Container -->
     <div class="widget-card">
-      <div class="widget-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-        <div>
-          <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #0F172A;">Company Holidays Directory</h3>
-          <p class="subtitle" style="margin: 4px 0 0 0; color: #64748B; font-size: 13px;">View official company holidays and non-working days.</p>
+      <!-- Holiday filters, rebuilt 13 Nov 2026: everything inline, no drawer needed -->
+      <div class="hf-bar">
+        <label class="hf-search">
+          <svg lucideSearch [size]="16" aria-hidden="true"></svg>
+          <input type="search" aria-label="Search holidays" placeholder="Search holidays"
+                 [ngModel]="holidayQuery()" (ngModelChange)="holidayQuery.set($event)">
+          <button type="button" *ngIf="holidayQuery()" aria-label="Clear search" (click)="holidayQuery.set('')">×</button>
+        </label>
+        <div class="hf-seg" role="group" aria-label="Holiday timing">
+          <button type="button" [class.on]="!holidayStatusFilter()" (click)="holidayStatusFilter.set('')">All</button>
+          <button type="button" *ngFor="let o of holidayTimingOptions" [class.on]="holidayStatusFilter() === o.id" (click)="holidayStatusFilter.set(o.id)">{{ o.name }}</button>
         </div>
-
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <input #holidayImport type="file" accept=".csv,text/csv" hidden (change)="importHolidaysCsv($event)">
-          <button *ngIf="isAdmin()" type="button" class="btn btn-outline" (click)="holidayImport.click()">Import CSV</button>
-          <button type="button" class="btn btn-outline" (click)="exportHolidaysCsv()">Export CSV</button>
-          <button type="button" class="btn btn-outline" (click)="holidayFilterDrawerOpen.set(true)">
-            <svg lucideFilter [size]="14"></svg>
-            Filters
-            <span *ngIf="holidayQuery() || holidayStatusFilter() || holidayStartDate() || holidayEndDate()"> · Active</span>
-          </button>
-          <!-- View Toggle -->
-          <div class="view-toggle pill-toggle">
-            <button [class.active]="holidayViewMode() === 'cards'" (click)="holidayViewMode.set('cards')" title="Card Grid View">
-              <svg lucideGrid size="18"></svg>
-            </button>
-            <button [class.active]="holidayViewMode() === 'calendar'" (click)="holidayViewMode.set('calendar')" title="Monthly Calendar View">
-              <svg lucideList size="18"></svg>
-            </button>
-          </div>
-
-          <!-- Year Selector (Cards View) -->
-          <div *ngIf="holidayViewMode() === 'cards'" style="display: flex; align-items: center; gap: 8px;">
-            <label style="font-size: 13px; font-weight: 600; color: #475569;">Year:</label>
-            <select [ngModel]="selectedHolidayYear()" (ngModelChange)="selectedHolidayYear.set($event)" class="form-control" style="width: auto; padding: 6px 12px; font-size: 13px;">
-              <option *ngFor="let y of years" [value]="y">{{ y }}</option>
-            </select>
-          </div>
-
-          <!-- Add Holiday Button (Admin only) -->
-          <button *ngIf="isAdmin()" class="btn btn-primary" (click)="openAddHolidayModal()" style="display: flex; align-items: center; gap: 6px; width: auto; font-size: 13px;">
-            <svg lucidePlus size="16"></svg>
-            Add Holiday
-          </button>
+        <select *ngIf="holidayViewMode() === 'cards'" class="hf-select" aria-label="Holiday year" [ngModel]="selectedHolidayYear()" (ngModelChange)="selectedHolidayYear.set($event)">
+          <option *ngFor="let y of years" [value]="y">{{ y }}</option>
+        </select>
+        <div class="hf-range" role="group" aria-label="Holiday dates">
+          <svg lucideCalendar [size]="15" aria-hidden="true"></svg>
+          <input type="date" [value]="holidayStartDate()" (change)="holidayStartDate.set($any($event.target).value)" aria-label="From date">
+          <span>→</span>
+          <input type="date" [value]="holidayEndDate()" [min]="holidayStartDate()" (change)="holidayEndDate.set($any($event.target).value)" aria-label="To date">
         </div>
+        <button type="button" class="clear-all-filters" *ngIf="holidayQuery() || holidayStatusFilter() || holidayStartDate() || holidayEndDate()"
+                (click)="holidayQuery.set(''); holidayStatusFilter.set(''); holidayStartDate.set(''); holidayEndDate.set('')">Clear all</button>
+        <span class="hf-count">{{ filteredHolidays().length }} holiday{{ filteredHolidays().length === 1 ? '' : 's' }}</span>
       </div>
       <app-attendance-filter-drawer
         [open]="holidayFilterDrawerOpen()"
@@ -1792,35 +1795,39 @@
     </div>
   </div>
 
-  <!-- Add/Edit Holiday Modal -->
-  <div class="drawer-overlay" *ngIf="isHolidayModalOpen()" (click)="closeHolidayModal()">
-    <div class="drawer-content" (click)="$event.stopPropagation()" style="max-width: 450px;">
-      <div class="drawer-header">
-        <h2>{{ holidayForm.id ? 'Edit Holiday' : 'Add New Holiday' }}</h2>
-        <button class="btn-icon" (click)="closeHolidayModal()">
-          <svg lucideX size="20"></svg>
-        </button>
+  <!-- Add/Edit Holiday dialog (restyled 13 Nov 2026) -->
+  <div class="hd-overlay" *ngIf="isHolidayModalOpen()" (click)="closeHolidayModal()">
+    <form class="hd-dialog" role="dialog" aria-modal="true" aria-labelledby="hd-title" (click)="$event.stopPropagation()" (ngSubmit)="submitHolidayForm()">
+      <header class="hd-head">
+        <span class="hd-icon"><svg lucideCalendar size="18"></svg></span>
+        <div>
+          <h3 id="hd-title">{{ holidayForm.id ? 'Edit holiday' : 'Add holiday' }}</h3>
+          <p>Everyone gets this day off; attendance shows it as a holiday.</p>
+        </div>
+        <button type="button" class="hd-close" (click)="closeHolidayModal()" aria-label="Close"><svg lucideX size="18"></svg></button>
+      </header>
+      <div class="hd-body">
+        <label class="hd-label" for="hd-name">Holiday name <b>*</b></label>
+        <input id="hd-name" type="text" class="hd-input" [class.invalid]="holidayTried() && !holidayForm.name.trim()" name="hName" [(ngModel)]="holidayForm.name" required maxlength="100" placeholder="e.g. Independence Day">
+        <div class="hd-row-help">
+          <small class="hd-error" *ngIf="holidayTried() && !holidayForm.name.trim()">Enter the holiday name.</small>
+          <small class="hd-help">{{ holidayForm.name.length }}/100</small>
+        </div>
+
+        <label class="hd-label" for="hd-date">Date <b>*</b></label>
+        <input id="hd-date" type="date" class="hd-input" [class.invalid]="holidayTried() && !holidayForm.date" name="hDate" [(ngModel)]="holidayForm.date" required>
+        <small class="hd-error" *ngIf="holidayTried() && !holidayForm.date">Pick a date.</small>
+
+        <div class="hd-preview" *ngIf="holidayForm.name && holidayForm.date">
+          <span class="hd-preview-date"><b>{{ holidayForm.date | date:'dd' }}</b>{{ holidayForm.date | date:'MMM' }}</span>
+          <span><strong>{{ holidayForm.name }}</strong><small>{{ holidayForm.date | date:'EEEE, d MMMM y' }}</small></span>
+        </div>
       </div>
-      <form (ngSubmit)="saveHoliday()" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
-        <div class="drawer-body">
-          <div class="form-group mb-4">
-            <label>Holiday Name</label>
-            <input type="text" class="form-control" name="hName" [(ngModel)]="holidayForm.name" required maxlength="100" placeholder="e.g. Independence Day">
-            <small style="color: #94A3B8;">{{ holidayForm.name.length }}/100</small>
-          </div>
-          <div class="form-group mb-4">
-            <label>Date</label>
-            <input type="date" class="form-control" name="hDate" [(ngModel)]="holidayForm.date" required>
-          </div>
-        </div>
-        <div class="drawer-footer" style="display: flex; justify-content: flex-end; gap: 12px;">
-          <button type="button" class="btn btn-outline" (click)="closeHolidayModal()" style="width: max-content;">Cancel</button>
-          <button type="submit" class="btn btn-primary" [disabled]="isSavingHoliday()" style="width: max-content;">
-            {{ holidayForm.id ? 'Save Changes' : 'Add Holiday' }}
-          </button>
-        </div>
-      </form>
-    </div>
+      <footer class="hd-foot">
+        <button type="button" class="hd-btn" (click)="closeHolidayModal()">Cancel</button>
+        <button type="submit" class="hd-btn primary" [disabled]="isSavingHoliday()">{{ isSavingHoliday() ? 'Saving…' : (holidayForm.id ? 'Save changes' : 'Add holiday') }}</button>
+      </footer>
+    </form>
   </div>
   <!-- ========================================== -->
   <!-- DETAILED ATTENDANCE LOG MODAL -->
@@ -2090,6 +2097,11 @@
             <input type="radio" name="tlStatus" value="ABSENT" [(ngModel)]="rescheduleForm.status">
             <span class="tl-dot absent"></span>
             <span><b>Absent</b><small>No attendance; counted as loss of pay</small></span>
+          </label>
+          <label class="tl-option" [class.selected]="rescheduleForm.status === 'DAY_OFF'">
+            <input type="radio" name="tlStatus" value="DAY_OFF" [(ngModel)]="rescheduleForm.status">
+            <span class="tl-dot day-off"></span>
+            <span><b>Day off</b><small>Weekly off for this date; no loss of pay</small></span>
           </label>
         </div>
 

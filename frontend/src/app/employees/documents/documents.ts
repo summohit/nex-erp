@@ -13,7 +13,7 @@ import {
   LucideFileText, LucideSearch, LucideUploadCloud,
   LucideTrash2, LucideFilter, LucideFileCheck, LucideFolder,
   LucideX, LucideExternalLink, LucidePaperclip, LucideDownload, LucideArchive,
-  LucideUserCheck, LucideClock, LucideBuilding, LucideEye, LucideUpload
+  LucideUserCheck, LucideClock, LucideBuilding, LucideEye, LucideUpload, LucidePencil
 } from '@lucide/angular';
 
 @Component({
@@ -25,7 +25,7 @@ import {
     FormsModule,
     SearchableSelectComponent,
     DatePresetFilterComponent,
-    LucideFileText, LucideSearch, LucideUploadCloud,
+    LucideFileText, LucideSearch, LucidePencil, LucideUploadCloud,
     LucideTrash2, LucideFilter, LucideFileCheck, LucideFolder,
     LucideX, LucideExternalLink, LucidePaperclip, LucideDownload, LucideArchive,
     LucideUserCheck, LucideClock, LucideBuilding, LucideEye, LucideUpload
@@ -360,6 +360,26 @@ export class EmployeeDocumentsComponent implements OnInit {
         this.isUploading.set(false);
         this.toast.error(err?.error?.message || 'Failed to upload documents');
       }
+    });
+  }
+
+  /** Rename (Super Admin only, 13 Nov 2026). */
+  renamingDoc = signal<any>(null);
+  renameValue = signal('');
+  renameError = signal('');
+  isRenaming = signal(false);
+  openRename(doc: any) { this.renamingDoc.set(doc); this.renameValue.set(doc.fileName || ''); this.renameError.set(''); }
+  closeRename() { if (!this.isRenaming()) this.renamingDoc.set(null); }
+  saveRename() {
+    const doc = this.renamingDoc();
+    const name = this.renameValue().trim();
+    if (!doc) return;
+    if (!name) { this.renameError.set('Name is required.'); return; }
+    if (name === doc.fileName) { this.renamingDoc.set(null); return; }
+    this.isRenaming.set(true);
+    this.employeeService.renameDocument(doc.employeeId, doc.id, name).subscribe({
+      next: () => { this.isRenaming.set(false); this.renamingDoc.set(null); this.toast.success('Document renamed'); this.loadEmployeesAndDocs(); },
+      error: (err: any) => { this.isRenaming.set(false); this.renameError.set(err?.error?.message || 'Could not rename the document.'); },
     });
   }
 

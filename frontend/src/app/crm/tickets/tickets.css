@@ -2494,3 +2494,8 @@ label {
 .guide-btn { border: 1px solid #bfdbfe; background: #fff; color: #1d4ed8; font: 600 12.5px inherit; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
 .guide-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
 .attendance-guide.warn .guide-btn.primary { background: #d97706; border-color: #d97706; }
+
+/* ── Responsive grids (auto, 13 Nov): stack multi-column layouts on small screens ── */
+@media (max-width: 640px) {
+  .form-grid-2 { grid-template-columns: 1fr !important; }
+}

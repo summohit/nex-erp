@@ -1,19 +1,8 @@
 <div class="apv-page">
 
-  <div class="apv-head">
-    <div>
-      <h1><svg lucideShieldCheck [size]="20"></svg> Approvals</h1>
-      <p>
-        Choose who, besides the people already trusted by role, may rule on each
-        of these. A Super Admin can approve all of them regardless, so nothing
-        here can lock a queue away.
-      </p>
-    </div>
-    <button class="apv-refresh" (click)="load()" [disabled]="isLoading()">
-      <svg lucideRefreshCw [size]="15" [class.spin]="isLoading()"></svg>
-      Refresh
-    </button>
-  </div>
+  <app-page-header icon="completion" section="Settings" heading="Approval delegation" subtitle="Who else may decide each kind of request. A Super Admin can always decide all of them.">
+    <button type="button" class="st-hdr-btn" (click)="load()" [disabled]="isLoading()"><svg lucideRefreshCw [size]="15" [class.spin]="isLoading()"></svg>Refresh</button>
+  </app-page-header>
 
   <div class="apv-loading" *ngIf="isLoading() && !groups().length">
     <svg lucideRefreshCw [size]="18" class="spin"></svg>

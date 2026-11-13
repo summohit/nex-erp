@@ -32,8 +32,8 @@ import { CommonModule } from '@angular/common';
     </header>
   `,
   styles: [`
-    .ph { position: relative; overflow: hidden; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 16px; padding: 15px; background: linear-gradient(100deg, #f5f8ff 0%, #ffffff 45%); border: 1px solid #e6ebf5; border-radius: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
-    .ph::before { content: ''; position: absolute; left: -40px; top: -40px; width: 160px; height: 160px; border-radius: 50%; background: rgba(37, 99, 235, .05); pointer-events: none; }
+    .ph { position: relative; overflow: visible; z-index: 20; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 16px; padding: 15px; background: radial-gradient(circle at 40px 40px, rgba(37, 99, 235, .05) 0 80px, transparent 81px), linear-gradient(100deg, #f5f8ff 0%, #ffffff 45%); border: 1px solid #e6ebf5; border-radius: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+    .ph::before { content: none; }
     .ph-back { position: relative; flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1px solid #e2e8f0; background: #fff; color: #334155; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; margin-right: -6px; }
     .ph-back:hover { background: #f1f5f9; color: #0f172a; }
     .ph-icon { position: relative; flex-shrink: 0; width: 50px; height: 50px; border-radius: 50%; background: #e8efff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-weight: bold; }

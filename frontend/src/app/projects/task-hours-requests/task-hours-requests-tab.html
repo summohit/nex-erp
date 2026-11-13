@@ -1,4 +1,10 @@
 <div class="thr-page-container" [class.thr-embedded]="embedded">
+  <app-page-header *ngIf="!embedded" icon="target" section="Delivery" [heading]="typeTitle"
+    [subtitle]="currentPendingCount() > 0 ? currentPendingCount() + (currentPendingCount() === 1 ? ' request' : ' requests') + ' awaiting decision' : 'All requests decided'">
+    <button type="button" class="thr-hdr-btn" (click)="refresh()" [disabled]="isCurrentQueueLoading()" title="Refresh requests">
+      <svg lucideRefreshCw size="15" [class.thr-spinning]="isCurrentQueueLoading()"></svg>Refresh
+    </button>
+  </app-page-header>
   <!-- Top Navigation & Actions Bar -->
   <div class="thr-top-nav" *ngIf="!embedded">
     <div class="thr-breadcrumbs">
@@ -364,12 +370,22 @@
     </div>
 
     <!-- Request Cards Feed -->
+    <!-- Bulk decide (13 Nov 2026): tick requests that are waiting on you -->
+    <div class="thr-bulk-bar" *ngIf="selectedHours().size > 0">
+      <span class="thr-bulk-count">{{ selectedHours().size }} selected</span>
+      <button type="button" class="thr-bulk-btn primary" [disabled]="bulkBusy()" (click)="bulkApprove()">Approve</button>
+      <input class="thr-bulk-reason" type="text" placeholder="Reason for rejecting (required)" [(ngModel)]="bulkRejectReason" [disabled]="bulkBusy()">
+      <button type="button" class="thr-bulk-btn danger" [disabled]="bulkBusy()" (click)="bulkReject()">Reject</button>
+      <button type="button" class="thr-bulk-btn ghost" (click)="clearHoursSelection()">Clear</button>
+    </div>
+
     <div class="ta-table-wrap" *ngIf="!loading() && filteredRequests().length > 0">
       <table class="ta-table hours-requests-table">
-        <thead><tr><th>Task Code</th><th>Task</th><th>Requested by</th><th>Requested</th><th>Reason</th><th>Stage</th><th class="ta-actions-col">Actions</th></tr></thead>
+        <thead><tr><th class="thr-check-col"><input type="checkbox" aria-label="Select all waiting requests" [checked]="allReviewableSelected()" [disabled]="!reviewableRows().length" (change)="toggleAllHours($any($event.target).checked)"></th><th>Task Code</th><th>Task</th><th>Requested by</th><th>Requested</th><th>Reason</th><th>Stage</th><th class="ta-actions-col">Actions</th></tr></thead>
         <tbody>
           <ng-container *ngFor="let r of filteredRequests()">
-          <tr>
+          <tr [class.thr-row-selected]="selectedHours().has(r.id)">
+            <td class="thr-check-col"><input type="checkbox" [attr.aria-label]="'Select ' + r.issue?.key" [disabled]="!canReview(r)" [title]="canReview(r) ? '' : 'Already decided or not yours to decide'" [checked]="selectedHours().has(r.id)" (change)="toggleHours(r.id)"></td>
             <td><a class="prq-key clickable" [routerLink]="['/projects', r.issue?.project?.id]" [queryParams]="{ task: r.issue?.id }">{{ r.issue?.key }}</a></td>
             <td class="ta-task"><a class="ta-title clickable" [routerLink]="['/projects', r.issue?.project?.id]" [queryParams]="{ task: r.issue?.id }">{{ r.issue?.title }}</a><a class="ta-project-under clickable" [routerLink]="['/projects', r.issue?.project?.id]">{{ r.issue?.project?.name }}</a></td>
             <td class="ta-raised-by">
@@ -385,7 +401,7 @@
             </td>
             <td><strong>{{ r.requestedHours }}h</strong></td>
             <td class="ta-muted ta-wide-cell">{{ r.reason }}</td>
-            <td><span class="ta-stage">{{ r.status === 'REQUESTED' ? 'Awaiting decision' : r.status }}</span></td>
+            <td><span class="ta-stage">{{ r.status === 'REQUESTED' ? 'Awaiting decision' : (r.status | titlecase) }}</span></td>
             <td class="ta-actions-col">
               <div class="ta-action-menu"><button type="button" class="ta-icon-btn" title="Actions" (click)="toggleHoursActionMenu(r.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === r.id"><a *ngIf="canEditApprovalRequest(r.status)" [routerLink]="['/projects', r.issue?.project?.id]" [queryParams]="{ task: r.issue?.id, hoursRequest: r.id, edit: 1 }">Edit</a><button (click)="toggleTimeline(r); toggleHoursActionMenu(r.id)">Audit</button><button *ngIf="canReview(r)" class="approve" (click)="approve(r); toggleHoursActionMenu(r.id)">Approve</button><button *ngIf="canReview(r)" (click)="startApproveWithEdit(r); toggleHoursActionMenu(r.id)">Approve less</button><button *ngIf="canReview(r)" class="reject" (click)="startReject(r); toggleHoursActionMenu(r.id)">Reject</button></div></div>
             </td>
@@ -846,7 +862,7 @@
     <div class="ta-toolbar" *ngIf="taskApprovals().length">
       <div class="ta-view-switch" role="tablist">
         <button type="button" role="tab" [class.active]="taskView() === 'TABLE'" (click)="setTaskView('TABLE')">Table</button>
-        <button type="button" role="tab" [class.active]="taskView() === 'CARDS'" (click)="setTaskView('CARDS')">Cards</button>
+        <button type="button" role="tab" [class.active]="taskView() === 'CARDS'" (click)="setTaskView('CARDS')">Board</button>
       </div>
       <div class="ta-filters">
         <input type="search" class="ta-filter-input" placeholder="Project name or code…"
@@ -1073,7 +1089,13 @@
       <p>No trip is waiting on your approval.</p>
     </div>
 
-    <div class="ta-table-wrap" *ngIf="filteredFieldVisitRequests().length"><table class="ta-table field-visit-table"><thead><tr><th>Visit Code</th><th>Project</th><th>Raised by</th><th>Site</th><th>Dates</th><th>Team</th><th>Tasks</th><th class="ta-actions-col">Actions</th></tr></thead><tbody><tr *ngFor="let r of filteredFieldVisitRequests()"><td><a class="prq-key clickable" [routerLink]="['/field-visits/requests', r.id]">{{ r.requestNumber }}</a></td><td><a class="clickable" [routerLink]="['/projects', r.project?.id]">{{ r.project?.name }}</a></td><td class="ta-raised-by"><div class="ta-user-cell" *ngIf="r.raisedBy as raiser; else unkRaiser"><div class="ta-person-avatar" [style.background-color]="getAvatarBg(fullName(raiser))"><img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)"><span *ngIf="!raiser.avatarUrl">{{ (raiser.firstName || '?').slice(0,1) + (raiser.lastName || '').slice(0,1) }}</span><span class="ta-person-tooltip">{{ fullName(raiser) }}</span></div><span class="ta-user-name">{{ fullName(raiser) }}</span></div><ng-template #unkRaiser><span class="ta-muted">—</span></ng-template></td><td class="ta-wide-cell">{{ r.location }}</td><td class="ta-nowrap">{{ r.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(r.startDate | date:'dd-MM-yyyy') !== (r.endDate | date:'dd-MM-yyyy')"><span class="date-to">to</span>{{ r.endDate | date:'dd-MM-yyyy' }}</ng-container></td><td><div class="fv-team-avatars"><div class="fv-team-avatar" *ngFor="let member of r.members.slice(0, 4)" [title]="member.employee.firstName + ' ' + member.employee.lastName"><img *ngIf="member.employee.avatarUrl" [src]="member.employee.avatarUrl" alt=""><span *ngIf="!member.employee.avatarUrl">{{ member.employee.firstName.slice(0,1) }}{{ member.employee.lastName.slice(0,1) }}</span><span class="fv-team-tooltip">{{ member.employee.firstName }} {{ member.employee.lastName }}</span></div><span class="fv-team-more" *ngIf="r.members.length > 4">+{{ r.members.length - 4 }}</span></div></td><td>{{ r.tasks.length }}</td><td class="ta-actions-col"><div class="ta-action-menu"><button class="ta-icon-btn" type="button" (click)="toggleHoursActionMenu(r.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === r.id"><button (click)="openVisitDetails(r); toggleHoursActionMenu(r.id)">View</button><a *ngIf="canEditApprovalRequest(r.status)" [routerLink]="['/field-visits/requests', r.id]" [queryParams]="{ edit: 1 }">Edit</a><button class="approve" (click)="decideFieldVisit(r, 'APPROVED'); toggleHoursActionMenu(r.id)">Approve</button><button class="reject" (click)="decideFieldVisit(r, 'REJECTED'); toggleHoursActionMenu(r.id)">Reject</button></div></div></td></tr></tbody></table></div>
+    <div class="thr-bulk-bar" *ngIf="bulkCount('FIELD_VISITS') > 0">
+      <span class="thr-bulk-count">{{ bulkCount('FIELD_VISITS') }} selected</span>
+      <button type="button" class="thr-bulk-btn primary" [disabled]="bulkBusy()" (click)="bulkDecide('FIELD_VISITS', 'APPROVED')">Approve</button>
+      <button type="button" class="thr-bulk-btn danger" [disabled]="bulkBusy()" (click)="bulkDecide('FIELD_VISITS', 'REJECTED')">Reject</button>
+      <button type="button" class="thr-bulk-btn ghost" (click)="bulkClear('FIELD_VISITS')">Clear</button>
+    </div>
+    <div class="ta-table-wrap" *ngIf="filteredFieldVisitRequests().length"><table class="ta-table field-visit-table"><thead><tr><th class="thr-check-col"><input type="checkbox" aria-label="Select all" [checked]="bulkAllOn('FIELD_VISITS', filteredFieldVisitRequests())" (change)="bulkToggleAll('FIELD_VISITS', filteredFieldVisitRequests(), $any($event.target).checked)"></th><th>Visit Code</th><th>Project</th><th>Raised by</th><th>Site</th><th>Dates</th><th>Team</th><th>Tasks</th><th class="ta-actions-col">Actions</th></tr></thead><tbody><tr *ngFor="let r of filteredFieldVisitRequests()"><td class="thr-check-col"><input type="checkbox" [disabled]="!bulkCan(r)" [title]="bulkCan(r) ? '' : 'Already decided'" [checked]="bulkHas('FIELD_VISITS', r.id)" (change)="bulkToggle('FIELD_VISITS', r.id)"></td><td><a class="prq-key clickable" [routerLink]="['/field-visits/requests', r.id]">{{ r.requestNumber }}</a></td><td><a class="clickable" [routerLink]="['/projects', r.project?.id]">{{ r.project?.name }}</a></td><td class="ta-raised-by"><div class="ta-user-cell" *ngIf="r.raisedBy as raiser; else unkRaiser"><div class="ta-person-avatar" [style.background-color]="getAvatarBg(fullName(raiser))"><img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)"><span *ngIf="!raiser.avatarUrl">{{ (raiser.firstName || '?').slice(0,1) + (raiser.lastName || '').slice(0,1) }}</span><span class="ta-person-tooltip">{{ fullName(raiser) }}</span></div><span class="ta-user-name">{{ fullName(raiser) }}</span></div><ng-template #unkRaiser><span class="ta-muted">—</span></ng-template></td><td class="ta-wide-cell">{{ r.location }}</td><td class="ta-nowrap">{{ r.startDate | date:'d MMM y' }}<ng-container *ngIf="(r.startDate | date:'dd-MM-yyyy') !== (r.endDate | date:'dd-MM-yyyy')"><span class="date-to">to</span>{{ r.endDate | date:'d MMM y' }}</ng-container></td><td><div class="fv-team-avatars"><div class="fv-team-avatar" *ngFor="let member of r.members.slice(0, 4)" [title]="member.employee.firstName + ' ' + member.employee.lastName"><img *ngIf="member.employee.avatarUrl" [src]="member.employee.avatarUrl" alt=""><span *ngIf="!member.employee.avatarUrl">{{ member.employee.firstName.slice(0,1) }}{{ member.employee.lastName.slice(0,1) }}</span><span class="fv-team-tooltip">{{ member.employee.firstName }} {{ member.employee.lastName }}</span></div><span class="fv-team-more" *ngIf="r.members.length > 4">+{{ r.members.length - 4 }}</span></div></td><td>{{ r.tasks.length }}</td><td class="ta-actions-col"><div class="ta-action-menu"><button class="ta-icon-btn" type="button" (click)="toggleHoursActionMenu(r.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === r.id"><button (click)="openVisitDetails(r); toggleHoursActionMenu(r.id)">View</button><a *ngIf="canEditApprovalRequest(r.status)" [routerLink]="['/field-visits/requests', r.id]" [queryParams]="{ edit: 1 }">Edit</a><button class="approve" (click)="decideFieldVisit(r, 'APPROVED'); toggleHoursActionMenu(r.id)">Approve</button><button class="reject" (click)="decideFieldVisit(r, 'REJECTED'); toggleHoursActionMenu(r.id)">Reject</button></div></div></td></tr></tbody></table></div>
 
     <article class="prq-card" [hidden]="true" *ngFor="let r of filteredFieldVisitRequests()">
       <div class="prq-card-head">
@@ -1093,7 +1115,7 @@
         </div>
         <div class="prq-figure">
           <span class="prq-figure-label">Dates</span>
-          <span class="prq-figure-value">{{ r.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(r.startDate | date:'dd-MM-yyyy') !== (r.endDate | date:'dd-MM-yyyy')"><span class="date-to">to</span>{{ r.endDate | date:'dd-MM-yyyy' }}</ng-container> ({{ r.visitDays }}d)</span>
+          <span class="prq-figure-value">{{ r.startDate | date:'d MMM y' }}<ng-container *ngIf="(r.startDate | date:'dd-MM-yyyy') !== (r.endDate | date:'dd-MM-yyyy')"><span class="date-to">to</span>{{ r.endDate | date:'d MMM y' }}</ng-container> ({{ r.visitDays }}d)</span>
         </div>
         <div class="prq-figure">
           <span class="prq-figure-label">Team · Tasks</span>
@@ -1142,68 +1164,23 @@
       <p>Nothing has been raised from a project's Fix button.</p>
     </div>
 
-    <article class="prq-card" *ngFor="let r of filteredScopeRequests()">
-      <div class="prq-card-head">
-        <div class="prq-card-ident">
-          <span class="prq-project" *ngIf="r.project">
-            <svg lucideFolderKanban size="13"></svg> {{ r.project.name }}
-          </span>
-          <!-- Out of scope is the answer that costs somebody money, so it
-               reads differently from in scope. -->
-          <span class="prq-scope-chip" [class.out]="r.scope === 'OUT_OF_SCOPE'">
-            {{ scopeLabel(r.scope) }}
-          </span>
-        </div>
-        <span class="prq-stage"> <svg lucideClock size="13"></svg> Awaiting administrator </span>
-      </div>
-
-      <h4 class="prq-title">{{ r.title }}</h4>
-
-      <div class="prq-meta prq-meta-with-avatars">
-        <div class="prq-meta-user" *ngIf="r.raisedBy as raiser">
-          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(fullName(raiser))">
-            <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)" />
-            <span *ngIf="!raiser.avatarUrl">{{ getInitials(fullName(raiser)) }}</span>
-          </div>
-          <span class="prq-meta-user-text">Raised by <strong>{{ fullName(raiser) }}</strong></span>
-        </div>
-        <span class="prq-meta-date">
-          <svg lucideCalendar size="13"></svg>
-          {{ r.createdAt | date: 'dd-MM-yyyy, h:mm a' }}
-        </span>
-      </div>
-
-      <!-- Angular sanitises this. Never bypassSecurityTrustHtml. -->
-      <div class="prq-body" [innerHTML]="r.body"></div>
-
-      <div class="prq-files" *ngIf="r.attachments?.length">
-        <a
-          *ngFor="let a of r.attachments"
-          class="prq-file"
-          [href]="a.url"
-          target="_blank"
-          rel="noopener noreferrer"
-          [title]="a.name"
-        >
-          <svg lucideFileText size="13"></svg>
-          {{ a.name }}
-          <span class="prq-file-size" *ngIf="a.sizeBytes">{{ formatFileSize(a.sizeBytes) }}</span>
-        </a>
-      </div>
-
-      <div class="prq-actions">
-        <a *ngIf="canEditApprovalRequest(r.status)" class="prq-btn view-details" [routerLink]="['/projects', r.projectId]" [queryParams]="{ scopeRequest: r.id, edit: 1 }">Edit Request</a>
-        <button type="button" class="prq-btn reject" (click)="decideScopeRequest(r, 'REJECTED')">
-          <svg lucideX size="14"></svg> Reject
-        </button>
-<button type="button" class="prq-btn edit" *ngIf="isAdmin()" (click)="openEditApprove('SCOPE', r)" title="Change the request, then approve it">
-          <svg lucidePencil size="14"></svg> Edit &amp; Approve
-        </button>
-        <button type="button" class="prq-btn approve" (click)="decideScopeRequest(r, 'APPROVED')">
-          <svg lucideCheck size="14"></svg> Approve
-        </button>
-      </div>
-    </article>
+    <div class="thr-bulk-bar" *ngIf="bulkCount('SCOPE') > 0">
+      <span class="thr-bulk-count">{{ bulkCount('SCOPE') }} selected</span>
+      <button type="button" class="thr-bulk-btn primary" [disabled]="bulkBusy()" (click)="bulkDecide('SCOPE', 'APPROVED')">Approve</button>
+      <button type="button" class="thr-bulk-btn danger" [disabled]="bulkBusy()" (click)="bulkDecide('SCOPE', 'REJECTED')">Reject</button>
+      <button type="button" class="thr-bulk-btn ghost" (click)="bulkClear('SCOPE')">Clear</button>
+    </div>
+    <div class="ta-table-wrap" *ngIf="filteredScopeRequests().length"><table class="ta-table">
+      <thead><tr><th class="thr-check-col"><input type="checkbox" aria-label="Select all" [checked]="bulkAllOn('SCOPE', filteredScopeRequests())" (change)="bulkToggleAll('SCOPE', filteredScopeRequests(), $any($event.target).checked)"></th><th>Request</th><th>Scope</th><th>Raised by</th><th>Raised on</th><th>Files</th><th class="ta-actions-col">Actions</th></tr></thead>
+      <tbody><tr *ngFor="let r of filteredScopeRequests()">
+        <td class="thr-check-col"><input type="checkbox" [disabled]="!bulkCan(r)" [title]="bulkCan(r) ? '' : 'Already decided'" [checked]="bulkHas('SCOPE', r.id)" (change)="bulkToggle('SCOPE', r.id)"></td>
+        <td class="ta-task"><span class="ta-title">{{ r.title }}</span><span class="ta-project-under" *ngIf="r.project">{{ r.project.name }}</span></td>
+        <td><span class="prq-scope-chip" [class.out]="r.scope === 'OUT_OF_SCOPE'">{{ scopeLabel(r.scope) }}</span></td>
+        <td><span class="ta-user-name" *ngIf="r.raisedBy">{{ fullName(r.raisedBy) }}</span></td>
+        <td class="ta-nowrap">{{ r.createdAt | date:'d MMM y, h:mm a' }}</td>
+        <td><ng-container *ngIf="r.attachments?.length; else noFiles"><a *ngFor="let a of r.attachments" class="thr-file" [href]="a.url" target="_blank" rel="noopener noreferrer" [title]="a.name"><svg lucideFileText size="14"></svg></a></ng-container><ng-template #noFiles><span class="ta-muted">—</span></ng-template></td>
+        <td class="ta-actions-col"><div class="ta-action-menu"><button type="button" class="ta-icon-btn" title="Actions" aria-label="Actions" (click)="toggleHoursActionMenu(r.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === r.id"><a *ngIf="canEditApprovalRequest(r.status)" [routerLink]="['/projects', r.projectId]" [queryParams]="{ scopeRequest: r.id, edit: 1 }">Edit</a><button class="approve" (click)="decideScopeRequest(r, 'APPROVED'); toggleHoursActionMenu(r.id)">Approve</button><button *ngIf="isAdmin()" (click)="openEditApprove('SCOPE', r); toggleHoursActionMenu(r.id)">Edit &amp; approve</button><button class="reject" (click)="decideScopeRequest(r, 'REJECTED'); toggleHoursActionMenu(r.id)">Reject</button></div></div></td>
+      </tr></tbody></table></div>
   </ng-container>
 
   <!-- ── Project tickets (§29) ────────────────────────────────────────────── -->
@@ -1214,62 +1191,25 @@
       <p>Tickets raised on a project's Tickets tab appear here for approval.</p>
     </div>
 
-    <article class="prq-card" *ngFor="let t of filteredTicketRequests()">
-      <div class="prq-card-head">
-        <div class="prq-card-ident">
-          <span class="prq-project" *ngIf="t.project">
-            <svg lucideFolderKanban size="13"></svg> {{ t.project.name }}
-          </span>
-          <span class="prq-scope-chip" [class.out]="t.priority === 'CRITICAL' || t.priority === 'HIGH'">
-            {{ t.ticketNumber }} · {{ t.priority | titlecase }}
-          </span>
-        </div>
-        <span class="prq-stage"> <svg lucideClock size="13"></svg> Awaiting administrator </span>
-      </div>
-
-      <h4 class="prq-title">{{ t.title }}</h4>
-
-      <div class="prq-meta prq-meta-with-avatars">
-        <div class="prq-meta-user" *ngIf="t.raisedBy as raiser">
-          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(fullName(raiser))">
-            <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)" />
-            <span *ngIf="!raiser.avatarUrl">{{ getInitials(fullName(raiser)) }}</span>
-          </div>
-          <span class="prq-meta-user-text">Raised by <strong>{{ fullName(raiser) }}</strong></span>
-        </div>
-        <div class="prq-meta-user" *ngIf="t.proposedAssignee as assignee">
-          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(fullName(assignee))">
-            <img *ngIf="assignee.avatarUrl" [src]="assignee.avatarUrl" [alt]="fullName(assignee)" />
-            <span *ngIf="!assignee.avatarUrl">{{ getInitials(fullName(assignee)) }}</span>
-          </div>
-          <span class="prq-meta-user-text">For <strong>{{ fullName(assignee) }}</strong></span>
-        </div>
-        <span class="prq-meta-date">
-          <svg lucideCalendar size="13"></svg>
-          {{ t.createdAt | date: 'dd-MM-yyyy, h:mm a' }}
-        </span>
-        <span *ngIf="t.estimatedHours" class="prq-meta-stat">
-          <svg lucideClock size="13"></svg>
-          {{ t.estimatedHours }}h estimated
-        </span>
-        <span *ngIf="t.startDate || t.dueDate" class="prq-meta-stat">
-          {{ t.startDate ? (t.startDate | date:'dd-MM-yyyy') : '—' }}<span class="date-to">to</span>{{ t.dueDate ? (t.dueDate | date:'dd-MM-yyyy') : '—' }}
-        </span>
-      </div>
-
-      <!-- Angular sanitises this. Never bypassSecurityTrustHtml. -->
-      <div class="prq-body" *ngIf="t.description" [innerHTML]="t.description"></div>
-
-      <div class="prq-actions">
-        <a class="prq-btn view-details" *ngIf="t.project" [routerLink]="['/projects', t.project.id]">Open project</a>
-        <button type="button" class="prq-btn reject" *ngIf="isAdmin()" (click)="decideTicket(t, 'REJECTED')">
-          <svg lucideX size="14"></svg> Reject
-        </button>
-        <button type="button" class="prq-btn approve" *ngIf="isAdmin()" (click)="decideTicket(t, 'APPROVED')">
-          <svg lucideCheck size="14"></svg> Approve
-        </button>
-      </div>
-    </article>
+    <div class="thr-bulk-bar" *ngIf="bulkCount('TICKETS') > 0">
+      <span class="thr-bulk-count">{{ bulkCount('TICKETS') }} selected</span>
+      <button type="button" class="thr-bulk-btn primary" [disabled]="bulkBusy()" (click)="bulkDecide('TICKETS', 'APPROVED')">Approve</button>
+      <button type="button" class="thr-bulk-btn danger" [disabled]="bulkBusy()" (click)="bulkDecide('TICKETS', 'REJECTED')">Reject</button>
+      <button type="button" class="thr-bulk-btn ghost" (click)="bulkClear('TICKETS')">Clear</button>
+    </div>
+    <div class="ta-table-wrap" *ngIf="filteredTicketRequests().length"><table class="ta-table">
+      <thead><tr><th class="thr-check-col"><input type="checkbox" aria-label="Select all" [checked]="bulkAllOn('TICKETS', filteredTicketRequests())" (change)="bulkToggleAll('TICKETS', filteredTicketRequests(), $any($event.target).checked)"></th><th>Ticket</th><th>Title</th><th>Priority</th><th>Raised by</th><th>For</th><th>Estimate</th><th>Dates</th><th class="ta-actions-col">Actions</th></tr></thead>
+      <tbody><tr *ngFor="let t of filteredTicketRequests()">
+        <td class="thr-check-col"><input type="checkbox" [disabled]="!bulkCan(t)" [title]="bulkCan(t) ? '' : 'Already decided'" [checked]="bulkHas('TICKETS', t.id)" (change)="bulkToggle('TICKETS', t.id)"></td>
+        <td><span class="prq-key">{{ t.ticketNumber }}</span></td>
+        <td class="ta-task"><span class="ta-title" [title]="t.title">{{ t.title }}</span><span class="ta-project-under" *ngIf="t.project">{{ t.project.name }}</span></td>
+        <td><span class="prq-scope-chip" [class.out]="t.priority === 'CRITICAL' || t.priority === 'HIGH'">{{ t.priority | titlecase }}</span></td>
+        <td><span class="ta-user-name" *ngIf="t.raisedBy">{{ fullName(t.raisedBy) }}</span></td>
+        <td><span class="ta-user-name" *ngIf="t.proposedAssignee; else noOne">{{ fullName(t.proposedAssignee) }}</span><ng-template #noOne><span class="ta-muted">—</span></ng-template></td>
+        <td class="ta-nowrap">{{ t.estimatedHours ? t.estimatedHours + 'h' : '—' }}</td>
+        <td class="ta-nowrap">{{ t.startDate ? (t.startDate | date:'d MMM y') : '—' }}<ng-container *ngIf="t.dueDate"><span class="date-to">→</span>{{ t.dueDate | date:'d MMM y' }}</ng-container></td>
+        <td class="ta-actions-col"><div class="ta-action-menu"><button type="button" class="ta-icon-btn" title="Actions" aria-label="Actions" (click)="toggleHoursActionMenu(t.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === t.id"><a *ngIf="t.project" [routerLink]="['/projects', t.project.id]">Open project</a><button *ngIf="isAdmin()" class="approve" (click)="decideTicket(t, 'APPROVED'); toggleHoursActionMenu(t.id)">Approve</button><button *ngIf="isAdmin()" class="reject" (click)="decideTicket(t, 'REJECTED'); toggleHoursActionMenu(t.id)">Reject</button></div></div></td>
+      </tr></tbody></table></div>
   </ng-container>
 
   <!-- ── Visit location requests ──────────────────────────────────────────── -->
@@ -1280,113 +1220,24 @@
       <p>New client and site locations proposed by project managers will appear here.</p>
     </div>
 
-    <article
-      class="prq-card prq-location-card"
-      *ngFor="let request of filteredVisitLocationRequests()"
-      [class.approved]="request.status === 'APPROVED'"
-      [class.rejected]="request.status === 'REJECTED'"
-    >
-      <div class="prq-card-head">
-        <div class="prq-card-ident">
-          <span class="prq-location-icon"><svg lucideMapPin size="14"></svg></span>
-          <h4 class="prq-location-title">{{ request.name }}</h4>
-        </div>
-        <span
-          class="prq-stage"
-          [class.approved]="request.status === 'APPROVED'"
-          [class.rejected]="request.status === 'REJECTED'"
-        >
-          <svg *ngIf="request.status === 'PENDING'" lucideClock size="13"></svg>
-          <svg *ngIf="request.status === 'APPROVED'" lucideCheck size="13"></svg>
-          <svg *ngIf="request.status === 'REJECTED'" lucideX size="13"></svg>
-          {{
-            request.status === 'PENDING'
-              ? 'Awaiting administrator'
-              : request.status === 'APPROVED'
-                ? 'Approved'
-                : 'Rejected'
-          }}
-        </span>
-      </div>
-
-      <div class="prq-meta prq-meta-with-avatars">
-        <div class="prq-meta-user" *ngIf="request.requestedBy as raiser">
-          <div class="prq-mini-avatar" [style.background-color]="getAvatarBg(fullName(raiser))">
-            <img *ngIf="raiser.avatarUrl" [src]="raiser.avatarUrl" [alt]="fullName(raiser)" />
-            <span *ngIf="!raiser.avatarUrl">{{ getInitials(fullName(raiser)) }}</span>
-          </div>
-          <span class="prq-meta-user-text">Raised by <strong>{{ fullName(raiser) }}</strong></span>
-        </div>
-        <span class="prq-meta-date">
-          <svg lucideCalendar size="13"></svg>
-          {{ request.createdAt | date: 'dd-MM-yyyy, h:mm a' }}
-        </span>
-      </div>
-
-      <div class="prq-location-details">
-        <div *ngIf="request.leadContact">
-          <span class="prq-detail-label">Client or contact</span>
-          <strong>{{ request.leadContact.name }}</strong>
-          <span *ngIf="request.leadContact.companyName">
-            · {{ request.leadContact.companyName }}</span
-          >
-        </div>
-        <div *ngIf="request.address">
-          <span class="prq-detail-label">Address</span>
-          <span>{{ request.address }}</span>
-        </div>
-        <div *ngIf="request.latitude != null && request.longitude != null">
-          <span class="prq-detail-label">Coordinates</span>
-          <span
-            >{{ request.latitude | number: '1.4-6' }},
-            {{ request.longitude | number: '1.4-6' }}</span
-          >
-        </div>
-      </div>
-
-      <div class="prq-location-outcome" *ngIf="request.status !== 'PENDING'">
-        <div class="prq-meta-user" *ngIf="request.reviewedBy as reviewer">
-          <div class="prq-mini-avatar reviewer" [style.background-color]="getAvatarBg(fullName(reviewer))">
-            <img *ngIf="$any(reviewer).avatarUrl" [src]="$any(reviewer).avatarUrl" [alt]="fullName(reviewer)" />
-            <span *ngIf="!$any(reviewer).avatarUrl">{{ getInitials(fullName(reviewer)) }}</span>
-          </div>
-          <span class="prq-meta-user-text">{{ request.status === 'APPROVED' ? 'Approved' : 'Rejected' }} by <strong>{{ fullName(reviewer) }}</strong></span>
-        </div>
-        <span *ngIf="request.reviewedAt" class="prq-meta-date">{{ request.reviewedAt | date: 'dd-MM-yyyy, h:mm a' }}</span>
-      </div>
-
-      <div
-        class="prq-location-rejection"
-        *ngIf="request.status === 'REJECTED' && request.rejectionReason"
-      >
-        <svg lucideAlertTriangle size="14"></svg>
-        <span>{{ request.rejectionReason }}</span>
-      </div>
-
-      <div
-        class="prq-actions"
-        *ngIf="request.status === 'PENDING' && locationCapabilities()?.canReview"
-      >
-        <button *ngIf="canEditApprovalRequest(request.status)" type="button" class="prq-btn view-details" (click)="openLocationRequestEditor()">Edit Request</button>
-        <button
-          type="button"
-          class="prq-btn reject"
-          (click)="decideVisitLocation(request, 'REJECTED')"
-        >
-          <svg lucideX size="14"></svg> Reject
-        </button>
-        <button type="button" class="prq-btn edit" (click)="openEditApprove('VISIT_LOCATIONS', request)" title="Change the location, then approve it">
-          <svg lucidePencil size="14"></svg> Edit &amp; Approve
-        </button>
-        <button
-          type="button"
-          class="prq-btn approve"
-          (click)="decideVisitLocation(request, 'APPROVED')"
-        >
-          <svg lucideCheck size="14"></svg> Approve and add
-        </button>
-      </div>
-    </article>
+    <div class="thr-bulk-bar" *ngIf="bulkCount('VISIT_LOCATIONS') > 0">
+      <span class="thr-bulk-count">{{ bulkCount('VISIT_LOCATIONS') }} selected</span>
+      <button type="button" class="thr-bulk-btn primary" [disabled]="bulkBusy()" (click)="bulkDecide('VISIT_LOCATIONS', 'APPROVED')">Approve</button>
+      <button type="button" class="thr-bulk-btn danger" [disabled]="bulkBusy()" (click)="bulkDecide('VISIT_LOCATIONS', 'REJECTED')">Reject</button>
+      <button type="button" class="thr-bulk-btn ghost" (click)="bulkClear('VISIT_LOCATIONS')">Clear</button>
+    </div>
+    <div class="ta-table-wrap" *ngIf="filteredVisitLocationRequests().length"><table class="ta-table">
+      <thead><tr><th class="thr-check-col"><input type="checkbox" aria-label="Select all" [checked]="bulkAllOn('VISIT_LOCATIONS', filteredVisitLocationRequests())" (change)="bulkToggleAll('VISIT_LOCATIONS', filteredVisitLocationRequests(), $any($event.target).checked)"></th><th>Location</th><th>Address</th><th>Client</th><th>Raised by</th><th>Raised on</th><th>Status</th><th class="ta-actions-col">Actions</th></tr></thead>
+      <tbody><tr *ngFor="let request of filteredVisitLocationRequests()">
+        <td class="thr-check-col"><input type="checkbox" [disabled]="!bulkCan(request)" [title]="bulkCan(request) ? '' : 'Already decided'" [checked]="bulkHas('VISIT_LOCATIONS', request.id)" (change)="bulkToggle('VISIT_LOCATIONS', request.id)"></td>
+        <td class="ta-task"><span class="ta-title">{{ request.name }}</span><span class="ta-project-under" *ngIf="request.latitude != null && request.longitude != null">{{ request.latitude | number:'1.4-6' }}, {{ request.longitude | number:'1.4-6' }}</span></td>
+        <td class="ta-wide-cell">{{ request.address || '—' }}</td>
+        <td>{{ request.leadContact?.name || '—' }}<span class="ta-project-under" *ngIf="request.leadContact?.companyName">{{ request.leadContact?.companyName }}</span></td>
+        <td><span class="ta-user-name" *ngIf="request.requestedBy">{{ fullName(request.requestedBy) }}</span></td>
+        <td class="ta-nowrap">{{ request.createdAt | date:'d MMM y, h:mm a' }}</td>
+        <td><span class="ta-stage" [title]="request.rejectionReason || ''">{{ request.status === 'PENDING' ? 'Awaiting' : (request.status | titlecase) }}</span></td>
+        <td class="ta-actions-col"><div class="ta-action-menu" *ngIf="request.status === 'PENDING' && locationCapabilities()?.canReview"><button type="button" class="ta-icon-btn" title="Actions" aria-label="Actions" (click)="toggleHoursActionMenu(request.id)"><svg lucideEllipsis size="18"></svg></button><div class="ta-action-popover" *ngIf="hoursActionMenuId() === request.id"><button *ngIf="canEditApprovalRequest(request.status)" (click)="openLocationRequestEditor(); toggleHoursActionMenu(request.id)">Edit</button><button class="approve" (click)="decideVisitLocation(request, 'APPROVED'); toggleHoursActionMenu(request.id)">Approve and add</button><button (click)="openEditApprove('VISIT_LOCATIONS', request); toggleHoursActionMenu(request.id)">Edit &amp; approve</button><button class="reject" (click)="decideVisitLocation(request, 'REJECTED'); toggleHoursActionMenu(request.id)">Reject</button></div></div></td>
+      </tr></tbody></table></div>
   </ng-container>
 
   <!-- ── Task Details Modal / Drawer (§Complete Task Inspection) ────────────── -->
@@ -1735,7 +1586,7 @@
           </div>
           <div class="fv-detail-card">
             <span class="fv-detail-label"><svg lucideCalendar size="12"></svg> Dates</span>
-            <span class="fv-detail-value">{{ v.startDate | date:'dd-MM-yyyy' }}<ng-container *ngIf="(v.startDate | date:'dd-MM-yyyy') !== (v.endDate | date:'dd-MM-yyyy')"><span class="date-to">to</span>{{ v.endDate | date:'dd-MM-yyyy' }}</ng-container></span>
+            <span class="fv-detail-value">{{ v.startDate | date:'d MMM y' }}<ng-container *ngIf="(v.startDate | date:'dd-MM-yyyy') !== (v.endDate | date:'dd-MM-yyyy')"><span class="date-to">to</span>{{ v.endDate | date:'d MMM y' }}</ng-container></span>
             <span class="fv-detail-sub">{{ v.visitDays }} {{ v.visitDays === 1 ? 'day' : 'days' }}</span>
           </div>
           <div class="fv-detail-card">

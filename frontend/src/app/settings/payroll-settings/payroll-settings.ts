@@ -50,10 +50,11 @@ import {
 
 type ActiveSettingsTab = 'components' | 'groups' | 'statutory' | 'tax' | 'setup' | 'calculator' | 'audit' | 'help';
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-payroll-settings',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule,
     FormsModule,
     LucideSliders,

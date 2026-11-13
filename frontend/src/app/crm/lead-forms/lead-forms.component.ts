@@ -44,10 +44,11 @@ const BASE_OPTIONS: Record<string, string[]> = {
   source: ['Website / Inbound', 'Referral', 'Social Media', 'Cold Outreach', 'Email Campaign', 'Event / Trade Show', 'Partner / Reseller', 'Paid Ads', 'Direct / Walk-In', 'Other'],
 };
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-lead-forms',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule, FormsModule, RouterModule, DragDropModule,
     LucidePlus, LucideChevronLeft, LucideEdit2, LucideCopy, LucideCopyPlus,
     LucideLink2, LucideTrash2, LucideGripVertical, LucideSave, LucideRotateCcw,

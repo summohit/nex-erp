@@ -18,6 +18,8 @@ import {
 import { LeavesService, QuotaReport, QuotaRow } from '../../services/leaves';
 import { AttendanceFilterDrawerComponent, AttendanceFilterValue } from '../../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
+
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 export type QuickFilterType = 'ALL' | 'LOW_REMAINING' | 'HIGH_USED' | 'UNASSIGNED';
@@ -30,7 +32,7 @@ export type QuickFilterType = 'ALL' | 'LOW_REMAINING' | 'HIGH_USED' | 'UNASSIGNE
     LucideDownload, LucideRefreshCw, LucideX, LucideTriangleAlert, LucideCalendarDays,
     LucideSearch, LucideClock, LucideCheckCircle2, LucideTrendingUp, LucidePieChart,
     LucideUsers, LucideFilter, LucideChevronRight, LucideInfo, LucideFileText, LucideAlertCircle,
-    LucideExternalLink, AttendanceFilterDrawerComponent,
+    LucideExternalLink, AttendanceFilterDrawerComponent, PageHeaderComponent,
   ],
   templateUrl: './leave-quota.html',
   styleUrls: ['./leave-quota.css'],
@@ -414,17 +416,16 @@ export class LeaveQuotaComponent implements OnInit {
     },
     {
       headerName: 'Action',
-      flex: 0.9,
-      minWidth: 110,
+      width: 90,
+      flex: 0,
       sortable: false,
       cellRenderer: () => `
         <div class="lq-action-cell">
-          <button class="lq-btn-breakdown" type="button" title="View detailed leave breakdown">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <button class="lq-btn-icon" type="button" title="View leave breakdown" aria-label="View leave breakdown">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
               <circle cx="12" cy="12" r="3"/>
             </svg>
-            <span>Breakdown</span>
           </button>
         </div>`,
       onCellClicked: (p: any) => this.openDetail(p.data),
@@ -434,7 +435,7 @@ export class LeaveQuotaComponent implements OnInit {
   defaultColDef: ColDef = {
     sortable: true,
     resizable: true,
-    filter: false,
+    filter: true,
   };
 
   onGridReady(e: GridReadyEvent) {
@@ -448,6 +449,36 @@ export class LeaveQuotaComponent implements OnInit {
       columnKeys: ['employee.name', 'allocated', 'used', 'remaining', 'encashed', 'utilisation'],
     });
   }
+
+  /** "All breakdowns" (13 Nov 2026): one column per leave type, remaining / allocated. */
+  showAllTypes = signal(false);
+  gridColumns = computed<ColDef[]>(() => {
+    if (!this.showAllTypes()) return this.columnDefs;
+    const types = this.report()?.leaveTypes || [];
+    const typeCols: ColDef[] = types.map((t: any) => ({
+      headerName: t.name,
+      headerTooltip: `${t.name} · remaining / allocated`,
+      minWidth: 120,
+      flex: 1,
+      wrapHeaderText: true,
+      autoHeaderHeight: true,
+      headerClass: 'lq-type-header',
+      valueGetter: (p: any) => p.data?.byType?.[t.id]?.remaining ?? null,
+      cellRenderer: (p: any) => {
+        const b = p.data?.byType?.[t.id];
+        if (!b || (!b.allocated && !b.used)) return '<span style="color:#cbd5e1">—</span>';
+        // Same cell as Leaves › Leave Balances: number, then a small fill bar.
+        const tone = b.remaining < 0 ? '#dc2626' : b.remaining === 0 ? '#d97706' : '#15803d';
+        const bar = b.remaining < 0 ? '#fca5a5' : b.remaining === 0 ? '#fcd34d' : '#86efac';
+        const pct = b.allocated > 0 ? Math.max(0, Math.min(100, (b.remaining / b.allocated) * 100)) : 0;
+        return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;height:100%">
+          <span style="font-size:13px;line-height:1;white-space:nowrap"><strong style="color:${tone};font-weight:700">${b.remaining}</strong><span style="color:#94a3b8;font-size:12px"> / ${b.allocated}</span></span>
+          <span style="display:block;width:56px;height:4px;border-radius:999px;background:#eef2f6;overflow:hidden"><span style="display:block;height:100%;width:${b.remaining < 0 ? 100 : pct}%;background:${bar};border-radius:999px"></span></span>
+        </div>`;
+      },
+    }));
+    return [this.columnDefs[0], ...typeCols, this.columnDefs[this.columnDefs.length - 1]];
+  });
 
   openDetail(row: QuotaRow | null) {
     if (row) this.detailRow.set(row);

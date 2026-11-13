@@ -1,29 +1,17 @@
 <div class="system-settings-page" *ngIf="!isLoading()">
   
-  <!-- Top Navigation Header -->
-  <div class="settings-header-bar">
-    <div class="header-left">
-      <div class="header-badge">
-        <svg lucideShieldAlert size="16"></svg>
-        <span>SuperAdmin Controls</span>
-      </div>
-      <h2>System Settings</h2>
-      <p>Configure company-wide defaults, automated templates, and employee visibility.</p>
-    </div>
-
-    <div class="header-actions">
-      <button *ngIf="tab() === 'field'" class="btn-save" (click)="saveTravel()" [disabled]="isSavingTravel()">
+  <app-page-header icon="target" section="Settings" heading="System settings" subtitle="Company-wide defaults, automated templates and employee visibility (Super Admin).">
+      <button *ngIf="tab() === 'field'" class="st-hdr-btn primary" (click)="saveTravel()" [disabled]="isSavingTravel()">
         <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSavingTravel()"></svg>
         <svg lucideSave size="16" *ngIf="!isSavingTravel()"></svg>
         <span>{{ isSavingTravel() ? 'Saving Allowance...' : 'Save Travel Allowance' }}</span>
       </button>
-      <button *ngIf="tab() !== 'field'" class="btn-save" (click)="save()" [disabled]="isSaving() || isUploading()">
+      <button *ngIf="tab() !== 'field'" class="st-hdr-btn primary" (click)="save()" [disabled]="isSaving() || isUploading()">
         <svg lucideLoader2 size="16" class="spin-icon" *ngIf="isSaving()"></svg>
         <svg lucideSave size="16" *ngIf="!isSaving()"></svg>
         <span>{{ isSaving() ? 'Saving Changes...' : 'Save Changes' }}</span>
       </button>
-    </div>
-  </div>
+  </app-page-header>
 
   <!-- Tabs: one group of settings at a time, instead of one long page. -->
   <div class="settings-tabs" role="tablist" aria-label="Settings sections">

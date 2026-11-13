@@ -30,10 +30,11 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETED: 'Completed',
 };
 
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 @Component({
   selector: 'app-field-visit-requests-page',
   standalone: true,
-  imports: [
+  imports: [PageHeaderComponent, 
     CommonModule, FormsModule, RouterModule, MyFieldVisitComponent,
     FieldVisitRequestFormComponent, VisitLocationFormModalComponent,
     LucideMapPin, LucideRoute, LucidePlus, LucideSearch,
@@ -46,6 +47,16 @@ const STATUS_LABELS: Record<string, string> = {
   styleUrls: ['./field-visit-requests-page.css'],
 })
 export class FieldVisitRequestsPageComponent implements OnInit {
+  /** Expandable task list per request row (13 Nov 2026). */
+  private openTaskRows = signal<Set<number>>(new Set());
+  isTasksOpen(id: number): boolean { return this.openTaskRows().has(id); }
+  toggleTasks(id: number, event: Event): void {
+    event.stopPropagation();
+    const next = new Set(this.openTaskRows());
+    next.has(id) ? next.delete(id) : next.add(id);
+    this.openTaskRows.set(next);
+  }
+
   private api = inject(FieldVisitRequestsService);
   private locationRequests = inject(VisitLocationRequestsService);
   private router = inject(Router);

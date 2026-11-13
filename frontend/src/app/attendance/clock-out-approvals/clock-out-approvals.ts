@@ -22,11 +22,13 @@ import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDateP
  * does not count and, at month end, pay that does not happen — so the page is
  * built to be emptied with clarity, priority triage, and zero friction.
  */
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
+import { DatePresetFilterComponent, DatePreset, DateRange } from '../../shared/components/date-preset-filter/date-preset-filter';
 @Component({
   selector: 'app-clock-out-approvals',
   standalone: true,
   imports: [
-    CommonModule, FormsModule,
+    CommonModule, FormsModule, PageHeaderComponent, DatePresetFilterComponent,
     LucideInbox, LucideClock, LucideCheck, LucideX, LucidePaperclip,
     LucideAlertCircle, LucideRefreshCw, LucideCalendarDays, LucideSearch,
     LucideCheckCircle2, LucideAlertTriangle, LucideExternalLink,
@@ -156,6 +158,13 @@ export class ClockOutApprovalsComponent implements OnInit {
       from = this.ymd(start); to = this.ymd(new Date());
     } else if (range === 'CUSTOM') { from = this.customFrom(); to = this.customTo(); }
     this.applyRange(from, to);
+  }
+
+  /** Shared date dropdown for the period (13 Nov 2026); feeds the same range as before. */
+  periodPreset: DatePreset = 'ALL'; // opens on Any time so every pending item shows
+  onPeriodRange(r: DateRange) {
+    this.quickRange.set(r ? 'CUSTOM' : 'ALL');
+    this.applyRange(r ? this.ymd(r.from) : '', r ? this.ymd(r.to) : '');
   }
 
   setCustomRange(which: 'from' | 'to', value: string) {
@@ -319,6 +328,7 @@ export class ClockOutApprovalsComponent implements OnInit {
     this.setGeoFilter('distance', 'ALL');
     this.geoTab.set('ALL');
     this.quickRange.set('ALL');
+    this.periodPreset = 'ALL';
   }
 
   goGeoPage(p: number) {
@@ -445,7 +455,7 @@ export class ClockOutApprovalsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.setQuickRange('YESTERDAY');
+    this.setQuickRange('ALL');
     this.attendanceService.canApproveGeofence().subscribe({
       next: (res) => {
         const canGeo = !!res?.canApprove;
@@ -610,11 +620,14 @@ export class ClockOutApprovalsComponent implements OnInit {
   });
 
   switchTab(tab: 'GEO' | 'LATE' | 'HISTORY'): void {
-    const range = this.quickRange();
+    // Keep the chosen period when switching tabs.
+    const preset = this.periodPreset, from = this.geoFrom(), to = this.geoTo(), range = this.quickRange();
     this.activeQueueTab.set(tab);
     this.clearFilters();
     this.resetGeoFilters();
-    this.setQuickRange(range);
+    this.periodPreset = preset;
+    this.quickRange.set(range);
+    this.applyRange(from, to);
     this.historyPage.set(1);
     if (tab === 'HISTORY') this.loadHistory();
   }

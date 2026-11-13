@@ -1,49 +1,16 @@
-<div class="page-container" style="padding: 24px;">
+<div class="page-container">
 
-  <!-- TOP BREADCRUMB NAVIGATION -->
-  <div class="ats-breadcrumb-bar">
-    <div class="breadcrumb-left">
-      <a routerLink="/settings/company-profile" class="btn-back-pill">
-        <svg lucideArrowLeft size="14"></svg>
-        <span>Back to Settings</span>
-      </a>
-
-      <nav class="ats-breadcrumbs">
-        <a class="crumb-link" routerLink="/settings/company-profile">Settings</a>
-        <svg lucideChevronRight size="13" class="crumb-sep"></svg>
-        <span class="crumb-current">Letter Templates</span>
-      </nav>
-    </div>
-  </div>
-
-  <!-- PAGE HEADER CARD -->
-  <div class="page-header">
-    <div class="header-content">
-      <div class="header-title-row">
-        <div class="header-icon-pill">
-          <svg lucideFileText size="22"></svg>
-        </div>
-        <div class="title-text-wrap">
-          <div class="title-with-pill">
-            <h1>Letter Templates</h1>
-            <span class="count-pill">{{ templates().length }} Templates</span>
-            <span class="count-pill issued">{{ letters().length }} Issued</span>
-          </div>
-          <p>Reusable HR letters — offer, relieving, increment, bond — with merge tags filled per employee.</p>
-        </div>
-      </div>
-    </div>
-    <div class="header-actions">
-      <button class="btn-action-outline" (click)="openGenerate()" [disabled]="!templates().length">
+  <app-page-header icon="documents" section="Settings" heading="Letter templates"
+    [subtitle]="templates().length + ' templates · ' + letters().length + ' issued · offer, relieving, increment and bond letters'">
+      <button class="st-hdr-btn" (click)="openGenerate()" [disabled]="!templates().length">
         <svg lucideSend size="15"></svg>
         <span>Generate Letter</span>
       </button>
-      <button class="btn-action-primary" (click)="openCreate()">
+      <button class="st-hdr-btn primary" (click)="openCreate()">
         <svg lucidePlus size="16"></svg>
         <span>Add Template</span>
       </button>
-    </div>
-  </div>
+  </app-page-header>
 
   <!-- CONTROLS TOOLBAR: TABS & SEARCH -->
   <div class="templates-controls-bar">
