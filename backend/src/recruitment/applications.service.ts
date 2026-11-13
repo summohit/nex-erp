@@ -10,6 +10,7 @@ import { LettersService } from '../letters/letters.service';
 import { OfferLettersService } from './offer-letters.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcrypt';
+import { randomInt } from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { EmployeesService } from '../employees/employees.service';
 import { parseIstDateTime } from '../common/timezone.util';
@@ -548,6 +549,16 @@ export class ApplicationsService {
     });
   }
 
+  /** 10 characters, no look-alikes (0/O, 1/l/I), at least one digit. */
+  private static temporaryPassword(): string {
+    const letters = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const all = letters + digits;
+    let out = '';
+    for (let i = 0; i < 8; i++) out += all[randomInt(all.length)];
+    return out + digits[randomInt(digits.length)] + letters[randomInt(letters.length)];
+  }
+
   async onboardCandidate(id: number, companyId: number, actorUserId?: number) {
     const application = await this.findOne(id, companyId);
 
@@ -590,7 +601,10 @@ export class ApplicationsService {
     const [firstName, ...lastNameParts] = application.fullName.split(' ');
     const lastName = lastNameParts.join(' ') || '';
 
-    const hashedPassword = await bcrypt.hash('nexerp2026', 10);
+    // A one-off temporary password, emailed to the new joiner, who must replace it
+    // on first login (self-service onboarding, 13 Nov 2026).
+    const tempPassword = ApplicationsService.temporaryPassword();
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     const joinedOn = application.joiningDate ? new Date(application.joiningDate) : new Date();
     const policySetting = await this.prisma.systemSetting.findUnique({ where: { companyId }, select: { probationPolicy: true } });
@@ -604,7 +618,11 @@ export class ApplicationsService {
           email: application.email,
           password: hashedPassword,
           role: 'EMPLOYEE',
-          companyId: companyId
+          companyId: companyId,
+          // HR vouches for the address; the emailed password is the proof of access.
+          status: 'ACTIVE',
+          emailVerifiedAt: new Date(),
+          mustChangePassword: true,
         }
       });
 
@@ -622,6 +640,7 @@ export class ApplicationsService {
           companyId: companyId,
           branchId: application.job?.branchId || null,
           onboardingStatus: 'PENDING',
+          selfOnboardingStatus: 'PENDING',
           joiningDate: joinedOn,
           // Probation from the company policy (months by employment category).
           ...(probationEnd ? { probationEndDate: probationEnd, employmentType: 'On Probation' } : {}),
@@ -687,13 +706,22 @@ export class ApplicationsService {
       // Onboarding succeeded; letters can be generated manually instead.
     }
 
+    let credentialsEmailed = true;
     try {
-      await this.mailService.sendOnboardingInitiatedEmail(application.email, application.fullName);
+      const company = await this.prisma.company.findUnique({ where: { id: companyId }, select: { name: true } });
+      await this.mailService.sendOnboardingCredentialsEmail({
+        email: application.email,
+        name: application.fullName,
+        employeeCode: newEmployee.employeeCode || "",
+        tempPassword,
+        companyName: company?.name,
+      });
     } catch (err) {
-      this.logger.error(`Failed to send initiation email: ${err}`);
+      credentialsEmailed = false;
+      this.logger.error(`Failed to send onboarding credentials email: ${err}`);
     }
 
-    return { ...newEmployee, lettersIssued: letters.titles };
+    return { ...newEmployee, lettersIssued: letters.titles, credentialsEmailed };
   }
 
   // ── Compensation Annexure & CTC Structure ──────────────────────────────────

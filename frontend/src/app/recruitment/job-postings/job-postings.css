@@ -1324,7 +1324,7 @@ select.form-control:disabled {
 /* Standard question picker */
 .q-library-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 6px 18px;
   margin-bottom: 14px;
   padding-bottom: 14px;

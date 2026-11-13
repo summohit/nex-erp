@@ -922,6 +922,64 @@ export class MailService {
   }
 
   /** Submitter-supplied values land inside an HTML email, so escape them. */
+  /**
+   * Start of self-service onboarding (13 Nov 2026): login email, temporary
+   * password and employee ID. On first login the person sets their own
+   * password and fills in their profile for HR to review.
+   */
+  async sendOnboardingCredentialsEmail(params: { email: string; name: string; employeeCode: string; tempPassword: string; companyName?: string }) {
+    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
+    const loginLink = `${baseUrl}/auth/login`;
+    const company = this.escapeHtml(params.companyName || 'the team');
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <h2 style="color: #0f172a; margin: 0 0 8px;">Welcome to ${company}, ${this.escapeHtml(params.name)}!</h2>
+        <p style="color: #475569; font-size: 15px;">Your onboarding has started. Sign in to MIRA with the details below. You will be asked to set your own password, then fill in your profile (personal details, bank, address, emergency contacts and documents) and submit it for HR review.</p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0; color: #1e293b; font-size: 15px;">
+          <p style="margin: 4px 0;"><strong>Employee ID:</strong> ${this.escapeHtml(params.employeeCode)}</p>
+          <p style="margin: 4px 0;"><strong>Login email:</strong> ${this.escapeHtml(params.email)}</p>
+          <p style="margin: 4px 0;"><strong>Temporary password:</strong> ${this.escapeHtml(params.tempPassword)}</p>
+        </div>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${loginLink}" style="background: #2563eb; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Sign in and start onboarding</a>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px;">Do not share this email. The temporary password stops working once you set your own.</p>
+      </div>
+    `;
+    const subject = 'Start your onboarding — your MIRA login';
+    try {
+      if (this.brevoApiKey) return await this.sendBrevoEmail({ to: params.email, subject, html });
+      return await this.sendWithRetry({ from: `"MIRA" <${this.fromEmail}>`, to: params.email, envelope: { from: this.fromEmail, to: params.email }, subject, html });
+    } catch (error) {
+      this.logger.error(`Failed to send onboarding credentials to ${params.email}: ${this.errorDetail(error)}`);
+      throw error;
+    }
+  }
+
+  /** HR sent the self-service profile back with notes. */
+  async sendOnboardingChangesRequestedEmail(email: string, name: string, notes: Record<string, string>, sectionLabels: Record<string, string>) {
+    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
+    const items = Object.entries(notes).filter(([, v]) => v && v.trim())
+      .map(([k, v]) => `<li style="margin: 6px 0;"><strong>${this.escapeHtml(sectionLabels[k] || k)}:</strong> ${this.escapeHtml(v)}</li>`).join('');
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <h2 style="color: #0f172a; margin: 0 0 8px;">A few changes needed, ${this.escapeHtml(name)}</h2>
+        <p style="color: #475569; font-size: 15px;">HR reviewed your onboarding profile and asked for these updates:</p>
+        <ul style="color: #1e293b; font-size: 15px; padding-left: 20px;">${items}</ul>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${baseUrl}/auth/login" style="background: #2563eb; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Update my profile</a>
+        </div>
+      </div>
+    `;
+    const subject = 'Your onboarding profile needs a few changes';
+    try {
+      if (this.brevoApiKey) return await this.sendBrevoEmail({ to: email, subject, html });
+      return await this.sendWithRetry({ from: `"MIRA" <${this.fromEmail}>`, to: email, envelope: { from: this.fromEmail, to: email }, subject, html });
+    } catch (error) {
+      this.logger.error(`Failed to send onboarding changes email to ${email}: ${this.errorDetail(error)}`);
+    }
+  }
+
   async sendOnboardingInitiatedEmail(email: string, employeeName: string) {
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">

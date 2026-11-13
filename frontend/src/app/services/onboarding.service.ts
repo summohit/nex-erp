@@ -62,4 +62,21 @@ export class OnboardingService {
   updateEmployeeStatus(employeeId: number, status: string): Observable<{ success: boolean, status: string }> {
     return this.http.put<{ success: boolean, status: string }>(`${this.apiUrl}/employee/${employeeId}/status`, { status });
   }
+
+  // --- Self-service onboarding (13 Nov 2026) ---
+  getMySelfOnboarding(): Observable<{ employeeId: number; status: string | null; notes: Record<string, string>; sections: Record<string, string>; submittedAt?: string; reviewedAt?: string }> {
+    return this.http.get<any>(`${this.apiUrl}/self`);
+  }
+
+  submitMySelfOnboarding(): Observable<{ status: string }> {
+    return this.http.post<{ status: string }>(`${this.apiUrl}/self/submit`, {});
+  }
+
+  getSelfOnboardingQueue(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/self-reviews`);
+  }
+
+  reviewSelfOnboarding(employeeId: number, decision: 'APPROVE' | 'CHANGES', notes?: Record<string, string>): Observable<{ status: string }> {
+    return this.http.post<{ status: string }>(`${this.apiUrl}/self-reviews/${employeeId}`, { decision, notes });
+  }
 }

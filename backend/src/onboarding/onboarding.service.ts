@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { lockJobCapacity, closeFilledJobs } from '../recruitment/job-capacity';
 
 import { MailService } from '../mail/mail.service';
@@ -295,6 +296,104 @@ export class OnboardingService {
       // Email delivery must never prevent an onboarding action from succeeding.
       console.error('Failed to send onboarding completion notifications:', error);
     }
+  }
+
+  // --- Self-service onboarding (13 Nov 2026) ---------------------------------
+  // The new joiner fills their own profile (personal, bank, address, family,
+  // emergency contacts, documents, resume) and submits it; HR approves it or
+  // sends it back with a note per section. Until approval the app shows the
+  // person nothing but this form.
+
+  static readonly SELF_SECTIONS: Record<string, string> = {
+    personal: 'Personal information',
+    contact: 'Private contact & banking',
+    address: 'Location & address',
+    family: 'Family details',
+    emergency: 'Emergency contacts',
+    documents: 'Documents',
+    resume: 'Resume & skills',
+  };
+
+  private async employeeForUser(companyId: number, userId: number) {
+    const employee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
+    if (!employee) throw new NotFoundException('No employee record for this login');
+    return employee;
+  }
+
+  async getMySelfOnboarding(companyId: number, userId: number) {
+    const e = await this.employeeForUser(companyId, userId);
+    return {
+      employeeId: e.id,
+      status: e.selfOnboardingStatus,
+      notes: e.selfOnboardingNotes ?? {},
+      submittedAt: e.selfOnboardingSubmittedAt,
+      reviewedAt: e.selfOnboardingReviewedAt,
+      sections: OnboardingService.SELF_SECTIONS,
+    };
+  }
+
+  async submitMySelfOnboarding(companyId: number, userId: number) {
+    const e = await this.employeeForUser(companyId, userId);
+    if (e.selfOnboardingStatus !== 'PENDING' && e.selfOnboardingStatus !== 'CHANGES_REQUESTED') {
+      throw new BadRequestException('Your profile is not open for submission.');
+    }
+    // The few fields HR can't do without; everything else is reviewed by eye.
+    const missing: string[] = [];
+    if (!e.dateOfBirth) missing.push('date of birth');
+    if (!e.bankAccountNumber) missing.push('bank account number');
+    if (!e.address) missing.push('address');
+    const contacts = await this.prisma.emergencyContact.count({ where: { employeeId: e.id } });
+    if (!contacts) missing.push('at least one emergency contact');
+    if (missing.length) throw new BadRequestException(`Please add your ${missing.join(', ')} before submitting.`);
+
+    await this.prisma.employee.update({
+      where: { id: e.id },
+      data: { selfOnboardingStatus: 'SUBMITTED', selfOnboardingSubmittedAt: new Date() },
+    });
+    return { status: 'SUBMITTED' };
+  }
+
+  /** HR list: everyone in the self-service flow who isn't approved yet. */
+  async getSelfOnboardingQueue(companyId: number) {
+    return this.prisma.employee.findMany({
+      where: { companyId, selfOnboardingStatus: { in: ['PENDING', 'SUBMITTED', 'CHANGES_REQUESTED'] } },
+      select: {
+        id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true, joiningDate: true,
+        selfOnboardingStatus: true, selfOnboardingNotes: true, selfOnboardingSubmittedAt: true, selfOnboardingReviewedAt: true,
+        department: { select: { name: true } }, designation: { select: { name: true } },
+        user: { select: { email: true } },
+      },
+      orderBy: [{ selfOnboardingSubmittedAt: 'desc' }, { id: 'desc' }],
+    });
+  }
+
+  async reviewSelfOnboarding(companyId: number, employeeId: number, decision: 'APPROVE' | 'CHANGES', notes?: Record<string, string>) {
+    const e = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId }, include: { user: { select: { email: true } } } });
+    if (!e) throw new NotFoundException('Employee not found');
+    if (e.selfOnboardingStatus !== 'SUBMITTED') throw new BadRequestException('Only a submitted profile can be reviewed.');
+
+    if (decision === 'CHANGES') {
+      const clean = Object.fromEntries(Object.entries(notes || {})
+        .filter(([k, v]) => k in OnboardingService.SELF_SECTIONS && typeof v === 'string' && v.trim())
+        .map(([k, v]) => [k, v.trim().slice(0, 1000)]));
+      if (!Object.keys(clean).length) throw new BadRequestException('Add a note to at least one section.');
+      await this.prisma.employee.update({
+        where: { id: e.id },
+        data: { selfOnboardingStatus: 'CHANGES_REQUESTED', selfOnboardingNotes: clean, selfOnboardingReviewedAt: new Date() },
+      });
+      if (e.user?.email) {
+        await this.mailService.sendOnboardingChangesRequestedEmail(e.user.email, `${e.firstName} ${e.lastName}`.trim(), clean, OnboardingService.SELF_SECTIONS);
+      }
+      return { status: 'CHANGES_REQUESTED' };
+    }
+
+    await this.prisma.employee.update({
+      where: { id: e.id },
+      data: { selfOnboardingStatus: 'APPROVED', selfOnboardingNotes: Prisma.DbNull, selfOnboardingReviewedAt: new Date() },
+    });
+    await this.setOnboardingStatus(companyId, e.id, 'COMPLETED');
+    await this.notifyOnboardingCompleted(companyId, e.id);
+    return { status: 'APPROVED' };
   }
 
   async getCompanyPipelineSummary(companyId: number) {

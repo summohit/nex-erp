@@ -400,7 +400,7 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { password: hashedPassword }
+      data: { password: hashedPassword, mustChangePassword: false }
     });
 
     return { message: 'Password updated successfully.' };

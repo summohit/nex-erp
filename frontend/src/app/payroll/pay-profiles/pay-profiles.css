@@ -1095,7 +1095,7 @@
 
 .pp-comp-tiles-grid {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.4fr) minmax(180px, 1.1fr);
+  grid-template-columns: minmax(180px, 1fr) minmax(min(220px, 100%), 1.4fr) minmax(180px, 1.1fr);
   gap: 0;
   border-bottom: 1px solid #f1f5f9;
 }
@@ -2561,4 +2561,9 @@ app-page-header .pp-switcher-menu { z-index: 60; }
   .fintech-summary-grid { grid-template-columns: 1fr !important; }
   .detail-inputs-grid.cols-3,
   .pp-bank-grid { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 640px) {
+  .pp-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; overflow-x: visible; }
+  .pp-stats-grid > * { min-width: 0 !important; }
 }

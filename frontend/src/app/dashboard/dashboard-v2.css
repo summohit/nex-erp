@@ -1226,7 +1226,7 @@
 
 .nb-cards-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 10px;
 }
 
@@ -4783,4 +4783,33 @@
   .mira-bar-content { min-width: 0; }
   .mira-bar-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mira-bar-text strong, .mira-kbd { display: none; }
+}
+
+/* ── Phone (13 Nov): My Team and Organization heroes, tab switch ── */
+@media (max-width: 640px) {
+  /* Three equal tabs that always fit; icons hidden to make room for names. */
+  .cmd-segmented { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; overflow: visible !important; }
+  .cmd-segmented .seg-btn { min-width: 0; justify-content: center; padding-left: 6px; padding-right: 6px; font-size: 13px; white-space: nowrap; }
+  .cmd-segmented .seg-btn > svg { display: none; }
+
+  /* Hero: icon, text and buttons stack in one column. */
+  .cmd-row-team-hero, .cmd-row-org-hero { flex-direction: column !important; align-items: stretch !important; gap: 14px !important; padding: 18px 16px !important; }
+  .team-hero-left, .org-hero-left { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; min-width: 0; }
+  .team-hero-icon-badge, .org-hero-icon-badge { width: 44px !important; height: 44px !important; }
+  .team-hero-info, .org-hero-info { min-width: 0; width: 100%; }
+  .team-hero-title, .org-hero-info h1 { font-size: 21px !important; line-height: 1.25 !important; }
+  .team-hero-tags, .org-hero-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .team-hero-actions, .org-hero-right { width: 100%; flex-wrap: wrap; gap: 8px; }
+  .team-hero-actions > *, .org-hero-right > * { flex: 1 1 auto; justify-content: center; max-width: 100%; }
+
+  /* Breadcrumb chip: a plain wrapping line instead of a squeezed pill. */
+  .dash-hero-breadcrumb { display: flex !important; flex-wrap: wrap; width: auto !important; max-width: 100%; border-radius: 12px !important; row-gap: 4px; }
+  .dash-hero-breadcrumb .bc-badge { white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  .org-card-footer { flex-wrap: wrap !important; gap: 8px 14px !important; }
+  .org-footer-item { min-width: 0; white-space: normal !important; }
+  /* Card title rows: title on its own line, count and link wrap below. */
+  .org-card-head, .team-card-head, .cmd-card-head, .wp-header { flex-wrap: wrap !important; gap: 6px 10px !important; }
+  .org-card-head > :first-child, .team-card-head > :first-child, .cmd-card-head > :first-child, .wp-header > :first-child { flex: 1 1 100%; }
 }

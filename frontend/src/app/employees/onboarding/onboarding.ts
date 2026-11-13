@@ -29,6 +29,8 @@ import {
   LucideRefreshCw
 } from '@lucide/angular';
 import { AgGridAngular } from 'ag-grid-angular';
+import { CandidatesService } from '../../services/candidates.service';
+import { EmployeeService } from '../../services/employee.service';
 import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -219,8 +221,9 @@ export class OnboardingComponent implements OnInit {
       flex: 0,
       sortable: false,
       filter: false,
-      cellRenderer: () => {
-        return `<button style="padding: 5px 12px; font-size: 12px; font-weight: 600; border-radius: 6px; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; cursor: pointer;">View Tasks</button>`;
+      cellRenderer: (params: any) => {
+        const label = params.data?.onboardingStatus === 'PENDING' ? 'Start onboarding' : 'View tasks';
+        return `<button style="padding: 5px 12px; font-size: 12px; font-weight: 600; border-radius: 6px; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; cursor: pointer;">${label}</button>`;
       },
       onCellClicked: (params: any) => {
         this.openChecklist(params.data);
@@ -264,6 +267,215 @@ export class OnboardingComponent implements OnInit {
 
   ngOnInit() {
     this.loadBoard();
+    this.loadSelfQueue();
+    this.loadReadyToOnboard();
+  }
+
+  // --- Hired candidates who don't have a login yet (13 Nov 2026) ---
+  private candidatesService = inject(CandidatesService);
+  readyToOnboard = signal<any[]>([]);
+  /** Which list the page shows (13 Nov 2026). */
+  section = signal<'hires' | 'ready' | 'reviews'>('hires');
+  /** Hired candidates whose joining date is over 30 days old are almost always stale records. */
+  showOlderHires = signal(false);
+  private isRecentHire(a: any): boolean {
+    const cutoff = Date.now() - 30 * 86400000;
+    const when = a.joiningDate || a.updatedAt;
+    return !when || new Date(when).getTime() >= cutoff;
+  }
+  recentHires = computed(() => this.readyToOnboard().filter(a => this.isRecentHire(a)));
+  olderHires = computed(() => this.readyToOnboard().filter(a => !this.isRecentHire(a)));
+  startingId = signal<number | null>(null);
+
+  loadReadyToOnboard() {
+    this.candidatesService.getApplications().subscribe({
+      next: (apps: any[]) => this.readyToOnboard.set((apps || []).filter(a => {
+        if (a.status !== 'HIRED' || a.approvalStatus === 'PENDING_APPROVAL') return false;
+        try { return !JSON.parse(a.answers || '{}')?.__traineeConversion?.sourceTraineeId; } catch { return true; }
+      })),
+      error: () => this.readyToOnboard.set([]),
+    });
+  }
+
+  /** Creates the employee login and emails the temporary password. */
+  startOnboarding(app: any) {
+    this.startingId.set(app.id);
+    this.candidatesService.onboardCandidate(app.id).subscribe({
+      next: (res: any) => {
+        if (res?.credentialsEmailed === false) this.toast.error(`Onboarding started, but the login email to ${app.email} failed.`);
+        else this.toast.success(`Onboarding started — login details emailed to ${app.email}`);
+        this.startingId.set(null);
+        this.loadReadyToOnboard();
+        this.loadSelfQueue();
+        this.loadBoard();
+      },
+      error: (err) => { this.toast.error(err?.error?.message || 'Could not start onboarding'); this.startingId.set(null); },
+    });
+  }
+
+  // --- Profile reviews (self-service onboarding, 13 Nov 2026) ---
+  readonly selfSections = [
+    { key: 'personal', label: 'Personal information' },
+    { key: 'contact', label: 'Private contact & banking' },
+    { key: 'address', label: 'Location & address' },
+    { key: 'family', label: 'Family details' },
+    { key: 'emergency', label: 'Emergency contacts' },
+    { key: 'documents', label: 'Documents' },
+    { key: 'resume', label: 'Resume & skills' },
+  ];
+  selfQueue = signal<any[]>([]);
+  selfSubmittedCount = computed(() => this.selfQueue().filter(e => e.selfOnboardingStatus === 'SUBMITTED').length);
+  reviewing = signal<any>(null);
+  reviewNotes = signal<Record<string, string>>({});
+  reviewBusy = signal(false);
+  hasReviewNotes = computed(() => Object.values(this.reviewNotes()).some(v => v && v.trim()));
+
+  loadSelfQueue() {
+    this.onboardingService.getSelfOnboardingQueue().subscribe({
+      next: (rows) => this.selfQueue.set(rows || []),
+      error: () => this.selfQueue.set([]),
+    });
+  }
+
+  selfStatusLabel(s: string): string {
+    return ({ PENDING: 'Filling in', SUBMITTED: 'Waiting for review', CHANGES_REQUESTED: 'Sent back' } as Record<string, string>)[s] || s;
+  }
+
+  private employeeService = inject(EmployeeService);
+  /** Full profile of the person being reviewed, loaded when the pop-up opens. */
+  reviewProfile = signal<any>(null);
+  reviewLoading = signal(false);
+
+  openSelfReview(e: any) {
+    this.reviewNotes.set({ ...(e.selfOnboardingStatus === 'CHANGES_REQUESTED' ? (e.selfOnboardingNotes || {}) : {}) });
+    this.noteOpen.set({});
+    this.expanded.set({});
+    this.reviewing.set(e);
+    this.reviewProfile.set(null);
+    this.reviewLoading.set(true);
+    this.employeeService.getProfile(e.id).subscribe({
+      next: (p) => { this.reviewProfile.set(p); this.reviewLoading.set(false); },
+      error: () => { this.reviewLoading.set(false); this.toast.error('Could not load the profile'); },
+    });
+  }
+
+  canDecide = computed(() => this.reviewing()?.selfOnboardingStatus === 'SUBMITTED');
+
+  /** What the new joiner entered, section by section, for the review pop-up. */
+  reviewSections = computed(() => {
+    const p = this.reviewProfile();
+    if (!p) return [];
+    const d = (v: any) => (v ? new Date(v).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+    const mask = (v: string) => (v ? (v.length > 4 ? '•••• ' + v.slice(-4) : v) : '');
+    const f = (label: string, value: any, required = false) => ({ label, value: value === 0 ? '0' : (value || ''), required });
+    return [
+      { key: 'personal', label: 'Personal information', fields: [
+        f('Legal name', [p.salutation, p.firstName, p.lastName].filter(x => !!x).join(' '), true),
+        f('Gender', p.gender), f('Date of birth', d(p.dateOfBirth), true),
+        f('Place of birth', [p.placeOfBirthCity, p.placeOfBirthCountry].filter(x => !!x).join(', ')),
+        f('Nationality', p.nationality), f('ID number', p.identificationNo), f('Passport', p.passportNo),
+      ] },
+      { key: 'contact', label: 'Private contact & banking', fields: [
+        f('Login email', p.user?.email), f('Mobile', p.phone),
+        f('Bank', p.bankName), f('Account number', mask(p.bankAccountNumber), true), f('IFSC', p.ifscCode),
+      ] },
+      { key: 'address', label: 'Location & address', fields: [
+        f('Street address', p.address, true), f('City', p.city), f('State', p.state), f('Country', p.country),
+        f('PIN code', p.zipCode), f('Home–work distance', p.homeWorkDistanceKm ? p.homeWorkDistanceKm + ' km' : ''),
+      ] },
+      { key: 'family', label: 'Family details', fields: [
+        f('Marital status', p.maritalStatus), f('Spouse', p.spouseName), f('Spouse birthdate', d(p.spouseBirthdate)),
+        f('Children', p.childrenCount),
+      ] },
+      { key: 'emergency', label: 'Emergency contacts', required: true,
+        list: (p.emergencyContacts || []).map((c: any) => `${c.name}${c.relationship ? ' (' + c.relationship + ')' : ''} · ${c.mobile || ''}${c.email ? ' · ' + c.email : ''}`) },
+      { key: 'documents', label: 'Documents',
+        list: (p.documents || []).map((doc: any) => `${doc.fileName}${doc.documentType && doc.documentType !== 'Other' ? ' — ' + doc.documentType : ''}`),
+        links: (p.documents || []).map((doc: any) => doc.fileUrl) },
+      { key: 'resume', label: 'Resume & skills',
+        list: [
+          ...(p.resumeLines || []).map((r: any) => `${r.type}: ${r.title}${r.organization ? ' — ' + r.organization : ''}${r.startDate ? ' (' + r.startDate + (r.endDate ? ' – ' + r.endDate : '') + ')' : ''}`),
+          ...((p.skills || []).length ? ['Skills: ' + p.skills.map((s: any) => s.name + (s.level ? ' (' + s.level + ')' : '')).join(', ')] : []),
+        ] },
+    ] as any[];
+  });
+
+  /** Per-section summary for the review pop-up: what's filled, what's missing, and a status. */
+  reviewSummary = computed(() => this.reviewSections().map((s: any) => {
+    if (s.fields) {
+      const filled = s.fields.filter((x: any) => !!x.value);
+      const missingReq = s.fields.filter((x: any) => x.required && !x.value).map((x: any) => x.label);
+      const empty = s.fields.filter((x: any) => !x.required && !x.value).map((x: any) => x.label);
+      const status = missingReq.length ? 'missing' : filled.length === s.fields.length ? 'done' : filled.length ? 'partial' : 'empty';
+      const rows = s.fields.filter((x: any) => x.value || x.required);
+      return { ...s, filled, rows, missingReq, empty, done: filled.length, total: s.fields.length, status };
+    }
+    const missingReq = s.required && !s.list.length ? ['At least one contact'] : [];
+    const status = missingReq.length ? 'missing' : s.list.length ? 'done' : 'empty';
+    return { ...s, missingReq, empty: [], done: s.list.length ? 1 : 0, total: 1, status };
+  }));
+
+  missingCount = computed(() => this.reviewSummary().reduce((n: number, s: any) => n + s.missingReq.length, 0));
+  completion = computed(() => {
+    const secs = this.reviewSummary();
+    if (!secs.length) return 0;
+    const parts = secs.reduce((acc: number, s: any) => acc + (s.total ? s.done / s.total : 0), 0);
+    return Math.round((parts / secs.length) * 100);
+  });
+
+  /** Sections whose note box is open (a section with a note stays open). */
+  noteOpen = signal<Record<string, boolean>>({});
+  toggleNote(key: string) { this.noteOpen.update(o => ({ ...o, [key]: !o[key] })); }
+
+  /** Review pop-up: which section cards are open. */
+  expanded = signal<Record<string, boolean>>({});
+  isExpanded(s: any): boolean {
+    const v = this.expanded()[s.key];
+    return v === undefined ? (s.status !== 'empty' || !!this.reviewNotes()[s.key]) : v;
+  }
+  toggleSection(s: any) { this.expanded.update(e => ({ ...e, [s.key]: !this.isExpanded(s) })); }
+
+  lastUpdated = computed(() => {
+    const at = this.reviewProfile()?.updatedAt;
+    if (!at) return '';
+    const mins = Math.max(0, Math.round((Date.now() - new Date(at).getTime()) / 60000));
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
+    const h = Math.round(mins / 60);
+    if (h < 24) return `${h} hour${h === 1 ? '' : 's'} ago`;
+    const d = Math.round(h / 24);
+    return `${d} day${d === 1 ? '' : 's'} ago`;
+  });
+
+  sectionStatusLabel(s: string): string {
+    return ({ done: 'Complete', partial: 'Partly filled', missing: 'Required missing', empty: 'Not started' } as Record<string, string>)[s] || s;
+  }
+
+  closeSelfReview() {
+    this.reviewing.set(null);
+    this.reviewProfile.set(null);
+  }
+
+  setReviewNote(key: string, value: string) {
+    this.reviewNotes.update(n => ({ ...n, [key]: value }));
+  }
+
+  decideSelfReview(decision: 'APPROVE' | 'CHANGES') {
+    const e = this.reviewing();
+    if (!e) return;
+    this.reviewBusy.set(true);
+    this.onboardingService.reviewSelfOnboarding(e.id, decision, decision === 'CHANGES' ? this.reviewNotes() : undefined).subscribe({
+      next: () => {
+        this.toast.success(decision === 'APPROVE'
+          ? `${e.firstName}'s onboarding is complete`
+          : `Sent back to ${e.firstName} with your notes`);
+        this.reviewBusy.set(false);
+        this.closeSelfReview();
+        this.loadSelfQueue();
+        this.loadBoard();
+      },
+      error: (err) => { this.toast.error(err?.error?.message || 'Could not save the review'); this.reviewBusy.set(false); },
+    });
   }
 
   loadBoard() {

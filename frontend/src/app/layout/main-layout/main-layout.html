@@ -1,3 +1,6 @@
+@if (onboardingGate()) {
+  <app-self-onboarding-gate></app-self-onboarding-gate>
+} @else {
 <div class="dashboard-layout">
   @if (v2) { <app-sidebar-v2></app-sidebar-v2> } @else { <app-sidebar></app-sidebar> }
   
@@ -8,9 +11,10 @@
       <router-outlet></router-outlet>
     </main>
   </div>
-  <app-dialog-host></app-dialog-host>
   <app-notice-popup></app-notice-popup>
   <app-profile-reminder></app-profile-reminder>
   <app-profile-modal></app-profile-modal>
   <app-chat-message-popup></app-chat-message-popup>
 </div>
+}
+<app-dialog-host></app-dialog-host>

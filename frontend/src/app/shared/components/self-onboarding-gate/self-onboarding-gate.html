@@ -1,0 +1,62 @@
+<div class="sog">
+  <header class="sog-top">
+    <div class="sog-brand">
+      <img *ngIf="user()?.company?.logoUrl" [src]="user()?.company?.logoUrl" alt="" class="sog-logo">
+      <span>{{ user()?.company?.name || 'MIRA' }}</span>
+    </div>
+    <ol class="sog-steps" aria-label="Onboarding steps">
+      <li [class.done]="step() !== 'password'" [class.on]="step() === 'password'"><span>1</span> Set password</li>
+      <li [class.done]="step() === 'review'" [class.on]="step() === 'profile'"><span>2</span> Your profile</li>
+      <li [class.on]="step() === 'review'"><span>3</span> HR review</li>
+    </ol>
+    <button type="button" class="sog-link" (click)="logout()">Sign out</button>
+  </header>
+
+  <!-- 1. Password -->
+  <section class="sog-card sog-narrow" *ngIf="step() === 'password'">
+    <h1>Welcome, {{ firstName() }}</h1>
+    <p class="sog-sub">First, replace the temporary password from your email with one only you know.</p>
+    <form (ngSubmit)="savePassword()" class="sog-form">
+      <label>New password
+        <input [type]="showPassword() ? 'text' : 'password'" name="np" [(ngModel)]="newPassword" autocomplete="new-password" minlength="8" required>
+      </label>
+      <label>Confirm new password
+        <input [type]="showPassword() ? 'text' : 'password'" name="cp" [(ngModel)]="confirmPassword" autocomplete="new-password" required>
+      </label>
+      <label class="sog-check"><input type="checkbox" [checked]="showPassword()" (change)="showPassword.set(!showPassword())"> Show passwords</label>
+      <p class="sog-hint">At least 8 characters.</p>
+      <button type="submit" class="sog-primary" [disabled]="savingPassword()">{{ savingPassword() ? 'Saving…' : 'Set password and continue' }}</button>
+    </form>
+  </section>
+
+  <!-- 2. Profile -->
+  <ng-container *ngIf="step() === 'profile'">
+    <section class="sog-card sog-intro">
+      <h1>Complete your profile</h1>
+      <p class="sog-sub">Fill in your personal details, bank account, address, family, emergency contacts and documents, then submit for HR review. Work details are filled in by HR.</p>
+      <div class="sog-notes" *ngIf="notes().length">
+        <strong>HR asked for these changes</strong>
+        <ul>
+          <li *ngFor="let n of notes()"><span>{{ n.label }}:</span> {{ n.note }}</li>
+        </ul>
+      </div>
+    </section>
+
+    <app-employee-profile *ngIf="user()?.employee?.id as id" [employeeId]="id" [embedded]="true"></app-employee-profile>
+
+    <footer class="sog-submit-bar">
+      <span>Saved everything? Send it to HR.</span>
+      <button type="button" class="sog-primary" (click)="submitForReview()" [disabled]="submitting()">
+        {{ submitting() ? 'Submitting…' : 'Submit for review' }}
+      </button>
+    </footer>
+  </ng-container>
+
+  <!-- 3. Waiting for HR -->
+  <section class="sog-card sog-narrow sog-center" *ngIf="step() === 'review'">
+    <div class="sog-tick">✓</div>
+    <h1>Submitted for review</h1>
+    <p class="sog-sub">HR is checking your profile. You'll get an email when it's approved, or if anything needs changing. Then the rest of MIRA opens up.</p>
+    <button type="button" class="sog-secondary" (click)="checkAgain()">Check again</button>
+  </section>
+</div>

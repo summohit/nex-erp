@@ -126,7 +126,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .tk-form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
   gap: 16px;
 }
 

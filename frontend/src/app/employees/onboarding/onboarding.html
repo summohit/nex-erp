@@ -3,7 +3,7 @@
   <!-- Page header (12 Nov 2026): same layout on every Employee page -->
   <app-page-header icon="onboarding" section="Employees" heading="Onboarding" subtitle="New hires and their onboarding checklists">
       <!-- View Switcher -->
-      <div class="view-switch-pills">
+      <div class="view-switch-pills" *ngIf="section() === 'hires'">
         <button type="button"
                 class="pill-btn"
                 [class.active]="viewMode() === 'KANBAN'"
@@ -23,7 +23,7 @@
       </div>
 
       <!-- Refresh -->
-      <button type="button" class="btn-refresh" (click)="loadBoard()" [disabled]="isLoading()" title="Refresh board">
+      <button type="button" class="btn-refresh" (click)="loadBoard(); loadReadyToOnboard(); loadSelfQueue()" [disabled]="isLoading()" title="Refresh board">
         <svg lucideRefreshCw size="14" [class.spin-anim]="isLoading()"></svg>
         <span>Refresh</span>
       </button>
@@ -106,6 +106,20 @@
     <button type="button" class="clear-all-filters" *ngIf="searchTerm() || selectedDepartment() !== 'ALL' || datePreset() !== 'ALL'" (click)="resetFilters()">Clear all</button>
   </div>
 
+  <!-- SECTION TABS (13 Nov 2026) -->
+  <div class="ob-tabs" role="tablist" aria-label="Onboarding sections">
+    <button type="button" role="tab" class="ob-tab" [class.active]="section() === 'hires'" [attr.aria-selected]="section() === 'hires'" (click)="section.set('hires')">
+      New hires <span class="ob-tab-count">{{ filteredBoardData().pending.length + filteredBoardData().inProgress.length + filteredBoardData().completed.length }}</span>
+    </button>
+    <button type="button" role="tab" class="ob-tab" [class.active]="section() === 'ready'" [attr.aria-selected]="section() === 'ready'" (click)="section.set('ready')">
+      Ready to onboard <span class="ob-tab-count">{{ recentHires().length }}</span>
+    </button>
+    <button type="button" role="tab" class="ob-tab" [class.active]="section() === 'reviews'" [attr.aria-selected]="section() === 'reviews'" (click)="section.set('reviews')">
+      Profile reviews <span class="ob-tab-count" [class.ob-tab-alert]="selfSubmittedCount() > 0">{{ selfSubmittedCount() > 0 ? selfSubmittedCount() + ' waiting' : selfQueue().length }}</span>
+    </button>
+  </div>
+
+  <ng-container *ngIf="section() === 'hires'">
   <!-- KANBAN VIEW -->
   <div class="kanban-board-container" cdkDropListGroup *ngIf="viewMode() === 'KANBAN'">
 
@@ -398,6 +412,81 @@
       [theme]="'legacy'">
     </ag-grid-angular>
   </div>
+  </ng-container>
+
+  <!-- READY TO ONBOARD: hired candidates without a login yet (13 Nov 2026) -->
+  <ng-container *ngIf="section() === 'ready'">
+    <section class="ot-card">
+      <div class="ot-toolbar">
+        <p class="ot-hint">Candidates marked <strong>Hired</strong> in Recruitment who don't have a login yet. <em>Start onboarding</em> creates their login and emails it to them.</p>
+        <div class="ot-pills" role="group" aria-label="Which hires">
+          <button type="button" [class.on]="!showOlderHires()" (click)="showOlderHires.set(false)">Recent <span>{{ recentHires().length }}</span></button>
+          <button type="button" [class.on]="showOlderHires()" (click)="showOlderHires.set(true)">Older <span>{{ olderHires().length }}</span></button>
+        </div>
+      </div>
+      <div class="ot-scroll">
+        <table class="ot-table">
+          <thead><tr><th>Candidate</th><th>Position</th><th>Joining date</th><th>Status</th><th class="ot-right">Action</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let a of (showOlderHires() ? olderHires() : recentHires())">
+              <td>
+                <div class="ot-person">
+                  <span class="ot-avatar" [style.background]="getAvatarBg(a.id)">{{ getInitials(a.fullName?.split(' ')[0], a.fullName?.split(' ')[1]) }}</span>
+                  <div><strong>{{ a.fullName }}</strong><small>{{ a.email }}</small></div>
+                </div>
+              </td>
+              <td class="ot-wrap">{{ a.job?.title || '—' }}</td>
+              <td>{{ a.joiningDate ? (a.joiningDate | date:'d MMM yyyy') : 'Not set' }}</td>
+              <td><span class="ot-chip ot-blue">Hired</span></td>
+              <td class="ot-right">
+                <button type="button" class="ot-btn ot-primary" [disabled]="startingId() === a.id" (click)="startOnboarding(a)">{{ startingId() === a.id ? 'Starting…' : 'Start onboarding' }}</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="ot-empty" *ngIf="!(showOlderHires() ? olderHires() : recentHires()).length">
+          {{ showOlderHires() ? 'No older hired candidates.' : 'No recent hires waiting. Older hired candidates (joining date over 30 days ago) are under Older.' }}
+        </p>
+      </div>
+      <p class="ot-foot" *ngIf="showOlderHires() && olderHires().length">These joined over 30 days ago and were probably added to Employees by hand. Move them to Onboarded or Rejected in Recruitment → Candidates to clear this list.</p>
+    </section>
+  </ng-container>
+
+  <!-- PROFILE REVIEWS (self-service onboarding, 13 Nov 2026) -->
+  <ng-container *ngIf="section() === 'reviews'">
+    <section class="ot-card">
+      <div class="ot-toolbar">
+        <p class="ot-hint">New joiners fill in their own profile, then submit it here. Review it to approve, or send it back with notes.</p>
+      </div>
+      <div class="ot-scroll">
+        <table class="ot-table">
+          <thead><tr><th>Employee</th><th>Department</th><th>Joining date</th><th>Status</th><th>Submitted</th><th class="ot-right">Action</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let e of selfQueue()" [class.ot-attn]="e.selfOnboardingStatus === 'SUBMITTED'">
+              <td>
+                <div class="ot-person">
+                  <img *ngIf="e.avatarUrl" [src]="e.avatarUrl" alt="" class="ot-avatar" (error)="e.avatarUrl = null">
+                  <span *ngIf="!e.avatarUrl" class="ot-avatar" [style.background]="getAvatarBg(e.id)">{{ getInitials(e.firstName, e.lastName) }}</span>
+                  <div>
+                    <button type="button" class="ot-link" (click)="openUserProfile(e.id, $event)">{{ e.firstName }} {{ e.lastName }}</button>
+                    <small>#{{ e.employeeCode }} · {{ e.user?.email }}</small>
+                  </div>
+                </div>
+              </td>
+              <td>{{ e.department?.name || '—' }}</td>
+              <td>{{ e.joiningDate ? (e.joiningDate | date:'d MMM yyyy') : '—' }}</td>
+              <td><span class="ot-chip" [ngClass]="{ 'ot-grey': e.selfOnboardingStatus === 'PENDING', 'ot-blue': e.selfOnboardingStatus === 'SUBMITTED', 'ot-orange': e.selfOnboardingStatus === 'CHANGES_REQUESTED' }">{{ selfStatusLabel(e.selfOnboardingStatus) }}</span></td>
+              <td>{{ e.selfOnboardingSubmittedAt ? (e.selfOnboardingSubmittedAt | date:'d MMM, h:mm a') : '—' }}</td>
+              <td class="ot-right">
+                <button type="button" class="ot-btn" [class.ot-primary]="e.selfOnboardingStatus === 'SUBMITTED'" (click)="openSelfReview(e)">{{ e.selfOnboardingStatus === 'SUBMITTED' ? 'Review' : 'View details' }}</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="ot-empty" *ngIf="!selfQueue().length">No profiles in review. New joiners appear here after you start their onboarding.</p>
+      </div>
+    </section>
+  </ng-container>
 
 </div>
 
@@ -586,5 +675,79 @@
       </button>
     </div>
 
+  </div>
+</div>
+
+<!-- PROFILE REVIEW MODAL (simplified 13 Nov 2026) -->
+<div class="modal-overlay" *ngIf="reviewing() as r" (click)="closeSelfReview()">
+  <div class="rv4" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="rv4-title">
+
+    <header class="rv4-head">
+      <span class="rv4-avatar">{{ getInitials(r.firstName, r.lastName) }}</span>
+      <div class="rv4-id">
+        <h3 id="rv4-title">{{ r.firstName }} {{ r.lastName }}</h3>
+        <p>#{{ r.employeeCode }} · {{ r.department?.name || 'No department' }}<ng-container *ngIf="r.joiningDate"> · Joins {{ r.joiningDate | date:'d MMM' }}</ng-container></p>
+      </div>
+      <button type="button" class="rv4-link" (click)="openUserProfile(r.id, $event)">Open profile</button>
+      <button type="button" class="rv4-x" (click)="closeSelfReview()" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+
+    <div class="rv4-progress" *ngIf="!reviewLoading() && reviewProfile()">
+      <div class="rv4-bar"><i [style.width.%]="completion()"></i></div>
+      <p>
+        <strong>{{ completion() }}% complete</strong>
+        <span *ngIf="missingCount()" class="rv4-bad"> · {{ missingCount() }} required item{{ missingCount() === 1 ? '' : 's' }} missing</span>
+        <span *ngIf="!missingCount()" class="rv4-good"> · all required details in</span>
+        <span class="rv4-muted"> · {{ canDecide() ? 'submitted ' + (r.selfOnboardingSubmittedAt | date:'d MMM, h:mm a') : (r.selfOnboardingStatus === 'CHANGES_REQUESTED' ? 'sent back, waiting for changes' : 'still filling in') }}</span>
+      </p>
+    </div>
+
+    <div class="rv4-body">
+      <div class="rv4-loading" *ngIf="reviewLoading()">Loading profile…</div>
+
+      <section class="rv4-sec" *ngFor="let s of reviewSummary()" [class.open]="isExpanded(s)" [class.noted]="reviewNotes()[s.key]">
+        <button type="button" class="rv4-sec-head" (click)="toggleSection(s)" [attr.aria-expanded]="isExpanded(s)">
+          <span class="rv4-sec-title">{{ s.label }}</span>
+          <span class="rv4-state" [ngClass]="'rv4-' + s.status">{{ sectionStatusLabel(s.status) }}</span>
+          <svg class="rv4-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+
+        <div class="rv4-sec-body" *ngIf="isExpanded(s)">
+          <dl class="rv4-grid" *ngIf="s.fields && s.rows.length">
+            <div *ngFor="let fld of s.rows"><dt>{{ fld.label }}</dt><dd [class.rv4-miss]="!fld.value">{{ fld.value || 'Missing' }}</dd></div>
+          </dl>
+          <p class="rv4-none" *ngIf="s.fields && !s.rows.length">Nothing filled in yet</p>
+
+          <ng-container *ngIf="!s.fields">
+            <ul class="rv4-list" *ngIf="s.list.length">
+              <li *ngFor="let item of s.list; let i = index">
+                <a *ngIf="s.links?.[i]; else plain" [href]="s.links[i]" target="_blank" rel="noopener">{{ item }}</a>
+                <ng-template #plain>{{ item }}</ng-template>
+              </li>
+            </ul>
+            <p class="rv4-none" [class.rv4-miss]="s.missingReq.length" *ngIf="!s.list.length">{{ s.missingReq.length ? 'Missing — at least one is required' : 'Nothing added yet' }}</p>
+          </ng-container>
+
+          <ng-container *ngIf="canDecide()">
+            <button type="button" class="rv4-addnote" *ngIf="!(noteOpen()[s.key] || reviewNotes()[s.key])" (click)="toggleNote(s.key)">Add note</button>
+            <textarea *ngIf="noteOpen()[s.key] || reviewNotes()[s.key]" rows="2" [placeholder]="'What should ' + r.firstName + ' change here?'"
+                      [value]="reviewNotes()[s.key] || ''" (input)="setReviewNote(s.key, $any($event.target).value)"></textarea>
+          </ng-container>
+          <p class="rv4-oldnote" *ngIf="!canDecide() && reviewNotes()[s.key]">Your note: {{ reviewNotes()[s.key] }}</p>
+        </div>
+      </section>
+    </div>
+
+    <footer class="rv4-foot">
+      <span class="rv4-muted" *ngIf="lastUpdated()">Updated {{ lastUpdated() }}</span>
+      <ng-container *ngIf="canDecide(); else closeOnly">
+        <button type="button" class="rv4-btn rv4-btn-text" (click)="closeSelfReview()">Cancel</button>
+        <button type="button" class="rv4-btn" [disabled]="reviewBusy() || !hasReviewNotes()" [title]="hasReviewNotes() ? '' : 'Add a note to a section first'" (click)="decideSelfReview('CHANGES')">Send back</button>
+        <button type="button" class="rv4-btn rv4-btn-primary" [disabled]="reviewBusy() || reviewLoading() || !reviewProfile() || hasReviewNotes()" [title]="hasReviewNotes() ? 'Remove the notes to approve' : ''" (click)="decideSelfReview('APPROVE')">Approve</button>
+      </ng-container>
+      <ng-template #closeOnly><button type="button" class="rv4-btn" (click)="closeSelfReview()">Close</button></ng-template>
+    </footer>
   </div>
 </div>

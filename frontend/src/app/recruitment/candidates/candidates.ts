@@ -468,6 +468,33 @@ export class CandidatesComponent implements OnInit {
     this.showSalaryPrompt.set(true);
   }
 
+  /**
+   * The salary was settled when the candidate was offered (and negotiated), so
+   * moving them on to Hired doesn't ask for it again (13 Nov 2026).
+   */
+  private offerAlreadyAgreed(app: JobApplication): boolean {
+    return Number(app.offeredSalary) > 0 && !!(app as any).compensationStructure?.salaryGroupCode;
+  }
+
+  private hireWithAgreedOffer(app: JobApplication) {
+    this.candidatesService.updateStatus(
+      app.id, 'HIRED', app.offeredSalary ?? undefined, undefined,
+      app.joiningDate ? app.joiningDate.split('T')[0] : undefined,
+      app.address || undefined,
+      app.approvalReason || undefined,
+    ).subscribe({
+      next: (updatedApp) => {
+        this.toast.success(updatedApp.approvalStatus === 'PENDING_APPROVAL'
+          ? `Sent for approval — ${updatedApp.fullName} stays in ${this.stageLabel(updatedApp.status)} until it is approved.`
+          : `${updatedApp.fullName} moved to Hired with the agreed offer`);
+        this.loadPendingApprovals();
+        this.loadApplications(false);
+        if (this.selectedApp()?.id === updatedApp.id) this.selectedApp.set(updatedApp);
+      },
+      error: (err) => { this.toast.error(err?.error?.message || 'Failed to update status'); this.loadApplications(false); },
+    });
+  }
+
   offerSubmitted = signal(false);
   offerGroupMissing = computed(() => this.offerSubmitted() && !this.annexureGroupCode());
 
@@ -1065,7 +1092,9 @@ export class CandidatesComponent implements OnInit {
         return;
       }
 
-      if (newStatus === 'HIRED' || newStatus === 'OFFERED') {
+      if (newStatus === 'HIRED' && this.offerAlreadyAgreed(movedItem)) {
+        this.hireWithAgreedOffer(movedItem);
+      } else if (newStatus === 'HIRED' || newStatus === 'OFFERED') {
         this.openSalaryPrompt(movedItem, newStatus);
       } else if (newStatus === 'REJECTED') {
         this.pendingRejectId.set(movedItem.id);
@@ -1824,6 +1853,11 @@ export class CandidatesComponent implements OnInit {
       return;
     }
 
+    if (newStatus === 'HIRED' && this.offerAlreadyAgreed(app)) {
+      this.hireWithAgreedOffer(app);
+      return;
+    }
+
     if (newStatus === 'HIRED' || newStatus === 'OFFERED') {
       this.openSalaryPrompt(app, newStatus);
       return;
@@ -1883,8 +1917,10 @@ export class CandidatesComponent implements OnInit {
     if (!app) return;
     
     this.candidatesService.onboardCandidate(app.id).subscribe({
-      next: () => {
-        this.toast.success('Candidate successfully onboarded as a new Employee!');
+      next: (res: any) => {
+        if (res?.alreadyOnboarded) this.toast.success(`${app.fullName} already has an employee login.`);
+        else if (res?.credentialsEmailed === false) this.toast.error(`Onboarding started, but the login email to ${app.email} failed. Use "Reset password" on their profile to resend.`);
+        else this.toast.success(`Onboarding started — login details emailed to ${app.email}`);
         this.closeDrawer();
         this.loadApplications();
       },

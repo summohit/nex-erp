@@ -59,4 +59,31 @@ export class OnboardingController {
     requireOnboardingManager(req);
     return this.onboardingService.updateEmployeeStatus(req.user.companyId, id, status);
   }
+
+  // --- Self-service onboarding (13 Nov 2026) ---
+  @Get('self')
+  async getMySelfOnboarding(@Request() req) {
+    return this.onboardingService.getMySelfOnboarding(req.user.companyId, req.user.sub);
+  }
+
+  @Post('self/submit')
+  async submitMySelfOnboarding(@Request() req) {
+    return this.onboardingService.submitMySelfOnboarding(req.user.companyId, req.user.sub);
+  }
+
+  @Get('self-reviews')
+  async getSelfOnboardingQueue(@Request() req) {
+    requireOnboardingManager(req);
+    return this.onboardingService.getSelfOnboardingQueue(req.user.companyId);
+  }
+
+  @Post('self-reviews/:employeeId')
+  async reviewSelfOnboarding(
+    @Request() req,
+    @Param('employeeId', ParseIntPipe) employeeId: number,
+    @Body() body: { decision: 'APPROVE' | 'CHANGES'; notes?: Record<string, string> },
+  ) {
+    requireOnboardingManager(req);
+    return this.onboardingService.reviewSelfOnboarding(req.user.companyId, employeeId, body.decision, body.notes);
+  }
 }

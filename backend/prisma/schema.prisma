@@ -146,6 +146,8 @@ model User {
   company                  Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   emailVerifiedAt          DateTime?
   status                   String                     @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, ACTIVE, SUSPENDED
+  /// Set when HR issues a temporary password; cleared when the person sets their own.
+  mustChangePassword       Boolean                    @default(false)
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
   employee                 Employee?
@@ -441,6 +443,14 @@ model Employee {
   employmentCategory String  @default("PERMANENT") // PERMANENT, TRAINEE, CONTRACT
 
   onboardingStatus String                   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  /// Self-service onboarding (13 Nov 2026): the new joiner fills their own profile,
+  /// HR reviews it. null = not part of this flow (everyone hired before it).
+  /// PENDING (invited), SUBMITTED, CHANGES_REQUESTED, APPROVED.
+  selfOnboardingStatus      String?
+  /// HR's notes when sending it back, keyed by section: { personal: "...", bank: "..." }.
+  selfOnboardingNotes       Json?
+  selfOnboardingSubmittedAt DateTime?
+  selfOnboardingReviewedAt  DateTime?
   onboardingTasks  EmployeeOnboardingTask[]
   kioskPin         String? // 4-digit PIN for Kiosk Mode
   recruitedJobs    Job[]                    @relation("JobRecruiter")

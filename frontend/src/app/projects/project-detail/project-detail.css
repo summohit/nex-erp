@@ -5367,7 +5367,7 @@ input[type=text], input[type=email], input[type=password] {
 /* ── KPI Stat Cards ── */
 .summary-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -7499,7 +7499,7 @@ input[type=text], input[type=email], input[type=password] {
 
 .att-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: 20px;
   align-content: flex-start;
 }
@@ -11513,7 +11513,7 @@ input[type=text], input[type=email], input[type=password] {
 .pfv-action-menu button:hover { background:#f1f5f9; }
 .pfv-action-menu button.danger { color:#b91c1c; }
 .pfv-action-menu button.danger:hover { background:#fef2f2; }
-.pfv-locs { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
+.pfv-locs { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(260px, 100%),1fr)); gap:10px; }
 .pfv-loc { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #f1f5f9; border-radius:10px; background:#fafbfc; }
 .pfv-loc-main { display:flex; flex-direction:column; min-width:0; flex:1; }
 .pfv-loc-main strong { font-size:13px; color:#172b4d; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

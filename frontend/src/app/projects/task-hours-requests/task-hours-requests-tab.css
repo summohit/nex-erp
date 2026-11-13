@@ -2580,7 +2580,7 @@
 /* Attachments */
 .prq-attachments-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
   gap: 8px;
 }
 
@@ -2699,7 +2699,7 @@
 .fv-detail-section { margin-top: 18px; }
 .fv-detail-heading { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14px; font-weight: 700; color: #0f172a; }
 .fv-count { padding: 1px 8px; border-radius: 999px; background: #eef2ff; color: #4338ca; font-size: 12px; }
-.fv-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.fv-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 8px; }
 .fv-person { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 10px; }
 .fv-person-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .fv-person-avatar.fallback { display: grid; place-items: center; background: #e0e7ff; color: #3730a3; font-size: 12px; font-weight: 700; }
@@ -3039,3 +3039,7 @@ tr.thr-row-selected td { background: #f8fbff !important; }
 /* ⋯ menu: Reject sits last, after a divider (all request tables). */
 .ta-action-popover .reject { border-top: 1px solid #eef2f6 !important; margin-top: 4px; }
 .ta-action-popover .approve { color: #15803d !important; font-weight: 600; }
+
+@media (max-width: 768px) {
+  .ta-table-wrap { overflow-x: auto !important; max-width: 100%; }
+}

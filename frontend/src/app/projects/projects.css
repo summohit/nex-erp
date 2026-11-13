@@ -5809,7 +5809,7 @@ a.team-avatar-circle:hover {
 
 .project-filters-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
   gap: 12px;
   margin-top: 12px;
   padding: 16px;
@@ -6533,7 +6533,7 @@ a.team-avatar-circle:hover {
 
 .tf-fields-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
   gap: 14px;
 }
 
@@ -6969,7 +6969,7 @@ a.team-avatar-circle:hover {
 }
 .cbm-dupe-checks {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
   gap: 8px;
   margin-top: 6px;
 }
@@ -7091,7 +7091,7 @@ a.team-avatar-circle:hover {
 
 .ttp-podium {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 12px;
 }
 

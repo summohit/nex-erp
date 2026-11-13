@@ -758,7 +758,7 @@
 
 .pc-disc-content {
   display: grid;
-  grid-template-columns: minmax(360px, 460px) 1fr;
+  grid-template-columns: minmax(min(360px, 100%), 460px) 1fr;
   gap: 20px;
   align-items: start;
 }

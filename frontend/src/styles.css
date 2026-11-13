@@ -2161,3 +2161,57 @@ body.nav-scroll-lock {
   .content-area .kpi-card .kpi-info { min-width: 0 !important; width: 100%; }
   .content-area .kpi-card .kpi-value { font-size: 20px !important; }
 }
+
+/* Grid and flex children may shrink below their text width on small screens,
+   so one long email or name can't push a card past the screen edge. */
+@media (max-width: 768px) {
+  .content-area :where([class*="grid"], [class*="-list"], [class*="cards"], [class*="row"]) > * { min-width: 0; }
+  .content-area :where([class*="card"]) { max-width: 100%; }
+  .content-area :where([class*="email"], [class*="mail"], [class*="name"], [class*="title"], [class*="sub"], [class*="meta"]) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Pages flagged in the 13 Nov strict phone sweep (pages + their tabs). */
+@media (max-width: 640px) {
+  /* One-row stat strips become a 2-column grid on phones. */
+  .content-area :where(.hol-kpis, .nb-kpi-grid, .offb-kpi-grid, .pp-stats-grid, .kpi-row, .kpi-grid, .kpi-summary-grid, .stats-grid, .stats-row) {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    overflow: visible !important;
+    gap: 10px !important;
+  }
+  .content-area :where(.hol-kpis, .nb-kpi-grid, .offb-kpi-grid, .pp-stats-grid, .kpi-row, .kpi-grid, .kpi-summary-grid, .stats-grid, .stats-row) > * {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex: initial !important;
+  }
+
+  /* Rows of controls wrap. */
+  .content-area :where(.chart-control-bar, .toolbar-actions, .ol-filter-row, .ol-range, .ai-row, .hub-control-bar, .scope-switch, .filters-panel) {
+    flex-wrap: wrap !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .content-area :where(.ol-range) > * { min-width: 0 !important; flex: 1 1 120px !important; }
+  .content-area :where(.ai-row) > * { flex: 1 1 calc(50% - 8px) !important; min-width: 0 !important; }
+
+  /* Pill and filter-tab rows swipe sideways. */
+  .content-area :where(.filter-tabs, .tab-filters-pills, .department-filter-bar) {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    scrollbar-width: none;
+  }
+  .content-area :where(.filter-tabs, .tab-filters-pills, .department-filter-bar) > * { flex-shrink: 0 !important; }
+
+  /* Wide tables and matrices scroll inside their own box. */
+  .content-area :where(.ta-table-wrap, .pw-table, .permissions-content, .heatmap-grid-wrap) {
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    -webkit-overflow-scrolling: touch;
+  }
+}

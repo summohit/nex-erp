@@ -1111,7 +1111,7 @@
 
 .leave-employee-view {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(270px, 100%), 1fr));
   gap: 12px;
 }
 
@@ -1121,7 +1121,7 @@
 
 .my-leave-summary {
   display: grid;
-  grid-template-columns: minmax(280px, 362px) minmax(280px, 362px);
+  grid-template-columns: minmax(min(280px, 100%), 362px) minmax(min(280px, 100%), 362px);
   gap: 26px;
   margin-bottom: 22px;
 }
@@ -1911,7 +1911,7 @@
 
 .balances-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
   gap: 20px;
 }
 
@@ -2284,7 +2284,7 @@
 /* Holidays Tab Styling */
 .holidays-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 16px;
   margin-top: 16px;
 }
@@ -2445,7 +2445,7 @@
 /* KPI Grid Styles */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 20px;
   margin-bottom: 24px;
 }
@@ -5493,9 +5493,9 @@ app-page-header { display: block; margin-bottom: 16px; }
 .leave-balances-count { font-size: 12px !important; padding: 3px 10px !important; }
 
 /* Assign Leave Balance: one aligned grid of equal 40px fields. */
-.alb-fields-row { display: grid !important; grid-template-columns: minmax(220px, 1.5fr) minmax(200px, 1.3fr) 150px 120px auto !important; gap: 14px !important; align-items: end !important; }
+.alb-fields-row { display: grid !important; grid-template-columns: minmax(min(220px, 100%), 1.5fr) minmax(min(200px, 100%), 1.3fr) 150px 120px auto !important; gap: 14px !important; align-items: end !important; }
 .alb-fields-row:has(> .alb-field-employee) { }
-.alb-fields-row:not(:has(> .alb-field-employee)) { grid-template-columns: minmax(220px, 1.6fr) 150px 120px auto !important; }
+.alb-fields-row:not(:has(> .alb-field-employee)) { grid-template-columns: minmax(min(220px, 100%), 1.6fr) 150px 120px auto !important; }
 .alb-field-group { display: flex !important; flex-direction: column !important; min-width: 0 !important; width: auto !important; margin: 0 !important; }
 .alb-label { display: flex !important; align-items: center !important; gap: 6px !important; height: 18px; margin: 0 0 6px !important; font-size: 12.5px !important; font-weight: 600 !important; color: #475569 !important; }
 .alb-label svg { color: #94a3b8; }
@@ -5576,7 +5576,7 @@ app-page-header { display: block; margin-bottom: 16px; }
 }
 
 /* ── Holidays in the MIRA standard (13 Nov) ── */
-.hol-kpis { display: grid !important; grid-template-columns: repeat(3, minmax(220px, 1fr)) !important; gap: 12px !important; overflow-x: auto; margin-bottom: 16px !important; }
+.hol-kpis { display: grid !important; grid-template-columns: repeat(3, minmax(min(220px, 100%), 1fr)) !important; gap: 12px !important; overflow-x: auto; margin-bottom: 16px !important; }
 .hol-kpis .kpi-card { padding: 14px 16px !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; box-shadow: none !important; gap: 14px !important; align-items: center !important; }
 .hol-kpis .kpi-icon { width: 40px !important; height: 40px !important; border-radius: 10px !important; flex: 0 0 40px; }
 .hol-kpis .kpi-title { font-size: 11.5px !important; font-weight: 600 !important; color: #64748b !important; text-transform: uppercase; letter-spacing: .04em; }
@@ -5673,4 +5673,9 @@ app-page-header { display: block; margin-bottom: 16px; }
   .half-day-periods { grid-template-columns: 1fr !important; }
   .reg-times-grid { grid-template-columns: 1fr !important; }
   .reg-detail-grid { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 640px) {
+  .hol-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; overflow-x: visible; }
+  .hol-kpis .kpi-card { min-width: 0 !important; padding: 12px !important; }
 }

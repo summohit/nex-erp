@@ -726,7 +726,7 @@
 
 .member-picker-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
   gap: 8px;
   max-height: 240px;
   overflow-y: auto;
@@ -1652,7 +1652,7 @@
 /* ── Uploaded Attachments List ───────────────────────────────────────────── */
 .attachments-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   gap: 9px;
   margin-top: 4px;
 }
@@ -2284,7 +2284,7 @@ textarea.has-field-error,
 
 /* Travel type (Delhi NCR / Outstation). */
 .travel-zone-field { margin-top: 14px; }
-.travel-zone-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.travel-zone-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 10px; }
 .travel-zone-option { text-align: left; display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; cursor: pointer; font: inherit; }
 .travel-zone-option strong { font-size: 14px; color: #0f172a; }
 .travel-zone-option span { font-size: 12.5px; color: #64748b; }
