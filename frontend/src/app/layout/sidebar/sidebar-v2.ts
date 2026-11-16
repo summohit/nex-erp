@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect, OnInit } from '@angular/core';
+import { Component, HostListener, inject, signal, computed, effect, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
@@ -212,8 +212,14 @@ export class SidebarComponentV2 implements OnInit {
   // Each person can drag modules on the rail, and pages inside a module, into
   // their own order. Saved to their profile, so it follows them everywhere.
 
-  /** True while the person is arranging; dragging is off otherwise. */
-  arranging = signal(false);
+  /** True while the person is arranging (started from the header); dragging is off otherwise. */
+  arranging = computed(() => this.layout.isArrangingMenu());
+  /** Opens the drawer and clears the filter when arranging starts. */
+  private arrangeOpened = effect(() => {
+    if (!this.arranging()) return;
+    this.searchFilter.set('');
+    if (this.currentActiveModule()?.items?.length) this.isDrawerCollapsed.set(false);
+  });
   /** Bumped after a reorder so the drawer list recomputes. */
   orderVersion = signal(0);
   /** The order as the server sends it, for "Reset". */
@@ -225,14 +231,14 @@ export class SidebarComponentV2 implements OnInit {
     return sorted;
   }
 
-  toggleArrange() {
-    const on = !this.arranging();
-    this.arranging.set(on);
-    if (on) {
-      this.searchFilter.set('');
-      if (this.currentActiveModule()?.items?.length) this.isDrawerCollapsed.set(false);
-      this.toast.info('Drag menus into the order you want. Click ⇅ again when done.', { duration: 4000 });
-    }
+  /** Done: leave arrange mode (each drag is already saved). */
+  finishArrange() {
+    this.layout.setArrangingMenu(false);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    if (this.arranging()) this.finishArrange();
   }
 
   dropModule(e: CdkDragDrop<SidebarModule[]>) {

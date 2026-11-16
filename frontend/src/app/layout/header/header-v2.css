@@ -1236,3 +1236,8 @@ button.menu-link {
 /* Nothing to open on single pages (Approvals etc.) on desktop; on a phone the
    button still opens the rail itself (12 Nov 2026). */
 @media (min-width: 1025px) { .btn-sidebar-toggle.no-submenu { display: none; } }
+
+/* Arrange my menu (16 Nov 2026) */
+.btn-arrange-menu { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; margin-left: 8px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; color: #334155; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn-arrange-menu:hover { background: #f8fafc; border-color: #cbd5e1; }
+@media (max-width: 1024px) { .btn-arrange-menu { display: none; } }

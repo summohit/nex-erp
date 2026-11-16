@@ -2215,3 +2215,14 @@ body.nav-scroll-lock {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* Arrange my menu (16 Nov 2026): the page blurs and only the sidebar can be used. */
+body.menu-arranging .main-content {
+  filter: blur(4px) grayscale(0.2);
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+  transition: filter 0.2s ease, opacity 0.2s ease;
+}
+body.menu-arranging app-sidebar-v2,
+body.menu-arranging app-sidebar { position: relative; z-index: 60; }

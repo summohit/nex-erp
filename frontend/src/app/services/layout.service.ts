@@ -18,6 +18,16 @@ export class LayoutService {
    * there is nothing to open (single pages such as Approvals).
    */
   readonly hasSubMenu = signal<boolean>(true);
+  /**
+   * "Arrange menu" mode (16 Nov 2026): started from the header, the page blurs
+   * and only the sidebar can be used, to drag menus into the person's order.
+   */
+  readonly isArrangingMenu = signal<boolean>(false);
+
+  setArrangingMenu(on: boolean) {
+    this.isArrangingMenu.set(on);
+    if (typeof document !== 'undefined') document.body.classList.toggle('menu-arranging', on);
+  }
   readonly isSidebarCollapsed = signal<boolean>(
     typeof localStorage !== 'undefined' ? localStorage.getItem('sidebar_collapsed') === 'true' : false
   );

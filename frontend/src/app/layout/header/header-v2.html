@@ -59,6 +59,12 @@
     </button>
   </div>
 
+  <!-- Arrange my menu (16 Nov 2026): blurs the page, only the sidebar moves -->
+  <button type="button" class="btn-arrange-menu" (click)="layout.setArrangingMenu(true)"
+          title="Drag the sidebar menus into your own order" aria-label="Arrange menu">
+    <span aria-hidden="true">⇅</span><span class="btn-arrange-label">Arrange menu</span>
+  </button>
+
   <!-- Tickets (Helpdesk) -->
   <button
     class="btn-header-tickets"

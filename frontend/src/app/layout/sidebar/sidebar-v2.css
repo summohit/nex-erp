@@ -896,3 +896,10 @@
 .cdk-drag-preview { box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2); border-radius: 10px; opacity: 0.95; }
 .cdk-drag-placeholder { opacity: 0.3; }
 .cdk-drag-animating, .cdk-drop-list-dragging .cdk-drag { transition: transform 200ms cubic-bezier(0, 0, 0.2, 1); }
+.rail-arrange-done { background: #16a34a !important; color: #fff !important; }
+.arrange-banner { margin: 8px 12px; padding: 10px 12px; border: 1px solid #bbf7d0; background: #f0fdf4; border-radius: 10px; font-size: 12.5px; color: #334155; display: flex; flex-direction: column; gap: 4px; }
+.arrange-banner strong { font-size: 13px; color: #0f172a; }
+.arrange-banner-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
+.arrange-banner-actions button { border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.arrange-reset { border: 1px solid #e2e8f0; background: #fff; color: #475569; }
+.arrange-done { border: 0; background: #16a34a; color: #fff; }

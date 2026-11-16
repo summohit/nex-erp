@@ -73,12 +73,13 @@
 
     <!-- Rail Bottom Actions -->
     <div class="rail-bottom-actions">
-      <!-- Arrange my menu (16 Nov 2026) -->
-      <button type="button" class="rail-icon-btn rail-arrange-btn" [class.active]="arranging()" (click)="toggleArrange()"
-              [attr.aria-pressed]="arranging()" [attr.aria-label]="arranging() ? 'Done arranging' : 'Arrange my menu'"
-              [attr.data-label]="arranging() ? 'Done arranging' : 'Arrange my menu'">⇅</button>
-      <button *ngIf="arranging()" type="button" class="rail-icon-btn rail-arrange-btn" (click)="resetOrder()"
-              aria-label="Reset to default order" data-label="Reset to default order">↺</button>
+      <!-- Arrange my menu (16 Nov 2026): started from the header -->
+      <ng-container *ngIf="arranging()">
+        <button type="button" class="rail-icon-btn rail-arrange-btn rail-arrange-done" (click)="finishArrange()"
+                aria-label="Done arranging" data-label="Done arranging">✓</button>
+        <button type="button" class="rail-icon-btn rail-arrange-btn" (click)="resetOrder()"
+                aria-label="Reset to default order" data-label="Reset to default order">↺</button>
+      </ng-container>
       <!-- Settings Icon -->
       <button
         *ngIf="settingsModule"
@@ -144,6 +145,16 @@
           placeholder="Filter menus..."
           [value]="searchFilter()"
           (input)="onSearchInput($event)">
+      </div>
+    </div>
+
+    <!-- Arrange mode banner (16 Nov 2026) -->
+    <div class="arrange-banner" *ngIf="arranging()">
+      <strong>Arrange your menu</strong>
+      <span>Drag the icons on the left, or the pages below. Changes save as you go.</span>
+      <div class="arrange-banner-actions">
+        <button type="button" class="arrange-reset" (click)="resetOrder()">Reset</button>
+        <button type="button" class="arrange-done" (click)="finishArrange()">Done</button>
       </div>
     </div>
 
