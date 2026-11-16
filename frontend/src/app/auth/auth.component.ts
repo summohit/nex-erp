@@ -63,6 +63,8 @@ export class AuthComponent implements OnInit {
 
   isSubmitting = signal(false);
   apiError = '';
+  /** Why the person was signed out (account deleted or deactivated), from ?reason= (16 Nov 2026). */
+  accountNotice: { title: string; text: string } | null = null;
   showPassword = false;
 
   constructor() {
@@ -84,6 +86,12 @@ export class AuthComponent implements OnInit {
   }
 
   ngOnInit() {
+    const reason = this.route.snapshot.queryParamMap.get('reason');
+    if (reason === 'account-inactive') {
+      this.accountNotice = { title: 'Your account is inactive', text: 'You have been signed out. If you think this is a mistake, please contact your HR team or administrator.' };
+    } else if (reason === 'account-removed') {
+      this.accountNotice = { title: 'Your account is no longer available', text: 'You have been signed out. Please contact your HR team or administrator for access.' };
+    }
     // Already signed in (a remembered session survives closing the browser):
     // go straight in rather than showing an empty form that looks like being
     // logged out. If the stored session has expired, the interceptor clears

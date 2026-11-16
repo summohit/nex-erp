@@ -5,6 +5,9 @@ import { AuthService } from '../services/auth.service';
 import { Router } from '@angular/router';
 import { getAccessToken } from '../core/token-storage';
 
+/** A screen fires several requests at once; sign out only once for all of them. */
+let signingOutForAccount = false;
+
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const token = getAccessToken();
   
@@ -26,6 +29,19 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
+      // The account itself is gone or switched off (16 Nov 2026). Renewing the
+      // session can't help, so sign out at once and say why on the login page.
+      const accountCode = error.status === 401 ? error.error?.code : null;
+      if (accountCode === 'ACCOUNT_DELETED' || accountCode === 'ACCOUNT_INACTIVE') {
+        if (!signingOutForAccount) {
+          signingOutForAccount = true;
+          authService.logout();
+          router.navigate(['/login'], { queryParams: { reason: accountCode === 'ACCOUNT_INACTIVE' ? 'account-inactive' : 'account-removed' } })
+            .finally(() => { signingOutForAccount = false; });
+        }
+        return EMPTY;
+      }
+
       // The 2fa/challenge routes are excluded because a wrong code legitimately
       // answers 401 there, and popping the session-expired modal mid sign-in
       // would strand the user. The AUTHENTICATED /auth/2fa routes are NOT

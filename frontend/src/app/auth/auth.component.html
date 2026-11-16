@@ -329,6 +329,10 @@
 
       <h1 class="auth-title">Sign into your account</h1>
       <p class="auth-subtitle">Enter your work credentials to access your workspace</p>
+      <div class="account-notice" *ngIf="accountNotice" role="alert">
+        <strong>{{ accountNotice.title }}</strong>
+        <span>{{ accountNotice.text }}</span>
+      </div>
     </div>
 
     <!-- MAIN LOGIN CARD -->

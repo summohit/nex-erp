@@ -341,6 +341,10 @@
 
       <h1 class="auth-title">Welcome back</h1>
       <p class="auth-subtitle">Sign in to your MIRA workspace</p>
+      <div class="account-notice" *ngIf="accountNotice" role="alert">
+        <strong>{{ accountNotice.title }}</strong>
+        <span>{{ accountNotice.text }}</span>
+      </div>
     </div>
 
     <div class="login-card">
