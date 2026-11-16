@@ -512,6 +512,9 @@ model Employee {
 
   // Work Location & Notes
   workLocation      String?
+  /// The personal address someone logged in with before moving to an office email
+  /// (16 Nov 2026). Kept for contact after they leave; never a login.
+  personalEmail     String?
   usualWorkLocation Json?
 
   // Statutory Details

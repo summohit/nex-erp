@@ -329,9 +329,10 @@ export class EmployeeListComponentV2 implements OnInit {
   }
 
   gridOptions = {
-    isExternalFilterPresent: () => !!this.dateRange || !!this.filterAccountStatus,
+    isExternalFilterPresent: () => !!this.dateRange || !!this.filterAccountStatus || this.personalOnly,
     doesExternalFilterPass: (node: any) =>
       inDateRange(node.data?.joiningDate, this.dateRange) &&
+      (!this.personalOnly || (node.data?.user?.status === 'ACTIVE' && this.isPersonalEmail(node.data))) &&
       (!this.filterAccountStatus || this.accountStatus(node.data) === this.filterAccountStatus),
     headerHeight: 44,
     rowHeight: 72,
@@ -588,6 +589,10 @@ export class EmployeeListComponentV2 implements OnInit {
         onResendVerification: (data: any) => this.resendVerification(data),
         // Super Admin only, and only on the shared HR login (16 Nov 2026).
         extraActions: [{
+          label: 'Change login email',
+          show: (data: any) => this.canChangeEmail(data),
+          onClick: (data: any) => this.openEmailChange(data),
+        }, {
           label: 'Hand over HR login',
           show: (data: any) => this.canHandover(data),
           onClick: (data: any) => this.openHandover(data),
@@ -601,8 +606,77 @@ export class EmployeeListComponentV2 implements OnInit {
   handoverToId: number | null = null;
   handoverBusy = false;
 
+  // ── Personal → office login email (16 Nov 2026) ──
+  static readonly OFFICE_DOMAIN = 'ces-pl.com';
+  emailFor: any = null;
+  newLoginEmail = '';
+  emailBusy = false;
+  /** Directory filter: only people still logging in with a personal address. */
+  personalOnly = false;
+
+  isPersonalEmail(e: any): boolean {
+    const email = String(e?.user?.email || '').toLowerCase();
+    return !!email && !email.endsWith('@' + EmployeeListComponentV2.OFFICE_DOMAIN);
+  }
+
+  personalEmailCount(): number {
+    return this.employees().filter((e: any) => e.user?.status === 'ACTIVE' && this.isPersonalEmail(e)).length;
+  }
+
+  canChangeEmail(data: any): boolean {
+    const role = this.authService.currentUser()?.role;
+    if (role !== 'SUPERADMIN' && role !== 'HR') return false;
+    if (!data?.user || EmployeeListComponentV2Shared.isShared(data.user.email)) return false;
+    return !(role === 'HR' && data.user.role === 'SUPERADMIN');
+  }
+
+  openEmailChange(data: any) {
+    this.emailFor = data;
+    // A sensible first guess; the admin edits it to the real mailbox name.
+    const guess = `${data.firstName || ''}.${data.lastName || ''}`.toLowerCase().replace(/[^a-z.]/g, '').replace(/^\.|\.$/g, '');
+    this.newLoginEmail = this.isPersonalEmail(data) && guess ? `${guess}@${EmployeeListComponentV2.OFFICE_DOMAIN}` : '';
+  }
+
+  emailError(): string {
+    const v = this.newLoginEmail.trim().toLowerCase();
+    if (!v) return '';
+    if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(v)) return 'Enter a valid email address.';
+    if (!v.endsWith('@' + EmployeeListComponentV2.OFFICE_DOMAIN)) return `Use an @${EmployeeListComponentV2.OFFICE_DOMAIN} address.`;
+    if (v === String(this.emailFor?.user?.email || '').toLowerCase()) return 'That is already their login email.';
+    if (this.employees().some((e: any) => String(e.user?.email || '').toLowerCase() === v)) return 'Another person already uses this email.';
+    return '';
+  }
+
+  confirmEmailChange() {
+    const emp = this.emailFor;
+    const email = this.newLoginEmail.trim().toLowerCase();
+    if (!emp || !email || this.emailError()) return;
+    this.emailBusy = true;
+    this.employeeService.changeLoginEmail(emp.id, email).subscribe({
+      next: (r: any) => {
+        this.emailBusy = false;
+        this.emailFor = null;
+        this.toast.success(`${emp.firstName} now signs in with ${r.email}.${r.emailed ? '' : ' (Notification email could not be sent.)'}`, { duration: 6000 });
+        this.loadEmployees();
+      },
+      error: (e: any) => { this.emailBusy = false; this.toast.error(e?.error?.message || 'Could not change the email'); },
+    });
+  }
+
+  togglePersonalOnly() {
+    this.personalOnly = !this.personalOnly;
+    this.gridApi?.onFilterChanged();
+  }
+
   /** The profile page's "Hand over HR login" button lands here with ?handover=<id>. */
   private openHandoverFromQuery() {
+    const forEmail = this.route.snapshot.queryParamMap.get('loginEmail');
+    if (forEmail) {
+      const m = this.employees().find((e: any) => String(e.id) === String(forEmail));
+      if (m && this.canChangeEmail(m)) this.openEmailChange(m);
+      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+      return;
+    }
     const id = this.route.snapshot.queryParamMap.get('handover');
     if (!id) return;
     const match = this.employees().find((e: any) => String(e.id) === String(id));
@@ -839,6 +913,7 @@ export class EmployeeListComponentV2 implements OnInit {
     if (this.filterEmploymentStatus) count++;
     if (this.filterAccountStatus) count++;
     if (this.dateRange) count++;
+    if (this.personalOnly) count++;
     return count;
   }
 
@@ -847,6 +922,7 @@ export class EmployeeListComponentV2 implements OnInit {
   }
 
   clearFilters() {
+    this.personalOnly = false;
     this.searchText = '';
     this.filterDepartmentId = null;
     this.filterDesignationId = null;

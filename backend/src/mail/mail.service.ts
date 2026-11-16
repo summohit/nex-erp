@@ -624,6 +624,26 @@ export class MailService {
     }
   }
 
+  /** "Your MIRA login email has changed" — sent to the new and the old address (16 Nov 2026). */
+  async sendLoginEmailChanged(to: string, name: string, newEmail: string, oldEmail: string) {
+    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
+    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #0f172a;">Your MIRA login email has changed</h2>
+        <p style="color: #334155; font-size: 15px;">Hi ${esc(name)},</p>
+        <p style="color: #334155; font-size: 15px; line-height: 1.6;">From now on, sign in to MIRA with <b>${esc(newEmail)}</b> instead of ${esc(oldEmail)}.
+        Your password and two-step verification stay the same.</p>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${baseUrl}/login" style="background-color: #2563eb; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Sign in to MIRA</a>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px;">If you did not expect this, contact HR.</p>
+      </div>`;
+    const subject = 'Your MIRA login email has changed';
+    if (this.brevoApiKey) { await this.sendBrevoEmail({ to, subject, html }); return; }
+    await this.sendWithRetry({ from: `"MIRA" <${this.fromEmail}>`, envelope: { from: this.fromEmail, to }, to, subject, html });
+  }
+
   async sendNoticeEmail(email: string, title: string, body: string, attachmentCount = 0) {
     const baseUrl = process.env.APP_URL || 'http://localhost:4200';
     const escape = (t: string) =>

@@ -249,6 +249,11 @@
       </div>
     </div>
 
+    <!-- People still logging in with a personal email (16 Nov 2026) -->
+    <button type="button" class="personal-email-chip" [class.on]="personalOnly" (click)="togglePersonalOnly()"
+            *ngIf="personalEmailCount() > 0" [attr.aria-pressed]="personalOnly" title="Active people whose MIRA login is not an @ces-pl.com address">
+      ✉ On personal email <span class="pe-count">{{ personalEmailCount() }}</span>
+    </button>
     <button type="button" class="clear-all-filters" (click)="clearFilters()" *ngIf="hasActiveFilters()">Clear all</button>
   </div>
 
@@ -460,6 +465,53 @@
       <button type="button" class="ho-cancel" (click)="handoverFrom = null">Cancel</button>
       <button type="button" class="ho-confirm" (click)="confirmHandover()" [disabled]="!handoverTarget() || handoverBusy">
         {{ handoverBusy ? 'Handing over…' : (handoverTarget() ? 'Hand over to ' + handoverTarget().firstName : 'Hand over') }}
+      </button>
+    </footer>
+  </div>
+</div>
+
+
+<!-- Change login email — Super Admin / HR (16 Nov 2026) -->
+<div class="ho-overlay" *ngIf="emailFor" (click)="emailFor = null">
+  <div class="ho-modal" role="dialog" aria-modal="true" aria-labelledby="em-title" (click)="$event.stopPropagation()">
+    <header class="ho-head">
+      <div>
+        <span class="ho-kicker em-kicker">Login email</span>
+        <h3 id="em-title">Switch {{ emailFor.firstName }} to an office email</h3>
+      </div>
+      <button type="button" class="ho-x" (click)="emailFor = null" aria-label="Close">✕</button>
+    </header>
+
+    <div class="ho-person">
+      <div class="ho-person-row">
+        <img *ngIf="emailFor.avatarUrl" [src]="emailFor.avatarUrl" alt="" class="ho-av">
+        <span *ngIf="!emailFor.avatarUrl" class="ho-av ho-av-i">{{ getEmployeeInitials(emailFor) }}</span>
+        <div class="ho-person-text">
+          <b>{{ emailFor.firstName }} {{ emailFor.lastName }}</b>
+          <small>Signs in today with <b>{{ emailFor.user?.email }}</b></small>
+        </div>
+      </div>
+    </div>
+
+    <label class="ho-label" for="em-input">New login email</label>
+    <div class="ho-search" [class.bad]="emailError()">
+      <span aria-hidden="true">✉</span>
+      <input id="em-input" type="email" [(ngModel)]="newLoginEmail" placeholder="name@ces-pl.com" autocomplete="off" (keyup.enter)="confirmEmailChange()">
+    </div>
+    <small class="em-error" *ngIf="emailError()">{{ emailError() }}</small>
+    <small class="em-hint" *ngIf="!emailError()">Make sure this mailbox exists — MIRA sends the sign-in notice there.</small>
+
+    <div class="ho-summary" *ngIf="newLoginEmail && !emailError()">
+      <div class="ho-step"><span class="ho-ic">🔑</span><div><b>Signs in with {{ newLoginEmail.trim().toLowerCase() }}</b><small>Password and 2FA stay as they are; only the login email changes.</small></div></div>
+      <div class="ho-step" *ngIf="isPersonalEmail(emailFor)"><span class="ho-ic">📇</span><div><b>{{ emailFor.user?.email }} is kept as the personal email</b><small>On the profile, for contact — it no longer signs in.</small></div></div>
+      <div class="ho-step"><span class="ho-ic">🗂️</span><div><b>Nothing else changes</b><small>Attendance, leave, payslips, documents and approvals all stay.</small></div></div>
+      <div class="ho-step"><span class="ho-ic">📨</span><div><b>Both addresses get a notice</b><small>“Your MIRA login email has changed.”</small></div></div>
+    </div>
+
+    <footer class="ho-actions">
+      <button type="button" class="ho-cancel" (click)="emailFor = null">Cancel</button>
+      <button type="button" class="ho-confirm em-confirm" (click)="confirmEmailChange()" [disabled]="!newLoginEmail || !!emailError() || emailBusy">
+        {{ emailBusy ? 'Changing…' : 'Change login email' }}
       </button>
     </footer>
   </div>

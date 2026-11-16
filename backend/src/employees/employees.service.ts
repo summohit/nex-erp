@@ -1157,6 +1157,53 @@ export class EmployeesService {
     return result;
   }
 
+  // ── Personal → office login email (16 Nov 2026) ────────────────────────
+  // Super Admin or HR switch someone's MIRA login to their @ces-pl.com
+  // address. Everything is keyed by user id, so history is untouched; the
+  // old personal address is kept on the profile for contact after exit.
+
+  static readonly OFFICE_DOMAIN = 'ces-pl.com';
+
+  async changeLoginEmail(companyId: number, role: string, actorUserId: number | null, employeeId: number, rawEmail: string) {
+    if (!['SUPERADMIN', 'HR'].includes(role)) throw new ForbiddenException('Only the Super Admin or HR can change a login email.');
+    const email = String(rawEmail ?? '').trim().toLowerCase();
+    if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email)) throw new BadRequestException('Enter a valid email address.');
+    if (!email.endsWith('@' + EmployeesService.OFFICE_DOMAIN)) throw new BadRequestException(`Use an @${EmployeesService.OFFICE_DOMAIN} office address.`);
+    if (EmployeesService.SHARED_LOGINS.includes(email)) throw new BadRequestException(`${email} is a shared login — use "Hand over HR login" instead.`);
+
+    const emp = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      select: { id: true, firstName: true, lastName: true, personalEmail: true, user: { select: { id: true, email: true, role: true } } },
+    });
+    if (!emp?.user) throw new NotFoundException('Employee not found');
+    if (role === 'HR' && emp.user.role === 'SUPERADMIN') throw new ForbiddenException('HR cannot change a Super Admin\'s login.');
+    const oldEmail = emp.user.email;
+    if (oldEmail.toLowerCase() === email) throw new BadRequestException('That is already their login email.');
+    if (EmployeesService.SHARED_LOGINS.includes(oldEmail.toLowerCase())) throw new BadRequestException('This is the shared HR login — use "Hand over HR login".');
+    const taken = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (taken) throw new ConflictException(`${email} is already used by another MIRA login.`);
+
+    const wasPersonal = !oldEmail.toLowerCase().endsWith('@' + EmployeesService.OFFICE_DOMAIN);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: emp.user!.id }, data: { email, emailVerifiedAt: new Date() } });
+      if (wasPersonal && !emp.personalEmail) await tx.employee.update({ where: { id: emp.id }, data: { personalEmail: oldEmail } });
+      await tx.auditLog.create({
+        data: {
+          companyId, actorId: actorUserId, action: 'LOGIN_EMAIL_CHANGED', entityType: 'User', entityId: String(emp.user!.id),
+          oldValue: { email: oldEmail } as any, newValue: { email, employeeId: emp.id } as any,
+        },
+      });
+    });
+    forgetAccountStatus(emp.user.id);
+
+    const name = `${emp.firstName} ${emp.lastName}`.trim();
+    let emailed = true;
+    for (const to of [email, oldEmail]) {
+      try { await this.mailService.sendLoginEmailChanged(to, name, email, oldEmail); } catch { emailed = false; }
+    }
+    return { email, previousEmail: oldEmail, personalEmailKept: wasPersonal, emailed };
+  }
+
   // ── Shared login hand over (16 Nov 2026) ───────────────────────────────
   // hr@ces-pl.com is a shared mailbox that is also somebody's MIRA login. When
   // HR changes, the Super Admin moves it to the next person in one step: the

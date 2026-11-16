@@ -12,14 +12,14 @@
       <div class="ph2-avatar">
         <img *ngIf="employeeData()?.avatarUrl; else ph2Initials" [src]="employeeData()?.avatarUrl" alt="">
         <ng-template #ph2Initials><span>{{ employeeInitials() }}</span></ng-template>
-        <span class="ph2-dot" [class.off]="employeeData()?.user?.status === 'DEACTIVATED'"></span>
+        <span class="ph2-dot" [class.off]="isDeactivated()"></span>
       </div>
 
       <div class="ph2-main">
         <div class="ph2-name-row">
           <h1>{{ employeeData()?.firstName }} {{ employeeData()?.lastName }}</h1>
-          <span class="ph2-chip" [class.off]="employeeData()?.user?.status === 'DEACTIVATED'">
-            <i></i>{{ employeeData()?.user?.status === 'DEACTIVATED' ? 'Deactivated' : 'Active' }}
+          <span class="ph2-chip" [class.off]="isDeactivated()">
+            <i></i>{{ isDeactivated() ? 'Deactivated' : 'Active' }}
           </span>
           <span class="ph2-chip probation" [ngClass]="heroBannerData().type" *ngIf="heroBannerData().type !== 'confirmed'"
                 [attr.title]="heroBannerData().message">{{ heroBannerData().tag | titlecase }}</span>
@@ -40,6 +40,8 @@
 
       <div class="ph2-actions">
         <button type="button" class="ph2-btn primary" *ngIf="canConvertTrainee()" (click)="openConversion()">Convert to employee</button>
+        <!-- Super Admin / HR: switch to an office login email (16 Nov 2026) -->
+        <button type="button" class="ph2-btn" *ngIf="canChangeLoginEmail()" (click)="changeLoginEmail()">Change login email</button>
         <!-- Super Admin, shared HR login only (16 Nov 2026) -->
         <button type="button" class="ph2-btn" *ngIf="canHandoverLogin()" (click)="handoverLogin()">Hand over HR login</button>
         <button type="button" class="ph2-btn" (click)="setTab('history')">

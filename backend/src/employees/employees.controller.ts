@@ -216,6 +216,12 @@ export class EmployeesController {
     return this.profileCompleteness.requestWaiver(req.user.companyId, req.user.role, req.user.employeeId ?? null, id, body?.documentType, body?.reason);
   }
 
+  /** Super Admin / HR: switch someone's login to their office email (16 Nov 2026). */
+  @Post(':id/login-email')
+  changeLoginEmail(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: { email: string }) {
+    return this.employeesService.changeLoginEmail(req.user.companyId, req.user.role, req.user.sub ?? null, id, body?.email);
+  }
+
   /** Super Admin: move the shared HR login to another person (16 Nov 2026). */
   @Post(':id/handover-login')
   handoverLogin(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: { toEmployeeId: number }) {

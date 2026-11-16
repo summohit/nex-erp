@@ -65,10 +65,29 @@ export class EmployeeProfileComponent implements OnInit {
   activeTab = signal<'work' | 'resume' | 'personal' | 'contacts' | 'documents' | 'history'>('work');
   employeeData = signal<any>(null);
 
+  /** Logins are deactivated as SUSPENDED (16 Nov 2026: the badge looked for DEACTIVATED and always said Active). */
+  isDeactivated(): boolean {
+    return ['SUSPENDED', 'INACTIVE', 'BLOCKED', 'DEACTIVATED'].includes(String(this.employeeData()?.user?.status || '').toUpperCase());
+  }
+
   /** Super Admin only, on the shared HR login (hr@ces-pl.com) — 16 Nov 2026. */
   canHandoverLogin(): boolean {
     return this.authService.currentUser()?.role === 'SUPERADMIN'
       && String(this.employeeData()?.user?.email || '').toLowerCase() === 'hr@ces-pl.com';
+  }
+
+  /** Super Admin or HR; not the shared HR login; HR not on a Super Admin. */
+  canChangeLoginEmail(): boolean {
+    const role = this.authService.currentUser()?.role;
+    const u = this.employeeData()?.user;
+    if (!u || (role !== 'SUPERADMIN' && role !== 'HR')) return false;
+    if (String(u.email || '').toLowerCase() === 'hr@ces-pl.com') return false;
+    return !(role === 'HR' && u.role === 'SUPERADMIN');
+  }
+
+  /** The dialog lives in the directory; open it there for this person. */
+  changeLoginEmail() {
+    this.router.navigate(['/employees/directory'], { queryParams: { loginEmail: this.employeeData()?.id } });
   }
 
   /** The hand over dialog lives in the directory; open it there for this person. */
