@@ -13,7 +13,7 @@
   </div>
 
   <!-- Required documents (self-service onboarding, 16 Nov 2026) -->
-  <section class="req-docs" *ngIf="onboarding" id="required-documents">
+  <section class="req-docs" *ngIf="onboarding || canWaive" id="required-documents">
     <div class="req-docs-head">
       <strong>Required documents <span class="req-star">*</span></strong>
       <span [class.req-docs-done]="!requiredDocsLeft">{{ requiredDocsLeft ? requiredDocsLeft + ' of ' + requiredDocs.length + ' still needed' : 'All uploaded' }}</span>
@@ -22,26 +22,28 @@
       <button type="button" *ngFor="let t of requiredDocs" class="req-doc" [class.done]="hasDoc(t)" (click)="uploadRequired(t)"
               [attr.aria-label]="t + (hasDoc(t) ? ' — uploaded' : ' — upload')">
         <span class="req-doc-dot" aria-hidden="true">{{ hasDoc(t) ? '✓' : '' }}</span>
-        <span class="req-doc-name">{{ t }}</span>
+        <span class="req-doc-name">{{ t }}<small class="req-doc-hint" *ngIf="hint(t) || need(t) > 1">{{ hint(t) }}{{ hint(t) && need(t) > 1 ? ' · ' : '' }}{{ need(t) > 1 ? haveCount(t) + ' of ' + need(t) + ' files' : '' }}</small></span>
         <span class="req-doc-go" *ngIf="!hasDoc(t)">Upload</span>
+        <small class="req-doc-waiver" *ngIf="waiverFor(t) as w" [class.ok]="w.status === 'APPROVED'" [class.bad]="w.status === 'REJECTED'" [title]="w.reason">{{ waiverText(w) }}</small>
+        <span class="req-doc-waive" role="button" tabindex="0" *ngIf="canWaive && !hasDoc(t) && waiverFor(t)?.status !== 'PENDING'"
+              (click)="waive(t, $event)" (keydown.enter)="waive(t, $event)">{{ role === 'SUPERADMIN' ? 'Waive' : 'Request waiver' }}</span>
       </button>
     </div>
-    <p class="req-docs-hint">After uploading, make sure each file has the right type. Other documents (passport, post-graduation, references) are optional.</p>
+    <p class="req-docs-hint">After uploading, make sure each file has the right type. Anything not listed here is optional.</p>
   </section>
 
   <!-- Documents Cards Responsive Grid -->
   <div class="documents-cards-grid">
-    <div class="doc-card" *ngFor="let doc of employeeData?.documents" [class.uncategorized]="doc.documentType === 'Other'">
+    <div class="doc-card" *ngFor="let doc of employeeData?.documents">
       
       <!-- Top Row: Icon + Category Badge -->
       <div class="doc-card-top">
-        <div class="doc-icon-badge" [ngClass]="doc.documentType === 'Other' ? 'amber' : (isImageDoc(doc) ? 'blue' : 'red')">
-          <svg *ngIf="doc.documentType === 'Other'" lucideClock size="18"></svg>
-          <svg *ngIf="doc.documentType !== 'Other' && isImageDoc(doc)" lucideImage size="18"></svg>
-          <svg *ngIf="doc.documentType !== 'Other' && !isImageDoc(doc)" lucideFileText size="18"></svg>
+        <div class="doc-icon-badge" [ngClass]="isImageDoc(doc) ? 'blue' : 'red'">
+          <svg *ngIf="isImageDoc(doc)" lucideImage size="18"></svg>
+          <svg *ngIf="!isImageDoc(doc)" lucideFileText size="18"></svg>
         </div>
 
-        <span class="doc-type-pill" [class.uncategorized-pill]="doc.documentType === 'Other'">
+        <span class="doc-type-pill">
           {{ getDocBadgeLabel(doc.documentType) }}
         </span>
       </div>
@@ -66,7 +68,7 @@
 
           <!-- Uncategorized "Other" File -->
           <div class="doc-uncategorized-prompt" *ngIf="doc.documentType === 'Other'">
-            <span class="prompt-text">What is this file?</span>
+            <span class="prompt-text">File under a type?</span>
             <select class="doc-set-type-select" (change)="retype(doc, $any($event.target).value)" aria-label="Set document type">
               <option value="" disabled selected>Set type… ▾</option>
               <option *ngFor="let type of documentTypes" [value]="type" [disabled]="type === 'Other'">{{ type }}</option>
@@ -111,14 +113,16 @@
     <div class="modal-body">
       <div class="form-group">
         <label>Document Type <span class="required">*</span></label>
-        <select class="form-control" [(ngModel)]="selectedDocumentType">
-          <option *ngFor="let type of availableDocumentTypes" [value]="type">{{ type }}</option>
+        <select class="form-control" [ngModel]="selectedDocumentType" (ngModelChange)="onTypeChange($event)">
+          <option *ngFor="let type of availableDocumentTypes" [value]="type">{{ type === 'Other' ? 'Other (type its name)' : type }}</option>
         </select>
       </div>
 
       <div class="form-group">
-        <label>File name <span class="required">*</span></label>
-        <input type="text" class="form-control" [(ngModel)]="fileName">
+        <label>{{ isOtherType ? 'Document name' : 'File name' }} <span class="required">*</span></label>
+        <input type="text" class="form-control" [(ngModel)]="fileName" (ngModelChange)="nameFromFile = false" maxlength="80"
+               [placeholder]="isOtherType ? 'e.g. Medical Fitness Certificate' : ''">
+        <small class="field-hint" *ngIf="isOtherType">What is this document? HR sees this name on the card.</small>
       </div>
       
       <div class="form-group">

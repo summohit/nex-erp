@@ -302,15 +302,8 @@ export class SidebarComponent implements OnInit {
     if (subItem.route && !subItem.external && subItem.route !== '/careers' && this.opensElsewhere(event)) return;
     event.preventDefault();
     if (subItem.external || subItem.route === '/careers') {
-      let route = subItem.route;
-      if (subItem.route === '/careers') {
-        const currentUser = this.user();
-        if (currentUser && currentUser.companyId) {
-          const encrypted = btoa(currentUser.companyId);
-          route = `/careers/${encrypted}`;
-        }
-      }
-      window.open(route, '_blank');
+      // Plain /careers, without the encoded company id (16 Nov 2026).
+      window.open(subItem.route, '_blank');
       return;
     }
     

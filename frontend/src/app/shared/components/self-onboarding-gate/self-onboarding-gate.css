@@ -51,8 +51,8 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #E8F0FE;
-  color: #1A73E8;
+  background: #FEF2F2;
+  color: #DC2626;
   font-family: var(--font-heading);
   font-size: 15px;
   font-weight: 700;
@@ -115,13 +115,13 @@
 }
 
 .sog-steps li.on {
-  color: #1A73E8;
+  color: #DC2626;
   font-weight: 600;
 }
 
 .sog-steps li.on .sog-step-num {
-  background: #1A73E8;
-  border-color: #1A73E8;
+  background: #DC2626;
+  border-color: #DC2626;
   color: #FFFFFF;
 }
 
@@ -176,8 +176,8 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #E8F0FE;
-  color: #1A73E8;
+  background: #FEF2F2;
+  color: #DC2626;
   font-size: 11px;
   font-weight: 600;
   display: inline-flex;
@@ -219,7 +219,7 @@
 }
 
 .sog-signout-btn:focus-visible {
-  outline: 2px solid #1A73E8;
+  outline: 2px solid #DC2626;
   outline-offset: 2px;
 }
 
@@ -283,9 +283,9 @@
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border: 1px solid #bfdbfe;
-  color: #2563eb;
+  background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
+  border: 1px solid #FECACA;
+  color: #DC2626;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -296,7 +296,7 @@
   position: absolute;
   inset: -4px;
   border-radius: 17px;
-  border: 1px solid rgba(37, 99, 235, 0.18);
+  border: 1px solid rgba(220, 38, 38, 0.18);
   pointer-events: none;
 }
 
@@ -308,9 +308,9 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #1d4ed8;
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
+  color: #B91C1C;
+  background: #FEF2F2;
+  border: 1px solid #FEE2E2;
   padding: 4px 10px;
   border-radius: 999px;
   margin-bottom: 10px;
@@ -424,7 +424,7 @@
 }
 
 .sog-input-wrap:focus-within .sog-input-icon {
-  color: #2563eb;
+  color: #DC2626;
 }
 
 .sog-input-wrap input {
@@ -449,12 +449,12 @@
 .sog-input-wrap input:focus {
   outline: none;
   background: #ffffff;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  border-color: #DC2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
 }
 
 .sog-input-wrap input:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid #DC2626;
   outline-offset: 1px;
 }
 
@@ -491,7 +491,7 @@
 }
 
 .sog-eye-btn:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid #DC2626;
   outline-offset: 1px;
 }
 
@@ -543,7 +543,7 @@
 
 .sog-strength[data-level="weak"] .sog-strength-bars span.active { background: #ef4444; }
 .sog-strength[data-level="fair"] .sog-strength-bars span.active { background: #f59e0b; }
-.sog-strength[data-level="good"] .sog-strength-bars span.active { background: #2563eb; }
+.sog-strength[data-level="good"] .sog-strength-bars span.active { background: #DC2626; }
 .sog-strength[data-level="strong"] .sog-strength-bars span.active { background: #16a34a; }
 
 .sog-strength-label {
@@ -556,7 +556,7 @@
 
 .sog-strength[data-level="weak"] .sog-strength-label { color: #dc2626; }
 .sog-strength[data-level="fair"] .sog-strength-label { color: #b45309; }
-.sog-strength[data-level="good"] .sog-strength-label { color: #1d4ed8; }
+.sog-strength[data-level="good"] .sog-strength-label { color: #B91C1C; }
 .sog-strength[data-level="strong"] .sog-strength-label { color: #15803d; }
 
 .sog-visually-hidden:where(:not(:focus-within, :active)) {
@@ -580,13 +580,13 @@
   padding: 0 22px;
   border: 0;
   border-radius: 12px;
-  background: #2563eb;
+  background: #DC2626;
   color: #ffffff;
   font-family: inherit;
   font-weight: 600;
   font-size: 14.5px;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.28);
   transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -596,9 +596,9 @@
 }
 
 .sog-primary:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: #B91C1C;
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.34);
+  box-shadow: 0 6px 18px rgba(220, 38, 38, 0.34);
 }
 
 .sog-primary:active:not(:disabled) {
@@ -606,7 +606,7 @@
 }
 
 .sog-primary:focus-visible {
-  outline: 2px solid #1A73E8;
+  outline: 2px solid #DC2626;
   outline-offset: 2px;
 }
 
@@ -648,7 +648,7 @@
   margin: 0 0 6px;
   font-size: 12.5px;
   font-weight: 600;
-  color: #1A73E8;
+  color: #DC2626;
   letter-spacing: 0.01em;
 }
 
@@ -670,6 +670,23 @@
 }
 
 /* HR change requests soft amber banner */
+/* The embedded profile's accent, red inside onboarding (16 Nov 2026). The
+   profile styles read these variables and fall back to their usual blue
+   everywhere else. Custom properties inherit through component boundaries. */
+.sog-profile-surface {
+  --pf-accent: #DC2626;
+  --pf-accent-rgb: 220, 38, 38;
+  --pf-accent-strong: #B91C1C;
+  --pf-accent-mid: #EF4444;
+  --pf-accent-light: #F87171;
+  --pf-accent-alt: #DC2626;
+  --pf-accent-alt-rgb: 220, 38, 38;
+  --pf-accent-soft: #FEF2F2;
+  --pf-accent-soft2: #FEE2E2;
+  --pf-accent-border: #FECACA;
+  --pf-accent-border2: #FCA5A5;
+}
+
 .sog-amber-banner {
   display: flex;
   align-items: flex-start;
@@ -698,6 +715,34 @@
   font-size: 14px;
   font-weight: 600;
   color: #202124;
+}
+
+.sog-amber-hint {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #5F6368;
+}
+
+.sog-note-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.sog-note-check input {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  accent-color: #1E8E3E;
+  cursor: pointer;
+}
+
+.sog-note-check.done > span {
+  color: #5F6368;
+  text-decoration: line-through;
 }
 
 .sog-amber-list {
@@ -761,7 +806,7 @@
 .sog-setup-bar-fill {
   height: 100%;
   border-radius: 9999px;
-  background: #1A73E8;
+  background: #DC2626;
   transition: width 0.2s ease, background-color 0.2s ease;
 }
 
@@ -793,12 +838,12 @@
 }
 
 .sog-req:hover {
-  background: rgba(26, 115, 232, 0.08);
-  border-color: #1A73E8;
+  background: rgba(220, 38, 38, 0.08);
+  border-color: #DC2626;
 }
 
 .sog-req:focus-visible {
-  outline: 2px solid #1A73E8;
+  outline: 2px solid #DC2626;
   outline-offset: 2px;
 }
 
@@ -823,8 +868,8 @@
 .sog-req-go {
   padding: 1px 7px;
   border-radius: 9999px;
-  background: #E8F0FE;
-  color: #1A73E8;
+  background: #FEF2F2;
+  color: #DC2626;
   font-size: 11px;
   font-weight: 600;
   line-height: 1.4;
@@ -966,7 +1011,7 @@ app-employee-profile {
   border: 1px solid #DADCE0;
   border-radius: 9999px;
   background: #FFFFFF;
-  color: #1A73E8;
+  color: #DC2626;
   font-family: inherit;
   font-size: 14px;
   font-weight: 600;
@@ -975,8 +1020,8 @@ app-employee-profile {
 }
 
 .sog-btn-save:hover:not(:disabled) {
-  background: rgba(26, 115, 232, 0.08);
-  border-color: #1A73E8;
+  background: rgba(220, 38, 38, 0.08);
+  border-color: #DC2626;
 }
 
 .sog-btn-submit {
@@ -989,7 +1034,7 @@ app-employee-profile {
   padding: 0 24px;
   border: 0;
   border-radius: 9999px;
-  background: #1A73E8;
+  background: #DC2626;
   color: #FFFFFF;
   font-family: inherit;
   font-size: 14px;
@@ -999,13 +1044,13 @@ app-employee-profile {
 }
 
 .sog-btn-submit:hover:not(:disabled) {
-  background: #1765CC;
+  background: #B91C1C;
 }
 
 .sog-btn-save:focus-visible,
 .sog-btn-submit:focus-visible,
 .sog-btn-tonal:focus-visible {
-  outline: 2px solid #1A73E8;
+  outline: 2px solid #DC2626;
   outline-offset: 2px;
 }
 
@@ -1101,7 +1146,7 @@ app-employee-profile {
 }
 
 .sog-review-steps li.active {
-  color: #1A73E8;
+  color: #DC2626;
   font-weight: 600;
 }
 
@@ -1121,14 +1166,14 @@ app-employee-profile {
 }
 
 .sog-review-steps li.active .sog-rs-dot {
-  background: #E8F0FE;
+  background: #FEF2F2;
 }
 
 .sog-rs-pulse {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #1A73E8;
+  background: #DC2626;
   animation: sogDotPulse 1.8s ease-in-out infinite;
 }
 
@@ -1143,8 +1188,8 @@ app-employee-profile {
   padding: 0 24px;
   border: 0;
   border-radius: 9999px;
-  background: #E8F0FE;
-  color: #1A73E8;
+  background: #FEF2F2;
+  color: #DC2626;
   font-family: inherit;
   font-size: 14px;
   font-weight: 600;
@@ -1153,7 +1198,7 @@ app-employee-profile {
 }
 
 .sog-btn-tonal:hover:not(:disabled) {
-  background: rgba(26, 115, 232, 0.16);
+  background: rgba(220, 38, 38, 0.16);
 }
 
 @keyframes sogDotPulse {
@@ -1220,7 +1265,7 @@ app-employee-profile {
 
   .sog-mobile-step-count {
     font-weight: 600;
-    color: #1A73E8;
+    color: #DC2626;
   }
 
   .sog-mobile-step-name {
@@ -1232,13 +1277,13 @@ app-employee-profile {
     width: calc(100% + 32px);
     margin-left: -16px;
     height: 4px;
-    background: #E8F0FE;
+    background: #FEF2F2;
     overflow: hidden;
   }
 
   .sog-mobile-progress-fill {
     height: 100%;
-    background: #1A73E8;
+    background: #DC2626;
     transition: width 0.2s ease;
   }
 

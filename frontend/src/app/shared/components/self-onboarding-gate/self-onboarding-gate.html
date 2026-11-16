@@ -225,10 +225,14 @@
     <section class="sog-amber-banner" *ngIf="notes().length" role="alert">
       <svg lucideAlertCircle size="20" class="sog-amber-icon" aria-hidden="true"></svg>
       <div class="sog-amber-body">
-        <strong class="sog-amber-title">HR asked for a few changes</strong>
+        <strong class="sog-amber-title">HR asked for {{ notes().length }} change{{ notes().length === 1 ? '' : 's' }}</strong>
+        <p class="sog-amber-hint">Tick each one once you have fixed it. Submit for review comes back when all are ticked ({{ notesTicked() }} of {{ notes().length }}).</p>
         <ul class="sog-amber-list">
           <li *ngFor="let n of notes()">
-            <span class="sog-amber-section">{{ n.label }}</span> — {{ n.note }}
+            <label class="sog-note-check" [class.done]="isTicked(n)">
+              <input type="checkbox" [checked]="isTicked(n)" (change)="toggleNote(n, $any($event.target).checked)">
+              <span><span class="sog-amber-section">{{ n.label }}</span> — {{ n.note }}</span>
+            </label>
           </li>
         </ul>
       </div>
@@ -278,14 +282,18 @@
     <footer class="sog-submit-bar">
       <div class="sog-submit-inner">
         <div class="sog-submit-status" aria-live="polite">
-          <strong>{{ readyToSubmit() ? 'Ready to send your profile to HR?' : requiredLeft() + ' required item' + (requiredLeft() === 1 ? '' : 's') + ' left' }}</strong>
-          <p>{{ readyToSubmit() ? 'All required details are saved. Save any last changes, then submit.' : 'Fill them in and press Save. Submit appears once they are saved.' }}</p>
+          <strong>{{ canSubmit() ? 'Ready to send your profile to HR?'
+            : !readyToSubmit() ? requiredLeft() + ' required item' + (requiredLeft() === 1 ? '' : 's') + ' left'
+            : notesLeft() + ' HR note' + (notesLeft() === 1 ? '' : 's') + ' to tick' }}</strong>
+          <p>{{ canSubmit() ? 'All required details are saved. Save any last changes, then submit.'
+            : !readyToSubmit() ? 'Fill them in and press Save. Submit appears once they are saved.'
+            : 'Fix each of HR’s notes at the top and tick it. Submit appears once all are ticked.' }}</p>
         </div>
         <div class="sog-submit-actions">
           <button type="button" class="sog-btn-save" (click)="saveDraft()" [disabled]="saving() || submitting()">
             {{ saving() ? 'Saving…' : 'Save' }}
           </button>
-          <button type="button" class="sog-btn-submit" *ngIf="readyToSubmit()" (click)="submitForReview()" [disabled]="submitting() || saving()">
+          <button type="button" class="sog-btn-submit" *ngIf="canSubmit()" (click)="submitForReview()" [disabled]="submitting() || saving()">
             <svg *ngIf="!submitting()" lucideSend size="16"></svg>
             <span>{{ submitting() ? 'Submitting…' : 'Submit for review' }}</span>
           </button>

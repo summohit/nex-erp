@@ -307,10 +307,9 @@ export class SidebarComponentV2 implements OnInit {
       // Stop the link's own navigation, or this tab follows it too while the
       // new tab opens (12 Nov 2026).
       event.preventDefault();
-      let route = item.route;
-      // The public careers page is addressed by the company id.
-      if (item.route === '/careers' && this.user()?.companyId) route = `/careers/${btoa(String(this.user().companyId))}`;
-      window.open(route, '_blank');
+      // Plain /careers: management did not want the encoded company id in the
+      // address (16 Nov 2026). Old /careers/<id> links still open.
+      window.open(item.route, '_blank');
       return;
     }
     // Ctrl/Cmd-click or middle-click: let the browser open the link in a new tab.

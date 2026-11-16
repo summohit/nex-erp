@@ -3,8 +3,10 @@
  * job detail page and the careers page alike: the company's careers page with
  * `?job=<id>`, which opens that posting directly.
  */
-export function jobPublicUrl(companyId: number | string, jobId: number | string): string {
-  return `${window.location.origin}/careers/${btoa(String(companyId))}?job=${encodeURIComponent(String(jobId))}`;
+export function jobPublicUrl(_companyId: number | string, jobId: number | string): string {
+  // No encoded company id in the address (16 Nov 2026): /careers lists every
+  // open posting and ?job= opens this one.
+  return `${window.location.origin}/careers?job=${encodeURIComponent(String(jobId))}`;
 }
 
 export function shareJobOnWhatsApp(title: string, location: string | null | undefined, url: string): void {

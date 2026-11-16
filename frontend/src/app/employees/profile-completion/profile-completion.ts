@@ -2,6 +2,8 @@ import { ProfileModalService } from '../../shared/profile-modal/profile-modal.se
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
+import { DocumentRequirementsComponent } from './document-requirements/document-requirements';
+import { WaiverQueueComponent } from './waiver-queue/waiver-queue';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { DatePresetFilterComponent, DatePreset, DateRange, inDateRange } from '../../shared/components/date-preset-filter/date-preset-filter';
@@ -37,6 +39,8 @@ import {
   imports: [
     CommonModule,
     PageHeaderComponent,
+    DocumentRequirementsComponent,
+    WaiverQueueComponent,
     FormsModule,
     RouterModule,
     DatePresetFilterComponent,
@@ -62,6 +66,9 @@ import {
   styleUrl: './profile-completion.css',
 })
 export class ProfileCompletionComponent implements OnInit {
+  /** Document requirements editor (16 Nov 2026). */
+  showDocRules = signal(false);
+
   private employees = inject(EmployeeService);
   profileModal = inject(ProfileModalService);
 

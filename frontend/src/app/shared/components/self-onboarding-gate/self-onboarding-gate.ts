@@ -7,6 +7,7 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { Router } from '@angular/router';
 import { EmployeeProfileComponent } from '../../../employees/employee-profile/employee-profile';
 import { of, switchMap } from 'rxjs';
+import { onboardingPreviewStep } from './onboarding-preview';
 import {
   LucideAlertCircle,
   LucideArrowRight,
@@ -83,7 +84,10 @@ export class SelfOnboardingGateComponent {
   @ViewChild(EmployeeProfileComponent) private profile?: EmployeeProfileComponent;
 
   user = this.auth.currentUser;
+  /** Localhost preview (?previewOnboarding=…): shows a step, saves nothing. */
+  readonly preview = onboardingPreviewStep();
   step = computed<'password' | 'profile' | 'review'>(() => {
+    if (this.preview) return this.preview;
     const u = this.user();
     if (u?.mustChangePassword) return 'password';
     return u?.employee?.selfOnboardingStatus === 'SUBMITTED' ? 'review' : 'profile';
@@ -124,6 +128,39 @@ export class SelfOnboardingGateComponent {
   /** Submit shows only once every required item is saved on the server. */
   readyToSubmit = computed(() => this.required().length > 0 && this.requiredLeft() === 0);
 
+  /**
+   * HR's notes, each ticked by the employee once fixed (16 Nov 2026). With 4
+   * notes there are 4 checkboxes, and Submit for review comes back only when
+   * all are ticked. Ticks are remembered per note text in this browser, so a
+   * reload keeps them and a fresh set of notes starts unticked.
+   */
+  ticked = signal<Record<string, string>>({});
+  notesTicked = computed(() => this.notes().filter(n => this.ticked()[n.key] === n.note).length);
+  notesLeft = computed(() => this.notes().length - this.notesTicked());
+  canSubmit = computed(() => this.readyToSubmit() && this.notesLeft() === 0);
+
+  isTicked(n: { key: string; note: string }): boolean {
+    return this.ticked()[n.key] === n.note;
+  }
+
+  toggleNote(n: { key: string; note: string }, on: boolean) {
+    const next = { ...this.ticked() };
+    if (on) next[n.key] = n.note; else delete next[n.key];
+    this.ticked.set(next);
+    try { localStorage.setItem(this.tickStoreKey(), JSON.stringify(next)); } catch { /* private mode */ }
+  }
+
+  private tickStoreKey(): string {
+    return `onb-notes-ticked-${this.user()?.employee?.id ?? 'me'}`;
+  }
+
+  private restoreTicks() {
+    try {
+      const raw = localStorage.getItem(this.tickStoreKey());
+      this.ticked.set(raw ? JSON.parse(raw) : {});
+    } catch { this.ticked.set({}); }
+  }
+
   constructor() {
     this.loadNotes();
   }
@@ -136,6 +173,14 @@ export class SelfOnboardingGateComponent {
         this.notes.set(Object.entries(r.notes || {})
           .filter(([, v]) => !!v)
           .map(([k, v]) => ({ key: k, label: r.sections?.[k] || k, note: v })));
+        // Localhost preview: sample notes so the tick-to-submit flow can be tried.
+        if (this.preview && !this.notes().length) {
+          this.notes.set([
+            { key: 'preview-bank', label: 'Bank details', note: 'IFSC code does not match the cancelled cheque.' },
+            { key: 'preview-docs', label: 'Documents', note: 'Aadhaar back side is missing.' },
+          ]);
+        }
+        this.restoreTicks();
       },
       error: () => {},
     });
@@ -196,6 +241,7 @@ export class SelfOnboardingGateComponent {
       this.confirmPasswordInput?.nativeElement?.focus();
       return;
     }
+    if (this.blockedInPreview()) return;
     this.savingPassword.set(true);
     this.auth.changePassword(this.newPassword).subscribe({
       next: () => {
@@ -235,7 +281,7 @@ export class SelfOnboardingGateComponent {
 
   /** Saves whatever form is open; the profile shows field errors itself. */
   saveDraft() {
-    if (!this.profile) return;
+    if (!this.profile || this.blockedInPreview()) return;
     this.saving.set(true);
     this.profile.saveOpenForm$().subscribe(ok => {
       this.saving.set(false);
@@ -245,6 +291,7 @@ export class SelfOnboardingGateComponent {
 
   /** Saves the open form first, then submits; anything missing opens its field. */
   submitForReview() {
+    if (this.blockedInPreview()) return;
     this.submitting.set(true);
     (this.profile ? this.profile.saveOpenForm$() : of(true)).pipe(
       switchMap(saved => saved ? this.onboarding.submitMySelfOnboarding() : of(null)),
@@ -286,7 +333,15 @@ export class SelfOnboardingGateComponent {
     });
   }
 
+  /** Preview never writes: the profile shown is the viewer's own, on live data. */
+  private blockedInPreview(): boolean {
+    if (!this.preview) return false;
+    this.toast.info('Preview only — nothing was saved.');
+    return true;
+  }
+
   logout() {
+    if (this.preview) { window.location.href = '/dashboard'; return; }
     this.auth.logout();
     this.router.navigate(['/']);
   }

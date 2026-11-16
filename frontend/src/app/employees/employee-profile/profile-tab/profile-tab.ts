@@ -55,7 +55,35 @@ export interface ProfileFormErrors {
   state?: string;
   city?: string;
   zipCode?: string;
+  avatarUrl?: string;
+  identificationNo?: string;
+  pfNumber?: string;
+  esiNumber?: string;
+  passportNo?: string;
+  spouseName?: string;
 }
+
+/**
+ * Format checks for the profile form (16 Nov 2026). Each runs only when the
+ * field has a value — whether it is required is a separate question.
+ * `upper` fields are trimmed and upper-cased before the check and the save.
+ */
+const NAME_RE = /^[A-Za-z][A-Za-z .'-]*$/;
+const PROFILE_FORMATS: { key: keyof ProfileFormErrors; upper?: boolean; strip?: RegExp; test: (v: string, f: any) => boolean; msg: string }[] = [
+  { key: 'firstName', test: v => NAME_RE.test(v), msg: 'Use letters only (spaces, . \' - allowed).' },
+  { key: 'lastName', test: v => NAME_RE.test(v), msg: 'Use letters only (spaces, . \' - allowed).' },
+  { key: 'spouseName', test: v => NAME_RE.test(v), msg: 'Use letters only (spaces, . \' - allowed).' },
+  { key: 'bankAccountNumber', strip: /\s/g, test: v => /^\d{9,18}$/.test(v), msg: 'Bank account number should be 9–18 digits.' },
+  { key: 'ifscCode', upper: true, test: v => /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v), msg: 'IFSC is 11 characters: 4 letters, 0, then 6 letters/digits (e.g. HDFC0001234).' },
+  { key: 'zipCode', test: (v, f) => (!f.country || f.country === 'IN') ? /^[1-9]\d{5}$/.test(v) : /^[A-Za-z0-9 -]{3,10}$/.test(v),
+    msg: 'Enter a valid PIN code (6 digits, not starting with 0).' },
+  { key: 'identificationNo', upper: true, strip: /[\s-]/g,
+    test: v => /^\d+$/.test(v) ? /^[2-9]\d{11}$/.test(v) : /^[A-Z0-9]{5,20}$/.test(v),
+    msg: 'Aadhaar is 12 digits (not starting with 0 or 1); other IDs 5–20 letters/digits.' },
+  { key: 'pfNumber', upper: true, strip: /\s/g, test: v => /^[A-Z0-9/]{5,26}$/.test(v), msg: 'PF number: 5–26 letters, digits or /.' },
+  { key: 'esiNumber', strip: /[\s-]/g, test: v => /^\d{10}(\d{7})?$/.test(v), msg: 'ESI number is 10 or 17 digits.' },
+  { key: 'passportNo', upper: true, strip: /\s/g, test: v => /^[A-Z0-9]{6,9}$/.test(v), msg: 'Passport number: 6–9 letters/digits (e.g. K1234567).' },
+];
 
 @Component({
   selector: 'app-profile-tab',
@@ -120,6 +148,7 @@ export class ProfileTabComponent implements OnInit {
   // Maps each validated field to the tab/sub-tab that contains it, so validation
   // errors can auto-navigate to the right section before scrolling to the field.
   private fieldTabMap: Record<string, { parent: 'work' | 'resume' | 'personal'; subTab?: 'all' | 'contact_bank' | 'personal' | 'citizenship_visa' | 'location' | 'family_edu' | 'bio' }> = {
+    avatarUrl: { parent: 'personal' },
     firstName: { parent: 'personal', subTab: 'personal' },
     lastName: { parent: 'personal', subTab: 'personal' },
     phone: { parent: 'personal', subTab: 'contact_bank' },
@@ -133,7 +162,12 @@ export class ProfileTabComponent implements OnInit {
     city: { parent: 'personal', subTab: 'location' },
     zipCode: { parent: 'personal', subTab: 'location' },
     homeWorkDistanceKm: { parent: 'personal', subTab: 'location' },
-    childrenCount: { parent: 'personal', subTab: 'family_edu' }
+    childrenCount: { parent: 'personal', subTab: 'family_edu' },
+    spouseName: { parent: 'personal', subTab: 'family_edu' },
+    identificationNo: { parent: 'personal', subTab: 'citizenship_visa' },
+    pfNumber: { parent: 'personal', subTab: 'citizenship_visa' },
+    esiNumber: { parent: 'personal', subTab: 'citizenship_visa' },
+    passportNo: { parent: 'personal', subTab: 'citizenship_visa' },
   };
 
   setPersonalSubTab(tab: 'all' | 'contact_bank' | 'personal' | 'citizenship_visa' | 'location' | 'family_edu' | 'bio') {
@@ -799,6 +833,7 @@ export class ProfileTabComponent implements OnInit {
       next: (res) => {
         this.isUploadingAvatar = false;
         this.formData.avatarUrl = res.url;
+        delete this.errors.avatarUrl;
         // Photos are an independent asset. Persist immediately so a user does
         // not lose a newly uploaded photo by navigating away without saving
         // unrelated profile fields.
@@ -1050,9 +1085,13 @@ export class ProfileTabComponent implements OnInit {
     keys.forEach(k => { if (msg[k]) (this.errors as any)[k] = msg[k]; });
   }
 
-  /** Every field a new joiner must fill (same list as the server's onboarding checklist). */
+  /**
+   * The starred fields. Required on every profile save since 16 Nov 2026 (was
+   * onboarding only); same list as the server's onboarding checklist.
+   */
   private onboardingRequiredMessages(): Record<string, string> {
     const m: Record<string, string> = {
+      avatarUrl: 'Profile picture is required — upload a clear, front-facing photo.',
       phone: 'Mobile phone is required.',
       bankName: 'Bank name is required.',
       bankAccountNumber: 'Bank account number is required.',
@@ -1076,7 +1115,7 @@ export class ProfileTabComponent implements OnInit {
     this.errors = {};
     let valid = true;
 
-    if (this.onboarding) {
+    {
       const req = this.onboardingRequiredMessages();
       for (const key of Object.keys(req)) {
         if (this.isOnboardingFieldEmpty(key)) { (this.errors as any)[key] = req[key]; valid = false; }
@@ -1097,6 +1136,19 @@ export class ProfileTabComponent implements OnInit {
       const phoneRegex = /^\+?[0-9]{10,15}$/;
       if (!phoneRegex.test(this.formData.phone)) {
         this.errors.phone = 'Enter a valid mobile number (10–15 digits).';
+        valid = false;
+      }
+    }
+
+    for (const rule of PROFILE_FORMATS) {
+      const raw = this.formData[rule.key];
+      if (raw == null || String(raw).trim() === '' || this.errors[rule.key]) continue;
+      let v = String(raw).trim();
+      if (rule.strip) v = v.replace(rule.strip, '');
+      if (rule.upper) v = v.toUpperCase();
+      if (rule.upper || rule.strip) this.formData[rule.key] = v; // saved tidy
+      if (!rule.test(v, this.formData)) {
+        this.errors[rule.key] = rule.msg;
         valid = false;
       }
     }
@@ -1136,7 +1188,7 @@ export class ProfileTabComponent implements OnInit {
   }
 
   private focusFirstError() {
-    const order: (keyof ProfileFormErrors)[] = ['firstName', 'lastName', 'phone', 'bankName', 'bankAccountNumber', 'ifscCode', 'dateOfBirth', 'country', 'state', 'city', 'zipCode', 'homeWorkDistanceKm', 'address', 'childrenCount'];
+    const order: (keyof ProfileFormErrors)[] = ['avatarUrl', 'firstName', 'lastName', 'phone', 'bankName', 'bankAccountNumber', 'ifscCode', 'dateOfBirth', 'country', 'state', 'city', 'zipCode', 'homeWorkDistanceKm', 'address', 'identificationNo', 'pfNumber', 'esiNumber', 'passportNo', 'spouseName', 'childrenCount'];
     const first = order.find(k => !!this.errors[k]);
     if (!first) return;
 
@@ -1146,19 +1198,28 @@ export class ProfileTabComponent implements OnInit {
     if (this.activeSubTab !== target.parent) {
       this.tabChange.emit(target.parent);
     }
-    if (target.parent === 'personal' && target.subTab) {
+    // "All Sections" already shows every field; only switch away from a
+    // different single section.
+    if (target.parent === 'personal' && target.subTab && this.personalSubTab !== 'all') {
       this.personalSubTab = target.subTab;
     }
 
-    // Wait a tick for the tab content to render, then scroll & focus the field
-    setTimeout(() => {
+    // Wait for the tab to render (a parent-tab switch takes a moment), then
+    // scroll to the field and put the cursor in it. The id sits on the input
+    // itself for most fields, on a wrapper for compound ones (16 Nov 2026).
+    const tryFocus = (attempt: number) => {
       const el = document.getElementById(`field-${first}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const input = el.querySelector('input, select, textarea') as HTMLElement | null;
-        input?.focus({ preventScroll: true });
-      }
-    }, 60);
+      if (!el) { if (attempt < 10) setTimeout(() => tryFocus(attempt + 1), 80); return; }
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const input = el.matches('input, select, textarea')
+        ? el
+        : (el.querySelector('input:not([type=file]), select, textarea') as HTMLElement | null) ?? el;
+      input.focus({ preventScroll: true });
+      el.classList.remove('field-flash');
+      void el.offsetWidth;
+      el.classList.add('field-flash');
+    };
+    setTimeout(() => tryFocus(0), 60);
   }
 
   goBack() {

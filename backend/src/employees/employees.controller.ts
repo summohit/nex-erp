@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile, BadRequestException, ForbiddenException, ParseIntPipe } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProfileCompletenessService } from './profile-completeness/profile-completeness.service';
+import { uploadTypes } from './profile-completeness/document-policy';
 import {
   ALL_DOCUMENT_TYPES, OPTIONAL_DOCUMENTS, PREVIOUS_EMPLOYMENT_DOCUMENTS, REQUIRED_DOCUMENTS,
 } from './profile-completeness/profile-documents';
@@ -174,11 +175,45 @@ export class EmployeesController {
 
   /** The document types, in order: one list for every upload dropdown. */
   @Get('document-types')
-  getDocumentTypes() {
+  async getDocumentTypes(@Request() req) {
+    // From HR's document rules (16 Nov 2026); the old keys stay for callers.
+    const rules = await this.profileCompleteness.getDocumentPolicy(req.user.companyId);
+    const active = rules.filter((r) => r.active);
     return {
-      required: REQUIRED_DOCUMENTS, previousEmployment: PREVIOUS_EMPLOYMENT_DOCUMENTS,
-      optional: OPTIONAL_DOCUMENTS, all: ALL_DOCUMENT_TYPES,
+      rules,
+      required: active.filter((r) => r.required === 'ALL').map((r) => r.type),
+      previousEmployment: active.filter((r) => r.required === 'EXPERIENCED').map((r) => r.type),
+      optional: [...active.filter((r) => r.required === 'OPTIONAL').map((r) => r.type), 'Other'],
+      all: uploadTypes(rules),
     };
+  }
+
+  /** HR / Super Admin: replace the document rules (Settings → Document Requirements). */
+  @Put('profile-completeness/document-policy')
+  saveDocumentPolicy(@Request() req, @Body() body: { rules: unknown }) {
+    return this.profileCompleteness.saveDocumentPolicy(req.user.companyId, req.user.role, body?.rules);
+  }
+
+  /** Super Admin: document waivers waiting for a decision (16 Nov 2026). */
+  @Get('profile-completeness/waivers')
+  getPendingWaivers(@Request() req) {
+    return this.profileCompleteness.pendingWaivers(req.user.companyId, req.user.role);
+  }
+
+  @Put('profile-completeness/waivers/:waiverId')
+  decideWaiver(@Request() req, @Param('waiverId', ParseIntPipe) waiverId: number, @Body() body: { action: 'APPROVE' | 'REJECT'; note?: string }) {
+    return this.profileCompleteness.decideWaiver(req.user.companyId, req.user.role, req.user.employeeId ?? null, waiverId, body?.action, body?.note);
+  }
+
+  @Get(':id/document-waivers')
+  getWaivers(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.profileCompleteness.listWaivers(req.user.companyId, id);
+  }
+
+  /** HR asks for a waiver; the Super Admin's is approved at once. */
+  @Post(':id/document-waivers')
+  requestWaiver(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: { documentType: string; reason: string }) {
+    return this.profileCompleteness.requestWaiver(req.user.companyId, req.user.role, req.user.employeeId ?? null, id, body?.documentType, body?.reason);
   }
 
   @Get('me/profile')

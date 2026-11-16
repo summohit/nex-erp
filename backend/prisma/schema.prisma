@@ -556,6 +556,9 @@ model Employee {
 
   emergencyContacts             EmergencyContact[]
   documents                     EmployeeDocument[]
+  documentWaivers               DocumentWaiver[] @relation("WaiverEmployee")
+  documentWaiversRequested      DocumentWaiver[] @relation("WaiverRequestedBy")
+  documentWaiversDecided        DocumentWaiver[] @relation("WaiverDecidedBy")
   leaveBalances                 LeaveBalance[]
   compOffCredits                CompOffCredit[]
   leaveEncashments              LeaveEncashment[]
@@ -3198,6 +3201,9 @@ model SystemSetting {
   /// Field visit travel allowance (super admin): { ncrRadiusKm, rates:
   /// [{ vehicle, ratePerKm }] }. See field-visits/travel/travel-allowance.service.ts.
   travelAllowanceConfig         Json?
+  /// Required documents, set by HR / Super Admin (16 Nov 2026): [{ type, required:
+  /// ALL | EXPERIENCED | OPTIONAL, count, hint, active }]. Null = built-in defaults.
+  documentPolicy                Json?
   defaultTicketAssigneeId       Int? // Employee auto-assigned as default ticket assignee
   // Standard terms pre-filled into every new quotation. Editable on the quote
   // itself, so this is a starting point rather than a policy — null falls back
@@ -5361,3 +5367,26 @@ model EmployeeDetailSuggestion {
   @@index([employeeId, field, status])
 }
 
+
+/// A required document the person cannot provide, waived by the Super Admin
+/// (16 Nov 2026). HR asks; the Super Admin approves or rejects, or waives
+/// directly. APPROVED counts as uploaded in every document check.
+model DocumentWaiver {
+  id            Int       @id @default(autoincrement())
+  employeeId    Int
+  employee      Employee  @relation("WaiverEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  documentType  String
+  reason        String
+  status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  requestedById Int?
+  requestedBy   Employee? @relation("WaiverRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  decidedById   Int?
+  decidedBy     Employee? @relation("WaiverDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt     DateTime?
+  decisionNote  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+}

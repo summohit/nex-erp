@@ -393,8 +393,9 @@
     <!-- SECTION: PHOTO -->
     <div class="field-section">
       <div class="form-group profile-pic-group">
-        <label class="profile-picture-label"><svg lucideImage size="16" aria-hidden="true"></svg><span>Profile Picture</span><svg lucideCircleHelp size="15" class="help-icon photo-help-icon" title="Upload a clear, front-facing JPG, PNG, or GIF under 5 MB" aria-label="Profile photo requirements"></svg></label>
-        <div class="profile-pic-upload" [class.has-image]="formData.avatarUrl" [class.readonly]="!canEditPersonalDetails">
+        <label class="profile-picture-label"><svg lucideImage size="16" aria-hidden="true"></svg><span>Profile Picture <span class="required">*</span></span><svg lucideCircleHelp size="15" class="help-icon photo-help-icon" title="Upload a clear, front-facing JPG, PNG, or GIF under 5 MB" aria-label="Profile photo requirements"></svg></label>
+        <small class="error-msg" *ngIf="errors.avatarUrl">{{ errors.avatarUrl }}</small>
+        <div class="profile-pic-upload" id="field-avatarUrl" tabindex="-1" [class.error]="errors.avatarUrl" [class.has-image]="formData.avatarUrl" [class.readonly]="!canEditPersonalDetails">
           <input #avatarInput type="file" (change)="handleAvatarUpload($event)" accept="image/*" [disabled]="!canEditPersonalDetails || isUploadingAvatar || isSavingAvatar" class="file-input">
 
           <div class="avatar-preview">
@@ -470,7 +471,7 @@
           </div>
 
           <div class="form-group">
-            <label>Mobile Phone <span class="required" *ngIf="onboarding">*</span></label>
+            <label>Mobile Phone <span class="required">*</span></label>
             <div class="compound-input mobile-input" [class.error]="errors.phone">
               <div class="country-code">
                 <span class="flag">🇮🇳</span> +91
@@ -481,19 +482,19 @@
           </div>
 
           <div class="form-group">
-            <label>Bank Name <span class="required" *ngIf="onboarding">*</span></label>
+            <label>Bank Name <span class="required">*</span></label>
             <input type="text" id="field-bankName" class="form-control" [class.is-invalid]="errors.bankName" [(ngModel)]="formData.bankName" (ngModelChange)="clearError('bankName')" [disabled]="!canEditPersonalDetails" placeholder="e.g. HDFC Bank / ICICI Bank">
             <small class="error-msg" *ngIf="errors.bankName">{{ errors.bankName }}</small>
           </div>
 
           <div class="form-group">
-            <label>Bank Account Number <span class="required" *ngIf="onboarding">*</span></label>
+            <label>Bank Account Number <span class="required">*</span></label>
             <input type="text" id="field-bankAccountNumber" class="form-control" [class.is-invalid]="errors.bankAccountNumber" [(ngModel)]="formData.bankAccountNumber" (ngModelChange)="clearError('bankAccountNumber')" [disabled]="!canEditPersonalDetails" placeholder="e.g. 50100012345678">
             <small class="error-msg" *ngIf="errors.bankAccountNumber">{{ errors.bankAccountNumber }}</small>
           </div>
 
           <div class="form-group">
-            <label>IFSC / SWIFT Code <span class="required" *ngIf="onboarding">*</span></label>
+            <label>IFSC / SWIFT Code <span class="required">*</span></label>
             <input type="text" id="field-ifscCode" class="form-control" [class.is-invalid]="errors.ifscCode" [(ngModel)]="formData.ifscCode" (ngModelChange)="clearError('ifscCode')" [disabled]="!canEditPersonalDetails" placeholder="e.g. HDFC0001234">
             <small class="error-msg" *ngIf="errors.ifscCode">{{ errors.ifscCode }}</small>
           </div>
@@ -510,7 +511,7 @@
         </div>
         <div class="card-body-grid">
           <div class="form-group">
-            <label>Legal Name</label>
+            <label>Legal Name <span class="required">*</span></label>
             <div class="compound-input name-inputs">
               <select class="form-control salutation" [(ngModel)]="formData.salutation" [disabled]="!canEditPersonalDetails">
                 <option value="Mr">Mr</option>
@@ -545,7 +546,7 @@
           </div>
 
           <div class="form-group">
-            <label>Birthday / Date of Birth <span class="required" *ngIf="onboarding">*</span></label>
+            <label>Birthday / Date of Birth <span class="required">*</span></label>
             <input type="date" id="field-dateOfBirth" class="form-control" [class.is-invalid]="errors.dateOfBirth" [(ngModel)]="formData.dateOfBirth" (ngModelChange)="clearError('dateOfBirth')" [disabled]="!canEditPersonalDetails">
             <small class="error-msg" *ngIf="errors.dateOfBirth">{{ errors.dateOfBirth }}</small>
           </div>
@@ -584,22 +585,26 @@
 
           <div class="form-group">
             <label>Identification No (Govt ID / Aadhaar)</label>
-            <input type="text" class="form-control" [(ngModel)]="formData.identificationNo" [disabled]="!canEditPersonalDetails" placeholder="Issued by Government">
+            <input type="text" id="field-identificationNo" class="form-control" [class.is-invalid]="errors.identificationNo" [(ngModel)]="formData.identificationNo" (ngModelChange)="clearError('identificationNo')" [disabled]="!canEditPersonalDetails" placeholder="Issued by Government">
+            <small class="error-msg" *ngIf="errors.identificationNo">{{ errors.identificationNo }}</small>
           </div>
 
           <div class="form-group">
             <label>PF Number (Provident Fund)</label>
-            <input type="text" class="form-control" [(ngModel)]="formData.pfNumber" [disabled]="!canEditPersonalDetails" placeholder="PF Number">
+            <input type="text" id="field-pfNumber" class="form-control" [class.is-invalid]="errors.pfNumber" [(ngModel)]="formData.pfNumber" (ngModelChange)="clearError('pfNumber')" [disabled]="!canEditPersonalDetails" placeholder="PF Number">
+            <small class="error-msg" *ngIf="errors.pfNumber">{{ errors.pfNumber }}</small>
           </div>
 
           <div class="form-group">
             <label>ESI Number</label>
-            <input type="text" class="form-control" [(ngModel)]="formData.esiNumber" [disabled]="!canEditPersonalDetails" placeholder="ESI Number">
+            <input type="text" id="field-esiNumber" class="form-control" [class.is-invalid]="errors.esiNumber" [(ngModel)]="formData.esiNumber" (ngModelChange)="clearError('esiNumber')" [disabled]="!canEditPersonalDetails" placeholder="ESI Number">
+            <small class="error-msg" *ngIf="errors.esiNumber">{{ errors.esiNumber }}</small>
           </div>
 
           <div class="form-group">
             <label>Passport No</label>
-            <input type="text" class="form-control" [(ngModel)]="formData.passportNo" [disabled]="!canEditPersonalDetails" placeholder="Passport Number">
+            <input type="text" id="field-passportNo" class="form-control" [class.is-invalid]="errors.passportNo" [(ngModel)]="formData.passportNo" (ngModelChange)="clearError('passportNo')" [disabled]="!canEditPersonalDetails" placeholder="Passport Number">
+            <small class="error-msg" *ngIf="errors.passportNo">{{ errors.passportNo }}</small>
           </div>
         </div>
       </div>
@@ -635,7 +640,7 @@
         </div>
         <div class="card-body-grid">
           <div class="form-group">
-            <label>Country <span class="required" *ngIf="onboarding">*</span></label>
+            <label>Country <span class="required">*</span></label>
             <select id="field-country" class="form-control" [class.is-invalid]="errors.country" [(ngModel)]="formData.country" (ngModelChange)="onCountryChange(); clearError('country')" [disabled]="!canEditPersonalDetails">
               <option value="">Select Country</option>
               <option *ngFor="let c of countries" [value]="c.isoCode">{{ c.name }}</option>
@@ -644,7 +649,7 @@
           </div>
 
           <div class="form-group">
-            <label>State / Province <span class="required" *ngIf="onboarding && states.length">*</span></label>
+            <label>State / Province <span class="required" *ngIf="states.length">*</span></label>
             <select id="field-state" class="form-control" [class.is-invalid]="errors.state" [(ngModel)]="formData.state" (ngModelChange)="onStateChange(); clearError('state')" [disabled]="!canEditPersonalDetails || !states.length">
               <option value="">Select State</option>
               <option *ngFor="let s of states" [value]="s.isoCode">{{ s.name }}</option>
@@ -653,7 +658,7 @@
           </div>
 
           <div class="form-group">
-            <label>City <span class="required" *ngIf="onboarding && cities.length">*</span></label>
+            <label>City <span class="required" *ngIf="cities.length">*</span></label>
             <select id="field-city" class="form-control" [class.is-invalid]="errors.city" [(ngModel)]="formData.city" (ngModelChange)="clearError('city')" [disabled]="!canEditPersonalDetails || !cities.length">
               <option value="">Select City</option>
               <option *ngFor="let c of cities" [value]="c.name">{{ c.name }}</option>
@@ -662,7 +667,7 @@
           </div>
 
           <div class="form-group">
-            <label>Zip / Postal Code <span class="required" *ngIf="onboarding">*</span></label>
+            <label>Zip / Postal Code <span class="required">*</span></label>
             <input type="text" id="field-zipCode" class="form-control" [class.is-invalid]="errors.zipCode" [(ngModel)]="formData.zipCode" (ngModelChange)="clearError('zipCode')" [disabled]="!canEditPersonalDetails" placeholder="e.g. 110001">
             <small class="error-msg" *ngIf="errors.zipCode">{{ errors.zipCode }}</small>
           </div>
@@ -674,7 +679,7 @@
           </div>
 
           <div class="form-group full-width">
-            <label>Private Street Address <span class="required" *ngIf="onboarding">*</span></label>
+            <label>Private Street Address <span class="required">*</span></label>
             <textarea id="field-address" class="form-control" rows="3" [class.is-invalid]="errors.address" [(ngModel)]="formData.address" (ngModelChange)="clearError('address')" [disabled]="!canEditPersonalDetails" placeholder="Street 1, Street 2..."></textarea>
             <small class="error-msg" *ngIf="errors.address">{{ errors.address }}</small>
           </div>
@@ -702,7 +707,8 @@
 
           <div class="form-group">
             <label>Spouse Legal Name</label>
-            <input type="text" class="form-control" [(ngModel)]="formData.spouseName" [disabled]="!canEditPersonalDetails" placeholder="Spouse Name">
+            <input type="text" id="field-spouseName" class="form-control" [class.is-invalid]="errors.spouseName" [(ngModel)]="formData.spouseName" (ngModelChange)="clearError('spouseName')" [disabled]="!canEditPersonalDetails" placeholder="Spouse Name">
+            <small class="error-msg" *ngIf="errors.spouseName">{{ errors.spouseName }}</small>
           </div>
 
           <div class="form-group">

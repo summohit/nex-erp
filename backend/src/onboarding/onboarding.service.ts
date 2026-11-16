@@ -7,6 +7,8 @@ import { forgetAccountStatus } from '../auth/auth.guard';
 import { lockJobCapacity, closeFilledJobs } from '../recruitment/job-capacity';
 
 import { MailService } from '../mail/mail.service';
+import { documentProgress, loadDocumentPolicy, requiredRulesFor } from '../employees/profile-completeness/document-policy';
+import { isIntern } from '../employees/profile-completeness/profile-documents';
 
 @Injectable()
 export class OnboardingService {
@@ -336,6 +338,8 @@ export class OnboardingService {
 
   /** Checklist groups shown to the new joiner; `fields` are profile form keys (16 Nov 2026). */
   static readonly SELF_REQUIRED: { key: string; label: string; tab: 'personal' | 'contacts' | 'documents'; fields?: { key: string; label: string }[] }[] = [
+    // Required from 16 Nov 2026.
+    { key: 'profilePhoto', label: 'Profile picture', tab: 'personal', fields: [{ key: 'avatarUrl', label: 'Profile picture' }] },
     { key: 'dateOfBirth', label: 'Date of birth', tab: 'personal', fields: [{ key: 'dateOfBirth', label: 'Date of birth' }] },
     { key: 'contactBank', label: 'Contact & bank details', tab: 'personal', fields: [
       { key: 'phone', label: 'Mobile phone' }, { key: 'bankName', label: 'Bank name' },
@@ -353,12 +357,21 @@ export class OnboardingService {
   private async missingRequired(e: any) {
     const contacts = await this.prisma.emergencyContact.count({ where: { employeeId: e.id } });
     const docs = await this.prisma.employeeDocument.findMany({ where: { employeeId: e.id }, select: { documentType: true } });
-    const have = new Set(docs.map(d => d.documentType));
-    const missingDocs = OnboardingService.SELF_REQUIRED_DOCS.filter(t => !have.has(t));
+    // HR's document rules (Settings → Document Requirements, 16 Nov 2026).
+    const policy = await loadDocumentPolicy(this.prisma, e.companyId);
+    const designation = e.designationId
+      ? (await this.prisma.designation.findUnique({ where: { id: e.designationId }, select: { name: true } }))?.name
+      : null;
+    const docRules = documentProgress(
+      requiredRulesFor(policy, { intern: isIntern(e.employmentType, designation), firstJob: !!e.firstJob }), docs,
+      (await this.prisma.documentWaiver.findMany({ where: { employeeId: e.id, status: 'APPROVED' }, select: { documentType: true } }))
+        .map(w => w.documentType));
+    const missingDocs = docRules.filter(r => !r.done).map(r => r.type);
     const text = (v: any) => !!String(v ?? '').trim();
     // State and city lists exist for India; elsewhere they may be empty, so don't block on them.
     const statesExpected = !e.country || e.country === 'IN';
     const fieldFilled: Record<string, boolean> = {
+      avatarUrl: text(e.avatarUrl),
       dateOfBirth: !!e.dateOfBirth,
       phone: text(e.phone), bankName: text(e.bankName), bankAccountNumber: text(e.bankAccountNumber), ifscCode: text(e.ifscCode),
       country: text(e.country), state: !statesExpected || text(e.state), city: !statesExpected || text(e.city),
@@ -378,8 +391,8 @@ export class OnboardingService {
       if (r.key === 'documents') {
         return {
           key: r.key, tab: r.tab, done: !missingDocs.length,
-          label: missingDocs.length ? `Documents (${missingDocs.length} of ${OnboardingService.SELF_REQUIRED_DOCS.length} left)` : 'Documents',
-          missingDocs, requiredDocs: OnboardingService.SELF_REQUIRED_DOCS,
+          label: missingDocs.length ? `Documents (${missingDocs.length} of ${docRules.length} left)` : 'Documents',
+          missingDocs, requiredDocs: docRules.map(r => r.type), docRules,
         };
       }
       return { key: r.key, label: r.label, tab: r.tab, done: contacts > 0 };
