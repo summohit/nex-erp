@@ -69,3 +69,5 @@ app-header {
     padding: 12px 10px;
   }
 }
+
+.gate-loading { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 14px; background: #f8fafc; }

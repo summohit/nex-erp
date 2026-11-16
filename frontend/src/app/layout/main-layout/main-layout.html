@@ -1,5 +1,11 @@
 @if (onboardingGate()) {
-  <app-self-onboarding-gate></app-self-onboarding-gate>
+  <!-- Loaded on demand: the gate embeds the full profile page, which is far too
+       big to ship to everyone in the first download (16 Nov 2026). -->
+  @defer (on immediate) {
+    <app-self-onboarding-gate></app-self-onboarding-gate>
+  } @loading (minimum 200ms) {
+    <div class="gate-loading">Loading your onboarding…</div>
+  }
 } @else {
 <div class="dashboard-layout">
   @if (v2) { <app-sidebar-v2></app-sidebar-v2> } @else { <app-sidebar></app-sidebar> }
