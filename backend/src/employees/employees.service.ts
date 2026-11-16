@@ -10,6 +10,7 @@ import { PermissionsService } from '../permissions/permissions.service';
 import { MailService } from '../mail/mail.service';
 import { PayrollService } from '../payroll/payroll.service';
 import * as crypto from 'crypto';
+import { forgetAccountStatus } from '../auth/auth.guard';
 
 @Injectable()
 export class EmployeesService {
@@ -1154,5 +1155,65 @@ export class EmployeesService {
     }
 
     return result;
+  }
+
+  // ── Shared login hand over (16 Nov 2026) ───────────────────────────────
+  // hr@ces-pl.com is a shared mailbox that is also somebody's MIRA login. When
+  // HR changes, the Super Admin moves it to the next person in one step: the
+  // leaver keeps their history under a renamed, deactivated login; the new
+  // person gets the address, the role and the leaver's reportees.
+
+  static readonly SHARED_LOGINS = ['hr@ces-pl.com'];
+
+  async handoverSharedLogin(companyId: number, role: string, actorUserId: number | null, fromEmployeeId: number, toEmployeeId: number) {
+    if (role !== 'SUPERADMIN') throw new ForbiddenException('Only the Super Admin can hand over the HR login.');
+    if (fromEmployeeId === toEmployeeId) throw new BadRequestException('Choose a different person to hand over to.');
+    const pick = { id: true, firstName: true, lastName: true, user: { select: { id: true, email: true, role: true, status: true } } } as const;
+    const [from, to] = await Promise.all([
+      this.prisma.employee.findFirst({ where: { id: fromEmployeeId, companyId }, select: pick }),
+      this.prisma.employee.findFirst({ where: { id: toEmployeeId, companyId }, select: pick }),
+    ]);
+    if (!from?.user || !to?.user) throw new NotFoundException('Employee not found');
+    const shared = from.user.email.toLowerCase();
+    if (!EmployeesService.SHARED_LOGINS.includes(shared)) throw new BadRequestException('Only the shared HR login can be handed over.');
+    if (to.user.status !== 'ACTIVE') throw new BadRequestException(`${to.firstName} ${to.lastName} is not an active user.`);
+
+    const domain = shared.split('@')[1];
+    const slug = `${from.firstName}.${from.lastName}`.toLowerCase().normalize('NFKD').replace(/[^a-z0-9.]+/g, '').replace(/\.+/g, '.').replace(/^\.|\.$/g, '') || 'former';
+    const leaverEmail = `${slug}.exited${from.user.id}@${domain}`;
+    // The Super Admin stays Super Admin; anyone else takes the shared login's role.
+    const newRole = ['SUPERADMIN', 'ADMIN'].includes(to.user.role) ? to.user.role : from.user.role;
+
+    const moved = await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: from.user!.id }, data: { email: leaverEmail, status: 'SUSPENDED' } });
+      await tx.user.update({ where: { id: to.user!.id }, data: { email: shared, role: newRole, emailVerifiedAt: new Date() } });
+      const reportees = await tx.employee.updateMany({ where: { managerId: from.id, companyId, id: { not: to.id } }, data: { managerId: to.id } });
+      await tx.auditLog.create({
+        data: {
+          companyId, actorId: actorUserId, action: 'SHARED_LOGIN_HANDOVER', entityType: 'User', entityId: String(to.user!.id),
+          oldValue: { from: { employeeId: from.id, userId: from.user!.id, email: shared }, to: { employeeId: to.id, userId: to.user!.id, email: to.user!.email, role: to.user!.role } } as any,
+          newValue: { from: { email: leaverEmail, status: 'SUSPENDED' }, to: { email: shared, role: newRole }, reporteesMoved: reportees.count } as any,
+        },
+      });
+      return reportees.count;
+    });
+    forgetAccountStatus(from.user.id);
+    forgetAccountStatus(to.user.id);
+
+    try {
+      await this.notifications.notifyEmployees([to.id], {
+        companyId,
+        title: `You now hold ${shared}`,
+        message: `Your MIRA login is now ${shared} (was ${to.user.email}). Your password is unchanged.`,
+        type: 'SYSTEM',
+        linkUrl: '/employees/my-profile',
+      } as any);
+    } catch { /* the hand over stands without the notice */ }
+
+    return {
+      shared, role: newRole, reporteesMoved: moved,
+      from: { name: `${from.firstName} ${from.lastName}`, email: leaverEmail },
+      to: { name: `${to.firstName} ${to.lastName}`, previousEmail: to.user.email },
+    };
   }
 }

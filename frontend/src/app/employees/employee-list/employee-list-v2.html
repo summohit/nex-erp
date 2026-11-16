@@ -385,3 +385,82 @@
   (saveSuccess)="onSaveSuccess()">
 </app-employee-drawer>
 
+
+
+<!-- Hand over the shared HR login — Super Admin only (16 Nov 2026) -->
+<div class="ho-overlay" *ngIf="handoverFrom" (click)="handoverFrom = null">
+  <div class="ho-modal" role="dialog" aria-modal="true" aria-labelledby="ho-title" (click)="$event.stopPropagation()">
+    <header class="ho-head">
+      <div>
+        <span class="ho-kicker">Super Admin · Shared login</span>
+        <h3 id="ho-title">Hand over <span class="ho-mail">{{ handoverFrom.user?.email }}</span></h3>
+      </div>
+      <button type="button" class="ho-x" (click)="handoverFrom = null" aria-label="Close">✕</button>
+    </header>
+
+    <!-- From → To -->
+    <div class="ho-flow">
+      <div class="ho-person">
+        <span class="ho-tag">From</span>
+        <div class="ho-person-row">
+          <img *ngIf="handoverFrom.avatarUrl" [src]="handoverFrom.avatarUrl" alt="" class="ho-av">
+          <span *ngIf="!handoverFrom.avatarUrl" class="ho-av ho-av-i">{{ getEmployeeInitials(handoverFrom) }}</span>
+          <div class="ho-person-text">
+            <b>{{ handoverFrom.firstName }} {{ handoverFrom.lastName }}</b>
+            <small>{{ handoverFrom.designation?.name || 'HR' }} · Deactivated</small>
+          </div>
+        </div>
+      </div>
+      <span class="ho-arrow" aria-hidden="true">→</span>
+      <div class="ho-person" [class.empty]="!handoverTarget()">
+        <span class="ho-tag">To</span>
+        <div class="ho-person-row" *ngIf="handoverTarget() as to; else pickHint">
+          <img *ngIf="to.avatarUrl" [src]="to.avatarUrl" alt="" class="ho-av">
+          <span *ngIf="!to.avatarUrl" class="ho-av ho-av-i">{{ getEmployeeInitials(to) }}</span>
+          <div class="ho-person-text">
+            <b>{{ to.firstName }} {{ to.lastName }}</b>
+            <small>{{ to.designation?.name || to.department?.name || 'Employee' }}</small>
+          </div>
+        </div>
+        <ng-template #pickHint><div class="ho-pick-hint">Choose someone below</div></ng-template>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <label class="ho-label" for="ho-search">New holder</label>
+    <div class="ho-search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="ho-search" type="text" [(ngModel)]="handoverQuery" placeholder="Search by name, employee ID or email…" autocomplete="off">
+      <button type="button" *ngIf="handoverQuery" class="ho-search-clear" (click)="handoverQuery = ''" aria-label="Clear search">✕</button>
+    </div>
+    <div class="ho-list" role="listbox" aria-label="Active employees">
+      <button type="button" role="option" class="ho-option" *ngFor="let e of handoverMatches()"
+              [class.selected]="handoverToId === e.id" [attr.aria-selected]="handoverToId === e.id" (click)="handoverToId = e.id">
+        <img *ngIf="e.avatarUrl" [src]="e.avatarUrl" alt="" class="ho-av sm">
+        <span *ngIf="!e.avatarUrl" class="ho-av ho-av-i sm">{{ getEmployeeInitials(e) }}</span>
+        <span class="ho-opt-text">
+          <b>{{ e.firstName }} {{ e.lastName }}</b>
+          <small>#{{ e.employeeCode }} · {{ e.user?.email }}</small>
+        </span>
+        <span class="ho-check" *ngIf="handoverToId === e.id">✓</span>
+      </button>
+      <p class="ho-empty" *ngIf="!handoverMatches().length">No active employee matches “{{ handoverQuery }}”.</p>
+    </div>
+
+    <!-- What happens -->
+    <div class="ho-summary" *ngIf="handoverTarget() as to">
+      <div class="ho-step"><span class="ho-ic">🔑</span><div><b>{{ to.firstName }} logs in with {{ handoverFrom.user?.email }}</b><small>Instead of {{ to.user?.email }}. Password and 2FA stay exactly as they are now — only the login email changes.</small></div></div>
+      <div class="ho-step" *ngIf="to.user?.role !== 'SUPERADMIN' && to.user?.role !== 'ADMIN'"><span class="ho-ic">🛡️</span><div><b>{{ to.firstName }} gets the {{ handoverFrom.user?.role }} role</b><small>Same access {{ handoverFrom.firstName }} had.</small></div></div>
+      <div class="ho-step" *ngIf="to.user?.role === 'SUPERADMIN' || to.user?.role === 'ADMIN'"><span class="ho-ic">🛡️</span><div><b>{{ to.firstName }} keeps the {{ to.user?.role }} role</b><small>Higher access is not reduced.</small></div></div>
+      <div class="ho-step"><span class="ho-ic">🗂️</span><div><b>{{ handoverFrom.firstName }}'s history is kept</b><small>The account stays deactivated under a renamed login.</small></div></div>
+      <div class="ho-step"><span class="ho-ic">👥</span><div><b>Reportees move to {{ to.firstName }}</b><small>Anyone reporting to {{ handoverFrom.firstName }} now reports to {{ to.firstName }}.</small></div></div>
+    </div>
+
+    <footer class="ho-actions">
+      <button type="button" class="ho-cancel" (click)="handoverFrom = null">Cancel</button>
+      <button type="button" class="ho-confirm" (click)="confirmHandover()" [disabled]="!handoverTarget() || handoverBusy">
+        {{ handoverBusy ? 'Handing over…' : (handoverTarget() ? 'Hand over to ' + handoverTarget().firstName : 'Hand over') }}
+      </button>
+    </footer>
+  </div>
+</div>

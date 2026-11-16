@@ -113,7 +113,10 @@ export class EmployeeListComponentV2 implements OnInit {
   ];
   filterEmploymentStatus: string | null = null;
   /** Directory opens on Active (management, 11 Nov); Reset returns to Active. */
-  filterAccountStatus: string | null = 'ACTIVE';
+  // Everyone by default (16 Nov 2026): deactivated people sort to the bottom,
+  // greyed out. Defaulting to Active hid them from search while the box said
+  // "All employees".
+  filterAccountStatus: string | null = null;
   accountStatusOptions = [
     { id: 'ACTIVE', name: 'Active' },
     { id: 'DEACTIVATED', name: 'Deactivated' },
@@ -250,7 +253,7 @@ export class EmployeeListComponentV2 implements OnInit {
       const searchable = [employee.firstName, employee.lastName, employee.employeeCode,
         employee.user?.email, employee.department?.name, employee.designation?.name]
         .filter(Boolean).join(' ').toLowerCase();
-      return searchable.includes(query);
+      return query.split(/\s+/).every(w => searchable.includes(w));
     }).slice(0, 8);
   }
 
@@ -396,6 +399,10 @@ export class EmployeeListComponentV2 implements OnInit {
     { 
       headerName: 'Employee Name',
       field: 'firstName',
+      // The quick filter matches every typed word; give it the whole name (and
+      // code / email) so "Akshara Shukla" finds Akshara Shukla (16 Nov 2026).
+      getQuickFilterText: (params: any) => [params.data?.firstName, params.data?.lastName,
+        params.data?.employeeCode, params.data?.user?.email].filter(Boolean).join(' '),
       flex: 1.2,
       minWidth: 280,
       width: 310,
@@ -578,10 +585,81 @@ export class EmployeeListComponentV2 implements OnInit {
         onDelete: (data: any) => this.deleteEmployee(data),
         deleteLabel: (data: any) => data?.user?.status === 'SUSPENDED' ? 'Activate' : 'Deactivate',
         onViewProfile: (data: any) => this.openProfile(data),
-        onResendVerification: (data: any) => this.resendVerification(data)
+        onResendVerification: (data: any) => this.resendVerification(data),
+        // Super Admin only, and only on the shared HR login (16 Nov 2026).
+        extraActions: [{
+          label: 'Hand over HR login',
+          show: (data: any) => this.canHandover(data),
+          onClick: (data: any) => this.openHandover(data),
+        }],
       }
     }
   ];
+
+  // ── Hand over the shared HR login (16 Nov 2026) ──
+  handoverFrom: any = null;
+  handoverToId: number | null = null;
+  handoverBusy = false;
+
+  /** The profile page's "Hand over HR login" button lands here with ?handover=<id>. */
+  private openHandoverFromQuery() {
+    const id = this.route.snapshot.queryParamMap.get('handover');
+    if (!id) return;
+    const match = this.employees().find((e: any) => String(e.id) === String(id));
+    if (match && this.canHandover(match)) this.openHandover(match);
+    this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+  }
+
+  canHandover(data: any): boolean {
+    return this.authService.currentUser()?.role === 'SUPERADMIN'
+      && EmployeeListComponentV2Shared.isShared(data?.user?.email);
+  }
+
+  handoverQuery = '';
+
+  openHandover(data: any) {
+    this.handoverFrom = data;
+    this.handoverToId = null;
+    this.handoverQuery = '';
+  }
+
+  /** Active employees for the hand over list, filtered word by word. */
+  handoverMatches(): any[] {
+    const words = this.handoverQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    return this.employees()
+      .filter((e: any) => e.id !== this.handoverFrom?.id && e.user?.status === 'ACTIVE')
+      .filter((e: any) => {
+        const text = [e.firstName, e.lastName, e.employeeCode, e.user?.email, e.designation?.name].filter(Boolean).join(' ').toLowerCase();
+        return words.every(w => text.includes(w));
+      })
+      .slice(0, 50);
+  }
+
+  handoverCandidates() {
+    return this.employees()
+      .filter((e: any) => e.id !== this.handoverFrom?.id && e.user?.status === 'ACTIVE')
+      .map((e: any) => ({ id: e.id, name: `${e.firstName} ${e.lastName}${e.employeeCode ? ' · #' + e.employeeCode : ''} — ${e.user?.email}` }));
+  }
+
+  handoverTarget(): any {
+    return this.employees().find((e: any) => e.id === Number(this.handoverToId));
+  }
+
+  confirmHandover() {
+    const from = this.handoverFrom;
+    const to = this.handoverTarget();
+    if (!from || !to) { this.toast.error('Choose who takes over.'); return; }
+    this.handoverBusy = true;
+    this.employeeService.handoverSharedLogin(from.id, to.id).subscribe({
+      next: (r: any) => {
+        this.handoverBusy = false;
+        this.handoverFrom = null;
+        this.toast.success(`${r.shared} now belongs to ${r.to.name}. ${r.reporteesMoved} reportee(s) moved.`, { duration: 6000 });
+        this.loadEmployees();
+      },
+      error: (e: any) => { this.handoverBusy = false; this.toast.error(e?.error?.message || 'Hand over failed'); },
+    });
+  }
 
   /** Shared by the grid row menu and the directory search suggestions. */
   resendVerification(emp: any) {
@@ -635,15 +713,13 @@ export class EmployeeListComponentV2 implements OnInit {
       list = list.filter(e => this.accountStatus(e) === this.filterAccountStatus);
     }
     if (this.searchText && this.searchText.trim()) {
-      const q = this.searchText.toLowerCase().trim();
-      list = list.filter(e =>
-        (e.firstName && e.firstName.toLowerCase().includes(q)) ||
-        (e.lastName && e.lastName.toLowerCase().includes(q)) ||
-        (e.user?.email && e.user.email.toLowerCase().includes(q)) ||
-        (e.employeeCode && e.employeeCode.toLowerCase().includes(q)) ||
-        (e.department?.name && e.department.name.toLowerCase().includes(q)) ||
-        (e.designation?.name && e.designation.name.toLowerCase().includes(q))
-      );
+      // Every word must appear somewhere, so a full name matches (16 Nov 2026).
+      const words = this.searchText.toLowerCase().trim().split(/\s+/);
+      list = list.filter(e => {
+        const text = [e.firstName, e.lastName, e.user?.email, e.employeeCode, e.department?.name, e.designation?.name]
+          .filter(Boolean).join(' ').toLowerCase();
+        return words.every(w => text.includes(w));
+      });
     }
     return list;
   }
@@ -747,6 +823,9 @@ export class EmployeeListComponentV2 implements OnInit {
     }
 
     this.gridApi.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
+    // The account-status and joined-date filters are external: the grid only
+    // re-checks them when told to (16 Nov 2026).
+    this.gridApi.onFilterChanged();
   }
 
   getActiveFilterCount(): number {
@@ -758,7 +837,7 @@ export class EmployeeListComponentV2 implements OnInit {
     if (this.filterOnboardingStatus) count++;
     if (this.filterOffboardingStatus) count++;
     if (this.filterEmploymentStatus) count++;
-    if (this.filterAccountStatus !== 'ACTIVE') count++;
+    if (this.filterAccountStatus) count++;
     if (this.dateRange) count++;
     return count;
   }
@@ -775,7 +854,7 @@ export class EmployeeListComponentV2 implements OnInit {
     this.filterOnboardingStatus = null;
     this.filterOffboardingStatus = null;
     this.filterEmploymentStatus = null;
-    this.filterAccountStatus = 'ACTIVE';
+    this.filterAccountStatus = null;
     this.datePreset = 'ALL';
     this.dateRange = null;
     this.onSearch();
@@ -805,6 +884,7 @@ export class EmployeeListComponentV2 implements OnInit {
         this.employees.set(sorted);
         this.isLoading.set(false);
         this.openPendingEditFromQuery();
+        this.openHandoverFromQuery();
       },
       error: (err) => {
         this.toast.error('Failed to load employees');
@@ -856,3 +936,8 @@ export class EmployeeListComponentV2 implements OnInit {
     this.router.navigate(['/employees/onboarding']);
   }
 }
+
+/** Shared HR login check, kept outside the class so the grid callbacks can use it. */
+export const EmployeeListComponentV2Shared = {
+  isShared: (email?: string | null) => ['hr@ces-pl.com'].includes(String(email || '').toLowerCase()),
+};

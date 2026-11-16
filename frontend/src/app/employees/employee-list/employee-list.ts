@@ -245,6 +245,9 @@ export class EmployeeListComponent implements OnInit {
     { 
       headerName: 'Employee Name',
       field: 'firstName',
+      // Whole name for the quick filter, so a full-name search matches (16 Nov 2026).
+      getQuickFilterText: (params: any) => [params.data?.firstName, params.data?.lastName,
+        params.data?.employeeCode, params.data?.user?.email].filter(Boolean).join(' '),
       flex: 2.1,
       minWidth: 210,
       cellRenderer: (params: any) => {

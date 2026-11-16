@@ -40,6 +40,8 @@
 
       <div class="ph2-actions">
         <button type="button" class="ph2-btn primary" *ngIf="canConvertTrainee()" (click)="openConversion()">Convert to employee</button>
+        <!-- Super Admin, shared HR login only (16 Nov 2026) -->
+        <button type="button" class="ph2-btn" *ngIf="canHandoverLogin()" (click)="handoverLogin()">Hand over HR login</button>
         <button type="button" class="ph2-btn" (click)="setTab('history')">
           View timeline
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>

@@ -309,6 +309,11 @@ export class EmployeeService {
     return this.http.get<any>(`${this.apiUrl}/document-types`, { headers: { Authorization: `Bearer ${token}` } });
   }
 
+  /** Super Admin: move the shared HR login (hr@ces-pl.com) to another employee (16 Nov 2026). */
+  handoverSharedLogin(fromEmployeeId: number, toEmployeeId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${fromEmployeeId}/handover-login`, { toEmployeeId }, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
+  }
+
   // ── Document waivers (16 Nov 2026) ──
   private auth() { return { headers: { Authorization: `Bearer ${getAccessToken()}` } }; }
   getDocumentWaivers(employeeId: number): Observable<DocumentWaiver[]> {

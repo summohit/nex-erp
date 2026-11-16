@@ -65,6 +65,17 @@ export class EmployeeProfileComponent implements OnInit {
   activeTab = signal<'work' | 'resume' | 'personal' | 'contacts' | 'documents' | 'history'>('work');
   employeeData = signal<any>(null);
 
+  /** Super Admin only, on the shared HR login (hr@ces-pl.com) — 16 Nov 2026. */
+  canHandoverLogin(): boolean {
+    return this.authService.currentUser()?.role === 'SUPERADMIN'
+      && String(this.employeeData()?.user?.email || '').toLowerCase() === 'hr@ces-pl.com';
+  }
+
+  /** The hand over dialog lives in the directory; open it there for this person. */
+  handoverLogin() {
+    this.router.navigate(['/employees/directory'], { queryParams: { handover: this.employeeData()?.id } });
+  }
+
   /** Initials for avatar squircle */
   employeeInitials = computed(() => {
     const e = this.employeeData();
