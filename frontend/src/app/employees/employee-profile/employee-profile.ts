@@ -1,4 +1,5 @@
-import { Component, computed, inject, Input, OnInit, signal } from '@angular/core';
+import { Component, computed, EventEmitter, inject, Input, OnInit, Output, signal, ViewChild } from '@angular/core';
+import { Observable, of } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
 import { FormsModule } from '@angular/forms';
@@ -49,6 +50,11 @@ export class EmployeeProfileComponent implements OnInit {
   /** Set when shown in the profile popup instead of on its own page. */
   @Input() employeeId: number | string | null = null;
   @Input() embedded = false;
+  /** Inside self-service onboarding (16 Nov 2026): the form's own footer is hidden and its fields are required. */
+  @Input() onboarding = false;
+  /** Fires after every (re)load, so the onboarding screen can refresh its checklist. */
+  @Output() profileLoaded = new EventEmitter<any>();
+  @ViewChild(ProfileTabComponent) private profileTab?: ProfileTabComponent;
   private route = inject(ActivatedRoute);
   private employeeService = inject(EmployeeService);
   private jobsService = inject(JobsService);
@@ -271,6 +277,8 @@ export class EmployeeProfileComponent implements OnInit {
   }
 
   ngOnInit() {
+    // New joiners fill in Personal first; Work and History are HR's (16 Nov 2026).
+    if (this.onboarding) this.activeTab.set('personal');
     if (this.employeeId != null) {
       this.loadProfile(String(this.employeeId));
       return;
@@ -288,6 +296,7 @@ export class EmployeeProfileComponent implements OnInit {
     this.employeeService.getProfile(id).subscribe({
       next: (data) => {
         this.employeeData.set(data);
+        this.profileLoaded.emit(data);
         this.isOwner.set(data.isOwner);
         // Fall back to isOwner: an endpoint that forgets the flag must never
         // hide someone's own documents from them.
@@ -299,6 +308,25 @@ export class EmployeeProfileComponent implements OnInit {
         this.isLoading.set(false);
       }
     });
+  }
+
+  /** Saves the form on the open tab (Work, Resume or Personal); emits true when there was nothing to save. */
+  saveOpenForm$(): Observable<boolean> {
+    return this.profileTab ? this.profileTab.saveProfile$() : of(true);
+  }
+
+  /** Opens the tab that holds a field, then scrolls to it and highlights it. */
+  goToField(tab: 'personal' | 'contacts' | 'documents', key: string, markMissing: string[] = []) {
+    this.setTab(tab);
+    setTimeout(() => {
+      if (tab === 'personal' && this.profileTab) {
+        this.profileTab.markRequired(markMissing);
+        this.profileTab.focusField(key);
+      } else {
+        const target = tab === 'documents' ? '#required-documents' : 'app-emergency-contacts-tab';
+        document.querySelector(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 120);
   }
 
   setTab(tab: 'work' | 'resume' | 'personal' | 'contacts' | 'documents' | 'history') {

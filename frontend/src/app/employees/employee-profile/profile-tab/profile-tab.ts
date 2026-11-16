@@ -2,7 +2,7 @@ import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Observable, of } from 'rxjs';
 import {
   LucidePlus, LucideX,
   LucideTrash2, LucideLayoutGrid,
@@ -47,6 +47,14 @@ export interface ProfileFormErrors {
   dateOfBirth?: string;
   homeWorkDistanceKm?: string;
   childrenCount?: string;
+  bankAccountNumber?: string;
+  address?: string;
+  bankName?: string;
+  ifscCode?: string;
+  country?: string;
+  state?: string;
+  city?: string;
+  zipCode?: string;
 }
 
 @Component({
@@ -100,6 +108,8 @@ export class ProfileTabComponent implements OnInit {
 
   @Input() isOwner: boolean = false;
   @Input() activeSubTab: string = 'work';
+  /** Shown inside self-service onboarding: no own footer, and the onboarding fields are required. */
+  @Input() onboarding = false;
   @Output() refreshProfile = new EventEmitter<void>();
   @Output() tabChange = new EventEmitter<'work' | 'resume' | 'personal'>();
 
@@ -114,6 +124,14 @@ export class ProfileTabComponent implements OnInit {
     lastName: { parent: 'personal', subTab: 'personal' },
     phone: { parent: 'personal', subTab: 'contact_bank' },
     dateOfBirth: { parent: 'personal', subTab: 'personal' },
+    bankAccountNumber: { parent: 'personal', subTab: 'contact_bank' },
+    bankName: { parent: 'personal', subTab: 'contact_bank' },
+    ifscCode: { parent: 'personal', subTab: 'contact_bank' },
+    address: { parent: 'personal', subTab: 'location' },
+    country: { parent: 'personal', subTab: 'location' },
+    state: { parent: 'personal', subTab: 'location' },
+    city: { parent: 'personal', subTab: 'location' },
+    zipCode: { parent: 'personal', subTab: 'location' },
     homeWorkDistanceKm: { parent: 'personal', subTab: 'location' },
     childrenCount: { parent: 'personal', subTab: 'family_edu' }
   };
@@ -961,11 +979,15 @@ export class ProfileTabComponent implements OnInit {
   isSaving = false;
 
   saveProfile() {
-    if (!this.canSaveProfile || this.isSaving || this.isUploadingAvatar) return;
+    this.saveProfile$().subscribe();
+  }
 
-    if (!this.validateForm()) {
-      return;
-    }
+  /** Saves the form; emits true when saved, false when invalid or failed. */
+  saveProfile$(): Observable<boolean> {
+    if (!this.canSaveProfile || this.isUploadingAvatar) return of(true);
+    if (this.isSaving) return of(false);
+
+    if (!this.validateForm()) return of(false);
 
     this.isSaving = true;
 
@@ -986,24 +1008,80 @@ export class ProfileTabComponent implements OnInit {
       delete payload.password;
     }
 
-    this.employeeService.updateProfile(this.employeeData.id, payload).subscribe({
-      next: () => {
-        this.isSaving = false;
-        this.toast.success('Profile updated successfully');
-        this.errors = {};
-        this.refreshProfile.emit();
-      },
-      error: (err: any) => {
-        this.isSaving = false;
-        this.toast.error('Failed to update profile');
-        console.error(err);
-      }
+    return new Observable<boolean>(sub => {
+      this.employeeService.updateProfile(this.employeeData.id, payload).subscribe({
+        next: () => {
+          this.isSaving = false;
+          this.toast.success(this.onboarding ? 'Saved' : 'Profile updated successfully');
+          this.errors = {};
+          this.refreshProfile.emit();
+          sub.next(true); sub.complete();
+        },
+        error: (err: any) => {
+          this.isSaving = false;
+          this.toast.error('Failed to update profile');
+          console.error(err);
+          sub.next(false); sub.complete();
+        }
+      });
     });
+  }
+
+  /** Scrolls a field into view, focuses it and flashes it (used by onboarding's checklist). */
+  focusField(key: string) {
+    const target = this.fieldTabMap[key];
+    if (target?.subTab && this.personalSubTab !== 'all' && this.personalSubTab !== target.subTab) {
+      this.personalSubTab = target.subTab;
+      setTimeout(() => this.focusField(key), 60);
+      return;
+    }
+    const el = document.getElementById('field-' + key) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.focus({ preventScroll: true });
+    el.classList.remove('field-flash');
+    void el.offsetWidth;
+    el.classList.add('field-flash');
+  }
+
+  /** Marks onboarding-required fields that are still empty (called by the onboarding screen). */
+  markRequired(keys: string[]) {
+    const msg = this.onboardingRequiredMessages();
+    keys.forEach(k => { if (msg[k]) (this.errors as any)[k] = msg[k]; });
+  }
+
+  /** Every field a new joiner must fill (same list as the server's onboarding checklist). */
+  private onboardingRequiredMessages(): Record<string, string> {
+    const m: Record<string, string> = {
+      phone: 'Mobile phone is required.',
+      bankName: 'Bank name is required.',
+      bankAccountNumber: 'Bank account number is required.',
+      ifscCode: 'IFSC code is required.',
+      dateOfBirth: 'Date of birth is required.',
+      country: 'Country is required.',
+      zipCode: 'PIN code is required.',
+      address: 'Street address is required.',
+    };
+    if (this.states?.length) m['state'] = 'State is required.';
+    if (this.cities?.length) m['city'] = 'City is required.';
+    return m;
+  }
+
+  private isOnboardingFieldEmpty(key: string): boolean {
+    const v = this.formData?.[key];
+    return !String(v ?? '').trim();
   }
 
   private validateForm(): boolean {
     this.errors = {};
     let valid = true;
+
+    if (this.onboarding) {
+      const req = this.onboardingRequiredMessages();
+      for (const key of Object.keys(req)) {
+        if (this.isOnboardingFieldEmpty(key)) { (this.errors as any)[key] = req[key]; valid = false; }
+      }
+    }
 
     if (!this.formData.firstName?.trim()) {
       this.errors.firstName = 'First name is required.';
@@ -1058,7 +1136,7 @@ export class ProfileTabComponent implements OnInit {
   }
 
   private focusFirstError() {
-    const order: (keyof ProfileFormErrors)[] = ['firstName', 'lastName', 'phone', 'dateOfBirth', 'homeWorkDistanceKm', 'childrenCount'];
+    const order: (keyof ProfileFormErrors)[] = ['firstName', 'lastName', 'phone', 'bankName', 'bankAccountNumber', 'ifscCode', 'dateOfBirth', 'country', 'state', 'city', 'zipCode', 'homeWorkDistanceKm', 'address', 'childrenCount'];
     const first = order.find(k => !!this.errors[k]);
     if (!first) return;
 

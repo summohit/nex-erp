@@ -1998,3 +1998,13 @@ select.form-control:disabled {
   .day-schedule-row { grid-template-columns: 1fr !important; }
   .form-grid-2 { grid-template-columns: 1fr !important; }
 }
+
+/* Onboarding checklist jumps here: brief highlight on the field (16 Nov 2026) */
+.field-flash { animation: fieldFlash 1.6s ease; }
+@keyframes fieldFlash {
+  0%, 60% { box-shadow: 0 0 0 4px rgba(220, 38, 38, .25); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+/* Required-field asterisk (onboarding fields and Private Email) */
+.form-group label .required { margin-left: 2px; color: #dc2626; font-weight: 700; }

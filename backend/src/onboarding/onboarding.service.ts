@@ -320,10 +320,73 @@ export class OnboardingService {
     return employee;
   }
 
+  /**
+   * Required before a new joiner can submit. Keys match the profile form
+   * fields, so the screen can jump straight to the empty one.
+   */
+  /** Documents a new joiner must upload (types as the Documents tab saves them; decided 16 Nov 2026). */
+  static readonly SELF_REQUIRED_DOCS = [
+    'Resume / CV', 'Aadhaar Card', 'PAN Card', 'Passport Size Photo',
+    '10th Marksheet', '12th Marksheet', 'Graduation Degree', 'Bank Proof / Cancelled Cheque',
+  ];
+
+  /** Checklist groups shown to the new joiner; `fields` are profile form keys (16 Nov 2026). */
+  static readonly SELF_REQUIRED: { key: string; label: string; tab: 'personal' | 'contacts' | 'documents'; fields?: { key: string; label: string }[] }[] = [
+    { key: 'dateOfBirth', label: 'Date of birth', tab: 'personal', fields: [{ key: 'dateOfBirth', label: 'Date of birth' }] },
+    { key: 'contactBank', label: 'Contact & bank details', tab: 'personal', fields: [
+      { key: 'phone', label: 'Mobile phone' }, { key: 'bankName', label: 'Bank name' },
+      { key: 'bankAccountNumber', label: 'Bank account number' }, { key: 'ifscCode', label: 'IFSC code' },
+    ] },
+    { key: 'addressDetails', label: 'Address details', tab: 'personal', fields: [
+      { key: 'country', label: 'Country' }, { key: 'state', label: 'State' }, { key: 'city', label: 'City' },
+      { key: 'zipCode', label: 'PIN code' },
+      { key: 'address', label: 'Street address' },
+    ] },
+    { key: 'emergencyContact', label: 'Emergency contact', tab: 'contacts' },
+    { key: 'documents', label: 'Documents', tab: 'documents' },
+  ];
+
+  private async missingRequired(e: any) {
+    const contacts = await this.prisma.emergencyContact.count({ where: { employeeId: e.id } });
+    const docs = await this.prisma.employeeDocument.findMany({ where: { employeeId: e.id }, select: { documentType: true } });
+    const have = new Set(docs.map(d => d.documentType));
+    const missingDocs = OnboardingService.SELF_REQUIRED_DOCS.filter(t => !have.has(t));
+    const text = (v: any) => !!String(v ?? '').trim();
+    // State and city lists exist for India; elsewhere they may be empty, so don't block on them.
+    const statesExpected = !e.country || e.country === 'IN';
+    const fieldFilled: Record<string, boolean> = {
+      dateOfBirth: !!e.dateOfBirth,
+      phone: text(e.phone), bankName: text(e.bankName), bankAccountNumber: text(e.bankAccountNumber), ifscCode: text(e.ifscCode),
+      country: text(e.country), state: !statesExpected || text(e.state), city: !statesExpected || text(e.city),
+      zipCode: text(e.zipCode), address: text(e.address),
+    };
+    return OnboardingService.SELF_REQUIRED.map(r => {
+      if (r.fields) {
+        const missingFields = r.fields.filter(f => !fieldFilled[f.key]);
+        const total = r.fields.length;
+        return {
+          key: r.key, tab: r.tab, done: !missingFields.length,
+          label: missingFields.length && total > 1 ? `${r.label} (${missingFields.length} of ${total} left)` : r.label,
+          field: missingFields[0]?.key ?? r.fields[0].key,
+          missingFields,
+        };
+      }
+      if (r.key === 'documents') {
+        return {
+          key: r.key, tab: r.tab, done: !missingDocs.length,
+          label: missingDocs.length ? `Documents (${missingDocs.length} of ${OnboardingService.SELF_REQUIRED_DOCS.length} left)` : 'Documents',
+          missingDocs, requiredDocs: OnboardingService.SELF_REQUIRED_DOCS,
+        };
+      }
+      return { key: r.key, label: r.label, tab: r.tab, done: contacts > 0 };
+    });
+  }
+
   async getMySelfOnboarding(companyId: number, userId: number) {
     const e = await this.employeeForUser(companyId, userId);
     return {
       employeeId: e.id,
+      required: await this.missingRequired(e),
       status: e.selfOnboardingStatus,
       notes: e.selfOnboardingNotes ?? {},
       submittedAt: e.selfOnboardingSubmittedAt,
@@ -338,13 +401,14 @@ export class OnboardingService {
       throw new BadRequestException('Your profile is not open for submission.');
     }
     // The few fields HR can't do without; everything else is reviewed by eye.
-    const missing: string[] = [];
-    if (!e.dateOfBirth) missing.push('date of birth');
-    if (!e.bankAccountNumber) missing.push('bank account number');
-    if (!e.address) missing.push('address');
-    const contacts = await this.prisma.emergencyContact.count({ where: { employeeId: e.id } });
-    if (!contacts) missing.push('at least one emergency contact');
-    if (missing.length) throw new BadRequestException(`Please add your ${missing.join(', ')} before submitting.`);
+    const required = await this.missingRequired(e);
+    const missing = required.filter(r => !r.done);
+    if (missing.length) {
+      throw new BadRequestException({
+        message: `Please add your ${missing.map(m => m.label.toLowerCase()).join(', ')} before submitting.`,
+        missing,
+      });
+    }
 
     await this.prisma.employee.update({
       where: { id: e.id },

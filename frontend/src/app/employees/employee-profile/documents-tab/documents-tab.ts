@@ -38,6 +38,24 @@ import { HotToastService } from '@ngneat/hot-toast';
 })
 export class DocumentsTabComponent implements OnInit {
   @Input() employeeData: any;
+  /** Self-service onboarding: show which documents are required (16 Nov 2026). */
+  @Input() onboarding = false;
+  readonly requiredDocs = [
+    'Resume / CV', 'Aadhaar Card', 'PAN Card', 'Passport Size Photo',
+    '10th Marksheet', '12th Marksheet', 'Graduation Degree', 'Bank Proof / Cancelled Cheque',
+  ];
+  hasDoc(type: string): boolean {
+    return (this.employeeData?.documents || []).some((d: any) => d.documentType === type);
+  }
+  get requiredDocsLeft(): number {
+    return this.requiredDocs.filter(t => !this.hasDoc(t)).length;
+  }
+  /** Opens the upload pop-up with this document type already picked. */
+  uploadRequired(type: string) {
+    if (this.hasDoc(type)) return;
+    this.openModal();
+    if (this.showModal) this.selectedDocumentType = type;
+  }
   @Output() refreshProfile = new EventEmitter<void>();
 
   showModal = false;

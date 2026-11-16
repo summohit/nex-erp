@@ -50,7 +50,7 @@
     <!-- Modern Pill Tabs Navigation Bar -->
     <div class="tabs-container">
       <div class="pill-tabs-bar">
-        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'work'" (click)="setTab('work')">
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'work'" (click)="setTab('work')" *ngIf="!onboarding">
           <svg lucideBriefcase size="15"></svg>
           <span>Work</span>
         </button>
@@ -63,22 +63,22 @@
 
         <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'personal'" (click)="setTab('personal')">
           <svg lucideUser size="15"></svg>
-          <span>Personal</span>
+          <span>Personal</span><span class="req-star" *ngIf="onboarding" aria-label="has required fields">*</span>
         </button>
 
         <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'contacts'" (click)="setTab('contacts')">
           <svg lucidePhone size="15"></svg>
-          <span>Emergency Contacts</span>
+          <span>Emergency Contacts</span><span class="req-star" *ngIf="onboarding" aria-label="required">*</span>
           <span class="tab-count-chip" *ngIf="contactsCount() > 0">{{ contactsCount() }}</span>
         </button>
 
         <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'documents'" (click)="setTab('documents')" *ngIf="canManageDocuments()">
           <svg lucideFolder size="15"></svg>
-          <span>Documents</span>
+          <span>Documents</span><span class="req-star" *ngIf="onboarding" aria-label="has required documents">*</span>
           <span class="tab-count-chip" *ngIf="documentsCount() > 0">{{ documentsCount() }}</span>
         </button>
 
-        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'history'" (click)="setTab('history')">
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'history'" (click)="setTab('history')" *ngIf="!onboarding">
           <svg lucideClock size="15"></svg>
           <span>History</span>
         </button>
@@ -91,6 +91,7 @@
         [activeSubTab]="activeTab()"
         [employeeData]="employeeData()" 
         [isOwner]="isOwner()"
+        [onboarding]="onboarding"
         (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')"
         (tabChange)="setTab($event)">
       </app-profile-tab>
@@ -103,6 +104,7 @@
 
       <app-documents-tab *ngIf="activeTab() === 'documents' && canManageDocuments()" 
         [employeeData]="employeeData()" 
+        [onboarding]="onboarding" 
         (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')">
       </app-documents-tab>
 

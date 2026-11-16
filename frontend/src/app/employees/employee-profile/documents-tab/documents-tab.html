@@ -12,6 +12,23 @@
     </button>
   </div>
 
+  <!-- Required documents (self-service onboarding, 16 Nov 2026) -->
+  <section class="req-docs" *ngIf="onboarding" id="required-documents">
+    <div class="req-docs-head">
+      <strong>Required documents <span class="req-star">*</span></strong>
+      <span [class.req-docs-done]="!requiredDocsLeft">{{ requiredDocsLeft ? requiredDocsLeft + ' of ' + requiredDocs.length + ' still needed' : 'All uploaded' }}</span>
+    </div>
+    <div class="req-docs-list">
+      <button type="button" *ngFor="let t of requiredDocs" class="req-doc" [class.done]="hasDoc(t)" (click)="uploadRequired(t)"
+              [attr.aria-label]="t + (hasDoc(t) ? ' — uploaded' : ' — upload')">
+        <span class="req-doc-dot" aria-hidden="true">{{ hasDoc(t) ? '✓' : '' }}</span>
+        <span class="req-doc-name">{{ t }}</span>
+        <span class="req-doc-go" *ngIf="!hasDoc(t)">Upload</span>
+      </button>
+    </div>
+    <p class="req-docs-hint">After uploading, make sure each file has the right type. Other documents (passport, post-graduation, references) are optional.</p>
+  </section>
+
   <!-- Documents Cards Responsive Grid -->
   <div class="documents-cards-grid">
     <div class="doc-card" *ngFor="let doc of employeeData?.documents" [class.uncategorized]="doc.documentType === 'Other'">

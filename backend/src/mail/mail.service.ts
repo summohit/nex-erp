@@ -928,24 +928,110 @@ export class MailService {
    * password and fills in their profile for HR to review.
    */
   async sendOnboardingCredentialsEmail(params: { email: string; name: string; employeeCode: string; tempPassword: string; companyName?: string }) {
-    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
+    const baseUrl = (process.env.APP_URL || 'http://localhost:4200').replace(/\/+$/, '');
     const loginLink = `${baseUrl}/auth/login`;
-    const company = this.escapeHtml(params.companyName || 'the team');
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
-        <h2 style="color: #0f172a; margin: 0 0 8px;">Welcome to ${company}, ${this.escapeHtml(params.name)}!</h2>
-        <p style="color: #475569; font-size: 15px;">Your onboarding has started. Sign in to MIRA with the details below. You will be asked to set your own password, then fill in your profile (personal details, bank, address, emergency contacts and documents) and submit it for HR review.</p>
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0; color: #1e293b; font-size: 15px;">
-          <p style="margin: 4px 0;"><strong>Employee ID:</strong> ${this.escapeHtml(params.employeeCode)}</p>
-          <p style="margin: 4px 0;"><strong>Login email:</strong> ${this.escapeHtml(params.email)}</p>
-          <p style="margin: 4px 0;"><strong>Temporary password:</strong> ${this.escapeHtml(params.tempPassword)}</p>
-        </div>
-        <div style="text-align: center; margin: 28px 0;">
-          <a href="${loginLink}" style="background: #2563eb; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Sign in and start onboarding</a>
-        </div>
-        <p style="color: #94a3b8; font-size: 12px;">Do not share this email. The temporary password stops working once you set your own.</p>
-      </div>
-    `;
+    const loginLabel = loginLink.replace(/^https?:\/\//, '');
+    const logoUrl = `${baseUrl}/mira-small-logo.png`;
+    const company = this.escapeHtml(params.companyName || 'your new team');
+    const firstName = this.escapeHtml((params.name || '').trim().split(/\s+/)[0] || 'there');
+    const email = this.escapeHtml(params.email);
+    const code = this.escapeHtml(params.employeeCode);
+    const pw = this.escapeHtml(params.tempPassword);
+    const font = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+    // Layout from the 16 Nov 2026 design: dark header band with the MIRA mark,
+    // a sign-in card pulled up over it, the button, three next steps, a privacy note.
+    const step = (n: number, title: string, text: string, last = false) => `
+                <tr><td style="padding-bottom:${last ? 6 : 14}px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                    <td valign="top" width="28" style="width:28px;padding:0;">
+                      <div style="width:28px;height:28px;background:#eef3ff;border-radius:50%;text-align:center;font-family:${font};font-size:13px;font-weight:700;color:#2f5bea;line-height:28px;">${n}</div>
+                    </td>
+                    <td style="padding-left:14px;font-family:${font};font-size:15px;line-height:22px;color:#3d4863;"><strong style="color:#0f1e3d;">${title}</strong> ${text}</td>
+                  </tr></table>
+                </td></tr>`;
+    const html = `<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
+  <title>Start your onboarding: your MIRA login</title>
+  <style>
+    body { margin:0; padding:0; width:100% !important; background:#eef2f8; }
+    table { border-collapse:collapse; }
+    img { border:0; display:block; }
+    a { color:#2f5bea; }
+    @media only screen and (max-width:620px) {
+      .container { width:100% !important; }
+      .px { padding-left:20px !important; padding-right:20px !important; }
+      .h1 { font-size:24px !important; line-height:30px !important; }
+      .btn a { display:block !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#eef2f8;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#eef2f8;font-size:1px;line-height:1px;">Your employee ID and temporary password are inside. Sign in to MIRA to begin.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f8;"><tr><td align="center" style="padding:32px 12px;">
+    <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+
+      <tr><td class="px" style="background:#0f1e3d;border-radius:16px 16px 0 0;padding:28px 40px 56px 40px;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="background:#ffffff;border-radius:10px;width:40px;height:40px;text-align:center;vertical-align:middle;">
+            <img src="${logoUrl}" width="28" height="23" alt="M" style="display:inline-block;width:28px;height:23px;margin:8px auto;font-family:${font};font-size:20px;font-weight:700;line-height:23px;color:#2f5bea;text-align:center;">
+          </td>
+          <td style="padding-left:12px;font-family:${font};font-size:18px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">MIRA</td>
+          <td style="padding-left:12px;font-family:${font};font-size:13px;color:#9fb0d3;">by ${company}</td>
+        </tr></table>
+        <h1 class="h1" style="margin:28px 0 0 0;font-family:${font};font-size:30px;line-height:38px;font-weight:700;color:#ffffff;">Welcome to ${company}, ${firstName}.</h1>
+        <p style="margin:10px 0 0 0;font-family:${font};font-size:16px;line-height:24px;color:#c4d0ea;">Your onboarding has started. It takes about 15 minutes.</p>
+      </td></tr>
+
+      <tr><td class="px" style="background:#ffffff;padding:0 40px 8px 40px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:-32px;background:#ffffff;border:1px solid #dfe5f0;border-radius:12px;box-shadow:0 6px 20px rgba(15,30,61,0.08);">
+          <tr><td style="padding:22px 24px 6px 24px;font-family:${font};font-size:15px;font-weight:700;color:#0f1e3d;">Your sign-in details</td></tr>
+          <tr><td style="padding:8px 24px 0 24px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:12px 0;border-bottom:1px solid #edf0f6;font-family:${font};font-size:14px;color:#64708a;width:38%;">Employee ID</td>
+                <td style="padding:12px 0;border-bottom:1px solid #edf0f6;font-family:${font};font-size:15px;font-weight:600;color:#0f1e3d;">${code}</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 0;border-bottom:1px solid #edf0f6;font-family:${font};font-size:14px;color:#64708a;">Login email</td>
+                <td style="padding:12px 0;border-bottom:1px solid #edf0f6;font-family:${font};font-size:15px;font-weight:600;color:#0f1e3d;word-break:break-all;">${email}</td>
+              </tr>
+              <tr>
+                <td style="padding:14px 0;font-family:${font};font-size:14px;color:#64708a;">Temporary password</td>
+                <td style="padding:14px 0;"><span style="display:inline-block;background:#eef3ff;border:1px dashed #9db4f5;border-radius:8px;padding:7px 12px;font-family:'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace;font-size:16px;font-weight:700;letter-spacing:1px;color:#1f3fb5;">${pw}</span></td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr><td align="center" class="btn" style="padding:30px 0 6px 0;">
+            <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${loginLink}" style="height:52px;v-text-anchor:middle;width:280px;" arcsize="20%" stroke="f" fillcolor="#2f5bea"><w:anchorlock/><center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Sign in and start onboarding</center></v:roundrect><![endif]-->
+            <!--[if !mso]><!-- --><a href="${loginLink}" style="display:inline-block;background:#2f5bea;color:#ffffff;text-decoration:none;font-family:${font};font-size:16px;font-weight:700;line-height:20px;padding:16px 36px;border-radius:10px;">Sign in and start onboarding</a><!--<![endif]-->
+          </td></tr>
+          <tr><td align="center" style="padding:10px 0 0 0;font-family:${font};font-size:13px;line-height:20px;color:#7a869e;">Button not working? Open <a href="${loginLink}" style="color:#2f5bea;">${loginLabel}</a> in your browser.</td></tr>
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:32px;">
+          <tr><td style="font-family:${font};font-size:16px;font-weight:700;color:#0f1e3d;padding-bottom:14px;">What happens next</td></tr>
+          ${step(1, 'Set your own password.', 'You will be asked to do this the first time you sign in.')}
+          ${step(2, 'Complete your profile.', 'Add your personal details, bank details, address and emergency contacts, and upload your documents.')}
+          ${step(3, 'Submit for HR review.', 'HR will check your details and confirm once everything is approved.', true)}
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0 32px 0;background:#fff7e6;border-left:4px solid #f0a92e;border-radius:8px;">
+          <tr><td style="padding:14px 18px;font-family:${font};font-size:14px;line-height:21px;color:#6b4a0a;"><strong>Keep this email private.</strong> Do not forward or share it. The temporary password stops working as soon as you set your own.</td></tr>
+        </table>
+      </td></tr>
+
+      <tr><td class="px" style="background:#f7f9fc;border-top:1px solid #e3e8f1;border-radius:0 0 16px 16px;padding:22px 40px;font-family:${font};font-size:13px;line-height:20px;color:#7a869e;">
+        Need help signing in? Reply to this email or contact your HR team.<br>Sent by MIRA on behalf of ${company}.
+      </td></tr>
+
+    </table>
+  </td></tr></table>
+</body></html>`;
     const subject = 'Start your onboarding — your MIRA login';
     try {
       if (this.brevoApiKey) return await this.sendBrevoEmail({ to: params.email, subject, html });

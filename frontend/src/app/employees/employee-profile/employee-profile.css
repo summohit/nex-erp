@@ -619,3 +619,7 @@
 .ph2-btn:hover { background: #f8fafc; }
 .ph2-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
 @media (max-width: 760px) { .ph2 { flex-wrap: wrap; padding: 16px; } .ph2-main { padding-left: 0; border-left: 0; } .ph2-actions { width: 100%; } .ph2-facts > div { padding: 0 16px 0 0; border-left: 0; } }
+
+/* Required marker on tabs during self-service onboarding (16 Nov 2026) */
+.req-star { margin-left: -2px; color: #dc2626; font-weight: 700; }
+.pill-tab-btn.active .req-star { color: #fecaca; }
