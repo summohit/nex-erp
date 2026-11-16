@@ -810,11 +810,12 @@
   <ng-container *ngIf="requestType() !== 'HOURS'">
     <div class="thr-controls-card delivery-shared-controls">
       <div class="thr-view-tabs" role="tablist" aria-label="Approval status">
-        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'AWAITING'" role="tab" [attr.aria-selected]="otherActiveTab() === 'AWAITING'" (click)="setOtherActiveTab('AWAITING')"><svg lucideClock size="15"></svg><span>Awaiting Decision</span><span class="thr-tab-pill pill-warn">{{ otherTabCount('AWAITING') }}</span></button>
-        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'HISTORY'" role="tab" [attr.aria-selected]="otherActiveTab() === 'HISTORY'" (click)="setOtherActiveTab('HISTORY')"><svg lucideHistory size="15"></svg><span>Decision History</span><span class="thr-tab-pill">{{ otherTabCount('HISTORY') }}</span></button>
-        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'APPROVED'" role="tab" [attr.aria-selected]="otherActiveTab() === 'APPROVED'" (click)="setOtherActiveTab('APPROVED')"><svg lucideCheckCircle2 size="15"></svg><span>Approved</span><span class="thr-tab-pill">{{ otherTabCount('APPROVED') }}</span></button>
-        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'REJECTED'" role="tab" [attr.aria-selected]="otherActiveTab() === 'REJECTED'" (click)="setOtherActiveTab('REJECTED')"><svg lucideXCircle size="15"></svg><span>Declined</span><span class="thr-tab-pill">{{ otherTabCount('REJECTED') }}</span></button>
-        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'ALL'" role="tab" [attr.aria-selected]="otherActiveTab() === 'ALL'" (click)="setOtherActiveTab('ALL')"><svg lucideSlidersHorizontal size="15"></svg><span>All Requests</span><span class="thr-tab-pill">{{ otherTabCount('ALL') }}</span></button>
+        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'AWAITING' && !fvChangesOn()" role="tab" [attr.aria-selected]="otherActiveTab() === 'AWAITING' && !fvChangesOn()" (click)="setOtherActiveTab('AWAITING')"><svg lucideClock size="15"></svg><span>Awaiting Decision</span><span class="thr-tab-pill pill-warn">{{ otherTabCount('AWAITING') }}</span></button>
+        <button type="button" class="thr-tab-btn" *ngIf="requestType() === 'FIELD_VISITS'" [class.active]="fvChangesOn()" role="tab" [attr.aria-selected]="fvChangesOn()" (click)="fvChangesOn.set(true)"><svg lucideHistory size="15"></svg><span>Change requests</span><span class="thr-tab-pill pill-warn" *ngIf="fvChangePending() !== null">{{ fvChangePending() }}</span></button>
+        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'HISTORY' && !fvChangesOn()" role="tab" [attr.aria-selected]="otherActiveTab() === 'HISTORY' && !fvChangesOn()" (click)="setOtherActiveTab('HISTORY')"><svg lucideHistory size="15"></svg><span>Decision History</span><span class="thr-tab-pill">{{ otherTabCount('HISTORY') }}</span></button>
+        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'APPROVED' && !fvChangesOn()" role="tab" [attr.aria-selected]="otherActiveTab() === 'APPROVED' && !fvChangesOn()" (click)="setOtherActiveTab('APPROVED')"><svg lucideCheckCircle2 size="15"></svg><span>Approved</span><span class="thr-tab-pill">{{ otherTabCount('APPROVED') }}</span></button>
+        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'REJECTED' && !fvChangesOn()" role="tab" [attr.aria-selected]="otherActiveTab() === 'REJECTED' && !fvChangesOn()" (click)="setOtherActiveTab('REJECTED')"><svg lucideXCircle size="15"></svg><span>Declined</span><span class="thr-tab-pill">{{ otherTabCount('REJECTED') }}</span></button>
+        <button type="button" class="thr-tab-btn" [class.active]="otherActiveTab() === 'ALL' && !fvChangesOn()" role="tab" [attr.aria-selected]="otherActiveTab() === 'ALL' && !fvChangesOn()" (click)="setOtherActiveTab('ALL')"><svg lucideSlidersHorizontal size="15"></svg><span>All Requests</span><span class="thr-tab-pill">{{ otherTabCount('ALL') }}</span></button>
       </div>
       <div class="thr-filter-row">
         <div class="thr-search-box">
@@ -1082,7 +1083,10 @@
   </ng-container>
 
   <!-- ── Field visit requests ─────────────────────────────────────────────── -->
-  <ng-container *ngIf="requestType() === 'FIELD_VISITS' && !loadingOthers()">
+  <!-- Field Visits → Change requests (16 Nov 2026) -->
+  <app-field-visit-change-requests *ngIf="requestType() === 'FIELD_VISITS' && fvChangesOn()"
+    [search]="otherSearchQuery()" (pendingCount)="fvChangePending.set($event)" (decided)="fvChangePending.set(null)"></app-field-visit-change-requests>
+  <ng-container *ngIf="requestType() === 'FIELD_VISITS' && !loadingOthers() && !fvChangesOn()">
     <div class="prq-empty" *ngIf="!filteredFieldVisitRequests().length">
       <svg lucideCheckCircle2 size="30"></svg>
       <h3>No field visits waiting</h3>

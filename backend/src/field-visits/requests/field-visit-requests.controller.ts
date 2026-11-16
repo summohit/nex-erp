@@ -54,6 +54,12 @@ export class FieldVisitRequestsController {
     return this.requests.history(req.user.companyId, req.user.role, req.user.employeeId ?? null);
   }
 
+  /** Change requests tab: prepone / postpone / date change / cancel, pending and history (16 Nov 2026). */
+  @Get('change-requests')
+  changeRequests(@Req() req) {
+    return this.requests.changeRequests(req.user.companyId, req.user.role, req.user.employeeId ?? null);
+  }
+
   @Get(':id')
   getOne(@Req() req, @Param('id', ParseIntPipe) id: number) {
     return this.requests.getOne(

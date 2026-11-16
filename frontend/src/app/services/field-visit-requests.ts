@@ -189,6 +189,11 @@ export class FieldVisitRequestsService {
     return this.http.get<FieldVisitActivity[]>(`${this.apiUrl}/${id}/timeline`);
   }
 
+  /** Change requests tab: prepone / postpone / date change / cancel, pending and history (16 Nov 2026). */
+  changeRequests() {
+    return this.http.get<FieldVisitChangeRow[]>(`${this.apiUrl}/change-requests`);
+  }
+
   history() {
     return this.http.get<FieldVisitHistoryEntry[]>(`${this.apiUrl}/history`);
   }
@@ -280,4 +285,18 @@ export class FieldVisitRequestsService {
       `${this.apiUrl}/bulk/status`, { ids, status, reason, ...opts },
     );
   }
+}
+
+type ChangePerson = { id: number; firstName: string; lastName: string; avatarUrl?: string | null };
+/** One prepone / postpone / date change / cancel request and its decision (16 Nov 2026). */
+export interface FieldVisitChangeRow {
+  id: number; requestId: number; requestNumber: string; location: string;
+  project: { id: number; name: string; key?: string } | null;
+  type: 'Prepone' | 'Postpone' | 'Date change' | 'Cancel';
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Withdrawn';
+  previous: { startDate: string; endDate: string } | null;
+  requested: { startDate: string; endDate: string } | null;
+  reason: string; requestedBy: ChangePerson | null; requestedAt: string;
+  decidedBy: ChangePerson | null; decidedAt: string | null; decisionNote: string | null;
+  canReview: boolean;
 }

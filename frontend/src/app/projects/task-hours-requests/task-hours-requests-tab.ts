@@ -56,6 +56,7 @@ import {
 } from '../../services/visit-location-requests.service';
 import { FieldVisitRequest, FieldVisitRequestsService } from '../../services/field-visit-requests';
 import { RoleService } from '../../services/role.service';
+import { FieldVisitChangeRequestsComponent } from '../../field-visits/change-requests/change-requests';
 import { ProjectTicketsService, ProjectTicket } from '../../services/project-tickets';
 
 export type RequestTabFilter = 'AWAITING' | 'HISTORY' | 'APPROVED' | 'REJECTED' | 'ALL';
@@ -77,7 +78,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-task-hours-requests-tab',
   standalone: true,
-  imports: [PageHeaderComponent, 
+  imports: [PageHeaderComponent, FieldVisitChangeRequestsComponent, 
     CommonModule,
     FormsModule,
     RouterModule,
@@ -350,7 +351,12 @@ export class TaskHoursRequestsTabComponent {
 
   setOtherActiveTab(tab: RequestTabFilter): void {
     this.otherActiveTab.set(tab);
+    this.fvChangesOn.set(false);
   }
+
+  /** Field Visits → Change requests (prepone / postpone / date change / cancel), 16 Nov 2026. */
+  fvChangesOn = signal(false);
+  fvChangePending = signal<number | null>(null);
 
   private otherTabStatus(row: any): RequestTabFilter {
     const status = String(row?.status ?? row?.approvalState ?? '').toUpperCase();
@@ -611,6 +617,11 @@ export class TaskHoursRequestsTabComponent {
   });
 
   constructor() {
+    // Pending count for the Field Visits → Change requests tab (16 Nov 2026).
+    this.fieldVisitApi.changeRequests().subscribe({
+      next: (rows) => this.fvChangePending.set((rows || []).filter((c) => c.status === 'Pending').length),
+      error: () => {},
+    });
     this.load();
     this.loadDeliveryProjects();
     // Loaded up front so the tab badge shows how many trips are waiting
@@ -992,6 +1003,7 @@ export class TaskHoursRequestsTabComponent {
     if (type === this.requestType()) return;
     this.requestType.set(type);
     this.otherActiveTab.set('AWAITING');
+    this.fvChangesOn.set(false);
     if (type !== 'HOURS') this.loadOthers(type);
   }
 

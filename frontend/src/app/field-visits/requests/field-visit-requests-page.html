@@ -97,6 +97,10 @@
     }
   </div>
 
+  @if (!isLoading() && statusFilter() === 'CHANGES') {
+    <app-field-visit-change-requests [search]="searchQuery()" (pendingCount)="changePending.set($event)" (decided)="load()"></app-field-visit-change-requests>
+  }
+
   @if (!isLoading() && statusFilter() === 'HISTORY') {
     <div class="card field-visit-history-card">
       <div class="history-heading">
@@ -158,8 +162,8 @@
         <p>Field visits you are sent on by your project manager appear here.</p>
       }
     </div>
-  } @else if (statusFilter() === 'HISTORY') {
-    <!-- The dedicated history table above is the complete History view. -->
+  } @else if (statusFilter() === 'HISTORY' || statusFilter() === 'CHANGES') {
+    <!-- The dedicated History / Change requests tables above are those views. -->
   } @else if (filteredRequests().length === 0) {
     <!-- Empty tab or no matching filters -->
     <div class="card empty-card">

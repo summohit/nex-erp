@@ -1737,6 +1737,67 @@ export class FieldVisitRequestsService {
     });
   }
 
+  /**
+   * Change requests tab (16 Nov 2026): every prepone, postpone, date change and
+   * cancellation asked for on a visible trip, each paired with its decision.
+   * Pending first, newest on top, then history.
+   */
+  async changeRequests(companyId: number, role: string, employeeId: number | null) {
+    const visible = await this.prisma.fieldVisitRequest.findMany({
+      where: this.visibilityWhere(companyId, role, employeeId),
+      select: { id: true, requestNumber: true, location: true, status: true, startDate: true, endDate: true,
+        pendingChange: true, project: { select: { id: true, name: true, key: true } } },
+    });
+    if (!visible.length) return [];
+    const byId = new Map(visible.map((r) => [r.id, r]));
+    const acts = await this.prisma.fieldVisitRequestActivity.findMany({
+      where: { requestId: { in: visible.map((r) => r.id) }, action: { in: ['MODIFICATION_REQUESTED', 'MODIFICATION_APPROVED', 'MODIFICATION_REJECTED'] } },
+      orderBy: [{ requestId: 'asc' }, { id: 'asc' }],
+      select: { id: true, requestId: true, action: true, detail: true, oldValue: true, newValue: true, createdAt: true, actor: this.PERSON },
+    });
+    const parse = (v: string | null) => { try { const o = v ? JSON.parse(v) : null; return o?.startDate ? { startDate: o.startDate, endDate: o.endDate ?? o.startDate } : null; } catch { return null; } };
+    const typeOf = (detail: string | null, kind?: string) => {
+      const d = String(detail ?? '').toLowerCase();
+      if (d.includes('prepone')) return 'Prepone';
+      if (d.includes('postpone') || kind === 'POSTPONE') return 'Postpone';
+      if (d.includes('cancel') || kind === 'CANCEL') return 'Cancel';
+      return 'Date change';
+    };
+    const rows: any[] = [];
+    const perRequest = new Map<number, typeof acts>();
+    for (const a of acts) { const list = perRequest.get(a.requestId) ?? []; list.push(a); perRequest.set(a.requestId, list); }
+    for (const [rid, list] of perRequest) {
+      const req = byId.get(rid)!;
+      const asks = list.filter((a) => a.action === 'MODIFICATION_REQUESTED');
+      asks.forEach((ask, i) => {
+        const nextAskId = asks[i + 1]?.id ?? Infinity;
+        const decision = list.find((a) => a.id > ask.id && a.id < nextAskId && a.action !== 'MODIFICATION_REQUESTED');
+        const isLatest = i === asks.length - 1;
+        const status = decision ? (decision.action === 'MODIFICATION_APPROVED' ? 'Approved' : 'Rejected')
+          : (isLatest && req.pendingChange ? 'Pending' : 'Withdrawn');
+        const d = String(ask.detail ?? '');
+        rows.push({
+          id: ask.id, requestId: rid, requestNumber: req.requestNumber, location: req.location, project: req.project,
+          type: typeOf(ask.detail, (status === 'Pending' ? (req.pendingChange as any)?.kind : undefined)),
+          status,
+          // Older requests did not record dates on the activity; for the open one
+          // fall back to the trip's current dates and the proposal's.
+          previous: parse(ask.oldValue) ?? (status === 'Pending' ? { startDate: this.day(req.startDate), endDate: this.day(req.endDate) } : null),
+          requested: parse(ask.newValue) ?? (status === 'Pending' && (req.pendingChange as any)?.startDate
+            ? { startDate: String((req.pendingChange as any).startDate).slice(0, 10), endDate: String((req.pendingChange as any).endDate ?? (req.pendingChange as any).startDate).slice(0, 10) } : null),
+          reason: d.includes(': ') ? d.slice(d.indexOf(': ') + 2) : d,
+          requestedBy: ask.actor, requestedAt: ask.createdAt,
+          decidedBy: decision?.actor ?? null, decidedAt: decision?.createdAt ?? null,
+          decisionNote: decision?.action === 'MODIFICATION_REJECTED' ? decision.detail : null,
+          canReview: status === 'Pending' && this.isApprover(role),
+        });
+      });
+    }
+    // Newest first (asked 16 Nov 2026); pending before decided.
+    return rows.sort((a, b) => (a.status === 'Pending' ? 0 : 1) - (b.status === 'Pending' ? 0 : 1)
+      || +new Date(b.requestedAt) - +new Date(a.requestedAt));
+  }
+
   private projectManagerIds(project: any): number[] {
     return [...new Set<number>([
       ...(project?.leadId ? [project.leadId] : []),

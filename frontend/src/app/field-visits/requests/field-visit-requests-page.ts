@@ -10,6 +10,7 @@ import {
   LucideRotateCcw, LucideRefreshCw, LucideFilter, LucideCheck,
   LucideChevronDown, LucideAlertTriangle, LucideMoreHorizontal, LucideEdit2, LucideHistory,
 } from '@lucide/angular';
+import { FieldVisitChangeRequestsComponent } from '../change-requests/change-requests';
 import { FieldVisitRequestsService, FieldVisitRequest, FieldVisitRequestTask, FieldVisitHistoryEntry } from '../../services/field-visit-requests';
 import { FieldVisitRequestFormComponent } from './field-visit-request-form';
 import { MyFieldVisitComponent } from '../my-field-visit/my-field-visit';
@@ -35,7 +36,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
   selector: 'app-field-visit-requests-page',
   standalone: true,
   imports: [PageHeaderComponent, 
-    CommonModule, FormsModule, RouterModule, MyFieldVisitComponent,
+    CommonModule, FormsModule, RouterModule, MyFieldVisitComponent, FieldVisitChangeRequestsComponent,
     FieldVisitRequestFormComponent, VisitLocationFormModalComponent,
     LucideMapPin, LucideRoute, LucidePlus, LucideSearch,
     LucideX, LucideCalendarDays, LucideUsers, LucideBuilding,
@@ -80,6 +81,9 @@ export class FieldVisitRequestsPageComponent implements OnInit {
   isLocationFormOpen = signal(false);
   allRequests = signal<FieldVisitRequest[]>([]);
   historyEntries = signal<FieldVisitHistoryEntry[]>([]);
+
+  // ── Change requests tab (16 Nov 2026): the table is FieldVisitChangeRequestsComponent ──
+  changePending = signal(0);
   isLoading = signal(true);
 
   // Filters
@@ -135,6 +139,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
   statuses = [
     { key: '', label: 'All' },
     { key: 'HISTORY', label: 'History' },
+    { key: 'CHANGES', label: 'Change requests' },
     { key: 'DRAFT', label: 'Draft' },
     { key: 'PENDING_APPROVAL', label: 'Pending approval' },
     { key: 'APPROVED', label: 'Approved' },
@@ -241,6 +246,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
     const counts: Record<string, number> = { '': rows.length };
     for (const s of this.statuses) if (s.key) counts[s.key] = 0;
     counts['HISTORY'] = this.historyEntries().length;
+    counts['CHANGES'] = this.changePending();
     for (const r of rows) {
       if (counts[r.status] !== undefined) counts[r.status]++;
       if (r.postponeState) counts['POSTPONED']++;
@@ -276,7 +282,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
 
   filteredRequests = computed(() => {
     const status = this.statusFilter();
-    if (status === 'HISTORY') return [];
+    if (status === 'HISTORY' || status === 'CHANGES') return [];
     const rows = this.baseRows();
     if (status === 'POSTPONED') return rows.filter((r) => r.postponeState);
     return status ? rows.filter((r) => r.status === status) : rows;
@@ -345,6 +351,7 @@ export class FieldVisitRequestsPageComponent implements OnInit {
       next: (entries) => this.historyEntries.set(entries || []),
       error: () => this.historyEntries.set([]),
     });
+    this.api.changeRequests().subscribe({ next: (rows) => this.changePending.set((rows || []).filter((c) => c.status === 'Pending').length), error: () => {} });
   }
 
   historyLabel(action: string): string {

@@ -1,0 +1,125 @@
+<!-- Change requests: prepone / postpone / date change / cancel, pending and history (16 Nov 2026) -->
+    <div class="card cr-card">
+      <div class="cr-heading">
+        <div>
+          <span class="cr-kicker">RESCHEDULE &amp; CANCEL</span>
+          <h2><span class="cr-heading-icon"><svg lucideCalendarDays [size]="19"></svg></span> Change requests</h2>
+          <p>Prepone, postpone, date-change and cancel requests on approved trips — waiting ones first, newest on top.</p>
+        </div>
+        <span class="cr-total"><strong>{{ changeCounts().Pending }}</strong> pending</span>
+      </div>
+
+      <div class="cr-filters">
+        <div class="cr-chips" role="group" aria-label="Show">
+          @for (v of ['Pending', 'History', 'All']; track v) {
+            <button type="button" class="cr-chip" [class.on]="changeView() === v" [attr.aria-pressed]="changeView() === v" (click)="changeView.set($any(v))">
+              {{ v }} <span class="cr-chip-count">{{ $any(changeCounts())[v] }}</span>
+            </button>
+          }
+        </div>
+        <div class="cr-chips" role="group" aria-label="Type">
+          @for (t of ['', 'Prepone', 'Postpone', 'Date change', 'Cancel']; track t) {
+            <button type="button" class="cr-chip small" [class.on]="changeType() === t" [attr.aria-pressed]="changeType() === t" (click)="changeType.set($any(t))">{{ t || 'All types' }}</button>
+          }
+        </div>
+      </div>
+
+      @if (!visibleChanges().length) {
+        <div class="cr-empty">
+          <div class="cr-empty-icon"><svg lucideCalendarDays [size]="28"></svg></div>
+          <div>
+            <h3>{{ changeView() === 'Pending' ? 'No change requests waiting' : 'No change requests here' }}</h3>
+            <p>When someone asks to prepone, postpone, change the dates of or cancel an approved trip, it shows here until it is decided — and stays in History after.</p>
+          </div>
+        </div>
+      } @else {
+        <div class="cr-table-wrap">
+          <table class="cr-table">
+            <thead>
+              <tr><th>Request</th><th>Change</th><th>Reason</th><th>Asked by</th><th>Status</th><th class="cr-th-actions">Action</th></tr>
+            </thead>
+            <tbody>
+              @for (c of visibleChanges(); track c.id) {
+                <tr class="cr-row" [class.cr-pending]="c.status === 'Pending'" [attr.data-status]="c.status">
+                  <td class="cr-col-req">
+                    <a class="cr-req" [routerLink]="['/field-visits/requests', c.requestId]" title="Open this field visit">{{ c.requestNumber }}</a>
+                    @if (c.project) {
+                      <a class="cr-proj" [routerLink]="['/projects', c.project.id]" title="Open the project">{{ c.project.name }}</a>
+                    }
+                    <div class="cr-loc" [title]="c.location">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                      <span>{{ c.location }}</span>
+                    </div>
+                  </td>
+                  <td class="cr-col-change">
+                    <span class="cr-type" [attr.data-type]="c.type">{{ c.type }}</span>
+                    <div class="cr-dates">
+                      @if (c.previous) { <span class="cr-old">{{ c.previous.startDate | date:'d MMM' }} – {{ c.previous.endDate | date:'d MMM' }}</span> }
+                      @if (c.requested) {
+                        <span class="cr-new">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                          {{ c.requested.startDate | date:'d MMM' }} – {{ c.requested.endDate | date:'d MMM yyyy' }}
+                        </span>
+                        <span class="cr-days">{{ dayCount(c.requested) }} day{{ dayCount(c.requested) === 1 ? '' : 's' }}</span>
+                      } @else if (c.type === 'Cancel') {
+                        <span class="cr-new cr-cancel">Cancel the trip</span>
+                      }
+                    </div>
+                  </td>
+                  <td class="cr-col-reason"><p class="cr-reason" [title]="c.reason">{{ c.reason || '—' }}</p></td>
+                  <td class="cr-col-person">
+                    @if (c.requestedBy; as p) {
+                      <div class="cr-person-row">
+                        @if (p.avatarUrl) { <img class="cr-av" [src]="p.avatarUrl" alt=""> }
+                        @else { <span class="cr-av cr-av-i" [style.background]="avatarBg(p)">{{ initials(p) }}</span> }
+                        <div class="cr-person-text">
+                          <span class="cr-person">{{ p.firstName }} {{ p.lastName }}</span>
+                          @if ($any(p).designation?.name) { <span class="cr-role">{{ $any(p).designation.name }}</span> }
+                        </div>
+                      </div>
+                    } @else { <span class="cr-sub">—</span> }
+                    <div class="cr-when">{{ c.requestedAt | date:'d MMM, h:mm a' }}
+                      @if (c.status === 'Pending') { <span class="cr-wait">{{ waitedFor(c.requestedAt) }}</span> }
+                    </div>
+                  </td>
+                  <td class="cr-col-status">
+                    <span class="cr-status" [attr.data-status]="c.status">{{ c.status }}</span>
+                    @if (c.decidedBy; as d) {
+                      <div class="cr-decided">
+                        @if (d.avatarUrl) { <img class="cr-av sm" [src]="d.avatarUrl" alt=""> }
+                        @else { <span class="cr-av sm cr-av-i" [style.background]="avatarBg(d)">{{ initials(d) }}</span> }
+                        <div class="cr-person-text">
+                          <span class="cr-person sm">{{ d.firstName }} {{ d.lastName }}</span>
+                          <span class="cr-role">{{ c.decidedAt | date:'d MMM, h:mm a' }}</span>
+                        </div>
+                      </div>
+                      @if (c.decisionNote) { <p class="cr-note">“{{ c.decisionNote }}”</p> }
+                    }
+                  </td>
+                  <td class="cr-actions">
+                    @if (c.canReview) {
+                      @if (rejectingChange() === c.id) {
+                        <input class="cr-reject-input" [(ngModel)]="rejectChangeText" placeholder="Why reject?" aria-label="Reason for rejecting" (keyup.enter)="rejectChange(c)">
+                        <div class="cr-btns">
+                          <button type="button" class="cr-btn" (click)="rejectingChange.set(null)">Cancel</button>
+                          <button type="button" class="cr-btn cr-btn-reject" [disabled]="changeBusy() === c.id" (click)="rejectChange(c)">Reject</button>
+                        </div>
+                      } @else {
+                        <div class="cr-btns">
+                          <button type="button" class="cr-btn cr-btn-approve" [disabled]="changeBusy() === c.id" (click)="approveChange(c)">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg> Approve
+                          </button>
+                          <button type="button" class="cr-btn cr-btn-ghost-red" [disabled]="changeBusy() === c.id" (click)="rejectingChange.set(c.id); rejectChangeText = ''">Reject</button>
+                        </div>
+                      }
+                    } @else {
+                      <a class="cr-btn" [routerLink]="['/field-visits/requests', c.requestId]">Open</a>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
