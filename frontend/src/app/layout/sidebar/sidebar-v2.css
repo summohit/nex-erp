@@ -885,3 +885,14 @@
   border-radius: 2px;
   background: #2563eb;
 }
+
+/* Arrange my menu (16 Nov 2026) */
+.rail-drop { display: contents; }
+.rail-drop.arranging { display: flex; flex-direction: column; align-items: center; gap: inherit; }
+.rail-drop.arranging .rail-icon-btn,
+.drawer-items-nav.arranging .drawer-item { cursor: grab; outline: 1px dashed #94a3b8; outline-offset: -2px; }
+.drawer-items-nav.arranging .drawer-item::before { content: '⋮⋮'; color: #94a3b8; margin-right: 8px; font-size: 12px; }
+.rail-arrange-btn { font-size: 18px; line-height: 1; }
+.cdk-drag-preview { box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2); border-radius: 10px; opacity: 0.95; }
+.cdk-drag-placeholder { opacity: 0.3; }
+.cdk-drag-animating, .cdk-drop-list-dragging .cdk-drag { transition: transform 200ms cubic-bezier(0, 0, 0.2, 1); }

@@ -318,11 +318,9 @@ export class JobDetailComponent implements OnInit {
   }
 
   /**
-   * The public careers route is `/careers/:companyId`, where the segment is the
-   * base64 company id the sidebar's "Public Careers Page" link also builds —
-   * not the job id. Putting the job id there asked for a company that does not
-   * exist, which is why the page loaded with zero open positions. The job id
-   * rides along as `?job=` so the visitor lands on this posting.
+   * Shared links are `/careers?job=<id>` (16 Nov 2026: no encoded company id
+   * in the address). The job id must never go in the path segment — that is
+   * read as a company and showed zero open positions.
    */
   shareMenuOpen = signal(false);
 

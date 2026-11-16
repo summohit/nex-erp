@@ -678,12 +678,13 @@
   <div class="rv4" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="rv4-title">
 
     <header class="rv4-head">
-      <span class="rv4-avatar">{{ getInitials(r.firstName, r.lastName) }}</span>
+      <img *ngIf="r.avatarUrl || reviewProfile()?.avatarUrl" [src]="r.avatarUrl || reviewProfile()?.avatarUrl" alt="" class="rv4-avatar rv4-avatar-img">
+      <span *ngIf="!(r.avatarUrl || reviewProfile()?.avatarUrl)" class="rv4-avatar">{{ getInitials(r.firstName, r.lastName) }}</span>
       <div class="rv4-id">
         <h3 id="rv4-title">{{ r.firstName }} {{ r.lastName }}</h3>
         <p>#{{ r.employeeCode }} · {{ r.department?.name || 'No department' }}<ng-container *ngIf="r.joiningDate"> · Joins {{ r.joiningDate | date:'d MMM' }}</ng-container></p>
       </div>
-      <button type="button" class="rv4-link" (click)="openUserProfile(r.id, $event)">Open profile</button>
+      <a class="rv4-link" [href]="'/employees/' + r.id + '/profile'" target="_blank" rel="noopener" title="Opens the full profile in a new tab">Open profile ↗</a>
       <button type="button" class="rv4-x" (click)="closeSelfReview()" aria-label="Close">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>

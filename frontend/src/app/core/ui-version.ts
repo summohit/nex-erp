@@ -11,7 +11,8 @@
  */
 export type UiVersion = 'v1' | 'v2';
 
-const DEFAULT_UI: UiVersion = 'v1';
+// v2 is the live UI from 16 Nov 2026 (approved). `?ui=v1` still switches back.
+const DEFAULT_UI: UiVersion = 'v2';
 const STORAGE_KEY = 'ui_version';
 
 function read(): UiVersion {

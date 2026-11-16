@@ -23,6 +23,8 @@ export interface ClockRefusal {
   message?: string;
   direction?: 'in' | 'out';
   distanceKm?: number | null;
+  /** Approved field visit, clocked away from the site: a photo is required (16 Nov 2026). */
+  fieldVisit?: boolean;
 }
 
 /**
@@ -38,6 +40,7 @@ export function clockRefusal(error: any): ClockRefusal {
     openSessionDate: body.openSessionDate,
     direction: body.direction,
     distanceKm: body.distanceKm,
+    fieldVisit: !!body.fieldVisit,
     message: Array.isArray(body.message) ? body.message[0] : body.message,
   };
 }
@@ -66,8 +69,8 @@ export const attendanceService = {
   },
   
   /** `accuracy` (metres) lets the server allow for an imprecise fix. */
-  clockIn: async (lat?: number, lng?: number, accuracy?: number, outsideReason?: string): Promise<AttendanceRecord> => {
-    const response = await apiClient.post('/attendance/clock-in', { lat, lng, accuracy, outsideReason });
+  clockIn: async (lat?: number, lng?: number, accuracy?: number, outsideReason?: string, outsideProofUrl?: string): Promise<AttendanceRecord> => {
+    const response = await apiClient.post('/attendance/clock-in', { lat, lng, accuracy, outsideReason, outsideProofUrl });
     return response.data;
   },
   

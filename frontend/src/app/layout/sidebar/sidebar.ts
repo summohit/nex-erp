@@ -4,7 +4,10 @@ import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { LayoutService } from '../../services/layout.service';
-import { MenusService } from '../../services/menus.service';
+import { MenusService, MenuOrder, applySavedOrder } from '../../services/menus.service';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { HotToastService } from '@ngneat/hot-toast';
 import { LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen, LucideFunnel, LucideShoppingCart, LucideBug, LucideMapPin, LucideMegaphone, LucideCheckCircle2, LucideMessageCircle } from '@lucide/angular';
 
@@ -25,7 +28,7 @@ const ATTENDANCE_SELF_ROUTES = new Set([
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen, LucideFunnel, LucideShoppingCart, LucideBug, LucideMapPin, LucideMegaphone, LucideCheckCircle2, LucideMessageCircle],
+  imports: [CommonModule, DragDropModule, LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock, LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown, LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy, LucideKanban, LucideLogOut, LucideX, LucideBuilding, LucideTarget, LucideDoorOpen, LucideFunnel, LucideShoppingCart, LucideBug, LucideMapPin, LucideMegaphone, LucideCheckCircle2, LucideMessageCircle],
   templateUrl: './sidebar.html',
   styleUrls: ['./sidebar.css']
 })
@@ -60,9 +63,14 @@ export class SidebarComponent implements OnInit {
   }
 
   loadMenus() {
-    this.menusService.getSidebarMenus().subscribe({
-      next: (menus) => {
-        this.menuSections = this.mergeLeaveMenuItems(menus);
+    forkJoin({
+      menus: this.menusService.getSidebarMenus(),
+      order: this.menusService.getMenuOrder().pipe(catchError(() => of(null))),
+    }).subscribe({
+      next: ({ menus, order }) => {
+        const merged = this.mergeLeaveMenuItems(menus);
+        this.defaultSections = JSON.parse(JSON.stringify(merged));
+        this.menuSections = this.ordered(merged, order);
         this.checkExpandedMenu(this.router.url);
         this.isLoading.set(false);
       },
@@ -70,6 +78,57 @@ export class SidebarComponent implements OnInit {
         this.toast.error('Failed to load menu');
         this.isLoading.set(false);
       }
+    });
+  }
+
+  // ── Arrange my menu (16 Nov 2026) ──────────────────────────────────────
+  // Each person drags menus (within a section) and sub-pages (within a menu)
+  // into their own order; saved to their profile on the server.
+  arranging = signal(false);
+  private defaultSections: any[] = [];
+
+  private ordered(sections: any[], order: MenuOrder | null): any[] {
+    for (const section of sections) {
+      section.items = applySavedOrder(section.items || [], order?.modules, (i: any) => i.id);
+      for (const item of section.items) {
+        if (item.subItems?.length) item.subItems = applySavedOrder(item.subItems, order?.subs?.[item.id], (x: any) => x.id);
+      }
+    }
+    return sections;
+  }
+
+  toggleArrange() {
+    const on = !this.arranging();
+    this.arranging.set(on);
+    if (on) this.toast.info('Drag menus and sub-pages into the order you want. Click Done when finished.', { duration: 4000 });
+  }
+
+  dropItem(section: any, e: CdkDragDrop<any[]>) {
+    if (e.previousIndex === e.currentIndex) return;
+    moveItemInArray(section.items, e.previousIndex, e.currentIndex);
+    this.saveOrder();
+  }
+
+  dropSub(item: any, e: CdkDragDrop<any[]>) {
+    if (e.previousIndex === e.currentIndex) return;
+    moveItemInArray(item.subItems, e.previousIndex, e.currentIndex);
+    this.saveOrder();
+  }
+
+  private saveOrder() {
+    const items = this.menuSections.flatMap((s: any) => s.items || []);
+    const order: MenuOrder = {
+      modules: items.map((i: any) => i.id),
+      subs: Object.fromEntries(items.filter((i: any) => i.subItems?.length > 1).map((i: any) => [i.id, i.subItems.map((x: any) => x.id)])),
+    };
+    this.menusService.saveMenuOrder(order).subscribe({ error: () => this.toast.error('Could not save your menu order') });
+  }
+
+  resetOrder() {
+    this.menuSections = JSON.parse(JSON.stringify(this.defaultSections));
+    this.menusService.saveMenuOrder(null).subscribe({
+      next: () => this.toast.success('Menu order reset'),
+      error: () => this.toast.error('Could not reset the menu order'),
     });
   }
 
@@ -270,6 +329,8 @@ export class SidebarComponent implements OnInit {
   }
 
   toggleMenu(menuItem: any, event: Event) {
+    // While arranging, a click only opens a group (to arrange its pages); it never navigates.
+    if (this.arranging() && !menuItem.subItems?.length) { event.preventDefault(); return; }
     if (!menuItem.subItems?.length && menuItem.route && this.opensElsewhere(event)) return;
     event.preventDefault();
 
@@ -299,18 +360,12 @@ export class SidebarComponent implements OnInit {
   }
 
   handleSubMenuClick(subItem: any, event: Event) {
+    if (this.arranging()) { event.preventDefault(); return; }
     if (subItem.route && !subItem.external && subItem.route !== '/careers' && this.opensElsewhere(event)) return;
     event.preventDefault();
     if (subItem.external || subItem.route === '/careers') {
-      let route = subItem.route;
-      if (subItem.route === '/careers') {
-        const currentUser = this.user();
-        if (currentUser && currentUser.companyId) {
-          const encrypted = btoa(currentUser.companyId);
-          route = `/careers/${encrypted}`;
-        }
-      }
-      window.open(route, '_blank');
+      // Plain /careers, without the encoded company id (16 Nov 2026).
+      window.open(subItem.route, '_blank');
       return;
     }
     

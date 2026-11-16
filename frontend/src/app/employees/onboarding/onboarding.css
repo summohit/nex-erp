@@ -1670,3 +1670,5 @@
   .rv4-foot { padding: 12px 16px; flex-wrap: wrap; }
   .rv4-foot .rv4-muted { flex: 1 1 100%; }
 }
+.rv4-avatar-img { object-fit: cover; border: 1px solid #e2e8f0; }
+a.rv4-link { text-decoration: none; }

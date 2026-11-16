@@ -18,6 +18,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useDashboardStore, getCurrentLocation, requestLocationPermission } from '../../store/dashboardStore';
 import { notificationService, AppNotification } from '../../api/notificationService';
 import { fieldVisitRequestService, FvDay } from '../../api/fieldVisitRequestService';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { startJourneyFor, endJourneyFor, flushJourneyPoints } from '../FieldVisit/JourneyPanel';
 import { formatElapsed } from '../../utils/haversine';
 import { navigateTo } from '../../navigation/navigationUtils';
@@ -298,7 +299,7 @@ export default function DashboardScreen() {
   };
 
   const [lateClockOut, setLateClockOut] = useState<{ visible: boolean; day?: string }>({ visible: false });
-  const [outside, setOutside] = useState<{ visible: boolean; direction?: 'in' | 'out'; message?: string }>({
+  const [outside, setOutside] = useState<{ visible: boolean; direction?: 'in' | 'out'; message?: string; fieldVisit?: boolean }>({
     visible: false,
   });
 
@@ -372,7 +373,7 @@ export default function DashboardScreen() {
       const refusal = clockRefusal(err);
 
       if (refusal.code === CLOCK_ERROR.OUTSIDE_OFFICE) {
-        setOutside({ visible: true, direction: refusal.direction, message: refusal.message });
+        setOutside({ visible: true, direction: refusal.direction, message: refusal.message, fieldVisit: refusal.fieldVisit });
         return;
       }
 
@@ -415,17 +416,54 @@ export default function DashboardScreen() {
     }
   };
 
+  /**
+   * A photo of where the person is, for a field visit clocked away from the
+   * site (16 Nov 2026). Camera or gallery, uploaded as attendance proof.
+   * Resolves to the uploaded URL, or null when cancelled.
+   */
+  const takeVisitPhoto = (): Promise<string | null> => new Promise((resolve) => {
+    const pick = async (source: 'camera' | 'gallery') => {
+      const opts = { mediaType: 'photo' as const, quality: 0.7 as const, maxWidth: 1600, maxHeight: 1600 };
+      const result = source === 'camera' ? await launchCamera(opts) : await launchImageLibrary(opts);
+      const asset = result.assets?.[0];
+      if (result.didCancel || !asset?.uri) return resolve(null);
+      try {
+        const fd = new FormData();
+        fd.append('file', { uri: asset.uri, name: asset.fileName || 'visit-photo.jpg', type: asset.type || 'image/jpeg' } as any);
+        const uploaded = await fieldVisitRequestService.uploadReceipt(fd);
+        resolve(uploaded?.url || null);
+      } catch {
+        Alert.alert('Upload failed', 'The photo could not be uploaded. Please try again.');
+        resolve(null);
+      }
+    };
+    Alert.alert('Photo required', 'Take a photo of where you are, for the approver.', [
+      { text: 'Camera', onPress: () => pick('camera') },
+      { text: 'Gallery', onPress: () => pick('gallery') },
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+    ]);
+  });
+
   const submitOutside = async (reason: string) => {
     const direction = outside.direction;
+    const fieldVisit = !!outside.fieldVisit;
     setOutside({ visible: false });
     try {
+      let proofUrl: string | undefined;
+      if (fieldVisit && direction !== 'out') {
+        const url = await takeVisitPhoto();
+        if (!url) return;
+        proofUrl = url;
+      }
       if (direction === 'out') await clockOut(undefined, undefined, undefined, reason, true);
-      else await clockIn(reason, true);
+      else await clockIn(reason, true, proofUrl);
       setFeedback({
         visible: true,
         type: 'success',
-        title: direction === 'out' ? 'Shift Ended' : 'Shift Started',
-        message: 'Recorded as outside the office — an administrator will review your reason.',
+        title: direction === 'out' ? 'Shift Ended' : (fieldVisit ? 'Sent for approval' : 'Shift Started'),
+        message: fieldVisit
+          ? 'Your photo and reason were sent to the Super Admin. You are marked clocked in once it is approved.'
+          : 'Recorded as outside the office — an administrator will review your reason.',
       });
     } catch (err: any) {
       setFeedback({
@@ -1390,9 +1428,9 @@ export default function DashboardScreen() {
       <LateClockOutModal
         visible={outside.visible}
         submitting={isClockingIn}
-        title="Outside the office"
+        title={outside.fieldVisit ? 'Away from the visit site' : 'Outside the office'}
         message={`${outside.message || 'You are outside the office radius.'}`}
-        placeholder="e.g. At the client site for a meeting"
+        placeholder={outside.fieldVisit ? 'Describe the issue — a photo is next' : 'e.g. At the client site for a meeting'}
         onCancel={() => setOutside({ visible: false })}
         onSubmit={submitOutside}
       />

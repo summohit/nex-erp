@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionsService } from '../permissions/permissions.service';
@@ -549,4 +550,42 @@ export class MenusService implements OnModuleInit {
 
     return filteredMenus;
   }
+
+  // ── Per-user sidebar order (16 Nov 2026) ─────────────────────────────────
+  // Only the order is personal: which menus a person sees still comes from
+  // the role filter above, so a saved id they may no longer open is ignored.
+
+  async getMenuOrder(userId: number): Promise<MenuOrder | null> {
+    const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { menuOrder: true } });
+    return cleanMenuOrder(u?.menuOrder);
+  }
+
+  async saveMenuOrder(userId: number, raw: unknown): Promise<MenuOrder | null> {
+    const order = raw == null ? null : cleanMenuOrder(raw);
+    await this.prisma.user.update({ where: { id: userId }, data: { menuOrder: (order ?? Prisma.DbNull) as any } });
+    return order;
+  }
+}
+
+export interface MenuOrder {
+  modules: string[];
+  subs: Record<string, string[]>;
+}
+
+/** Keeps only lists of short string ids; anything else is dropped. */
+export function cleanMenuOrder(raw: unknown): MenuOrder | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const ids = (v: unknown) => Array.isArray(v)
+    ? [...new Set(v.filter((x) => typeof x === 'string' && x.length <= 120))].slice(0, 200) as string[]
+    : [];
+  const r = raw as any;
+  const subs: Record<string, string[]> = {};
+  if (r.subs && typeof r.subs === 'object') {
+    for (const [k, v] of Object.entries(r.subs).slice(0, 100)) {
+      const list = ids(v);
+      if (k.length <= 120 && list.length) subs[k] = list;
+    }
+  }
+  const modules = ids(r.modules);
+  return modules.length || Object.keys(subs).length ? { modules, subs } : null;
 }

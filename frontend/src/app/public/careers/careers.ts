@@ -110,6 +110,12 @@ export class CareersComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.fetchPublicJobs();
+    // An old /careers/<encoded id> link still loads that company's jobs, but
+    // the address bar is tidied to /careers so the code is not seen or
+    // re-shared (16 Nov 2026).
+    if (this.route.snapshot.paramMap.get('companyId')) {
+      history.replaceState(history.state, '', `/careers${window.location.search}`);
+    }
     if (!this.loadNexChatWidget()) this.loadTawkWidget();
   }
 
@@ -311,8 +317,7 @@ export class CareersComponent implements OnInit, OnDestroy {
 
   /** The link that opens this posting directly: this careers page + ?job=<id>. */
   jobShareUrl(job: PublicJob): string {
-    const base = `${window.location.origin}${window.location.pathname}`;
-    return `${base}?job=${encodeURIComponent(String((job as any).id))}`;
+    return `${window.location.origin}/careers?job=${encodeURIComponent(String((job as any).id))}`;
   }
 
   toggleShare(job: PublicJob, event: Event) {

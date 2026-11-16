@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
+import { inject, Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -10,10 +10,10 @@ import {
   LucideFolderOpen,
   LucideX,
   LucideImage,
-  LucideClock,
   LucideUpload
 } from '@lucide/angular';
-import { EmployeeService } from '../../../services/employee.service';
+import { DocumentRule, DocumentWaiver, EmployeeService } from '../../../services/employee.service';
+import { AuthService } from '../../../services/auth.service';
 import { HotToastService } from '@ngneat/hot-toast';
 
 @Component({
@@ -30,7 +30,6 @@ import { HotToastService } from '@ngneat/hot-toast';
     LucideFolderOpen,
     LucideX,
     LucideImage,
-    LucideClock,
     LucideUpload
   ],
   templateUrl: './documents-tab.html',
@@ -40,12 +39,70 @@ export class DocumentsTabComponent implements OnInit {
   @Input() employeeData: any;
   /** Self-service onboarding: show which documents are required (16 Nov 2026). */
   @Input() onboarding = false;
-  readonly requiredDocs = [
-    'Resume / CV', 'Aadhaar Card', 'PAN Card', 'Passport Size Photo',
-    '10th Marksheet', '12th Marksheet', 'Graduation Degree', 'Bank Proof / Cancelled Cheque',
-  ];
+  /** HR's document rules (Settings → Document requirements, 16 Nov 2026). */
+  rules: DocumentRule[] = [];
+
+  /** The rules that apply to this person: interns and first jobs skip "not interns" ones. */
+  get requiredRules(): DocumentRule[] {
+    const e = this.employeeData || {};
+    const intern = /intern/i.test(e.employmentType || '') || /intern/i.test(e.designation?.name || '');
+    return this.rules.filter(r => r.active && (r.required === 'ALL' || (r.required === 'EXPERIENCED' && !intern && !e.firstJob)));
+  }
+  get requiredDocs(): string[] {
+    return this.requiredRules.map(r => r.type);
+  }
+  private rule(type: string): DocumentRule | undefined {
+    return this.rules.find(r => r.type === type);
+  }
+  /** Files needed for this type to count (Aadhaar front + back = 2). */
+  need(type: string): number {
+    return this.rule(type)?.count || 1;
+  }
+  hint(type: string): string {
+    return this.rule(type)?.hint || '';
+  }
+  haveCount(type: string): number {
+    return (this.employeeData?.documents || []).filter((d: any) => d.documentType === type).length;
+  }
   hasDoc(type: string): boolean {
-    return (this.employeeData?.documents || []).some((d: any) => d.documentType === type);
+    return this.haveCount(type) >= this.need(type) || this.waiverFor(type)?.status === 'APPROVED';
+  }
+
+  // ── Waivers (16 Nov 2026): HR asks, the Super Admin approves or waives directly ──
+  private auth = inject(AuthService);
+  waivers: DocumentWaiver[] = [];
+  get role(): string { return String(this.auth.currentUser()?.role || ''); }
+  get canWaive(): boolean { return ['SUPERADMIN', 'HR', 'ADMIN'].includes(this.role); }
+  /** The latest waiver for this type, if any. */
+  waiverFor(type: string): DocumentWaiver | undefined {
+    return this.waivers.find(w => w.documentType === type);
+  }
+  waiverText(w: DocumentWaiver): string {
+    const who = (p?: { firstName: string; lastName: string } | null) => p ? `${p.firstName} ${p.lastName}`.trim() : 'Super Admin';
+    const when = (d?: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+    if (w.status === 'APPROVED') return `Waived by ${who(w.decidedBy)} · ${when(w.decidedAt)}`;
+    if (w.status === 'PENDING') return 'Waiver waiting for Super Admin';
+    return `Waiver rejected${w.decisionNote ? ': ' + w.decisionNote : ''}`;
+  }
+  loadWaivers() {
+    const id = this.employeeData?.id;
+    if (!id) return;
+    this.employeeService.getDocumentWaivers(id).subscribe({ next: (w) => this.waivers = w || [], error: () => {} });
+  }
+  waive(type: string, event: Event) {
+    event.stopPropagation();
+    const direct = this.role === 'SUPERADMIN';
+    const reason = window.prompt(`${direct ? 'Waive' : 'Ask the Super Admin to waive'} "${type}" for this employee.\n\nWhy can't they provide it?`);
+    if (reason == null) return;
+    if (reason.trim().length < 5) { this.toast.error('Give a short reason (at least 5 characters).'); return; }
+    this.employeeService.requestDocumentWaiver(this.employeeData.id, type, reason.trim()).subscribe({
+      next: () => {
+        this.toast.success(direct ? `${type} waived` : 'Waiver sent to the Super Admin');
+        this.loadWaivers();
+        this.refreshProfile.emit();
+      },
+      error: (e) => this.toast.error(e?.error?.message || 'Could not request the waiver'),
+    });
   }
   get requiredDocsLeft(): number {
     return this.requiredDocs.filter(t => !this.hasDoc(t)).length;
@@ -90,7 +147,16 @@ export class DocumentsTabComponent implements OnInit {
 
   constructor(private employeeService: EmployeeService, private toast: HotToastService) {}
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.loadWaivers();
+    this.employeeService.getDocumentTypes().subscribe({
+      next: (r) => {
+        this.rules = r.rules || [];
+        if (r.all?.length) this.documentTypes = r.all;
+      },
+      error: () => {},
+    });
+  }
 
   isImageDoc(doc: any): boolean {
     const type = (doc.documentType || '').toLowerCase();
@@ -101,13 +167,14 @@ export class DocumentsTabComponent implements OnInit {
   }
 
   getDocBadgeLabel(type?: string): string {
-    if (!type || type === 'Other') return 'Other (Needs Categorization)';
+    // The card's heading already says what it is (the typed name).
+    if (!type || type === 'Other') return 'Other document';
     return type;
   }
 
   get availableDocumentTypes(): string[] {
-    const existingTypes = (this.employeeData?.documents || []).map((d: any) => d.documentType);
-    return this.documentTypes.filter(type => !existingTypes.includes(type) || type === 'Other');
+    // A type stays offered until it has as many files as HR asks for.
+    return this.documentTypes.filter(type => type === 'Other' || !this.hasDoc(type));
   }
 
   openModal() {
@@ -118,6 +185,7 @@ export class DocumentsTabComponent implements OnInit {
     }
     this.showModal = true;
     this.fileName = '';
+    this.nameFromFile = false;
     this.selectedDocumentType = available[0];
     this.selectedFile = null;
     this.selectedFileUrl = null;
@@ -134,10 +202,12 @@ export class DocumentsTabComponent implements OnInit {
     this.selectedFile = file;
     this.selectedFileUrl = null;
 
-    if (!this.fileName) {
+    if (!this.fileName && !this.isOtherType) {
       // Everything before the extension: the box asks for a name, not a
       // filename, and the user is about to read it back on a document card.
+      // Not for "Other" — that name has to be typed (16 Nov 2026).
       this.fileName = file.name.replace(/\.[^.]+$/, '');
+      this.nameFromFile = true;
     }
 
     // A thumbnail only for what can actually be shown. Reading a 40MB PDF into
@@ -177,11 +247,35 @@ export class DocumentsTabComponent implements OnInit {
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   }
 
+  /**
+   * "Other" documents carry a name the person types — "Medical Fitness
+   * Certificate", "Gap Certificate" — so HR can tell what they are without
+   * opening them (16 Nov 2026). Stored in fileName; the type stays "Other".
+   */
+  get isOtherType(): boolean {
+    return this.selectedDocumentType === 'Other';
+  }
+
+  /** True while the name box holds the auto-filled file name, not a typed one. */
+  nameFromFile = false;
+
+  onTypeChange(type: string) {
+    this.selectedDocumentType = type;
+    // A file name like "IMG_2034" is no name for an "Other" document.
+    if (type === 'Other' && this.nameFromFile) { this.fileName = ''; this.nameFromFile = false; }
+  }
+
   submitDocument() {
-    if (!this.fileName || !this.selectedFile) {
+    const name = (this.fileName || '').trim();
+    if (this.isOtherType && name.length < 3) {
+      this.toast.error('Enter the document’s name, e.g. Medical Fitness Certificate');
+      return;
+    }
+    if (!name || !this.selectedFile) {
       this.toast.error('File name and file are required');
       return;
     }
+    this.fileName = name;
     
     this.uploading = true;
     this.toast.loading('Uploading document...', { id: 'doc-upload' });

@@ -1,3 +1,6 @@
+import {
+  DEFAULT_DOCUMENT_POLICY, DocumentRule, documentProgress, loadDocumentPolicy, normaliseDocumentPolicy, requiredRulesFor,
+} from './document-policy';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { isHrAdmin } from '../../common/company-roles';
@@ -40,6 +43,7 @@ const SELECT = {
   manager: { select: { id: true, firstName: true, lastName: true } },
   documents: { select: { id: true, fileName: true, fileUrl: true, documentType: true } },
   emergencyContacts: { select: { id: true } },
+  documentWaivers: { where: { status: 'APPROVED' }, select: { documentType: true } },
 } as const;
 
 /**
@@ -51,18 +55,18 @@ const SELECT = {
 export class ProfileCompletenessService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private evaluate(emp: any): Completeness {
+  private evaluate(emp: any, policy: DocumentRule[] = DEFAULT_DOCUMENT_POLICY): Completeness {
     const email = String(emp.user?.email ?? '').toLowerCase();
     const exempt = EXEMPT_EMAILS.has(email) || !!emp.profileExempt;
     const intern = isIntern(emp.employmentType, emp.designation?.name);
-    const have = new Set<string>((emp.documents ?? []).map((d: any) => d.documentType));
-
-    const needed: string[] = [...REQUIRED_DOCUMENTS];
-    if (!intern && !emp.firstJob) needed.push(...PREVIOUS_EMPLOYMENT_DOCUMENTS);
-
-    const missing: MissingItem[] = needed
-      .filter((t) => !have.has(t))
-      .map((t) => ({ key: t, label: t, kind: 'document' as const, ...(DOCUMENT_HINTS[t] ? { hint: DOCUMENT_HINTS[t] } : {}) }));
+    // HR's document rules (Settings → Document Requirements, 16 Nov 2026).
+    const missing: MissingItem[] = documentProgress(requiredRulesFor(policy, { intern, firstJob: !!emp.firstJob }), emp.documents ?? [],
+      (emp.documentWaivers ?? []).map((w: any) => w.documentType))
+      .filter((r) => !r.done)
+      .map((r) => {
+        const hint = [r.hint, r.count > 1 ? `${r.have} of ${r.count} uploaded` : ''].filter(Boolean).join(' · ');
+        return { key: r.type, label: r.type, kind: 'document' as const, ...(hint ? { hint } : {}) };
+      });
 
     const details: [string, boolean][] = [
       ['Phone number', !!String(emp.phone ?? '').trim()],
@@ -97,7 +101,7 @@ export class ProfileCompletenessService {
     if (employeeId == null) return null;
     const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId }, select: SELECT });
     if (!emp) return null;
-    const c = this.evaluate(emp);
+    const c = this.evaluate(emp, await loadDocumentPolicy(this.prisma, companyId));
     const lock = await this.getLock(companyId);
     return { ...c, locked: lock.active && !c.exempt && !c.complete };
   }
@@ -158,6 +162,92 @@ export class ProfileCompletenessService {
     return this.listExempt(companyId, role);
   }
 
+  /** The document rules, for upload lists and the settings page. */
+  getDocumentPolicy(companyId: number) {
+    return loadDocumentPolicy(this.prisma, companyId);
+  }
+
+  /** HR / Super Admin replace the document rules. */
+  async saveDocumentPolicy(companyId: number, role: string, rules: unknown) {
+    if (!['SUPERADMIN', 'HR'].includes(role)) throw new ForbiddenException('Only HR or the Super Admin can change document requirements');
+    if (!Array.isArray(rules) || !rules.length) throw new BadRequestException('Send at least one document type');
+    const policy = normaliseDocumentPolicy(rules);
+    await this.prisma.systemSetting.upsert({
+      where: { companyId },
+      create: { companyId, documentPolicy: policy as any },
+      update: { documentPolicy: policy as any },
+    });
+    return policy;
+  }
+
+  // ── Document waivers (16 Nov 2026) ─────────────────────────────────────
+  // HR asks the Super Admin to waive a required document someone cannot
+  // provide; a Super Admin waives directly. Approved = counts as uploaded.
+
+  private static readonly WAIVER_SELECT = {
+    id: true, employeeId: true, documentType: true, reason: true, status: true,
+    decidedAt: true, decisionNote: true, createdAt: true,
+    employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+    requestedBy: { select: { id: true, firstName: true, lastName: true } },
+    decidedBy: { select: { id: true, firstName: true, lastName: true } },
+  } as const;
+
+  /** One person's waivers, newest first (shown on their Documents tab). */
+  async listWaivers(companyId: number, employeeId: number) {
+    return this.prisma.documentWaiver.findMany({
+      where: { employeeId, employee: { companyId } },
+      select: ProfileCompletenessService.WAIVER_SELECT,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /** The Super Admin's queue. */
+  async pendingWaivers(companyId: number, role: string) {
+    if (role !== 'SUPERADMIN') throw new ForbiddenException('Only the Super Admin reviews document waivers');
+    return this.prisma.documentWaiver.findMany({
+      where: { status: 'PENDING', employee: { companyId } },
+      select: ProfileCompletenessService.WAIVER_SELECT,
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async requestWaiver(companyId: number, role: string, actorEmployeeId: number | null, employeeId: number, documentType: string, reason: string) {
+    if (role !== 'SUPERADMIN' && !isHrAdmin(role)) throw new ForbiddenException('Only HR or the Super Admin can waive a document');
+    const type = String(documentType ?? '').trim();
+    const why = String(reason ?? '').trim();
+    if (!type) throw new BadRequestException('Which document?');
+    if (why.length < 5) throw new BadRequestException('Say why this document cannot be provided.');
+    const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId }, select: { id: true } });
+    if (!emp) throw new BadRequestException('Employee not found');
+    const open = await this.prisma.documentWaiver.findFirst({
+      where: { employeeId, documentType: type, status: { in: ['PENDING', 'APPROVED'] } }, select: { status: true },
+    });
+    if (open) throw new BadRequestException(open.status === 'APPROVED' ? 'This document is already waived.' : 'A waiver for this document is already waiting for the Super Admin.');
+    const direct = role === 'SUPERADMIN';
+    return this.prisma.documentWaiver.create({
+      data: {
+        employeeId, documentType: type, reason: why, requestedById: actorEmployeeId,
+        ...(direct ? { status: 'APPROVED', decidedById: actorEmployeeId, decidedAt: new Date() } : {}),
+      },
+      select: ProfileCompletenessService.WAIVER_SELECT,
+    });
+  }
+
+  async decideWaiver(companyId: number, role: string, actorEmployeeId: number | null, waiverId: number, action: 'APPROVE' | 'REJECT', note?: string) {
+    if (role !== 'SUPERADMIN') throw new ForbiddenException('Only the Super Admin reviews document waivers');
+    const w = await this.prisma.documentWaiver.findFirst({ where: { id: waiverId, employee: { companyId } }, select: { id: true, status: true } });
+    if (!w) throw new BadRequestException('Waiver not found');
+    if (w.status !== 'PENDING') throw new BadRequestException(`This has already been ${w.status.toLowerCase()}.`);
+    const rejecting = action === 'REJECT';
+    const text = String(note ?? '').trim();
+    if (rejecting && !text) throw new BadRequestException('A rejection has to say why.');
+    return this.prisma.documentWaiver.update({
+      where: { id: w.id },
+      data: { status: rejecting ? 'REJECTED' : 'APPROVED', decidedById: actorEmployeeId, decidedAt: new Date(), decisionNote: text || null },
+      select: ProfileCompletenessService.WAIVER_SELECT,
+    });
+  }
+
   /** "This is my first job": previous-employment documents are not asked for. */
   async setFirstJob(companyId: number, employeeId: number | null, firstJob: boolean): Promise<Completeness | null> {
     if (employeeId == null) throw new BadRequestException('No employee profile');
@@ -173,8 +263,9 @@ export class ProfileCompletenessService {
       select: SELECT,
       orderBy: [{ firstName: 'asc' }],
     });
+    const policy = await loadDocumentPolicy(this.prisma, companyId);
     const rows = emps.map((e) => {
-      const c = this.evaluate(e);
+      const c = this.evaluate(e, policy);
       return {
         employee: {
           id: e.id, firstName: e.firstName, lastName: e.lastName, employeeCode: e.employeeCode,

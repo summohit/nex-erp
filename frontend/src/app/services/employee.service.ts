@@ -39,6 +39,26 @@ export interface Employee {
   }>;
 }
 
+type PersonRef = { id: number; firstName: string; lastName: string };
+/** A required document waived by the Super Admin (16 Nov 2026). */
+export interface DocumentWaiver {
+  id: number; employeeId: number; documentType: string; reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  decidedAt?: string | null; decisionNote?: string | null; createdAt: string;
+  employee?: PersonRef & { employeeCode?: string };
+  requestedBy?: PersonRef | null; decidedBy?: PersonRef | null;
+}
+
+/** One row of HR's document rules (Settings → Document requirements, 16 Nov 2026). */
+export interface DocumentRule {
+  type: string;
+  /** ALL = everyone; EXPERIENCED = not interns / first job; OPTIONAL = never required. */
+  required: 'ALL' | 'EXPERIENCED' | 'OPTIONAL';
+  count: number;
+  hint?: string;
+  active: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -283,10 +303,31 @@ export class EmployeeService {
     });
   }
 
-  /** The document types every upload dropdown offers, in order. */
-  getDocumentTypes(): Observable<{ required: string[]; previousEmployment: string[]; optional: string[]; all: string[] }> {
+  /** The document types every upload dropdown offers, in order, with HR's rules (16 Nov 2026). */
+  getDocumentTypes(): Observable<{ rules: DocumentRule[]; required: string[]; previousEmployment: string[]; optional: string[]; all: string[] }> {
     const token = getAccessToken();
     return this.http.get<any>(`${this.apiUrl}/document-types`, { headers: { Authorization: `Bearer ${token}` } });
+  }
+
+  // ── Document waivers (16 Nov 2026) ──
+  private auth() { return { headers: { Authorization: `Bearer ${getAccessToken()}` } }; }
+  getDocumentWaivers(employeeId: number): Observable<DocumentWaiver[]> {
+    return this.http.get<DocumentWaiver[]>(`${this.apiUrl}/${employeeId}/document-waivers`, this.auth());
+  }
+  requestDocumentWaiver(employeeId: number, documentType: string, reason: string): Observable<DocumentWaiver> {
+    return this.http.post<DocumentWaiver>(`${this.apiUrl}/${employeeId}/document-waivers`, { documentType, reason }, this.auth());
+  }
+  getPendingWaivers(): Observable<DocumentWaiver[]> {
+    return this.http.get<DocumentWaiver[]>(`${this.apiUrl}/profile-completeness/waivers`, this.auth());
+  }
+  decideDocumentWaiver(waiverId: number, action: 'APPROVE' | 'REJECT', note?: string): Observable<DocumentWaiver> {
+    return this.http.put<DocumentWaiver>(`${this.apiUrl}/profile-completeness/waivers/${waiverId}`, { action, note }, this.auth());
+  }
+
+  /** HR / Super Admin: replace the document rules. */
+  saveDocumentPolicy(rules: DocumentRule[]): Observable<DocumentRule[]> {
+    const token = getAccessToken();
+    return this.http.put<DocumentRule[]>(`${this.apiUrl}/profile-completeness/document-policy`, { rules }, { headers: { Authorization: `Bearer ${token}` } });
   }
 
   uploadDocument(file: File): Observable<{ url: string }> {

@@ -10,6 +10,7 @@ import { SidebarComponentV2 } from '../sidebar/sidebar-v2';
 import { HeaderComponent } from '../header/header';
 import { HeaderComponentV2 } from '../header/header-v2';
 import { isUiV2 } from '../../core/ui-version';
+import { onboardingPreviewStep } from '../../shared/components/self-onboarding-gate/onboarding-preview';
 import { DialogHostComponent } from '../../shared/components/dialog-host/dialog-host.component';
 import { NoticePopupComponent } from '../../shared/components/notice-popup/notice-popup';
 import { ChatMessagePopupComponent } from '../../shared/components/chat-message-popup/chat-message-popup';
@@ -34,6 +35,7 @@ export class MainLayoutComponent {
   readonly onboardingGate = computed(() => {
     const u = this.auth.currentUser();
     if (!u) return false;
+    if (onboardingPreviewStep()) return true; // localhost only — see onboarding-preview.ts
     return !!u.mustChangePassword
       || ['PENDING', 'SUBMITTED', 'CHANGES_REQUESTED'].includes(u.employee?.selfOnboardingStatus);
   });

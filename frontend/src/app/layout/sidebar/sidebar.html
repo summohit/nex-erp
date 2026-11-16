@@ -43,12 +43,19 @@
     </ng-container>
     
     <ng-template #loadedMenu>
+      <!-- Arrange my menu (16 Nov 2026) -->
+      <div class="arrange-bar" *ngIf="!isCollapsed()">
+        <button type="button" class="arrange-btn" [class.on]="arranging()" (click)="toggleArrange()" [attr.aria-pressed]="arranging()">
+          {{ arranging() ? '✓ Done' : '⇅ Arrange menu' }}
+        </button>
+        <button type="button" class="arrange-btn" *ngIf="arranging()" (click)="resetOrder()">↺ Reset</button>
+      </div>
       <ng-container *ngFor="let section of menuSections; let first = first">
       <ng-container *ngIf="hasVisibleItems(section)">
         <span class="nav-section-title" [class.mt-4]="!first">{{ section.title }}</span>
-        <nav class="sidebar-nav">
+        <nav class="sidebar-nav" cdkDropList [cdkDropListDisabled]="!arranging()" (cdkDropListDropped)="dropItem(section, $event)" [class.arranging]="arranging()">
         <ng-container *ngFor="let item of section.items">
-          <div class="nav-section">
+          <div class="nav-section" cdkDrag [cdkDragDisabled]="!arranging()" cdkDragLockAxis="y">
             <!-- Real addresses (17 Oct 2026), so right-click → "Open in new tab"
                  opens that page instead of falling back to the dashboard. -->
             <a [attr.href]="(!item.subItems?.length && item.route) ? item.route : '#'"
@@ -97,9 +104,9 @@
 
             <!-- Collapsible Sub-menu with Tree Lines -->
             <div class="sub-nav" [class.open]="expandedMenu() === item.id" *ngIf="item.subItems">
-              <div class="tree-line-container">
+              <div class="tree-line-container" cdkDropList [cdkDropListDisabled]="!arranging()" (cdkDropListDropped)="dropSub(item, $event)" [class.arranging]="arranging()">
                 <ng-container *ngFor="let sub of item.subItems; let last = last">
-                  <div class="sub-nav-item-wrapper">
+                  <div class="sub-nav-item-wrapper" cdkDrag [cdkDragDisabled]="!arranging()" cdkDragLockAxis="y">
                     <div class="tree-line" [class.last]="last"></div>
                     <a [attr.href]="sub.route || '#'" class="sub-nav-item" [class.active]="isSubItemActive(sub)" (click)="handleSubMenuClick(sub, $event)">
                       {{ sub.title }}

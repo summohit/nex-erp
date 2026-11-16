@@ -76,7 +76,7 @@
   width: 68px;
   height: 68px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, var(--pf-accent-mid, #3b82f6) 0%, var(--pf-accent-strong, #1d4ed8) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -84,7 +84,7 @@
   font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.5px;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 4px 12px rgba(var(--pf-accent-rgb, 37, 99, 235), 0.2);
 }
 
 .hero-avatar-img {
@@ -181,9 +181,9 @@
 }
 
 .hero-pill.probation.confirmed {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background: var(--pf-accent-soft, #eff6ff);
+  color: var(--pf-accent-strong, #1d4ed8);
+  border: 1px solid var(--pf-accent-border, #bfdbfe);
 }
 
 .hero-pill.probation.on-probation {
@@ -249,7 +249,7 @@
   border: 0;
   border-radius: 8px;
   padding: 8px 14px;
-  background: #2563eb;
+  background: var(--pf-accent, #2563eb);
   color: #fff;
   font-weight: 700;
   font-size: 12.5px;
@@ -258,7 +258,7 @@
 }
 
 .btn-convert-trainee-hero:hover {
-  background: #1d4ed8;
+  background: var(--pf-accent-strong, #1d4ed8);
 }
 
 /* ==================== HERO BOTTOM BANNER ==================== */
@@ -273,8 +273,8 @@
 }
 
 .hero-banner.confirmed {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background: var(--pf-accent-soft, #eff6ff);
+  border: 1px solid var(--pf-accent-border, #bfdbfe);
 }
 
 .hero-banner.on-probation {
@@ -295,7 +295,7 @@
 }
 
 .hero-banner-tag {
-  background: #2563eb;
+  background: var(--pf-accent, #2563eb);
   color: #ffffff;
   font-size: 10.5px;
   font-weight: 800;
@@ -389,10 +389,10 @@
 }
 
 .pill-tab-btn.active {
-  background: #2563eb;
+  background: var(--pf-accent, #2563eb);
   color: #ffffff;
   font-weight: 600;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 2px 6px rgba(var(--pf-accent-rgb, 37, 99, 235), 0.25);
 }
 
 .pill-tab-btn.active svg {
@@ -435,7 +435,7 @@
   width: 32px;
   height: 32px;
   border: 3px solid #f3f3f3;
-  border-top: 3px solid #2563eb;
+  border-top: 3px solid var(--pf-accent, #2563eb);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 16px;
@@ -496,8 +496,8 @@
   left: -36px;
   top: 4px;
   background: #ffffff;
-  border: 3px solid #2563eb;
-  box-shadow: 0 0 0 3px #eff6ff;
+  border: 3px solid var(--pf-accent, #2563eb);
+  box-shadow: 0 0 0 3px var(--pf-accent-soft, #eff6ff);
 }
 
 .lifecycle-ring.ring-green {
@@ -506,8 +506,8 @@
 }
 
 .lifecycle-ring.ring-blue {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px #eff6ff;
+  border-color: var(--pf-accent, #2563eb);
+  box-shadow: 0 0 0 3px var(--pf-accent-soft, #eff6ff);
 }
 
 .lifecycle-ring.ring-purple {
@@ -580,7 +580,7 @@
 .conversion-modal header p { margin: 5px 0 0; color: #64748b; font-size: 13px; }
 .conversion-modal header button { border: 0; background: #f1f5f9; border-radius: 50%; width: 32px; height: 32px; font-size: 22px; color: #64748b; cursor: pointer; }
 .conversion-body { display: grid; gap: 15px; padding: 22px; }
-.trainee-summary { display: grid; gap: 3px; padding: 12px; border-radius: 8px; background: #eff6ff; color: #1e3a8a; }
+.trainee-summary { display: grid; gap: 3px; padding: 12px; border-radius: 8px; background: var(--pf-accent-soft, #eff6ff); color: #1e3a8a; }
 .trainee-summary span { font-size: 13px; color: #64748b; }
 .conversion-body label { display: grid; gap: 7px; color: #475569; font-size: 13px; font-weight: 700; }
 .conversion-body input, .conversion-body select, .conversion-body textarea { width: 100%; box-sizing: border-box; padding: 10px 11px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; color: #0f172a; }
@@ -588,12 +588,12 @@
 .conversion-modal footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
 .btn-cancel-conversion, .btn-proceed-conversion { border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
 .btn-cancel-conversion { border: 1px solid #cbd5e1; background: #fff; color: #475569; }
-.btn-proceed-conversion { border: 1px solid #2563eb; background: #2563eb; color: #fff; }
+.btn-proceed-conversion { border: 1px solid var(--pf-accent, #2563eb); background: var(--pf-accent, #2563eb); color: #fff; }
 .btn-proceed-conversion:disabled { opacity: .6; cursor: wait; }
 
 /* Profile card (12 Nov 2026), from the shared design */
 .ph2 { display: flex; align-items: flex-start; gap: 24px; padding: 22px 24px; margin-bottom: 16px; background: #fff; border: 1px solid #e6ebf5; border-radius: 16px; box-shadow: 0 1px 3px rgba(15, 23, 42, .05); }
-.ph2-avatar { position: relative; flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; background: #e0e9ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; }
+.ph2-avatar { position: relative; flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; background: #e0e9ff; color: var(--pf-accent, #2563eb); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; }
 .ph2-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .ph2-dot { position: absolute; right: 1px; bottom: 3px; width: 13px; height: 13px; border-radius: 50%; background: #22c55e; border: 2px solid #fff; }
 .ph2-dot.off { background: #94a3b8; }
@@ -617,7 +617,7 @@
 .ph2-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .ph2-btn { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; color: #0f172a; font-size: 13px; font-weight: 600; cursor: pointer; }
 .ph2-btn:hover { background: #f8fafc; }
-.ph2-btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+.ph2-btn.primary { background: var(--pf-accent, #2563eb); border-color: var(--pf-accent, #2563eb); color: #fff; }
 @media (max-width: 760px) { .ph2 { flex-wrap: wrap; padding: 16px; } .ph2-main { padding-left: 0; border-left: 0; } .ph2-actions { width: 100%; } .ph2-facts > div { padding: 0 16px 0 0; border-left: 0; } }
 
 /* Required marker on tabs during self-service onboarding (16 Nov 2026) */

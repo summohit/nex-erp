@@ -1,0 +1,67 @@
+<div class="dr-overlay" (click)="closed.emit(false)">
+  <div class="dr-modal" role="dialog" aria-modal="true" aria-labelledby="dr-title" (click)="$event.stopPropagation()">
+    <header class="dr-head">
+      <div>
+        <h3 id="dr-title">Document requirements</h3>
+        <p>Which documents employees must upload. Used by onboarding, the profile reminder and every upload list.</p>
+      </div>
+      <button type="button" class="dr-x" (click)="closed.emit(false)" aria-label="Close">✕</button>
+    </header>
+
+    <div class="dr-body">
+      <p class="dr-loading" *ngIf="loading()">Loading…</p>
+
+      <table class="dr-table" *ngIf="!loading()">
+        <thead>
+          <tr>
+            <th>Document</th>
+            <th>Required?</th>
+            <th class="dr-num">Files</th>
+            <th>Hint shown to employee</th>
+            <th class="dr-num">In use</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of rules(); let i = index" [class.dr-off]="!r.active">
+            <td class="dr-type">{{ r.type }}</td>
+            <td>
+              <select [(ngModel)]="r.required" [disabled]="!r.active" aria-label="Required for">
+                <option value="ALL">Required — everyone</option>
+                <option value="EXPERIENCED">Required — not interns / first job</option>
+                <option value="OPTIONAL">Optional</option>
+              </select>
+            </td>
+            <td class="dr-num">
+              <input type="number" min="1" max="10" [(ngModel)]="r.count" [disabled]="!r.active || r.required === 'OPTIONAL'" aria-label="Files needed">
+            </td>
+            <td>
+              <input type="text" maxlength="120" [(ngModel)]="r.hint" [disabled]="!r.active" placeholder="e.g. Front and back" aria-label="Hint">
+            </td>
+            <td class="dr-num">
+              <input type="checkbox" [(ngModel)]="r.active" [attr.aria-label]="'Use ' + r.type">
+            </td>
+            <td class="dr-move">
+              <button type="button" (click)="move(i, -1)" [disabled]="i === 0" aria-label="Move up">↑</button>
+              <button type="button" (click)="move(i, 1)" [disabled]="i === rules().length - 1" aria-label="Move down">↓</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="dr-add" *ngIf="!loading()">
+        <input type="text" [(ngModel)]="newType" maxlength="80" placeholder="New document type, e.g. Police Verification" (keyup.enter)="addType()">
+        <button type="button" (click)="addType()">+ Add type</button>
+      </div>
+      <p class="dr-note">Unticking “In use” hides a type from upload lists and stops requiring it; files already uploaded keep their type. “Other” is always offered.</p>
+    </div>
+
+    <footer class="dr-foot">
+      <span>{{ requiredCount() }} required</span>
+      <div>
+        <button type="button" class="dr-cancel" (click)="closed.emit(false)">Cancel</button>
+        <button type="button" class="dr-save" (click)="save()" [disabled]="saving() || loading()">{{ saving() ? 'Saving…' : 'Save' }}</button>
+      </div>
+    </footer>
+  </div>
+</div>
