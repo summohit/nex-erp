@@ -1122,18 +1122,17 @@ export class MailService {
     const crmUrl = process.env.APP_URL || 'http://localhost:4200';
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-        <h2 style="color: #1e3a8a; text-align: center;">Onboarding Complete! Welcome to MIRA</h2>
+        <h2 style="color: #0f172a; text-align: center;">Your profile is approved — welcome aboard!</h2>
         <p style="color: #475569; font-size: 16px;">Hi ${this.escapeHtml(employeeName)},</p>
-        <p style="color: #475569; font-size: 16px;">
-          Your onboarding setup is now complete! You can log into the system using the credentials below.
+        <p style="color: #475569; font-size: 16px; line-height: 1.6;">
+          HR has reviewed and approved your onboarding. You now have full access to MIRA — attendance, leave, payslips, tasks and more.
         </p>
         <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0; border: 1px solid #e2e8f0;">
-          <p style="margin: 0 0 10px 0; color: #334155; font-size: 14px;"><strong>CRM URL:</strong> <a href="${crmUrl}">${crmUrl}</a></p>
-          <p style="margin: 0 0 10px 0; color: #334155; font-size: 14px;"><strong>Username:</strong> ${this.escapeHtml(email)}</p>
-          <p style="margin: 0; color: #334155; font-size: 14px;"><strong>Temporary Password:</strong> nexerp2026</p>
+          <p style="margin: 0 0 10px 0; color: #334155; font-size: 14px;"><strong>Sign in at:</strong> <a href="${crmUrl}/login">${crmUrl}</a></p>
+          <p style="margin: 0; color: #334155; font-size: 14px;"><strong>Login email:</strong> ${this.escapeHtml(email)}</p>
         </div>
-        <p style="color: #ef4444; font-size: 14px; font-weight: bold;">
-          * For your security, please change your password immediately after logging in.
+        <p style="color: #475569; font-size: 14px;">
+          Use the password you set during onboarding. Forgot it? Use <b>Forgot password</b> on the sign-in page.
         </p>
       </div>
     `;
@@ -1142,7 +1141,7 @@ export class MailService {
       if (this.brevoApiKey) {
         return await this.sendBrevoEmail({
           to: email,
-          subject: 'Onboarding Complete - Your Login Credentials',
+          subject: 'Your MIRA profile is approved — welcome aboard',
           html: htmlContent,
         });
       }
@@ -1150,7 +1149,7 @@ export class MailService {
         from: `"MIRA" <${this.fromEmail}>`,
         to: email,
         envelope: { from: this.fromEmail, to: email },
-        subject: 'Onboarding Complete - Your Login Credentials',
+        subject: 'Your MIRA profile is approved — welcome aboard',
         html: htmlContent,
       });
     } catch (error) {
