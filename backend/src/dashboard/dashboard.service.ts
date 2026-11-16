@@ -149,8 +149,9 @@ export class DashboardService {
     const todayMonth = now.getMonth();
     const todayDate = now.getDate();
 
+    // Only current staff: people who have left don't appear in birthdays or anniversaries (16 Nov 2026).
     const employees = await this.prisma.employee.findMany({
-      where: { companyId },
+      where: { companyId, user: { status: { notIn: ['SUSPENDED', 'INACTIVE', 'BLOCKED'] } } },
       select: {
         id: true,
         firstName: true,
@@ -243,7 +244,7 @@ export class DashboardService {
       .map(l => person(l.employee, { leaveType: l.leaveType?.name || 'Work From Home', requestId: l.id }));
 
     const appreciations = await this.prisma.appreciation.findMany({
-      where: { companyId },
+      where: { companyId, employee: { user: { status: { notIn: ['SUSPENDED', 'INACTIVE', 'BLOCKED'] } } } },
       include: {
         awardType: { select: { title: true, icon: true, color: true } },
         employee: {
@@ -1028,7 +1029,7 @@ export class DashboardService {
     // No avatarUrl here — this is fetched for every employee on every dashboard
     // load, and the Upcoming Celebrations widget never renders a photo.
     const employees = await this.prisma.employee.findMany({
-      where: { companyId },
+      where: { companyId, user: { status: { notIn: ['SUSPENDED', 'INACTIVE', 'BLOCKED'] } } },
       select: { id: true, firstName: true, lastName: true, dateOfBirth: true, joiningDate: true }
     });
 

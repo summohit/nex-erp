@@ -86,4 +86,10 @@ export class OnboardingController {
     requireOnboardingManager(req);
     return this.onboardingService.reviewSelfOnboarding(req.user.companyId, employeeId, body.decision, body.notes);
   }
+
+  @Post('employee/:id/invite')
+  async inviteToSelfOnboarding(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    requireOnboardingManager(req);
+    return this.onboardingService.inviteToSelfOnboarding(req.user.companyId, id);
+  }
 }

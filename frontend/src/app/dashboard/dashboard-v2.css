@@ -57,8 +57,16 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
   padding-bottom: 96px;
+}
+
+/* Collapse empty custom-element hosts so flex gap is not multiplied between cards */
+app-probation-watch-card:not(:has(*)),
+app-my-probation-card:not(:has(*)),
+app-my-pip-card:not(:has(*)),
+app-people-watch-card:not(:has(*)) {
+  display: none !important;
 }
 
 /* ==========================================================================
@@ -1600,12 +1608,27 @@
   .cmd-dashboard {
     padding: 14px 14px 92px;
   }
-  .kpi-grid-5 {
-    grid-template-columns: 1fr;
+  .cmd-container {
     gap: 14px;
   }
+  .cmd-topbar {
+    position: static;
+    top: auto;
+    padding: 0;
+    margin-top: 0;
+    border-bottom: 0;
+  }
+  .cmd-topbar-right,
+  .cmd-row-hero,
+  .sprint-card-header .sp-pill {
+    display: none !important;
+  }
+  .kpi-grid-5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
   .grid-12 {
-    gap: 16px;
+    gap: 14px;
   }
 
   /* Convert Pending Leave Approvals Table Rows into Cards on Narrow Screens */
@@ -2732,26 +2755,35 @@
 
 /* 6. ENHANCED 12-WEEK ACTIVITY & WORK-HOURS INTENSITY HUB */
 .heatmap-card {
+  container: heatmap / inline-size;
   background: var(--dash-surface, #ffffff);
   border: 1px solid var(--dash-border, #e2e8f0);
   border-radius: 16px;
   padding: 22px 28px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .heatmap-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 22px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px 16px;
+}
+
+.hm-header-left {
+  min-width: 0;
+  flex: 1 1 240px;
 }
 
 .hm-title-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 10px;
 }
 
 .heatmap-header h3 {
@@ -2759,15 +2791,18 @@
   font-size: 16px;
   font-weight: 800;
   color: var(--dash-text-primary, #0f172a);
+  text-wrap: balance;
 }
 
 .hm-period-badge {
   background: #f1f5f9;
   color: #475569;
-  padding: 2px 10px;
+  padding: 3px 10px;
   border-radius: 9999px;
   font-size: 11.5px;
   font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .heatmap-sub {
@@ -2782,12 +2817,14 @@
   gap: 6px;
   font-size: 11.5px;
   color: #64748b;
+  flex-shrink: 0;
 }
 
 .hm-box {
   width: 13px;
   height: 13px;
   border-radius: 3px;
+  flex-shrink: 0;
 }
 .hm-box.lvl-0 { background: #f1f5f9; }
 .hm-box.lvl-1 { background: #bfdbfe; }
@@ -2798,8 +2835,8 @@
 /* 2-Part Flex Layout */
 .heatmap-body-flex {
   display: flex;
-  align-items: flex-start;
-  gap: 32px;
+  align-items: stretch;
+  gap: 28px;
 }
 
 .heatmap-matrix-wrap {
@@ -2824,19 +2861,28 @@
 
 .heatmap-grid-wrap {
   display: flex;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 10px;
   overflow-x: auto;
   padding-bottom: 4px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .hm-days-labels {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-top: 24px;
+  padding-top: 28px;
   font-size: 11px;
   font-weight: 700;
   color: #94a3b8;
+  flex-shrink: 0;
+  width: 28px;
+  position: sticky;
+  left: 0;
+  background: var(--dash-surface, #ffffff);
+  z-index: 2;
 }
 
 .hm-days-labels span {
@@ -2846,8 +2892,11 @@
 }
 
 .hm-columns {
-  display: flex;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(22px, 1fr));
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
 }
 
 .hm-col {
@@ -2855,17 +2904,27 @@
   flex-direction: column;
   gap: 6px;
   align-items: center;
+  min-width: 0;
 }
 
 .hm-col-label {
-  font-size: 11px;
+  font-size: 9.5px;
+  line-height: 1.1;
+  height: 22px;
+  max-width: 28px;
+  word-spacing: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   font-weight: 700;
   color: #64748b;
-  margin-bottom: 2px;
+  margin-bottom: 0;
 }
 
 .hm-cell {
-  width: 22px;
+  width: 100%;
+  max-width: 24px;
   height: 22px;
   border-radius: 5px;
   cursor: pointer;
@@ -2892,12 +2951,13 @@
   padding-left: 28px;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 16px;
 }
 
 .hm-telemetry-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -2909,6 +2969,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .hm-sc-top {
@@ -2951,6 +3012,7 @@
   letter-spacing: -0.3px;
   font-variant-numeric: tabular-nums;
   margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 
 .hm-sc-sub {
@@ -2967,12 +3029,15 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .hm-id-header {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 10px;
   font-size: 12px;
   color: #475569;
 }
@@ -2980,6 +3045,7 @@
 .hm-id-header strong {
   color: #0f172a;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .hm-stacked-bar {
@@ -3001,7 +3067,7 @@
 .hm-id-legend {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px 14px;
   font-size: 11px;
   color: #64748b;
   flex-wrap: wrap;
@@ -3017,12 +3083,112 @@
 .hm-dot.d-overtime { background: #1e40af; }
 .hm-dot.d-optimal { background: #2563eb; }
 .hm-dot.d-standard { background: #60a5fa; }
+.hm-dot.d-partial { background: #bfdbfe; }
+
+/* Responsive Container & Viewport Queries for 12-Week Activity Hub */
+@container heatmap (max-width: 760px) {
+  .heatmap-body-flex {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .heatmap-matrix-wrap,
+  .heatmap-telemetry-col {
+    flex: none;
+    width: 100%;
+  }
+
+  .heatmap-telemetry-col {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 18px;
+  }
+}
+
+@container heatmap (max-width: 480px) {
+  .hm-columns {
+    grid-template-columns: repeat(12, minmax(18px, 1fr));
+    gap: 4px;
+  }
+
+  .hm-cell {
+    max-width: 20px;
+    height: 18px;
+    border-radius: 4px;
+  }
+
+  .hm-days-labels {
+    gap: 5px;
+    padding-top: 25px;
+    font-size: 10px;
+    width: 24px;
+  }
+
+  .hm-days-labels span {
+    height: 18px;
+  }
+
+  .hm-col {
+    gap: 5px;
+  }
+
+  .hm-col-label {
+    font-size: 8.5px;
+    height: 20px;
+  }
+
+  .hm-telemetry-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .hm-stat-chip {
+    padding: 10px;
+  }
+
+  .hm-sc-val {
+    font-size: 15px;
+  }
+}
+
+@container heatmap (max-width: 340px) {
+  .hm-telemetry-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .heatmap-body-flex {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .heatmap-matrix-wrap,
+  .heatmap-telemetry-col {
+    flex: none;
+    width: 100%;
+  }
+
+  .heatmap-telemetry-col {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  .heatmap-card {
+    padding: 18px 16px;
+  }
+}
 
 /* ==========================================================================
    ENHANCED PROBATION & LIFECYCLE WATCH CARDS (FIGMA SCREENSHOT 2 POLISH)
    ========================================================================== */
 :host ::ng-deep app-probation-watch-card .pwc {
-  margin-top: 18px;
+  margin-top: 0;
   background: var(--dash-surface, #ffffff);
   border: 1px solid var(--dash-border, #e2e8f0);
   border-radius: 16px;
@@ -3236,7 +3402,7 @@
 
 /* Enhanced Lifecycle Watch Card */
 :host ::ng-deep app-people-watch-card .pwc-card {
-  margin-top: 18px;
+  margin-top: 0;
   background: var(--dash-surface, #ffffff);
   border: 1px solid var(--dash-border, #e2e8f0);
   border-radius: 16px;
@@ -3292,24 +3458,9 @@
   overflow: hidden;
 }
 
-/* 7. FLOATING MIRA AI BAR */
+/* 7. FLOATING MIRA AI BAR (DISABLED) */
 .floating-mira-bar {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(12px);
-  border: 1px solid #cbd5e1;
-  border-radius: 9999px;
-  padding: 8px 12px 8px 20px;
-  box-shadow: 0 12px 36px -4px rgba(15, 23, 42, 0.16);
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  display: none !important;
 }
 
 .floating-mira-bar:hover {
@@ -3404,7 +3555,19 @@
 
 @media (max-width: 768px) {
   .kpi-accent-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .kpi-accent-card {
+    padding: 13px 14px;
+    min-width: 0;
+  }
+  .kpi-accent-val-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .kpi-accent-val {
+    font-size: 22px;
   }
   .agenda-status-strip {
     flex-direction: column;
@@ -3415,15 +3578,7 @@
     align-items: flex-start;
   }
   .floating-mira-bar {
-    width: 90%;
-    bottom: 74px;
-    box-sizing: border-box;
-    justify-content: space-between;
-  }
-  .mira-bar-text {
-    font-size: 12px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: none !important;
   }
 }
 
@@ -4756,13 +4911,19 @@
 @media (max-width: 1024px) {
   .cmd-row-hero { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .grid-12 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .grid-12 > .col-12,
+  .grid-12 > .col-8,
+  .grid-12 > .col-7,
+  .grid-12 > .col-6,
+  .grid-12 > .col-5,
+  .grid-12 > .col-4 { grid-column: 1 / -1 !important; }
   :host ::ng-deep app-probation-watch-card .pwc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
 @media (max-width: 640px) {
   .cmd-row-hero { grid-template-columns: 1fr !important; }
   .quick-access-inline { grid-template-columns: 1fr !important; }
   .grid-12 { grid-template-columns: 1fr !important; }
-  .hm-telemetry-grid { grid-template-columns: 1fr !important; }
+  .grid-12 > * { grid-column: 1 / -1 !important; }
   :host ::ng-deep app-probation-watch-card .pwc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   :host ::ng-deep app-people-watch-card .pwc-counts { grid-template-columns: 1fr !important; }
   .sla-buckets-grid { grid-template-columns: 1fr !important; }

@@ -181,62 +181,81 @@
       </div>
     </div>
 
-    <!-- Selected Day Agenda Drawer -->
-    <aside class="mc-day" *ngIf="selected() as d">
-      <div class="mc-day-head">
-        <div>
-          <span class="mc-day-rel" *ngIf="relativeDayLabel(d) as rel" [class.is-today]="d === todayKey">{{ rel }}</span>
-          <div class="mc-day-title">{{ longDate(d) }}</div>
-          <div class="mc-day-count">
-            {{ selectedEvents().length }} {{ selectedEvents().length === 1 ? 'scheduled item' : 'scheduled items' }}
-          </div>
-        </div>
-        <button type="button" class="mc-x" (click)="selected.set(null)" aria-label="Close day details">
-          <svg lucideX size="15"></svg>
-        </button>
-      </div>
-
-      <div class="mc-day-empty" *ngIf="!selectedEvents().length">
-        <div class="mc-day-empty-ico">
-          <svg lucideCalendar size="20"></svg>
-        </div>
-        <div class="mc-day-empty-title">No events on this day</div>
-        <div class="mc-day-empty-sub">No holidays, leaves, or tasks scheduled.</div>
-      </div>
-
-      <div class="mc-day-list" *ngIf="selectedEvents().length > 0">
-        <div
-          class="mc-day-item k-{{ e.type }}"
-          *ngFor="let e of selectedEvents()"
-          [class.link]="!!e.link"
-          (click)="open(e, $event)"
-        >
-          <div class="mc-av">
-            <img *ngIf="e.avatarUrl" [src]="e.avatarUrl" alt="" (error)="e.avatarUrl = null">
-            <ng-container *ngIf="!e.avatarUrl">
-              <svg *ngIf="e.type === 'HOLIDAY'" lucideSparkles size="15"></svg>
-              <svg *ngIf="e.type === 'TASK'" lucideCheckSquare size="15"></svg>
-              <svg *ngIf="e.type === 'SHIFT'" lucideClock size="15"></svg>
-              <svg *ngIf="e.type === 'DAY_OFF'" lucideCalendar size="15"></svg>
-              <span *ngIf="e.type === 'LEAVE' || e.type === 'BIRTHDAY' || e.type === 'ANNIVERSARY'">{{ initials(e.title) }}</span>
-            </ng-container>
-          </div>
-
-          <div class="mc-day-text">
-            <div class="mc-day-name">
-              <span>{{ e.title }}</span>
-              <span class="mc-you" *ngIf="e.mine && (e.type === 'LEAVE' || e.type === 'BIRTHDAY' || e.type === 'ANNIVERSARY')">You</span>
-            </div>
-            <div class="mc-day-sub">
-              <span class="mc-day-kind-pill">{{ kindLabel(e.type) }}</span>
-              <span class="mc-day-sub-text" *ngIf="e.subtitle">{{ e.subtitle }}</span>
-            </div>
-          </div>
-
-          <svg *ngIf="e.link" lucideExternalLink size="13" class="mc-day-link-ico"></svg>
-        </div>
-      </div>
+    <!-- Selected Day Agenda Drawer (Desktop only) -->
+    <aside class="mc-day mc-day-desktop" *ngIf="selected() as d">
+      <ng-container *ngTemplateOutlet="dayInspectorContent; context: { $implicit: d }"></ng-container>
     </aside>
   </div>
+
+  <!-- Responsive Modal Dialog (Top-layer <dialog> on mobile & tablet <= 1024px) -->
+  <dialog
+    #dayDialog
+    class="mc-day-dialog"
+    *ngIf="selected() as d"
+    (close)="selected.set(null)"
+    (click)="onDialogBackdropClick($event)"
+    [attr.aria-label]="longDate(d)"
+  >
+    <div class="mc-day-dialog-panel" (click)="$event.stopPropagation()">
+      <ng-container *ngTemplateOutlet="dayInspectorContent; context: { $implicit: d }"></ng-container>
+    </div>
+  </dialog>
+
+  <!-- Shared Day Inspector Content Template -->
+  <ng-template #dayInspectorContent let-d>
+    <div class="mc-day-head">
+      <div>
+        <span class="mc-day-rel" *ngIf="relativeDayLabel(d) as rel" [class.is-today]="d === todayKey">{{ rel }}</span>
+        <div class="mc-day-title">{{ longDate(d) }}</div>
+        <div class="mc-day-count">
+          {{ selectedEvents().length }} {{ selectedEvents().length === 1 ? 'scheduled item' : 'scheduled items' }}
+        </div>
+      </div>
+      <button type="button" class="mc-x" (click)="closeDay()" aria-label="Close day details">
+        <svg lucideX size="15"></svg>
+      </button>
+    </div>
+
+    <div class="mc-day-empty" *ngIf="!selectedEvents().length">
+      <div class="mc-day-empty-ico">
+        <svg lucideCalendar size="20"></svg>
+      </div>
+      <div class="mc-day-empty-title">No events on this day</div>
+      <div class="mc-day-empty-sub">No holidays, leaves, or tasks scheduled.</div>
+    </div>
+
+    <div class="mc-day-list" *ngIf="selectedEvents().length > 0">
+      <div
+        class="mc-day-item k-{{ e.type }}"
+        *ngFor="let e of selectedEvents()"
+        [class.link]="!!e.link"
+        (click)="open(e, $event)"
+      >
+        <div class="mc-av">
+          <img *ngIf="e.avatarUrl" [src]="e.avatarUrl" alt="" (error)="e.avatarUrl = null">
+          <ng-container *ngIf="!e.avatarUrl">
+            <svg *ngIf="e.type === 'HOLIDAY'" lucideSparkles size="15"></svg>
+            <svg *ngIf="e.type === 'TASK'" lucideCheckSquare size="15"></svg>
+            <svg *ngIf="e.type === 'SHIFT'" lucideClock size="15"></svg>
+            <svg *ngIf="e.type === 'DAY_OFF'" lucideCalendar size="15"></svg>
+            <span *ngIf="e.type === 'LEAVE' || e.type === 'BIRTHDAY' || e.type === 'ANNIVERSARY'">{{ initials(e.title) }}</span>
+          </ng-container>
+        </div>
+
+        <div class="mc-day-text">
+          <div class="mc-day-name">
+            <span>{{ e.title }}</span>
+            <span class="mc-you" *ngIf="e.mine && (e.type === 'LEAVE' || e.type === 'BIRTHDAY' || e.type === 'ANNIVERSARY')">You</span>
+          </div>
+          <div class="mc-day-sub">
+            <span class="mc-day-kind-pill">{{ kindLabel(e.type) }}</span>
+            <span class="mc-day-sub-text" *ngIf="e.subtitle">{{ e.subtitle }}</span>
+          </div>
+        </div>
+
+        <svg *ngIf="e.link" lucideExternalLink size="13" class="mc-day-link-ico"></svg>
+      </div>
+    </div>
+  </ng-template>
 </div>
 

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -73,15 +73,22 @@ const DEFAULT_HIDDEN = ['SHIFT'];
   templateUrl: './my-calendar.html',
   styleUrls: ['./my-calendar.css'],
 })
-export class MyCalendarComponent implements OnInit {
+export class MyCalendarComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
   private router = inject(Router);
+  @ViewChild('dayDialog') private dayDialog?: ElementRef<HTMLDialogElement>;
+  private mql: MediaQueryList | null = null;
+  private readonly onMqlChange = (e: MediaQueryListEvent) => {
+    this.setView(e.matches ? 'month' : 'week');
+  };
 
   readonly kinds = KINDS;
   readonly weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  /** Default to compact Week view per command-center design spec. */
-  view = signal<'month' | 'week'>('week');
+  /** Default to Month view on mobile (<= 768px) and compact Week view on desktop. */
+  view = signal<'month' | 'week'>(
+    typeof window !== 'undefined' && window.innerWidth <= 768 ? 'month' : 'week'
+  );
   /** Collapsible card body state. */
   collapsed = signal<boolean>(false);
   /** Any day inside the period on screen. */
@@ -176,7 +183,27 @@ export class MyCalendarComponent implements OnInit {
       .sort((x, y) => (order.get(x.type) ?? 99) - (order.get(y.type) ?? 99) || Number(!!y.mine) - Number(!!x.mine));
   });
 
-  ngOnInit() { this.load(); }
+  ngOnInit() {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      this.mql = window.matchMedia('(max-width: 768px)');
+      if (this.mql.matches && this.view() !== 'month') {
+        this.view.set('month');
+      }
+      this.mql.addEventListener?.('change', this.onMqlChange);
+    }
+    this.load();
+  }
+
+  ngOnDestroy() {
+    this.mql?.removeEventListener?.('change', this.onMqlChange);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    if (this.selected()) {
+      this.closeDay();
+    }
+  }
 
   load() {
     const c = this.cells();
@@ -215,14 +242,14 @@ export class MyCalendarComponent implements OnInit {
     this.anchor.set(this.view() === 'month'
       ? new Date(a.getFullYear(), a.getMonth() + step, 1)
       : this.addDays(a, 7 * step));
-    this.selected.set(null);
+    this.closeDay();
     this.load();
   }
 
   today() {
     this.anchor.set(this.startOfDay(new Date()));
-    this.selected.set(this.todayKey);
     this.load();
+    this.pick(this.todayKey);
   }
 
   toggleKind(type: string) {
@@ -244,7 +271,37 @@ export class MyCalendarComponent implements OnInit {
     return e.type === 'LEAVE' || e.type === 'BIRTHDAY' || e.type === 'ANNIVERSARY' || !!e.avatarUrl;
   }
 
-  pick(date: string) { this.selected.set(this.selected() === date ? null : date); }
+  pick(date: string) {
+    const isResponsive = typeof window !== 'undefined' && window.innerWidth <= 1024;
+    if (!isResponsive && this.selected() === date) {
+      this.closeDay();
+      return;
+    }
+    this.selected.set(date);
+    if (isResponsive) {
+      setTimeout(() => {
+        const dlg = this.dayDialog?.nativeElement;
+        if (dlg && !dlg.open) {
+          dlg.showModal();
+        }
+      });
+    }
+  }
+
+  closeDay() {
+    const dlg = this.dayDialog?.nativeElement;
+    if (dlg?.open) {
+      dlg.close();
+    }
+    this.selected.set(null);
+  }
+
+  onDialogBackdropClick(ev: MouseEvent) {
+    const dlg = this.dayDialog?.nativeElement;
+    if (dlg && ev.target === dlg) {
+      this.closeDay();
+    }
+  }
 
   open(e: CalEvent, ev?: Event) {
     if (ev) ev.stopPropagation();

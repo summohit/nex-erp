@@ -28,11 +28,6 @@
         <span>Refresh</span>
       </button>
 
-      <!-- Manage Templates -->
-      <button type="button" class="btn-manage-templates" (click)="openTemplateModal()">
-        <svg lucideSettings size="14"></svg>
-        <span>Manage Templates</span>
-      </button>
   </app-page-header>
 
   <!-- Metric Stat Cards Grid (Cohesive with Documents & Profile Completion) -->
@@ -163,7 +158,7 @@
           <div class="board-card card-pending"
                *ngFor="let emp of filteredBoardData().pending"
                cdkDrag
-               (click)="openChecklist(emp)">
+               (click)="openUserProfile(emp.id, $event)">
 
             <div class="card-drag-grip" cdkDragHandle title="Drag to change status">
               <svg lucideGripVertical size="14"></svg>
@@ -254,7 +249,7 @@
           <div class="board-card card-inprogress"
                *ngFor="let emp of filteredBoardData().inProgress"
                cdkDrag
-               (click)="openChecklist(emp)">
+               (click)="openUserProfile(emp.id, $event)">
 
             <div class="card-drag-grip" cdkDragHandle title="Drag to change status">
               <svg lucideGripVertical size="14"></svg>

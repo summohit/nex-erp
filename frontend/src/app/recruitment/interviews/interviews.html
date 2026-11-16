@@ -14,7 +14,7 @@
     <button type="button" class="iv-btn-refresh" (click)="fetchMyInterviews()" [disabled]="isLoading()">
       <svg lucideRotateCcw size="14" [class.spin-anim]="isLoading()"></svg><span>Refresh</span>
     </button>
-    <button type="button" class="iv-btn-add" (click)="openScheduleInterview()">
+    <button type="button" class="iv-btn-add" *ngIf="canSchedule()" (click)="openScheduleInterview()">
       <span>+</span> Add interview
     </button>
   </app-page-header>

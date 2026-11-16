@@ -271,10 +271,21 @@ export class InterviewsComponent implements OnInit {
     return { jobId: null, applicationId: null, interviewerId: null, title: '', interviewType: 'VIDEO', scheduledAt: '', endAt: '', interviewerComments: '', candidateComments: '', reminderAt: '', locationUrl: '' };
   }
 
+  /**
+   * False once the server refuses the scheduling lists (403): the person is an
+   * interviewer, not a recruiter, so Add interview is hidden instead of showing
+   * "Could not load candidates / interviewers" errors (16 Nov 2026).
+   */
+  canSchedule = signal(true);
+
   loadScheduleOptions() {
-    this.http.get<any[]>(`${environment.apiUrl}/recruitment/jobs`).subscribe({ next: rows => this.scheduleJobs.set(rows || []), error: () => this.toast.error('Could not load jobs') });
-    this.http.get<any[]>(`${environment.apiUrl}/recruitment/applications`).subscribe({ next: rows => this.scheduleApplications.set(rows || []), error: () => this.toast.error('Could not load candidates') });
-    this.http.get<any[]>(`${environment.apiUrl}/employees`).subscribe({ next: rows => this.scheduleEmployees.set(rows || []), error: () => this.toast.error('Could not load interviewers') });
+    const fail = (what: string) => (err: any) => {
+      if (err?.status === 403) { this.canSchedule.set(false); return; }
+      this.toast.error(`Could not load ${what}`);
+    };
+    this.http.get<any[]>(`${environment.apiUrl}/recruitment/jobs`).subscribe({ next: rows => this.scheduleJobs.set(rows || []), error: fail('jobs') });
+    this.http.get<any[]>(`${environment.apiUrl}/recruitment/applications`).subscribe({ next: rows => this.scheduleApplications.set(rows || []), error: fail('candidates') });
+    this.http.get<any[]>(`${environment.apiUrl}/employees`).subscribe({ next: rows => this.scheduleEmployees.set(rows || []), error: fail('interviewers') });
   }
 
   scheduleJobCandidates = computed(() => {

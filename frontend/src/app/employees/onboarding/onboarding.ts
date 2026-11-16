@@ -217,19 +217,50 @@ export class OnboardingComponent implements OnInit {
     },
     { 
       headerName: 'Action',
-      width: 120,
+      width: 250,
       flex: 0,
       sortable: false,
       filter: false,
       cellRenderer: (params: any) => {
-        const label = params.data?.onboardingStatus === 'PENDING' ? 'Start onboarding' : 'View tasks';
-        return `<button style="padding: 5px 12px; font-size: 12px; font-weight: 600; border-radius: 6px; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; cursor: pointer;">${label}</button>`;
+        const d = params.data || {};
+        const btn = (act: string, label: string, primary = false) =>
+          `<button data-act="${act}" style="padding: 5px 12px; margin-right: 6px; font-size: 12px; font-weight: 600; border-radius: 6px; cursor: pointer; ${primary
+            ? 'background: #2563eb; color: #fff; border: 1px solid #2563eb;'
+            : 'background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe;'}">${label}</button>`;
+        // Self-service invite for anyone not finished: created before the new flow, or whose login email needs resending.
+        const canInvite = d.onboardingStatus !== 'COMPLETED' && (!d.selfOnboardingStatus || d.selfOnboardingStatus === 'PENDING' || d.selfOnboardingStatus === 'CHANGES_REQUESTED');
+        const invite = canInvite ? btn('invite', d.selfOnboardingStatus ? 'Resend invite' : 'Send invite', !d.selfOnboardingStatus) : '';
+        // The task checklist is the old flow: only finished onboardings keep it, as history (16 Nov 2026).
+        return invite + (d.onboardingStatus === 'COMPLETED' ? btn('tasks', 'View tasks') : '');
       },
       onCellClicked: (params: any) => {
-        this.openChecklist(params.data);
+        const act = (params.event?.target as HTMLElement)?.closest?.('[data-act]')?.getAttribute('data-act');
+        if (act === 'invite') this.inviteEmployee(params.data);
+        else if (act === 'tasks') this.openChecklist(params.data);
       }
     }
   ];
+
+  /**
+   * Sends (or resends) the self-service onboarding email: new temporary
+   * password, employee ID, and the first-login profile form (16 Nov 2026).
+   */
+  inviteEmployee(emp: any) {
+    const name = `${emp.firstName} ${emp.lastName}`.trim();
+    const email = emp.user?.email || 'their email';
+    const again = !!emp.selfOnboardingStatus;
+    const ok = confirm(`${again ? 'Resend' : 'Send'} the onboarding invite to ${name} (${email})?\n\nThey get a new temporary password and must complete their profile before using MIRA.${again ? ' Any earlier temporary password stops working.' : ''}`);
+    if (!ok) return;
+    this.onboardingService.inviteToSelfOnboarding(emp.id).subscribe({
+      next: (r) => {
+        if (r.credentialsEmailed) this.toast.success(`Invite sent to ${r.email}`);
+        else this.toast.error(`${name} is in the new flow, but the email to ${r.email} failed. Try Resend invite.`);
+        this.loadBoard();
+        this.loadSelfQueue();
+      },
+      error: (e) => this.toast.error(e?.error?.message || 'Could not send the invite'),
+    });
+  }
 
   isTemplateModalOpen = signal(false);
   newTemplate = { title: '', description: '' };

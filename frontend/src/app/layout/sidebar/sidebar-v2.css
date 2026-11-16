@@ -825,3 +825,63 @@
 /* Rail placeholders while the menu loads */
 .rail-skeleton { display: block; width: 40px; height: 40px; margin: 6px auto; border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,.06) 25%, rgba(255,255,255,.14) 50%, rgba(255,255,255,.06) 75%); background-size: 200% 100%; animation: rail-shimmer 1.2s ease-in-out infinite; }
 @keyframes rail-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* All modules list: group headings read as section labels, items sit under
+   them on a guide line, so the two levels are easy to tell apart (16 Nov 2026). */
+.tree-group + .tree-group {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eef1f5;
+}
+
+.tree-group-header {
+  padding: 6px 10px 4px !important;
+  background: none !important;
+  cursor: default;
+}
+
+.tree-group-title {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b !important;
+}
+
+.tree-group-count {
+  font-size: 10.5px !important;
+  color: #94a3b8 !important;
+}
+
+.tree-group-items {
+  position: relative;
+  margin: 2px 0 0 14px;
+  padding-left: 10px;
+  border-left: 2px solid #e2e8f0;
+}
+
+.tree-item .tree-dash {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.tree-item.active {
+  position: relative;
+}
+
+.tree-item.active .tree-dash {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.tree-item.active::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: #2563eb;
+}

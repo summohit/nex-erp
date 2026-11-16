@@ -10,7 +10,7 @@ import { LettersService } from '../letters/letters.service';
 import { OfferLettersService } from './offer-letters.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcrypt';
-import { randomInt } from 'crypto';
+import { temporaryPassword } from '../common/temporary-password';
 import { MailService } from '../mail/mail.service';
 import { EmployeesService } from '../employees/employees.service';
 import { parseIstDateTime } from '../common/timezone.util';
@@ -549,16 +549,6 @@ export class ApplicationsService {
     });
   }
 
-  /** 10 characters, no look-alikes (0/O, 1/l/I), at least one digit. */
-  private static temporaryPassword(): string {
-    const letters = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz';
-    const digits = '23456789';
-    const all = letters + digits;
-    let out = '';
-    for (let i = 0; i < 8; i++) out += all[randomInt(all.length)];
-    return out + digits[randomInt(digits.length)] + letters[randomInt(letters.length)];
-  }
-
   async onboardCandidate(id: number, companyId: number, actorUserId?: number) {
     const application = await this.findOne(id, companyId);
 
@@ -603,7 +593,7 @@ export class ApplicationsService {
 
     // A one-off temporary password, emailed to the new joiner, who must replace it
     // on first login (self-service onboarding, 13 Nov 2026).
-    const tempPassword = ApplicationsService.temporaryPassword();
+    const tempPassword = temporaryPassword();
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     const joinedOn = application.joiningDate ? new Date(application.joiningDate) : new Date();

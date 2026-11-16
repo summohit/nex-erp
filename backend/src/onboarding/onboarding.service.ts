@@ -1,6 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { temporaryPassword } from '../common/temporary-password';
+import { forgetAccountStatus } from '../auth/auth.guard';
 import { lockJobCapacity, closeFilledJobs } from '../recruitment/job-capacity';
 
 import { MailService } from '../mail/mail.service';
@@ -115,6 +118,7 @@ export class OnboardingService {
         employeeCode: true,
         joiningDate: true,
         onboardingStatus: true,
+        selfOnboardingStatus: true,
         createdAt: true,
         user: { select: { email: true } },
         designation: { select: { name: true } },
@@ -458,6 +462,60 @@ export class OnboardingService {
     await this.setOnboardingStatus(companyId, e.id, 'COMPLETED');
     await this.notifyOnboardingCompleted(companyId, e.id);
     return { status: 'APPROVED' };
+  }
+
+  /**
+   * Bring an employee created before self-service onboarding (or one whose
+   * invite needs resending) into the new flow: activate the login, issue a
+   * fresh temporary password, and email it with their employee ID (16 Nov 2026).
+   */
+  async inviteToSelfOnboarding(companyId: number, employeeId: number) {
+    const e = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      include: { user: { select: { id: true, email: true } }, company: { select: { name: true } } },
+    });
+    if (!e || !e.user) throw new NotFoundException('Employee not found');
+    if (e.selfOnboardingStatus === 'APPROVED' || e.onboardingStatus === 'COMPLETED') {
+      throw new BadRequestException('Onboarding is already complete for this employee.');
+    }
+    if (e.selfOnboardingStatus === 'SUBMITTED') {
+      throw new BadRequestException('They have already submitted their profile. Review it under Profile reviews.');
+    }
+
+    const tempPassword = temporaryPassword();
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: e.user.id },
+        data: {
+          password: await bcrypt.hash(tempPassword, 10),
+          status: 'ACTIVE',
+          emailVerifiedAt: new Date(),
+          mustChangePassword: true,
+        },
+      }),
+      this.prisma.employee.update({
+        where: { id: e.id },
+        data: {
+          selfOnboardingStatus: e.selfOnboardingStatus === 'CHANGES_REQUESTED' ? 'CHANGES_REQUESTED' : 'PENDING',
+          ...(e.onboardingStatus === 'PENDING' ? { onboardingStatus: 'IN_PROGRESS' } : {}),
+        },
+      }),
+    ]);
+    forgetAccountStatus(e.user.id);
+
+    let credentialsEmailed = true;
+    try {
+      await this.mailService.sendOnboardingCredentialsEmail({
+        email: e.user.email,
+        name: `${e.firstName} ${e.lastName}`.trim(),
+        employeeCode: e.employeeCode || '',
+        tempPassword,
+        companyName: e.company?.name,
+      });
+    } catch {
+      credentialsEmailed = false;
+    }
+    return { credentialsEmailed, email: e.user.email };
   }
 
   async getCompanyPipelineSummary(companyId: number) {

@@ -79,4 +79,9 @@ export class OnboardingService {
   reviewSelfOnboarding(employeeId: number, decision: 'APPROVE' | 'CHANGES', notes?: Record<string, string>): Observable<{ status: string }> {
     return this.http.post<{ status: string }>(`${this.apiUrl}/self-reviews/${employeeId}`, { decision, notes });
   }
+
+  /** Brings an existing employee into self-service onboarding and emails their login. */
+  inviteToSelfOnboarding(employeeId: number): Observable<{ credentialsEmailed: boolean; email: string }> {
+    return this.http.post<{ credentialsEmailed: boolean; email: string }>(`${this.apiUrl}/employee/${employeeId}/invite`, {});
+  }
 }
