@@ -77,3 +77,29 @@ export class OutsideOfficeError extends BadRequestException {
     });
   }
 }
+
+/**
+ * An approved field visit clocked in from outside the site radius (16 Nov
+ * 2026). No longer a flat refusal: with a reason AND a photo the clock-in is
+ * saved and waits on the Super Admin, like an out-of-office clock. Same code
+ * as OutsideOfficeError so every client already opens its reason dialog; the
+ * `fieldVisit` / `photoRequired` flags tell newer clients to insist on a photo.
+ */
+export class OutsideVisitError extends BadRequestException {
+  constructor(requestNumber: string, location: string, distance: string, radiusM: number, missing: 'reason' | 'photo') {
+    super({
+      statusCode: 400,
+      code: OutsideOfficeError.CODE,
+      direction: 'in',
+      fieldVisit: true,
+      photoRequired: true,
+      radiusM,
+      branchName: location,
+      message: missing === 'photo'
+        ? `A photo is required to clock in away from the field visit site (${requestNumber}). You are ${distance} from ${location}.`
+        : `You are ${distance} from ${location} (${requestNumber}), outside the ${radiusM} m site radius. `
+          + 'Take a photo and describe the issue — the Super Admin reviews it, and you are marked clocked in once approved.',
+      error: 'Bad Request',
+    });
+  }
+}

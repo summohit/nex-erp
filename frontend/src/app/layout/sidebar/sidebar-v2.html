@@ -28,8 +28,10 @@
       <ng-container *ngIf="isLoading()">
         <span class="rail-skeleton" *ngFor="let i of [1,2,3,4,5,6,7,8,9]" aria-hidden="true"></span>
       </ng-container>
+      <div cdkDropList [cdkDropListDisabled]="!arranging()" [cdkDropListData]="modules" (cdkDropListDropped)="dropModule($event)" class="rail-drop" [class.arranging]="arranging()">
       <ng-container *ngFor="let mod of modules">
         <button
+          cdkDrag [cdkDragDisabled]="!arranging()" cdkDragLockAxis="y"
           type="button"
           class="rail-icon-btn"
           [class.active]="activeModuleId() === mod.id"
@@ -66,10 +68,17 @@
           <span class="rail-badge" *ngIf="mod.badge">{{ mod.badge }}</span>
         </button>
       </ng-container>
+      </div>
     </div>
 
     <!-- Rail Bottom Actions -->
     <div class="rail-bottom-actions">
+      <!-- Arrange my menu (16 Nov 2026) -->
+      <button type="button" class="rail-icon-btn rail-arrange-btn" [class.active]="arranging()" (click)="toggleArrange()"
+              [attr.aria-pressed]="arranging()" [attr.aria-label]="arranging() ? 'Done arranging' : 'Arrange my menu'"
+              [attr.data-label]="arranging() ? 'Done arranging' : 'Arrange my menu'">⇅</button>
+      <button *ngIf="arranging()" type="button" class="rail-icon-btn rail-arrange-btn" (click)="resetOrder()"
+              aria-label="Reset to default order" data-label="Reset to default order">↺</button>
       <!-- Settings Icon -->
       <button
         *ngIf="settingsModule"
@@ -144,8 +153,9 @@
       <!-- VIEW A: SINGLE MODULE VIEW (Figma Image 1) -->
       <ng-container *ngIf="mode() === 'single'">
 
-        <nav class="drawer-items-nav">
+        <nav class="drawer-items-nav" cdkDropList [cdkDropListDisabled]="!arranging()" (cdkDropListDropped)="dropSub($event)" [class.arranging]="arranging()">
           <a
+            cdkDrag [cdkDragDisabled]="!arranging()" cdkDragLockAxis="y"
             *ngFor="let item of filteredActiveItems()"
             [attr.href]="item.route"
             class="drawer-item"

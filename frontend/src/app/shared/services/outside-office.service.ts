@@ -32,6 +32,7 @@ export class OutsideOfficeService {
   /** Null when the person cancels. */
   async ask(err: any): Promise<OutsideOfficeAnswer | null> {
     const body = err?.error ?? {};
+    if (body.fieldVisit) return this.askFieldVisit(body);
     const direction = body.direction === 'out' ? 'out' : 'in';
     const answer = await this.dialog.promptWithAttachment(
       `${body.message || 'You are outside the office radius.'} `
@@ -71,6 +72,40 @@ export class OutsideOfficeService {
         'Cancel',
       );
       return ok ? { reason, visitType } : null;
+    }
+  }
+
+  /**
+   * An approved field visit, but away from the site (16 Nov 2026): a photo and
+   * a description are both required. The clock-in is saved as pending and the
+   * day counts once the Super Admin approves it.
+   */
+  private async askFieldVisit(body: any): Promise<OutsideOfficeAnswer | null> {
+    let note = '';
+    for (;;) {
+      const answer = await this.dialog.promptWithAttachment(
+        `${note}${body.message || 'You are outside the field visit site.'}`,
+        'Clock in away from the site',
+        {
+          placeholder: 'Describe the issue, e.g. site moved to the client\'s warehouse, gate closed…',
+          confirmLabel: 'Send for approval',
+          required: true,
+          accept: 'image/*',
+          attachmentLabel: 'Photo of where you are (required)',
+          attachmentHint: 'Take a photo now or choose one. JPG or PNG.',
+        },
+      );
+      if (!answer) return null;
+      if (!answer.text?.trim()) { note = 'Describe the issue. '; continue; }
+      if (!answer.file) { note = 'A photo is required. '; continue; }
+      try {
+        const res: any = await firstValueFrom(this.upload.uploadAttendanceProof(answer.file));
+        const proofUrl = res?.url ?? res?.path;
+        if (!proofUrl) throw new Error('no url');
+        return { reason: answer.text.trim(), visitType: 'FIELD_VISIT_UNAPPROVED', proofUrl };
+      } catch {
+        note = 'The photo could not be uploaded — try again. ';
+      }
     }
   }
 }

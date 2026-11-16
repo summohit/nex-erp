@@ -84,11 +84,29 @@ describe('the ordinary clock on a field visit day', () => {
     expect(visit.data.clockInDistanceKm).toBeLessThan(1);
   });
 
-  it('blocks the ordinary clock-in when outside the field visit site geofence', async () => {
+  // Outside the site (16 Nov 2026): a reason and a photo, then the Super Admin.
+  it('asks for a reason and photo when outside the field visit site geofence', async () => {
     // 23km away from the site.
-    await expect(service.clockIn(99, SOFA)).rejects.toThrow(
-      /outside the approved Field Visit location/i,
-    );
+    await expect(service.clockIn(99, SOFA)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'OUTSIDE_OFFICE_REASON_REQUIRED', fieldVisit: true, photoRequired: true }),
+    });
+    expect(prisma.attendance.create).not.toHaveBeenCalled();
+  });
+
+  it('still refuses outside the site with a reason but no photo', async () => {
+    await expect(service.clockIn(99, { ...SOFA, outsideReason: 'Site gate locked' } as any))
+      .rejects.toThrow(/photo is required/i);
+    expect(prisma.attendance.create).not.toHaveBeenCalled();
+  });
+
+  it('saves an outside-site clock-in with reason and photo as pending, not present', async () => {
+    await service.clockIn(99, { ...SOFA, outsideReason: 'Site gate locked', outsideProofUrl: 'https://x/photo.jpg' } as any);
+    const written = prisma.attendance.create.mock.calls[0][0].data;
+    expect(written.geofenceApproval).toBe('PENDING');
+    expect(written.status).toBe('ABSENT');
+    expect(written.clockInOutside).toBe(true);
+    expect(written.clockInOutsideProofUrl).toBe('https://x/photo.jpg');
+    expect(written.clockInOutsideReason).toMatch(/FVR-0009.*Site gate locked/);
   });
 
   it('requires GPS coordinates to clock in on an approved field visit day', async () => {

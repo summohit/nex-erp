@@ -146,6 +146,9 @@ model User {
   company                  Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   emailVerifiedAt          DateTime?
   status                   String                     @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, ACTIVE, SUSPENDED
+  /// This person's own sidebar order (16 Nov 2026): { modules: [id], subs: { moduleId: [id] } }.
+  /// Order only — what they may see still comes from permissions. Null = default.
+  menuOrder                Json?
   /// Set when HR issues a temporary password; cleared when the person sets their own.
   mustChangePassword       Boolean                    @default(false)
   createdAt                DateTime                   @default(now())

@@ -25,7 +25,7 @@ interface DashboardState {
 
   fetchDashboardData: () => Promise<void>;
   /** `outsideReason`: the answer to the server's outside-office refusal. */
-  clockIn: (outsideReason?: string, useLastFix?: boolean) => Promise<void>;
+  clockIn: (outsideReason?: string, useLastFix?: boolean, outsideProofUrl?: string) => Promise<void>;
   clockOut: (lat?: number, lng?: number, reason?: string, outsideReason?: string, useLastFix?: boolean) => Promise<void>;
   markNotificationRead: (id: number) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
@@ -134,14 +134,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
   },
 
-  clockIn: async (outsideReason?: string, useLastFix?: boolean) => {
+  clockIn: async (outsideReason?: string, useLastFix?: boolean, outsideProofUrl?: string) => {
     set({ isClockingIn: true, error: null });
     try {
       const hasPermission = await requestLocationPermission();
       if (!hasPermission) throw new Error('Location permission is required.');
       const coords = get().lastFix && (useLastFix || outsideReason) ? get().lastFix! : await getCurrentLocation();
       set({ lastFix: coords });
-      const record = await attendanceService.clockIn(coords.lat, coords.lng, Math.round(coords.accuracy), outsideReason);
+      const record = await attendanceService.clockIn(coords.lat, coords.lng, Math.round(coords.accuracy), outsideReason, outsideProofUrl);
       set({ todayAttendance: record, isClockingIn: false });
       useTimesheetStore.getState().fetchData();
     } catch (error: any) {

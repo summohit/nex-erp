@@ -4,7 +4,10 @@ import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { LayoutService } from '../../services/layout.service';
-import { MenusService } from '../../services/menus.service';
+import { MenusService, MenuOrder, applySavedOrder } from '../../services/menus.service';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
   LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock,
@@ -59,6 +62,7 @@ const ATTENDANCE_SELF_ROUTES = new Set(['/attendance/attendance', '/attendance/m
   standalone: true,
   imports: [
     CommonModule,
+    DragDropModule,
     LucideLayoutDashboard, LucideUsers, LucideBriefcase, LucideCalendarClock,
     LucideBanknote, LucideLaptop, LucideSettings, LucideChevronDown,
     LucideChevronRight, LucideChevronLeft, LucideUser, LucideTrophy,
@@ -124,6 +128,7 @@ export class SidebarComponentV2 implements OnInit {
   });
 
   filteredActiveItems = computed(() => {
+    this.orderVersion();
     const mod = this.currentActiveModule();
     if (!mod) return [];
     const term = this.searchFilter().trim().toLowerCase();
@@ -181,14 +186,18 @@ export class SidebarComponentV2 implements OnInit {
   }
 
   private loadMenus() {
-    this.menusService.getSidebarMenus().subscribe({
-      next: (sections) => {
+    forkJoin({
+      sections: this.menusService.getSidebarMenus(),
+      order: this.menusService.getMenuOrder().pipe(catchError(() => of(null))),
+    }).subscribe({
+      next: ({ sections, order }) => {
         const all: SidebarModule[] = [];
         for (const section of sections || []) {
           for (const item of section.items || []) all.push(this.toModule(item));
         }
         this.settingsModule = all.find(m => m.icon === 'settings' || m.title.toLowerCase() === 'settings') ?? null;
-        this.modules = all.filter(m => m !== this.settingsModule);
+        this.defaultModules = all.filter(m => m !== this.settingsModule).map(m => ({ ...m, items: [...m.items] }));
+        this.modules = this.ordered(all.filter(m => m !== this.settingsModule), order);
         this.isLoading.set(false);
         this.updateActiveModuleFromUrl(this.router.url);
       },
@@ -196,6 +205,64 @@ export class SidebarComponentV2 implements OnInit {
         this.toast.error('Failed to load menu');
         this.isLoading.set(false);
       },
+    });
+  }
+
+  // ── Arrange the menu (16 Nov 2026) ─────────────────────────────────────
+  // Each person can drag modules on the rail, and pages inside a module, into
+  // their own order. Saved to their profile, so it follows them everywhere.
+
+  /** True while the person is arranging; dragging is off otherwise. */
+  arranging = signal(false);
+  /** Bumped after a reorder so the drawer list recomputes. */
+  orderVersion = signal(0);
+  /** The order as the server sends it, for "Reset". */
+  private defaultModules: SidebarModule[] = [];
+
+  private ordered(mods: SidebarModule[], order: MenuOrder | null): SidebarModule[] {
+    const sorted = applySavedOrder(mods, order?.modules, m => m.id);
+    for (const m of sorted) m.items = applySavedOrder(m.items, order?.subs?.[m.id], x => x.id);
+    return sorted;
+  }
+
+  toggleArrange() {
+    const on = !this.arranging();
+    this.arranging.set(on);
+    if (on) {
+      this.searchFilter.set('');
+      if (this.currentActiveModule()?.items?.length) this.isDrawerCollapsed.set(false);
+      this.toast.info('Drag menus into the order you want. Click ⇅ again when done.', { duration: 4000 });
+    }
+  }
+
+  dropModule(e: CdkDragDrop<SidebarModule[]>) {
+    if (e.previousIndex === e.currentIndex) return;
+    moveItemInArray(this.modules, e.previousIndex, e.currentIndex);
+    this.saveOrder();
+  }
+
+  dropSub(e: CdkDragDrop<SidebarSubItem[]>) {
+    const mod = this.currentActiveModule();
+    if (!mod || e.previousIndex === e.currentIndex) return;
+    moveItemInArray(mod.items, e.previousIndex, e.currentIndex);
+    this.orderVersion.update(v => v + 1);
+    this.saveOrder();
+  }
+
+  private saveOrder() {
+    const order: MenuOrder = {
+      modules: this.modules.map(m => m.id),
+      subs: Object.fromEntries(this.modules.filter(m => m.items.length > 1).map(m => [m.id, m.items.map(i => i.id)])),
+    };
+    this.menusService.saveMenuOrder(order).subscribe({ error: () => this.toast.error('Could not save your menu order') });
+  }
+
+  resetOrder() {
+    this.modules = this.defaultModules.map(m => ({ ...m, items: [...m.items] }));
+    this.orderVersion.update(v => v + 1);
+    this.menusService.saveMenuOrder(null).subscribe({
+      next: () => this.toast.success('Menu order reset'),
+      error: () => this.toast.error('Could not reset the menu order'),
     });
   }
 
@@ -303,6 +370,8 @@ export class SidebarComponentV2 implements OnInit {
   }
 
   onItemClick(item: SidebarSubItem, event: Event) {
+    // While arranging, a click is the end of a drag, not a request to open the page.
+    if (this.arranging()) { event.preventDefault(); return; }
     if (item.external || item.route === '/careers') {
       // Stop the link's own navigation, or this tab follows it too while the
       // new tab opens (12 Nov 2026).

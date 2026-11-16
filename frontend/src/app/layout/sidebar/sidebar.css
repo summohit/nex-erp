@@ -729,3 +729,14 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Arrange my menu (16 Nov 2026) */
+.arrange-bar { display: flex; gap: 6px; padding: 4px 12px 8px; }
+.arrange-btn { border: 1px solid #e2e8f0; background: transparent; color: #64748b; border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.arrange-btn:hover { color: #0f172a; border-color: #cbd5e1; }
+.arrange-btn.on { background: #16a34a; border-color: #16a34a; color: #fff; }
+.sidebar-nav.arranging .nav-item, .tree-line-container.arranging .sub-nav-item { cursor: grab; outline: 1px dashed #94a3b8; outline-offset: -2px; border-radius: 8px; }
+.sidebar-nav.arranging .nav-item::before, .tree-line-container.arranging .sub-nav-item::before { content: '⋮⋮'; color: #94a3b8; margin-right: 6px; font-size: 11px; }
+.cdk-drag-preview { box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2); border-radius: 10px; opacity: 0.95; }
+.cdk-drag-placeholder { opacity: 0.3; }
+.cdk-drop-list-dragging .cdk-drag { transition: transform 200ms cubic-bezier(0, 0, 0.2, 1); }

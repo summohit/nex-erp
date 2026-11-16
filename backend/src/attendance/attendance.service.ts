@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { istDateKey, istTimeInstant } from '../common/timezone.util';
-import { LateClockOutError, OpenSessionError, OutsideOfficeError } from './open-session.error';
+import { LateClockOutError, OpenSessionError, OutsideOfficeError, OutsideVisitError } from './open-session.error';
 import { haversineKm, distanceAllowingAccuracyM } from '../common/geo.util';
 import { FIELD_VISIT_STATUS, FIELD_VISIT_DAY } from '../field-visits/field-visit-status';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -463,6 +463,7 @@ export class AttendanceService {
     const approvedVisitClock = !!visitDayToday || !!options?.fieldVisit;
 
     // Enforce field visit geofence if clocking in on an approved field visit day
+    let visitOutside: Record<string, any> | null = null;
     if (visitDayToday && !options?.fieldVisit) {
       if (data.lat == null || data.lng == null || !Number.isFinite(data.lat) || !Number.isFinite(data.lng)) {
         throw new BadRequestException('Your GPS location is required to clock in on an approved field visit day.');
@@ -477,20 +478,24 @@ export class AttendanceService {
 
       if (allowedM > radiusM) {
         const spokenDist = distanceM >= 1000 ? `${(distanceM / 1000).toFixed(1)}km` : `${distanceM}m`;
-        if (employee.userId) {
-          await this.notificationsService?.createNotification(
-            employee.userId,
-            'Clock-in denied: outside field visit location',
-            `${visitDayToday.request.requestNumber} at ${visitDayToday.request.location}: you were ${spokenDist} away, outside the ${radiusM}m radius.`,
-            'WARNING',
-            '/field-visits/my',
-            employee.companyId,
-          );
-        }
-        throw new BadRequestException(
-          `Clock-in denied: You are outside the approved Field Visit location (${visitDayToday.request.requestNumber}). ` +
-          `Please move within ${radiusM} metres of the site to Clock In. You are ${spokenDist} from ${visitDayToday.request.location}.`,
-        );
+        const { requestNumber, location } = visitDayToday.request;
+        // Outside the site (16 Nov 2026): allowed with a reason and a photo,
+        // then waits on the Super Admin like an out-of-office clock. Until it
+        // is approved the day does not count as present.
+        const reason = String((data as any).outsideReason ?? '').trim();
+        const proof = String((data as any).outsideProofUrl ?? '').trim();
+        if (!reason) throw new OutsideVisitError(requestNumber, location, spokenDist, radiusM, 'reason');
+        if (!proof) throw new OutsideVisitError(requestNumber, location, spokenDist, radiusM, 'photo');
+        visitOutside = {
+          clockInOutside: true,
+          clockInDistanceKm: Math.round(distanceKm * 100) / 100,
+          clockInOutsideReason: `Field visit ${requestNumber} at ${location} (${spokenDist} away): ${reason}`,
+          clockInOutsideProofUrl: proof,
+          geofenceApproval: 'PENDING',
+          geofenceReviewedById: null,
+          geofenceReviewedAt: null,
+          geofenceReviewNote: null,
+        };
       }
     }
 
@@ -530,7 +535,7 @@ export class AttendanceService {
     // day is not checked against the office either (19 Oct 2026).
     const wfhToday = !onsite && (await this.hasApprovedWfh(employee.id, new Date()));
     const office = await this.officeCheck(employee, effective, onsite || wfhToday || anywhere, data);
-    const outsideIn = this.outsideFields('in', office, data);
+    const outsideIn = visitOutside ?? this.outsideFields('in', office, data);
 
     // Nothing may start while something earlier is still running.
     //
