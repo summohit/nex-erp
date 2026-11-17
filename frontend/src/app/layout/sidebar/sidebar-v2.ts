@@ -272,6 +272,15 @@ export class SidebarComponentV2 implements OnInit {
     });
   }
 
+  /** Short label under each rail icon (16 Nov 2026): the part before '&', one word when long. */
+  railLabel(title: string): string {
+    const short: Record<string, string> = { 'Dashboard & Workspace': 'Dashboard', 'Customer Relationship': 'CRM', 'Delivery': 'Delivery' };
+    if (short[title]) return short[title];
+    let t = String(title || '').split('&')[0].split('/')[0].trim();
+    if (t.length > 11) t = t.split(' ')[0];
+    return t.length > 11 ? t.slice(0, 10) + '…' : t;
+  }
+
   /** Server menu item → rail module. Leave pages fold into one "Leaves" entry. */
   private toModule(item: any): SidebarModule {
     let subs: SidebarSubItem[] = (item.subItems || []).map((s: any) => ({

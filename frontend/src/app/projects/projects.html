@@ -170,9 +170,9 @@
 </ng-template>
 
 <ng-container *ngIf="!editOnlyProjectId">
-<div class="boards-page">
+<div class="boards-page" [class.in-profile]="profileEmployeeId">
   <!-- Search & Filter Control Bar -->
-  <div class="hub-control-bar">
+  <div class="hub-control-bar" *ngIf="!profileEmployeeId">
     <!-- Searchable Select for My Tasks only -->
     <div class="search-select-box" [class.open]="boardDropdownOpen()" *ngIf="activeTab() === 'my-tasks'">
       <button 
@@ -313,7 +313,7 @@
   <app-task-transfer *ngIf="taskTransferOpen()" (closed)="taskTransferOpen.set(false)"></app-task-transfer>
 
   <!-- ⭐ Starred Boards Section -->
-  <div class="section-container" *ngIf="starredProjects().length > 0 && (activeTab() === 'all' || activeTab() === 'starred')">
+  <div class="section-container" *ngIf="!profileEmployeeId && starredProjects().length > 0 && (activeTab() === 'all' || activeTab() === 'starred')">
     <div class="section-header">
       <div class="section-title-group">
         <svg lucideStar size="20" class="section-icon star-yellow"></svg>
@@ -389,7 +389,7 @@
   </div>
 
   <!-- 🕒 Recently Viewed Section -->
-  <div class="section-container" *ngIf="recentlyViewedProjects().length > 0 && !searchQuery() && (activeTab() === 'all' || activeTab() === 'recent')">
+  <div class="section-container" *ngIf="!profileEmployeeId && recentlyViewedProjects().length > 0 && !searchQuery() && (activeTab() === 'all' || activeTab() === 'recent')">
     <div class="section-header">
       <div class="section-title-group">
         <svg lucideClock size="20" class="section-icon"></svg>
@@ -469,7 +469,7 @@
     <div class="section-header">
       <div class="section-title-group">
         <svg lucideUser size="20" class="section-icon"></svg>
-        <h2>Your boards</h2>
+        <h2>{{ profileEmployeeId ? 'Projects' : 'Your boards' }}</h2>
         <span class="boards-search-note" *ngIf="pickedMembers().length">
           {{ filteredProjects().length }} {{ filteredProjects().length === 1 ? 'board' : 'boards' }} with {{ pickedMembers().length === 1 ? pickedMembers()[0].name : pickedMembers().length + ' people' }}
           <button type="button" (click)="filterMemberIds.set([])">Clear</button>
@@ -910,13 +910,13 @@
         <!-- CARD VIEW -->
         <div class="boards-grid" *ngIf="viewMode() === 'card'">
           <!-- Generate with AI (First) -->
-          <div class="create-board-card ai-wizard-card" routerLink="/projects/onboarding/new" *ngIf="isAdmin">
+          <div class="create-board-card ai-wizard-card" routerLink="/projects/onboarding/new" *ngIf="isAdmin && !profileEmployeeId">
             <svg lucideBrainCircuit size="18" class="create-icon"></svg>
             <span>Generate with AI</span>
           </div>
 
           <!-- Create New Board (Second) -->
-          <div class="create-board-card" (click)="openCreateModal()" *ngIf="isAdmin">
+          <div class="create-board-card" (click)="openCreateModal()" *ngIf="isAdmin && !profileEmployeeId">
             <svg lucidePlus size="18" class="create-icon"></svg>
             <span>Create new board</span>
           </div>
@@ -996,7 +996,7 @@
 
         <!-- TABLE VIEW -->
         <div class="boards-table-wrapper" *ngIf="viewMode() === 'table'">
-          <div class="table-toolbar" *ngIf="isAdmin">
+          <div class="table-toolbar" *ngIf="isAdmin && !profileEmployeeId">
             <button type="button" class="btn-create-inline" (click)="openCreateModal()">
               <svg lucidePlus size="14"></svg>
               Create new board
@@ -1042,7 +1042,7 @@
 
   <!-- ✅ My Tasks — project, general and pre-sales work in one list -->
   <div class="section-container my-tasks-section" id="my-tasks-section" *ngIf="activeTab() === 'my-tasks'">
-    <app-page-header icon="target" section="Delivery"
+    <app-page-header *ngIf="!profileEmployeeId" icon="target" section="Delivery"
       [heading]="myTasksScope() === 'all' ? 'All tasks' : myTasksScope() === 'created' ? 'Tasks I created' : 'My tasks'"
       [subtitle]="myTasksCount() + (myTasksCount() === 1 ? ' task' : ' tasks') + ' · project work, general tasks and pre-sales deals'">
           <!-- Administrators only. Without this an admin with nothing assigned
@@ -1074,7 +1074,7 @@
     </app-page-header>
     <div class="my-tasks-header-card">
       <!-- Top Row: Title, Subtitle, Scope Switch & Add Task -->
-      <div class="my-tasks-card-top">
+      <div class="my-tasks-card-top" *ngIf="!profileEmployeeId">
         <div class="my-tasks-title-group">
           <div class="my-tasks-icon-badge">
             <svg lucideListChecks size="22"></svg>
@@ -1100,7 +1100,7 @@
       </div>
 
       <!-- Card Inner Divider -->
-      <div class="my-tasks-card-divider"></div>
+      <div class="my-tasks-card-divider" *ngIf="!profileEmployeeId"></div>
 
       <!-- Bottom Toolbar: Quick Filter Chips on Left, Show Completed on Right -->
       <div class="my-tasks-toolbar-row">

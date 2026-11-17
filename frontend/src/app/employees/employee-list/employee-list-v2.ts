@@ -113,10 +113,9 @@ export class EmployeeListComponentV2 implements OnInit {
   ];
   filterEmploymentStatus: string | null = null;
   /** Directory opens on Active (management, 11 Nov); Reset returns to Active. */
-  // Everyone by default (16 Nov 2026): deactivated people sort to the bottom,
-  // greyed out. Defaulting to Active hid them from search while the box said
-  // "All employees".
-  filterAccountStatus: string | null = null;
+  // Active employees by default (asked 16 Nov 2026); the box shows 'Active'.
+  // Pick 'All employees' (clear) or 'Deactivated' to see the others.
+  filterAccountStatus: string | null = 'ACTIVE';
   accountStatusOptions = [
     { id: 'ACTIVE', name: 'Active' },
     { id: 'DEACTIVATED', name: 'Deactivated' },
@@ -911,7 +910,7 @@ export class EmployeeListComponentV2 implements OnInit {
     if (this.filterOnboardingStatus) count++;
     if (this.filterOffboardingStatus) count++;
     if (this.filterEmploymentStatus) count++;
-    if (this.filterAccountStatus) count++;
+    if (this.filterAccountStatus !== 'ACTIVE') count++;
     if (this.dateRange) count++;
     if (this.personalOnly) count++;
     return count;
@@ -930,7 +929,7 @@ export class EmployeeListComponentV2 implements OnInit {
     this.filterOnboardingStatus = null;
     this.filterOffboardingStatus = null;
     this.filterEmploymentStatus = null;
-    this.filterAccountStatus = null;
+    this.filterAccountStatus = 'ACTIVE';
     this.datePreset = 'ALL';
     this.dateRange = null;
     this.onSearch();
@@ -955,7 +954,10 @@ export class EmployeeListComponentV2 implements OnInit {
             if (employee.user?.status === 'SUSPENDED') return 1;
             return 0;
           };
-          return rank(a) - rank(b);
+          // 17 Nov 2026: newest joiners first (joining date, not the day the
+          // record was created — old hires entered late must not jump the queue).
+          const joined = (e: any) => (e.joiningDate ? new Date(e.joiningDate).getTime() : 0);
+          return rank(a) - rank(b) || joined(b) - joined(a);
         });
         this.employees.set(sorted);
         this.isLoading.set(false);

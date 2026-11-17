@@ -743,7 +743,20 @@
         <button type="button" class="rv4-btn" [disabled]="reviewBusy() || !hasReviewNotes()" [title]="hasReviewNotes() ? '' : 'Add a note to a section first'" (click)="decideSelfReview('CHANGES')">Send back</button>
         <button type="button" class="rv4-btn rv4-btn-primary" [disabled]="reviewBusy() || reviewLoading() || !reviewProfile() || hasReviewNotes()" [title]="hasReviewNotes() ? 'Remove the notes to approve' : ''" (click)="decideSelfReview('APPROVE')">Approve</button>
       </ng-container>
-      <ng-template #closeOnly><button type="button" class="rv4-btn" (click)="closeSelfReview()">Close</button></ng-template>
+      <ng-template #closeOnly>
+        <button type="button" class="rv4-btn" [class.rv4-btn-text]="canOverrideApprove()" (click)="closeSelfReview(); confirmOverride.set(false)">Close</button>
+        <!-- Super Admin: approve a sent-back profile (16 Nov 2026) -->
+        @if (canOverrideApprove()) {
+          @if (!confirmOverride()) {
+            <button type="button" class="rv4-btn rv4-btn-primary" [disabled]="reviewBusy() || reviewLoading() || !reviewProfile()"
+                    title="Approve without waiting for the joiner to resubmit" (click)="confirmOverride.set(true)">Approve anyway</button>
+          } @else {
+            <span class="rv4-override-q">Approve without the requested changes? The notes are cleared.</span>
+            <button type="button" class="rv4-btn rv4-btn-text" (click)="confirmOverride.set(false)">No</button>
+            <button type="button" class="rv4-btn rv4-btn-primary" [disabled]="reviewBusy()" (click)="decideSelfReview('APPROVE')">Yes, approve</button>
+          }
+        }
+      </ng-template>
     </footer>
   </div>
 </div>

@@ -65,6 +65,7 @@
           </ng-container>
 
           <!-- Top-Right Red Notification Pill (Approvals 3) -->
+          <span class="rail-label">{{ railLabel(mod.title) }}</span>
           <span class="rail-badge" *ngIf="mod.badge">{{ mod.badge }}</span>
         </button>
       </ng-container>
@@ -91,11 +92,15 @@
         [attr.data-label]="settingsModule.title">
         <span class="rail-active-indicator" *ngIf="activeModuleId() === settingsModule.id"></span>
         <svg lucideSettings size="20"></svg>
+        <span class="rail-label">Settings</span>
       </button>
 
       <!-- User Profile Initials Avatar with Green Online Dot -->
       <div class="rail-user-avatar-wrap" (click)="goToProfile()" aria-label="My profile" data-label="My profile">
-        <div class="rail-user-avatar">{{ getUserInitials() }}</div>
+        <div class="rail-user-avatar">
+          <img *ngIf="user()?.employee?.avatarUrl; else railInitials" [src]="user().employee.avatarUrl" alt="" class="rail-user-photo">
+          <ng-template #railInitials>{{ getUserInitials() }}</ng-template>
+        </div>
         <span class="online-dot"></span>
       </div>
     </div>

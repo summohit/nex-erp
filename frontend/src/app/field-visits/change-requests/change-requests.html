@@ -33,14 +33,33 @@
           </div>
         </div>
       } @else {
+        @if (selectable().length) {
+          <div class="cr-bulk" [class.on]="selectedRows().length">
+            <label class="cr-check-all">
+              <input type="checkbox" [checked]="allSelected()" [indeterminate]="selectedRows().length > 0 && !allSelected()" (change)="toggleAll($any($event.target).checked)" aria-label="Select all pending">
+              <span>{{ selectedRows().length ? selectedRows().length + ' selected' : 'Select all pending (' + selectable().length + ')' }}</span>
+            </label>
+            @if (selectedRows().length) {
+              <button type="button" class="cr-btn" (click)="toggleAll(false)" [disabled]="bulkBusy()">Clear</button>
+              <button type="button" class="cr-btn cr-btn-approve" (click)="approveSelected()" [disabled]="bulkBusy()">
+                {{ bulkBusy() ? 'Approving…' : 'Approve selected (' + selectedRows().length + ')' }}
+              </button>
+            }
+          </div>
+        }
         <div class="cr-table-wrap">
           <table class="cr-table">
             <thead>
-              <tr><th>Request</th><th>Change</th><th>Reason</th><th>Asked by</th><th>Status</th><th class="cr-th-actions">Action</th></tr>
+              <tr><th class="cr-th-check">@if (selectable().length) { <input type="checkbox" [checked]="allSelected()" (change)="toggleAll($any($event.target).checked)" aria-label="Select all pending"> }</th><th>Request</th><th>Change</th><th>Reason</th><th>Asked by</th><th>Status</th><th class="cr-th-actions">Action</th></tr>
             </thead>
             <tbody>
               @for (c of visibleChanges(); track c.id) {
                 <tr class="cr-row" [class.cr-pending]="c.status === 'Pending'" [attr.data-status]="c.status">
+                  <td class="cr-col-check">
+                    @if (c.canReview) {
+                      <input type="checkbox" [checked]="selected().has(c.id)" (change)="toggle(c, $any($event.target).checked)" [attr.aria-label]="'Select ' + c.requestNumber">
+                    }
+                  </td>
                   <td class="cr-col-req">
                     <a class="cr-req" [routerLink]="['/field-visits/requests', c.requestId]" title="Open this field visit">{{ c.requestNumber }}</a>
                     @if (c.project) {
@@ -50,6 +69,17 @@
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
                       <span>{{ c.location }}</span>
                     </div>
+                    @if (c.team.length) {
+                      <div class="cr-team" [title]="'Assigned: ' + teamNames(c)">
+                        <span class="cr-team-avs">
+                          @for (m of c.team.slice(0, 4); track m.id) {
+                            @if (m.avatarUrl) { <img class="cr-av xs" [src]="m.avatarUrl" alt=""> }
+                            @else { <span class="cr-av xs cr-av-i" [style.background]="avatarBg(m)">{{ initials(m) }}</span> }
+                          }
+                        </span>
+                        <span class="cr-team-names">{{ teamNames(c) }}</span>
+                      </div>
+                    }
                   </td>
                   <td class="cr-col-change">
                     <span class="cr-type" [attr.data-type]="c.type">{{ c.type }}</span>

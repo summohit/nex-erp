@@ -56,6 +56,7 @@ export interface ProfileFormErrors {
   city?: string;
   zipCode?: string;
   avatarUrl?: string;
+  personalEmail?: string;
   identificationNo?: string;
   pfNumber?: string;
   esiNumber?: string;
@@ -73,6 +74,7 @@ const PROFILE_FORMATS: { key: keyof ProfileFormErrors; upper?: boolean; strip?: 
   { key: 'firstName', test: v => NAME_RE.test(v), msg: 'Use letters only (spaces, . \' - allowed).' },
   { key: 'lastName', test: v => NAME_RE.test(v), msg: 'Use letters only (spaces, . \' - allowed).' },
   { key: 'spouseName', test: v => NAME_RE.test(v), msg: 'Use letters only (spaces, . \' - allowed).' },
+  { key: 'personalEmail', test: v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v), msg: 'Enter a valid personal email, e.g. name@gmail.com.' },
   { key: 'bankAccountNumber', strip: /\s/g, test: v => /^\d{9,18}$/.test(v), msg: 'Bank account number should be 9–18 digits.' },
   { key: 'ifscCode', upper: true, test: v => /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v), msg: 'IFSC is 11 characters: 4 letters, 0, then 6 letters/digits (e.g. HDFC0001234).' },
   { key: 'zipCode', test: (v, f) => (!f.country || f.country === 'IN') ? /^[1-9]\d{5}$/.test(v) : /^[A-Za-z0-9 -]{3,10}$/.test(v),
@@ -149,6 +151,7 @@ export class ProfileTabComponent implements OnInit {
   // errors can auto-navigate to the right section before scrolling to the field.
   private fieldTabMap: Record<string, { parent: 'work' | 'resume' | 'personal'; subTab?: 'all' | 'contact_bank' | 'personal' | 'citizenship_visa' | 'location' | 'family_edu' | 'bio' }> = {
     avatarUrl: { parent: 'personal' },
+    personalEmail: { parent: 'personal', subTab: 'contact_bank' },
     firstName: { parent: 'personal', subTab: 'personal' },
     lastName: { parent: 'personal', subTab: 'personal' },
     phone: { parent: 'personal', subTab: 'contact_bank' },
@@ -390,6 +393,9 @@ export class ProfileTabComponent implements OnInit {
         dateOfBirth: this.employeeData.dateOfBirth ? new Date(this.employeeData.dateOfBirth).toISOString().split('T')[0] : '',
         slackId: this.employeeData.slackId || '',
         maritalStatus: this.employeeData.maritalStatus || 'Single',
+        // Prefill from the login when that is still a personal (non-office) address (17 Nov 2026).
+        personalEmail: this.employeeData.personalEmail
+          || (/@ces-pl\.com$/i.test(String(this.employeeData.user?.email || '')) ? '' : (this.employeeData.user?.email || '')),
         address: this.employeeData.address || '',
         about: this.employeeData.about || '',
         // The directory API may expose the uploaded portrait on either the
@@ -1092,6 +1098,7 @@ export class ProfileTabComponent implements OnInit {
   private onboardingRequiredMessages(): Record<string, string> {
     const m: Record<string, string> = {
       avatarUrl: 'Profile picture is required — upload a clear, front-facing photo.',
+      personalEmail: 'Personal email is required.',
       phone: 'Mobile phone is required.',
       bankName: 'Bank name is required.',
       bankAccountNumber: 'Bank account number is required.',
@@ -1143,6 +1150,8 @@ export class ProfileTabComponent implements OnInit {
     for (const rule of PROFILE_FORMATS) {
       const raw = this.formData[rule.key];
       if (raw == null || String(raw).trim() === '' || this.errors[rule.key]) continue;
+      // Spouse fields are hidden for Single, so never block a save on them.
+      if (rule.key === 'spouseName' && this.formData.maritalStatus === 'Single') continue;
       let v = String(raw).trim();
       if (rule.strip) v = v.replace(rule.strip, '');
       if (rule.upper) v = v.toUpperCase();
@@ -1188,7 +1197,7 @@ export class ProfileTabComponent implements OnInit {
   }
 
   private focusFirstError() {
-    const order: (keyof ProfileFormErrors)[] = ['avatarUrl', 'firstName', 'lastName', 'phone', 'bankName', 'bankAccountNumber', 'ifscCode', 'dateOfBirth', 'country', 'state', 'city', 'zipCode', 'homeWorkDistanceKm', 'address', 'identificationNo', 'pfNumber', 'esiNumber', 'passportNo', 'spouseName', 'childrenCount'];
+    const order: (keyof ProfileFormErrors)[] = ['avatarUrl', 'firstName', 'lastName', 'personalEmail', 'phone', 'bankName', 'bankAccountNumber', 'ifscCode', 'dateOfBirth', 'country', 'state', 'city', 'zipCode', 'homeWorkDistanceKm', 'address', 'identificationNo', 'pfNumber', 'esiNumber', 'passportNo', 'spouseName', 'childrenCount'];
     const first = order.find(k => !!this.errors[k]);
     if (!first) return;
 

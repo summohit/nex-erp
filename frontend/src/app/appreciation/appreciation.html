@@ -1,7 +1,7 @@
-<div class="page-container">
+<div class="page-container" [class.in-profile]="profileEmployeeId">
 
   <!-- ── 1. Standard MIRA Page Header ────────────────────────────────────── -->
-  <app-page-header 
+  <app-page-header *ngIf="!profileEmployeeId"
     icon="trophy" 
     section="HR & Team" 
     heading="Appreciation & Awards" 
@@ -56,7 +56,7 @@
   </app-page-header>
 
   <!-- ── 2. KPI Summary Cards ─────────────────────────────────────────────── -->
-  <section class="appr-kpi-grid">
+  <section class="appr-kpi-grid" *ngIf="!profileEmployeeId">
     <!-- Card 1: Total Appreciations -->
     <article
       class="appr-kpi-card"
@@ -114,7 +114,7 @@
 
   <!-- ── 3. Single-Row Filter Bar ─────────────────────────────────────────── -->
   <!-- Tab 1 Filters: Appreciations List -->
-  <div class="filter-card" *ngIf="activeTab() === 'list'">
+  <div class="filter-card" *ngIf="!profileEmployeeId && activeTab() === 'list'">
     <!-- 1. Search (always first) -->
     <div class="filter-group search-group">
       <svg lucideSearch size="15" class="search-icon"></svg>

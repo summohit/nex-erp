@@ -1,4 +1,4 @@
-<div class="all-attendance-container page-container quota-page">
+<div class="all-attendance-container page-container quota-page" *ngIf="!profileEmployeeId">
 
   <app-page-header icon="calendar" section="Attendance & Leave" heading="Leave Quota Report"
     [subtitle]="summary().people + (summary().people === 1 ? ' employee' : ' employees') + ' · allocated, used and remaining leave for ' + year() + (report()?.scope === 'SELF' ? ' · your own figures' : '')">
@@ -158,7 +158,7 @@
 </div>
 
 <!-- ── Per-type Breakdown Modal ────────────────────────────────────────────── -->
-<div class="modal-overlay" *ngIf="detailRow() as row" (click)="closeDetail()">
+<div class="modal-overlay" *ngIf="(profileEmployeeId ? null : detailRow()) as row" (click)="closeDetail()">
   <div class="modal-card" (click)="$event.stopPropagation()">
     <!-- Modal Header with Full Employee Profile Details -->
     <div class="modal-header">
@@ -206,6 +206,18 @@
       </div>
     </div>
 
+    <ng-container *ngTemplateOutlet="breakdown; context: { $implicit: row }"></ng-container>
+
+    <!-- Modal Footer -->
+    <div class="modal-footer">
+      <button class="btn-modal-close" (click)="closeDetail()">Close</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Shared per-type breakdown: the popup above and the profile Leaves Quota tab (17 Nov 2026) -->
+<ng-template #breakdown let-row>
     <!-- Modal Quick KPI Stats Strip -->
     <div class="modal-kpi-strip">
       <div class="modal-kpi-item">
@@ -282,9 +294,236 @@
       </div>
     </div>
 
-    <!-- Modal Footer -->
-    <div class="modal-footer">
-      <button class="btn-modal-close" (click)="closeDetail()">Close</button>
+</ng-template>
+
+<!-- Profile Leaves Quota tab: one person, inline (17 Nov 2026) -->
+<section class="lqp" *ngIf="profileEmployeeId">
+  <header class="lqp-head">
+    <div class="lqp-head-left">
+      <div class="lqp-icon-badge" aria-hidden="true">
+        <svg lucideCalendarDays [size]="20"></svg>
+      </div>
+      <div class="lqp-title-group">
+        <div class="lqp-title-row">
+          <h2 id="lqp-heading">Leaves Quota</h2>
+          <span class="lqp-range">
+            <svg lucideInfo [size]="13"></svg>
+            <span>01 Jan {{ year() }} – 31 Dec {{ year() }}</span>
+          </span>
+        </div>
+        <p class="lqp-subtitle">Annual leave entitlements, approved consumption, remaining balances and LOP breakdown.</p>
+      </div>
     </div>
+
+    <div class="lqp-head-actions">
+      <div class="lqp-legend-inline" aria-label="Leave category legend">
+        <span><i class="lqp-dot paid"></i>Paid</span>
+        <span><i class="lqp-dot optional"></i>Optional</span>
+        <span><i class="lqp-dot unpaid"></i>Unpaid</span>
+      </div>
+      <div class="lqp-year-wrap">
+        <svg lucideCalendarDays [size]="14" class="lqp-year-ico" aria-hidden="true"></svg>
+        <select class="lqp-year" [ngModel]="year()" (ngModelChange)="onYearChange($event)" aria-label="Year">
+          <option *ngFor="let y of years()" [ngValue]="y">{{ y }}</option>
+        </select>
+      </div>
+      <button type="button" class="lqp-refresh-btn" (click)="load()" [disabled]="loading()" title="Refresh quota" aria-label="Refresh quota">
+        <svg lucideRefreshCw [size]="14" [class.spin-anim]="loading()"></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="lqp-state" *ngIf="loading()">
+    <div class="loading-spinner"></div>
+    <span>Loading leave quota for {{ year() }}…</span>
   </div>
-</div>
+
+  <div class="lqp-state" *ngIf="!loading() && !detailRow()">
+    <svg lucideCalendarDays [size]="28"></svg>
+    <span>No leave quota records found for {{ year() }}.</span>
+  </div>
+
+  <ng-container *ngIf="!loading() && detailRow() as row">
+    <div class="lqp-kpis">
+      <article class="lqp-kpi blue">
+        <div class="lqp-kpi-top">
+          <span class="lqp-kpi-label">Total leaves</span>
+          <span class="lqp-kpi-ico"><svg lucideCalendarDays [size]="16"></svg></span>
+        </div>
+        <div class="lqp-kpi-val-row">
+          <strong>{{ days(profileKpis().allocated) }}</strong>
+          <span class="lqp-kpi-unit">days</span>
+        </div>
+        <small>Allocated for {{ year() }}</small>
+      </article>
+
+      <article class="lqp-kpi amber">
+        <div class="lqp-kpi-top">
+          <span class="lqp-kpi-label">Leaves taken</span>
+          <span class="lqp-kpi-ico"><svg lucideClock [size]="16"></svg></span>
+        </div>
+        <div class="lqp-kpi-val-row">
+          <strong>{{ days(profileKpis().taken) }}</strong>
+          <span class="lqp-kpi-unit">days</span>
+          <span class="lqp-kpi-chip amber" *ngIf="profileKpis().allocated > 0">
+            {{ (profileKpis().taken / profileKpis().allocated) * 100 | number:'1.0-0' }}% used
+          </span>
+        </div>
+        <div class="lqp-kpi-bar-row">
+          <div class="lqp-kpi-bar" aria-hidden="true">
+            <span [style.width.%]="profileKpis().allocated > 0 ? ((profileKpis().taken / profileKpis().allocated) * 100 > 100 ? 100 : (profileKpis().taken / profileKpis().allocated) * 100) : 0"></span>
+          </div>
+          <small>Approved days</small>
+        </div>
+      </article>
+
+      <article class="lqp-kpi green">
+        <div class="lqp-kpi-top">
+          <span class="lqp-kpi-label">Remaining leaves</span>
+          <span class="lqp-kpi-ico"><svg lucideCheckCircle2 [size]="16"></svg></span>
+        </div>
+        <div class="lqp-kpi-val-row">
+          <strong>{{ days(profileKpis().remaining) }}</strong>
+          <span class="lqp-kpi-unit">days</span>
+        </div>
+        <small>Still available to apply</small>
+      </article>
+
+      <article class="lqp-kpi red">
+        <div class="lqp-kpi-top">
+          <span class="lqp-kpi-label">Over utilised</span>
+          <span class="lqp-kpi-ico"><svg lucideTriangleAlert [size]="16"></svg></span>
+        </div>
+        <div class="lqp-kpi-val-row">
+          <strong [class.is-over]="profileKpis().over > 0">{{ days(profileKpis().over) }}</strong>
+          <span class="lqp-kpi-unit">days</span>
+          <span class="lqp-kpi-chip red" *ngIf="profileKpis().unpaid > 0">LOP</span>
+        </div>
+        <small>{{ days(profileKpis().unpaid) }} unpaid (LOP)</small>
+      </article>
+    </div>
+
+    <div class="lqp-table-wrap" tabindex="0" role="region" aria-labelledby="lqp-heading">
+      <table class="lqp-table">
+        <thead>
+          <tr>
+            <th scope="col">Leave type</th>
+            <th scope="col" class="num">No. of leaves</th>
+            <th scope="col" class="num">Leaves taken</th>
+            <th scope="col" class="num">Remaining</th>
+            <th scope="col" class="num">Over utilised</th>
+            <th scope="col" class="num">Encashed</th>
+            <th scope="col" class="chev-hd">History</th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let l of profileLines()">
+            <tr
+              [class.muted]="!l.allocated && !l.used"
+              [class.open]="expandedTypeId() === l.type.id"
+              [class.clickable]="l.dates.length > 0"
+              (click)="l.dates.length && toggleType(l.type.id)"
+            >
+              <th scope="row" class="lqp-type-cell">
+                <span class="lqp-dot" [ngClass]="l.kind" aria-hidden="true"></span>
+                <span class="lqp-name">{{ l.type.name }}</span>
+                <span class="lqp-tag unpaid" *ngIf="l.kind === 'unpaid'">Unpaid</span>
+                <span class="lqp-tag optional" *ngIf="l.kind === 'optional'">Optional</span>
+                <span class="lqp-tag blue" *ngIf="l.type.encashable">Encashable</span>
+              </th>
+              <td class="num" data-label="No. of leaves">
+                <span class="lqp-num-alloc">{{ days(l.allocated) }}</span>
+              </td>
+              <td class="num" data-label="Leaves taken">
+                <div class="lqp-taken-cell">
+                  <span class="lqp-num-used">{{ days(l.used) }}</span>
+                  <div class="lqp-mini-track" *ngIf="l.allocated > 0" aria-hidden="true">
+                    <span
+                      class="lqp-mini-fill"
+                      [class.full]="l.used >= l.allocated"
+                      [class.warn]="l.used < l.allocated && (l.used / l.allocated) >= 0.75"
+                      [style.width.%]="(l.used / l.allocated) * 100 > 100 ? 100 : (l.used / l.allocated) * 100"
+                    ></span>
+                  </div>
+                </div>
+              </td>
+              <td class="num" data-label="Remaining">
+                <span
+                  class="lqp-rem-pill"
+                  [class.zero]="l.left === 0 && l.allocated > 0"
+                  [class.low]="l.left > 0 && l.left <= 2"
+                  [class.healthy]="l.left > 2"
+                  [class.neutral]="l.left === 0 && l.allocated === 0"
+                >
+                  {{ days(l.left) }}
+                </span>
+              </td>
+              <td class="num" data-label="Over utilised">
+                <span class="lqp-over-pill" *ngIf="l.over > 0">+{{ days(l.over) }}</span>
+                <span class="lqp-zero-muted" *ngIf="!l.over">0</span>
+              </td>
+              <td class="num" data-label="Encashed">
+                <span class="lqp-encashed-pill" *ngIf="l.encashed">{{ days(l.encashed) }}</span>
+                <span class="lqp-zero-muted" *ngIf="!l.encashed">—</span>
+              </td>
+              <td class="chev" data-label="History">
+                <button
+                  type="button"
+                  class="lqp-expand-pill"
+                  *ngIf="l.dates.length"
+                  [class.active]="expandedTypeId() === l.type.id"
+                  [attr.aria-expanded]="expandedTypeId() === l.type.id"
+                  (click)="$event.stopPropagation(); toggleType(l.type.id)"
+                >
+                  <span>{{ l.dates.length }} {{ l.dates.length === 1 ? 'date' : 'dates' }}</span>
+                  <svg lucideChevronRight [size]="13" class="lqp-chev-ico"></svg>
+                </button>
+                <span class="lqp-zero-muted" *ngIf="!l.dates.length">—</span>
+              </td>
+            </tr>
+            <tr class="lqp-dates" *ngIf="expandedTypeId() === l.type.id">
+              <td colspan="7">
+                <div class="lqp-dates-box">
+                  <span class="lqp-dates-label">Approved dates ({{ l.dates.length }}):</span>
+                  <div class="lqp-date-list">
+                    <span class="lqp-date" *ngFor="let r of l.dates">
+                      <svg lucideCalendarDays [size]="12" class="lqp-date-ico" aria-hidden="true"></svg>
+                      <strong>
+                        {{ r.startDate | date:'dd MMM' }}<ng-container *ngIf="r.endDate.slice(0,10) !== r.startDate.slice(0,10)"> – {{ r.endDate | date:'dd MMM' }}</ng-container>
+                      </strong>
+                      <em>{{ leaveDays(r) }}</em>
+                    </span>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+        </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row">Total</th>
+            <td class="num">{{ days(profileKpis().allocated) }}</td>
+            <td class="num">{{ days(profileKpis().taken) }}</td>
+            <td class="num"><span class="lqp-total-rem">{{ days(profileKpis().remaining) }}</span></td>
+            <td class="num"><span [class.lqp-total-over]="profileKpis().over > 0">{{ days(profileKpis().over) }}</span></td>
+            <td class="num">{{ days(row.totals.encashed) }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="lqp-note" *ngIf="row.hasNoBalances">
+      <svg lucideAlertCircle [size]="16"></svg>
+      <span>No leave balance has been set up for {{ year() }}. All figures are currently zero.</span>
+    </div>
+
+    <dl class="lqp-key">
+      <div><dt>No. of leaves</dt><dd>Days given for the year (pro-rata for joiners / confirmations).</dd></div>
+      <div><dt>Leaves taken</dt><dd>Approved leave days. Click any row with dates to inspect history.</dd></div>
+      <div><dt>Remaining</dt><dd>Days still available to apply.</dd></div>
+      <div><dt>Over utilised</dt><dd>Days taken beyond the quota — Loss of Pay is always over utilised.</dd></div>
+      <div><dt>Encashed</dt><dd>Unused days paid out at year end.</dd></div>
+    </dl>
+  </ng-container>
+</section>

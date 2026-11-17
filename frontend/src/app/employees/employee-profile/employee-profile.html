@@ -52,8 +52,10 @@
     </section>
 
     <!-- Modern Pill Tabs Navigation Bar -->
-    <div class="tabs-container">
-      <div class="pill-tabs-bar">
+    <div class="tabs-container" [class.has-left]="canScrollLeft()" [class.has-right]="canScrollRight()">
+      <!-- 17 Nov 2026: arrows show there are more tabs; disabled at either end -->
+      <button type="button" class="tabs-arrow left" (click)="scrollTabs(-1)" [disabled]="!canScrollLeft()" aria-label="Previous tabs">‹</button>
+      <div class="pill-tabs-bar" #tabsBar (scroll)="updateTabArrows()">
         <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'work'" (click)="setTab('work')" *ngIf="!onboarding">
           <svg lucideBriefcase size="15"></svg>
           <span>Work</span>
@@ -82,11 +84,62 @@
           <span class="tab-count-chip" *ngIf="documentsCount() > 0">{{ documentsCount() }}</span>
         </button>
 
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'attendance'" (click)="setTab('attendance')" *ngIf="!onboarding && canSeeWorkTabs()">
+          <svg lucideCalendar size="15"></svg>
+          <span>Attendance</span>
+        </button>
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'leaves'" (click)="setTab('leaves')" *ngIf="!onboarding && canSeeWorkTabs()">
+          <svg lucideFileText size="15"></svg>
+          <span>Leaves</span>
+        </button>
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'quota'" (click)="setTab('quota')" *ngIf="!onboarding && canSeeWorkTabs()">
+          <svg lucideCalendar size="15"></svg>
+          <span>Leaves Quota</span>
+        </button>
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'projects'" (click)="setTab('projects')" *ngIf="!onboarding && canSeeWorkTabs()">
+          <svg lucideBriefcase size="15"></svg>
+          <span>Projects</span>
+        </button>
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'tasks'" (click)="setTab('tasks')" *ngIf="!onboarding && canSeeWorkTabs()">
+          <svg lucideCheck size="15"></svg>
+          <span>Tasks</span>
+        </button>
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'timesheet'" (click)="setTab('timesheet')" *ngIf="!onboarding && canSeeWorkTabs()">
+          <svg lucideClock size="15"></svg>
+          <span>Timesheet</span>
+        </button>
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'tickets'" (click)="setTab('tickets')" *ngIf="!onboarding && canSeeWorkTabs()">
+          <svg lucideFileText size="15"></svg>
+          <span>Tickets</span>
+        </button>
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'appreciation'" (click)="setTab('appreciation')" *ngIf="!onboarding && canSeeWorkTabs()">
+          <svg lucideCheck size="15"></svg>
+          <span>Appreciation</span>
+        </button>
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'roster'" (click)="setTab('roster')" *ngIf="!onboarding && canSeeWorkTabs()">
+          <svg lucideCalendar size="15"></svg>
+          <span>Shift Roster</span>
+        </button>
+
+        <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'activity'" (click)="setTab('activity')" *ngIf="!onboarding && canSeeWorkTabs()">
+          <svg lucideClock size="15"></svg>
+          <span>Activity</span>
+        </button>
+
         <button type="button" class="pill-tab-btn" [class.active]="activeTab() === 'history'" (click)="setTab('history')" *ngIf="!onboarding">
           <svg lucideClock size="15"></svg>
           <span>History</span>
         </button>
       </div>
+      <button type="button" class="tabs-arrow right" (click)="scrollTabs(1)" [disabled]="!canScrollRight()" aria-label="More tabs">›</button>
     </div>
 
     <!-- Tab Content Area -->
@@ -111,6 +164,17 @@
         [onboarding]="onboarding" 
         (refreshProfile)="loadProfile(employeeData()?.id?.toString() || 'me')">
       </app-documents-tab>
+
+      <app-attendance-leave *ngIf="activeTab() === 'attendance' && canSeeWorkTabs()" [profileEmployeeId]="employeeData()?.id"></app-attendance-leave>
+      <app-attendance-leave *ngIf="activeTab() === 'leaves' && canSeeWorkTabs()" [profileEmployeeId]="employeeData()?.id" profileTab="leave"></app-attendance-leave>
+      <app-leave-quota *ngIf="activeTab() === 'quota' && canSeeWorkTabs()" [profileEmployeeId]="employeeData()?.id"></app-leave-quota>
+      <app-projects *ngIf="activeTab() === 'projects' && canSeeWorkTabs()" [profileEmployeeId]="employeeData()?.id"></app-projects>
+      <app-projects *ngIf="activeTab() === 'tasks' && canSeeWorkTabs()" [profileEmployeeId]="employeeData()?.id" profileTab="tasks"></app-projects>
+      <app-timesheets *ngIf="activeTab() === 'timesheet' && canSeeWorkTabs()" [profileEmployeeId]="employeeData()?.id"></app-timesheets>
+      <app-tickets *ngIf="activeTab() === 'tickets' && canSeeWorkTabs()" [profileEmployeeId]="employeeData()?.id"></app-tickets>
+      <app-appreciation *ngIf="activeTab() === 'appreciation' && canSeeWorkTabs()" [profileEmployeeId]="employeeData()?.id"></app-appreciation>
+      <app-shift-roster *ngIf="activeTab() === 'roster' && canSeeWorkTabs()" [profileEmployeeId]="employeeData()?.id"></app-shift-roster>
+      <app-activity-tab *ngIf="activeTab() === 'activity' && canSeeWorkTabs()" [employeeId]="employeeData()?.id"></app-activity-tab>
 
       <section *ngIf="activeTab() === 'history'" class="employment-history-card">
         <div class="history-heading">

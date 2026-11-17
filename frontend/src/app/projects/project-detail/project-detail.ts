@@ -2162,6 +2162,18 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   activeTimerString = signal<string>('');
   private timerInterval: any;
 
+  /**
+   * 17 Nov 2026: the page the board was opened from (an employee profile, My
+   * Tasks, a client…), so ← returns there instead of always to Delivery.
+   * Captured once on arrival; moving between the board's own views doesn't change it.
+   */
+  private readonly returnUrl: string | null = (() => {
+    const prev = this.router.getCurrentNavigation()?.previousNavigation?.finalUrl?.toString()
+      ?? null;
+    if (!prev || /^\/projects\/\d+/.test(prev) || prev.startsWith('/login')) return null;
+    return prev;
+  })();
+
   constructor() {
     effect(() => {
       if (this.isTimerRunning()) {
@@ -7331,6 +7343,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   goBack() {
+    if (this.returnUrl) { this.router.navigateByUrl(this.returnUrl); return; }
     this.router.navigate(['/projects']);
   }
 

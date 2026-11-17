@@ -1672,3 +1672,6 @@
 }
 .rv4-avatar-img { object-fit: cover; border: 1px solid #e2e8f0; }
 a.rv4-link { text-decoration: none; }
+
+/* Super Admin approve-anyway confirm (16 Nov 2026) */
+.rv4-override-q { font-size: 12.5px; color: #b45309; margin-right: 4px; }

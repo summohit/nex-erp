@@ -80,6 +80,12 @@ export class LeavesController {
     return this.leavesService.getMyRequests(req.user.sub);
   }
 
+  /** One person's approved/pending leave — profile Attendance tab (17 Nov 2026). */
+  @Get('requests/employee/:employeeId')
+  getEmployeeRequests(@Request() req, @Param('employeeId', ParseIntPipe) employeeId: number) {
+    return this.leavesService.getEmployeeRequests(req.user.companyId, { role: req.user.role, employeeId: req.user.employeeId ?? null }, employeeId);
+  }
+
   @Get('requests/managers')
   getManagerRequests(@Request() req) {
     return this.leavesService.getManagerRequests(req.user.sub);

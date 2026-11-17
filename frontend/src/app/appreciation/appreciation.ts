@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, Input, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -588,7 +588,15 @@ export class AppreciationComponent implements OnInit {
     status: true
   };
 
+  /** 17 Nov 2026: set inside an employee profile — only that person's awards. */
+  @Input() profileEmployeeId: number | null = null;
+
   ngOnInit() {
+    if (this.profileEmployeeId) {
+      this.activeTab.set('list');
+      this.loadData();
+      return;
+    }
     this.route.paramMap.subscribe(params => {
       const tab = params.get('tab');
       if (tab === 'types') {
@@ -603,6 +611,7 @@ export class AppreciationComponent implements OnInit {
 
   setTab(tab: 'list' | 'types') {
     this.activeTab.set(tab);
+    if (this.profileEmployeeId) return; // stay inside the profile
     this.router.navigate(['/appreciation', tab]);
   }
 
@@ -610,7 +619,8 @@ export class AppreciationComponent implements OnInit {
     this.isLoading.set(true);
     this.appreciationService.getAppreciations().subscribe({
       next: (res) => {
-        this.appreciations.set(res || []);
+        const pid = this.profileEmployeeId ? Number(this.profileEmployeeId) : null;
+        this.appreciations.set((res || []).filter((a: any) => !pid || a.employee?.id === pid || a.employeeId === pid));
         this.isLoading.set(false);
       },
       error: () => {

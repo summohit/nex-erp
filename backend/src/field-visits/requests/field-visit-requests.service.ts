@@ -1746,7 +1746,8 @@ export class FieldVisitRequestsService {
     const visible = await this.prisma.fieldVisitRequest.findMany({
       where: this.visibilityWhere(companyId, role, employeeId),
       select: { id: true, requestNumber: true, location: true, status: true, startDate: true, endDate: true,
-        pendingChange: true, project: { select: { id: true, name: true, key: true } } },
+        pendingChange: true, project: { select: { id: true, name: true, key: true } },
+        members: { select: { employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } } } } },
     });
     if (!visible.length) return [];
     const byId = new Map(visible.map((r) => [r.id, r]));
@@ -1778,6 +1779,7 @@ export class FieldVisitRequestsService {
         const d = String(ask.detail ?? '');
         rows.push({
           id: ask.id, requestId: rid, requestNumber: req.requestNumber, location: req.location, project: req.project,
+          team: (req as any).members?.map((m: any) => m.employee) ?? [],
           type: typeOf(ask.detail, (status === 'Pending' ? (req.pendingChange as any)?.kind : undefined)),
           status,
           // Older requests did not record dates on the activity; for the open one

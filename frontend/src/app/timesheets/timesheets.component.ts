@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Input, Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -350,6 +350,9 @@ export class TimesheetsComponent implements OnInit {
     this.router.navigate(['/tasks'], { queryParams: { search: issueKey } });
   }
 
+  /** 17 Nov 2026: set inside an employee profile — that person's week, read-only. */
+  @Input() profileEmployeeId: number | null = null;
+
   ngOnInit() {
     this.load();
   }
@@ -361,6 +364,14 @@ export class TimesheetsComponent implements OnInit {
     const end = this.dayKey(this.weekEnd());
     this.loading.set(true);
     this.collapseAll();
+
+    if (this.profileEmployeeId) {
+      this.api.getEmployeeWeek(Number(this.profileEmployeeId), start, end).subscribe({
+        next: (w) => { this.myWeek.set(w); this.loading.set(false); },
+        error: (e) => { this.loading.set(false); this.fail(e, 'Could not load this timesheet.'); },
+      });
+      return;
+    }
 
     if (this.scope() === 'ME') {
       this.api.getMyWeek(start, end).subscribe({

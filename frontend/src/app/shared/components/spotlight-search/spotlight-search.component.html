@@ -30,7 +30,11 @@
         (mouseenter)="selectedIndex.set(i)"
         (click)="item.action()"
       >
-        <div class="item-icon-wrapper">
+        <div class="item-icon-wrapper avatar" *ngIf="item.category === 'Employees'">
+          <img *ngIf="item.avatarUrl; else spInitials" [src]="item.avatarUrl" alt="">
+          <ng-template #spInitials><span>{{ item.initials }}</span></ng-template>
+        </div>
+        <div class="item-icon-wrapper" *ngIf="item.category !== 'Employees'">
           <svg [attr.lucideSearch]="item.iconName === 'search' ? '' : null"
                [attr.lucideUser]="item.iconName === 'user' ? '' : null"
                [attr.lucideBriefcase]="item.iconName === 'briefcase' ? '' : null"

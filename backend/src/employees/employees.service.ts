@@ -812,6 +812,12 @@ export class EmployeesService {
     setDate('dateOfBirth');
     setText('slackId');
     setText('maritalStatus');
+    // Personal email beside the office login email (16 Nov 2026): contact only, never a login.
+    if (data.personalEmail !== undefined) {
+      const pe = String(data.personalEmail ?? '').trim().toLowerCase();
+      if (pe && !/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(pe)) throw new BadRequestException('Enter a valid personal email address.');
+      updateData.personalEmail = pe || null;
+    }
     setText('address');
     setText('about');
     // A photo is uploaded on its own and only its URL is stored. An inline data:

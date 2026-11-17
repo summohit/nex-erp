@@ -1,7 +1,7 @@
-<div class="tickets-page page-container">
+<div class="tickets-page page-container" [class.in-profile]="profileEmployeeId">
 
   <!-- Enhanced Page Header Card -->
-  <div class="page-header-card">
+  <div class="page-header-card" *ngIf="!profileEmployeeId">
     <div class="header-title-group">
       <div class="header-title-row">
         <h1>Helpdesk & Tickets</h1>
@@ -31,7 +31,7 @@
   </div>
 
   <!-- KPI / Stats Row — skeleton mirrors the real card shape so nothing jumps -->
-  <div class="stats-row" *ngIf="!stats">
+  <div class="stats-row" *ngIf="!profileEmployeeId && !stats">
     <div class="stat-card skeleton-card" *ngFor="let i of [1,2,3,4,5,6]">
       <app-skeleton width="44px" height="44px" radius="12px"></app-skeleton>
       <div class="stat-info">
@@ -42,7 +42,7 @@
     </div>
   </div>
 
-  <div class="stats-row" *ngIf="stats">
+  <div class="stats-row" *ngIf="!profileEmployeeId && stats">
     <!-- Total Tickets -->
     <div class="stat-card stat-indigo" [class.active-card]="!filterStatus && hasActiveFilters() === false" (click)="toggleStatusCard('')" title="Click to show all tickets">
       <div class="stat-icon-wrapper">
@@ -117,7 +117,7 @@
   </div>
 
   <!-- View Tabs -->
-  <div class="view-tabs">
+  <div class="view-tabs" *ngIf="!profileEmployeeId">
     <button class="view-tab-btn" [class.active]="activeTab === 'list'" (click)="setTab('list')">
       Ticket List
     </button>
@@ -454,7 +454,7 @@
         </div>
 
         <!-- Employee Filter (Searchable) -->
-        <div class="searchable-filter-dropdown">
+        <div class="searchable-filter-dropdown" *ngIf="!profileEmployeeId">
           <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterEmployee" (click)="showEmployeeDropdown = !showEmployeeDropdown; showDeptDropdown=false; showStatusDropdown=false; showPriorityDropdown=false; showPlatformDropdown=false">
             <svg lucideUser [size]="14" class="trigger-prefix-icon"></svg>
             <span class="trigger-text">{{ getSelectedEmployeeLabel() }}</span>

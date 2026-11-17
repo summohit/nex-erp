@@ -143,6 +143,13 @@ export class EmployeeService {
     });
   }
 
+  /** Profile Activity tab (17 Nov 2026). */
+  getActivity(id: number | string, q: { before?: string; areas?: string; from?: string; to?: string } = {}): Observable<{ items: any[]; nextBefore: string | null }> {
+    const params: any = {};
+    for (const [k, v] of Object.entries(q)) if (v) params[k] = v;
+    return this.http.get<{ items: any[]; nextBefore: string | null }>(`${this.apiUrl}/${id}/activity`, { params });
+  }
+
   getEmploymentHistory(id: number | string): Observable<any[]> {
     const token = getAccessToken();
     return this.http.get<any[]>(`${this.apiUrl}/${id}/history`, { headers: { Authorization: `Bearer ${token}` } });

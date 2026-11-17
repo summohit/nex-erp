@@ -51,6 +51,11 @@ export class ShiftsService {
     return this.http.get<RosterGrid>(`${this.apiUrl}/roster?${params.join('&')}`);
   }
 
+  /** One person's roster, read-only (profile Shift Roster tab, 17 Nov 2026). */
+  getEmployeeRoster(employeeId: number, start: string, end: string): Observable<RosterGrid> {
+    return this.http.get<RosterGrid>(`${this.apiUrl}/roster/employee/${employeeId}?start=${start}&end=${end}`);
+  }
+
   assignRoster(data: RosterAssignmentPayload) {
     return this.http.post(`${this.apiUrl}/roster`, data);
   }

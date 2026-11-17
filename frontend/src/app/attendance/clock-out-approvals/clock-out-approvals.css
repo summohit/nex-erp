@@ -2097,3 +2097,16 @@ th.sticky-actions-col {
 .history-filters input { flex: 1 1 240px; max-width: 340px; }
 .history-filters select { flex: 0 0 180px; }
 .history-scroll th { text-transform: none !important; letter-spacing: 0 !important; font-size: 12.5px !important; font-weight: 600 !important; color: #475569 !important; background: #f8fafc !important; }
+
+/* History KPIs (16 Nov 2026) */
+.history-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 4px 0 18px; }
+@media (max-width: 1100px) { .history-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .history-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.hk-card { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 14px 16px 12px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; overflow: hidden; }
+.hk-card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: #64748b; }
+.hk-total::before { background: #1f3a5f; } .hk-appr::before { background: #16a34a; } .hk-rej::before { background: #dc2626; }
+.hk-geo::before { background: #3b5bdb; } .hk-late::before { background: #f59e0b; }
+.hk-label { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #64748b; }
+.hk-card strong { font-size: 26px; line-height: 1.15; color: #0f172a; font-variant-numeric: tabular-nums; }
+.hk-appr strong { color: #15803d; } .hk-rej strong { color: #b91c1c; } .hk-geo strong { color: #3b5bdb; } .hk-late strong { color: #b45309; }
+.hk-card small { font-size: 12px; color: #64748b; }

@@ -31,6 +31,7 @@ import {
 import { AgGridAngular } from 'ag-grid-angular';
 import { CandidatesService } from '../../services/candidates.service';
 import { EmployeeService } from '../../services/employee.service';
+import { AuthService } from '../../services/auth.service';
 import { ColDef, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -71,6 +72,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 export class OnboardingComponent implements OnInit {
   private onboardingService = inject(OnboardingService);
   private toast = inject(HotToastService);
+  private auth = inject(AuthService);
   profileModal = inject(ProfileModalService);
 
   boardData = signal<OnboardingBoardData>({ pending: [], inProgress: [], completed: [] });
@@ -391,6 +393,10 @@ export class OnboardingComponent implements OnInit {
   }
 
   canDecide = computed(() => this.reviewing()?.selfOnboardingStatus === 'SUBMITTED');
+  /** Super Admin may approve a sent-back profile without waiting for a resubmit (16 Nov 2026). */
+  canOverrideApprove = computed(() =>
+    this.auth.currentUser()?.role === 'SUPERADMIN' && this.reviewing()?.selfOnboardingStatus === 'CHANGES_REQUESTED');
+  confirmOverride = signal(false);
 
   /** What the new joiner entered, section by section, for the review pop-up. */
   reviewSections = computed(() => {
@@ -414,10 +420,11 @@ export class OnboardingComponent implements OnInit {
         f('Street address', p.address, true), f('City', p.city), f('State', p.state), f('Country', p.country),
         f('PIN code', p.zipCode), f('Home–work distance', p.homeWorkDistanceKm ? p.homeWorkDistanceKm + ' km' : ''),
       ] },
-      { key: 'family', label: 'Family details', fields: [
-        f('Marital status', p.maritalStatus), f('Spouse', p.spouseName), f('Spouse birthdate', d(p.spouseBirthdate)),
-        f('Children', p.childrenCount),
-      ] },
+      // Single: spouse and children don't apply, so the section is complete on its own (16 Nov 2026).
+      { key: 'family', label: 'Family details', fields: p.maritalStatus === 'Single'
+        ? [f('Marital status', p.maritalStatus)]
+        : [f('Marital status', p.maritalStatus), f('Spouse', p.spouseName), f('Spouse birthdate', d(p.spouseBirthdate)),
+           f('Children', p.childrenCount)] },
       { key: 'emergency', label: 'Emergency contacts', required: true,
         list: (p.emergencyContacts || []).map((c: any) => `${c.name}${c.relationship ? ' (' + c.relationship + ')' : ''} · ${c.mobile || ''}${c.email ? ' · ' + c.email : ''}`) },
       { key: 'documents', label: 'Documents',
@@ -494,6 +501,7 @@ export class OnboardingComponent implements OnInit {
   decideSelfReview(decision: 'APPROVE' | 'CHANGES') {
     const e = this.reviewing();
     if (!e) return;
+    this.confirmOverride.set(false);
     this.reviewBusy.set(true);
     this.onboardingService.reviewSelfOnboarding(e.id, decision, decision === 'CHANGES' ? this.reviewNotes() : undefined).subscribe({
       next: () => {

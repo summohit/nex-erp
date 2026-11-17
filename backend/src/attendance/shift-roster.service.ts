@@ -102,6 +102,12 @@ export class ShiftRosterService {
     private notifications: NotificationsService,
   ) {}
 
+  /** True when `managerEmployeeId` is the direct manager of `employeeId` (17 Nov 2026). */
+  async isManagerOf(companyId: number, managerEmployeeId: number, employeeId: number): Promise<boolean> {
+    const e = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId }, select: { managerId: true } });
+    return !!e && e.managerId === managerEmployeeId;
+  }
+
   /**
    * The roster grid: one row per employee, one cell per day in the range.
    *

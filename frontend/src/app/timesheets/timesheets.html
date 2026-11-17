@@ -1,6 +1,6 @@
-<div class="ts-page">
+<div class="ts-page" [class.in-profile]="profileEmployeeId">
   <div class="ts-container">
-    <app-page-header icon="calendar" section="Delivery" heading="Timesheet" subtitle="Login, logged and unlogged hours, day by day."></app-page-header>
+    <app-page-header *ngIf="!profileEmployeeId" icon="calendar" section="Delivery" heading="Timesheet" subtitle="Login, logged and unlogged hours, day by day."></app-page-header>
 
     <!-- ── Header ──────────────────────────────────────────────────────── -->
     <div class="ts-header">
@@ -34,7 +34,7 @@
 
     <!-- ── Scope switcher (§21) ────────────────────────────────────────── -->
     <div class="ts-scope-bar">
-      <div class="ts-scope-tabs">
+      <div class="ts-scope-tabs" *ngIf="!profileEmployeeId">
         <button
           *ngFor="let s of scopes()"
           class="ts-scope-tab"
@@ -464,14 +464,14 @@
             <div class="ts-day-actions" (click)="$event.stopPropagation()">
               <button
                 class="ts-btn-primary sm"
-                *ngIf="day.loggedHours > 0 && day.status !== 'APPROVED' && day.status !== 'SUBMITTED'"
+                *ngIf="!profileEmployeeId && day.loggedHours > 0 && day.status !== 'APPROVED' && day.status !== 'SUBMITTED'"
                 [disabled]="isBusy(day.date)"
                 (click)="submitDay(day)">
                 <svg lucideSend size="13"></svg> Submit
               </button>
               <button
                 class="ts-btn-ghost sm"
-                *ngIf="day.status === 'SUBMITTED' && day.changedSinceSubmission"
+                *ngIf="!profileEmployeeId && day.status === 'SUBMITTED' && day.changedSinceSubmission"
                 [disabled]="isBusy(day.date)"
                 (click)="submitDay(day)">
                 <svg lucideRotateCcw size="13"></svg> Re-submit

@@ -292,6 +292,8 @@ type ChangePerson = { id: number; firstName: string; lastName: string; avatarUrl
 export interface FieldVisitChangeRow {
   id: number; requestId: number; requestNumber: string; location: string;
   project: { id: number; name: string; key?: string } | null;
+  /** Who is going on the trip. */
+  team: ChangePerson[];
   type: 'Prepone' | 'Postpone' | 'Date change' | 'Cancel';
   status: 'Pending' | 'Approved' | 'Rejected' | 'Withdrawn';
   previous: { startDate: string; endDate: string } | null;

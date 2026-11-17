@@ -130,6 +130,22 @@ export class ClockOutApprovalsComponent implements OnInit {
     });
   });
   historyPages = computed(() => Math.max(1, Math.ceil(this.historyFiltered().length / 25)));
+  /** History KPIs (16 Nov 2026) — follow the period and filters, like the table. */
+  historyKpis = computed(() => {
+    const rows = this.historyFiltered();
+    const total = rows.length;
+    const appr = rows.filter(r => r.outcome === 'APPROVED').length;
+    const rej = rows.filter(r => r.outcome === 'REJECTED').length;
+    const geo = rows.filter(r => r.type === 'GEO'); const late = rows.filter(r => r.type === 'LATE');
+    const today = new Date().toDateString();
+    const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
+    return {
+      total, today: rows.filter(r => r.decidedAt && new Date(r.decidedAt).toDateString() === today).length,
+      appr, apprPct: pct(appr), rej, rejPct: pct(rej),
+      geo: geo.length, geoAppr: geo.filter(r => r.outcome === 'APPROVED').length, geoRej: geo.filter(r => r.outcome === 'REJECTED').length,
+      late: late.length, lateAppr: late.filter(r => r.outcome === 'APPROVED').length, lateRej: late.filter(r => r.outcome === 'REJECTED').length,
+    };
+  });
   historyPageRows = computed(() => this.historyFiltered().slice((Math.min(this.historyPage(), this.historyPages()) - 1) * 25, Math.min(this.historyPage(), this.historyPages()) * 25));
   loadHistory() {
     this.historyLoading.set(true); this.historyError.set(false);

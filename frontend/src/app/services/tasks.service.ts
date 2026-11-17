@@ -171,13 +171,14 @@ export class TasksService {
    * whether the caller may have it and echoes back what it actually returned,
    * so the screen can label itself honestly rather than trusting the request.
    */
-  getMyTasks(opts: { includeReported?: boolean; includeDone?: boolean; scope?: TaskScope; assigneeId?: number } = {}):
+  getMyTasks(opts: { includeReported?: boolean; includeDone?: boolean; scope?: TaskScope; assigneeId?: number; forEmployeeId?: number } = {}):
     Observable<{ items: MyTask[]; truncated: boolean; scope: TaskScope }> {
     const params: string[] = [];
     if (opts.includeReported) params.push('includeReported=true');
     if (opts.includeDone) params.push('includeDone=true');
     if (opts.scope && opts.scope !== 'mine') params.push(`scope=${opts.scope}`);
     if (opts.assigneeId) params.push(`assigneeId=${opts.assigneeId}`);
+    if (opts.forEmployeeId) params.push(`forEmployeeId=${opts.forEmployeeId}`);
     return this.http.get<{ items: MyTask[]; truncated: boolean; scope: TaskScope }>(
       `${this.apiUrl}/my${params.length ? '?' + params.join('&') : ''}`,
     );

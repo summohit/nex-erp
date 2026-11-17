@@ -903,3 +903,18 @@
 .arrange-banner-actions button { border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .arrange-reset { border: 1px solid #e2e8f0; background: #fff; color: #475569; }
 .arrange-done { border: 0; background: #16a34a; color: #fff; }
+
+/* Labels under rail icons (16 Nov 2026) */
+.rail-icons-scroll .rail-icon-btn, .rail-bottom-actions .rail-icon-btn {
+  width: 60px; height: 54px; flex-direction: column; gap: 3px; padding: 6px 2px 4px;
+}
+.rail-label {
+  display: block; max-width: 58px; font-size: 9.5px; font-weight: 600; line-height: 1.1; letter-spacing: 0.01em;
+  color: inherit; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
+}
+.rail-icon-btn.active .rail-label { opacity: 1; }
+.rail-icons-scroll { gap: 4px; }
+
+/* 17 Nov 2026: show the user's photo, initials only when there is none */
+.rail-user-avatar { overflow: hidden; }
+.rail-user-photo { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }

@@ -96,8 +96,9 @@ export class ProjectsService {
   private dialog = inject(DialogService);
   private apiUrl = `${environment.apiUrl}/projects`;
 
-  getProjects() {
-    return this.http.get<any[]>(this.apiUrl);
+  /** `employeeId`: one person's boards (profile Projects tab, 17 Nov 2026). */
+  getProjects(employeeId?: number) {
+    return this.http.get<any[]>(this.apiUrl, employeeId ? { params: { employeeId: String(employeeId) } } : {});
   }
 
   getProject(id: number) {

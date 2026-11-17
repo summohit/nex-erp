@@ -176,7 +176,11 @@ export class LeavesService {
         select: { id: true },
       });
       if (!me) return this.emptyQuotaReport(year);
-      scopeEmployeeId = me.id;
+      // 17 Nov 2026: a manager may read a direct report's quota (profile Leaves Quota tab).
+      const reportee = employeeId && employeeId !== me.id
+        ? await this.prisma.employee.findFirst({ where: { id: employeeId, companyId, managerId: me.id }, select: { id: true } })
+        : null;
+      scopeEmployeeId = reportee ? reportee.id : me.id;
     }
 
     const [leaveTypes, employees, balances, encashments] = await Promise.all([
@@ -994,6 +998,34 @@ export class LeavesService {
       }
 
       return { deleted: true, id: deleted.id };
+    });
+  }
+
+  /**
+   * 17 Nov 2026: one person's leave requests (every status), for the Attendance
+   * and Leaves tabs on their profile. The person, their direct manager, HR and Super Admin.
+   */
+  async getEmployeeRequests(companyId: number, viewer: { role?: string; employeeId?: number | null }, employeeId: number) {
+    const target = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId }, select: { id: true, managerId: true } });
+    if (!target) throw new BadRequestException('Employee not found');
+    const allowed = isHrAdmin(viewer.role) || viewer.employeeId === employeeId || (!!viewer.employeeId && target.managerId === viewer.employeeId);
+    if (!allowed) throw new ForbiddenException("You can't view this person's leave.");
+    return this.prisma.leaveRequest.findMany({
+      // All statuses, same shape as the company list, so the Leaves tab can reuse its grid.
+      where: { employeeId, deletedAt: null },
+      include: {
+        employee: {
+          select: {
+            id: true, firstName: true, lastName: true, avatarUrl: true, employeeCode: true,
+            department: { select: { name: true } },
+            designation: { select: { name: true } },
+            user: { select: { email: true, role: true } },
+          },
+        },
+        leaveType: true,
+        approvedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true } } } },
+      },
+      orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
     });
   }
 

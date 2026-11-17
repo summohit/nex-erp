@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile, BadRequestException, ForbiddenException, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile, BadRequestException, ForbiddenException, ParseIntPipe, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProfileCompletenessService } from './profile-completeness/profile-completeness.service';
 import { uploadTypes } from './profile-completeness/document-policy';
@@ -6,6 +6,7 @@ import {
   ALL_DOCUMENT_TYPES, OPTIONAL_DOCUMENTS, PREVIOUS_EMPLOYMENT_DOCUMENTS, REQUIRED_DOCUMENTS,
 } from './profile-completeness/profile-documents';
 import { EmployeesService } from './employees.service';
+import { EmployeeActivityService } from './employee-activity.service';
 import { EmployeesImportService } from './employees-import.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -33,6 +34,7 @@ export class EmployeesController {
     private readonly employeesService: EmployeesService,
     private readonly employeesImportService: EmployeesImportService,
     private readonly profileCompleteness: ProfileCompletenessService,
+    private readonly activity: EmployeeActivityService,
   ) {}
 
   @Post('bulk-upload')
@@ -236,6 +238,14 @@ export class EmployeesController {
   @Get(':id/profile')
   getProfile(@Request() req, @Param('id') id: string) {
     return this.employeesService.getProfile(+id, req.user.companyId, req.user.sub, req.user.role);
+  }
+
+  /** Profile Activity tab (17 Nov 2026): one timeline from existing records. */
+  @Get(':id/activity')
+  getActivity(@Request() req, @Param('id') id: string, @Query() q: any) {
+    return this.activity.getActivity(req.user.companyId, { role: req.user.role, employeeId: req.user.employeeId ?? null }, +id, {
+      before: q.before, limit: q.limit ? Number(q.limit) : undefined, areas: q.areas, from: q.from, to: q.to,
+    });
   }
 
   @Get(':id/history')

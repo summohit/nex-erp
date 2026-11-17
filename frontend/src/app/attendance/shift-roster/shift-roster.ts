@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal, HostListener } from '@angular/core';
+import { Component, Input, OnInit, computed, inject, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -10,6 +10,7 @@ import {
   LucideArrowRight, LucideBriefcase, LucideInfo, LucideUserCheck, LucideUsers, LucideSearch, LucideCheck,
   LucideHouse, LucideFileSpreadsheet, LucideUpload, LucideDownload, LucideFileText, LucideCalendarCheck, LucidePlus
 } from '@lucide/angular';
+import { PermissionsService } from '../../services/permissions.service';
 import { ShiftsService, RosterAssignmentPayload, RosterCell, RosterGrid, RosterRow, RosterShift } from '../../services/shifts.service';
 import { MasterDataService } from '../../services/master-data.service';
 import { ProjectsService } from '../../services/projects';
@@ -401,7 +402,32 @@ export class ShiftRosterComponent implements OnInit {
     return this.holidays().get(day) ?? null;
   }
 
+  /** 17 Nov 2026: set inside an employee profile — that person's roster, read-only. */
+  @Input() profileEmployeeId: number | null = null;
+  /** In a profile: whether this viewer may change shifts (same rule as the roster page). */
+  canEditRoster = signal(false);
+  private permissionsService = inject(PermissionsService);
+
+  private checkRosterEditAccess() {
+    const role = String(this.currentUser()?.role || '').toUpperCase();
+    if (['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes(role)) { this.canEditRoster.set(true); return; }
+    this.permissionsService.getAllPermissions(role).subscribe({
+      next: (perms) => this.canEditRoster.set(!!perms?.some((p) => p.module === 'attendance/shifts')),
+      error: () => this.canEditRoster.set(false),
+    });
+  }
+
   ngOnInit() {
+    if (this.profileEmployeeId) {
+      this.masterData.getHolidays().subscribe({
+        next: (rows: any) => this.holidays.set(new Map((rows || []).filter((h: any) => h?.date).map((h: any) => [String(h.date).slice(0, 10), h.name || 'Holiday']))),
+        error: () => this.holidays.set(new Map()),
+      });
+      this.checkRosterEditAccess();
+      this.projectsService.getProjects().subscribe({ next: (p: any) => this.projects.set(p || []), error: () => this.projects.set([]) });
+      this.load();
+      return;
+    }
     this.masterData.getHolidays().subscribe({
       next: (rows: any) => {
         const map = new Map<string, string>();
@@ -589,6 +615,13 @@ export class ShiftRosterComponent implements OnInit {
   // ── data ────────────────────────────────────────────────────────────────
   load() {
     this.loading.set(true);
+    if (this.profileEmployeeId) {
+      this.shiftsService.getEmployeeRoster(Number(this.profileEmployeeId), this.fmt(this.rangeStart()), this.fmt(this.rangeEnd())).subscribe({
+        next: (g) => { this.grid.set(g); this.loading.set(false); },
+        error: (e) => { this.toast.error(e.error?.message || 'Failed to load roster'); this.loading.set(false); },
+      });
+      return;
+    }
     this.shiftsService.getRoster({
       start: this.fmt(this.rangeStart()),
       end: this.fmt(this.rangeEnd()),
@@ -953,6 +986,7 @@ export class ShiftRosterComponent implements OnInit {
   // ── editing ─────────────────────────────────────────────────────────────
   openCell(row: RosterRow, cell: RosterCell) {
     this.hoveredCellTooltip.set(null);
+    if (this.profileEmployeeId && !this.canEditRoster()) return; // read-only unless allowed to change shifts
     // Leave is owned by the leave module; the roster must not silently override it.
     if (cell.type === 'LEAVE') {
       this.toast.info(`${row.employee.name} is on approved ${cell.label} this day`);

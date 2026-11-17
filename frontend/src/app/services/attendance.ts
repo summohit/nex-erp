@@ -260,6 +260,11 @@ export class AttendanceService {
   }
 
   /** Your own roster rows, for My Attendance. */
+  getEmployeeRosterDays(employeeId: number, from: string, to: string): Observable<{ employeeId: number; date: string; isDayOff: boolean }[]> {
+    return this.http.get<{ employeeId: number; date: string; isDayOff: boolean }[]>(
+      `${this.apiUrl}/roster-days/employee/${employeeId}?from=${from}&to=${to}`);
+  }
+
   getMyRosterDays(from: string, to: string): Observable<{ employeeId: number; date: string; isDayOff: boolean }[]> {
     return this.http.get<{ employeeId: number; date: string; isDayOff: boolean }[]>(
       `${this.apiUrl}/roster-days/me?from=${from}&to=${to}`,

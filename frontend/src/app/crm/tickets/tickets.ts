@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, Input, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -443,7 +443,16 @@ export class TicketsComponent implements OnInit {
     'row-status-rejected':    (p: any) => p.data?.status === 'REJECTED',
   };
 
+  /** 17 Nov 2026: set inside an employee profile — tickets raised by or assigned to that person. */
+  @Input() profileEmployeeId: number | null = null;
+
   ngOnInit() {
+    if (this.profileEmployeeId) {
+      this.filterEmployee = String(this.profileEmployeeId);
+      this.loadTickets();
+      this.masterDataService.getDepartments().subscribe({ next: (d) => (this.departments = d) });
+      return;
+    }
     this.loadAll();
 
     // Handed off from the attendance screen's "Report an issue" button, which
@@ -769,7 +778,7 @@ export class TicketsComponent implements OnInit {
   }
 
   hasActiveFilters(): boolean {
-    return !!(this.searchTerm || this.filterEmployee || this.filterDept || this.filterStatus || this.filterPriority || this.filterPlatform || (this.filterMonth && this.filterMonth !== 'all') || (this.filterDeadline && this.filterDeadline !== 'all'));
+    return !!(this.searchTerm || (this.filterEmployee && !this.profileEmployeeId) || this.filterDept || this.filterStatus || this.filterPriority || this.filterPlatform || (this.filterMonth && this.filterMonth !== 'all') || (this.filterDeadline && this.filterDeadline !== 'all'));
   }
 
   closeAllDropdowns() {
@@ -990,7 +999,7 @@ export class TicketsComponent implements OnInit {
       });
     }
 
-    if (this.filterEmployee) {
+    if (this.filterEmployee && !this.profileEmployeeId) {
       const emp = this.employees.find(e => String(e.id) === String(this.filterEmployee));
       chips.push({
         key: 'employee',
@@ -1028,7 +1037,7 @@ export class TicketsComponent implements OnInit {
 
   clearFilters() {
     this.filterDept = '';
-    this.filterEmployee = '';
+    this.filterEmployee = this.profileEmployeeId ? String(this.profileEmployeeId) : '';
     this.employeeSearchQuery = '';
     this.filterStatus = '';
     this.filterPriority = '';

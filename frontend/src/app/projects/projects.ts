@@ -560,6 +560,10 @@ export class ProjectsComponent implements OnInit {
    * very same edit form over its own page. Nothing else of the boards page is
    * rendered or loaded; closing the form tells the host whether it saved.
    */
+  /** 17 Nov 2026: set inside an employee profile — only that person's boards. */
+  @Input() profileEmployeeId: number | null = null;
+  /** Which profile tab this instance serves. */
+  @Input() profileTab: 'projects' | 'tasks' = 'projects';
   @Input() editOnlyProjectId: number | null = null;
   @Output() editClosed = new EventEmitter<boolean>();
   /** Which field the host wants in view and highlighted when the form opens. */
@@ -2197,6 +2201,17 @@ export class ProjectsComponent implements OnInit {
       });
       return;
     }
+    if (this.profileEmployeeId) {
+      if (this.profileTab === 'tasks') {
+        this.activeTab.set('my-tasks');
+        this.configureTaskTableColumns();
+        this.loadMyTasks();
+      } else {
+        this.activeTab.set('all');
+        this.loadProjects();
+      }
+      return;
+    }
     this.configureTaskTableColumns();
     this.syncTabFromRoute();
 
@@ -3177,7 +3192,7 @@ export class ProjectsComponent implements OnInit {
 
   loadMyTasks() {
     // §Tasks1: alongside the list, not instead of it. Fails quietly on its own.
-    this.loadTopPerformers();
+    if (!this.profileEmployeeId) this.loadTopPerformers();
     this.myTasksLoading.set(true);
     // In the company-wide view, one person's tasks are fetched from the server
     // rather than picked out of the first 200 it sent.
@@ -3185,13 +3200,14 @@ export class ProjectsComponent implements OnInit {
     this.tasksService.getMyTasks({
       includeDone: this.myTasksShowDone(),
       scope: this.myTasksScope(),
-      assigneeId: assignee,
+      assigneeId: this.profileEmployeeId ? undefined : assignee,
+      forEmployeeId: this.profileEmployeeId ? Number(this.profileEmployeeId) : undefined,
     }).subscribe({
       next: (res) => {
         this.myTasks.set(res.items || []);
         this.myTasksTruncated.set(!!res.truncated);
         // What the server gave us, not what we asked for.
-        if (res.scope) this.myTasksScope.set(res.scope);
+        if (res.scope && !this.profileEmployeeId) this.myTasksScope.set(res.scope);
         this.myTasksLoading.set(false);
         this.myTasksLoaded.set(true);
         // Join each project room whose tasks the list shows, so board changes
@@ -4461,7 +4477,7 @@ export class ProjectsComponent implements OnInit {
 
   loadProjects() {
     this.isLoading.set(true);
-    this.projectsService.getProjects().subscribe({
+    this.projectsService.getProjects(this.profileEmployeeId ? Number(this.profileEmployeeId) : undefined).subscribe({
       next: (res) => {
         this.projects.set(res);
         this.isLoading.set(false);

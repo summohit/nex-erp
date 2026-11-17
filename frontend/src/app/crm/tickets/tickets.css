@@ -2499,3 +2499,6 @@ label {
 @media (max-width: 640px) {
   .form-grid-2 { grid-template-columns: 1fr !important; }
 }
+
+/* Inside an employee profile tab (17 Nov 2026): same edges as Documents */
+.tickets-page.in-profile { padding: 0 !important; min-height: 0; }

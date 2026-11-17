@@ -104,3 +104,16 @@
 .cr-btn-approve:hover:not(:disabled) { background: #15803d; }
 .cr-btn-ghost-red { color: #b91c1c; border-color: #fecaca; }
 .cr-btn-ghost-red:hover:not(:disabled) { background: #fef2f2; }
+
+/* Team + bulk approve (16 Nov 2026) */
+.cr-team { display: flex; align-items: center; gap: 6px; margin-top: 8px; min-width: 0; }
+.cr-team-avs { display: inline-flex; flex-shrink: 0; }
+.cr-team-avs .cr-av + .cr-av { margin-left: -6px; }
+.cr-av.xs { width: 22px; height: 22px; border-width: 1.5px; }
+.cr-av.xs.cr-av-i { font-size: 9px; }
+.cr-team-names { font-size: 12px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cr-th-check, .cr-col-check { width: 36px; text-align: center; }
+.cr-col-check input, .cr-th-check input, .cr-check-all input { width: 16px; height: 16px; accent-color: #16a34a; cursor: pointer; }
+.cr-bulk { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 10px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
+.cr-bulk.on { border-color: #86efac; background: #f0fdf4; }
+.cr-check-all { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #334155; margin-right: auto; cursor: pointer; }

@@ -5679,3 +5679,21 @@ app-page-header { display: block; margin-bottom: 16px; }
   .hol-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; overflow-x: visible; }
   .hol-kpis .kpi-card { min-width: 0 !important; padding: 12px !important; }
 }
+
+/* Day details popup: non-working day cards (17 Nov 2026) */
+.dd-state { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border-radius: 12px; border: 1px solid; }
+.dd-state strong { display: block; font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+.dd-state p { margin: 0; font-size: 13px; line-height: 1.45; }
+.dd-state .dd-sub { margin-top: 4px; font-size: 12px; opacity: .8; }
+.dd-state-icon { width: 40px; height: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: #fff; }
+.dd-state.leave { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.dd-state.off { background: #f8fafc; border-color: #e2e8f0; color: #475569; }
+.dd-state.holiday { background: #f5f3ff; border-color: #ddd6fe; color: #5b21b6; }
+.dd-state.absent { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.status-round.status-leave { background: #dbeafe; color: #1e40af; }
+.status-round.status-off { background: #f1f5f9; color: #475569; }
+.status-round.status-holiday { background: #ede9fe; color: #5b21b6; }
+
+/* Inside an employee profile tab (17 Nov 2026): full width, same edges as Documents */
+.attendance-container.in-profile { max-width: none; margin: 0; padding: 0; }
+.attendance-container.in-profile .tab-content { min-height: 0; }

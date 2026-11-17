@@ -115,8 +115,11 @@ export class ProjectsController {
   }
 
   @Get()
-  getProjects(@Req() req) {
-    return this.projectsService.getProjects(req.user.companyId, req.user.sub, req.user.role);
+  getProjects(@Req() req, @Query('employeeId') employeeId?: string) {
+    // 17 Nov 2026: ?employeeId= lists one person's boards (profile Projects tab).
+    const forEmployee = employeeId ? Number(employeeId) : undefined;
+    return this.projectsService.getProjects(req.user.companyId, req.user.sub, req.user.role,
+      forEmployee && Number.isFinite(forEmployee) ? forEmployee : undefined);
   }
 
   @Get('archived')

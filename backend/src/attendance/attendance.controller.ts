@@ -47,14 +47,16 @@ export class AttendanceController {
   }
 
   @Get('employee/:employeeId')
-  getEmployeeHistory(
+  async getEmployeeHistory(
     @Request() req,
     @Param('employeeId') employeeId: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
     const targetEmployeeId = +employeeId;
-    if (!this.mayViewAllAttendance(req.user.role) && req.user.employeeId !== targetEmployeeId) {
+    // 17 Nov 2026: a manager may also see a direct report's attendance (profile Attendance tab).
+    if (!this.mayViewAllAttendance(req.user.role) && req.user.employeeId !== targetEmployeeId
+        && !(req.user.employeeId && await this.attendanceService.isManagerOf(req.user.employeeId, targetEmployeeId))) {
       throw new ForbiddenException('You can only view your own attendance history.');
     }
     return this.attendanceService.getEmployeeHistory(targetEmployeeId, from, to);
@@ -242,6 +244,17 @@ export class AttendanceController {
   @Get('roster-days/me')
   getMyRosterDays(@Request() req, @Query('from') from: string, @Query('to') to: string) {
     return this.attendanceService.getRosterDays(req.user.companyId, from, to, req.user.employeeId ?? -1);
+  }
+
+  /** One person's roster rows — profile Attendance tab (17 Nov 2026). Self, manager, HR, Super Admin. */
+  @Get('roster-days/employee/:employeeId')
+  async getEmployeeRosterDays(@Request() req, @Param('employeeId') employeeId: string, @Query('from') from: string, @Query('to') to: string) {
+    const target = +employeeId;
+    if (!this.mayViewAllAttendance(req.user.role) && req.user.employeeId !== target
+        && !(req.user.employeeId && await this.attendanceService.isManagerOf(req.user.employeeId, target))) {
+      throw new ForbiddenException("You can't view this person's roster.");
+    }
+    return this.attendanceService.getRosterDays(req.user.companyId, from, to, target);
   }
 
   @Get('roster-days')

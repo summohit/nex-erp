@@ -744,6 +744,20 @@ export class TasksService {
    * the dashboard; a non-admin asking for 'all' is quietly given their own
    * list rather than an error, since the toggle is not offered to them.
    */
+  /** Self, direct manager, HR, Admin or Super Admin may read a person's task list. */
+  async assertMayViewPerson(companyId: number, viewerEmployeeId: number | null, role: string | undefined, employeeId: number) {
+    const r = String(role || '').toUpperCase();
+    if (['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN', 'HR'].includes(r) || viewerEmployeeId === employeeId) {
+      const exists = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId }, select: { id: true } });
+      if (!exists) throw new NotFoundException('Employee not found');
+      return;
+    }
+    const e = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId }, select: { managerId: true } });
+    if (!e || !viewerEmployeeId || e.managerId !== viewerEmployeeId) {
+      throw new ForbiddenException("You can't view this person's tasks.");
+    }
+  }
+
   async getMyTasks(
     companyId: number,
     employeeId: number,

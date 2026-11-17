@@ -26,6 +26,9 @@ export interface SearchResultItem {
   title: string;
   subtitle?: string;
   iconName: string;
+  /** Employees (17 Nov 2026): photo, or initials when there is none. */
+  avatarUrl?: string | null;
+  initials?: string;
   action: () => void;
   /** Permission module key (or prefix) required to show this item. Omit for always-visible items. */
   requiresModule?: string;
@@ -178,10 +181,13 @@ export class SpotlightSearchComponent {
     let list: SearchResultItem[] = [...this.navItems];
 
     // Dynamic Employee Search Results
+    // 17 Nov 2026: deactivated and separated people are left out of search.
     const empMatches: SearchResultItem[] = this.employeesList()
+      .filter(e => e.user?.status !== 'SUSPENDED' && e.offboardingStatus !== 'SEPARATED')
       .filter(e => 
         (e.firstName + ' ' + e.lastName).toLowerCase().includes(q) ||
         (e.email || '').toLowerCase().includes(q) ||
+        (e.user?.email || '').toLowerCase().includes(q) ||
         (e.designation?.name || '').toLowerCase().includes(q)
       )
       .slice(0, 5)
@@ -189,8 +195,10 @@ export class SpotlightSearchComponent {
         id: `emp-${e.id}`,
         category: 'Employees' as const,
         title: `${e.firstName} ${e.lastName}`,
-        subtitle: `${e.designation?.name || 'Staff'} • ${e.department?.name || 'General'}`,
+        subtitle: [e.user?.email || e.email, e.designation?.name || 'Staff', e.department?.name].filter(Boolean).join(' • '),
         iconName: 'user',
+        avatarUrl: e.avatarUrl || null,
+        initials: `${(e.firstName || '')[0] || ''}${(e.lastName || '')[0] || ''}`.toUpperCase(),
         action: () => this.openProfile(e.id),
         actions: this.employeeRowActions(e),
       }));

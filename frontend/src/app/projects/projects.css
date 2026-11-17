@@ -7879,3 +7879,9 @@ a.team-avatar-circle:hover {
   .cbm-fields-grid-2 { grid-template-columns: 1fr !important; }
   .cbm-fields-grid-3 { grid-template-columns: 1fr !important; }
 }
+
+/* Inside an employee profile tab (17 Nov 2026): no page padding, same edges as Documents */
+.boards-page.in-profile { padding: 0; min-height: 0; background: transparent; }
+.boards-page.in-profile .section-container,
+.boards-page.in-profile .boards-container { max-width: none; }
+.boards-page.in-profile .boards-container { padding-bottom: 0; }

@@ -342,6 +342,7 @@ export class OnboardingService {
     { key: 'profilePhoto', label: 'Profile picture', tab: 'personal', fields: [{ key: 'avatarUrl', label: 'Profile picture' }] },
     { key: 'dateOfBirth', label: 'Date of birth', tab: 'personal', fields: [{ key: 'dateOfBirth', label: 'Date of birth' }] },
     { key: 'contactBank', label: 'Contact & bank details', tab: 'personal', fields: [
+      { key: 'personalEmail', label: 'Personal email' },
       { key: 'phone', label: 'Mobile phone' }, { key: 'bankName', label: 'Bank name' },
       { key: 'bankAccountNumber', label: 'Bank account number' }, { key: 'ifscCode', label: 'IFSC code' },
     ] },
@@ -372,6 +373,7 @@ export class OnboardingService {
     const statesExpected = !e.country || e.country === 'IN';
     const fieldFilled: Record<string, boolean> = {
       avatarUrl: text(e.avatarUrl),
+      personalEmail: text(e.personalEmail),
       dateOfBirth: !!e.dateOfBirth,
       phone: text(e.phone), bankName: text(e.bankName), bankAccountNumber: text(e.bankAccountNumber), ifscCode: text(e.ifscCode),
       country: text(e.country), state: !statesExpected || text(e.state), city: !statesExpected || text(e.city),
@@ -448,10 +450,17 @@ export class OnboardingService {
     });
   }
 
-  async reviewSelfOnboarding(companyId: number, employeeId: number, decision: 'APPROVE' | 'CHANGES', notes?: Record<string, string>) {
+  async reviewSelfOnboarding(companyId: number, employeeId: number, decision: 'APPROVE' | 'CHANGES', notes?: Record<string, string>, role?: string) {
     const e = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId }, include: { user: { select: { email: true } } } });
     if (!e) throw new NotFoundException('Employee not found');
-    if (e.selfOnboardingStatus !== 'SUBMITTED') throw new BadRequestException('Only a submitted profile can be reviewed.');
+    // The Super Admin may approve a profile that was sent back, without waiting
+    // for the joiner to resubmit (16 Nov 2026). Everyone else reviews submitted ones only.
+    const overrideApprove = decision === 'APPROVE' && role === 'SUPERADMIN' && e.selfOnboardingStatus === 'CHANGES_REQUESTED';
+    if (e.selfOnboardingStatus !== 'SUBMITTED' && !overrideApprove) {
+      throw new BadRequestException(role === 'SUPERADMIN' && decision === 'APPROVE'
+        ? 'Only a submitted or sent-back profile can be approved.'
+        : 'Only a submitted profile can be reviewed.');
+    }
 
     if (decision === 'CHANGES') {
       const clean = Object.fromEntries(Object.entries(notes || {})

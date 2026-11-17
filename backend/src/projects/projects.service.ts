@@ -1461,7 +1461,7 @@ export class ProjectsService {
     return { status: 'ANALYZING', message: 'Analysis started in background' };
   }
 
-  async getProjects(companyId: number, userId: number, role: string) {
+  async getProjects(companyId: number, userId: number, role: string, forEmployeeId?: number) {
     const emp = await this.prisma.employee.findUnique({
       where: { userId },
       select: { id: true, department: { select: { defaultRole: true } } },
@@ -1476,7 +1476,16 @@ export class ProjectsService {
     
     const empId = emp ? emp.id : userId;
 
-    if (!isAdmin) {
+    if (forEmployeeId) {
+      // One person's boards: theirs, their manager's view of them, HR, or company-wide project access.
+      const target = await this.prisma.employee.findFirst({ where: { id: forEmployeeId, companyId }, select: { managerId: true } });
+      if (!target) throw new NotFoundException('Employee not found');
+      const isHr = ['HR', 'SUPERADMIN', 'SUPER_ADMIN'].includes(String(role || '').toUpperCase());
+      if (!(isAdmin || isHr || empId === forEmployeeId || target.managerId === empId)) {
+        throw new ForbiddenException("You can't view this person's projects.");
+      }
+      whereClause.OR = [{ members: { some: { employeeId: forEmployeeId } } }, { leadId: forEmployeeId }];
+    } else if (!isAdmin) {
       whereClause.members = {
         some: { employeeId: empId }
       };

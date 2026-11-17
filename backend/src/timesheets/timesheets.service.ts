@@ -300,6 +300,8 @@ export class TimesheetsService {
     const allowed =
       viewerEmployeeId === employeeId ||
       this.FINANCE_ROLES.includes(role) ||
+      // 17 Nov 2026: HR reads a person's week on their profile (read-only).
+      ['HR', 'SUPER_ADMIN'].includes(String(role || '').toUpperCase()) ||
       (await this.visibleEmployeeIds(
         companyId, viewerEmployeeId, 'TEAM',
         new Date(`${startDateStr}T00:00:00`), new Date(`${endDateStr}T23:59:59.999`),

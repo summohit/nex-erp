@@ -153,6 +153,11 @@ export class LeavesService {
     return this.http.post<LeaveRequestResult>(`${this.apiUrl}/request`, data);
   }
 
+  /** One person's approved/pending leave (profile Attendance tab, 17 Nov 2026). */
+  getEmployeeRequests(employeeId: number): Observable<LeaveRequest[]> {
+    return this.http.get<LeaveRequest[]>(`${this.apiUrl}/requests/employee/${employeeId}`);
+  }
+
   getMyRequests(): Observable<LeaveRequest[]> {
     return this.http.get<LeaveRequest[]>(`${this.apiUrl}/requests/me`);
   }

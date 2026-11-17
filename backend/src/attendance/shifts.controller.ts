@@ -21,6 +21,19 @@ export class ShiftsController {
 
   // ── roster ────────────────────────────────────────────────────────────
   // Declared before ':id' routes so "roster" isn't parsed as an id.
+  /**
+   * 17 Nov 2026: one person's roster, read-only, for the Shift Roster tab on
+   * their profile. The person, their direct manager, HR and Super Admin.
+   */
+  @Get('roster/employee/:employeeId')
+  async getEmployeeRoster(@Request() req, @Param('employeeId', ParseIntPipe) employeeId: number, @Query() q: any) {
+    const role = String(req.user.role || '').toUpperCase();
+    const allowed = isSuperAdmin(req.user.role) || role === 'HR' || req.user.employeeId === employeeId
+      || (req.user.employeeId && await this.rosterService.isManagerOf(req.user.companyId, req.user.employeeId, employeeId));
+    if (!allowed) throw new ForbiddenException("You can't view this person's roster.");
+    return this.rosterService.getGrid(req.user.companyId, { start: q.start, end: q.end, employeeId });
+  }
+
   @Get('roster')
   @Permissions('attendance/shifts')
   getRoster(@Request() req, @Query() q: any) {

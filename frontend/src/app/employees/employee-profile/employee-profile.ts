@@ -1,4 +1,4 @@
-import { Component, computed, EventEmitter, inject, Input, OnInit, Output, signal, ViewChild } from '@angular/core';
+import { Component, computed, ElementRef, EventEmitter, HostListener, inject, Input, OnInit, Output, signal, ViewChild } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
@@ -11,6 +11,14 @@ import { HotToastService } from '@ngneat/hot-toast';
 import { ProfileTabComponent } from './profile-tab/profile-tab';
 import { EmergencyContactsTabComponent } from './emergency-contacts-tab/emergency-contacts-tab';
 import { DocumentsTabComponent } from './documents-tab/documents-tab';
+import { AttendanceLeaveComponent } from '../../attendance-leave/attendance-leave';
+import { LeaveQuotaComponent } from '../../attendance/leave-quota/leave-quota';
+import { ProjectsComponent } from '../../projects/projects';
+import { TimesheetsComponent } from '../../timesheets/timesheets.component';
+import { TicketsComponent } from '../../crm/tickets/tickets';
+import { AppreciationComponent } from '../../appreciation/appreciation';
+import { ShiftRosterComponent } from '../../attendance/shift-roster/shift-roster';
+import { ActivityTabComponent } from './activity-tab/activity-tab';
 import {
   LucideBriefcase,
   LucideFileText,
@@ -33,6 +41,14 @@ import {
     ProfileTabComponent,
     EmergencyContactsTabComponent,
     DocumentsTabComponent,
+    AttendanceLeaveComponent,
+    LeaveQuotaComponent,
+    ProjectsComponent,
+    TimesheetsComponent,
+    TicketsComponent,
+    AppreciationComponent,
+    ShiftRosterComponent,
+    ActivityTabComponent,
     LucideBriefcase,
     LucideFileText,
     LucideUser,
@@ -55,6 +71,41 @@ export class EmployeeProfileComponent implements OnInit {
   /** Fires after every (re)load, so the onboarding screen can refresh its checklist. */
   @Output() profileLoaded = new EventEmitter<any>();
   @ViewChild(ProfileTabComponent) private profileTab?: ProfileTabComponent;
+
+  /** Scrolling tab bar arrows (17 Nov 2026). */
+  @ViewChild('tabsBar') private set tabsBarRef(el: ElementRef<HTMLElement> | undefined) {
+    this.tabsBar = el?.nativeElement;
+    setTimeout(() => this.updateTabArrows(), 0);
+  }
+  private tabsBar?: HTMLElement;
+  private readonly tabKeys = ['work', 'resume', 'personal', 'contacts', 'documents', 'history', 'attendance', 'leaves', 'quota', 'projects', 'tasks', 'timesheet', 'tickets', 'appreciation', 'roster', 'activity'];
+  canScrollLeft = signal(false);
+  canScrollRight = signal(false);
+
+  @HostListener('window:resize')
+  updateTabArrows() {
+    const el = this.tabsBar;
+    if (!el) return;
+    this.canScrollLeft.set(el.scrollLeft > 2);
+    this.canScrollRight.set(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }
+
+  /** Puts the active tab in the middle of the scrolling tab bar. */
+  centerActiveTab() {
+    const bar = this.tabsBar;
+    const active = bar?.querySelector<HTMLElement>('.pill-tab-btn.active');
+    if (bar && active) {
+      const b = bar.getBoundingClientRect(), a = active.getBoundingClientRect();
+      bar.scrollTo({ left: bar.scrollLeft + (a.left + a.width / 2) - (b.left + b.width / 2), behavior: 'auto' });
+    }
+    this.updateTabArrows();
+  }
+
+  scrollTabs(dir: 1 | -1) {
+    const el = this.tabsBar;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.max(el.clientWidth * 0.6, 200), behavior: 'smooth' });
+  }
   private route = inject(ActivatedRoute);
   private employeeService = inject(EmployeeService);
   private jobsService = inject(JobsService);
@@ -62,7 +113,7 @@ export class EmployeeProfileComponent implements OnInit {
   private router = inject(Router);
   private toast = inject(HotToastService);
 
-  activeTab = signal<'work' | 'resume' | 'personal' | 'contacts' | 'documents' | 'history'>('work');
+  activeTab = signal<'work' | 'resume' | 'personal' | 'contacts' | 'documents' | 'history' | 'attendance' | 'leaves' | 'quota' | 'projects' | 'tasks' | 'timesheet' | 'tickets' | 'appreciation' | 'roster' | 'activity'>('work');
   employeeData = signal<any>(null);
 
   /** Logins are deactivated as SUSPENDED (16 Nov 2026: the badge looked for DEACTIVATED and always said Active). */
@@ -236,6 +287,14 @@ export class EmployeeProfileComponent implements OnInit {
   isOwner = signal(false);
   /** Server-resolved: the owner, HR, admins and designation-level profile editors. */
   canManageDocuments = signal(false);
+  /** 360° tabs (17 Nov 2026): the person, their manager, HR and Super Admin. */
+  canSeeWorkTabs = computed(() => {
+    const me = this.authService.currentUser();
+    const e = this.employeeData();
+    if (!me || !e) return false;
+    const role = String(me.role || '').toUpperCase();
+    return this.isOwner() || ['SUPERADMIN', 'SUPER_ADMIN', 'HR'].includes(role) || (!!me.employeeId && e.managerId === me.employeeId);
+  });
   conversionOpen = signal(false);
   isStartingConversion = signal(false);
   jobs = signal<Job[]>([]);
@@ -313,6 +372,9 @@ export class EmployeeProfileComponent implements OnInit {
       this.loadProfile(String(this.employeeId));
       return;
     }
+    // 17 Nov 2026: ?tab= reopens the tab you left (e.g. back from a project board).
+    const qTab = this.route.snapshot.queryParamMap.get('tab') as any;
+    if (qTab && this.tabKeys.includes(qTab)) this.activeTab.set(qTab);
     this.route.paramMap.subscribe(params => {
       let id = params.get('id');
       if (id) {
@@ -332,6 +394,9 @@ export class EmployeeProfileComponent implements OnInit {
         // hide someone's own documents from them.
         this.canManageDocuments.set(!!data.canManageDocuments || !!data.isOwner);
         this.isLoading.set(false);
+        // Opened on a later tab (?tab=…): bring it into view on the scrolling bar.
+        // The later tabs render a moment after the profile, so try a few times.
+        [0, 150, 400, 900].forEach((ms) => setTimeout(() => this.centerActiveTab(), ms));
       },
       error: (err) => {
         this.toast.error('Failed to load profile');
@@ -359,8 +424,16 @@ export class EmployeeProfileComponent implements OnInit {
     }, 120);
   }
 
-  setTab(tab: 'work' | 'resume' | 'personal' | 'contacts' | 'documents' | 'history') {
+  setTab(tab: 'work' | 'resume' | 'personal' | 'contacts' | 'documents' | 'history' | 'attendance' | 'leaves' | 'quota' | 'projects' | 'tasks' | 'timesheet' | 'tickets' | 'appreciation' | 'roster' | 'activity') {
     this.activeTab.set(tab);
+    // Full page only: keep the tab in the URL so Back returns to it.
+    if (!this.embedded && !this.onboarding) {
+      this.router.navigate([], { relativeTo: this.route, queryParams: { tab: tab === 'work' ? null : tab }, queryParamsHandling: 'merge', replaceUrl: true });
+    }
+    // Keep the picked tab in view on the scrolling tab bar.
+    setTimeout(() => document.querySelector('.pill-tabs-bar .pill-tab-btn.active')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }), 0);
+    setTimeout(() => this.updateTabArrows(), 400);
     if (tab === 'history' && this.employeeData()?.id) this.loadEmploymentHistory();
   }
 

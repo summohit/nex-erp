@@ -2690,3 +2690,7 @@ button:disabled {
 @media (max-width: 640px) {
   .ts-detail-hours { grid-template-columns: 1fr !important; }
 }
+
+/* Inside an employee profile tab (17 Nov 2026): same edges as Documents */
+.ts-page.in-profile { background: transparent; padding: 0; min-height: 0; }
+.ts-page.in-profile .ts-container { max-width: none; padding: 0; }

@@ -1,5 +1,5 @@
-<div class="page-container">
-  <app-page-header icon="calendar" section="Attendance & Leave" heading="Shift Roster"
+<div class="page-container" [class.in-profile]="profileEmployeeId">
+  <app-page-header *ngIf="!profileEmployeeId" icon="calendar" section="Attendance & Leave" heading="Shift Roster"
     [subtitle]="loading() ? 'Who works which shift, day by day. Click any cell to change it.' : visibleRows().length + (visibleRows().length === 1 ? ' employee' : ' employees') + ' · click any cell to change it'">
       <div class="actions-utility-group">
         <button type="button" class="btn-action-outline btn-approvals-pill" *ngIf="isApprover && pendingOnsite().length > 0" (click)="openApprovals()" title="On-site (No Project) requests awaiting approval">
@@ -41,7 +41,7 @@
         <button class="toggle-btn" [class.active]="viewMode() === 'month'" (click)="setView('month')">Monthly</button>
       </div>
 
-      <div class="roster-filter employee-filter" role="group" aria-label="Filter by employee">
+      <div class="roster-filter employee-filter" role="group" aria-label="Filter by employee" *ngIf="!profileEmployeeId">
         <app-searchable-select
           [options]="employeeFilterOptions()"
           [value]="filterEmployeeId()"
@@ -60,7 +60,7 @@
         <span>Field visit{{ fieldVisitCount() === 1 ? '' : 's' }}</span>
       </button>
 
-      <div class="roster-filter department-filter" role="group" aria-label="Filter by department">
+      <div class="roster-filter department-filter" role="group" aria-label="Filter by department" *ngIf="!profileEmployeeId">
         <app-searchable-select
           [options]="departmentFilterOptions()"
           [value]="filterDepartmentId()"

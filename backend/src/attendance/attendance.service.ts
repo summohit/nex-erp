@@ -362,6 +362,12 @@ export class AttendanceService {
     return this.getHistoryFor(employee.id, from, to);
   }
 
+  /** True when `managerEmployeeId` is the direct manager of `employeeId`. */
+  async isManagerOf(managerEmployeeId: number, employeeId: number): Promise<boolean> {
+    const e = await this.prisma.employee.findUnique({ where: { id: employeeId }, select: { managerId: true } });
+    return !!e && e.managerId === managerEmployeeId;
+  }
+
   async getEmployeeHistory(employeeId: number, from?: string, to?: string) {
     return this.getHistoryFor(employeeId, from, to);
   }
@@ -1725,10 +1731,9 @@ export class AttendanceService {
         `This has already been ${String(record.geofenceApproval ?? 'settled').toLowerCase()}.`,
       );
     }
-    // Two administrators exist to check each other; nobody clears their own.
-    if (approverEmployeeId != null && record.employeeId === approverEmployeeId) {
-      throw new ForbiddenException('Another Super Admin has to review your own out-of-geo visit request.');
-    }
+    // Only the Super Admin reviews these (mayApproveGeofence above), and the Super
+    // Admin is the top of the chain, so may decide their own — the same as late
+    // clock-outs, regularizations and leave (decided 17 Nov 2026).
 
     const rejecting = data.action === 'REJECT';
     const note = data.note?.trim() || '';

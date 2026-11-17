@@ -1,4 +1,5 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener } from '@angular/core';
+import { DatePresetFilterComponent, DatePreset, DateRange } from '../shared/components/date-preset-filter/date-preset-filter';
+import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener, Input } from '@angular/core';
 import { CompOffHistoryComponent } from '../shared/components/comp-off-history/comp-off-history';
 import { CommonModule, DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -85,6 +86,7 @@ import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDateP
   selector: 'app-attendance-leave',
   standalone: true,
   imports: [
+    DatePresetFilterComponent,
     PageHeaderComponent,
     CompOffHistoryComponent,
     CommonModule, RouterLink,
@@ -179,7 +181,8 @@ export class AttendanceLeaveComponent implements OnInit {
       this.employees().map((employee) => employee.department?.name).filter((name): name is string => !!name),
     )].sort((a, b) => a.localeCompare(b));
     return [
-      ...(this.canViewAllAttendance() ? [{
+      // 17 Nov 2026: inside a profile the person is fixed — no Employee/Department pickers.
+      ...(this.canViewAllAttendance() && !this.profileEmployeeId ? [{
         key: 'employee',
         label: 'Employee',
         placeholder: 'My Attendance',
@@ -188,7 +191,7 @@ export class AttendanceLeaveComponent implements OnInit {
           label: `${employee.firstName} ${employee.lastName}`.trim(),
         })),
       }] : []),
-      ...(this.canViewAllAttendance() ? [{
+      ...(this.canViewAllAttendance() && !this.profileEmployeeId ? [{
         key: 'department',
         label: 'Department',
         placeholder: 'All Departments',
@@ -412,6 +415,15 @@ export class AttendanceLeaveComponent implements OnInit {
     String((b as any).createdAt ?? '').localeCompare(String((a as any).createdAt ?? '')) || b.id - a.id;
 
   filteredLeaveApplications = computed(() => {
+    if (this.profileEmployeeId) {
+      const status = this.approvalStatusFilter();
+      return this.profileRequests().filter(r =>
+        this.matchesLeaveApplicationSearch(r)
+        && (status === 'ALL' || r.status === status)
+        && (!this.filterLeaveTypeId() || String(r.leaveTypeId) === this.filterLeaveTypeId())
+        && this.matchesAttendanceFilters(r.employee, r.startDate, r.endDate),
+      ).sort(this.newestAppliedFirst);
+    }
     if (this.isAdmin()) return [...this.filteredRequests()].sort(this.newestAppliedFirst);
     const requests = new Map<number, LeaveRequest>();
     for (const request of [...this.filteredMyRequests(), ...this.filteredManagerRequests()]) {
@@ -463,6 +475,7 @@ export class AttendanceLeaveComponent implements OnInit {
   );
 
   isLoadingLeaveApplications = computed(() =>
+    this.profileEmployeeId ? this.profileRequestsLoading() :
     this.isLoadingRequests()
       || (this.isAdmin() && this.isLoadingLeaveApprovals())
       || (!this.isAdmin() && this.isLoadingManagerRequests()),
@@ -1510,6 +1523,7 @@ export class AttendanceLeaveComponent implements OnInit {
   approvalStatusFilter = signal<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('ALL');
 
   leaveApplicationsList = computed(() => {
+    if (this.profileEmployeeId) return this.profileRequests();
     if (this.isAdmin()) return this.allRequests();
     const requests = new Map<number, LeaveRequest>();
     for (const r of [...this.myRequests(), ...this.managerRequests()]) {
@@ -1548,6 +1562,15 @@ export class AttendanceLeaveComponent implements OnInit {
     this.filterLeaveTypeId.set('');
     this.leaveStatusFilter.set('');
     this.filterDatePreset.set('ALL');
+    this.leaveDatePreset = 'ALL';
+  }
+
+  /** Leave date picker (17 Nov 2026): Any time / Today / … / Custom range. */
+  leaveDatePreset: DatePreset = 'ALL';
+  onLeaveDateRange(r: DateRange) {
+    const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    this.filterStartDate.set(r ? ymd(r.from) : '');
+    this.filterEndDate.set(r ? ymd(r.to) : '');
   }
 
   selectedApprovalIds = signal<number[]>([]);
@@ -3302,6 +3325,17 @@ export class AttendanceLeaveComponent implements OnInit {
   };
 
   // HR Target Employee Selection & Day Log Modal State
+  /**
+   * 17 Nov 2026: set when shown inside an employee profile's Attendance tab.
+   * Shows only that person's month strip — same look as My Attendance.
+   */
+  @Input() profileEmployeeId: number | null = null;
+  /** Which profile tab this instance serves (17 Nov 2026). */
+  @Input() profileTab: 'attendance' | 'leave' = 'attendance';
+  /** That person's approved/pending leave, used instead of mine in profile mode. */
+  profileRequests = signal<LeaveRequest[]>([]);
+  profileRequestsLoading = signal(true);
+
   selectedAttendanceEmployeeId = signal<number | null>(null);
   isLoadingTimesheet = signal(false);
 
@@ -3387,11 +3421,12 @@ export class AttendanceLeaveComponent implements OnInit {
 
     const dateString = this.getLocalDateString(day.date);
     const log = this.myHistory().find(l => this.getBackendDateString(l.date) === dateString);
-    const leave = this.isViewingOwnAttendance ? this.myRequests().find(r => {
+    const leaveSource = this.profileEmployeeId ? this.profileRequests() : (this.isViewingOwnAttendance ? this.myRequests() : []);
+    const leave = leaveSource.find(r => {
       const s = this.getBackendDateString(r.startDate);
       const e = this.getBackendDateString(r.endDate);
       return r.status === 'APPROVED' && dateString >= s && dateString <= e;
-    }) : undefined;
+    });
     const holiday = this.holidays().find(h => this.getBackendDateString(h.date) === dateString);
 
     let targetEmpName = 'My Attendance Log';
@@ -3542,6 +3577,37 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   ngOnInit() {
+    if (this.profileEmployeeId) {
+      this.activeTab.set(this.profileTab === 'leave' ? 'leave' : 'attendance');
+      if (this.profileTab === 'leave') {
+        this.leaveSection.set('application');
+        this.masterDataService.getLeaveTypes().subscribe({ next: (t: any) => this.leaveTypes.set(t), error: () => {} });
+      }
+      this.selectedAttendanceEmployeeId.set(Number(this.profileEmployeeId));
+      // That person's weekly off, not the viewer's.
+      this.employeeService.getProfile(this.profileEmployeeId).subscribe({
+        next: (p: any) => {
+          const own = (p?.weeklyOffs ?? '').trim();
+          this.myWeeklyOffs.set(own ? own : (p?.branch ? (p.branch.weeklyOffs ?? '') : null));
+          this.myShiftDays.set(own ? null : (p?.shift?.workingDays ?? null));
+          this.generateGrid();
+        },
+        error: () => {},
+      });
+      // Their leave and roster days off, so the strip matches their own My Attendance.
+      const pid = Number(this.profileEmployeeId);
+      this.loadProfileRequests();
+      const d = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+      const rFrom = new Date(); rFrom.setDate(rFrom.getDate() - 330);
+      const rTo = new Date(); rTo.setDate(rTo.getDate() + 60);
+      this.attendanceService.getEmployeeRosterDays(pid, d(rFrom), d(rTo)).subscribe({
+        next: (rows) => { this.myRoster.set(new Map(rows.map((r) => [r.date, r.isDayOff]))); this.generateGrid(); },
+        error: () => {},
+      });
+      this.loadTimesheetHistory();
+      this.loadHolidays();
+      return;
+    }
     this.loadMyProbation();
     // Deep link from the ticket form: ?regularize=1 opens the request form.
     if (this.route.snapshot.queryParamMap.get('regularize')) {
@@ -3633,7 +3699,22 @@ export class AttendanceLeaveComponent implements OnInit {
     }
   }
 
+  /** Profile mode: that person's leave requests (every status). */
+  private loadProfileRequests() {
+    if (!this.profileEmployeeId) return;
+    this.leavesService.getEmployeeRequests(Number(this.profileEmployeeId)).subscribe({
+      next: (rows) => { this.profileRequests.set(rows || []); this.profileRequestsLoading.set(false); this.generateGrid(); },
+      error: () => this.profileRequestsLoading.set(false),
+    });
+  }
+
   loadData() {
+    if (this.profileEmployeeId) {
+      // After approve / reject / cancel inside a profile tab.
+      this.loadProfileRequests();
+      this.loadTimesheetHistory();
+      return;
+    }
     this.attendanceService.getTodayAttendance().subscribe((res: any) => this.todayAttendance.set(res));
     this.loadTimesheetHistory();
     this.attendanceService.getMyRegularizations().subscribe((res: any) => this.myRegularizations.set(res));
@@ -3863,7 +3944,9 @@ export class AttendanceLeaveComponent implements OnInit {
     // A pending request is still a declared absence. Showing it in the
     // employee's own calendar prevents a submitted leave day from looking
     // indistinguishable from an unexplained absence while it awaits review.
-    const reqs = this.isViewingOwnAttendance
+    const reqs = this.profileEmployeeId
+      ? this.profileRequests().filter(r => ['APPROVED', 'PENDING'].includes(r.status))
+      : this.isViewingOwnAttendance
       ? this.myRequests().filter(r => ['APPROVED', 'PENDING'].includes(r.status))
       : [];
 
@@ -4285,7 +4368,9 @@ export class AttendanceLeaveComponent implements OnInit {
       const previousMonth = this.selectedMonth();
       const previousYear = this.selectedYear();
       const employeeId = filters.filters['employee'];
-      if (employeeId) {
+      if (this.profileEmployeeId) {
+        this.selectedAttendanceEmployeeId.set(Number(this.profileEmployeeId));
+      } else if (employeeId) {
         this.selectedAttendanceEmployeeId.set(Number(employeeId));
       } else if (this.canViewAllAttendance()) {
         this.selectedAttendanceEmployeeId.set(null);

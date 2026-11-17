@@ -84,7 +84,7 @@ export class OnboardingController {
     @Body() body: { decision: 'APPROVE' | 'CHANGES'; notes?: Record<string, string> },
   ) {
     requireOnboardingManager(req);
-    return this.onboardingService.reviewSelfOnboarding(req.user.companyId, employeeId, body.decision, body.notes);
+    return this.onboardingService.reviewSelfOnboarding(req.user.companyId, employeeId, body.decision, body.notes, req.user.role);
   }
 
   @Post('employee/:id/invite')

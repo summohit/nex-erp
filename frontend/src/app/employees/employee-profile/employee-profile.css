@@ -352,7 +352,22 @@
   position: sticky;
   top: 76px;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+.tabs-container .pill-tabs-bar { flex: 1; min-width: 0; }
+.tabs-arrow {
+  flex-shrink: 0;
+  width: 34px; height: 34px;
+  border: 1px solid #e2e8f0; border-radius: 10px;
+  background: #fff; color: #0f172a;
+  font-size: 20px; line-height: 1; cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  transition: background .15s, color .15s, opacity .15s;
+}
+.tabs-arrow:hover:not(:disabled) { background: var(--pf-accent, #2563eb); color: #fff; border-color: transparent; }
+.tabs-arrow:disabled { opacity: .35; cursor: default; box-shadow: none; }
 
 .pill-tabs-bar {
   background: #ffffff;
@@ -363,10 +378,16 @@
   align-items: center;
   gap: 4px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
-  flex-wrap: wrap;
+  /* 17 Nov 2026: one row that scrolls sideways — no second line as tabs grow */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
   width: 100%;
   box-sizing: border-box;
 }
+.pill-tabs-bar::-webkit-scrollbar { display: none; }
+.pill-tabs-bar .pill-tab-btn { flex-shrink: 0; white-space: nowrap; }
 
 .pill-tab-btn {
   display: inline-flex;
@@ -448,11 +469,13 @@
 
 /* Inside the profile popup: embedded adjustments */
 .page-container.embedded { padding: 0; max-width: none; background: #fff; }
+/* 17 Nov 2026: no app header above the popup, so the tab bar sticks at the top edge. */
+.page-container.embedded .tabs-container { top: 0; background: #fff; }
 
 /* ==================== LIFECYCLE TIMELINE ==================== */
 .employment-history-card {
   padding: 24px 28px;
-  max-width: 1000px;
+  max-width: none; /* 17 Nov 2026: full width like Documents */
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 16px;

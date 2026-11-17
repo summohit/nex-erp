@@ -466,10 +466,18 @@
         </div>
         <div class="card-body-grid">
           <div class="form-group">
-            <label>Login Email <span class="required">*</span></label>
+            <label>Login Email (office) <span class="required">*</span></label>
             <input type="email" class="form-control" [(ngModel)]="formData.email" disabled>
-            <!-- Kept when someone moved to an office email (16 Nov 2026) -->
-            <small class="field-note" *ngIf="employeeData?.personalEmail">Personal email: {{ employeeData.personalEmail }}</small>
+            <small class="field-note">Used to sign in. HR / Super Admin change it with "Change login email".</small>
+          </div>
+
+          <!-- Personal email beside the office login email (16 Nov 2026) -->
+          <div class="form-group">
+            <label>Personal Email <span class="required">*</span></label>
+            <input type="email" id="field-personalEmail" class="form-control" [class.is-invalid]="errors.personalEmail" [(ngModel)]="formData.personalEmail"
+                   (ngModelChange)="clearError('personalEmail')" [disabled]="!canEditPersonalDetails" placeholder="e.g. name@gmail.com" autocomplete="email">
+            <small class="error-msg" *ngIf="errors.personalEmail">{{ errors.personalEmail }}</small>
+            <small class="field-note" *ngIf="!errors.personalEmail">For contact only (e.g. after leaving) — not used to sign in.</small>
           </div>
 
           <div class="form-group">
@@ -707,6 +715,8 @@
             </select>
           </div>
 
+          <!-- Spouse and children only when not Single (16 Nov 2026) -->
+          <ng-container *ngIf="formData.maritalStatus !== 'Single'">
           <div class="form-group">
             <label>Spouse Legal Name</label>
             <input type="text" id="field-spouseName" class="form-control" [class.is-invalid]="errors.spouseName" [(ngModel)]="formData.spouseName" (ngModelChange)="clearError('spouseName')" [disabled]="!canEditPersonalDetails" placeholder="Spouse Name">
@@ -723,6 +733,7 @@
             <input type="number" min="0" id="field-childrenCount" class="form-control" [class.is-invalid]="errors.childrenCount" [(ngModel)]="formData.childrenCount" (ngModelChange)="clearError('childrenCount')" [disabled]="!canEditPersonalDetails" placeholder="0">
             <small class="error-msg" *ngIf="errors.childrenCount">{{ errors.childrenCount }}</small>
           </div>
+          </ng-container>
         </div>
       </div>
 

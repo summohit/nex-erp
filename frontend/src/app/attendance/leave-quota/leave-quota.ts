@@ -1,5 +1,5 @@
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, Input, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -15,7 +15,7 @@ import {
   LucideFileText, LucideAlertCircle, LucideExternalLink
 } from '@lucide/angular';
 
-import { LeavesService, QuotaReport, QuotaRow } from '../../services/leaves';
+import { LeavesService, QuotaReport, QuotaRow, LeaveRequest } from '../../services/leaves';
 import { AttendanceFilterDrawerComponent, AttendanceFilterValue } from '../../shared/components/attendance-filter-drawer/attendance-filter-drawer';
 
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header';
@@ -41,6 +41,9 @@ export class LeaveQuotaComponent implements OnInit {
   private leavesService = inject(LeavesService);
   private toast = inject(HotToastService);
   profileModal = inject(ProfileModalService);
+
+  /** 17 Nov 2026: set inside an employee profile — shows only that person's breakdown. */
+  @Input() profileEmployeeId: number | null = null;
 
   loading = signal(true);
   report = signal<QuotaReport | null>(null);
@@ -70,9 +73,16 @@ export class LeaveQuotaComponent implements OnInit {
 
   load() {
     this.loading.set(true);
-    this.leavesService.getQuotaReport(this.year()).subscribe({
+    this.leavesService.getQuotaReport(this.year(), this.profileEmployeeId ? Number(this.profileEmployeeId) : undefined).subscribe({
       next: (res) => {
         this.report.set(res);
+        if (this.profileEmployeeId) {
+          this.leavesService.getEmployeeRequests(Number(this.profileEmployeeId)).subscribe({
+            next: (rows) => this.profileLeaves.set(rows || []),
+            error: () => {},
+          });
+          this.detailRow.set(res.rows.find(r => r.employee.id === Number(this.profileEmployeeId)) ?? null);
+        }
         this.loading.set(false);
       },
       error: (e) => {
@@ -498,6 +508,49 @@ export class LeaveQuotaComponent implements OnInit {
       ...(row.byType[t.id] ?? { allocated: 0, used: 0, remaining: 0, encashed: 0 }),
     }));
   });
+
+  // ── Profile Leaves Quota tab (17 Nov 2026) ─────────────────────────────────
+
+  /** That person's approved leave, to list the dates behind each type. */
+  profileLeaves = signal<LeaveRequest[]>([]);
+  expandedTypeId = signal<number | null>(null);
+
+  /** One line per leave type, in the old tool's terms. */
+  profileLines = computed(() => this.detailLines().map((l) => {
+    const isOptional = /optional/i.test(l.type.name);
+    return {
+      ...l,
+      kind: !l.type.isPaid ? 'unpaid' : isOptional ? 'optional' : 'paid',
+      left: Math.max(l.allocated - l.used, 0),
+      over: Math.max(l.used - l.allocated, 0),
+      dates: this.profileLeaves()
+        .filter((r) => r.leaveTypeId === l.type.id && r.status === 'APPROVED'
+          && new Date(r.startDate).getFullYear() === this.year())
+        .sort((a, b) => a.startDate.localeCompare(b.startDate)),
+    };
+  }));
+
+  profileKpis = computed(() => {
+    const lines = this.profileLines();
+    const sum = (f: (l: any) => number) => lines.reduce((a, l) => a + f(l), 0);
+    return {
+      allocated: sum((l) => l.allocated),
+      taken: sum((l) => l.used),
+      remaining: sum((l) => l.left),
+      over: sum((l) => l.over),
+      unpaid: sum((l) => (l.kind === 'unpaid' ? l.used : 0)),
+    };
+  });
+
+  toggleType(id: number) {
+    this.expandedTypeId.set(this.expandedTypeId() === id ? null : id);
+  }
+
+  leaveDays(r: LeaveRequest): string {
+    if ((r as any).isHalfDay) return `½ day${(r as any).halfDayPeriod ? ' (' + (r as any).halfDayPeriod + ')' : ''}`;
+    const n = Math.round((new Date(r.endDate).getTime() - new Date(r.startDate).getTime()) / 86400000) + 1;
+    return n === 1 ? '1 day' : `${n} days`;
+  }
 
   // ── formatting ─────────────────────────────────────────────────────────────
 

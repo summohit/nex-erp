@@ -1,0 +1,217 @@
+<section class="act-card">
+  <header class="act-head">
+    <div class="act-head-left">
+      <div class="act-icon-badge" aria-hidden="true">
+        <svg lucideActivity [size]="20"></svg>
+      </div>
+      <div class="act-title-group">
+        <div class="act-title-row">
+          <h2>Activity</h2>
+          <span class="act-count-pill" *ngIf="!loading() && filteredItems().length">
+            {{ filteredItems().length }}{{ nextBefore() ? '+' : '' }} {{ filteredItems().length === 1 ? 'event' : 'events' }}
+          </span>
+        </div>
+        <p>Everything this person did in MIRA, newest first.</p>
+      </div>
+    </div>
+
+    <div class="act-controls">
+      <label class="act-search" aria-label="Search activity">
+        <svg lucideSearch [size]="14" class="act-search-ico" aria-hidden="true"></svg>
+        <input
+          type="search"
+          placeholder="Search activity…"
+          [ngModel]="search()"
+          (ngModelChange)="search.set($event)"
+        />
+        <button
+          type="button"
+          class="act-search-clear"
+          *ngIf="search()"
+          (click)="search.set('')"
+          aria-label="Clear search"
+        >
+          <svg lucideX [size]="13"></svg>
+        </button>
+      </label>
+
+      <div class="act-range-picker" role="group" aria-label="Quick date range">
+        <button type="button" *ngFor="let r of ranges" class="act-range-btn"
+                [class.active]="activeRange() === r.days" (click)="setRange(r.days)">{{ r.label }}</button>
+      </div>
+
+      <div class="act-dates">
+        <label class="act-date-field">
+          <span>From</span>
+          <input type="date" [ngModel]="from()" (ngModelChange)="from.set($event); reload()">
+        </label>
+        <span class="act-date-sep" aria-hidden="true">–</span>
+        <label class="act-date-field">
+          <span>To</span>
+          <input type="date" [ngModel]="to()" (ngModelChange)="to.set($event); reload()">
+        </label>
+      </div>
+
+      <button
+        type="button"
+        class="act-refresh-btn"
+        (click)="reload()"
+        [disabled]="loading()"
+        title="Refresh activity"
+        aria-label="Refresh activity"
+      >
+        <svg lucideRefreshCw [size]="14" [class.act-spin]="loading()"></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Filter Chips Toolbar -->
+  <div class="act-chips-bar">
+    <div class="act-chips" role="group" aria-label="Filter by area">
+      <button
+        type="button"
+        class="act-chip act-chip-all"
+        [class.on]="selected().size === 0"
+        [attr.aria-pressed]="selected().size === 0"
+        (click)="selectAllAreas()"
+      >
+        <span>All</span>
+      </button>
+
+      <button
+        type="button"
+        class="act-chip"
+        *ngFor="let a of areas"
+        [class.on]="selected().has(a.key)"
+        [attr.aria-pressed]="selected().has(a.key)"
+        [attr.data-area]="a.key"
+        (click)="toggleArea(a.key)"
+      >
+        <span class="act-chip-ico" aria-hidden="true">
+          <ng-container [ngSwitch]="a.key">
+            <svg *ngSwitchCase="'attendance'" lucideClock [size]="13"></svg>
+            <svg *ngSwitchCase="'requests'" lucideFileText [size]="13"></svg>
+            <svg *ngSwitchCase="'leave'" lucideCalendar [size]="13"></svg>
+            <svg *ngSwitchCase="'tasks'" lucideCheckSquare [size]="13"></svg>
+            <svg *ngSwitchCase="'tickets'" lucideTicket [size]="13"></svg>
+            <svg *ngSwitchCase="'field-visits'" lucideMapPin [size]="13"></svg>
+            <svg *ngSwitchCase="'timesheet'" lucideTimer [size]="13"></svg>
+            <svg *ngSwitchCase="'documents'" lucideFolder [size]="13"></svg>
+            <svg *ngSwitchCase="'employment'" lucideBriefcase [size]="13"></svg>
+            <svg *ngSwitchCase="'recognition'" lucideTrophy [size]="13"></svg>
+            <svg *ngSwitchCase="'approvals'" lucideCheckCircle2 [size]="13"></svg>
+            <svg *ngSwitchCase="'assets'" lucideLaptop [size]="13"></svg>
+            <svg *ngSwitchCase="'expenses'" lucideReceipt [size]="13"></svg>
+            <svg *ngSwitchCase="'payroll'" lucideBanknote [size]="13"></svg>
+            <svg *ngSwitchCase="'comp-off'" lucideRepeat [size]="13"></svg>
+            <svg *ngSwitchCase="'notices'" lucideMegaphone [size]="13"></svg>
+            <svg *ngSwitchCase="'performance'" lucideTarget [size]="13"></svg>
+            <span *ngSwitchDefault>{{ a.icon }}</span>
+          </ng-container>
+        </span>
+        <span>{{ a.label }}</span>
+      </button>
+
+      <button type="button" class="act-clear" *ngIf="hasFilters()" (click)="clearFilters()">
+        <svg lucideRotateCcw [size]="12"></svg>
+        <span>Reset filters</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div class="act-state error" *ngIf="error()" role="alert">
+    <svg lucideAlertCircle [size]="18"></svg>
+    <span>{{ error() }}</span>
+  </div>
+
+  <!-- Loading State -->
+  <div class="act-state" *ngIf="loading()">
+    <div class="act-spinner"></div>
+    <span>Loading activity timeline…</span>
+  </div>
+
+  <!-- Empty State -->
+  <div class="act-empty" *ngIf="!loading() && !error() && !filteredItems().length">
+    <div class="act-empty-ico" aria-hidden="true">
+      <svg lucideInbox [size]="24"></svg>
+    </div>
+    <strong>No activity found{{ hasFilters() ? ' for these filters' : '' }}</strong>
+    <p>{{ hasFilters() ? 'Try clearing one or more category or date filters to see older events.' : 'Activity events will appear here as this employee uses MIRA.' }}</p>
+    <button type="button" class="act-empty-reset" *ngIf="hasFilters()" (click)="clearFilters()">
+      Reset all filters
+    </button>
+  </div>
+
+  <!-- Activity Timeline -->
+  <div class="act-timeline" *ngIf="!loading() && filteredItems().length">
+    <section class="act-day" *ngFor="let g of groups()">
+      <div class="act-day-header">
+        <h3>{{ g.label }}</h3>
+        <span class="act-day-count">{{ g.items.length }}</span>
+        <span class="act-day-line" aria-hidden="true"></span>
+      </div>
+
+      <ol class="act-list">
+        <li class="act-item" *ngFor="let it of g.items" [attr.data-tone]="it.tone || 'slate'" [attr.data-area]="it.area">
+          <span class="act-dot" aria-hidden="true">
+            <ng-container [ngSwitch]="it.area">
+              <svg *ngSwitchCase="'attendance'" lucideClock [size]="14"></svg>
+              <svg *ngSwitchCase="'requests'" lucideFileText [size]="14"></svg>
+              <svg *ngSwitchCase="'leave'" lucideCalendar [size]="14"></svg>
+              <svg *ngSwitchCase="'tasks'" lucideCheckSquare [size]="14"></svg>
+              <svg *ngSwitchCase="'tickets'" lucideTicket [size]="14"></svg>
+              <svg *ngSwitchCase="'field-visits'" lucideMapPin [size]="14"></svg>
+              <svg *ngSwitchCase="'timesheet'" lucideTimer [size]="14"></svg>
+              <svg *ngSwitchCase="'documents'" lucideFolder [size]="14"></svg>
+              <svg *ngSwitchCase="'employment'" lucideBriefcase [size]="14"></svg>
+              <svg *ngSwitchCase="'recognition'" lucideTrophy [size]="14"></svg>
+              <svg *ngSwitchCase="'approvals'" lucideCheckCircle2 [size]="14"></svg>
+              <svg *ngSwitchCase="'assets'" lucideLaptop [size]="14"></svg>
+              <svg *ngSwitchCase="'expenses'" lucideReceipt [size]="14"></svg>
+              <svg *ngSwitchCase="'payroll'" lucideBanknote [size]="14"></svg>
+              <svg *ngSwitchCase="'comp-off'" lucideRepeat [size]="14"></svg>
+              <svg *ngSwitchCase="'notices'" lucideMegaphone [size]="14"></svg>
+              <svg *ngSwitchCase="'performance'" lucideTarget [size]="14"></svg>
+              <span *ngSwitchDefault>{{ areaOf(it.area)?.icon || '•' }}</span>
+            </ng-container>
+          </span>
+
+          <div class="act-body">
+            <div class="act-line">
+              <div class="act-main-info">
+                <span class="act-area-pill">{{ areaOf(it.area)?.label || it.area }}</span>
+                <a
+                  *ngIf="it.link; else plainTitle"
+                  [routerLink]="linkPath(it.link)"
+                  [queryParams]="linkQuery(it.link)"
+                  class="act-title link"
+                >
+                  <span>{{ it.title }}</span>
+                  <svg lucideExternalLink [size]="12" class="act-link-ico" aria-hidden="true"></svg>
+                </a>
+                <ng-template #plainTitle>
+                  <span class="act-title">{{ it.title }}</span>
+                </ng-template>
+              </div>
+
+              <time class="act-time">
+                <svg lucideClock [size]="11" aria-hidden="true"></svg>
+                <span>{{ it.at | date:'hh:mm a' }}</span>
+              </time>
+            </div>
+
+            <p class="act-detail" *ngIf="it.detail">{{ it.detail }}</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <div class="act-more" *ngIf="nextBefore()">
+      <button type="button" (click)="loadMore()" [disabled]="loadingMore()">
+        <span>{{ loadingMore() ? 'Loading older activity…' : 'Load older activity' }}</span>
+        <svg *ngIf="!loadingMore()" lucideChevronDown [size]="15"></svg>
+      </button>
+    </div>
+  </div>
+</section>

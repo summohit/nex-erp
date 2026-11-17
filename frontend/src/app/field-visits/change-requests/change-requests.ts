@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { HotToastService } from '@ngneat/hot-toast';
+import { firstValueFrom } from 'rxjs';
 import { LucideCalendarDays } from '@lucide/angular';
 import { FieldVisitChangeRow, FieldVisitRequestsService } from '../../services/field-visit-requests';
 
@@ -34,6 +35,41 @@ export class FieldVisitChangeRequestsComponent implements OnInit {
   changeType = signal<'' | 'Prepone' | 'Postpone' | 'Date change' | 'Cancel'>('');
   changeBusy = signal<number | null>(null);
   rejectingChange = signal<number | null>(null);
+
+  // ── Bulk approve (16 Nov 2026) ──
+  selected = signal<Set<number>>(new Set());
+  bulkBusy = signal(false);
+  /** Rows on screen this person may decide. */
+  selectable = computed(() => this.visibleChanges().filter((c) => c.canReview));
+  selectedRows = computed(() => this.selectable().filter((c) => this.selected().has(c.id)));
+  allSelected = computed(() => this.selectable().length > 0 && this.selectedRows().length === this.selectable().length);
+
+  toggle(c: FieldVisitChangeRow, on: boolean) {
+    const next = new Set(this.selected());
+    on ? next.add(c.id) : next.delete(c.id);
+    this.selected.set(next);
+  }
+
+  toggleAll(on: boolean) {
+    this.selected.set(on ? new Set(this.selectable().map((c) => c.id)) : new Set());
+  }
+
+  /** Approve each selected change in turn; report how many went through. */
+  async approveSelected() {
+    const rows = this.selectedRows();
+    if (!rows.length) return;
+    this.bulkBusy.set(true);
+    let ok = 0; const failed: string[] = [];
+    for (const c of rows) {
+      try { await firstValueFrom(this.api.approveModification(c.requestId)); ok++; }
+      catch (err) { failed.push(`${c.requestNumber}: ${this.messageOf(err)}`); }
+    }
+    this.bulkBusy.set(false);
+    this.selected.set(new Set());
+    if (ok) this.toast.success(`${ok} change request${ok === 1 ? '' : 's'} approved`);
+    if (failed.length) this.toast.error(failed.join(' · '), { duration: 8000 });
+    this.loadChanges(); this.decided.emit();
+  }
   rejectChangeText = '';
 
   visibleChanges = computed(() => {
@@ -66,6 +102,10 @@ export class FieldVisitChangeRequestsComponent implements OnInit {
   avatarBg(p: { id?: number; firstName?: string }): string {
     const hues = [221, 262, 199, 160, 24, 340, 45, 290];
     return `hsl(${hues[(p.id ?? (p.firstName || 'x').charCodeAt(0)) % hues.length]} 65% 45%)`;
+  }
+
+  teamNames(c: FieldVisitChangeRow): string {
+    return c.team.map((m) => `${m.firstName} ${m.lastName}`.trim()).join(', ');
   }
 
   dayCount(r: { startDate: string; endDate: string }): number {

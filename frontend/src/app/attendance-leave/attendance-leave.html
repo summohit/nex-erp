@@ -1,5 +1,5 @@
-<div class="attendance-container">
-  <app-page-header icon="calendar" section="Attendance & Leave"
+<div class="attendance-container" [class.in-profile]="profileEmployeeId">
+  <app-page-header *ngIf="!profileEmployeeId" icon="calendar" section="Attendance & Leave"
     [heading]="activeTab() === 'leave' ? 'Leaves' : (activeTab() === 'timeline' ? 'Team Timeline' : (activeTab() === 'holidays' ? 'Holidays' : 'My Attendance'))"
     [subtitle]="activeTab() === 'leave' ? 'Leave requests, regularizations and balances.' : (activeTab() === 'timeline' ? 'Who was present, late, on leave or absent, day by day.' : (activeTab() === 'holidays' ? 'Official company holidays and non-working days.' : 'Manage your time, view logs, and request leaves.'))">
     <ng-container *ngIf="activeTab() === 'leave' && leaveSection() !== 'balances' && leaveSection() !== 'regularizations'">
@@ -163,7 +163,7 @@
       </div>
       
       <!-- My Regularizations -->
-      <div class="widget-card mt-4">
+      <div class="widget-card mt-4" *ngIf="!profileEmployeeId">
         <div class="widget-header">
           <h3>My Regularizations</h3>
           <button class="btn btn-outline" (click)="openRegularizationModal()" style="height: 32px; font-size: 13px;">Request</button>
@@ -208,7 +208,7 @@
     <div class="loading-state" *ngIf="isLoadingMyShift()">Loading…</div>
   </div>
 
-  <div class="tabs-nav leave-section-nav" *ngIf="activeTab() === 'leave'">
+  <div class="tabs-nav leave-section-nav" *ngIf="activeTab() === 'leave' && !profileEmployeeId">
     <button class="nav-tab" [class.active]="leaveSection() !== 'balances' && leaveSection() !== 'regularizations'" (click)="setLeaveSection('application')">
       Leave Applications
       <span class="tab-badge" *ngIf="isAdmin() && pendingCount() > 0">{{ pendingCount() }}</span>
@@ -226,7 +226,7 @@
     [title]="activeTab() === 'attendance' ? 'Attendance filters' : (leaveSection() === 'balances' ? 'Leave balance filters' : 'Leave request filters')"
     [description]="activeTab() === 'attendance' ? 'Choose a month, employee, date, department, status, and attendance flags.' : (leaveSection() === 'balances' ? 'Find people and focus the balance table on a leave type.' : 'Find requests by leave type, status, date, and employee.')"
     [showDates]="activeTab() !== 'attendance' && leaveSection() !== 'balances'"
-    [showEmployee]="activeTab() !== 'attendance'"
+    [showEmployee]="activeTab() !== 'attendance' && !profileEmployeeId"
     [showPeriodControls]="activeTab() === 'attendance'"
     [periodMonth]="selectedMonth()"
     [periodYear]="selectedYear()"
@@ -336,7 +336,7 @@
     <!-- Executive KPI Metric Cards -->
     <div class="leave-list-toolbar">
       <div class="leave-search-filter-wrap">
-        <label class="leave-application-search">
+        <label class="leave-application-search" *ngIf="!profileEmployeeId">
           <svg lucideSearch [size]="16" aria-hidden="true"></svg>
           <input
             type="search"
@@ -348,13 +348,15 @@
                   (click)="leaveApplicationsSearch.set('')">×</button>
         </label>
 
-        <app-searchable-select *ngIf="isAdmin()" class="lv-status-select"
+        <app-searchable-select *ngIf="isAdmin() || profileEmployeeId" class="lv-status-select"
           [options]="leaveStatusOptions"
           placeholder="All statuses"
           [clearable]="true"
           [value]="approvalStatusFilter() === 'ALL' ? null : approvalStatusFilter()"
           (valueChange)="setApprovalFilter($event || 'ALL')">
         </app-searchable-select>
+
+        <app-date-preset-filter label="Leave date" [preset]="leaveDatePreset" (presetChange)="leaveDatePreset = $event" (rangeChange)="onLeaveDateRange($event)"></app-date-preset-filter>
 
         <button type="button" class="btn btn-outline leave-filter-btn" (click)="openLeaveFilters()" title="Advanced filters">
           <svg lucideFilter [size]="15"></svg>
@@ -1860,7 +1862,10 @@
           <span class="status-round" [ngClass]="{
             'status-approved': selectedDayDetails()?.day?.status === 'Present',
             'status-pending': selectedDayDetails()?.day?.status === 'Late' || selectedDayDetails()?.day?.status === 'Half Day',
-            'status-rejected': selectedDayDetails()?.day?.status === 'Absent'
+            'status-rejected': selectedDayDetails()?.day?.status === 'Absent',
+            'status-leave': selectedDayDetails()?.day?.status === 'On Leave',
+            'status-off': selectedDayDetails()?.day?.status === 'Day Off',
+            'status-holiday': selectedDayDetails()?.day?.status === 'Holiday'
           }">
             <span class="status-dot"></span>
             {{ selectedDayDetails()?.day?.status }}
@@ -1930,14 +1935,37 @@
             </div>
           </ng-container>
           <ng-template #noPunches>
-            <div style="text-align: center; padding: 20px; font-size: 13px; color: #64748B; background: #F8FAFC; border-radius: 12px;">
-              No punch records found for this date.
-            </div>
+            <!-- 17 Nov 2026: leave, day off, holiday and absent each get their own card -->
+            <ng-container [ngSwitch]="selectedDayDetails()?.day?.status">
+              <div *ngSwitchCase="'On Leave'" class="dd-state leave">
+                <span class="dd-state-icon"><svg lucidePlane [size]="22"></svg></span>
+                <div>
+                  <strong>On leave</strong>
+                  <p>{{ selectedDayDetails()?.leave?.leaveType?.name || selectedDayDetails()?.day?.tooltip || 'Leave' }}<ng-container *ngIf="selectedDayDetails()?.leave?.isHalfDay"> · Half day{{ selectedDayDetails()?.leave?.halfDayPeriod ? ' (' + selectedDayDetails()?.leave?.halfDayPeriod + ')' : '' }}</ng-container></p>
+                  <p class="dd-sub" *ngIf="selectedDayDetails()?.leave?.startDate">{{ selectedDayDetails()?.leave?.startDate | date:'dd MMM' }} – {{ selectedDayDetails()?.leave?.endDate | date:'dd MMM yyyy' }}</p>
+                </div>
+              </div>
+              <div *ngSwitchCase="'Day Off'" class="dd-state off">
+                <span class="dd-state-icon"><svg lucideCalendar [size]="22"></svg></span>
+                <div><strong>Day off</strong><p>Weekly off or rostered day off. No attendance needed.</p></div>
+              </div>
+              <div *ngSwitchCase="'Holiday'" class="dd-state holiday">
+                <span class="dd-state-icon"><svg lucideStar [size]="22"></svg></span>
+                <div><strong>Holiday</strong><p>{{ selectedDayDetails()?.holiday?.name || selectedDayDetails()?.day?.tooltip || 'Company holiday' }}</p></div>
+              </div>
+              <div *ngSwitchCase="'Absent'" class="dd-state absent">
+                <span class="dd-state-icon"><svg lucideX [size]="22"></svg></span>
+                <div><strong>Absent</strong><p>No clock-in and no approved leave for this working day.</p></div>
+              </div>
+              <div *ngSwitchDefault style="text-align: center; padding: 20px; font-size: 13px; color: #64748B; background: #F8FAFC; border-radius: 12px;">
+                No punch records found for this date.
+              </div>
+            </ng-container>
           </ng-template>
         </div>
 
-        <!-- Summary Duration -->
-        <div style="display: flex; align-items: center; justify-content: space-between; background: #f3efff; border: 1px solid #e0d7ff; padding: 10px 14px; border-radius: 10px;">
+        <!-- Summary Duration (only for worked days) -->
+        <div *ngIf="!['On Leave', 'Day Off', 'Holiday', 'Absent'].includes(selectedDayDetails()?.day?.status) || selectedDayDetails()?.log?.logs?.length" style="display: flex; align-items: center; justify-content: space-between; background: #f3efff; border: 1px solid #e0d7ff; padding: 10px 14px; border-radius: 10px;">
           <span style="font-size: 12px; font-weight: 600; color: #504f51;">⏱️ Total Duration Worked:</span>
           <span style="font-size: 13px; font-weight: 800; color: #434344;">{{ selectedDayDetails()?.durationStr }}</span>
         </div>

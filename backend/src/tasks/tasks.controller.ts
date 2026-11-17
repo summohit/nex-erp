@@ -33,7 +33,17 @@ export class TasksController {
     @Query('includeDone') includeDone?: string,
     @Query('scope') scope?: string,
     @Query('assigneeId') assigneeId?: string,
+    @Query('forEmployeeId') forEmployeeId?: string,
   ) {
+    // 17 Nov 2026: profile Tasks tab — that person's own "My tasks" list.
+    const forId = forEmployeeId ? Number(forEmployeeId) : NaN;
+    if (Number.isInteger(forId) && forId > 0) {
+      await this.tasks.assertMayViewPerson(req.user.companyId, req.user.employeeId, req.user.role, forId);
+      return this.tasks.getMyTasks(req.user.companyId, forId, 'EMPLOYEE', {
+        includeDone: includeDone === 'true',
+        scope: 'mine',
+      });
+    }
     return this.tasks.getMyTasks(req.user.companyId, req.user.employeeId, req.user.role, {
       includeReported: includeReported === 'true',
       includeDone: includeDone === 'true',
