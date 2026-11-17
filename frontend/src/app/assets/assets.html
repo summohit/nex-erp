@@ -128,14 +128,26 @@
     </button>
   </div>
 
+  <div class="inventory-view-switch" *ngIf="isAdmin() && activeTab() === 'inventory'" role="group" aria-label="Inventory view">
+    <span class="inventory-view-switch-label">View inventory by</span>
+    <div class="inventory-view-switch-options">
+      <button type="button" [class.active]="inventoryViewMode() === 'grouped'" (click)="inventoryViewMode.set('grouped')">
+        Grouped assets
+      </button>
+      <button type="button" [class.active]="inventoryViewMode() === 'tracked'" (click)="inventoryViewMode.set('tracked')">
+        Individually tracked assets
+      </button>
+    </div>
+  </div>
+
   <!-- Tab 1: Inventory -->
   <div class="tab-content" *ngIf="isAdmin() && activeTab() === 'inventory'">
     <div class="section-card">
       <!-- Compact empty state (replaces oversized blank grid) -->
-      <div class="inv-empty" *ngIf="!inventoryLoading() && inventoryItems().length === 0">
+      <div class="inv-empty" *ngIf="!inventoryLoading() && ((inventoryViewMode() === 'grouped' && inventoryItems().length === 0) || (inventoryViewMode() === 'tracked' && trackedAssetsInInventory().length === 0))">
         <div class="inv-empty-icon bg-blue-tint"><svg lucidePackage size="24" class="text-blue"></svg></div>
-        <h4>No items in inventory yet</h4>
-        <p>Click Add New Item to record your first purchase.</p>
+        <h4>{{ inventoryViewMode() === 'grouped' ? 'No grouped assets in inventory yet' : 'No individually tracked assets yet' }}</h4>
+        <p>{{ inventoryViewMode() === 'grouped' ? 'Click Add New Item to record your first purchase.' : 'Returned or newly registered devices will appear here.' }}</p>
         <div class="inv-empty-actions">
           <button class="btn btn-primary btn-sm" (click)="openAddItemModal()">
             <svg lucidePlus size="15"></svg>
@@ -148,12 +160,14 @@
       <div class="grid-loading-line" *ngIf="inventoryLoading()">Loading inventory...</div>
 
       <ag-grid-angular
-        *ngIf="!inventoryLoading() && inventoryItems().length > 0"
+        *ngIf="!inventoryLoading() && inventoryViewMode() === 'grouped' && inventoryItems().length > 0"
         class="ag-theme-quartz assets-grid inventory-grid"
         [theme]="'legacy'"
         [rowData]="inventoryItems()"
         [columnDefs]="inventoryColDefs"
         [defaultColDef]="defaultColDef"
+        [domLayout]="'autoHeight'"
+        [suppressHorizontalScroll]="true"
         [headerHeight]="46"
         [pagination]="true"
         [paginationPageSize]="paginationPageSize"
@@ -164,6 +178,32 @@
         [overlayNoRowsTemplate]="'No items match your search.'"
         (rowClicked)="onInventoryRowClicked($event)">
       </ag-grid-angular>
+
+      <section class="tracked-assets-section" *ngIf="inventoryViewMode() === 'tracked' && trackedAssetsInInventory().length > 0">
+        <div class="tracked-assets-heading">
+          <div>
+            <h3>Individually Tracked Assets</h3>
+            <p>Devices returned from assignments reappear here as Available.</p>
+          </div>
+          <span class="tracked-assets-count">{{ trackedAssetsInInventory().length }} devices</span>
+        </div>
+        <ag-grid-angular
+          class="ag-theme-quartz assets-grid inventory-grid tracked-assets-grid"
+          [theme]="'legacy'"
+          [rowData]="trackedAssetsInInventory()"
+          [columnDefs]="assetInventoryColDefs"
+          [defaultColDef]="defaultColDef"
+          [domLayout]="'autoHeight'"
+          [suppressHorizontalScroll]="true"
+          [headerHeight]="46"
+          [pagination]="true"
+          [paginationPageSize]="paginationPageSize"
+          [paginationPageSizeSelector]="paginationPageSizeOptions"
+          [quickFilterText]="searchQuery()"
+          [rowHeight]="56"
+          (rowClicked)="onTrackedAssetRowClicked($event)">
+        </ag-grid-angular>
+      </section>
     </div>
   </div>
 
@@ -191,6 +231,8 @@
         [getRowId]="getAssignmentRowId"
         [columnDefs]="assignmentsColDefs"
         [defaultColDef]="defaultColDef"
+        [domLayout]="'autoHeight'"
+        [suppressHorizontalScroll]="true"
         [headerHeight]="46"
         [pagination]="true"
         [paginationPageSize]="paginationPageSize"
@@ -245,25 +287,40 @@
   <!-- Tab 3: Hardware Requests -->
   <div class="tab-content" *ngIf="activeTab() === 'requests'">
     <div class="section-card">
-      <div class="table-toolbar mb-3">
-        <div class="search-box">
-          <svg lucideSearch size="16" class="search-icon"></svg>
-          <input type="text" placeholder="Search requests..." [(ngModel)]="reqQuery">
+      <div class="request-queue-toolbar">
+        <div class="request-queue-title">
+          <div><h3>Hardware request queue</h3><p>Review, track and manage employee hardware needs.</p></div>
         </div>
+        <div class="request-queue-metrics">
+          <span class="request-queue-chip pending"><b>{{ pendingRequestsCount() }}</b> awaiting review</span>
+          <span class="request-queue-chip"><b>{{ requests().length }}</b> total requests</span>
+        </div>
+      </div>
+
+      <div class="table-toolbar request-search-row">
+        <div class="search-box request-search-box">
+          <svg lucideSearch size="16" class="search-icon"></svg>
+          <input type="text" placeholder="Search by employee, subject or category..." [(ngModel)]="reqQuery">
+        </div>
+        <span class="request-search-hint">Click a row to view its complete request</span>
       </div>
 
       <ag-grid-angular
         *ngIf="!requestsLoading()"
-        class="ag-theme-quartz assets-grid"
+        class="ag-theme-quartz assets-grid request-grid"
         [theme]="'legacy'"
         [rowData]="requests()"
         [columnDefs]="requestsColDefs"
         [defaultColDef]="defaultColDef"
+        [domLayout]="'autoHeight'"
+        [suppressHorizontalScroll]="true"
         [pagination]="true"
         [paginationPageSize]="paginationPageSize"
         [paginationPageSizeSelector]="paginationPageSizeOptions"
         [quickFilterText]="reqQuery()"
-        [rowHeight]="64">
+        [headerHeight]="48"
+        [rowHeight]="62"
+        (rowClicked)="onHardwareRequestRowClicked($event)">
       </ag-grid-angular>
 
       <!-- Skeleton Loader for Hardware Requests -->
@@ -303,6 +360,133 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- ASSIGNMENT DETAIL DRAWER -->
+<div class="assignment-detail-overlay" *ngIf="isAssignmentDetailOpen() && selectedAssignment() as assignment" (click)="closeAssignmentDetail()">
+  <aside class="assignment-detail-drawer" (click)="$event.stopPropagation()" aria-label="Assignment details">
+    <header class="assignment-detail-header">
+      <div>
+        <span class="assignment-detail-eyebrow">{{ assignment.source === 'INVENTORY' ? 'Inventory assignment' : 'Asset assignment' }}</span>
+        <h2>{{ assignmentItemName(assignment) }}</h2>
+      </div>
+      <div class="assignment-detail-header-actions">
+        <button class="request-action-button" [matMenuTriggerFor]="assignmentActions" *ngIf="assignment.status === 'ACTIVE' && isAdmin()">Actions <svg lucideMoreHorizontal size="17"></svg></button>
+        <button class="request-detail-close" (click)="closeAssignmentDetail()" aria-label="Close details"><svg lucideX size="19"></svg></button>
+      </div>
+      <mat-menu #assignmentActions="matMenu" panelClass="custom-action-menu">
+        <button mat-menu-item (click)="editAssignmentFromDetail()" *ngIf="assignment.source === 'ASSET'">Edit assignment</button>
+        <button mat-menu-item class="text-primary" (click)="returnAssignmentFromDetail()">Return assignment</button>
+        <button mat-menu-item class="text-danger" (click)="deleteAssignmentFromDetail()" *ngIf="assignment.source === 'ASSET'">Delete assignment</button>
+      </mat-menu>
+    </header>
+
+    <section class="assignment-detail-body">
+      <div class="assignment-status-line">
+        <span class="status-round" [ngClass]="assignmentStatusClass(assignment)"><span class="status-dot"></span>{{ assignmentStatusLabel(assignment) }}</span>
+        <span class="badge-condition" [ngClass]="'cond-' + (assignment.source === 'INVENTORY' ? (assignment.lastCondition || 'GOOD') : (assignment.conditionOnAssign || 'GOOD')).toLowerCase().replace('_', '-')">{{ (assignment.source === 'INVENTORY' ? assignment.lastCondition : assignment.conditionOnAssign) || 'GOOD' }}</span>
+      </div>
+
+      <a class="assignment-person-card" *ngIf="assignment.employee as employee" [href]="'/employees/' + employee.id + '/profile'">
+        <div class="request-person-avatar">{{ (employee.firstName || 'U').charAt(0) }}</div>
+        <div><span class="request-section-label">Assigned to</span><strong>{{ employee.firstName }} {{ employee.lastName }}</strong><span>{{ employee.department?.name || 'Employee' }}</span></div>
+        <span class="assignment-profile-link">View profile →</span>
+      </a>
+      <div class="assignment-person-card" *ngIf="!assignment.employee">
+        <div class="request-person-avatar">L</div>
+        <div><span class="request-section-label">Assigned to</span><strong>{{ assignment.purpose || 'Location assignment' }}</strong><span>Unlinked recipient</span></div>
+      </div>
+
+      <section class="assignment-detail-section">
+        <span class="request-section-label">Assignment details</span>
+        <div class="request-meta-grid">
+          <div><span>{{ assignment.source === 'INVENTORY' ? 'Item category' : 'Asset tag' }}</span><b>{{ assignment.source === 'INVENTORY' ? (assignment.category || '—') : (assignment.itemAsset?.assetTag || '—') }}</b></div>
+          <div><span>Quantity</span><b>{{ assignment.source === 'INVENTORY' ? ((assignment.outstanding || 0) + ' of ' + (assignment.quantity || 0)) : '1 device' }}</b></div>
+          <div><span>Assigned on</span><b>{{ fmtDate(assignment.assignedDate) }}</b></div>
+          <div><span>{{ assignment.source === 'INVENTORY' ? 'Expected return' : 'Returned on' }}</span><b>{{ fmtDate(assignment.source === 'INVENTORY' ? assignment.expectedReturnDate : assignment.returnDate) }}</b></div>
+        </div>
+      </section>
+
+      <section class="assignment-detail-section" *ngIf="assignment.source === 'ASSET' && assignment.itemAsset">
+        <span class="request-section-label">Device information</span>
+        <div class="request-meta-grid">
+          <div><span>Category</span><b>{{ assignment.itemAsset.category || '—' }}</b></div>
+          <div><span>Serial number</span><b>{{ assignment.itemAsset.serialNumber || '—' }}</b></div>
+        </div>
+      </section>
+
+      <section class="assignment-detail-section" *ngIf="assignment.source === 'INVENTORY' && assignment.returnedQty">
+        <span class="request-section-label">Return progress</span>
+        <div class="assignment-return-progress"><span>{{ assignment.returnedQty }} returned</span><b>{{ assignment.outstanding }} still assigned</b></div>
+      </section>
+
+      <section class="assignment-detail-section" *ngIf="assignment.notes || assignment.purpose">
+        <span class="request-section-label">Notes</span>
+        <p class="request-description">{{ assignment.notes || assignment.purpose }}</p>
+      </section>
+    </section>
+  </aside>
+</div>
+
+<!-- REQUEST DETAIL DRAWER -->
+<div class="request-detail-overlay" *ngIf="isRequestDetailOpen() && selectedRequest() as request" (click)="closeRequestDetail()">
+  <aside class="request-detail-drawer" (click)="$event.stopPropagation()" aria-label="Hardware request details">
+    <header class="request-detail-header">
+      <div>
+        <span class="request-detail-eyebrow">Hardware request</span>
+        <h2>{{ request.subject || request.reason || 'Hardware Request' }}</h2>
+      </div>
+      <div class="request-detail-header-actions">
+        <button class="request-action-button" [matMenuTriggerFor]="requestActions">Actions <svg lucideMoreHorizontal size="17"></svg></button>
+        <button class="request-detail-close" (click)="closeRequestDetail()" aria-label="Close details"><svg lucideX size="19"></svg></button>
+      </div>
+      <mat-menu #requestActions="matMenu" panelClass="custom-action-menu">
+        <button mat-menu-item (click)="openEditRequestDrawer(request)" *ngIf="isSuperAdmin() || (request.status === 'PENDING' && isSelfRequest(request))">Edit request</button>
+        <button mat-menu-item class="text-success" (click)="openFulfillModal(request.id); closeRequestDetail()" *ngIf="request.status === 'PENDING' && isAdmin()">Approve &amp; fulfill</button>
+        <button mat-menu-item class="text-danger" (click)="openRejectModal(request.id); closeRequestDetail()" *ngIf="request.status === 'PENDING' && isAdmin()">Reject request</button>
+        <button mat-menu-item class="text-danger" (click)="deleteHardwareRequest(request)" *ngIf="isSuperAdmin()">Delete request</button>
+      </mat-menu>
+    </header>
+
+    <section class="request-detail-body">
+      <div class="request-status-line">
+        <span class="status-round" [ngClass]="'status-' + (request.status || 'PENDING').toLowerCase().replace('_', '-')"><span class="status-dot"></span>{{ request.status || 'PENDING' }}</span>
+        <span class="badge-condition" [ngClass]="'urgency-' + (request.urgency || 'MEDIUM').toLowerCase()">{{ request.urgency || 'MEDIUM' }}</span>
+      </div>
+
+      <section class="request-person-card">
+        <div class="request-person-avatar">{{ (request.employee?.firstName || 'U').charAt(0) }}</div>
+        <div><span class="request-section-label">Requested by</span><strong>{{ request.employee?.firstName }} {{ request.employee?.lastName }}</strong><span>{{ request.employee?.department?.name || 'Employee' }}</span></div>
+      </section>
+
+      <section class="request-detail-section">
+        <span class="request-section-label">Request details</span>
+        <div class="request-meta-grid">
+          <div><span>Category</span><b>{{ request.category || '—' }}</b></div>
+          <div><span>Request type</span><b>{{ (request.requestType || '—').replace('_', ' ') }}</b></div>
+          <div><span>Submitted</span><b>{{ request.createdAt ? (request.createdAt | date:'dd MMM yyyy, h:mm a') : '—' }}</b></div>
+          <div><span>Request ID</span><b>#{{ request.id }}</b></div>
+        </div>
+      </section>
+
+      <section class="request-detail-section">
+        <span class="request-section-label">Reason / description</span>
+        <p class="request-description">{{ request.reason || 'No additional details were provided.' }}</p>
+      </section>
+
+      <section class="request-detail-section" *ngIf="request.status === 'REJECTED' && request.rejectionReason">
+        <span class="request-section-label">Rejection reason</span>
+        <p class="request-rejection-note">{{ request.rejectionReason }}</p>
+      </section>
+
+      <section class="request-detail-section" *ngIf="requestImages(request).length">
+        <span class="request-section-label">Attachments</span>
+        <div class="request-attachments">
+          <button type="button" *ngFor="let image of requestImages(request); let i = index" (click)="openImageViewer(requestImages(request), i)"><img [src]="image" [alt]="'Attachment ' + (i + 1)"></button>
+        </div>
+      </section>
+    </section>
+  </aside>
 </div>
 
 <!-- ========================================== -->
@@ -587,7 +771,7 @@
                  [readonly]="invItemForm.id != null" placeholder="10">
         </div>
         <div class="form-group col-6">
-          <label class="form-label">Unit Cost (Γé╣)</label>
+          <label class="form-label">Unit Cost (&#8377;)</label>
           <input type="number" min="0" step="0.01" class="form-control" [(ngModel)]="invItemForm.unitCost" placeholder="50">
         </div>
       </div>
@@ -937,8 +1121,15 @@
       </div>
 
       <div class="form-group">
+        <label class="form-label">Subject <span class="text-danger">*</span></label>
+        <input class="form-control" maxlength="180" [(ngModel)]="requestForm.subject" placeholder="Short summary, e.g. Laptop keyboard not working">
+        <span class="form-field-hint">A concise title that helps IT quickly triage the request.</span>
+      </div>
+
+      <div class="form-group">
         <label class="form-label">Reason / Justification <span class="text-danger">*</span></label>
-        <textarea class="form-control" rows="3" [(ngModel)]="requestForm.reason" placeholder="Explain why you need this hardware or describe the issue with your current device..."></textarea>
+        <textarea class="form-control" rows="4" [(ngModel)]="requestForm.reason" placeholder="Explain the business need, the issue you are facing, and any relevant details..."></textarea>
+        <span class="form-field-hint">Include the work impact and any troubleshooting already attempted.</span>
       </div>
 
       <!-- Multiple Images & Attachment Upload Section -->
@@ -1180,7 +1371,7 @@
           <input type="date" class="form-control" [(ngModel)]="assetForm.purchaseDate">
         </div>
         <div class="form-group col-6" id="asset-field-cost">
-          <label class="form-label">Cost (Γé╣)</label>
+          <label class="form-label">Cost (&#8377;)</label>
           <input type="number" class="form-control" [class.is-invalid]="assetFormErrors.cost" [(ngModel)]="assetForm.cost" (ngModelChange)="clearAssetError('cost')" placeholder="0.00">
           <small class="error-msg" *ngIf="assetFormErrors.cost">{{ assetFormErrors.cost }}</small>
         </div>
@@ -1295,17 +1486,20 @@
 <!-- ========================================== -->
 <!-- DRAWER 2: ASSIGN ASSET -->
 <!-- ========================================== -->
-<div class="drawer-overlay" *ngIf="isAssignDrawerOpen()" (click)="isAssignDrawerOpen.set(false)">
+<div class="drawer-overlay" *ngIf="isAssignDrawerOpen()" (click)="closeAssignmentDrawer()">
   <div class="drawer-panel" (click)="$event.stopPropagation()">
     <div class="drawer-header">
-      <h3>Assign Asset to Employee</h3>
-      <button class="btn-close" (click)="isAssignDrawerOpen.set(false)"><svg lucideX size="18"></svg></button>
+      <h3>{{ editingAssignmentId() ? 'Edit Assignment' : 'Assign Asset to Employee' }}</h3>
+      <button class="btn-close" (click)="closeAssignmentDrawer()"><svg lucideX size="18"></svg></button>
     </div>
     <div class="drawer-body">
       <div class="form-group">
-        <label class="form-label">Select Available Asset <span class="text-danger">*</span></label>
-        <select class="form-control" [(ngModel)]="assignForm.assetId">
+        <label class="form-label">{{ editingAssignmentId() ? 'Assigned Asset' : 'Select Available Asset' }} <span class="text-danger">*</span></label>
+        <select class="form-control" [(ngModel)]="assignForm.assetId" [disabled]="!!editingAssignmentId()">
           <option [ngValue]="0" disabled>-- Choose Asset --</option>
+          <option *ngIf="editingAssignmentId() && editingAssignmentAsset()" [ngValue]="assignForm.assetId">
+            [{{ editingAssignmentAsset()!.assetTag }}] {{ editingAssignmentAsset()!.name }} ({{ editingAssignmentAsset()!.brand || editingAssignmentAsset()!.category }})
+          </option>
           <option *ngFor="let a of availableAssets()" [ngValue]="a.id">
             [{{ a.assetTag }}] {{ a.name }} ({{ a.brand || a.category }})
           </option>
@@ -1343,8 +1537,10 @@
       </div>
     </div>
     <div class="drawer-footer">
-      <button class="btn btn-outline" (click)="isAssignDrawerOpen.set(false)">Cancel</button>
-      <button class="btn btn-primary" (click)="submitAssign()">Assign Device</button>
+      <button class="btn btn-outline" (click)="closeAssignmentDrawer()">Cancel</button>
+      <button class="btn btn-primary" (click)="editingAssignmentId() ? submitAssignmentChanges() : submitAssign()">
+        {{ editingAssignmentId() ? 'Save Changes' : 'Assign Device' }}
+      </button>
     </div>
   </div>
 </div>
@@ -1408,7 +1604,7 @@
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Cost</span>
-          <span class="detail-info-value">{{ detailAsset()!.cost ? ('Γé╣' + detailAsset()!.cost!.toLocaleString('en-IN')) : 'ΓÇö' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.cost != null ? fmtMoney(detailAsset()!.cost) : '—' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Warranty Expiry</span>
@@ -1471,7 +1667,7 @@
 <!-- ========================================== -->
 <!-- IMAGE LIGHTBOX / VIEWER MODAL -->
 <!-- ========================================== -->
-<div class="viewer-overlay" *ngIf="previewImages().length > 0" (click)="closeImageViewer()">
+<div class="viewer-overlay" *ngIf="false && previewImages().length > 0" (click)="closeImageViewer()">
   <div class="image-viewer-modal" (click)="$event.stopPropagation()">
     <button class="btn-close-viewer" (click)="closeImageViewer()" title="Close Viewer">
       <svg lucideX size="18"></svg>

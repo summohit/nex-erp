@@ -61,6 +61,7 @@ export interface HardwareRequest {
   requestType: 'NEW_DEVICE' | 'REPLACEMENT' | 'REPAIR' | 'PERIPHERAL';
   category: string;
   urgency: 'LOW' | 'MEDIUM' | 'HIGH';
+  subject?: string;
   reason: string;
   images?: string | string[];
   status: 'PENDING' | 'APPROVED' | 'FULFILLED' | 'REJECTED';
@@ -171,14 +172,22 @@ export class AssetService {
     return this.http.put<AssetAssignment>(`${this.apiUrl}/assignments/${id}/return`, data);
   }
 
+  updateAssignment(id: number, data: { employeeId?: number; assignedDate?: string; conditionOnAssign?: string; notes?: string }): Observable<AssetAssignment> {
+    return this.http.put<AssetAssignment>(`${this.apiUrl}/assignments/${id}`, data);
+  }
+
+  deleteAssignment(id: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/assignments/${id}`);
+  }
+
   // 3. Hardware Requests
   getHardwareRequests(): Observable<HardwareRequest[]> {
     return this.http.get<HardwareRequest[]>(`${this.apiUrl}/requests`);
-  }  createHardwareRequest(data: { requestType: string; category: string; urgency: string; reason: string; images?: string[] }): Observable<HardwareRequest> {
+  }  createHardwareRequest(data: { requestType: string; category: string; urgency: string; subject: string; reason: string; images?: string[] }): Observable<HardwareRequest> {
     return this.http.post<HardwareRequest>(`${this.apiUrl}/requests`, data);
   }
 
-  updateHardwareRequest(id: number, data: { requestType?: string; category?: string; urgency?: string; reason?: string; images?: string[] }): Observable<HardwareRequest> {
+  updateHardwareRequest(id: number, data: { requestType?: string; category?: string; urgency?: string; subject?: string; reason?: string; images?: string[] }): Observable<HardwareRequest> {
     return this.http.put<HardwareRequest>(`${this.apiUrl}/requests/${id}`, data);
   }
 

@@ -13,6 +13,7 @@ export interface AssetActionCellParams extends ICellRendererParams {
    onAssign?: (data: any) => void;
    onReturn?: (data: any) => void;
    canReturn?: (data: any) => boolean;
+   returnLabel?: string;
   onApprove?: (data: any) => void;
   canApprove?: (data: any) => boolean;
   onReject?: (data: any) => void;
@@ -20,6 +21,8 @@ export interface AssetActionCellParams extends ICellRendererParams {
   onCancel?: (data: any) => void;
   canCancel?: (data: any) => boolean;
   onDelete?: (data: any) => void;
+  canDelete?: (data: any) => boolean;
+  deleteLabel?: string;
 }
 
 @Component({
@@ -43,7 +46,7 @@ export interface AssetActionCellParams extends ICellRendererParams {
           <span class="menu-text">Assign to Employee</span>
         </button>
         <button mat-menu-item class="menu-item text-primary" (click)="returnAsset()" *ngIf="params.onReturn && canReturn()">
-          <span class="menu-text">Return Asset</span>
+          <span class="menu-text">{{ params.returnLabel || 'Return Asset' }}</span>
         </button>
         <button mat-menu-item class="menu-item text-success" (click)="approve()" *ngIf="params.onApprove && canApprove()">
           <span class="menu-text">Approve & Fulfill</span>
@@ -54,8 +57,8 @@ export interface AssetActionCellParams extends ICellRendererParams {
         <button mat-menu-item class="menu-item text-danger" (click)="cancelRequest()" *ngIf="params.onCancel && canCancel()">
           <span class="menu-text">Cancel Request</span>
         </button>
-        <button mat-menu-item class="menu-item text-danger" (click)="deleteAsset()" *ngIf="params.onDelete">
-          <span class="menu-text">Delete Asset</span>
+        <button mat-menu-item class="menu-item text-danger" (click)="deleteAsset()" *ngIf="params.onDelete && canDelete()">
+          <span class="menu-text">{{ params.deleteLabel || 'Delete Asset' }}</span>
         </button>
       </mat-menu>
     </div>
@@ -119,6 +122,11 @@ export class AssetActionCellRendererComponent implements ICellRendererAngularCom
   canCancel(): boolean {
     if (!this.params?.canCancel) return true;
     return this.params.canCancel(this.params.data);
+  }
+
+  canDelete(): boolean {
+    if (!this.params?.canDelete) return true;
+    return this.params.canDelete(this.params.data);
   }
 
   canReturn(): boolean {

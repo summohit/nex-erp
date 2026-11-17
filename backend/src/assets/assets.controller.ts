@@ -73,6 +73,22 @@ export class AssetsController {
     return this.assetsService.returnAsset(req.user.companyId, id, data);
   }
 
+  @Put('assignments/:id')
+  @Permissions('assets/inventory', 'assets/assignments')
+  updateAssignment(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: { employeeId?: number; assignedDate?: string; conditionOnAssign?: string; notes?: string }
+  ) {
+    return this.assetsService.updateAssignment(req.user.companyId, id, data);
+  }
+
+  @Delete('assignments/:id')
+  @Permissions('assets/inventory', 'assets/assignments')
+  deleteAssignment(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.assetsService.deleteAssignment(req.user.companyId, id);
+  }
+
   // ==========================================
   // 3. PRODUCT/BATCH INVENTORY ENDPOINTS
   // ==========================================
@@ -164,7 +180,7 @@ export class AssetsController {
   @Post('requests')
   createHardwareRequest(
     @Request() req,
-    @Body() data: { requestType: string; category: string; urgency: string; reason: string; images?: string[] }
+    @Body() data: { requestType: string; category: string; urgency: string; subject: string; reason: string; images?: string[] }
   ) {
     return this.assetsService.createHardwareRequest(req.user.companyId, req.user.sub, data);
   }
@@ -173,9 +189,9 @@ export class AssetsController {
   updateHardwareRequest(
     @Request() req,
     @Param('id', ParseIntPipe) id: number,
-    @Body() data: { requestType?: string; category?: string; urgency?: string; reason?: string; images?: string[] }
+    @Body() data: { requestType?: string; category?: string; urgency?: string; subject?: string; reason?: string; images?: string[] }
   ) {
-    return this.assetsService.updateHardwareRequest(req.user.companyId, id, req.user.sub, data);
+    return this.assetsService.updateHardwareRequest(req.user.companyId, id, req.user.sub, req.user.role, data);
   }
 
   @Delete('requests/:id')
@@ -183,7 +199,7 @@ export class AssetsController {
     @Request() req,
     @Param('id', ParseIntPipe) id: number
   ) {
-    return this.assetsService.cancelHardwareRequest(req.user.companyId, id, req.user.sub);
+    return this.assetsService.cancelHardwareRequest(req.user.companyId, id, req.user.sub, req.user.role);
   }
 
   @Put('requests/:id/status')

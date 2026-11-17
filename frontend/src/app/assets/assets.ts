@@ -39,6 +39,7 @@ import { AssetActionCellRendererComponent } from '../shared/components/asset-act
 import { SearchableSelectComponent, SearchableSelectOption } from '../shared/components/searchable-select/searchable-select.component';
 import { SkeletonComponent } from '../shared/components/skeleton/skeleton.component';
 import { RoleService } from '../services/role.service';
+import { DialogService } from '../shared/services/dialog.service';
 
 const ADD_NEW_CATEGORY_ID = '__ADD_NEW_CATEGORY__';
 
@@ -119,6 +120,7 @@ export class AssetsComponent implements OnInit {
   private uploadService = inject(UploadService);
   private authService = inject(AuthService);
   private permissionsService = inject(PermissionsService);
+  private dialog = inject(DialogService);
   private toast = inject(HotToastService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -186,9 +188,13 @@ export class AssetsComponent implements OnInit {
 
   // Filter Query
   searchQuery = signal<string>('');
+  inventoryViewMode = signal<'grouped' | 'tracked'>('grouped');
 
   // Available Assets for assignment dropdown (legacy hardware request fulfillment)
   availableAssets = computed(() => this.assets().filter(a => a.status === 'AVAILABLE'));
+  // Individually tracked devices live alongside stock-ledger inventory. A returned
+  // device is immediately visible here with its new AVAILABLE / IN_REPAIR status.
+  trackedAssetsInInventory = computed(() => this.assets().filter(asset => asset.status !== 'RETIRED'));
 
   // ===== Item Detail Modal =====
   isItemDetailOpen = signal<boolean>(false);
@@ -266,9 +272,15 @@ export class AssetsComponent implements OnInit {
 
   // Drawer & Modal States (legacy flows)
   isAssignDrawerOpen = signal<boolean>(false);
+  editingAssignmentId = signal<number | null>(null);
+  editingAssignmentAsset = signal<Asset | null>(null);
   isAssetDrawerOpen = signal<boolean>(false);
   isReturnModalOpen = signal<boolean>(false);
   isRequestDrawerOpen = signal<boolean>(false);
+  isRequestDetailOpen = signal<boolean>(false);
+  selectedRequest = signal<HardwareRequest | null>(null);
+  isAssignmentDetailOpen = signal(false);
+  selectedAssignment = signal<any | null>(null);
   isFulfillModalOpen = signal<boolean>(false);
   isRejectModalOpen = signal<boolean>(false);
   isAddCategoryModalOpen = signal<boolean>(false);
@@ -374,6 +386,7 @@ export class AssetsComponent implements OnInit {
     requestType: 'NEW_DEVICE',
     category: 'LAPTOP',
     urgency: 'MEDIUM',
+    subject: '',
     reason: '',
     images: [] as string[]
   };
@@ -407,7 +420,7 @@ export class AssetsComponent implements OnInit {
   // ==========================================
   fmtMoney(n?: number | null): string {
     if (n === null || n === undefined || isNaN(n)) return '-';
-    return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+    return `\u20B9${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
   }
 
   fmtDate(d?: string | Date | null): string {
@@ -543,7 +556,7 @@ export class AssetsComponent implements OnInit {
       headerName: 'Item Name',
       field: 'name',
       flex: 2.4,
-      minWidth: 220,
+      minWidth: 200,
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         const sub: string[] = [];
@@ -567,14 +580,14 @@ export class AssetsComponent implements OnInit {
       headerName: 'Brand',
       field: 'brand',
       flex: 1,
-      minWidth: 140,
+      minWidth: 105,
       valueGetter: (p: any) => p.data?.brand || '-'
     },
     {
       headerName: 'Category',
       field: 'category',
       flex: 1.15,
-      minWidth: 160,
+      minWidth: 130,
       valueGetter: (p: any) => this.catLabel(p.data?.category),
       cellRenderer: (params: any) => {
         if (!params.value || params.value === '-') return '-';
@@ -583,42 +596,42 @@ export class AssetsComponent implements OnInit {
       }
     },
     {
-      headerName: 'Quantity',
+      headerName: 'Qty',
       field: 'quantity',
-      width: 100,
+      width: 78,
       type: 'alignedCenter',
       filter: 'agNumberColumnFilter',
       cellRenderer: (params: any) => params.value != null ? `<span class="cell-num">${params.value}</span>` : '-'
     },
     {
-      headerName: 'Unit Cost',
+      headerName: 'Cost',
       field: 'unitCost',
-      width: 120,
+      width: 92,
       type: 'rightAligned',
       filter: 'agNumberColumnFilter',
       valueFormatter: (p: any) => this.fmtMoney(p.value)
     },
     {
-      headerName: 'Total Value',
+      headerName: 'Value',
       field: 'totalValue',
-      width: 140,
+      width: 105,
       type: 'rightAligned',
       filter: 'agNumberColumnFilter',
       cellRenderer: (params: any) => `<span class="cell-num-strong">${this.fmtMoney(params.value)}</span>`
     },
     {
-      headerName: 'Purchase Date',
+      headerName: 'Purchased',
       field: 'purchaseDate',
-      width: 148,
+      width: 116,
       type: 'alignedCenter',
       valueFormatter: () => '',
       valueGetter: (p: any) => p.data?.purchaseDate || '',
       cellRenderer: (params: any) => this.fmtDate(params.value)
     },
     {
-      headerName: 'Available',
+      headerName: 'In Stock',
       field: 'available',
-      width: 110,
+      width: 88,
       type: 'alignedCenter',
       filter: 'agNumberColumnFilter',
       cellRenderer: (params: any) => {
@@ -628,9 +641,9 @@ export class AssetsComponent implements OnInit {
       }
     },
     {
-      headerName: 'Assigned',
+      headerName: 'Out',
       field: 'netAssigned',
-      width: 110,
+      width: 72,
       type: 'alignedCenter',
       filter: 'agNumberColumnFilter',
       cellRenderer: (params: any) => {
@@ -641,7 +654,7 @@ export class AssetsComponent implements OnInit {
     {
       headerName: 'Status',
       field: 'statusLabel',
-      width: 138,
+      width: 122,
       type: 'alignedCenter',
       cellRenderer: (params: any) => {
         if (!params.data) return '';
@@ -673,10 +686,49 @@ export class AssetsComponent implements OnInit {
     }
   ];
 
+  assetInventoryColDefs: ColDef[] = [
+    {
+      headerName: 'Asset', field: 'name', flex: 1.7, minWidth: 210,
+      cellRenderer: (params: any) => {
+        const asset = params.data as Asset;
+        return `<div class="cell-stacked"><div class="cell-title-bold">${asset.name}</div><div class="cell-subtitle-row"><span class="tag-mono">${asset.assetTag}</span>${asset.model ? `<span>${asset.model}</span>` : ''}</div></div>`;
+      }
+    },
+    { headerName: 'Category', field: 'category', flex: 1, minWidth: 125, cellRenderer: (params: any) => `<span class="cat-badge ${getCategoryClass(params.value || '')}">${this.catLabel(params.value)}</span>` },
+    { headerName: 'Brand', field: 'brand', flex: 0.9, minWidth: 110, valueGetter: (p: any) => p.data?.brand || '—' },
+    { headerName: 'Serial Number', field: 'serialNumber', flex: 1.1, minWidth: 145, valueGetter: (p: any) => p.data?.serialNumber || '—' },
+    {
+      headerName: 'Status', field: 'status', flex: 0.95, minWidth: 125,
+      cellRenderer: (params: any) => {
+        const status = String(params.value || 'AVAILABLE');
+        const label = status.replace(/_/g, ' ');
+        const css = status === 'AVAILABLE' ? 'status-available' : status === 'ASSIGNED' ? 'status-assigned' : 'status-repair';
+        return `<span class="status-pill ${css}"><span class="status-dot"></span>${label}</span>`;
+      }
+    },
+    {
+      headerName: 'Actions', field: 'actions', width: 96, sortable: false, filter: false, pinned: 'right',
+      cellRenderer: AssetActionCellRendererComponent,
+      cellRendererParams: {
+        onViewDetails: (asset: Asset) => this.openDetailModal(asset),
+        onEdit: (asset: Asset) => this.openEditAssetDrawer(asset),
+        onAssign: (asset: Asset) => this.openAssignDrawer(asset.id),
+        onDelete: (asset: Asset) => this.deleteAsset(asset),
+        canEdit: () => this.isAdmin(),
+        canDelete: () => this.isAdmin()
+      }
+    }
+  ];
+
   onInventoryRowClicked(event: any) {
     if (!event?.data) return;
     if (event.column?.getColId() === 'actions') return;
     this.openItemDetail(event.data.id);
+  }
+
+  onTrackedAssetRowClicked(event: any) {
+    if (!event?.data || event.column?.getColId() === 'actions') return;
+    this.openDetailModal(event.data);
   }
 
   // ==========================================
@@ -704,7 +756,9 @@ export class AssetsComponent implements OnInit {
       source: 'ASSET',
       key: `A${a.id}`,
       id: a.id,
+      assetId: a.assetId,
       itemAsset: a.asset,
+      employeeId: a.employeeId,
       employee: a.employee || null,
       assignedDate: a.assignedDate,
       returnDate: a.returnDate || null,
@@ -749,10 +803,55 @@ export class AssetsComponent implements OnInit {
   onAssignmentRowClicked(event: any) {
     if (!event?.data) return;
     if (event.column?.getColId() === 'actions') return;
-    if (event.data.source === 'INVENTORY') {
-      const txn = this.inventoryAssignments().find((t: any) => t.id === event.data.id);
-      if (txn) this.openTxnCheck(txn);
+    this.openAssignmentDetail(event.data);
+  }
+
+  openAssignmentDetail(assignment: any) {
+    this.selectedAssignment.set(assignment);
+    this.isAssignmentDetailOpen.set(true);
+  }
+
+  closeAssignmentDetail() {
+    this.isAssignmentDetailOpen.set(false);
+    this.selectedAssignment.set(null);
+  }
+
+  assignmentStatusLabel(assignment: any): string {
+    return this.isOverdueRow(assignment) ? 'OVERDUE' : assignment?.status === 'ACTIVE' ? 'ASSIGNED' : 'RETURNED';
+  }
+
+  assignmentStatusClass(assignment: any): string {
+    return this.isOverdueRow(assignment) ? 'status-overdue' : assignment?.status === 'ACTIVE' ? 'status-assigned' : 'status-returned';
+  }
+
+  assignmentItemName(assignment: any): string {
+    return assignment?.source === 'INVENTORY' ? assignment.itemName : assignment?.itemAsset?.name || 'Asset';
+  }
+
+  returnAssignmentFromDetail() {
+    const row = this.selectedAssignment();
+    if (!row || row.status !== 'ACTIVE' || !this.isAdmin()) return;
+    this.closeAssignmentDetail();
+    if (row.source === 'INVENTORY') {
+      const txn = this.inventoryAssignments().find((t: any) => t.id === row.id);
+      if (txn) this.openInvReturnModal(txn);
+    } else {
+      this.openReturnModal(row.id);
     }
+  }
+
+  editAssignmentFromDetail() {
+    const row = this.selectedAssignment();
+    if (!row || row.source !== 'ASSET' || row.status !== 'ACTIVE') return;
+    this.closeAssignmentDetail();
+    this.openEditAssignment(row);
+  }
+
+  async deleteAssignmentFromDetail() {
+    const row = this.selectedAssignment();
+    if (!row || row.source !== 'ASSET' || row.status !== 'ACTIVE') return;
+    this.closeAssignmentDetail();
+    await this.deleteAssignment(row);
   }
 
   assignmentsColDefs: ColDef[] = [
@@ -809,13 +908,13 @@ export class AssetsComponent implements OnInit {
           : `<div class="avatar-circle-sm">${initial}</div>`;
 
         return `
-          <div class="cell-user-avatar-row">
+          <a class="cell-user-avatar-row employee-profile-link" href="/employees/${emp.id}/profile" onclick="event.stopPropagation()" title="View ${fullName}'s profile">
             ${avatarHtml}
             <div class="user-text-stack">
               <div class="cell-title-bold">${fullName}</div>
               <div class="user-dept">${dept}</div>
             </div>
-          </div>
+          </a>
         `;
       }
     },
@@ -911,6 +1010,9 @@ export class AssetsComponent implements OnInit {
       pinned: 'right',
       cellRenderer: AssetActionCellRendererComponent,
       cellRendererParams: {
+        onEdit: (row: any) => this.openEditAssignment(row),
+        canEdit: (row: any) => !!row && row.source === 'ASSET' && row.status === 'ACTIVE' && this.isAdmin(),
+        editLabel: 'Edit assignment',
         onReturn: (row: any) => {
           if (row.status !== 'ACTIVE' || !this.isAdmin()) return;
           if (row.source === 'INVENTORY') {
@@ -920,7 +1022,11 @@ export class AssetsComponent implements OnInit {
             this.openReturnModal(row.id);
           }
         },
-        canReturn: (row: any) => !!row && row.status === 'ACTIVE' && this.isAdmin()
+        canReturn: (row: any) => !!row && row.status === 'ACTIVE' && this.isAdmin(),
+        returnLabel: 'Return assignment',
+        onDelete: (row: any) => this.deleteAssignment(row),
+        canDelete: (row: any) => !!row && row.source === 'ASSET' && row.status === 'ACTIVE' && this.isAdmin(),
+        deleteLabel: 'Delete assignment'
       }
     }
   ];
@@ -932,6 +1038,7 @@ export class AssetsComponent implements OnInit {
       field: 'employee',
       valueFormatter: (p) => p.value ? (p.value.lastName ? `${p.value.firstName} ${p.value.lastName}` : p.value.firstName) : '',
       flex: 1.4,
+      cellStyle: { display: 'flex', alignItems: 'center', lineHeight: 'normal' },
       cellRenderer: (params: any) => {
         const emp = params.data?.employee;
         if (!emp) return '-';
@@ -941,15 +1048,16 @@ export class AssetsComponent implements OnInit {
         const avatarHtml = avatarUrl
             ? `<img src="${avatarUrl}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid #E2E8F0;" />`
             : `<div class="avatar-circle-sm">${initial}</div>`;
+        const profileUrl = emp.id ? `/employees/${emp.id}/profile` : '';
 
         return `
-          <div class="cell-user-avatar-row">
+          <a class="cell-user-avatar-row employee-profile-link" href="${profileUrl}" onclick="event.stopPropagation()" title="View ${emp.firstName} ${emp.lastName}'s profile" style="display:flex;align-items:center;gap:9px;min-width:0;line-height:1.2;color:inherit;text-decoration:none;">
             ${avatarHtml}
-            <div class="user-text-stack">
-              <div class="cell-title-bold">${emp.firstName} ${emp.lastName}</div>
-              <div class="user-dept">${emp.department?.name || 'Employee'}</div>
+            <div class="user-text-stack" style="min-width:0;display:flex;flex-direction:column;gap:2px;">
+              <div class="cell-title-bold" style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${emp.firstName} ${emp.lastName}</div>
+              <div class="user-dept" style="font-size:10.5px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${emp.department?.name || 'Employee'}</div>
             </div>
-          </div>
+          </a>
         `;
       }
     },
@@ -957,15 +1065,16 @@ export class AssetsComponent implements OnInit {
       headerName: 'Request Details & Category',
       field: 'reason',
       flex: 1.6,
+      cellStyle: { display: 'flex', alignItems: 'center', lineHeight: 'normal' },
       cellRenderer: (params: any) => {
         if (!params.data) return '-';
         const catClass = getCategoryClass(params.data.category);
         return `
-          <div class="cell-stacked">
-            <div class="cell-title-bold">${params.data.reason || 'Hardware Request'}</div>
-            <div class="cell-subtitle-row">
+          <div class="request-summary" style="height:100%;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:4px;line-height:1.15;">
+            <div class="request-summary-title" title="${params.data.subject || params.data.reason || 'Hardware Request'}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#172033;font-size:13px;font-weight:700;">${params.data.subject || params.data.reason || 'Hardware Request'}</div>
+            <div class="request-summary-meta" style="display:flex;align-items:center;gap:7px;min-width:0;line-height:1;">
               <span class="cat-badge ${catClass}">${params.data.category}</span>
-              <span>${params.data.requestType || 'NEW DEVICE'}</span>
+              <span class="request-type-label">${(params.data.requestType || 'NEW_DEVICE').replace('_', ' ')}</span>
             </div>
           </div>
         `;
@@ -975,10 +1084,11 @@ export class AssetsComponent implements OnInit {
       headerName: 'Urgency',
       field: 'urgency',
       flex: 0.9,
+      cellStyle: { display: 'flex', alignItems: 'center', lineHeight: 'normal' },
       cellRenderer: (params: any) => {
         const u = params.value || 'MEDIUM';
         const urgencyClass = getUrgencyClass(u);
-        return `<span class="badge-condition ${urgencyClass}">${u}</span>`;
+        return `<span class="badge-condition ${urgencyClass}" style="display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:5px 9px;min-width:52px;">${u}</span>`;
       }
     },
     {
@@ -986,6 +1096,7 @@ export class AssetsComponent implements OnInit {
       field: 'images',
       flex: 1.1,
       minWidth: 130,
+      cellStyle: { display: 'flex', alignItems: 'center', lineHeight: 'normal' },
       cellRenderer: (params: any) => {
         let imgs: string[] = [];
         if (params.value) {
@@ -996,7 +1107,7 @@ export class AssetsComponent implements OnInit {
         if (!imgs || imgs.length === 0) return '<span style="color: #94A3B8; font-size: 12px;">No photos</span>';
 
         return `
-          <div class="cell-user-avatar-row" style="cursor: pointer;" title="Click to view full photos">
+          <div class="cell-user-avatar-row" style="display:flex;align-items:center;gap:8px;cursor:pointer;line-height:1;" title="Click to view full photos">
             <img src="${imgs[0]}" style="width: 30px; height: 30px; border-radius: 6px; object-fit: cover; border: 1px solid #CBD5E1;" />
             <span style="font-size: 11px; font-weight: 600; color: #2563EB;">${imgs.length} photo(s)</span>
           </div>
@@ -1018,12 +1129,14 @@ export class AssetsComponent implements OnInit {
       headerName: 'Submitted Date',
       field: 'createdAt',
       flex: 1,
+      cellStyle: { display: 'flex', alignItems: 'center', lineHeight: 'normal' },
       valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : '-'
     },
     {
       headerName: 'Status',
       field: 'status',
       flex: 1.2,
+      cellStyle: { display: 'flex', alignItems: 'center', lineHeight: 'normal' },
       cellRenderer: (params: any) => {
         const s = params.value || 'PENDING';
         const statusClass = getStatusClass(s);
@@ -1031,8 +1144,8 @@ export class AssetsComponent implements OnInit {
           ? `<div style="font-size: 10px; color: #1373e5; font-weight: 500; line-height: 1.2; margin-top: 3px;" title="${params.data.rejectionReason}">Reason: ${params.data.rejectionReason}</div>`
           : '';
         return `
-          <div class="cell-stacked">
-            <span class="status-round ${statusClass}">
+          <div class="cell-stacked" style="height:100%;display:flex;flex-direction:column;justify-content:center;gap:3px;line-height:1.1;">
+            <span class="status-round ${statusClass}" style="display:inline-flex;align-items:center;align-self:flex-start;line-height:1;padding:5px 10px;">
               <span class="status-dot"></span>
               ${s}
             </span>
@@ -1051,10 +1164,13 @@ export class AssetsComponent implements OnInit {
       cellRenderer: AssetActionCellRendererComponent,
       cellRendererParams: {
         editLabel: 'Edit Request',
-        canEdit: (data: HardwareRequest) => data.status === 'PENDING' && (this.isSelfRequest(data) || this.isSuperAdmin()),
+        canEdit: (data: HardwareRequest) => this.isSuperAdmin() || (data.status === 'PENDING' && this.isSelfRequest(data)),
         onEdit: (data: HardwareRequest) => this.openEditRequestDrawer(data),
         canCancel: (data: HardwareRequest) => data.status === 'PENDING' && this.isSelfRequest(data),
         onCancel: (data: HardwareRequest) => this.cancelRequest(data.id),
+        deleteLabel: 'Delete Request',
+        canDelete: () => this.isSuperAdmin(),
+        onDelete: (data: HardwareRequest) => this.deleteHardwareRequest(data),
         canApprove: (data: HardwareRequest) => data.status === 'PENDING' && this.isAdmin() && (!this.isSelfRequest(data) || this.isSuperAdmin()),
         onApprove: (data: HardwareRequest) => {
           if (data.status === 'PENDING' && this.isAdmin()) {
@@ -1114,6 +1230,22 @@ export class AssetsComponent implements OnInit {
   setTab(tab: 'inventory' | 'assignments' | 'requests') {
     this.activeTab.set(tab);
     this.router.navigate(['/assets', tab]);
+  }
+
+  onHardwareRequestRowClicked(event: any) {
+    if (!event?.data) return;
+    this.selectedRequest.set(event.data);
+    this.isRequestDetailOpen.set(true);
+  }
+
+  closeRequestDetail() {
+    this.isRequestDetailOpen.set(false);
+    this.selectedRequest.set(null);
+  }
+
+  requestImages(request: HardwareRequest): string[] {
+    if (!request?.images) return [];
+    try { return typeof request.images === 'string' ? JSON.parse(request.images) : request.images; } catch { return []; }
   }
 
   loadAllData() {
@@ -1990,6 +2122,8 @@ export class AssetsComponent implements OnInit {
   // LEGACY: Assignment Drawer Actions (serial assets via hardware fulfillment)
   // ==========================================
   openAssignDrawer(assetId?: number) {
+    this.editingAssignmentId.set(null);
+    this.editingAssignmentAsset.set(null);
     this.assignForm = {
       assetId: assetId || (this.availableAssets()[0]?.id || 0),
       employeeId: this.employees()[0]?.id || 0,
@@ -2014,6 +2148,69 @@ export class AssetsComponent implements OnInit {
       },
       error: (err) => this.toast.error(err.error?.message || 'Failed to assign asset')
     });
+  }
+
+  openEditAssignment(assignment: any) {
+    if (!assignment || assignment.source !== 'ASSET' || assignment.status !== 'ACTIVE') return;
+    this.editingAssignmentId.set(assignment.id);
+    this.editingAssignmentAsset.set(assignment.itemAsset || this.assets().find(asset => asset.id === assignment.assetId) || null);
+    this.assignForm = {
+      assetId: assignment.assetId,
+      employeeId: assignment.employeeId,
+      assignedDate: this.toDateInput(assignment.assignedDate),
+      conditionOnAssign: assignment.conditionOnAssign || 'GOOD',
+      notes: assignment.notes || ''
+    };
+    this.isAssignDrawerOpen.set(true);
+  }
+
+  submitAssignmentChanges() {
+    const assignmentId = this.editingAssignmentId();
+    if (!assignmentId || !this.assignForm.employeeId) {
+      this.toast.error('Please select an employee');
+      return;
+    }
+    const { employeeId, assignedDate, conditionOnAssign, notes } = this.assignForm;
+    this.assetService.updateAssignment(assignmentId, { employeeId, assignedDate, conditionOnAssign, notes }).subscribe({
+      next: () => {
+        this.toast.success('Assignment updated successfully');
+        this.closeAssignmentDrawer();
+        this.loadAllData();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Failed to update assignment')
+    });
+  }
+
+  async deleteAssignment(assignment: any) {
+    if (!assignment || assignment.source !== 'ASSET' || assignment.status !== 'ACTIVE') return;
+    const name = assignment.itemAsset?.name || 'this assignment';
+    const confirmed = await this.dialog.confirm(
+      `Delete the assignment for "${name}"? The asset will be returned to available inventory. This cannot be undone.`,
+      'Delete assignment',
+      'Delete',
+      'Cancel',
+      'danger'
+    );
+    if (!confirmed) return;
+    this.assetService.deleteAssignment(assignment.id).subscribe({
+      next: () => {
+        this.toast.success('Assignment deleted and asset returned to inventory');
+        this.loadAllData();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Failed to delete assignment')
+    });
+  }
+
+  private toDateInput(value: string | Date | undefined): string {
+    if (!value) return new Date().toISOString().split('T')[0];
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? new Date().toISOString().split('T')[0] : date.toISOString().split('T')[0];
+  }
+
+  closeAssignmentDrawer() {
+    this.isAssignDrawerOpen.set(false);
+    this.editingAssignmentId.set(null);
+    this.editingAssignmentAsset.set(null);
   }
 
   openReturnModal(assignmentId: number) {
@@ -2073,6 +2270,7 @@ export class AssetsComponent implements OnInit {
       requestType: 'NEW_DEVICE',
       category: 'LAPTOP',
       urgency: 'MEDIUM',
+      subject: '',
       reason: '',
       images: []
     };
@@ -2080,6 +2278,7 @@ export class AssetsComponent implements OnInit {
   }
 
   openEditRequestDrawer(data: HardwareRequest) {
+    this.closeRequestDetail();
     this.editingRequestId.set(data.id);
     let imgs: string[] = [];
     if (data.images) {
@@ -2091,6 +2290,7 @@ export class AssetsComponent implements OnInit {
       requestType: data.requestType || 'NEW_DEVICE',
       category: data.category || 'LAPTOP',
       urgency: data.urgency || 'MEDIUM',
+      subject: data.subject || '',
       reason: data.reason || '',
       images: [...imgs]
     };
@@ -2106,6 +2306,26 @@ export class AssetsComponent implements OnInit {
         this.loadAllData();
       },
       error: (err) => this.toast.error(err.error?.message || 'Failed to cancel request')
+    });
+  }
+
+  async deleteHardwareRequest(request: HardwareRequest) {
+    const confirmed = await this.dialog.confirm(
+      `This will permanently remove “${request.subject || request.reason || 'Hardware Request'}”. This action cannot be undone.`,
+      'Delete hardware request?',
+      'Delete request',
+      'Keep request',
+      'danger'
+    );
+    if (!confirmed) return;
+
+    this.assetService.cancelHardwareRequest(request.id).subscribe({
+      next: () => {
+        this.closeRequestDetail();
+        this.toast.success('Hardware request deleted');
+        this.loadAllData();
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Failed to delete request')
     });
   }
 
@@ -2143,8 +2363,8 @@ export class AssetsComponent implements OnInit {
   }
 
   submitRequest() {
-    if (!this.requestForm.reason) {
-      this.toast.error('Please provide a reason for the hardware request');
+    if (!this.requestForm.subject.trim() || !this.requestForm.reason.trim()) {
+      this.toast.error('Please add both a subject and justification for the hardware request');
       return;
     }
 

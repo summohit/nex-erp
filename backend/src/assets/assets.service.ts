@@ -9,6 +9,24 @@ export class AssetsService {
     private notificationsService: NotificationsService,
   ) {}
 
+  /** Keeps the new subject/justification split compatible with existing databases. */
+  private packRequestText(subject: string, reason: string): string {
+    return `[SUBJECT] ${subject.trim()}\n[JUSTIFICATION]\n${reason.trim()}`;
+  }
+
+  private unpackRequestText(reason: string): { subject?: string; reason: string } {
+    const match = /^\[SUBJECT\]\s*(.*?)\n\[JUSTIFICATION\]\n([\s\S]*)$/.exec(reason || '');
+    return match ? { subject: match[1], reason: match[2] } : { reason };
+  }
+
+  private presentHardwareRequest<T extends { reason: string }>(request: T): T & { subject?: string } {
+    const content = this.unpackRequestText(request.reason);
+    // Older records stored only a long reason. Give them a compact, readable
+    // title so the details drawer never uses the entire justification as its heading.
+    const legacySubject = content.reason.replace(/\s+/g, ' ').trim().slice(0, 72).replace(/[,:;\-\s]+$/, '');
+    return { ...request, reason: content.reason, subject: content.subject || legacySubject || undefined };
+  }
+
   // ==========================================
   // 1. ASSET INVENTORY
   // ==========================================
@@ -220,27 +238,65 @@ export class AssetsService {
   async returnAsset(companyId: number, id: number, data: { returnDate?: string; conditionOnReturn?: string; assetNextStatus?: string; notes?: string }) {
     const assignment = await this.prisma.assetAssignment.findFirst({ where: { id, companyId } });
     if (!assignment) throw new NotFoundException('Assignment record not found');
+    if (assignment.status !== 'ACTIVE') throw new BadRequestException('This assignment has already been returned');
 
     const nextStatus = data.assetNextStatus || (data.conditionOnReturn === 'NEEDS_REPAIR' ? 'IN_REPAIR' : 'AVAILABLE');
 
-    // Mark Assignment as Returned
-    const updatedAssignment = await this.prisma.assetAssignment.update({
-      where: { id },
-      data: {
-        status: 'RETURNED',
-        returnDate: data.returnDate ? new Date(data.returnDate) : new Date(),
-        conditionOnReturn: data.conditionOnReturn || 'GOOD',
-        notes: data.notes ? `${assignment.notes || ''}\n[Return Notes]: ${data.notes}` : assignment.notes
-      }
-    });
-
-    // Update Asset status back to AVAILABLE or IN_REPAIR
-    await this.prisma.asset.update({
-      where: { id: assignment.assetId },
-      data: { status: nextStatus }
+    // The assignment record and the device availability must always change together.
+    const updatedAssignment = await this.prisma.$transaction(async (tx) => {
+      const returned = await tx.assetAssignment.update({
+        where: { id },
+        data: {
+          status: 'RETURNED',
+          returnDate: data.returnDate ? new Date(data.returnDate) : new Date(),
+          conditionOnReturn: data.conditionOnReturn || 'GOOD',
+          notes: data.notes ? `${assignment.notes || ''}\n[Return Notes]: ${data.notes}` : assignment.notes
+        }
+      });
+      await tx.asset.update({
+        where: { id: assignment.assetId },
+        data: { status: nextStatus }
+      });
+      return returned;
     });
 
     return updatedAssignment;
+  }
+
+  async updateAssignment(companyId: number, id: number, data: { employeeId?: number; assignedDate?: string; conditionOnAssign?: string; notes?: string }) {
+    const assignment = await this.prisma.assetAssignment.findFirst({ where: { id, companyId } });
+    if (!assignment) throw new NotFoundException('Assignment record not found');
+    if (assignment.status !== 'ACTIVE') throw new BadRequestException('Only active assignments can be edited');
+
+    if (data.employeeId && data.employeeId !== assignment.employeeId) {
+      const employee = await this.prisma.employee.findFirst({ where: { id: data.employeeId, companyId } });
+      if (!employee) throw new NotFoundException('Employee not found');
+    }
+
+    return this.prisma.assetAssignment.update({
+      where: { id },
+      data: {
+        ...(data.employeeId ? { employeeId: data.employeeId } : {}),
+        ...(data.assignedDate ? { assignedDate: new Date(data.assignedDate) } : {}),
+        ...(data.conditionOnAssign ? { conditionOnAssign: data.conditionOnAssign } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes } : {})
+      }
+    });
+  }
+
+  async deleteAssignment(companyId: number, id: number) {
+    const assignment = await this.prisma.assetAssignment.findFirst({ where: { id, companyId } });
+    if (!assignment) throw new NotFoundException('Assignment record not found');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.assetAssignment.delete({ where: { id } });
+      // Deleting an active record releases the serialised asset back to stock.
+      if (assignment.status === 'ACTIVE') {
+        await tx.asset.update({ where: { id: assignment.assetId }, data: { status: 'AVAILABLE' } });
+      }
+    });
+
+    return { message: 'Assignment deleted successfully' };
   }
 
   // ==========================================
@@ -257,7 +313,7 @@ export class AssetsService {
       }
     }
 
-    return this.prisma.hardwareRequest.findMany({
+    const requests = await this.prisma.hardwareRequest.findMany({
       where: whereClause,
       include: {
         employee: {
@@ -277,9 +333,10 @@ export class AssetsService {
       },
       orderBy: { createdAt: 'desc' }
     });
+    return requests.map(request => this.presentHardwareRequest(request));
   }
 
-  async createHardwareRequest(companyId: number, userId: number, data: { requestType: string; category: string; urgency: string; reason: string; images?: string[] }) {
+  async createHardwareRequest(companyId: number, userId: number, data: { requestType: string; category: string; urgency: string; subject: string; reason: string; images?: string[] }) {
     const employee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
     if (!employee) throw new NotFoundException('Employee profile not found');
 
@@ -292,7 +349,7 @@ export class AssetsService {
         requestType: data.requestType || 'NEW_DEVICE',
         category: data.category || 'LAPTOP',
         urgency: data.urgency || 'MEDIUM',
-        reason: data.reason,
+        reason: this.packRequestText(data.subject, data.reason),
         images: imagesStr,
         status: 'PENDING'
       }
@@ -306,31 +363,33 @@ export class AssetsService {
         roles: ['SUPERADMIN', 'ADMIN', 'HR'],
         excludeUserId: userId,
         title: urgent ? 'Urgent Hardware Request' : 'New Hardware Request',
-        message: `${name} requested ${(data.category || 'hardware').toLowerCase()}: ${data.reason}`,
+        message: `${name} requested ${(data.category || 'hardware').toLowerCase()}: ${data.subject}`,
         type: 'ACTION_REQUIRED',
         linkUrl: '/assets/requests',
       })
       .catch(() => { /* the request is saved; the alert is best-effort */ });
 
-    return created;
+    return this.presentHardwareRequest(created);
   }
 
-  async updateHardwareRequest(companyId: number, id: number, userId: number, data: { requestType?: string; category?: string; urgency?: string; reason?: string; images?: string[] }) {
+  async updateHardwareRequest(companyId: number, id: number, userId: number, userRole: string, data: { requestType?: string; category?: string; urgency?: string; subject?: string; reason?: string; images?: string[] }) {
     const request = await this.prisma.hardwareRequest.findFirst({
       where: { id, companyId },
       include: { employee: true }
     });
     if (!request) throw new NotFoundException('Hardware request not found');
 
-    if (request.employee.userId !== userId) {
+    const isSuperAdmin = userRole === 'SUPERADMIN';
+    if (!isSuperAdmin && request.employee.userId !== userId) {
       throw new ForbiddenException('You can only edit your own hardware request');
     }
 
-    if (request.status !== 'PENDING') {
+    if (!isSuperAdmin && request.status !== 'PENDING') {
       throw new BadRequestException('Only pending requests can be edited');
     }
 
     const imagesStr = data.images && data.images.length > 0 ? (Array.isArray(data.images) ? JSON.stringify(data.images) : data.images) : null;
+    const currentContent = this.unpackRequestText(request.reason);
 
     return this.prisma.hardwareRequest.update({
       where: { id },
@@ -338,24 +397,25 @@ export class AssetsService {
         requestType: data.requestType || request.requestType,
         category: data.category || request.category,
         urgency: data.urgency || request.urgency,
-        reason: data.reason || request.reason,
+        reason: this.packRequestText(data.subject?.trim() || currentContent.subject || '', data.reason?.trim() || currentContent.reason),
         images: imagesStr
       }
     });
   }
 
-  async cancelHardwareRequest(companyId: number, id: number, userId: number) {
+  async cancelHardwareRequest(companyId: number, id: number, userId: number, userRole?: string) {
     const request = await this.prisma.hardwareRequest.findFirst({
       where: { id, companyId },
       include: { employee: true }
     });
     if (!request) throw new NotFoundException('Hardware request not found');
 
-    if (request.employee.userId !== userId) {
+    const canManageRequests = userRole === 'SUPERADMIN';
+    if (!canManageRequests && request.employee.userId !== userId) {
       throw new ForbiddenException('You can only cancel your own hardware request');
     }
 
-    if (request.status !== 'PENDING') {
+    if (!canManageRequests && request.status !== 'PENDING') {
       throw new BadRequestException('Only pending requests can be cancelled');
     }
 
