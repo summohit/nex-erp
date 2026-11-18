@@ -86,19 +86,21 @@ export class OutsideOfficeError extends BadRequestException {
  * `fieldVisit` / `photoRequired` flags tell newer clients to insist on a photo.
  */
 export class OutsideVisitError extends BadRequestException {
-  constructor(requestNumber: string, location: string, distance: string, radiusM: number, missing: 'reason' | 'photo') {
+  constructor(requestNumber: string, location: string, distance: string, radiusM: number, missing: 'reason' | 'photo', direction: 'in' | 'out' = 'in') {
     super({
       statusCode: 400,
       code: OutsideOfficeError.CODE,
-      direction: 'in',
+      direction,
       fieldVisit: true,
       photoRequired: true,
       radiusM,
       branchName: location,
       message: missing === 'photo'
-        ? `A photo is required to clock in away from the field visit site (${requestNumber}). You are ${distance} from ${location}.`
+        ? `A photo is required to clock ${direction} away from the field visit site (${requestNumber}). You are ${distance} from ${location}.`
         : `You are ${distance} from ${location} (${requestNumber}), outside the ${radiusM} m site radius. `
-          + 'Take a photo and describe the issue — the Super Admin reviews it, and you are marked clocked in once approved.',
+          + (direction === 'in'
+            ? 'Take a photo and describe the issue — the Super Admin reviews it, and you are marked clocked in once approved.'
+            : 'Take a photo and describe why you are clocking out away from the site — the Super Admin reviews it.'),
       error: 'Bad Request',
     });
   }

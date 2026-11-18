@@ -85,7 +85,7 @@ export class OutsideOfficeService {
     for (;;) {
       const answer = await this.dialog.promptWithAttachment(
         `${note}${body.message || 'You are outside the field visit site.'}`,
-        'Clock in away from the site',
+        body.direction === 'out' ? 'Clock out away from the site' : 'Clock in away from the site',
         {
           placeholder: 'Describe the issue, e.g. site moved to the client\'s warehouse, gate closed…',
           confirmLabel: 'Send for approval',

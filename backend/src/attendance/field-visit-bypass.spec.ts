@@ -109,10 +109,12 @@ describe('the ordinary clock on a field visit day', () => {
     expect(written.clockInOutsideReason).toMatch(/FVR-0009.*Site gate locked/);
   });
 
-  it('requires GPS coordinates to clock in on an approved field visit day', async () => {
-    await expect(service.clockIn(99, { ipAddress: '49.36.1.1' })).rejects.toThrow(
-      /GPS location is required/i,
-    );
+  // 18 Nov 2026: no GPS is no longer a dead end — it asks for a reason and a
+  // photo like being away from the site, and the Super Admin approves it.
+  it('asks for a reason and photo when there is no GPS on an approved field visit day', async () => {
+    await expect(service.clockIn(99, { ipAddress: '49.36.1.1' })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'OUTSIDE_OFFICE_REASON_REQUIRED', fieldVisit: true, photoRequired: true }),
+    });
   });
 
   it('is not late when clocking in at the site within the visit start', async () => {

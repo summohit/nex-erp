@@ -1,0 +1,643 @@
+@if (allowed()) {
+  <!-- Floating 60x60 Futuristic MIRA Launcher -->
+  <div class="mira-launcher-wrap">
+    <button
+      type="button"
+      class="mira-launcher"
+      [class.is-bursting]="isBursting()"
+      [class.is-morphed]="isLauncherMorphed()"
+      [class.is-returning]="justReturned()"
+      (click)="openPanel()"
+      aria-label="Open Ask MIRA AI assistant"
+      aria-haspopup="dialog"
+      [attr.aria-expanded]="open()"
+      aria-describedby="mira-launcher-tooltip"
+    >
+      <!-- Expanding Hover & Click Ripple Ring -->
+      <span class="mira-ripple" [class.burst]="isBursting()" aria-hidden="true"></span>
+
+      <!-- Stage 1 Click Sparkle Burst Particles -->
+      <span class="mira-burst-particles" [class.active]="isBursting()" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </span>
+
+      <!-- Animated MIRA Sparkle Icon -->
+      <span class="mira-sparkle" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path
+            class="mira-sparkle-primary"
+            d="M11 3l2.15 6.35L19.5 11.5l-6.35 2.15L11 20l-2.15-6.35L2.5 11.5l6.35-2.15z"
+          />
+          <path
+            class="mira-sparkle-secondary"
+            d="M19 3.2l.82 2.48 2.48.82-2.48.82L19 9.8l-.82-2.48-2.48-.82 2.48-.82z"
+          />
+        </svg>
+      </span>
+    </button>
+
+    <!-- Floating Hover / Focus Tooltip -->
+    <div id="mira-launcher-tooltip" role="tooltip" class="mira-tooltip">
+      <span>Ask MIRA</span>
+      <span class="mira-tooltip-kbd">Ctrl/⌘ + J</span>
+    </div>
+  </div>
+
+  <!-- Morphing Ask MIRA Chatbot Panel -->
+  @if (open()) {
+    <div
+      class="am-backdrop"
+      [class.closing]="isClosing()"
+      (click)="closePanel()"
+      aria-hidden="true"
+    ></div>
+
+    <aside
+      class="am-panel"
+      [class.mira-panel-opening]="isOpening()"
+      [class.mira-panel-closing]="isClosing()"
+      [class.mira-expanded]="expanded()"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Ask MIRA AI Assistant"
+    >
+      <!-- Stage 2 Morphing Purple Gradient Veil -->
+      <div class="mira-morph-veil" aria-hidden="true"></div>
+
+      <!-- Top Decorative Aurora Glow -->
+      <div class="am-aurora" aria-hidden="true"></div>
+
+      <!-- Header (.mira-header-enter) -->
+      <header class="am-head" [class.mira-header-enter]="isOpening()">
+        <div class="am-brand">
+          <span class="am-logo" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11 3l2.05 6.15L19.2 11.2l-6.15 2.05L11 19.4l-2.05-6.15L2.8 11.2l6.15-2.05z"/>
+              <path d="M18.8 3.6l.75 2.25 2.25.75-2.25.75-.75 2.25-.75-2.25-2.25-.75 2.25-.75z" opacity=".9"/>
+            </svg>
+          </span>
+          <div class="am-brand-text">
+            <strong>Ask MIRA</strong>
+            <small><span class="am-live-dot"></span>AI assistant · Super Admin</small>
+          </div>
+        </div>
+        <div class="am-head-actions">
+          <button type="button" class="am-icon-btn" (click)="newChat()" title="New chat" aria-label="Start new chat">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button
+            type="button"
+            class="am-icon-btn"
+            (click)="expanded.set(!expanded())"
+            [title]="expanded() ? 'Collapse view' : 'Expand view'"
+            [attr.aria-label]="expanded() ? 'Collapse chatbot panel' : 'Expand chatbot panel'"
+          >
+            @if (expanded()) {
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>
+            } @else {
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+            }
+          </button>
+          <button type="button" class="am-icon-btn" (click)="closePanel()" title="Close (Esc)" aria-label="Close Ask MIRA">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Sticky Mini Bar When In Active Conversation -->
+      @if (messages().length) {
+        <div class="am-chat-topbar">
+          <button type="button" class="am-back-btn" (click)="newChat()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            <span>Dashboard</span>
+          </button>
+          @if (briefing(); as b) {
+            <div class="am-mini-pills">
+              @for (it of b.items.slice(0, 4); track it.label) {
+                <button type="button" class="am-mini-pill" [attr.data-tone]="it.tone" (click)="send(it.ask)">
+                  <strong>{{ it.value }}</strong> {{ it.label }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Scrollable Body -->
+      <div class="am-body" #scroller>
+        @if (!messages().length) {
+          <section class="am-welcome">
+            <!-- Hero Greeting + 3D AI Robot Illustration (.mira-content-enter) -->
+            <div class="am-hero" [class.mira-content-enter]="isOpening()">
+              <div class="am-hero-copy">
+                <h3>
+                  {{ greetingPrefix() }},
+                  <span class="am-grad-name">{{ userName() }}</span>
+                  <span class="am-wave">👋</span>
+                </h3>
+                <p>Here's MIRA today. Tap a card or ask anything about attendance, leave, tasks or people.</p>
+              </div>
+
+              <!-- 3D-Style Friendly Robot Mascot -->
+              <!-- Animated MIRA robot mascot (17 Nov) -->
+              <div class="am-robot-wrap" aria-hidden="true">
+                <img class="am-robot-img" src="assets/ask-mira/mira-bot.svg" alt="" width="150" height="150">
+              </div>
+            </div>
+
+            <!-- 6 Pastel Briefing Cards (.mira-card-stagger) -->
+            @if (briefing(); as b) {
+              <div class="am-brief">
+                @for (it of b.items; track it.label; let ci = $index) {
+                  @let meta = cardMeta(it.label);
+                  <button
+                    type="button"
+                    class="am-brief-card {{ meta.cardClass }}"
+                    [class.mira-card-stagger]="isOpening()"
+                    [style.--stagger-i]="ci"
+                    [class.has-action]="meta.badge && it.value > 0"
+                    [attr.data-tone]="it.tone"
+                    (click)="send(it.ask)"
+                  >
+                    @if (meta.badge && it.value > 0) {
+                      <span class="am-action-pill">{{ meta.badge }} <i class="dot"></i></span>
+                    }
+
+                    <div class="am-card-top">
+                      <span class="am-card-icon" [attr.data-tone]="it.tone">
+                        @switch (it.label) {
+                          @case ('Present') {
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                          }
+                          @case ('Late') {
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                          }
+                          @case ('On leave') {
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+                          }
+                          @case ('Not clocked in') {
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                          }
+                          @case ('Pending leave') {
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4M12 14l3-3M12 6a8 8 0 1 0 8 8 8 8 0 0 0-8-8z"/></svg>
+                          }
+                          @default {
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                          }
+                        }
+                      </span>
+                    </div>
+
+                    <span class="v">{{ it.value }}</span>
+
+                    <div class="am-card-foot">
+                      <span class="l">{{ it.label }}</span>
+                      <span class="am-trend" [attr.data-dir]="meta.dir">
+                        {{ meta.dir === 'up' ? '↗' : '↘' }} {{ meta.trend }}
+                      </span>
+                    </div>
+                  </button>
+                }
+              </div>
+            } @else {
+              <div class="am-brief loading">
+                @for (i of [1,2,3,4,5,6]; track i) {
+                  <div class="am-brief-card skel"></div>
+                }
+              </div>
+            }
+
+            <!-- Try Asking Header -->
+            <div class="am-sugg-head" [class.mira-content-enter]="isOpening()">
+              <div class="am-sugg-title">
+                <span class="am-bolt">⚡</span>
+                <span>Try asking</span>
+              </div>
+              <button type="button" class="am-see-all" (click)="showAllSuggestions.set(!showAllSuggestions())">
+                {{ showAllSuggestions() ? 'Show less' : 'See all →' }}
+              </button>
+            </div>
+
+            <!-- 2-Column Rich Suggestion Cards (.mira-card-stagger) -->
+            <div class="am-sugg-grid">
+              @for (s of visibleSuggestions(); track s.text; let si = $index) {
+                <button
+                  type="button"
+                  class="am-sugg-card"
+                  [class.mira-card-stagger]="isOpening()"
+                  [style.--stagger-i]="si + 4"
+                  (click)="send(s.text)"
+                >
+                  <span class="am-sugg-ic" [attr.data-tone]="s.tone">
+                    @switch (s.icon) {
+                      @case ('calendar') {
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/></svg>
+                      }
+                      @case ('island') {
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M13 6.06V3h-2v3.06A8.994 8.994 0 0 0 3.22 13h17.56A8.994 8.994 0 0 0 13 6.06zM11 15v5H4v2h16v-2h-7v-5h-2z"/></svg>
+                      }
+                      @case ('trophy') {
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0 0 11 15.9V19H7v2h10v-2h-4v-3.1a5.01 5.01 0 0 0 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>
+                      }
+                      @case ('alert-doc') {
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm-1 15h-2v-2h2v2zm0-4h-2V9h2v4zm1-5V3.5L18.5 8H14z"/></svg>
+                      }
+                      @case ('checklist') {
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                      }
+                      @case ('chart') {
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg>
+                      }
+                      @case ('user-plus') {
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                      }
+                      @default {
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 13h-2v-2h2v2zm1.8-5.1c-.3.4-.8.8-1.1 1.1-.3.3-.7.8-.7 1.5h-2c0-.9.4-1.7.9-2.2.4-.4 1-.8 1.2-1.2.2-.3.2-.8-.1-1.1-.3-.3-.7-.4-1.1-.4-.8 0-1.3.5-1.4 1.2H8.5C8.6 7.4 9.9 6 11.9 6c1.1 0 2.1.4 2.7 1.1.7.8.7 2 .2 2.8z"/></svg>
+                      }
+                    }
+                  </span>
+                  <span class="am-sugg-txt">{{ s.text }}</span>
+                  <span class="am-sugg-chev">›</span>
+                </button>
+              }
+            </div>
+          </section>
+        }
+
+        <!-- Chat Messages -->
+        @for (m of messages(); track $index; let mi = $index) {
+          @if (m.role === 'user') {
+            <div class="am-msg user">
+              <div class="am-user-col">
+                @if (m.replyTo) {
+                  <div class="am-msg-reply-tag">↩ {{ m.replyTo }}</div>
+                }
+                <div class="bubble">{{ m.content }}</div>
+                @if (m.time) {
+                  <span class="am-msg-time">{{ m.time }}</span>
+                }
+              </div>
+            </div>
+          } @else {
+            <div class="am-msg bot" [class.err]="m.error">
+              <div class="am-bot-head">
+                <span class="am-bot-ava">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/></svg>
+                </span>
+                <strong>MIRA AI</strong>
+                <span class="am-bot-badge">Live Data</span>
+                @if (m.time) {
+                  <span class="am-msg-time">{{ m.time }}</span>
+                }
+              </div>
+
+              <div class="am-bot-card">
+                <div class="am-answer" [innerHTML]="m.html"></div>
+
+                @for (b of m.blocks || []; track $index; let bi = $index) {
+                  @switch (b.type) {
+                    @case ('kpis') {
+                      <div class="am-kpis">
+                        @if (asKpis(b).title) {
+                          <div class="am-block-title">
+                            <span class="am-blk-ic">📊</span>
+                            <span>{{ asKpis(b).title }}</span>
+                          </div>
+                        }
+                        <div class="am-kpi-row">
+                          @for (k of asKpis(b).items; track k.label) {
+                            @let tone = kpiTone(k);
+                            @let ic = kpiIcon(k.label);
+                            <div class="am-kpi" [attr.data-tone]="tone">
+                              <div class="am-kpi-top">
+                                <span class="v">{{ k.value }}</span>
+                                <span class="am-kpi-ic" aria-hidden="true">
+                                  @switch (ic) {
+                                    @case ('users') {
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                                    }
+                                    @case ('check') {
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                                    }
+                                    @case ('clock') {
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                                    }
+                                    @case ('alert') {
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+                                    }
+                                    @default {
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z"/></svg>
+                                    }
+                                  }
+                                </span>
+                              </div>
+                              <span class="l">{{ k.label }}</span>
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    }
+                    @case ('chart') {
+                      <div class="am-chart">
+                        <div class="am-block-title">
+                          <span class="am-blk-ic">📈</span>
+                          <span>{{ asChart(b).title }}</span>
+                        </div>
+                        @if (asChart(b).kind === 'line') {
+                          <svg viewBox="0 0 100 42" preserveAspectRatio="none" class="am-line">
+                            <defs>
+                              <linearGradient id="amChartGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#6542F5" stop-opacity="0.28"/>
+                                <stop offset="100%" stop-color="#6542F5" stop-opacity="0.0"/>
+                              </linearGradient>
+                            </defs>
+                            <polygon [attr.points]="areaPoints(asChart(b))" fill="url(#amChartGrad)"/>
+                            <polyline [attr.points]="linePoints(asChart(b))" fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+                          </svg>
+                          <div class="am-line-axis">
+                            <span>{{ asChart(b).labels[0] }}</span>
+                            <span>{{ asChart(b).labels[asChart(b).labels.length - 1] }}</span>
+                          </div>
+                        } @else {
+                          <div class="am-bars">
+                            @for (l of asChart(b).labels; track $index; let i = $index) {
+                              <div class="am-bar-row">
+                                <span class="lbl" [title]="l">{{ l }}</span>
+                                <span class="track">
+                                  <span class="fill" [style.width.%]="asChart(b).values[i] / chartMax(asChart(b)) * 100"></span>
+                                </span>
+                                <span class="val">{{ asChart(b).values[i] }}</span>
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                    @case ('table') {
+                      @let tKey = mi + '-' + bi;
+                      @let rows = filteredRows(asTable(b), tKey);
+                      <div class="am-table">
+                        <div class="am-table-head">
+                          <div class="am-block-title">
+                            <span class="am-blk-ic">📋</span>
+                            <span>{{ asTable(b).title }}</span>
+                            <span class="cnt">{{ rows.length }}</span>
+                          </div>
+                          <div class="am-table-tools">
+                            @if (asTable(b).rows.length > 4) {
+                              <div class="am-search-wrap">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+                                <input
+                                  type="search"
+                                  class="am-tbl-search"
+                                  placeholder="Filter rows…"
+                                  aria-label="Filter table rows"
+                                  [ngModel]="tableSearch[tKey] || ''"
+                                  (ngModelChange)="tableSearch[tKey] = $event"
+                                />
+                              </div>
+                            }
+                            <button type="button" class="am-excel-btn" (click)="exportCsv(asTable(b))" title="Download for Excel">
+                              ⬇ Excel
+                            </button>
+                          </div>
+                        </div>
+                        <div class="am-table-scroll">
+                          <table>
+                            <thead>
+                              <tr>
+                                @for (c of asTable(b).columns; track c) {
+                                  <th>{{ c }}</th>
+                                }
+                                <th class="am-th-act"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              @for (r of rows.slice(0, limitFor(tKey)); track $index; let ri = $index) {
+                                <tr>
+                                  @for (v of r; track $index; let ci = $index) {
+                                    @let colName = asTable(b).columns[ci];
+                                    @if (ci === 0 && asTable(b).employeeIds?.[ri] && colName === 'Employee') {
+                                      <td>
+                                        <a class="am-person" (click)="openProfile(asTable(b).employeeIds?.[ri])">
+                                          @if (asTable(b).avatars?.[asTable(b).employeeIds?.[ri] ?? 0]; as av) { <img class="am-emp-ini am-emp-img" [src]="av" alt="" (error)="$any($event.target).style.display='none'"> } @else { <span class="am-emp-ini">{{ initials(v) }}</span> }
+                                          <span>{{ v }}</span>
+                                          <span class="am-ext-arr" aria-hidden="true">↗</span>
+                                        </a>
+                                      </td>
+                                    } @else if (colName === 'Assignee' && asTable(b).employeeIds?.[ri]) {
+                                      <td>
+                                        <a class="am-person" (click)="openProfile(asTable(b).employeeIds?.[ri])">
+                                          @if (asTable(b).avatars?.[asTable(b).employeeIds?.[ri] ?? 0]; as av) { <img class="am-emp-ini am-emp-img" [src]="av" alt="" (error)="$any($event.target).style.display='none'"> } @else { <span class="am-emp-ini">{{ initials(v) }}</span> }
+                                          <span>{{ v }}</span>
+                                          <span class="am-ext-arr" aria-hidden="true">↗</span>
+                                        </a>
+                                      </td>
+                                    } @else if (colName === 'Status') {
+                                      <td>
+                                        <span class="am-status" [attr.data-s]="v">
+                                          <i class="s-dot"></i>{{ v }}
+                                        </span>
+                                      </td>
+                                    } @else if (isDateValue(v)) {
+                                      <td>
+                                        <span class="am-date-pill">{{ formatDateCell(v) }}</span>
+                                      </td>
+                                    } @else if (colName === 'Location' || colName === 'Project' || colName === 'Reason' || colName === 'Task') {
+                                      <td class="am-trunc-td">
+                                        <div class="am-trunc-cell" [title]="v ?? ''">
+                                          @if (colName === 'Location' && v) {
+                                            <span class="am-loc-pin" aria-hidden="true">📍</span>
+                                          }
+                                          <span>{{ v ?? '—' }}</span>
+                                        </div>
+                                      </td>
+                                    } @else {
+                                      <td>{{ v ?? '—' }}</td>
+                                    }
+                                  }
+                                  <td class="am-td-act">
+                                    <button
+                                      type="button"
+                                      class="am-row-reply"
+                                      title="Ask MIRA about {{ r[0] }}"
+                                      (click)="askAboutPerson(r[0], asTable(b).title)"
+                                    >
+                                      ↩
+                                    </button>
+                                  </td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        </div>
+                        @if (rows.length > limitFor(tKey)) {
+                          <button type="button" class="am-more" (click)="showMore(tKey, rows.length)">
+                            Show all {{ rows.length }} records →
+                          </button>
+                        }
+                      </div>
+                    }
+                  }
+                }
+
+                @if (m.sources?.length) {
+                  <div class="am-sources">
+                    <span class="am-src-ic">✓</span> Verified from: {{ m.sources!.join(' · ') }}
+                  </div>
+                }
+
+                <div class="am-bot-actions">
+                  <button type="button" class="am-act-btn" (click)="setReplyContext(m.content)" title="Reply to this answer">
+                    ↩ Reply
+                  </button>
+                  <button type="button" class="am-act-btn" (click)="copyMessage(m, mi)" title="Copy response">
+                    {{ copiedIndex() === mi ? '✓ Copied' : '📋 Copy' }}
+                  </button>
+                  <button type="button" class="am-act-btn" (click)="regenerate(mi)" title="Regenerate response">
+                    🔄 Retry
+                  </button>
+                  <div class="am-react-grp">
+                    <button
+                      type="button"
+                      class="am-act-btn icon-only"
+                      [class.active]="m.reaction === 'up'"
+                      (click)="react(mi, 'up')"
+                      title="Helpful"
+                    >
+                      👍
+                    </button>
+                    <button
+                      type="button"
+                      class="am-act-btn icon-only"
+                      [class.active]="m.reaction === 'down'"
+                      (click)="react(mi, 'down')"
+                      title="Not helpful"
+                    >
+                      👎
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              @if (mi === messages().length - 1 && m.followUps?.length && !thinking()) {
+                <div class="am-followups">
+                  <span class="am-fu-lbl">⚡ Suggested follow-ups:</span>
+                  <div class="am-fu-list">
+                    @for (fu of m.followUps; track fu) {
+                      <button type="button" class="am-fu-chip" (click)="send(fu)">
+                        <span>{{ fu }}</span>
+                        <span class="arr">›</span>
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        }
+
+        @if (thinking()) {
+          <div class="am-msg bot">
+            <div class="am-bot-head">
+              <span class="am-bot-ava pulse">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/></svg>
+              </span>
+              <strong>MIRA AI</strong>
+            </div>
+            <div class="am-typing">
+              <span></span><span></span><span></span>
+              <em>Analyzing live MIRA data…</em>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Footer Area (.mira-input-enter) -->
+      <div class="am-bottom-area" [class.mira-input-enter]="isOpening()">
+        @if (replyingTo(); as rep) {
+          <div class="am-reply-banner">
+            <div class="am-reply-info">
+              <span class="am-reply-badge">↩ Replying to</span>
+              <span class="am-reply-text">{{ rep.preview }}</span>
+            </div>
+            <button type="button" class="am-reply-close" (click)="clearReply()" title="Cancel reply">✕</button>
+          </div>
+        }
+
+        <form class="am-foot" (submit)="$event.preventDefault(); send()">
+          <span class="am-input-sparkle" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11 3l2.05 6.15L19.2 11.2l-6.15 2.05L11 19.4l-2.05-6.15L2.8 11.2l6.15-2.05z"/>
+              <path d="M18.8 3.6l.75 2.25 2.25.75-2.25.75-.75 2.25-.75-2.25-2.25-.75 2.25-.75z" opacity=".85"/>
+            </svg>
+          </span>
+          <label for="am-chat-input" class="am-sr-only">Ask MIRA about attendance, leave, tasks, people</label>
+          <textarea
+            id="am-chat-input"
+            #inputEl
+            rows="1"
+            placeholder="Ask about attendance, leave, tasks, people..."
+            [ngModel]="input()"
+            (ngModelChange)="input.set($event)"
+            name="miraQuery"
+            (keydown)="onKeydown($event)"
+          ></textarea>
+          <button
+            type="button"
+            class="am-mic-btn"
+            [class.listening]="listening()"
+            (click)="toggleVoice()"
+            [title]="listening() ? 'Listening… click to stop' : 'Voice input'"
+            aria-label="Voice input"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="2" width="6" height="11" rx="3"/>
+              <path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8"/>
+            </svg>
+          </button>
+          <button
+            type="submit"
+            class="am-send"
+            [disabled]="!input().trim() || thinking()"
+            aria-label="Send message"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </form>
+
+        <div class="am-quick-bar">
+          <span class="am-quick-lbl"><span class="bolt">⚡</span> Quick suggestions:</span>
+          @for (qc of quickChips; track qc.label) {
+            <button type="button" class="am-quick-chip" (click)="send(qc.ask)">{{ qc.label }}</button>
+          }
+          <button type="button" class="am-quick-chip more" (click)="showMoreQuick.set(!showMoreQuick())">
+            More {{ showMoreQuick() ? '▴' : '▾' }}
+          </button>
+        </div>
+
+        @if (showMoreQuick()) {
+          <div class="am-quick-extra">
+            @for (eq of extraQuickChips; track eq.label) {
+              <button type="button" class="am-quick-chip" (click)="send(eq.ask); showMoreQuick.set(false)">
+                {{ eq.label }}
+              </button>
+            }
+          </div>
+        }
+
+        <div class="am-hint">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+          <span>Read-only · Answers come from live MIRA data</span>
+          <span class="sep">|</span>
+          <span>Ctrl/⌘ + J</span>
+        </div>
+      </div>
+    </aside>
+  }
+}

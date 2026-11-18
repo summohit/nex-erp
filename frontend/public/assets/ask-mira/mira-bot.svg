@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320" role="img" aria-label="MIRA assistant waving hi">
+  <defs>
+    <radialGradient id="shell" cx=".38" cy=".28" r=".85">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".55" stop-color="#f1f3fc"/>
+      <stop offset="1" stop-color="#c9cfee"/>
+    </radialGradient>
+    <radialGradient id="shellBody" cx=".4" cy=".25" r=".9">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".6" stop-color="#eef0fa"/>
+      <stop offset="1" stop-color="#c3c9ea"/>
+    </radialGradient>
+    <radialGradient id="visor" cx=".45" cy=".35" r=".8">
+      <stop offset="0" stop-color="#1d2552"/>
+      <stop offset=".7" stop-color="#0d1233"/>
+      <stop offset="1" stop-color="#060920"/>
+    </radialGradient>
+    <linearGradient id="visorShine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b7cfa"/>
+      <stop offset="1" stop-color="#2c3fd6"/>
+    </linearGradient>
+    <radialGradient id="blueBall" cx=".35" cy=".3" r=".75">
+      <stop offset="0" stop-color="#a9c2ff"/>
+      <stop offset=".5" stop-color="#4f6bf5"/>
+      <stop offset="1" stop-color="#2433b8"/>
+    </radialGradient>
+    <linearGradient id="bubble" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c6cff"/>
+      <stop offset="1" stop-color="#4b3fe0"/>
+    </linearGradient>
+    <radialGradient id="bg" cx=".55" cy=".45" r=".6">
+      <stop offset="0" stop-color="#e9e6ff" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#e9e6ff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#3a3f9a" flood-opacity=".22"/>
+    </filter>
+    <filter id="neon" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="blur6"><feGaussianBlur stdDeviation="6"/></filter>
+    <style>
+      .float  { animation: float 3.2s ease-in-out infinite; }
+      .wave   { animation: wave 1.8s ease-in-out infinite; transform-origin: 120px 222px; }
+      .eye    { animation: blink 4.5s infinite; transform-box: fill-box; transform-origin: center; }
+      .face   { animation: glow 2.4s ease-in-out infinite; }
+      .bubble { animation: pop 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+      .tip    { animation: tip 1.6s ease-in-out infinite; }
+      .shadow { animation: shadow 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+      .head   { animation: tilt 6.4s ease-in-out infinite; transform-origin: 182px 206px; }
+      @keyframes float  { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
+      @keyframes wave   { 0%,100% { transform: rotate(0) } 30% { transform: rotate(-14deg) } 70% { transform: rotate(9deg) } }
+      @keyframes blink  { 0%,46%,52%,100% { transform: scaleY(1) } 49% { transform: scaleY(.12) } }
+      @keyframes glow   { 0%,100% { opacity: .88 } 50% { opacity: 1 } }
+      @keyframes pop    { 0%,100% { transform: scale(1) } 8% { transform: scale(1.1) } 16% { transform: scale(1) } }
+      @keyframes tip    { 0%,100% { opacity: .6 } 50% { opacity: 1 } }
+      @keyframes shadow { 0%,100% { transform: scaleX(1); opacity: .22 } 50% { transform: scaleX(.86); opacity: .13 } }
+      @keyframes tilt   { 0%,100% { transform: rotate(0) } 25% { transform: rotate(-3deg) } 75% { transform: rotate(2deg) } }
+      @media (prefers-reduced-motion: reduce) { .float,.wave,.eye,.face,.bubble,.tip,.shadow,.head { animation: none } }
+    </style>
+  </defs>
+
+  <circle cx="180" cy="170" r="150" fill="url(#bg)"/>
+  <ellipse class="shadow" cx="182" cy="306" rx="74" ry="9" fill="#3a3f9a"/>
+
+  <g class="float">
+    <path d="M118 262 Q112 222 142 208 Q180 196 218 208 Q250 222 244 262 Q240 300 206 306 L156 306 Q122 300 118 262 Z" fill="url(#shellBody)" filter="url(#soft)"/>
+    <ellipse cx="160" cy="232" rx="20" ry="10" fill="#fff" opacity=".7"/>
+    <circle cx="181" cy="258" r="11" fill="#e6e9f8"/>
+    <circle class="tip" cx="181" cy="258" r="6" fill="url(#blueBall)"/>
+
+    <path d="M236 226 Q260 238 256 276" fill="none" stroke="url(#shellBody)" stroke-width="22" stroke-linecap="round" filter="url(#soft)"/>
+    <circle cx="238" cy="226" r="11" fill="url(#blue)"/>
+    <ellipse cx="256" cy="282" rx="14" ry="13" fill="url(#shell)" filter="url(#soft)"/>
+
+    <g class="wave">
+      <circle cx="122" cy="222" r="12" fill="url(#blue)"/>
+      <path d="M118 220 Q90 210 82 174" fill="none" stroke="url(#shellBody)" stroke-width="24" stroke-linecap="round" filter="url(#soft)"/>
+      <rect x="66" y="160" width="34" height="14" rx="7" transform="rotate(-12 83 167)" fill="url(#blue)"/>
+      <g filter="url(#soft)">
+        <ellipse cx="78" cy="140" rx="24" ry="22" fill="url(#shell)"/>
+        <rect x="52" y="96"  width="13" height="40" rx="6.5" transform="rotate(-14 58 116)" fill="url(#shell)"/>
+        <rect x="65" y="86"  width="13" height="44" rx="6.5" transform="rotate(-5 71 108)"  fill="url(#shell)"/>
+        <rect x="79" y="86"  width="13" height="44" rx="6.5" transform="rotate(4 85 108)"   fill="url(#shell)"/>
+        <rect x="92" y="94"  width="12" height="40" rx="6"   transform="rotate(13 98 114)"  fill="url(#shell)"/>
+        <rect x="96" y="128" width="12" height="30" rx="6"   transform="rotate(48 102 143)" fill="url(#shell)"/>
+      </g>
+      <ellipse cx="72" cy="132" rx="8" ry="5" fill="#fff" opacity=".8"/>
+    </g>
+
+    <rect x="152" y="196" width="58" height="16" rx="8" fill="url(#blue)"/>
+
+    <g class="head">
+      <line x1="182" y1="62" x2="182" y2="40" stroke="#c9cfee" stroke-width="5" stroke-linecap="round"/>
+      <circle class="tip" cx="182" cy="34" r="16" fill="#7c94ff" opacity=".35" filter="url(#blur6)"/>
+      <circle cx="182" cy="34" r="9" fill="url(#blueBall)"/>
+      <circle cx="179" cy="31" r="3" fill="#fff" opacity=".8"/>
+
+      <g filter="url(#soft)">
+        <ellipse cx="92"  cy="138" rx="20" ry="30" fill="url(#blue)"/>
+        <ellipse cx="272" cy="138" rx="20" ry="30" fill="url(#blue)"/>
+      </g>
+      <ellipse cx="88" cy="128" rx="5" ry="10" fill="#fff" opacity=".35"/>
+
+      <path d="M182 60 C246 60 270 98 270 140 C270 186 236 206 182 206 C128 206 94 186 94 140 C94 98 118 60 182 60 Z" fill="url(#shell)" filter="url(#soft)"/>
+      <ellipse cx="146" cy="84" rx="30" ry="12" fill="#fff" opacity=".9" transform="rotate(-18 146 84)"/>
+
+      <path d="M182 86 C232 86 250 104 250 138 C250 172 230 186 182 186 C134 186 114 172 114 138 C114 104 132 86 182 86 Z" fill="url(#visor)"/>
+      <path d="M182 90 C226 90 244 104 245 126 C220 112 146 112 119 126 C120 104 138 90 182 90 Z" fill="url(#visorShine)"/>
+
+      <g class="face" filter="url(#neon)" fill="none" stroke="#5fd8ff" stroke-width="8" stroke-linecap="round">
+        <path class="eye" d="M140 140 Q153 122 166 140"/>
+        <path class="eye" d="M198 140 Q211 122 224 140"/>
+        <path d="M166 158 Q182 172 198 158"/>
+      </g>
+    </g>
+  </g>
+
+  <g class="bubble" filter="url(#soft)">
+    <path d="M10 46 Q10 18 38 18 L104 18 Q132 18 132 46 L132 72 Q132 98 104 98 L74 98 L56 118 L58 98 L38 98 Q10 98 10 72 Z" fill="url(#bubble)"/>
+    <path d="M22 44 Q24 28 40 28 L100 28" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".25"/>
+    <text x="71" y="72" text-anchor="middle" font-family="Outfit, Inter, Arial, sans-serif" font-size="34" font-weight="800" fill="#fff">Hi!</text>
+  </g>
+</svg>

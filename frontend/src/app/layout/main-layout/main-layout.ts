@@ -13,12 +13,13 @@ import { isUiV2 } from '../../core/ui-version';
 import { onboardingPreviewStep } from '../../shared/components/self-onboarding-gate/onboarding-preview';
 import { DialogHostComponent } from '../../shared/components/dialog-host/dialog-host.component';
 import { NoticePopupComponent } from '../../shared/components/notice-popup/notice-popup';
+import { AskMiraComponent } from '../../shared/components/ask-mira/ask-mira';
 import { ChatMessagePopupComponent } from '../../shared/components/chat-message-popup/chat-message-popup';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule, SidebarComponent, SidebarComponentV2, HeaderComponent, HeaderComponentV2, DialogHostComponent, NoticePopupComponent, ProfileReminderComponent, ProfileModalComponent, ChatMessagePopupComponent, SelfOnboardingGateComponent],
+  imports: [CommonModule, RouterModule, SidebarComponent, SidebarComponentV2, HeaderComponent, HeaderComponentV2, DialogHostComponent, NoticePopupComponent, ProfileReminderComponent, ProfileModalComponent, ChatMessagePopupComponent, SelfOnboardingGateComponent, AskMiraComponent],
   templateUrl: './main-layout.html',
   styleUrls: ['./main-layout.css']
 })

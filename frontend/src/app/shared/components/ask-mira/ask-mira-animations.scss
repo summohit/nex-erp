@@ -1,0 +1,544 @@
+// =============================================================================
+// Ask MIRA — Modular Futuristic Launcher & Morphing Panel Animation System
+// =============================================================================
+// Primary Palette Tokens:
+//   Primary Violet:   #6542F5
+//   Secondary Purple: #8438ED
+//   Background:       #F8F9FF
+//   Text:             #171A2E
+//   Border:           #E5E7F2
+// =============================================================================
+
+$mira-violet: #6542f5;
+$mira-purple: #8438ed;
+$mira-bg: #f8f9ff;
+$mira-text: #171a2e;
+$mira-border: #e5e7f2;
+
+$ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+$ease-spring: cubic-bezier(0.22, 1.18, 0.36, 1);
+$ease-in-out-Quint: cubic-bezier(0.65, 0, 0.35, 1);
+
+// -----------------------------------------------------------------------------
+// 1. Floating MIRA Launcher (.mira-launcher)
+// -----------------------------------------------------------------------------
+.mira-launcher-wrap {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2147483645;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.mira-launcher {
+  pointer-events: auto;
+  position: relative;
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 20px;
+  cursor: pointer;
+  color: #ffffff;
+  background: linear-gradient(135deg, $mira-violet 0%, $mira-purple 100%);
+  box-shadow:
+    0 12px 28px rgba(101, 66, 245, 0.36),
+    0 4px 10px rgba(23, 26, 46, 0.14),
+    inset 0 1px 1px rgba(255, 255, 255, 0.42);
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  transform-origin: center center;
+  transition:
+    transform 280ms $ease-spring,
+    border-radius 280ms $ease-out-expo,
+    opacity 240ms ease-out;
+
+  // Ambient GPU-composited glow halo (animates transform & opacity, not box-shadow)
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    z-index: -2;
+    border-radius: 26px;
+    background: radial-gradient(
+      circle,
+      rgba(132, 56, 237, 0.58) 0%,
+      rgba(101, 66, 245, 0.28) 52%,
+      transparent 76%
+    );
+    opacity: 0.65;
+    transform: scale(0.94);
+    transition:
+      transform 320ms $ease-out-expo,
+      opacity 320ms ease-out;
+    pointer-events: none;
+  }
+
+  // Subtle glass inner sheen
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    z-index: -1;
+    border-radius: 19px;
+    background: linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.28) 0%,
+      rgba(255, 255, 255, 0.03) 48%,
+      rgba(101, 66, 245, 0.12) 100%
+    );
+    pointer-events: none;
+  }
+
+  &:focus-visible {
+    outline: 2.5px solid $mira-violet;
+    outline-offset: 4px;
+  }
+
+  // Hover & keyboard focus micro-interaction
+  &:hover,
+  &:focus-visible {
+    @media (prefers-reduced-motion: no-preference) {
+      transform: translateY(-3px) scale(1.06);
+    }
+    border-radius: 22px;
+
+    &::before {
+      opacity: 1;
+      @media (prefers-reduced-motion: no-preference) {
+        transform: scale(1.18);
+      }
+    }
+
+    .mira-sparkle {
+      @media (prefers-reduced-motion: no-preference) {
+        transform: scale(1.14) rotate(16deg);
+      }
+    }
+
+    .mira-sparkle-secondary {
+      @media (prefers-reduced-motion: no-preference) {
+        transform: translate(1px, -1px) scale(1.25) rotate(-25deg);
+      }
+      opacity: 1;
+    }
+
+    .mira-ripple {
+      opacity: 1;
+      @media (prefers-reduced-motion: no-preference) {
+        animation: miraHoverRipple 1.65s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+      }
+    }
+
+    & ~ .mira-tooltip {
+      opacity: 1;
+      transform: translateX(-8px) scale(1);
+    }
+  }
+
+  &:active {
+    @media (prefers-reduced-motion: no-preference) {
+      transform: scale(0.95);
+    }
+  }
+
+  // Stage 1: Initial click burst state before panel morphs open
+  &.is-bursting {
+    @media (prefers-reduced-motion: no-preference) {
+      animation: miraLauncherClickPop 180ms $ease-spring forwards;
+    }
+    &::before {
+      opacity: 1;
+      transform: scale(1.45);
+    }
+  }
+
+  // Hidden while panel is open; smoothly scales out during morph
+  &.is-morphed {
+    opacity: 0;
+    pointer-events: none;
+    @media (prefers-reduced-motion: no-preference) {
+      transform: scale(0.45);
+    }
+  }
+
+  // Smoothly returns when panel closes
+  &.is-returning {
+    @media (prefers-reduced-motion: no-preference) {
+      animation: miraLauncherReturn 420ms $ease-spring both;
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 2. Sparkle Icon & Burst Particles (.mira-sparkle)
+// -----------------------------------------------------------------------------
+.mira-sparkle {
+  position: relative;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  transition: transform 340ms $ease-spring;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: miraIdleFloat 3.6s ease-in-out infinite;
+  }
+
+  svg {
+    width: 28px;
+    height: 28px;
+    overflow: visible;
+    filter: drop-shadow(0 2px 6px rgba(255, 255, 255, 0.35));
+  }
+}
+
+.mira-sparkle-primary {
+  transform-origin: 11px 11px;
+}
+
+.mira-sparkle-secondary {
+  transform-origin: 19px 6px;
+  opacity: 0.85;
+  transition:
+    transform 340ms $ease-spring,
+    opacity 250ms ease;
+}
+
+// Click Sparkle Burst Particles (Stage 1)
+.mira-burst-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+
+  span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    margin: -3px 0 0 -3px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 0 8px #ffffff, 0 0 14px $mira-purple;
+    opacity: 0;
+  }
+
+  &.active span {
+    @media (prefers-reduced-motion: no-preference) {
+      &:nth-child(1) { animation: miraParticle1 420ms $ease-out-expo forwards; }
+      &:nth-child(2) { animation: miraParticle2 420ms $ease-out-expo forwards; }
+      &:nth-child(3) { animation: miraParticle3 420ms $ease-out-expo forwards; }
+      &:nth-child(4) { animation: miraParticle4 420ms $ease-out-expo forwards; }
+      &:nth-child(5) { animation: miraParticle5 420ms $ease-out-expo forwards; }
+      &:nth-child(6) { animation: miraParticle6 420ms $ease-out-expo forwards; }
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 3. Expanding Light / Ripple Effect (.mira-ripple)
+// -----------------------------------------------------------------------------
+.mira-ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1.5px solid rgba(167, 139, 250, 0.65);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+
+  &.burst {
+    @media (prefers-reduced-motion: no-preference) {
+      animation: miraClickRipple 420ms $ease-out-expo forwards;
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 4. Floating Tooltip (.mira-tooltip)
+// -----------------------------------------------------------------------------
+.mira-tooltip {
+  position: absolute;
+  right: calc(100% + 6px);
+  top: 50%;
+  translate: 0 -50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 13px;
+  border-radius: 12px;
+  background: rgba(23, 26, 46, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font: 600 12.5px/1 'Outfit', 'Inter', sans-serif;
+  white-space: nowrap;
+  box-shadow: 0 10px 25px rgba(23, 26, 46, 0.24);
+  opacity: 0;
+  transform: translateX(4px) scale(0.95);
+  transform-origin: right center;
+  transition:
+    opacity 200ms ease-out,
+    transform 220ms $ease-out-expo;
+  pointer-events: none;
+
+  .mira-tooltip-kbd {
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.14);
+    color: #c4b5fd;
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    margin-top: -4px;
+    width: 8px;
+    height: 8px;
+    background: rgba(23, 26, 46, 0.92);
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    border-right: 1px solid rgba(255, 255, 255, 0.14);
+    transform: rotate(45deg);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 5. Panel Opening, Closing & Expanded Morph States
+// -----------------------------------------------------------------------------
+// Stage 2 & 3: Launcher transforms into Chatbot Panel (~650ms)
+.mira-panel-opening {
+  transform-origin: calc(100% - 36px) calc(100% - 36px);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: miraPanelMorphOpen 620ms $ease-out-expo forwards;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    animation: miraFadeSimple 180ms ease-out forwards;
+  }
+
+  // Purple gradient morph veil that transitions from launcher gradient into header
+  .mira-morph-veil {
+    @media (prefers-reduced-motion: no-preference) {
+      animation: miraVeilDissolve 560ms $ease-out-expo forwards;
+    }
+  }
+}
+
+// Section 5: Smooth Closing Transformation back into Launcher (~420ms)
+.mira-panel-closing {
+  transform-origin: calc(100% - 36px) calc(100% - 36px);
+  pointer-events: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: miraPanelMorphClose 420ms $ease-in-out-Quint forwards;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    animation: miraFadeOutSimple 150ms ease-in forwards;
+  }
+
+  .mira-morph-veil {
+    @media (prefers-reduced-motion: no-preference) {
+      animation: miraVeilAppear 380ms ease-in forwards;
+    }
+  }
+}
+
+// Section 6: Expanded State transition (.mira-expanded)
+.mira-expanded {
+  width: min(980px, calc(100vw - 24px)) !important;
+}
+
+// -----------------------------------------------------------------------------
+// 6. Staggered Inner Section Reveal Classes (Stage 3)
+// -----------------------------------------------------------------------------
+.mira-header-enter {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: miraSlideDownFade 440ms $ease-out-expo 90ms both;
+  }
+}
+
+.mira-content-enter {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: miraSlideUpFade 480ms $ease-out-expo 150ms both;
+  }
+}
+
+.mira-card-stagger {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: miraCardStaggerIn 460ms $ease-out-expo both;
+    animation-delay: calc(200ms + (var(--stagger-i, 0) * 45ms));
+  }
+}
+
+.mira-input-enter {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: miraInputRise 480ms $ease-out-expo 260ms both;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 7. Keyframe Definitions (GPU-Friendly Transform & Opacity)
+// -----------------------------------------------------------------------------
+@keyframes miraIdleFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2px) scale(1.03); }
+}
+
+@keyframes miraHoverRipple {
+  0% {
+    transform: scale(1);
+    opacity: 0.72;
+  }
+  100% {
+    transform: scale(1.52);
+    opacity: 0;
+  }
+}
+
+@keyframes miraClickRipple {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+@keyframes miraLauncherClickPop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.16) rotate(8deg); }
+  100% { transform: scale(0.92); opacity: 0.85; }
+}
+
+@keyframes miraLauncherReturn {
+  0% {
+    opacity: 0;
+    transform: scale(0.35) rotate(-18deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.06) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes miraPanelMorphOpen {
+  0% {
+    opacity: 0.15;
+    transform: scale(0.11) translate3d(0, 12px, 0);
+    border-radius: 34px;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+    border-radius: 22px;
+  }
+}
+
+@keyframes miraPanelMorphClose {
+  0% {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+    border-radius: 22px;
+  }
+  65% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.11) translate3d(0, 12px, 0);
+    border-radius: 34px;
+  }
+}
+
+@keyframes miraVeilDissolve {
+  0% { opacity: 0.92; }
+  65% { opacity: 0.18; }
+  100% { opacity: 0; }
+}
+
+@keyframes miraVeilAppear {
+  0% { opacity: 0; }
+  100% { opacity: 0.85; }
+}
+
+@keyframes miraSlideDownFade {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes miraSlideUpFade {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes miraCardStaggerIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes miraInputRise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes miraFadeSimple {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes miraFadeOutSimple {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+// 6 radial particle bursts
+@keyframes miraParticle1 { 0% { opacity: 1; transform: translate(0, 0) scale(1); } 100% { opacity: 0; transform: translate(-34px, -28px) scale(0.2); } }
+@keyframes miraParticle2 { 0% { opacity: 1; transform: translate(0, 0) scale(1); } 100% { opacity: 0; transform: translate(32px, -30px) scale(0.2); } }
+@keyframes miraParticle3 { 0% { opacity: 1; transform: translate(0, 0) scale(1); } 100% { opacity: 0; transform: translate(-40px, 8px) scale(0.2); } }
+@keyframes miraParticle4 { 0% { opacity: 1; transform: translate(0, 0) scale(1); } 100% { opacity: 0; transform: translate(38px, 12px) scale(0.2); } }
+@keyframes miraParticle5 { 0% { opacity: 1; transform: translate(0, 0) scale(1); } 100% { opacity: 0; transform: translate(-14px, -42px) scale(0.2); } }
+@keyframes miraParticle6 { 0% { opacity: 1; transform: translate(0, 0) scale(1); } 100% { opacity: 0; transform: translate(16px, 36px) scale(0.2); } }

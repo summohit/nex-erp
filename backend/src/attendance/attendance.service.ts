@@ -471,19 +471,18 @@ export class AttendanceService {
     // Enforce field visit geofence if clocking in on an approved field visit day
     let visitOutside: Record<string, any> | null = null;
     if (visitDayToday && !options?.fieldVisit) {
-      if (data.lat == null || data.lng == null || !Number.isFinite(data.lat) || !Number.isFinite(data.lng)) {
-        throw new BadRequestException('Your GPS location is required to clock in on an approved field visit day.');
-      }
-
+      // No GPS fix (18 Nov 2026): not a flat refusal any more — same path as
+      // being away from the site (reason + photo, Super Admin approves).
+      const hasFix = data.lat != null && data.lng != null && Number.isFinite(data.lat) && Number.isFinite(data.lng);
       const visitLat = visitDayToday.request.latitude;
       const visitLng = visitDayToday.request.longitude;
       const radiusM = visitDayToday.request.geofenceRadiusM ?? 1000;
-      const distanceKm = haversineKm(visitLat, visitLng, data.lat, data.lng);
-      const distanceM = Math.round(distanceKm * 1000);
-      const allowedM = Math.round(distanceAllowingAccuracyM(distanceKm, data.accuracy));
+      const distanceKm = hasFix ? haversineKm(visitLat, visitLng, data.lat as number, data.lng as number) : null;
+      const distanceM = distanceKm == null ? null : Math.round(distanceKm * 1000);
+      const allowedM = distanceKm == null ? Infinity : Math.round(distanceAllowingAccuracyM(distanceKm, data.accuracy));
 
       if (allowedM > radiusM) {
-        const spokenDist = distanceM >= 1000 ? `${(distanceM / 1000).toFixed(1)}km` : `${distanceM}m`;
+        const spokenDist = distanceM == null ? 'at an unknown distance (GPS unavailable)' : distanceM >= 1000 ? `${(distanceM / 1000).toFixed(1)}km` : `${distanceM}m`;
         const { requestNumber, location } = visitDayToday.request;
         // Outside the site (16 Nov 2026): allowed with a reason and a photo,
         // then waits on the Super Admin like an out-of-office clock. Until it
@@ -494,8 +493,8 @@ export class AttendanceService {
         if (!proof) throw new OutsideVisitError(requestNumber, location, spokenDist, radiusM, 'photo');
         visitOutside = {
           clockInOutside: true,
-          clockInDistanceKm: Math.round(distanceKm * 100) / 100,
-          clockInOutsideReason: `Field visit ${requestNumber} at ${location} (${spokenDist} away): ${reason}`,
+          clockInDistanceKm: distanceKm == null ? null : Math.round(distanceKm * 100) / 100,
+          clockInOutsideReason: `Field visit ${requestNumber} at ${location} (${distanceM == null ? 'GPS unavailable' : spokenDist + ' away'}): ${reason}`,
           clockInOutsideProofUrl: proof,
           geofenceApproval: 'PENDING',
           geofenceReviewedById: null,
@@ -1019,7 +1018,37 @@ export class AttendanceService {
       },
       select: { id: true, request: { select: { requestNumber: true, location: true, latitude: true, longitude: true, geofenceRadiusM: true } } },
     });
-    if (plannedVisitDay) this.assertWithinApprovedVisitSite(plannedVisitDay as any, data, 'out');
+    // Field visit clock-out away from the site (18 Nov 2026). A previous day's
+    // session is closed from wherever the person is now (they are not at
+    // yesterday's site) — the late clock-out reason + approval covers it.
+    // Same day: allowed with a reason and a photo, pending Super Admin review,
+    // instead of a flat refusal that left people unable to ever close the day.
+    let visitOutsideOut: Record<string, any> = {};
+    if (plannedVisitDay && !isPreviousDay) {
+      try {
+        this.assertWithinApprovedVisitSite(plannedVisitDay as any, data, 'out');
+      } catch (e) {
+        const req = (plannedVisitDay as any).request;
+        const radiusM = req.geofenceRadiusM ?? 1000;
+        const hasFix = data.lat != null && data.lng != null && Number.isFinite(data.lat) && Number.isFinite(data.lng);
+        const distanceKm = hasFix ? haversineKm(req.latitude, req.longitude, data.lat as number, data.lng as number) : null;
+        const metres = distanceKm == null ? null : Math.round(distanceKm * 1000);
+        const spoken = metres == null ? 'at an unknown distance (GPS unavailable)' : metres >= 1000 ? `${(metres / 1000).toFixed(1)}km` : `${metres}m`;
+        const why = String((data as any).outsideReason ?? '').trim();
+        const proof = String((data as any).outsideProofUrl ?? '').trim();
+        if (!why) throw new OutsideVisitError(req.requestNumber, req.location, spoken, radiusM, 'reason', 'out');
+        if (!proof) throw new OutsideVisitError(req.requestNumber, req.location, spoken, radiusM, 'photo', 'out');
+        visitOutsideOut = {
+          clockOutOutside: true,
+          clockOutOutsideReason: `Field visit ${req.requestNumber} at ${req.location} (${metres == null ? 'GPS unavailable' : spoken + ' away'}): ${why}`,
+          clockOutOutsideProofUrl: proof,
+          geofenceApproval: 'PENDING',
+          geofenceReviewedById: null,
+          geofenceReviewedAt: null,
+          geofenceReviewNote: null,
+        };
+      }
+    }
 
     const effective = this.workingWindow(await this.roster.getEffectiveShift(
       employee.id, existing.date, personalDaysOff(employee as any).shift as any, personalDaysOff(employee as any).weeklyOffs,
@@ -1033,7 +1062,7 @@ export class AttendanceService {
     const officeOut = await this.officeCheck(
       employee, effective, exemptOut || (await this.hasApprovedWfh(employee.id, existing.date)), data,
     );
-    const outsideOut = this.outsideFields('out', officeOut, data);
+    const outsideOut = { ...this.outsideFields('out', officeOut, data), ...visitOutsideOut };
 
     let isEarlyLeave = false;
     let status = 'PRESENT';
