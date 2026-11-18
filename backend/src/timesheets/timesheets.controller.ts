@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, Param, Req, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Query, Param, Req, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { TimesheetsService } from './timesheets.service';
 import type { TimesheetScope, TimesheetFilters, TimesheetStatus } from './timesheets.service';
@@ -12,6 +12,28 @@ export class TimesheetsController {
   @Get('me')
   myWeek(@Req() req, @Query('startDate') startDate: string, @Query('endDate') endDate: string) {
     return this.timesheets.getWeek(req.user.companyId, req.user.employeeId, startDate, endDate);
+  }
+
+  /** The caller's tasks for a date, for the "Add work" picker (19 Nov 2026). */
+  @Get('my-tasks')
+  myTasks(@Req() req, @Query('date') date: string) {
+    return this.timesheets.myTasksForDate(req.user.companyId, req.user.employeeId ?? null, date);
+  }
+
+  /** Manual "Add work" lines on the caller's own timesheet (19 Nov 2026). */
+  @Post('work')
+  addWork(@Req() req, @Body() body: any) {
+    return this.timesheets.addWork(req.user.companyId, req.user.employeeId ?? null, body);
+  }
+
+  @Put('work/:id')
+  updateWork(@Req() req, @Param('id', ParseIntPipe) id: number, @Body() body: any) {
+    return this.timesheets.updateWork(req.user.companyId, req.user.employeeId ?? null, id, body);
+  }
+
+  @Delete('work/:id')
+  deleteWork(@Req() req, @Param('id', ParseIntPipe) id: number) {
+    return this.timesheets.deleteWork(req.user.companyId, req.user.employeeId ?? null, id);
   }
 
   /** Days waiting on this reviewer. */

@@ -291,6 +291,11 @@ export class PayProfilesService {
     });
 
     await this.audit(companyId, 'EmployeePayProfile', saved.id, 'CREATE', null, { ...saved, statutory }, actorUserId);
+    // Keep the old salary structure in step with the profile in force (19 Nov 2026).
+    // A future-dated version is picked up when it comes into force.
+    if (saved.effectiveFrom <= new Date()) {
+      try { await this.syncStructureFromProfile(companyId, employeeId, actorUserId); } catch { /* the profile is saved; sync is best-effort */ }
+    }
     return { profile: saved, breakup: result };
   }
 
@@ -661,6 +666,95 @@ export class PayProfilesService {
       }
     }
     return { saved: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok), results };
+  }
+
+  // ═══ Salary structure sync (19 Nov 2026) ════════════════════════════════
+  // The pay profile is the source of truth. The old per-employee
+  // SalaryStructure (still read by grades, project cost, hourly-rate fallback
+  // and travel allowance) is rewritten from the profile's current breakup:
+  // earnings that are part of gross, and employee deductions.
+
+  private async structureFromProfile(companyId: number, employeeId: number) {
+    const versions = await this.prisma.employeePayProfile.findMany({ where: { companyId, employeeId }, orderBy: { version: 'desc' } });
+    const cur = this.current(versions);
+    if (!cur) return null;
+    const now = new Date();
+    const fyStart = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const financialYear = `${fyStart}-${String((fyStart + 1) % 100).padStart(2, '0')}`;
+    const calc = await this.masters.prepareCalculator(companyId, cur.salaryGroupCode, now, { regimeCode: cur.taxRegime === 'OLD' ? 'OLD' : 'NEW', financialYear });
+    if (!calc) return { version: cur.version, error: `Salary group ${cur.salaryGroupCode} could not be calculated` } as const;
+    const out = calc.run(cur.annualCtc, (cur.overrides as any) ?? undefined, cur.grossMonthly);
+    const lines = (out?.lines ?? [])
+      .filter((l: any) => l.monthly > 0 && ((l.category === 'EARNING' && l.partOfGross) || l.category === 'EMPLOYEE_DEDUCTION'))
+      .map((l: any) => ({ name: String(l.name).trim(), type: l.category === 'EARNING' ? 'EARNING' : 'DEDUCTION', monthly: Math.round(l.monthly * 100) / 100 }));
+    const gross = Math.round(lines.filter((l) => l.type === 'EARNING').reduce((a, l) => a + l.monthly, 0) * 100) / 100;
+    return { version: cur.version, lines, gross } as const;
+  }
+
+  private gradeFor(grades: { name: string; minGross: number; maxGross: number | null }[], gross: number) {
+    if (!(gross > 0)) return null;
+    return grades.find((g) => gross >= g.minGross && (g.maxGross == null || gross <= g.maxGross))?.name ?? null;
+  }
+
+  /** Write one person's SalaryStructure from their current pay profile. */
+  async syncStructureFromProfile(companyId: number, employeeId: number, actorUserId?: number) {
+    const target = await this.structureFromProfile(companyId, employeeId);
+    if (!target || 'error' in target) return { synced: false, reason: target ? (target as any).error : 'No pay profile in force' };
+    const old = await this.prisma.salaryStructure.findMany({ where: { employeeId }, include: { component: true } });
+    await this.prisma.$transaction(async (tx) => {
+      const comps = await tx.salaryComponent.findMany({ where: { companyId } });
+      const byName = new Map(comps.map((c) => [c.name.trim().toLowerCase(), c]));
+      await tx.salaryStructure.deleteMany({ where: { employeeId } });
+      for (const l of target.lines) {
+        let c = byName.get(l.name.toLowerCase());
+        if (!c) {
+          c = await tx.salaryComponent.create({ data: { companyId, name: l.name, type: l.type, description: 'Created from pay profile sync' } });
+          byName.set(l.name.toLowerCase(), c);
+        }
+        await tx.salaryStructure.create({ data: { employeeId, componentId: c.id, amount: l.monthly } });
+      }
+    });
+    await this.audit(companyId, 'SalaryStructure', employeeId, 'SYNC_FROM_PAY_PROFILE',
+      old.map((o) => ({ name: o.component.name, type: o.component.type, amount: o.amount })),
+      { profileVersion: target.version, lines: target.lines, gross: target.gross }, actorUserId);
+    return { synced: true, gross: target.gross };
+  }
+
+  /** Before → after for every active person, nothing written. */
+  async previewStructureSync(companyId: number) {
+    const [emps, grades] = await Promise.all([
+      this.prisma.employee.findMany({
+        where: { companyId, user: { status: 'ACTIVE' }, offboardingStatus: { not: 'SEPARATED' } },
+        select: { id: true, firstName: true, lastName: true, employeeCode: true, salaryStructures: { select: { amount: true, component: { select: { type: true } } } } },
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      }),
+      this.prisma.salaryGrade.findMany({ where: { companyId }, orderBy: [{ position: 'asc' }, { minGross: 'asc' }], select: { name: true, minGross: true, maxGross: true } }),
+    ]);
+    const rows: any[] = [];
+    for (const e of emps) {
+      const oldGross = Math.round(e.salaryStructures.filter((s) => s.component.type === 'EARNING').reduce((a, s) => a + s.amount, 0) * 100) / 100;
+      const t = await this.structureFromProfile(companyId, e.id);
+      const name = `${e.firstName} ${e.lastName}`.trim();
+      if (!t) { rows.push({ employeeId: e.id, name, code: e.employeeCode, status: oldGross > 0 ? 'NO_PROFILE' : 'NEITHER', oldGross, newGross: null, oldGrade: this.gradeFor(grades, oldGross), newGrade: null }); continue; }
+      if ('error' in t) { rows.push({ employeeId: e.id, name, code: e.employeeCode, status: 'ERROR', note: (t as any).error, oldGross, newGross: null, oldGrade: this.gradeFor(grades, oldGross), newGrade: null }); continue; }
+      const same = Math.abs(oldGross - t.gross) < 1;
+      rows.push({ employeeId: e.id, name, code: e.employeeCode, status: same ? 'IN_SYNC' : 'WILL_CHANGE', oldGross, newGross: t.gross,
+        oldGrade: this.gradeFor(grades, oldGross), newGrade: this.gradeFor(grades, t.gross), lines: t.lines });
+    }
+    const count = (st: string) => rows.filter((r) => r.status === st).length;
+    return { summary: { total: rows.length, willChange: count('WILL_CHANGE'), inSync: count('IN_SYNC'), noProfile: count('NO_PROFILE'), neither: count('NEITHER'), errors: count('ERROR') }, rows };
+  }
+
+  /** Apply the catch-up for everyone who has a profile in force. */
+  async applyStructureSync(companyId: number, actorUserId?: number, employeeIds?: number[]) {
+    const preview = await this.previewStructureSync(companyId);
+    const todo = preview.rows.filter((r) => r.status === 'WILL_CHANGE' && (!employeeIds?.length || employeeIds.includes(r.employeeId)));
+    let done = 0; const failed: any[] = [];
+    for (const r of todo) {
+      try { const x = await this.syncStructureFromProfile(companyId, r.employeeId, actorUserId); if (x.synced) done++; else failed.push({ name: r.name, reason: x.reason }); }
+      catch (e: any) { failed.push({ name: r.name, reason: e?.message ?? 'error' }); }
+    }
+    return { updated: done, failed };
   }
 
   private async audit(companyId: number, entity: string, entityId: number, action: string, before: any, after: any, actorUserId?: number) {

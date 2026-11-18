@@ -513,6 +513,7 @@ export class ApprovalsComponent implements OnInit {
           title: 'Regularization',
           detail: `In ${this.time(r.proposedClockIn)} → Out ${this.time(r.proposedClockOut)}`,
           reason: r.reason ?? null,
+          proofUrl: r.proofUrl ?? null,
         });
       }
     }

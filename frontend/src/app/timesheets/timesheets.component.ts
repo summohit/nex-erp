@@ -87,7 +87,8 @@ export class TimesheetsComponent implements OnInit {
     ];
     if (admin || this.isPm()) tabs.push({ key: 'TEAM', label: 'My Team', icon: 'users' });
     if (admin) tabs.push({ key: 'ALL', label: 'All Employees', icon: 'building' });
-    if (admin || role === 'FINANCE') tabs.push({ key: 'FINANCE', label: 'Cost Hours', icon: 'coins' });
+    // Cost is Super Admin only (19 Nov 2026).
+    if (role === 'SUPERADMIN') tabs.push({ key: 'FINANCE', label: 'Cost Hours', icon: 'coins' });
     return tabs;
   });
 
@@ -701,6 +702,79 @@ export class TimesheetsComponent implements OnInit {
   }
 
   // ── Submit and review (§22) ────────────────────────────────────────────
+
+  // ── Leave / holiday / week off rows (19 Nov 2026) ──
+  /** Whole row tinted only when nothing was worked that day. */
+  isFullOff(day: any): boolean {
+    return !!day?.offDay && !day.offDay.halfDay && !(day.loginHours > 0) && !(day.loggedHours > 0);
+  }
+  offIcon(type: string): string {
+    return ({ HOLIDAY: '🎉', LEAVE: '🌴', LOP: '🌴', WEEK_OFF: '🛋️' } as any)[type] ?? '•';
+  }
+
+  // ── Manual "Add work" (19 Nov 2026) ──
+  /** Only on your own timesheet, never on someone's profile view. */
+  canAddWork(day: any): boolean {
+    return this.scope() === 'ME' && !this.profileEmployeeId && day?.status !== 'APPROVED';
+  }
+  workForm: { date: string | null; id: number | null; hours: number | null; mins: number | null; description: string; issueId: number | null } =
+    { date: null, id: null, hours: null, mins: null, description: '', issueId: null };
+  /** Task picker: that day's tasks, or all my open tasks (19 Nov 2026). */
+  workTasks: { onDate: any[]; all: any[] } = { onDate: [], all: [] };
+  workTaskScope: 'date' | 'all' = 'date';
+  get workTaskOptions(): any[] { return this.workTaskScope === 'date' ? this.workTasks.onDate : this.workTasks.all; }
+  private loadWorkTasks(date: string) {
+    this.workTasks = { onDate: [], all: [] };
+    this.api.getMyTasks(date).subscribe({
+      next: (r) => {
+        this.workTasks = r ?? { onDate: [], all: [] };
+        // Nothing scheduled that day: start on "All tasks" so the list isn't empty.
+        if (!this.workTasks.onDate.length) this.workTaskScope = 'all';
+      },
+      error: () => {},
+    });
+  }
+  workSaving = false;
+  entryKindLabel(e: any): string {
+    return ({ TICKET: 'Ticket', FIELD_VISIT: 'Field visit', WORK: 'Added work' } as any)[e.kind]
+      ?? (e.source === 'MANUAL' ? 'Manual' : 'Timer');
+  }
+  openWorkForm(date: string, e?: any) {
+    const totalMin = e ? Math.round((e.hours ?? 0) * 60) : 0;
+    this.workForm = e
+      ? { date, id: e.workId, hours: Math.floor(totalMin / 60), mins: totalMin % 60, description: e.note || e.title || '', issueId: e.issueId ?? null }
+      : { date, id: null, hours: 1, mins: 0, description: '', issueId: null };
+    this.workTaskScope = 'date';
+    this.loadWorkTasks(date);
+  }
+  cancelWork() { this.workForm = { date: null, id: null, hours: null, mins: null, description: '', issueId: null }; }
+  onWorkTaskPicked() {
+    const t = this.workTasks.all.find((x) => x.id === Number(this.workForm.issueId)) ?? this.workTasks.onDate.find((x) => x.id === Number(this.workForm.issueId));
+    if (t && !this.workForm.description.trim()) this.workForm.description = `${t.key} · ${t.title}`;
+  }
+  saveWork() {
+    const f = this.workForm;
+    const minutes = (Number(f.hours) || 0) * 60 + (Number(f.mins) || 0);
+    if (!f.date) return;
+    if (minutes < 5) { this.toast.error('Enter how long it took.'); return; }
+    if (f.description.trim().length < 3) { this.toast.error('Describe what you did.'); return; }
+    this.workSaving = true;
+    const task = [...this.workTasks.onDate, ...this.workTasks.all].find((x) => x.id === Number(f.issueId));
+    const body = { date: f.date, minutes, description: f.description.trim(), issueId: task?.id ?? null, projectId: task?.projectId ?? null };
+    const req = f.id ? this.api.updateWork(f.id, body) : this.api.addWork(body);
+    req.subscribe({
+      next: () => { this.workSaving = false; this.toast.success(f.id ? 'Work updated' : 'Work added'); this.cancelWork(); this.load(); },
+      error: (e) => { this.workSaving = false; this.fail(e, 'Could not save the work entry.'); },
+    });
+  }
+  deleteWorkEntry(e: any, ev: Event) {
+    ev.stopPropagation();
+    if (!e.workId || !confirm('Delete this work entry?')) return;
+    this.api.deleteWork(e.workId).subscribe({
+      next: () => { this.toast.success('Work deleted'); this.load(); },
+      error: (err) => this.fail(err, 'Could not delete the work entry.'),
+    });
+  }
 
   submitDay(day: TimesheetDay) {
     if (this.isBusy(day.date)) return;

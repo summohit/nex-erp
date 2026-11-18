@@ -1139,15 +1139,15 @@
                 [options]="employeeAssignOptions()"
                 placeholder="Search employee by name, ID..."
                 [value]="selectedEmployeeId()"
-                (valueChange)="selectedEmployeeId.set($event ? $event.toString() : '')"
+                (valueChange)="selectedEmployeeId.set($event ? $event.toString() : ''); loadQuotaGrid()"
                 [loading]="isLoadingEmployees()"
                 loadingText="Loading employees..."
                 [fullWidth]="true">
               </app-searchable-select>
             </div>
 
-            <!-- Searchable Leave Type Select -->
-            <div class="alb-field-group alb-field-leavetype">
+            <!-- Searchable Leave Type Select (All Employees only; Individual uses the table below) -->
+            <div class="alb-field-group alb-field-leavetype" *ngIf="assignToAll()">
               <label class="alb-label">
                 <svg lucideSparkles size="13"></svg>
                 <span>Leave Type</span>
@@ -1165,7 +1165,7 @@
             </div>
 
             <!-- Allocated Days Input -->
-            <div class="alb-field-group alb-field-days">
+            <div class="alb-field-group alb-field-days" *ngIf="assignToAll()">
               <label class="alb-label">
                 <svg lucideClock size="13"></svg>
                 <span>Allocated Days</span>
@@ -1197,14 +1197,14 @@
                   type="number"
                   class="alb-input"
                   [ngModel]="assignYear()"
-                  (ngModelChange)="assignYear.set($event)"
+                  (ngModelChange)="assignYear.set($event); loadQuotaGrid()"
                   placeholder="2026"
                 />
               </div>
             </div>
 
             <!-- Submit Button -->
-            <div class="alb-action-group">
+            <div class="alb-action-group" *ngIf="assignToAll()">
               <button
                 type="button"
                 class="alb-submit-btn"
@@ -1215,6 +1215,35 @@
                 <span>{{ isAssigning() ? 'Assigning...' : (assignToAll() ? 'Assign to All' : 'Assign Balance') }}</span>
               </button>
             </div>
+          </div>
+
+          <!-- Individual: every leave type in one table (19 Nov 2026, like the old tool's Leaves Quota) -->
+          <div class="alq" *ngIf="!assignToAll()">
+            <div class="alq-title" *ngIf="selectedEmployeeId()">Leaves Quota</div>
+            <div class="alq-empty" *ngIf="!selectedEmployeeId()">Pick an employee to see and set all their leave quotas.</div>
+            <div class="alq-empty" *ngIf="selectedEmployeeId() && quotaGridLoading()">Loading leave quotas…</div>
+            <table class="alq-table" *ngIf="selectedEmployeeId() && !quotaGridLoading() && quotaGrid().length">
+              <thead><tr><th>Leave Type</th><th>No of Leaves</th><th></th><th class="alq-act">Action</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let r of quotaGrid()" [class.locked]="r.locked">
+                  <td><span class="alq-dot" [class.unpaid]="!r.isPaid" [class.optional]="r.name.toLowerCase().includes('optional')"></span>{{ r.name }}
+                    <span class="alq-tag" *ngIf="!r.isPaid">Unpaid</span></td>
+                  <td><input type="number" min="0" step="0.5" class="alq-input" [(ngModel)]="r.draft" [disabled]="r.locked && !isSuperAdminUser()"></td>
+                  <td>
+                    <label class="alq-lock" [title]="'Locked balances are not changed by monthly accrual, probation pro-rata or bulk assign. Only the Super Admin can change or unlock them.'">
+                      <input type="checkbox" [(ngModel)]="r.lockDraft" [disabled]="!isSuperAdminUser()">
+                      <span>Cannot Edit</span><span class="alq-help">?</span>
+                    </label>
+                  </td>
+                  <td class="alq-act">
+                    <button type="button" class="alq-save" (click)="saveQuotaRow(r)" title="Save this row"
+                            [disabled]="quotaSaving === r.leaveTypeId || !quotaRowChanged(r) || (r.locked && !isSuperAdminUser())">
+                      {{ quotaSaving === r.leaveTypeId ? '…' : '✓' }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -1271,15 +1300,89 @@
 
       <!-- All Balances Grid -->
       <div class="widget-card mt-4 leave-balances-card">
-        <div class="widget-header">
-          <div>
-            <h3>Employee Leave Balances</h3>
-            <p class="leave-balances-caption">Available / total days for each leave type · {{ selectedYear() }}</p>
+        <div class="widget-header lb-card-header">
+          <div class="lb-card-header-left">
+            <div class="lb-card-icon" aria-hidden="true">
+              <svg lucideCalendar [size]="20"></svg>
+            </div>
+            <div>
+              <div class="lb-card-title-row">
+                <h3>Employee Leave Balances</h3>
+                <span class="lb-year-badge">{{ selectedYear() }} Cycle</span>
+                <span class="leave-balances-count" *ngIf="!isLoadingBalances()">
+                  {{ balanceSummaryRows().length }} {{ balanceSummaryRows().length === 1 ? 'employee' : 'employees' }}
+                </span>
+              </div>
+              <p class="leave-balances-caption">
+                Paid leave allocated, used, and remaining per person ·
+                <span class="lb-pending-note">Pending</span> = applied &amp; awaiting approval ·
+                <span class="lb-lop-note">LOP</span> = unpaid days
+              </p>
+            </div>
           </div>
-          <span class="leave-balances-count" *ngIf="!isLoadingBalances()">
-            {{ pivotedBalances().length }} employees
-          </span>
         </div>
+
+        <!-- Team Leave Summary Strip -->
+        <div class="lb-overview-strip" *ngIf="!isLoadingBalances() && balanceOverviewStats() as st">
+          <div class="lb-overview-card accent-blue">
+            <div class="lb-ov-top">
+              <span class="lb-ov-label">Total Allocated</span>
+              <span class="lb-ov-tag blue">Paid Quota</span>
+            </div>
+            <div class="lb-ov-val-row">
+              <strong>{{ st.totalAllocated }}</strong>
+              <span class="lb-ov-unit">days</span>
+            </div>
+            <span class="lb-ov-sub">Across {{ st.totalEmployees }} employees in {{ selectedYear() }}</span>
+          </div>
+
+          <div class="lb-overview-card accent-indigo">
+            <div class="lb-ov-top">
+              <span class="lb-ov-label">Paid Leave Used</span>
+              <span class="lb-ov-tag indigo">{{ st.utilizationPct }}% used</span>
+            </div>
+            <div class="lb-ov-val-row">
+              <strong>{{ st.totalUsed }}</strong>
+              <span class="lb-ov-unit">days</span>
+            </div>
+            <div class="lb-ov-bar">
+              <span class="lb-ov-bar-fill" [style.width.%]="st.utilizationPct"></span>
+            </div>
+          </div>
+
+          <div class="lb-overview-card accent-emerald">
+            <div class="lb-ov-top">
+              <span class="lb-ov-label">Total Remaining</span>
+              <span class="lb-ov-tag emerald">{{ st.availableCount }} available</span>
+            </div>
+            <div class="lb-ov-val-row">
+              <strong class="text-emerald">{{ st.totalRemaining }}</strong>
+              <span class="lb-ov-unit">days</span>
+            </div>
+            <span class="lb-ov-sub">{{ st.exhaustedCount }} exhausted · {{ st.deficitCount }} deficit</span>
+          </div>
+
+          <div class="lb-overview-card accent-rose">
+            <div class="lb-ov-top">
+              <span class="lb-ov-label">Pending &amp; LOP</span>
+              <span class="lb-ov-tag rose" *ngIf="st.totalLop > 0">{{ st.lopCount }} with LOP</span>
+              <span class="lb-ov-tag amber" *ngIf="st.totalLop === 0">{{ st.pendingCount }} pending</span>
+            </div>
+            <div class="lb-ov-val-row lb-ov-dual">
+              <span class="lb-dual-metric">
+                <strong class="text-amber">{{ st.totalPending }}</strong>
+                <small>pending</small>
+              </span>
+              <span class="lb-dual-sep">/</span>
+              <span class="lb-dual-metric">
+                <strong class="text-rose">{{ st.totalLop }}</strong>
+                <small>LOP days</small>
+              </span>
+            </div>
+            <span class="lb-ov-sub">{{ st.pendingCount }} awaiting approval · {{ st.lopCount }} unpaid</span>
+          </div>
+        </div>
+
         <div class="leave-balances-toolbar">
           <label class="leave-balances-search">
             <svg lucideSearch [size]="16" aria-hidden="true"></svg>
@@ -1290,19 +1393,37 @@
             <button type="button" *ngIf="balanceSearch()" aria-label="Clear search"
                     (click)="balanceSearch.set('')">×</button>
           </label>
-          <div class="balance-legend-group">
-            <span class="balance-legend-item">
+
+          <div class="balance-legend-group" role="group" aria-label="Filter balances by status" *ngIf="balanceOverviewStats() as st">
+            <button type="button" class="lb-status-chip" [class.active]="balanceStatusFilter() === 'all'"
+                    (click)="balanceStatusFilter.set('all')">
+              <span>All</span>
+              <span class="lb-chip-count">{{ st.totalEmployees }}</span>
+            </button>
+            <button type="button" class="lb-status-chip" [class.active]="balanceStatusFilter() === 'available'"
+                    (click)="balanceStatusFilter.set(balanceStatusFilter() === 'available' ? 'all' : 'available')">
               <span class="balance-legend-dot healthy"></span>
               <span>Available</span>
-            </span>
-            <span class="balance-legend-item">
+              <span class="lb-chip-count">{{ st.availableCount }}</span>
+            </button>
+            <button type="button" class="lb-status-chip" [class.active]="balanceStatusFilter() === 'exhausted'"
+                    (click)="balanceStatusFilter.set(balanceStatusFilter() === 'exhausted' ? 'all' : 'exhausted')">
               <span class="balance-legend-dot exhausted"></span>
-              <span>Exhausted</span>
-            </span>
-            <span class="balance-legend-item">
+              <span>Exhausted / Deficit</span>
+              <span class="lb-chip-count">{{ st.exhaustedCount + st.deficitCount }}</span>
+            </button>
+            <button type="button" class="lb-status-chip" [class.active]="balanceStatusFilter() === 'pending'"
+                    (click)="balanceStatusFilter.set(balanceStatusFilter() === 'pending' ? 'all' : 'pending')">
+              <span class="balance-legend-dot pending"></span>
+              <span>Pending</span>
+              <span class="lb-chip-count">{{ st.pendingCount }}</span>
+            </button>
+            <button type="button" class="lb-status-chip" [class.active]="balanceStatusFilter() === 'lop'"
+                    (click)="balanceStatusFilter.set(balanceStatusFilter() === 'lop' ? 'all' : 'lop')">
               <span class="balance-legend-dot deficit"></span>
-              <span>Deficit</span>
-            </span>
+              <span>LOP</span>
+              <span class="lb-chip-count">{{ st.lopCount }}</span>
+            </button>
           </div>
         </div>
         
@@ -1337,20 +1458,177 @@
 
         <div class="leave-balances-grid mt-4" *ngIf="!isLoadingBalances()">
           <ag-grid-angular
-            class="ag-theme-quartz"
+            class="ag-theme-quartz lb-summary-grid"
             [theme]="'legacy'"
             style="width: 100%;"
             [domLayout]="'autoHeight'"
-            [rowData]="pivotedBalances()"
-            [columnDefs]="dynamicColDefs()"
+            [rowData]="balanceSummaryRows()"
+            [columnDefs]="balanceSummaryColDefs"
             [defaultColDef]="balanceDefaultColDef"
             [rowHeight]="64"
-            [headerHeight]="48"
+            [headerHeight]="46"
             [pagination]="true"
             [paginationPageSize]="20"
             [paginationPageSizeSelector]="leavePageSizes"
             [gridOptions]="balanceGridOptions">
           </ag-grid-angular>
+        </div>
+
+        <!-- Per-type breakdown modal -->
+        <div class="lb-modal-overlay" *ngIf="balanceBreakdown() as b" (click)="closeBalanceBreakdown()">
+          <div class="lb-modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="lb-breakdown-heading">
+            <div class="lb-modal-head">
+              <div class="lb-modal-profile">
+                <img *ngIf="b.employeeData?.avatarUrl" [src]="b.employeeData.avatarUrl" class="lb-modal-avatar" alt="">
+                <div *ngIf="!b.employeeData?.avatarUrl" class="lb-modal-avatar lb-modal-avatar-initials">
+                  {{ (b.employeeData?.firstName?.charAt(0) || '') + (b.employeeData?.lastName?.charAt(0) || '') || 'E' }}
+                </div>
+                <div class="lb-modal-title-block">
+                  <div class="lb-modal-name-row">
+                    <h3 id="lb-breakdown-heading">{{ b.employeeData?.firstName }} {{ b.employeeData?.lastName }}</h3>
+                    <span class="lb-modal-code" *ngIf="b.employeeData?.employeeCode">#{{ b.employeeData.employeeCode }}</span>
+                    <span class="lb-modal-year-pill">{{ selectedYear() }} Quota</span>
+                  </div>
+                  <p class="lb-modal-sub">
+                    <ng-container *ngIf="b.employeeData?.designation?.name || b.employeeData?.department?.name; else defaultBreakdownSub">
+                      {{ b.employeeData?.designation?.name || 'Team Member' }}<ng-container *ngIf="b.employeeData?.department?.name"> · {{ b.employeeData.department.name }}</ng-container>
+                      · Leave balance breakdown
+                    </ng-container>
+                    <ng-template #defaultBreakdownSub>Leave balance breakdown · Paid &amp; Unpaid quotas</ng-template>
+                  </p>
+                </div>
+              </div>
+              <button type="button" class="lb-modal-x" (click)="closeBalanceBreakdown()" aria-label="Close breakdown modal">
+                <svg lucideX [size]="18" aria-hidden="true"></svg>
+              </button>
+            </div>
+
+            <div class="lb-modal-kpis">
+              <div class="lb-kpi-card kpi-allocated">
+                <span class="lb-kpi-label">Allocated</span>
+                <div class="lb-kpi-val">
+                  <strong>{{ b.allocated }}</strong>
+                  <small>days</small>
+                </div>
+                <span class="lb-kpi-caption">Paid entitlement</span>
+              </div>
+              <div class="lb-kpi-card kpi-used">
+                <span class="lb-kpi-label">Used</span>
+                <div class="lb-kpi-val">
+                  <strong>{{ b.used }}</strong>
+                  <small>days</small>
+                </div>
+                <span class="lb-kpi-caption">Approved paid</span>
+              </div>
+              <div class="lb-kpi-card kpi-remaining" [class.is-neg]="b.remaining < 0" [class.is-zero]="b.remaining === 0">
+                <span class="lb-kpi-label">Remaining</span>
+                <div class="lb-kpi-val">
+                  <strong [class.neg]="b.remaining < 0" [class.zero]="b.remaining === 0" class="rem">{{ b.remaining }}</strong>
+                  <small>days</small>
+                </div>
+                <span class="lb-kpi-caption">{{ b.remaining < 0 ? 'Over quota' : (b.remaining === 0 ? 'Fully used' : 'Still available') }}</span>
+              </div>
+              <div class="lb-kpi-card kpi-pending">
+                <span class="lb-kpi-label">Pending</span>
+                <div class="lb-kpi-val">
+                  <strong class="pend">{{ b.pending }}</strong>
+                  <small>days</small>
+                </div>
+                <span class="lb-kpi-caption">Awaiting approval</span>
+              </div>
+              <div class="lb-kpi-card kpi-lop">
+                <span class="lb-kpi-label">LOP</span>
+                <div class="lb-kpi-val">
+                  <strong class="lop">{{ b.lop }}</strong>
+                  <small>days</small>
+                </div>
+                <span class="lb-kpi-caption">Unpaid taken</span>
+              </div>
+            </div>
+
+            <!-- Overall Paid Leave Utilization Strip -->
+            <div class="lb-modal-util" *ngIf="b.allocated > 0">
+              <div class="lb-modal-util-head">
+                <span class="lb-util-title">Paid Leave Utilization</span>
+                <span class="lb-util-meta">
+                  <strong>{{ b.used }}</strong> of <strong>{{ b.allocated }}</strong> paid days used
+                  ({{ (b.used / b.allocated) * 100 | number:'1.0-0' }}%)
+                </span>
+              </div>
+              <div class="lb-modal-util-track">
+                <span class="lb-util-seg used" [style.width.%]="(b.used / b.allocated) * 100 > 100 ? 100 : (b.used / b.allocated) * 100"></span>
+                <span class="lb-util-seg pending" *ngIf="b.pending > 0" [style.width.%]="(b.pending / b.allocated) * 100"></span>
+              </div>
+            </div>
+
+            <div class="lb-modal-table-wrap" tabindex="0" role="region" aria-labelledby="lb-breakdown-heading">
+              <table class="lb-modal-table">
+                <thead>
+                  <tr>
+                    <th>Leave Type</th>
+                    <th class="num">Allocated</th>
+                    <th class="num">Used</th>
+                    <th class="num">Remaining</th>
+                    <th class="num">Pending</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let t of b.types"
+                      [class.unpaid]="!t.paid"
+                      [class.is-inactive]="t.paid && t.allocated === 0 && t.used === 0 && !t.pending">
+                    <td>
+                      <div class="lb-type-cell">
+                        <span class="lb-type-dot"
+                              [class.dot-unpaid]="!t.paid"
+                              [class.dot-active]="t.paid && (t.allocated > 0 || t.used > 0)"
+                              [class.dot-exhausted]="t.paid && t.allocated > 0 && t.remaining <= 0"
+                              [class.dot-idle]="t.paid && t.allocated === 0 && t.used === 0"></span>
+                        <span class="lb-type-name">{{ t.name }}</span>
+                        <span class="lb-unpaid" *ngIf="!t.paid">Unpaid · LOP</span>
+                      </div>
+                    </td>
+                    <td class="num">
+                      <ng-container *ngIf="t.paid; else unpaidDash">
+                        <span class="lb-t-num" [class.muted-zero]="t.allocated === 0">{{ t.allocated }}</span>
+                        <span class="lb-t-unit" *ngIf="t.allocated > 0">d</span>
+                      </ng-container>
+                      <ng-template #unpaidDash><span class="muted">—</span></ng-template>
+                    </td>
+                    <td class="num">
+                      <span class="lb-t-num" [class.used-active]="t.used > 0" [class.muted-zero]="t.used === 0">{{ t.used }}</span>
+                      <span class="lb-t-unit" *ngIf="t.used > 0">d</span>
+                    </td>
+                    <td class="num">
+                      <ng-container *ngIf="t.paid; else unpaidDashRem">
+                        <span class="lb-rem-unassigned" *ngIf="t.allocated === 0 && t.used === 0">0</span>
+                        <span class="lb-rem-pill"
+                              *ngIf="t.allocated > 0 || t.used > 0"
+                              [class.neg]="t.remaining < 0"
+                              [class.zero]="t.remaining === 0"
+                              [class.pos]="t.remaining > 0">
+                          {{ t.remaining }}d
+                        </span>
+                      </ng-container>
+                      <ng-template #unpaidDashRem><span class="muted">—</span></ng-template>
+                    </td>
+                    <td class="num">
+                      <span class="lb-pend-pill" *ngIf="t.pending > 0">{{ t.pending }}d</span>
+                      <span *ngIf="!t.pending" class="muted">—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="lb-modal-foot">
+              <span class="lb-modal-foot-note">
+                Paid totals exclude unpaid Loss of Pay (LOP) days.
+              </span>
+              <button type="button" class="lb-modal-done-btn" (click)="closeBalanceBreakdown()">
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2063,6 +2341,24 @@
                     [style.border-color]="showFormErrors() && !regularizationForm.reason ? '#dc2626' : ''"></textarea>
           <span class="reg-field-help">This reason applies to all days in this request.</span>
         </div>
+
+        <!-- Optional proof: photo or PDF (18 Nov 2026) -->
+        <div class="form-group reg-proof-group">
+          <div class="reg-reason-header">
+            <label class="reg-label">Attachment</label>
+            <span class="reg-label-hint">Optional</span>
+          </div>
+          <label class="reg-proof-drop" *ngIf="!regularizationForm.proofFile">
+            <input type="file" accept="image/*,application/pdf" (change)="onRegularizationProof($event)" hidden>
+            <span>📎 Add a screenshot, photo or PDF</span>
+          </label>
+          <div class="reg-proof-file" *ngIf="regularizationForm.proofFile as f">
+            <span class="reg-proof-name">{{ f.name }}</span>
+            <span class="reg-proof-size">{{ (f.size / 1024) | number:'1.0-0' }} KB</span>
+            <button type="button" class="reg-proof-remove" (click)="regularizationForm.proofFile = null" aria-label="Remove attachment">✕</button>
+          </div>
+          <span class="reg-field-help">For example an error screenshot. JPG, PNG or PDF, up to 5 MB.</span>
+        </div>
       </div>
       <div class="drawer-footer reg-drawer-footer">
         <div class="reg-footer-actions">
@@ -2240,6 +2536,15 @@
           <div class="reg-reason-content">
             <p>{{ reg.reason || 'No detailed reason provided.' }}</p>
           </div>
+        </div>
+
+        <!-- Attachment (18 Nov 2026) -->
+        <div class="reg-detail-reason-box" *ngIf="reg.proofUrl">
+          <span class="reg-detail-label">Attachment</span>
+          <a class="reg-proof-preview" [href]="reg.proofUrl" target="_blank" rel="noopener">
+            <img *ngIf="!reg.proofUrl.toLowerCase().endsWith('.pdf')" [src]="reg.proofUrl" alt="Attached proof">
+            <span>📎 Open attachment</span>
+          </a>
         </div>
 
         <!-- Rejection Reason if Rejected -->

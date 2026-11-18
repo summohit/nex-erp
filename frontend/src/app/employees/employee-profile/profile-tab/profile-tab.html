@@ -85,6 +85,21 @@
               </div>
             </div>
 
+            <!-- Hourly cost (Super Admin only, 19 Nov 2026) -->
+            <div class="form-row-item" *ngIf="canSeeHourlyCost && hourlyCost">
+              <label class="item-label">
+                Hourly Cost
+                <span class="help-icon" title="Own rate → grade rate → ungraded rate → monthly gross ÷ hours. Super Admin only.">?</span>
+              </label>
+              <div class="item-value hourly-cost-value">
+                <span class="hc-rate" *ngIf="hourlyCost.rate != null; else hcNone">₹{{ hourlyCost.rate | number:'1.0-2' }}<small>/hr</small></span>
+                <ng-template #hcNone><span class="hc-rate hc-none">Not set</span></ng-template>
+                <span class="hc-src">{{ hourlyCostSource(hourlyCost.source) }}<span *ngIf="hourlyCost.grade"> · {{ hourlyCost.grade.name }} {{ hourlyCost.grade.label }}</span><span *ngIf="hourlyCost.since"> · since {{ hourlyCost.since | date:'d MMM y' }}</span></span>
+                <span class="hc-calc" *ngIf="hourlyCost.source === 'SALARY'">₹{{ hourlyCost.monthlyGross | number }} ÷ {{ hourlyCost.hoursPerMonth }} h</span>
+                <span class="hc-lock">🔒 Super Admin only</span>
+              </div>
+            </div>
+
           </div>
         </div>
 

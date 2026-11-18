@@ -233,7 +233,7 @@ export class LifecycleService {
       const days = proRataDays(t.defaultDays, on, policy.proRataRounding);
       const existing = await this.prisma.leaveBalance.findFirst({ where: { employeeId, leaveTypeId: t.id, year } });
       if (existing) {
-        if (existing.allocated < days) await this.prisma.leaveBalance.update({ where: { id: existing.id }, data: { allocated: days } });
+        if (!existing.locked && existing.allocated < days) await this.prisma.leaveBalance.update({ where: { id: existing.id }, data: { allocated: days } });
       } else {
         await this.prisma.leaveBalance.create({ data: { employeeId, leaveTypeId: t.id, year, allocated: days } });
       }

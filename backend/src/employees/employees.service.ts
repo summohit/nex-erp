@@ -30,7 +30,8 @@ export class EmployeesService {
    * somebody's hour. A project manager sees cost rolled up on their own
    * project's dashboard, never per person here.
    */
-  private static readonly COST_RATE_ROLES = ['SUPERADMIN', 'ADMIN', 'FINANCE'];
+  // Hourly cost is Super Admin only (19 Nov 2026; was also Admin and Finance).
+  private static readonly COST_RATE_ROLES = ['SUPERADMIN'];
 
   private canSeeCostRate(role: string): boolean {
     return EmployeesService.COST_RATE_ROLES.includes(role);
@@ -511,7 +512,7 @@ export class EmployeesService {
    */
   async setCostRate(id: number, companyId: number, role: string, rate: number | null) {
     if (!this.canSeeCostRate(role)) {
-      throw new ForbiddenException('Only an administrator or finance can set a cost rate');
+      throw new ForbiddenException('Only the Super Admin can set a cost rate');
     }
 
     const employee = await this.prisma.employee.findFirst({ where: { id, companyId } });
@@ -1203,11 +1204,92 @@ export class EmployeesService {
     forgetAccountStatus(emp.user.id);
 
     const name = `${emp.firstName} ${emp.lastName}`.trim();
+    const companyName = (await this.prisma.company.findUnique({ where: { id: companyId }, select: { name: true } }))?.name ?? undefined;
     let emailed = true;
     for (const to of [email, oldEmail]) {
-      try { await this.mailService.sendLoginEmailChanged(to, name, email, oldEmail); } catch { emailed = false; }
+      try { await this.mailService.sendLoginEmailChanged(to, name, email, oldEmail, companyName); } catch { emailed = false; }
     }
+    // In-app notice too (19 Nov 2026), so they see it the next time they open MIRA.
+    try {
+      await this.notifications.createNotification(
+        emp.user.id,
+        'Your login email has been changed',
+        `Use ${email} to sign in to MIRA from now on (previously ${oldEmail}). Your password stays the same. Login: ${(process.env.APP_URL || 'https://mira.ces-pl.com').replace(/\/+$/, '')}/login`,
+        'INFO',
+        '/dashboard',
+        companyId,
+      );
+    } catch { /* the change is saved; the notice is best-effort */ }
     return { email, previousEmail: oldEmail, personalEmailKept: wasPersonal, emailed };
+  }
+
+  /**
+   * A person's hourly cost today and where it comes from (19 Nov 2026), same
+   * order as project costing: own rate → grade rate in force → ungraded rate →
+   * monthly gross ÷ 234 h. Super Admin only.
+   */
+  async getHourlyCost(companyId: number, role: string, employeeId: number) {
+    if (role !== 'SUPERADMIN') throw new ForbiddenException('Only the Super Admin can see hourly cost.');
+    const emp = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      select: { id: true, hourlyCostRate: true, payType: true, salaryStructures: { select: { amount: true, component: { select: { type: true } } } } },
+    });
+    if (!emp) throw new NotFoundException('Employee not found');
+    const HOURS = 234;
+    const gross = emp.salaryStructures.filter((s) => s.component.type === 'EARNING').reduce((a, s) => a + s.amount, 0);
+    const grades = await this.prisma.salaryGrade.findMany({ where: { companyId }, orderBy: [{ position: 'asc' }, { minGross: 'asc' }], select: { name: true, label: true, minGross: true, maxGross: true } });
+    const g = emp.payType === 'EMPLOYEE' && gross > 0 ? grades.find((x) => gross >= x.minGross && (x.maxGross == null || gross <= x.maxGross)) ?? null : null;
+    const today = new Date(new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10) + 'T00:00:00.000Z');
+    const dated = await this.prisma.gradeCostRate.findFirst({
+      where: { companyId, gradeName: g?.name ?? null, effectiveFrom: { lte: today } },
+      orderBy: [{ effectiveFrom: 'desc' }, { id: 'desc' }],
+    });
+    const base = { grade: g ? { name: g.name, label: g.label } : null, monthlyGross: gross > 0 ? Math.round(gross) : null, hoursPerMonth: HOURS };
+    if (emp.hourlyCostRate != null) return { ...base, rate: emp.hourlyCostRate, source: 'OWN' };
+    if (dated) return { ...base, rate: dated.rate, source: g ? 'GRADE' : 'UNGRADED', since: dated.effectiveFrom.toISOString().slice(0, 10) };
+    if (gross > 0) return { ...base, rate: Math.round((gross / HOURS) * 100) / 100, source: 'SALARY' };
+    return { ...base, rate: null, source: null };
+  }
+
+  /**
+   * Resend the "your login email has been changed" notice (19 Nov 2026) —
+   * e.g. the person missed or deleted the first one. Uses the last recorded
+   * change, so it always names the right old and new address.
+   */
+  async resendLoginEmailNotice(companyId: number, role: string, actorUserId: number | null, employeeId: number) {
+    if (!['SUPERADMIN', 'HR'].includes(role)) throw new ForbiddenException('Only the Super Admin or HR can resend this.');
+    const emp = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      select: { id: true, firstName: true, lastName: true, user: { select: { id: true, email: true, role: true } } },
+    });
+    if (!emp?.user) throw new NotFoundException('Employee not found');
+    if (role === 'HR' && emp.user.role === 'SUPERADMIN') throw new ForbiddenException('HR cannot act on a Super Admin\'s login.');
+    const last = await this.prisma.auditLog.findFirst({
+      where: { companyId, action: 'LOGIN_EMAIL_CHANGED', entityType: 'User', entityId: String(emp.user.id) },
+      orderBy: { createdAt: 'desc' },
+    });
+    const oldEmail = (last?.oldValue as any)?.email as string | undefined;
+    if (!last || !oldEmail) throw new BadRequestException('No login email change on record for this person — use "Change login email" first.');
+    const email = emp.user.email;
+    const name = `${emp.firstName} ${emp.lastName}`.trim();
+    const companyName = (await this.prisma.company.findUnique({ where: { id: companyId }, select: { name: true } }))?.name ?? undefined;
+    let emailed = true;
+    for (const to of [email, oldEmail]) {
+      try { await this.mailService.sendLoginEmailChanged(to, name, email, oldEmail, companyName); } catch { emailed = false; }
+    }
+    try {
+      await this.notifications.createNotification(
+        emp.user.id,
+        'Your login email has been changed',
+        `Use ${email} to sign in to MIRA from now on (previously ${oldEmail}). Your password stays the same. Login: ${(process.env.APP_URL || 'https://mira.ces-pl.com').replace(/\/+$/, '')}/login`,
+        'INFO', '/dashboard', companyId,
+      );
+    } catch { /* best-effort */ }
+    await this.prisma.auditLog.create({
+      data: { companyId, actorId: actorUserId, action: 'LOGIN_EMAIL_NOTICE_RESENT', entityType: 'User', entityId: String(emp.user.id),
+        newValue: { email, oldEmail, emailed } as any },
+    }).catch(() => undefined);
+    return { email, previousEmail: oldEmail, emailed };
   }
 
   // ── Shared login hand over (16 Nov 2026) ───────────────────────────────

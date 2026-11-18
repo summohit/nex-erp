@@ -1881,7 +1881,7 @@ export class AttendanceService {
    * A plain { date, ... } body is the single-day form and behaves as before.
    */
   async requestRegularization(userId: number, data: {
-    date?: string, proposedClockIn?: string, proposedClockOut?: string, reason: string,
+    date?: string, proposedClockIn?: string, proposedClockOut?: string, reason: string, proofUrl?: string,
     entries?: Array<{ date: string, proposedClockIn?: string, proposedClockOut?: string }>,
   }) {
     const employee = await this.prisma.employee.findUnique({
@@ -1892,6 +1892,9 @@ export class AttendanceService {
 
     const reason = String(data?.reason ?? '').trim();
     if (!reason) throw new BadRequestException('Say why you are regularizing.');
+    // Optional proof (18 Nov 2026): a link from our own upload endpoint.
+    const proofUrl = String(data?.proofUrl ?? '').trim() || null;
+    if (proofUrl && !/^https?:\/\/\S+$/i.test(proofUrl)) throw new BadRequestException('The attachment link is not valid.');
     const entries = Array.isArray(data?.entries) && data.entries.length
       ? data.entries
       : [{ date: data?.date as string, proposedClockIn: data?.proposedClockIn, proposedClockOut: data?.proposedClockOut }];
@@ -1914,7 +1917,7 @@ export class AttendanceService {
 
     const createdAll = await this.prisma.$transaction(days.map((d) =>
       this.prisma.attendanceRegularization.create({
-        data: { employeeId: employee.id, date: d.date, proposedClockIn: d.inAt, proposedClockOut: d.outAt, reason },
+        data: { employeeId: employee.id, date: d.date, proposedClockIn: d.inAt, proposedClockOut: d.outAt, reason, proofUrl },
       }),
     ));
     const created = createdAll.length === 1 ? createdAll[0] : createdAll;

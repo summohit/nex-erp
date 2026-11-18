@@ -3414,153 +3414,192 @@
             <span>Tip: Leave "To" empty on the highest grade only for uncapped upper limits. Pay ranges must be contiguous and non-overlapping.</span>
           </div>
 
-          <!-- Travel rate for people outside grades -->
-          <div class="gt-ungraded-row">
+        </div>
+
+        <!-- Hourly cost rate by grade (19 Nov 2026) — Super Admin only -->
+        <div class="config-section hcr-section mt-4" *ngIf="isSuperAdminUser() && costRates() as cr">
+          <div class="section-header-row hcr-header-row">
             <div>
-              <strong>Interns · Travel ₹ / km</strong>
-              <p>Interns (employment type Internship or designation Intern) are not graded. Own-vehicle field visit trips are paid at this rate. Leave empty to use the default rate per km in System Settings → Field Visits. Metro, bus and cab are always paid at the actual fare.</p>
+              <div class="hcr-title-line">
+                <h4 class="section-title">Hourly Cost Rate by Grade</h4>
+                <span class="hcr-lock">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                  <span>Super Admin only</span>
+                </span>
+              </div>
+              <p class="section-subtitle">Used for project costing and timesheets. A person's own hourly rate (on their profile) still overrides their grade. A new rate applies from its date; hours before that keep the old rate.</p>
             </div>
-            <div class="currency-input-sm gt-ungraded-input">
-              <span class="curr-tag">₹</span>
-              <input class="form-control form-control-sm" type="number" min="0" step="0.5" [(ngModel)]="ungradedKmRateDraft" placeholder="Default" aria-label="Travel rate per km for interns">
+            <span class="hcr-autosave-hint">
+              <span class="hcr-autosave-dot" aria-hidden="true"></span>
+              Saved per row immediately
+            </span>
+          </div>
+
+          <div class="hcr-table-wrap">
+            <table class="hcr-table">
+              <thead>
+                <tr>
+                  <th class="hcr-col-grade">Grade &amp; Current Rate</th>
+                  <th class="hcr-col-rate">New Rate (₹ / hr)</th>
+                  <th class="hcr-col-date">Applies From</th>
+                  <th class="hcr-col-action">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let g of cr.grades">
+                  <td class="hcr-col-grade">
+                    <div class="hcr-grade-cell">
+                      <span class="hcr-grade-badge">{{ g.name }}</span>
+                      <div class="hcr-grade-Copy">
+                        <span class="hcr-grade-label">{{ g.label || 'Standard band' }}</span>
+                        <div class="hcr-now" *ngIf="g.current">
+                          <span class="hcr-now-pill">Active: ₹{{ g.current.rate | number }}/hr</span>
+                          <span class="hcr-now-date">since {{ g.current.effectiveFrom | date:'d MMM y' }}</span>
+                          <span class="hcr-upcoming-pill" *ngIf="g.upcoming">→ ₹{{ g.upcoming.rate | number }}/hr from {{ g.upcoming.effectiveFrom | date:'d MMM y' }}</span>
+                        </div>
+                        <div class="hcr-now hcr-now-unset" *ngIf="!g.current">
+                          <span>Default: salary ÷ {{ cr.hoursPerMonth }}h</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="hcr-col-rate">
+                    <div class="currency-input-sm hcr-rate-input-wrap">
+                      <span class="curr-tag">₹</span>
+                      <input
+                        class="form-control form-control-sm"
+                        type="number"
+                        min="0"
+                        step="10"
+                        [(ngModel)]="costRateDraft[costRateKey(g.name)].rate"
+                        placeholder="e.g. 450"
+                        [attr.aria-label]="'New hourly rate for ' + g.name"
+                      >
+                      <span class="hcr-unit-suffix">/hr</span>
+                    </div>
+                    <!-- Suggested from real salaries (19 Nov 2026) -->
+                    <button
+                      type="button"
+                      class="hcr-suggest-pill"
+                      *ngIf="g.suggestedRate != null"
+                      (click)="costRateDraft[costRateKey(g.name)].rate = g.suggestedRate"
+                      [title]="'Average monthly gross ₹' + (g.avgMonthlyGross | number) + ' of ' + g.basedOnPeople + ' active people ÷ ' + cr.hoursPerMonth + ' hours'"
+                    >
+                      <span class="hcr-sug-text">Suggested <strong>₹{{ g.suggestedRate | number }}/hr</strong></span>
+                      <span class="hcr-sug-count">· {{ g.basedOnPeople }} {{ g.basedOnPeople === 1 ? 'person' : 'people' }}</span>
+                      <span class="hcr-use">Use</span>
+                    </button>
+                    <div class="hcr-suggest-empty" *ngIf="g.suggestedRate == null">No active people in this grade</div>
+                  </td>
+                  <td class="hcr-col-date">
+                    <input
+                      class="form-control form-control-sm hcr-date-input"
+                      type="date"
+                      [(ngModel)]="costRateDraft[costRateKey(g.name)].from"
+                      [attr.aria-label]="'Effective date for ' + g.name"
+                    >
+                  </td>
+                  <td class="hcr-col-action">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-primary hcr-set-btn"
+                      (click)="saveCostRate(g.name)"
+                      [disabled]="costRateSaving === costRateKey(g.name)"
+                    >
+                      {{ costRateSaving === costRateKey(g.name) ? 'Saving…' : 'Set rate' }}
+                    </button>
+                  </td>
+                </tr>
+
+                <tr class="hcr-ungraded">
+                  <td class="hcr-col-grade">
+                    <div class="hcr-grade-cell">
+                      <span class="hcr-grade-badge ungraded">Ungraded</span>
+                      <div class="hcr-grade-Copy">
+                        <span class="hcr-grade-label">Consultants, interns, no salary set</span>
+                        <div class="hcr-now" *ngIf="cr.ungraded.current">
+                          <span class="hcr-now-pill">Active: ₹{{ cr.ungraded.current.rate | number }}/hr</span>
+                          <span class="hcr-now-date">since {{ cr.ungraded.current.effectiveFrom | date:'d MMM y' }}</span>
+                          <span class="hcr-upcoming-pill" *ngIf="cr.ungraded.upcoming">→ ₹{{ cr.ungraded.upcoming.rate | number }}/hr from {{ cr.ungraded.upcoming.effectiveFrom | date:'d MMM y' }}</span>
+                        </div>
+                        <div class="hcr-now hcr-now-unset" *ngIf="!cr.ungraded.current">
+                          <span>Default: salary ÷ {{ cr.hoursPerMonth }}h</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="hcr-col-rate">
+                    <div class="currency-input-sm hcr-rate-input-wrap">
+                      <span class="curr-tag">₹</span>
+                      <input
+                        class="form-control form-control-sm"
+                        type="number"
+                        min="0"
+                        step="10"
+                        [(ngModel)]="costRateDraft[costRateKey(null)].rate"
+                        placeholder="e.g. 300"
+                        aria-label="New hourly rate for Ungraded"
+                      >
+                      <span class="hcr-unit-suffix">/hr</span>
+                    </div>
+                  </td>
+                  <td class="hcr-col-date">
+                    <input
+                      class="form-control form-control-sm hcr-date-input"
+                      type="date"
+                      [(ngModel)]="costRateDraft[costRateKey(null)].from"
+                      aria-label="Effective date for Ungraded"
+                    >
+                  </td>
+                  <td class="hcr-col-action">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-primary hcr-set-btn"
+                      (click)="saveCostRate(null)"
+                      [disabled]="costRateSaving === costRateKey(null)"
+                    >
+                      {{ costRateSaving === costRateKey(null) ? 'Saving…' : 'Set rate' }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- How the hourly cost is worked out (19 Nov 2026) -->
+          <div class="hcr-logic">
+            <div class="hcr-logic-head">
+              <div class="hcr-logic-ico" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+              </div>
+              <div>
+                <div class="hcr-logic-title">How a person's hourly cost is worked out</div>
+                <div class="hcr-logic-note">Suggested rate = average monthly gross of active people in that grade ÷ {{ cr.hoursPerMonth }} hours ({{ cr.hoursPerMonth }} h = 26 working days × 9 h).</div>
+              </div>
             </div>
+            <ol class="hcr-logic-steps">
+              <li>
+                <span class="hcr-step-num">1</span>
+                <div><b>Own rate</b><span>If a rate is set on the person's profile, it takes top priority.</span></div>
+              </li>
+              <li>
+                <span class="hcr-step-num">2</span>
+                <div><b>Grade rate</b><span>Otherwise uses their grade rate (G1–G5) effective on the logged date.</span></div>
+              </li>
+              <li>
+                <span class="hcr-step-num">3</span>
+                <div><b>Ungraded rate</b><span>Consultants, interns &amp; people without a salary band use Ungraded.</span></div>
+              </li>
+              <li>
+                <span class="hcr-step-num">4</span>
+                <div><b>Salary ÷ hours</b><span>Fallback: monthly gross ÷ {{ cr.hoursPerMonth }}h (e.g. ₹46,800 ÷ {{ cr.hoursPerMonth }} = ₹200/hr).</span></div>
+              </li>
+            </ol>
           </div>
         </div>
 
-        <!-- Section 2: Salary Template Formula -->
-        <div class="config-section mt-4" *ngIf="templateDraft as t">
-          <div class="section-header-row">
-            <div>
-              <h4 class="section-title">Automated Salary Distribution Formula</h4>
-              <p class="section-subtitle">How a monthly gross is apportioned when applying the standard template. Special Allowance automatically balances the remainder.</p>
-            </div>
-          </div>
+        <!-- Salary formula section removed from this window (19 Nov 2026, user request). The template still applies. -->
 
-          <div class="formula-grid">
-            <!-- Basic Salary -->
-            <div class="formula-card">
-              <div class="formula-card-top">
-                <span class="formula-badge">Primary Earning</span>
-                <span class="formula-type">Statutory</span>
-              </div>
-              <label class="formula-label">Basic Salary</label>
-              <p class="formula-desc">Percentage of monthly gross earnings</p>
-              <div class="formula-input-unit">
-                <input class="form-control" type="number" min="1" max="100" [(ngModel)]="t.basicPct">
-                <span class="unit-tag">% of gross</span>
-              </div>
-            </div>
-
-            <!-- HRA -->
-            <div class="formula-card">
-              <div class="formula-card-top">
-                <span class="formula-badge">Allowance</span>
-                <span class="formula-type">Tax Exempt</span>
-              </div>
-              <label class="formula-label">House Rent Allowance (HRA)</label>
-              <p class="formula-desc">40% for non-metro, 50% for metro cities</p>
-              <div class="formula-input-unit">
-                <input class="form-control" type="number" min="0" max="100" [(ngModel)]="t.hraPctOfBasic">
-                <span class="unit-tag">% of Basic</span>
-              </div>
-            </div>
-
-            <!-- Conveyance -->
-            <div class="formula-card">
-              <div class="formula-card-top">
-                <span class="formula-badge">Allowance</span>
-                <span class="formula-type">Standard</span>
-              </div>
-              <label class="formula-label">Conveyance Allowance</label>
-              <p class="formula-desc">Standard travel reimbursement rate</p>
-              <div class="formula-input-unit">
-                <span class="curr-prefix">₹</span>
-                <input class="form-control" type="number" min="0" [(ngModel)]="t.conveyance">
-                <span class="unit-tag">/ month</span>
-              </div>
-            </div>
-
-            <!-- Medical -->
-            <div class="formula-card">
-              <div class="formula-card-top">
-                <span class="formula-badge">Allowance</span>
-                <span class="formula-type">Healthcare</span>
-              </div>
-              <label class="formula-label">Medical Allowance</label>
-              <p class="formula-desc">Standard medical health reimbursement</p>
-              <div class="formula-input-unit">
-                <span class="curr-prefix">₹</span>
-                <input class="form-control" type="number" min="0" [(ngModel)]="t.medical">
-                <span class="unit-tag">/ month</span>
-              </div>
-            </div>
-
-            <!-- Provident Fund -->
-            <div class="formula-card">
-              <div class="formula-card-top">
-                <span class="formula-badge badge-deduction">Deduction</span>
-                <span class="formula-type">Retirement</span>
-              </div>
-              <label class="formula-label">Provident Fund (PF)</label>
-              <p class="formula-desc">Employee contribution percentage of Basic</p>
-              <div class="formula-input-unit">
-                <input class="form-control" type="number" min="0" [(ngModel)]="t.pfPct">
-                <span class="unit-tag">% of Basic</span>
-              </div>
-              <div class="sub-input-row mt-2">
-                <span class="sub-label">Wage Cap (₹):</span>
-                <input class="form-control form-control-sm" type="number" min="0" [(ngModel)]="t.pfWageCap" placeholder="No cap (full Basic)">
-              </div>
-            </div>
-
-            <!-- ESI -->
-            <div class="formula-card">
-              <div class="formula-card-top">
-                <span class="formula-badge badge-deduction">Deduction</span>
-                <span class="formula-type">Health Scheme</span>
-              </div>
-              <label class="formula-label">Employee State Insurance (ESI)</label>
-              <p class="formula-desc">Applicable for monthly gross within ceiling</p>
-              <div class="formula-input-unit">
-                <input class="form-control" type="number" min="0" step="0.01" [(ngModel)]="t.esiPct">
-                <span class="unit-tag">% of gross</span>
-              </div>
-              <div class="sub-input-row mt-2">
-                <span class="sub-label">Applies up to (₹):</span>
-                <input class="form-control form-control-sm" type="number" min="0" [(ngModel)]="t.esiGrossLimit" placeholder="e.g. 21,000">
-              </div>
-            </div>
-
-            <!-- Professional Tax -->
-            <div class="formula-card">
-              <div class="formula-card-top">
-                <span class="formula-badge badge-deduction">Deduction</span>
-                <span class="formula-type">State Tax</span>
-              </div>
-              <label class="formula-label">Professional Tax (PT)</label>
-              <p class="formula-desc">Monthly state statutory deduction</p>
-              <div class="formula-input-unit">
-                <span class="curr-prefix">₹</span>
-                <input class="form-control" type="number" min="0" [(ngModel)]="t.professionalTax">
-                <span class="unit-tag">/ month</span>
-              </div>
-            </div>
-
-            <!-- Special Allowance Balancing Card -->
-            <div class="formula-card formula-card-special">
-              <div class="formula-card-top">
-                <span class="formula-badge badge-auto">Auto Calculated</span>
-                <span class="formula-type">Dynamic</span>
-              </div>
-              <label class="formula-label">Special Allowance</label>
-              <p class="formula-desc">Automatically balances the remainder to ensure: <br><code>Basic + HRA + Conveyance + Medical + Special = 100% Gross</code></p>
-              <div class="special-balance-chip">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <span>Automated balancing active</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Footer Actions -->

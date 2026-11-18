@@ -5145,7 +5145,7 @@
 }
 
 .gt-config-modal {
-  max-width: 860px;
+  max-width: min(980px, 95vw);
 }
 
 .modal-accent-stripe {
@@ -5640,7 +5640,8 @@
 .gt-table-container {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: auto;
+  background: #ffffff;
 }
 
 .gt-styled-table {
@@ -5651,20 +5652,27 @@
 
 .gt-styled-table th {
   background: #f8fafc;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
   color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  padding: 10px 12px;
+  padding: 10px 10px;
   border-bottom: 1px solid #e2e8f0;
   text-align: left;
+  white-space: nowrap;
 }
 
 .gt-styled-table td {
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
+}
+
+.gt-styled-table input.form-control {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .gt-grade-row:last-child td {
@@ -5679,26 +5687,33 @@
   font-weight: 700;
   text-transform: uppercase;
   text-align: center;
-  max-width: 75px;
+  max-width: 68px;
 }
 
 .currency-input-sm {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .currency-input-sm .curr-tag {
   position: absolute;
-  left: 8px;
+  left: 10px;
   font-size: 12px;
   font-weight: 600;
-  color: #94a3b8;
+  color: #64748b;
   pointer-events: none;
+  z-index: 1;
 }
 
 .currency-input-sm input {
-  padding-left: 22px;
+  width: 100%;
+  min-width: 0;
+  padding-left: 24px !important;
+  box-sizing: border-box;
 }
 
 .gt-remove-btn {
@@ -6760,4 +6775,414 @@ app-page-header, .payroll-container app-page-header { position: relative; z-inde
 @media (max-width: 640px) {
   .drawer-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .employee-meta-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ── Hourly Cost Rate by Grade (Enhanced UI) ─────────────────────────────── */
+.hcr-section {
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hcr-header-row {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.hcr-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hcr-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+.hcr-autosave-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.hcr-autosave-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #16a34a;
+}
+
+.hcr-table-wrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow-x: auto;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02);
+}
+
+.hcr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+  min-width: 680px;
+}
+
+.hcr-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 11px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.hcr-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.hcr-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.hcr-table tbody tr:hover td {
+  background: #fcfdff;
+}
+
+.hcr-col-grade { width: 34%; }
+.hcr-col-rate { width: 32%; }
+.hcr-col-date { width: 20%; }
+.hcr-col-action { width: 14%; text-align: right !important; }
+
+.hcr-grade-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hcr-grade-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.hcr-grade-badge.ungraded {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.hcr-grade-Copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.hcr-grade-label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.hcr-now {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.hcr-now-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hcr-now-date {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.hcr-upcoming-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.hcr-now-unset {
+  color: #94a3b8;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* Rate Input + Suffix */
+.hcr-rate-input-wrap {
+  width: 100%;
+  max-width: 215px;
+}
+
+.hcr-rate-input-wrap input {
+  padding-right: 34px !important;
+}
+
+.hcr-unit-suffix {
+  position: absolute;
+  right: 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+/* One-line Suggested Rate Interactive Pill */
+.hcr-suggest-pill {
+  margin-top: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px 3px 9px;
+  border-radius: 999px;
+  border: 1px solid #99f6e4;
+  background: #f0fdfa;
+  color: #0f766e;
+  font-family: inherit;
+  font-size: 11.5px;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.hcr-suggest-pill:hover {
+  background: #ccfbf1;
+  border-color: #5eead4;
+  transform: translateY(-1px);
+}
+
+.hcr-sug-text strong {
+  font-weight: 800;
+  color: #115e59;
+  font-variant-numeric: tabular-nums;
+}
+
+.hcr-sug-count {
+  color: #0d9488;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.hcr-use {
+  margin-left: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #0d9488;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: background-color 0.15s ease;
+}
+
+.hcr-suggest-pill:hover .hcr-use {
+  background: #0f766e;
+}
+
+.hcr-suggest-empty {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+.hcr-table .form-control-sm,
+.hcr-date-input {
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hcr-date-input {
+  max-width: 165px;
+}
+
+.hcr-table .form-control-sm:focus,
+.hcr-date-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.hcr-ungraded td {
+  background: #f8fafc;
+}
+
+.hcr-set-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2);
+}
+
+/* Precedence & Calculation Rules Card */
+.hcr-logic {
+  padding: 16px 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  color: #334155;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hcr-logic-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.hcr-logic-ico {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.hcr-logic-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.hcr-logic-note {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.hcr-logic-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hcr-logic-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.hcr-step-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.hcr-logic-steps li b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 1px;
+}
+
+.hcr-logic-steps li span {
+  color: #64748b;
+}
+
+@media (max-width: 720px) {
+  .hcr-logic-steps {
+    grid-template-columns: 1fr;
+  }
 }

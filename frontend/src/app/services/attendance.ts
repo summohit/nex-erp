@@ -233,7 +233,7 @@ export class AttendanceService {
     return this.http.get<any[]>(`${this.apiUrl}/regularization/pending${params}`);
   }
 
-  requestRegularization(data: { reason: string; date?: string; proposedClockIn?: string; proposedClockOut?: string; entries?: { date: string; proposedClockIn?: string; proposedClockOut?: string }[] }) {
+  requestRegularization(data: { reason: string; proofUrl?: string; date?: string; proposedClockIn?: string; proposedClockOut?: string; entries?: { date: string; proposedClockIn?: string; proposedClockOut?: string }[] }) {
     return this.http.post(`${this.apiUrl}/regularization`, data);
   }
 

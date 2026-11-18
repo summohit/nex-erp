@@ -592,6 +592,12 @@ export class EmployeeListComponentV2 implements OnInit {
           show: (data: any) => this.canChangeEmail(data),
           onClick: (data: any) => this.openEmailChange(data),
         }, {
+          // Only for people already on an office login, i.e. after a change (19 Nov 2026).
+          label: 'Resend login email notice',
+          show: (data: any) => this.canChangeEmail(data)
+            && String(data?.user?.email || '').toLowerCase().endsWith('@' + EmployeeListComponentV2.OFFICE_DOMAIN),
+          onClick: (data: any) => this.resendLoginNotice(data),
+        }, {
           label: 'Hand over HR login',
           show: (data: any) => this.canHandover(data),
           onClick: (data: any) => this.openHandover(data),
@@ -620,6 +626,17 @@ export class EmployeeListComponentV2 implements OnInit {
 
   personalEmailCount(): number {
     return this.employees().filter((e: any) => e.user?.status === 'ACTIVE' && this.isPersonalEmail(e)).length;
+  }
+
+  resendLoginNotice(data: any) {
+    const name = `${data?.firstName ?? ''} ${data?.lastName ?? ''}`.trim();
+    if (!confirm(`Resend the "login email has been changed" email and notification to ${name} (${data?.user?.email})?`)) return;
+    this.employeeService.resendLoginEmailNotice(data.id).subscribe({
+      next: (r: any) => this.toast.success(r?.emailed
+        ? `Sent again to ${r.email} and ${r.previousEmail}.`
+        : 'Notification sent; the email could not be delivered.', { duration: 6000 }),
+      error: (e: any) => this.toast.error(e?.error?.message || 'Could not resend the notice'),
+    });
   }
 
   canChangeEmail(data: any): boolean {

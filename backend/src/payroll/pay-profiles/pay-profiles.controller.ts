@@ -28,6 +28,19 @@ export class PayProfilesController {
     return this.profiles.list(req.user.companyId);
   }
 
+  // Salary structure ← pay profile sync (19 Nov 2026). Super Admin only.
+  @Get('structure-sync/preview')
+  previewStructureSync(@Req() req) {
+    assertSalaryEditor(req.user.role);
+    return this.profiles.previewStructureSync(req.user.companyId);
+  }
+
+  @Post('structure-sync/apply')
+  applyStructureSync(@Req() req, @Body() body: { employeeIds?: number[] }) {
+    assertSalaryEditor(req.user.role);
+    return this.profiles.applyStructureSync(req.user.companyId, req.user.sub, Array.isArray(body?.employeeIds) ? body.employeeIds.map(Number) : undefined);
+  }
+
   // Before ':employeeId' so "import" isn't read as an id.
   @Get('import/preview')
   previewImport(@Req() req: any) {

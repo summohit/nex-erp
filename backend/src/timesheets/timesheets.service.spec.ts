@@ -237,9 +237,9 @@ describe('the overview scopes', () => {
     await expect(run(service, 'FINANCE', 'EMPLOYEE')).rejects.toThrow(ForbiddenException);
   });
 
-  it('lets finance see cost hours', async () => {
+  it('lets the Super Admin see cost hours (Finance view)', async () => {
     const { service } = overviewService();
-    const out = await run(service, 'FINANCE', 'FINANCE');
+    const out = await run(service, 'FINANCE', 'SUPERADMIN');
     expect(out.canViewCost).toBe(true);
   });
 
@@ -258,7 +258,7 @@ describe('the overview scopes', () => {
     const { service, prisma } = overviewService();
     prisma.issueTimeLog.findMany.mockResolvedValue([{ ...timeLog(120), employeeId: 60 }]);
 
-    const out = await run(service, 'FINANCE', 'FINANCE');
+    const out = await run(service, 'FINANCE', 'SUPERADMIN');
 
     expect(out.employees[0].cost).toEqual({ hourlyRate: 500, amount: 1000, unratedHours: 0 });
   });
@@ -277,7 +277,7 @@ describe('the overview scopes', () => {
     });
     prisma.issueTimeLog.findMany.mockResolvedValue([{ ...timeLog(120), employeeId: 60 }]);
 
-    const out = await run(service, 'FINANCE', 'FINANCE');
+    const out = await run(service, 'FINANCE', 'SUPERADMIN');
 
     expect(out.employees[0].cost).toEqual({ hourlyRate: null, amount: null, unratedHours: 2 });
     expect(out.totals.cost).toBe(0);

@@ -123,7 +123,12 @@ export class LeavesService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/leaves`;
 
-  assignBalance(data: { employeeId: number, leaveTypeId: number, allocated: number, year: number }) {
+  /** Every leave type with one person's balance (Individual assign table, 19 Nov 2026). */
+  getEmployeeQuotaGrid(employeeId: number, year: number) {
+    return this.http.get<any[]>(`${this.apiUrl}/balances/employee/${employeeId}/grid`, { params: { year: String(year) } });
+  }
+
+  assignBalance(data: { employeeId: number, leaveTypeId: number, allocated: number, year: number, locked?: boolean, bulk?: boolean }) {
     return this.http.post<LeaveBalance>(`${this.apiUrl}/assign-balance`, data);
   }
 

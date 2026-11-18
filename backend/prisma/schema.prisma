@@ -806,6 +806,10 @@ model LeaveBalance {
   allocated   Float     @default(0)
   used        Float     @default(0)
   year        Int
+  /// "Cannot edit" (19 Nov 2026): the allocated days are fixed by hand —
+  /// accrual, probation pro-rata and bulk assign leave it alone, and only the
+  /// Super Admin can change or unlock it. Used days still move with leave.
+  locked      Boolean   @default(false)
 
   /// Which accrual period this row has already been credited for — "2026-09"
   /// for MONTHLY types, "2026" for YEARLY. The credit is applied in a single
@@ -1020,6 +1024,8 @@ model AttendanceRegularization {
   proposedClockIn  DateTime?
   proposedClockOut DateTime?
   reason           String?
+  /// Optional photo or document backing the request (18 Nov 2026).
+  proofUrl         String?
   status           String    @default("PENDING") // PENDING, APPROVED, REJECTED
   rejectionReason  String?
   approvedById     Int?
@@ -1139,6 +1145,23 @@ model SalaryGrade {
   updatedAt DateTime @updatedAt
 
   @@unique([companyId, name])
+}
+
+/// Hourly cost rate by grade, dated (19 Nov 2026). Keyed by grade NAME because
+/// saving grades re-creates the rows. gradeName null = the "ungraded" rate for
+/// people outside grades (no salary, consultants, interns). A change applies
+/// from effectiveFrom; earlier hours keep the rate that applied then. A
+/// person's own Employee.hourlyCostRate still overrides all of this.
+model GradeCostRate {
+  id            Int      @id @default(autoincrement())
+  companyId     Int
+  gradeName     String?
+  rate          Float
+  effectiveFrom DateTime @db.Date
+  createdById   Int?
+  createdAt     DateTime @default(now())
+
+  @@index([companyId, gradeName, effectiveFrom])
 }
 
 /// How a monthly gross splits into components -- one per company.
@@ -2572,6 +2595,25 @@ model IssueTimeLog {
 /// Absence of a row means "not submitted", NOT "rejected". Every hour logged
 /// before approvals existed has no row, and treating that as refused would
 /// erase the project cost history overnight.
+/// Manual "Add work" line on a timesheet day (19 Nov 2026): work that has no
+/// task timer — a client call, a meeting, training. Optional link to a
+/// project / task / ticket. Counts toward the day's logged hours.
+model TimesheetWorkEntry {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  employeeId  Int
+  date        DateTime @db.Date
+  minutes     Int
+  description String   @db.Text
+  projectId   Int?
+  issueId     Int?
+  ticketId    Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([employeeId, date])
+}
+
 model TimesheetDay {
   id         Int      @id @default(autoincrement())
   employeeId Int

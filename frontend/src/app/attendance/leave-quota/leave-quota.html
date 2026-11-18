@@ -193,7 +193,7 @@
 
       <div class="modal-header-actions">
         <a
-          [routerLink]="['/employees', row.employee.id, 'profile']" (click)="$event.preventDefault(); profileModal.open(row.employee.id)"
+          [routerLink]="['/employees', row.employee.id, 'profile']" (click)="onProfileLinkClick($event, row.employee.id)"
           class="btn-view-profile"
           target="_blank"
           title="Open employee profile in new tab">
@@ -265,10 +265,11 @@
                   encashes {{ line.type.encashmentLimit > 0 ? 'up to ' + line.type.encashmentLimit : 'in full' }}
                 </span>
               </td>
-              <td class="num">{{ days(line.allocated) }}</td>
+              <!-- Loss of Pay has no quota or remaining (19 Nov 2026) -->
+              <td class="num">{{ line.type.isPaid ? days(line.allocated) : '—' }}</td>
               <td class="num font-semibold">{{ days(line.used) }}</td>
-              <td class="num font-bold" [class.none-left]="line.remaining <= 0" [class.low-left]="line.remaining > 0 && line.remaining <= 2">
-                {{ days(line.remaining) }}
+              <td class="num font-bold" [class.none-left]="line.type.isPaid && line.remaining <= 0" [class.low-left]="line.type.isPaid && line.remaining > 0 && line.remaining <= 2">
+                {{ line.type.isPaid ? days(line.remaining) : '—' }}
               </td>
               <td class="num">
                 <span *ngIf="line.encashed" class="text-carried">{{ days(line.encashed) }}</span>
@@ -391,15 +392,15 @@
 
       <article class="lqp-kpi red">
         <div class="lqp-kpi-top">
-          <span class="lqp-kpi-label">Over utilised</span>
+          <span class="lqp-kpi-label">Loss of Pay</span>
           <span class="lqp-kpi-ico"><svg lucideTriangleAlert [size]="16"></svg></span>
         </div>
         <div class="lqp-kpi-val-row">
-          <strong [class.is-over]="profileKpis().over > 0">{{ days(profileKpis().over) }}</strong>
+          <strong [class.is-over]="profileKpis().unpaid > 0">{{ days(profileKpis().unpaid) }}</strong>
           <span class="lqp-kpi-unit">days</span>
-          <span class="lqp-kpi-chip red" *ngIf="profileKpis().unpaid > 0">LOP</span>
+          <span class="lqp-kpi-chip red" *ngIf="profileKpis().unpaid > 0">Unpaid</span>
         </div>
-        <small>{{ days(profileKpis().unpaid) }} unpaid (LOP)</small>
+        <small>{{ profileKpis().over > 0 ? days(profileKpis().over) + ' days over paid quota' : 'Days taken without pay' }}</small>
       </article>
     </div>
 
@@ -432,7 +433,7 @@
                 <span class="lqp-tag blue" *ngIf="l.type.encashable">Encashable</span>
               </th>
               <td class="num" data-label="No. of leaves">
-                <span class="lqp-num-alloc">{{ days(l.allocated) }}</span>
+                <span class="lqp-num-alloc">{{ l.kind === 'unpaid' ? '—' : days(l.allocated) }}</span>
               </td>
               <td class="num" data-label="Leaves taken">
                 <div class="lqp-taken-cell">
@@ -455,7 +456,7 @@
                   [class.healthy]="l.left > 2"
                   [class.neutral]="l.left === 0 && l.allocated === 0"
                 >
-                  {{ days(l.left) }}
+                  {{ l.kind === 'unpaid' ? '—' : days(l.left) }}
                 </span>
               </td>
               <td class="num" data-label="Over utilised">

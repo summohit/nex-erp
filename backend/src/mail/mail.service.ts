@@ -624,22 +624,115 @@ export class MailService {
     }
   }
 
-  /** "Your MIRA login email has changed" — sent to the new and the old address (16 Nov 2026). */
-  async sendLoginEmailChanged(to: string, name: string, newEmail: string, oldEmail: string) {
-    const baseUrl = process.env.APP_URL || 'http://localhost:4200';
-    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-        <h2 style="color: #0f172a;">Your MIRA login email has changed</h2>
-        <p style="color: #334155; font-size: 15px;">Hi ${esc(name)},</p>
-        <p style="color: #334155; font-size: 15px; line-height: 1.6;">From now on, sign in to MIRA with <b>${esc(newEmail)}</b> instead of ${esc(oldEmail)}.
-        Your password and two-step verification stay the same.</p>
-        <div style="text-align: center; margin: 28px 0;">
-          <a href="${baseUrl}/login" style="background-color: #2563eb; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Sign in to MIRA</a>
-        </div>
-        <p style="color: #94a3b8; font-size: 12px;">If you did not expect this, contact HR.</p>
-      </div>`;
-    const subject = 'Your MIRA login email has changed';
+  /**
+   * "Your MIRA login email has been changed" — sent to the new and the old
+   * address (16 Nov 2026). 19 Nov: same look as the onboarding email (dark
+   * header, details card, button, next steps), with the login link as text too.
+   */
+  async sendLoginEmailChanged(to: string, name: string, newEmail: string, oldEmail: string, companyName?: string) {
+    const baseUrl = (process.env.APP_URL || 'http://localhost:4200').replace(/\/+$/, '');
+    const loginLink = `${baseUrl}/auth/login`;
+    const loginLabel = loginLink.replace(/^https?:\/\//, '');
+    const logoUrl = `${baseUrl}/mira-small-logo.png`;
+    const company = this.escapeHtml(companyName || 'your company');
+    const firstName = this.escapeHtml((name || '').trim().split(/\s+/)[0] || 'there');
+    const nEmail = this.escapeHtml(newEmail);
+    const oEmail = this.escapeHtml(oldEmail);
+    const toOld = to.toLowerCase() === oldEmail.toLowerCase();
+    const font = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+    const step = (n: number, title: string, text: string, last = false) => `
+                <tr><td style="padding-bottom:${last ? 6 : 14}px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                    <td valign="top" width="28" style="width:28px;padding:0;">
+                      <div style="width:28px;height:28px;background:#eef3ff;border-radius:50%;text-align:center;font-family:${font};font-size:13px;font-weight:700;color:#2f5bea;line-height:28px;">${n}</div>
+                    </td>
+                    <td style="padding-left:14px;font-family:${font};font-size:15px;line-height:22px;color:#3d4863;"><strong style="color:#0f1e3d;">${title}</strong> ${text}</td>
+                  </tr></table>
+                </td></tr>`;
+    const html = `<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
+  <title>Your MIRA login email has been changed</title>
+  <style>
+    body { margin:0; padding:0; width:100% !important; background:#eef2f8; }
+    table { border-collapse:collapse; }
+    img { border:0; display:block; }
+    a { color:#2f5bea; }
+    @media only screen and (max-width:620px) {
+      .container { width:100% !important; }
+      .px { padding-left:20px !important; padding-right:20px !important; }
+      .h1 { font-size:24px !important; line-height:30px !important; }
+      .btn a { display:block !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#eef2f8;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#eef2f8;font-size:1px;line-height:1px;">From now on, sign in to MIRA with ${nEmail}. Your password stays the same.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f8;"><tr><td align="center" style="padding:32px 12px;">
+    <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+
+      <tr><td class="px" style="background:#0f1e3d;border-radius:16px 16px 0 0;padding:28px 40px 56px 40px;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="background:#ffffff;border-radius:10px;width:40px;height:40px;text-align:center;vertical-align:middle;">
+            <img src="${logoUrl}" width="28" height="23" alt="M" style="display:inline-block;width:28px;height:23px;margin:8px auto;font-family:${font};font-size:20px;font-weight:700;line-height:23px;color:#2f5bea;text-align:center;">
+          </td>
+          <td style="padding-left:12px;font-family:${font};font-size:18px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">MIRA</td>
+          <td style="padding-left:12px;font-family:${font};font-size:13px;color:#9fb0d3;">by ${company}</td>
+        </tr></table>
+        <h1 class="h1" style="margin:28px 0 0 0;font-family:${font};font-size:30px;line-height:38px;font-weight:700;color:#ffffff;">Your login email has changed, ${firstName}.</h1>
+        <p style="margin:10px 0 0 0;font-family:${font};font-size:16px;line-height:24px;color:#c4d0ea;">${toOld ? 'This address no longer signs in to MIRA.' : 'Use this email to sign in to MIRA from now on.'}</p>
+      </td></tr>
+
+      <tr><td class="px" style="background:#ffffff;padding:0 40px 8px 40px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:-32px;background:#ffffff;border:1px solid #dfe5f0;border-radius:12px;box-shadow:0 6px 20px rgba(15,30,61,0.08);">
+          <tr><td style="padding:22px 24px 6px 24px;font-family:${font};font-size:15px;font-weight:700;color:#0f1e3d;">Your sign-in details</td></tr>
+          <tr><td style="padding:8px 24px 0 24px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:12px 0;border-bottom:1px solid #edf0f6;font-family:${font};font-size:14px;color:#64708a;width:38%;">New login email</td>
+                <td style="padding:12px 0;border-bottom:1px solid #edf0f6;"><span style="display:inline-block;background:#eef3ff;border:1px dashed #9db4f5;border-radius:8px;padding:7px 12px;font-family:${font};font-size:15px;font-weight:700;color:#1f3fb5;word-break:break-all;">${nEmail}</span></td>
+              </tr>
+              <tr>
+                <td style="padding:12px 0;border-bottom:1px solid #edf0f6;font-family:${font};font-size:14px;color:#64708a;">Previous email</td>
+                <td style="padding:12px 0;border-bottom:1px solid #edf0f6;font-family:${font};font-size:15px;color:#7a869e;text-decoration:line-through;word-break:break-all;">${oEmail}</td>
+              </tr>
+              <tr>
+                <td style="padding:14px 0;font-family:${font};font-size:14px;color:#64708a;">Password</td>
+                <td style="padding:14px 0;font-family:${font};font-size:15px;font-weight:600;color:#0f1e3d;">Unchanged — use your current password</td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr><td align="center" class="btn" style="padding:30px 0 6px 0;">
+            <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${loginLink}" style="height:52px;v-text-anchor:middle;width:240px;" arcsize="20%" stroke="f" fillcolor="#2f5bea"><w:anchorlock/><center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Sign in to MIRA</center></v:roundrect><![endif]-->
+            <!--[if !mso]><!-- --><a href="${loginLink}" style="display:inline-block;background:#2f5bea;color:#ffffff;text-decoration:none;font-family:${font};font-size:16px;font-weight:700;line-height:20px;padding:16px 36px;border-radius:10px;">Sign in to MIRA</a><!--<![endif]-->
+          </td></tr>
+          <tr><td align="center" style="padding:10px 0 0 0;font-family:${font};font-size:13px;line-height:20px;color:#7a869e;">Button not working? Open <a href="${loginLink}" style="color:#2f5bea;">${loginLabel}</a> in your browser.</td></tr>
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:32px;">
+          <tr><td style="font-family:${font};font-size:16px;font-weight:700;color:#0f1e3d;padding-bottom:14px;">What to do now</td></tr>
+          ${step(1, 'Sign in with your new email.', `Use <strong>${nEmail}</strong> and your current password.`)}
+          ${step(2, 'Update saved logins.', 'If your browser or phone saved the old email, update it so sign-in works first time.')}
+          ${step(3, 'Mobile app too.', 'If you use the MIRA app, sign out and sign in again with the new email.', true)}
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0 32px 0;background:#fff7e6;border-left:4px solid #f0a92e;border-radius:8px;">
+          <tr><td style="padding:14px 18px;font-family:${font};font-size:14px;line-height:21px;color:#6b4a0a;"><strong>Didn't expect this?</strong> Contact your HR team straight away. Your attendance, leave, payslips and documents are all unchanged.</td></tr>
+        </table>
+      </td></tr>
+
+      <tr><td class="px" style="background:#f7f9fc;border-top:1px solid #e3e8f1;border-radius:0 0 16px 16px;padding:22px 40px;font-family:${font};font-size:13px;line-height:20px;color:#7a869e;">
+        Need help signing in? Reply to this email or contact your HR team.<br>Sent by MIRA on behalf of ${company}.
+      </td></tr>
+
+    </table>
+  </td></tr></table>
+</body></html>`;
+    const subject = 'Your MIRA login email has been changed';
     if (this.brevoApiKey) { await this.sendBrevoEmail({ to, subject, html }); return; }
     await this.sendWithRetry({ from: `"MIRA" <${this.fromEmail}>`, envelope: { from: this.fromEmail, to }, to, subject, html });
   }

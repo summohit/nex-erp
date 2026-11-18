@@ -170,7 +170,9 @@ export class PayrollService {
   async getAllSalaryStructures(companyId: number) {
     const grades = await this.getSalaryGrades(companyId);
     const employees = await this.prisma.employee.findMany({
-      where: { companyId },
+      // Active people only (19 Nov 2026): deactivated and separated people
+      // are left out of the Salary Structure tab.
+      where: { companyId, user: { status: { not: 'SUSPENDED' } }, offboardingStatus: { not: 'SEPARATED' } },
       include: {
         department: { select: { id: true, name: true } },
         designation: { select: { id: true, name: true } },
@@ -298,6 +300,69 @@ export class PayrollService {
   }
 
   // ==================== 2b. GRADES & TEMPLATE ====================
+
+  /**
+   * Hourly cost rates by grade (19 Nov 2026): the rate in force today for each
+   * grade and for "ungraded" people, plus the full history. Rows are keyed by
+   * grade name because saving grades re-creates them.
+   */
+  async getGradeCostRates(companyId: number) {
+    const [grades, rows] = await Promise.all([
+      this.prisma.salaryGrade.findMany({ where: { companyId }, orderBy: [{ position: 'asc' }, { minGross: 'asc' }], select: { name: true, label: true, minGross: true, maxGross: true } }),
+      this.prisma.gradeCostRate.findMany({ where: { companyId }, orderBy: [{ effectiveFrom: 'desc' }, { id: 'desc' }] }),
+    ]);
+    const today = new Date(new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10) + 'T00:00:00.000Z');
+    const pick = (name: string | null) => {
+      const mine = rows.filter((r) => (r.gradeName ?? null) === name);
+      const current = mine.find((r) => r.effectiveFrom <= today) ?? null;
+      const upcoming = mine.filter((r) => r.effectiveFrom > today).sort((a, b) => +a.effectiveFrom - +b.effectiveFrom)[0] ?? null;
+      return {
+        current: current ? { rate: current.rate, effectiveFrom: current.effectiveFrom.toISOString().slice(0, 10) } : null,
+        upcoming: upcoming ? { rate: upcoming.rate, effectiveFrom: upcoming.effectiveFrom.toISOString().slice(0, 10) } : null,
+        history: mine.map((r) => ({ rate: r.rate, effectiveFrom: r.effectiveFrom.toISOString().slice(0, 10), setAt: r.createdAt })),
+      };
+    };
+    // Suggested rate (19 Nov 2026): average monthly gross of the ACTIVE people
+    // in each grade ÷ standard monthly hours (same 234 h as project costing).
+    const HOURS = 234;
+    const structures = await this.prisma.salaryStructure.findMany({
+      where: { component: { type: 'EARNING' }, employee: { companyId, user: { status: { not: 'SUSPENDED' } }, offboardingStatus: { not: 'SEPARATED' } } },
+      select: { employeeId: true, amount: true },
+    });
+    const grossBy = new Map<number, number>();
+    for (const r of structures) grossBy.set(r.employeeId, (grossBy.get(r.employeeId) ?? 0) + r.amount);
+    const suggest = (g: { minGross: number; maxGross: number | null }) => {
+      const xs = [...grossBy.values()].filter((v) => v > 0 && v >= g.minGross && (g.maxGross == null || v <= g.maxGross));
+      if (!xs.length) return { suggestedRate: null, basedOnPeople: 0, avgMonthlyGross: null };
+      const avg = xs.reduce((a, v) => a + v, 0) / xs.length;
+      return { suggestedRate: Math.round(avg / HOURS), basedOnPeople: xs.length, avgMonthlyGross: Math.round(avg) };
+    };
+    return {
+      hoursPerMonth: HOURS,
+      grades: grades.map((g) => ({ ...g, ...pick(g.name), ...suggest(g) })),
+      ungraded: pick(null),
+    };
+  }
+
+  async setGradeCostRate(companyId: number, actorUserId: number | null, body: { gradeName: string | null; rate: number; effectiveFrom: string }) {
+    const gradeName = body?.gradeName ? String(body.gradeName).trim() : null;
+    const rate = Number(body?.rate);
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100000) throw new BadRequestException('Enter an hourly rate between 0 and 1,00,000.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body?.effectiveFrom ?? ''))) throw new BadRequestException('Pick the date this rate applies from.');
+    if (gradeName) {
+      const exists = await this.prisma.salaryGrade.findFirst({ where: { companyId, name: gradeName }, select: { id: true } });
+      if (!exists) throw new BadRequestException(`Grade ${gradeName} does not exist.`);
+    }
+    const effectiveFrom = new Date(`${body.effectiveFrom}T00:00:00.000Z`);
+    // Same grade + same date: replace, so a typo is fixed rather than stacked.
+    await this.prisma.gradeCostRate.deleteMany({ where: { companyId, gradeName, effectiveFrom } });
+    const row = await this.prisma.gradeCostRate.create({ data: { companyId, gradeName, rate: Math.round(rate * 100) / 100, effectiveFrom, createdById: actorUserId } });
+    await this.prisma.auditLog.create({ data: {
+      companyId, actorId: actorUserId, action: 'GRADE_COST_RATE_SET', entityType: 'GradeCostRate', entityId: String(row.id),
+      newValue: { gradeName: gradeName ?? 'UNGRADED', rate: row.rate, effectiveFrom: body.effectiveFrom } as any,
+    } }).catch(() => undefined);
+    return this.getGradeCostRates(companyId);
+  }
 
   async getSalaryGrades(companyId: number) {
     return this.prisma.salaryGrade.findMany({

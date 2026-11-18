@@ -9,6 +9,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { AttendanceService, AttendanceRecord, Shift } from '../services/attendance';
+import { UploadService } from '../services/upload.service';
 import { LeavesService, LeaveBalance, LeaveRequest } from '../services/leaves';
 import { LifecycleService } from '../services/lifecycle.service';
 import { MasterDataService, Holiday, LeaveType } from '../services/master-data.service';
@@ -136,6 +137,7 @@ export class AttendanceLeaveComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private attendanceService = inject(AttendanceService);
+  private uploadService = inject(UploadService);
   private leavesService = inject(LeavesService);
   private lifecycleApi = inject(LifecycleService);
   /** The signed-in person's probation, for the Request Leave notice (no paid leave on probation). */
@@ -1013,6 +1015,20 @@ export class AttendanceLeaveComponent implements OnInit {
         `;
       }
     },
+    {
+      // Optional proof attached to the request (18 Nov 2026).
+      field: 'proofUrl',
+      headerName: 'Proof',
+      minWidth: 90,
+      maxWidth: 110,
+      sortable: false,
+      cellRenderer: (params: any) => {
+        const url = String(params.value || '');
+        if (!/^https?:\/\//i.test(url)) return `<span style="color:#94a3b8;font-size:12px;">—</span>`;
+        const safe = url.replace(/"/g, '&quot;');
+        return `<a href="${safe}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:6px;font-size:11.5px;font-weight:600;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;text-decoration:none;">📎 View</a>`;
+      }
+    },
     { 
       field: 'status', 
       headerName: 'Status', 
@@ -1207,6 +1223,20 @@ export class AttendanceLeaveComponent implements OnInit {
             </span>
           </div>
         `;
+      }
+    },
+    {
+      // Optional proof attached to the request (18 Nov 2026).
+      field: 'proofUrl',
+      headerName: 'Proof',
+      minWidth: 90,
+      maxWidth: 110,
+      sortable: false,
+      cellRenderer: (params: any) => {
+        const url = String(params.value || '');
+        if (!/^https?:\/\//i.test(url)) return `<span style="color:#94a3b8;font-size:12px;">—</span>`;
+        const safe = url.replace(/"/g, '&quot;');
+        return `<a href="${safe}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:6px;font-size:11.5px;font-weight:600;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;text-decoration:none;">📎 View</a>`;
       }
     },
     { 
@@ -2045,7 +2075,8 @@ export class AttendanceLeaveComponent implements OnInit {
   regularizationForm: {
     days: { date: string; proposedClockIn: string; proposedClockOut: string }[];
     reason: string;
-  } = { days: [{ date: '', proposedClockIn: '', proposedClockOut: '' }], reason: '' };
+    proofFile: File | null;
+  } = { days: [{ date: '', proposedClockIn: '', proposedClockOut: '' }], reason: '', proofFile: null };
 
   // Reject Modal
   isRejectModalOpen = signal<boolean>(false);
@@ -2496,6 +2527,7 @@ export class AttendanceLeaveComponent implements OnInit {
     this.regularizationForm = {
       days: [{ date: dateStr || '', proposedClockIn: '', proposedClockOut: '' }],
       reason: '',
+      proofFile: null,
     };
     this.showFormErrors.set(false);
     this.isRegularizationModalOpen.set(true);
@@ -2522,6 +2554,17 @@ export class AttendanceLeaveComponent implements OnInit {
     return !!d && this.regularizationForm.days.findIndex((x) => x.date === d) !== i;
   }
 
+  /** Optional attachment on a regularization (18 Nov 2026). */
+  onRegularizationProof(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const f = input.files?.[0] ?? null;
+    input.value = '';
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) { this.toast.error('Attachment is larger than 5 MB.'); return; }
+    if (!/^image\/|application\/pdf/.test(f.type)) { this.toast.error('Attach an image or a PDF.'); return; }
+    this.regularizationForm.proofFile = f;
+  }
+
   submitRegularization() {
     this.showFormErrors.set(true);
     const days = this.regularizationForm.days;
@@ -2532,7 +2575,7 @@ export class AttendanceLeaveComponent implements OnInit {
     // The times are IST wall-clock. Without the offset the server — which does
     // not run in India — read 09:30 in its own time zone.
     const at = (date: string, time: string) => (time ? `${date}T${time}:00+05:30` : undefined);
-    const data = {
+    const data: any = {
       reason: this.regularizationForm.reason.trim(),
       entries: days.map((d) => ({
         date: d.date,
@@ -2541,7 +2584,7 @@ export class AttendanceLeaveComponent implements OnInit {
       })),
     };
 
-    this.attendanceService.requestRegularization(data as any).subscribe({
+    const send = () => this.attendanceService.requestRegularization(data as any).subscribe({
       next: () => {
         this.toast.success(days.length > 1
           ? `Regularization requested for ${days.length} days`
@@ -2554,6 +2597,16 @@ export class AttendanceLeaveComponent implements OnInit {
         this.toast.error(err?.error?.message || 'Failed to submit request');
         this.isSubmittingRequest.set(false);
       }
+    });
+
+    const file = this.regularizationForm.proofFile;
+    if (!file) { send(); return; }
+    this.uploadService.uploadAttendanceProof(file).subscribe({
+      next: (res: any) => { data.proofUrl = res?.url ?? res?.path; send(); },
+      error: () => {
+        this.toast.error('The attachment could not be uploaded. Try again or remove it.');
+        this.isSubmittingRequest.set(false);
+      },
     });
   }
 
@@ -3135,8 +3188,23 @@ export class AttendanceLeaveComponent implements OnInit {
     });
   }
 
+  /** Pending (applied, not yet approved) days per employee + leave type, this year (19 Nov 2026). */
+  pendingLeaveDays = computed(() => {
+    const yr = this.selectedYear ? Number(this.selectedYear()) : new Date().getFullYear();
+    const map = new Map<string, number>();
+    for (const r of (this.allRequests() || []) as any[]) {
+      if (r.status !== 'PENDING' || r.deletedAt) continue;
+      if (new Date(r.startDate).getFullYear() !== yr) continue;
+      const days = r.isHalfDay ? 0.5 : Math.round((new Date(r.endDate).getTime() - new Date(r.startDate).getTime()) / 86400000) + 1;
+      const k = `${r.employeeId}:${r.leaveTypeId}`;
+      map.set(k, (map.get(k) ?? 0) + days);
+    }
+    return map;
+  });
+
   pivotedBalances = computed(() => {
     const balances = this.filteredBalanceRecords();
+    const pending = this.pendingLeaveDays();
     const empMap = new Map<number, any>();
     const employeesList = this.employees() || [];
     const empLookup = new Map<number, any>(employeesList.map((e: any) => [e.id, e]));
@@ -3157,7 +3225,8 @@ export class AttendanceLeaveComponent implements OnInit {
       const empData = empMap.get(b.employeeId);
       if (b.leaveType && b.leaveType.name) {
         const available = b.allocated - b.used;
-        empData[b.leaveType.name] = `${available} / ${b.allocated}`;
+        const p = pending.get(`${b.employeeId}:${b.leaveTypeId}`) ?? 0;
+        empData[b.leaveType.name] = `${available} / ${b.allocated} / ${p}`;
       }
     });
 
@@ -3242,7 +3311,7 @@ export class AttendanceLeaveComponent implements OnInit {
       const suffix = halfDay === false ? ' · No Half Day' : ' · Half Day';
       cols.push({
         headerName: type,
-        headerTooltip: `${type} · Available / total${suffix}`,
+        headerTooltip: `${type} · Available / total · pending (applied, not approved)${suffix}`,
         field: type,
         flex: 1,
         minWidth: 120,
@@ -3262,8 +3331,9 @@ export class AttendanceLeaveComponent implements OnInit {
           }
           const avail = parseFloat(parts[0].trim());
           const alloc = parseFloat(parts[1].trim());
+          const pend = parts[2] ? parseFloat(parts[2].trim()) : 0;
           // Nothing allocated and nothing used: a quiet dash, not a pill (12 Nov 2026).
-          if (!alloc && !avail) {
+          if (!alloc && !avail && !pend) {
             return `<div style="display:flex;align-items:center;justify-content:center;height:100%;"><span style="color:#cbd5e1;font-size:13px;">—</span></div>`;
           }
           const tone = avail < 0 ? '#dc2626' : (avail === 0 ? '#d97706' : '#15803d');
@@ -3273,6 +3343,7 @@ export class AttendanceLeaveComponent implements OnInit {
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;height:100%;">
               <span style="font-size:13px;white-space:nowrap;line-height:1;"><strong style="color:${tone};font-weight:700;">${avail}</strong><span style="color:#94a3b8;font-size:12px;"> / ${alloc}</span></span>
               <span style="display:block;width:56px;height:4px;border-radius:999px;background:#eef2f6;overflow:hidden;"><span style="display:block;height:100%;width:${avail < 0 ? 100 : pct}%;background:${bar};border-radius:999px;"></span></span>
+              ${pend > 0 ? `<span title="${pend} day(s) applied, waiting for approval — available after approval: ${avail - pend}" style="font-size:10.5px;font-weight:600;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:999px;padding:0 6px;line-height:16px;white-space:nowrap;">${pend} pending</span>` : ''}
             </div>
           `;
         }
@@ -3281,6 +3352,192 @@ export class AttendanceLeaveComponent implements OnInit {
 
     return cols;
   });
+
+  // ── Leave Balances summary (19 Nov 2026): no horizontal scroll, totals + breakdown ──
+  balanceStatusFilter = signal<'all' | 'available' | 'exhausted' | 'pending' | 'lop'>('all');
+
+  /** All employee summary rows after text/type filtering, before status pill filtering. */
+  balanceSummaryAllRows = computed(() => {
+    const pending = this.pendingLeaveDays();
+    const empLookup = new Map<number, any>((this.employees() || []).map((e: any) => [e.id, e]));
+    const by = new Map<number, any>();
+    for (const b of this.filteredBalanceRecords() as any[]) {
+      if (!by.has(b.employeeId)) {
+        by.set(b.employeeId, {
+          employeeId: b.employeeId,
+          employeeData: { ...empLookup.get(b.employeeId), ...b.employee },
+          allocated: 0, used: 0, remaining: 0, pending: 0, lop: 0, types: [] as any[],
+        });
+      }
+      const row = by.get(b.employeeId);
+      const t = b.leaveType || {};
+      const p = pending.get(`${b.employeeId}:${b.leaveTypeId}`) ?? 0;
+      const paid = t.isPaid !== false;
+      row.types.push({ name: t.name || 'Leave', paid, allocated: b.allocated, used: b.used, remaining: paid ? b.allocated - b.used : null, pending: p });
+      if (paid) { row.allocated += b.allocated; row.used += b.used; row.remaining += b.allocated - b.used; row.pending += p; }
+      else { row.lop += b.used; row.pending += p; }
+    }
+    for (const r of by.values()) r.types.sort((a: any, b: any) => Number(b.paid) - Number(a.paid) || a.name.localeCompare(b.name));
+    return [...by.values()];
+  });
+
+  /** One row per person filtered by the active status chip. */
+  balanceSummaryRows = computed(() => {
+    const rows = this.balanceSummaryAllRows();
+    const f = this.balanceStatusFilter();
+    if (f === 'available') return rows.filter(r => r.remaining > 0);
+    if (f === 'exhausted') return rows.filter(r => r.remaining <= 0);
+    if (f === 'pending') return rows.filter(r => r.pending > 0);
+    if (f === 'lop') return rows.filter(r => r.lop > 0);
+    return rows;
+  });
+
+  /** Aggregate metrics across the current employee balance list. */
+  balanceOverviewStats = computed(() => {
+    const rows = this.balanceSummaryAllRows();
+    let totalAllocated = 0;
+    let totalUsed = 0;
+    let totalRemaining = 0;
+    let totalPending = 0;
+    let totalLop = 0;
+    let availableCount = 0;
+    let exhaustedCount = 0;
+    let deficitCount = 0;
+    let pendingCount = 0;
+    let lopCount = 0;
+    for (const r of rows) {
+      totalAllocated += Number(r.allocated || 0);
+      totalUsed += Number(r.used || 0);
+      totalRemaining += Number(r.remaining || 0);
+      totalPending += Number(r.pending || 0);
+      totalLop += Number(r.lop || 0);
+      if (r.remaining > 0) availableCount++;
+      else if (r.remaining < 0) deficitCount++;
+      else exhaustedCount++;
+      if (r.pending > 0) pendingCount++;
+      if (r.lop > 0) lopCount++;
+    }
+    const round1 = (n: number) => Math.round(n * 10) / 10;
+    const utilizationPct = totalAllocated > 0 ? Math.min(100, Math.round((totalUsed / totalAllocated) * 100)) : 0;
+    return {
+      totalEmployees: rows.length,
+      totalAllocated: round1(totalAllocated),
+      totalUsed: round1(totalUsed),
+      totalRemaining: round1(totalRemaining),
+      totalPending: round1(totalPending),
+      totalLop: round1(totalLop),
+      availableCount,
+      exhaustedCount,
+      deficitCount,
+      pendingCount,
+      lopCount,
+      utilizationPct,
+    };
+  });
+
+  balanceBreakdown = signal<any | null>(null);
+  openBalanceBreakdown(row: any) { this.balanceBreakdown.set(row); }
+  closeBalanceBreakdown() { this.balanceBreakdown.set(null); }
+
+  @HostListener('document:keydown.escape')
+  onBalanceBreakdownEscape() {
+    if (this.balanceBreakdown()) {
+      this.closeBalanceBreakdown();
+    }
+  }
+
+  balanceSummaryColDefs: ColDef[] = [
+    {
+      headerName: 'Employee', field: 'employeeData', flex: 2.3, minWidth: 250, filter: false,
+      headerClass: 'lb-col-emp', cellClass: 'lb-cell-emp',
+      valueGetter: (p: any) => `${p.data?.employeeData?.firstName ?? ''} ${p.data?.employeeData?.lastName ?? ''}`.trim(),
+      cellRenderer: (p: any) => {
+        const e = p.data?.employeeData || {};
+        const name = `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim() || 'Employee';
+        const safe = name.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        const code = e.employeeCode ? String(e.employeeCode).replace(/</g, '&lt;') : '';
+        const dept = e.department?.name || (typeof e.department === 'string' ? e.department : '');
+        const des = e.designation?.name || (typeof e.designation === 'string' ? e.designation : '');
+        const meta = [des, dept].filter(Boolean).join(' · ').replace(/</g, '&lt;');
+        const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=2563EB&color=fff&size=128&bold=true`;
+        return `<div class="lb-emp-cell">
+          <img src="${e.avatarUrl || fallback}" onerror="this.onerror=null;this.src='${fallback}'" class="lb-emp-avatar" alt="${safe}">
+          <div class="lb-emp-info">
+            <div class="lb-emp-top">
+              <span class="lb-emp-name" title="${safe}">${safe}</span>
+              ${code ? `<span class="lb-emp-code">#${code}</span>` : ''}
+            </div>
+            <div class="lb-emp-sub" title="${meta || (code ? 'Emp ID: ' + code : '')}">
+              ${meta ? meta : (code ? `Emp ID: <span class="lb-emp-code-inline">${code}</span>` : 'Team Member')}
+            </div>
+          </div>
+        </div>`;
+      },
+    },
+    {
+      headerName: 'Allocated', field: 'allocated', flex: 1, minWidth: 110, filter: false,
+      headerClass: 'lb-col-num', cellClass: 'lb-cell-num',
+      headerTooltip: 'Paid leave allocated this year',
+      cellRenderer: (p: any) => {
+        const v = p.value ?? 0;
+        return `<div class="lb-num-wrap"><span class="lb-num-main">${v}</span><span class="lb-num-unit">d</span></div>`;
+      },
+    },
+    {
+      headerName: 'Used', field: 'used', flex: 1, minWidth: 105, filter: false,
+      headerClass: 'lb-col-num', cellClass: 'lb-cell-num',
+      headerTooltip: 'Paid leave taken',
+      cellRenderer: (p: any) => {
+        const v = p.value ?? 0;
+        return `<div class="lb-num-wrap"><span class="lb-num-main ${v > 0 ? 'is-used' : 'is-zero'}">${v}</span><span class="lb-num-unit">d</span></div>`;
+      },
+    },
+    {
+      headerName: 'Remaining', field: 'remaining', flex: 1.35, minWidth: 145, filter: false,
+      headerClass: 'lb-col-num', cellClass: 'lb-cell-num',
+      headerTooltip: 'Paid leave still available',
+      cellRenderer: (p: any) => {
+        const v = p.value ?? 0;
+        const alloc = p.data?.allocated ?? 0;
+        const pct = alloc > 0 ? Math.max(0, Math.min(100, Math.round((v / alloc) * 100))) : 0;
+        const tone = v < 0 ? 'deficit' : v === 0 ? 'exhausted' : 'healthy';
+        return `<div class="lb-rem-cell">
+          <span class="lb-rem-badge ${tone}">
+            <span class="lb-rem-dot"></span>
+            <strong>${v}</strong><small>d</small>
+          </span>
+          <span class="lb-rem-track" title="${pct}% of paid quota remaining">
+            <span class="lb-rem-fill ${tone}" style="width:${v < 0 ? 100 : pct}%"></span>
+          </span>
+        </div>`;
+      },
+    },
+    {
+      headerName: 'Pending', field: 'pending', flex: 1, minWidth: 110, filter: false,
+      headerClass: 'lb-col-center', cellClass: 'lb-cell-center',
+      headerTooltip: 'Applied, waiting for approval',
+      cellRenderer: (p: any) => p.value > 0
+        ? `<span class="lb-grid-pend-pill"><span class="lb-pend-dot"></span>${p.value}d pending</span>`
+        : '<span class="lb-grid-dash">—</span>',
+    },
+    {
+      headerName: 'LOP', field: 'lop', flex: 0.95, minWidth: 100, filter: false,
+      headerClass: 'lb-col-center', cellClass: 'lb-cell-center',
+      headerTooltip: 'Loss of Pay days taken (unpaid)',
+      cellRenderer: (p: any) => p.value > 0
+        ? `<span class="lb-grid-lop-pill">${p.value}d LOP</span>`
+        : '<span class="lb-grid-dash">—</span>',
+    },
+    {
+      headerName: 'Breakdown', field: 'employeeId', flex: 1.15, minWidth: 155, sortable: false, filter: false,
+      headerClass: 'lb-col-action', cellClass: 'lb-cell-action',
+      cellRenderer: () => `<button type="button" class="lb-breakdown-btn">
+        <span>View breakdown</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </button>`,
+      onCellClicked: (p: any) => this.openBalanceBreakdown(p.data),
+    },
+  ];
 
   defaultColDef: ColDef = {
     flex: 1,
@@ -3825,6 +4082,8 @@ export class AttendanceLeaveComponent implements OnInit {
           balances: this.leavesService.getAllBalances(year),
           employees: this.employeeService.getEmployeesBasicList(),
           leaveTypes: this.masterDataService.getLeaveTypes(),
+          // Pending requests, to show applied-but-not-approved days (19 Nov 2026).
+          requests: this.leavesService.getRequests(),
         })
       : forkJoin({
           requests: this.leavesService.getRequests(),
@@ -3835,6 +4094,7 @@ export class AttendanceLeaveComponent implements OnInit {
         if (isBalancesPage) {
           this.allBalances.set(data.balances);
           this.employees.set(data.employees);
+          this.allRequests.set(data.requests || []);
         } else {
           this.allRequests.set(data.requests);
         }
@@ -4189,7 +4449,7 @@ export class AttendanceLeaveComponent implements OnInit {
     if (!rows.length) { this.toast.error('No valid balance rows found. Expected columns: employee_id, leave_type_id, allocated, year.'); return; }
     if (!confirm(`Set ${rows.length} leave balance${rows.length === 1 ? '' : 's'} from this CSV?`)) return;
     try {
-      for (const row of rows) await firstValueFrom(this.leavesService.assignBalance(row));
+      for (const row of rows) await firstValueFrom(this.leavesService.assignBalance({ ...row, bulk: true }));
       this.toast.success(`Imported ${rows.length} leave balance${rows.length === 1 ? '' : 's'}`);
       this.loadAdminData();
     } catch (error: any) { this.toast.error(error?.error?.message || 'Could not import leave balances.'); }
@@ -4541,6 +4801,44 @@ export class AttendanceLeaveComponent implements OnInit {
     }
   }
 
+  // ── Individual assign: all leave types in one table (19 Nov 2026) ──
+  quotaGrid = signal<any[]>([]);
+  quotaGridLoading = signal(false);
+  quotaSaving: number | null = null;
+
+  loadQuotaGrid() {
+    const id = Number(this.selectedEmployeeId());
+    if (!id || this.assignToAll()) { this.quotaGrid.set([]); return; }
+    this.quotaGridLoading.set(true);
+    this.leavesService.getEmployeeQuotaGrid(id, Number(this.assignYear()) || new Date().getFullYear()).subscribe({
+      next: (rows) => { this.quotaGrid.set((rows || []).map((r) => ({ ...r, draft: r.allocated, lockDraft: r.locked }))); this.quotaGridLoading.set(false); },
+      error: (e) => { this.quotaGridLoading.set(false); this.toast.error(e?.error?.message || 'Could not load leave balances'); },
+    });
+  }
+
+  saveQuotaRow(r: any) {
+    const id = Number(this.selectedEmployeeId());
+    const days = Number(r.draft);
+    if (!id || !Number.isFinite(days) || days < 0) { this.toast.error('Enter a valid number of days'); return; }
+    this.quotaSaving = r.leaveTypeId;
+    this.leavesService.assignBalance({
+      employeeId: id, leaveTypeId: r.leaveTypeId, allocated: days, year: Number(this.assignYear()) || new Date().getFullYear(),
+      ...(this.isSuperAdminUser() ? { locked: !!r.lockDraft } : {}),
+    }).subscribe({
+      next: () => {
+        this.quotaSaving = null;
+        r.allocated = days; r.locked = this.isSuperAdminUser() ? !!r.lockDraft : r.locked; r.exists = true;
+        this.toast.success(`${r.name}: ${days} day${days === 1 ? '' : 's'} saved${r.locked ? ' · locked' : ''}`);
+        this.loadAdminData();
+      },
+      error: (e) => { this.quotaSaving = null; this.toast.error(e?.error?.message || 'Could not save'); },
+    });
+  }
+
+  quotaRowChanged(r: any): boolean {
+    return Number(r.draft) !== Number(r.allocated) || !!r.lockDraft !== !!r.locked || !r.exists;
+  }
+
   /** Assign Leave Balance lives in a pop-up opened from the header (12 Nov 2026). */
   isAssignModalOpen = signal(false);
 
@@ -4565,7 +4863,7 @@ export class AttendanceLeaveComponent implements OnInit {
 
     if (this.assignToAll()) {
       const requests = this.employees().map(emp => 
-        this.leavesService.assignBalance({ ...payloadTemplate, employeeId: emp.id })
+        this.leavesService.assignBalance({ ...payloadTemplate, employeeId: emp.id, bulk: true })
       );
 
       forkJoin(requests).subscribe({

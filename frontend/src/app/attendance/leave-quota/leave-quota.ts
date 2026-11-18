@@ -521,8 +521,11 @@ export class LeaveQuotaComponent implements OnInit {
     return {
       ...l,
       kind: !l.type.isPaid ? 'unpaid' : isOptional ? 'optional' : 'paid',
-      left: Math.max(l.allocated - l.used, 0),
-      over: Math.max(l.used - l.allocated, 0),
+      // Loss of Pay is unpaid (19 Nov 2026): no allocation and nothing "left";
+      // every LOP day is over-utilised, whatever allocation the row carries.
+      allocated: l.type.isPaid ? l.allocated : 0,
+      left: l.type.isPaid ? Math.max(l.allocated - l.used, 0) : 0,
+      over: l.type.isPaid ? Math.max(l.used - l.allocated, 0) : l.used,
       dates: this.profileLeaves()
         .filter((r) => r.leaveTypeId === l.type.id && r.status === 'APPROVED'
           && new Date(r.startDate).getFullYear() === this.year())
@@ -533,14 +536,27 @@ export class LeaveQuotaComponent implements OnInit {
   profileKpis = computed(() => {
     const lines = this.profileLines();
     const sum = (f: (l: any) => number) => lines.reduce((a, l) => a + f(l), 0);
+    // Paid leave only in Total / Taken / Remaining / Over (19 Nov 2026);
+    // Loss of Pay days are reported on their own.
+    const paid = (f: (l: any) => number) => sum((l) => (l.kind === 'unpaid' ? 0 : f(l)));
     return {
-      allocated: sum((l) => l.allocated),
-      taken: sum((l) => l.used),
-      remaining: sum((l) => l.left),
-      over: sum((l) => l.over),
+      allocated: paid((l) => l.allocated),
+      taken: paid((l) => l.used),
+      remaining: paid((l) => l.left),
+      over: paid((l) => l.over),
       unpaid: sum((l) => (l.kind === 'unpaid' ? l.used : 0)),
     };
   });
+
+  /**
+   * Plain click opens the quick profile pop-up; Ctrl/⌘/Shift-click or middle
+   * click opens the full profile in a new tab like any link (19 Nov 2026).
+   */
+  onProfileLinkClick(ev: MouseEvent, employeeId: number) {
+    if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button === 1) return;
+    ev.preventDefault();
+    this.profileModal.open(employeeId);
+  }
 
   toggleType(id: number) {
     this.expandedTypeId.set(this.expandedTypeId() === id ? null : id);

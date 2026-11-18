@@ -62,25 +62,55 @@ export class LeavesService {
     private approvals: ApprovalsService
   ) {}
 
-  async assignLeaveBalance(data: { employeeId: number, leaveTypeId: number, allocated: number, year: number }) {
+  static readonly BALANCE_EDITORS = ['SUPERADMIN', 'ADMIN', 'HR'];
+
+  /**
+   * Set one person's allocation for one leave type (19 Nov 2026: role check
+   * added; "Cannot edit" lock respected). `bulk` = part of an All Employees
+   * run: locked balances are skipped silently instead of refused.
+   */
+  async assignLeaveBalance(
+    data: { employeeId: number, leaveTypeId: number, allocated: number, year: number, locked?: boolean, bulk?: boolean },
+    actor?: { role?: string; companyId?: number },
+  ) {
+    const role = actor?.role ?? '';
+    if (!LeavesService.BALANCE_EDITORS.includes(role)) throw new ForbiddenException('Only HR or the Super Admin can assign leave balances.');
+    const allocated = Number(data.allocated);
+    if (!Number.isFinite(allocated) || allocated < 0 || allocated > 365) throw new BadRequestException('Days must be between 0 and 365.');
+    if (actor?.companyId) {
+      const emp = await this.prisma.employee.findFirst({ where: { id: Number(data.employeeId), companyId: actor.companyId }, select: { id: true } });
+      if (!emp) throw new ForbiddenException('Employee not found in your company');
+    }
+    const key = { employeeId_leaveTypeId_year: { employeeId: Number(data.employeeId), leaveTypeId: Number(data.leaveTypeId), year: Number(data.year) } };
+    const existing = await this.prisma.leaveBalance.findUnique({ where: key, select: { id: true, locked: true, allocated: true } });
+    const isSuper = role === 'SUPERADMIN';
+    if (existing?.locked && !isSuper) {
+      if (data.bulk) return { skipped: true, reason: 'locked' };
+      throw new ForbiddenException('This balance is locked ("Cannot edit"). Only the Super Admin can change it.');
+    }
+    // Only the Super Admin sets or clears the lock.
+    const lockChange = isSuper && typeof data.locked === 'boolean' ? { locked: data.locked } : {};
     return this.prisma.leaveBalance.upsert({
-      where: {
-        employeeId_leaveTypeId_year: {
-          employeeId: data.employeeId,
-          leaveTypeId: data.leaveTypeId,
-          year: data.year
-        }
-      },
-      update: {
-        allocated: data.allocated
-      },
-      create: {
-        employeeId: data.employeeId,
-        leaveTypeId: data.leaveTypeId,
-        allocated: data.allocated,
-        year: data.year
-      }
+      where: key,
+      update: { allocated, ...lockChange },
+      create: { employeeId: Number(data.employeeId), leaveTypeId: Number(data.leaveTypeId), allocated, year: Number(data.year), ...lockChange },
     });
+  }
+
+  /** Every leave type with this person's balance for the year — for the Individual assign table. */
+  async getEmployeeQuotaGrid(companyId: number, role: string, employeeId: number, year: number) {
+    if (!LeavesService.BALANCE_EDITORS.includes(role)) throw new ForbiddenException('Only HR or the Super Admin can see this.');
+    const emp = await this.prisma.employee.findFirst({ where: { id: employeeId, companyId }, select: { id: true } });
+    if (!emp) throw new ForbiddenException('Employee not found');
+    const [types, balances] = await Promise.all([
+      this.prisma.leaveType.findMany({ where: { companyId }, orderBy: { name: 'asc' }, select: { id: true, name: true, isPaid: true, defaultDays: true } }),
+      this.prisma.leaveBalance.findMany({ where: { employeeId, year }, select: { leaveTypeId: true, allocated: true, used: true, locked: true } }),
+    ]);
+    const by = new Map(balances.map((b) => [b.leaveTypeId, b]));
+    return types.map((t) => ({
+      leaveTypeId: t.id, name: t.name, isPaid: t.isPaid, defaultDays: t.defaultDays,
+      allocated: by.get(t.id)?.allocated ?? 0, used: by.get(t.id)?.used ?? 0, locked: by.get(t.id)?.locked ?? false, exists: by.has(t.id),
+    }));
   }
 
   /**

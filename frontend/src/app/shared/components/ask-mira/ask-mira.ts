@@ -10,7 +10,21 @@ import { environment } from '../../../../environments/environment';
 type Block =
   | { type: 'kpis'; title?: string; items: { label: string; value: string | number; tone?: string }[] }
   | { type: 'table'; title: string; columns: string[]; rows: (string | number | null)[][]; employeeIds?: (number | null)[]; avatars?: Record<number, string> }
-  | { type: 'chart'; title: string; kind: 'bar' | 'line'; labels: string[]; values: number[] };
+  | { type: 'chart'; title: string; kind: 'bar' | 'line'; labels: string[]; values: number[] }
+  | { type: 'action'; kind: string; decision: 'approve' | 'reject'; title: string; total: number; items: ActionItem[] };
+
+interface ActionItem { id: number; employeeId: number | null; name: string; line: string; detail?: string; warn?: string }
+
+/** One Confirm card's state (Ask MIRA actions v1, 18 Nov 2026). */
+interface ActionState {
+  decision: 'approve' | 'reject';
+  selected: Set<number>;
+  note: string;
+  busy: boolean;
+  result: null | 'done' | 'cancelled';
+  summary: string;
+  outcome: Map<number, { ok: boolean; message?: string }>;
+}
 
 interface Msg {
   role: 'user' | 'assistant';
@@ -575,6 +589,71 @@ export class AskMiraComponent implements OnDestroy {
   }
   asChart(b: Block) {
     return b as Extract<Block, { type: 'chart' }>;
+  }
+  asAction(b: Block) {
+    return b as Extract<Block, { type: 'action' }>;
+  }
+
+  // ----- Confirm cards (Ask MIRA actions v1) -----
+  private actionStates = new Map<string, ActionState>();
+  private readonly kindLabels: Record<string, string> = {
+    leave: 'leave requests', regularization: 'regularization requests', late_clock_out: 'late / forgotten clock-outs',
+    away_clock: 'away-from-office / site clocks', field_visit: 'field visit requests', timesheet: 'timesheet days',
+    wfh: 'work from home requests', field_visit_change: 'field visit change requests',
+    early_release: 'field visit early releases', visit_location: 'visit location requests',
+  };
+  kindLabel(kind: string) { return this.kindLabels[kind] ?? kind; }
+
+  actionState(key: string, ac: Extract<Block, { type: 'action' }>): ActionState {
+    let st = this.actionStates.get(key);
+    if (!st) {
+      st = { decision: ac.decision === 'reject' ? 'reject' : 'approve', selected: new Set(ac.items.map((i) => i.id)), note: '',
+        busy: false, result: null, summary: '', outcome: new Map() };
+      this.actionStates.set(key, st);
+    }
+    return st;
+  }
+  toggleItem(st: ActionState, id: number) { st.selected.has(id) ? st.selected.delete(id) : st.selected.add(id); st.selected = new Set(st.selected); }
+  toggleAll(st: ActionState, ac: Extract<Block, { type: 'action' }>) {
+    st.selected = st.selected.size === ac.items.length ? new Set() : new Set(ac.items.map((i) => i.id));
+  }
+  resultFor(st: ActionState, id: number): 'ok' | 'fail' | 'skip' | null {
+    if (st.result !== 'done') return null;
+    const o = st.outcome.get(id);
+    return o ? (o.ok ? 'ok' : 'fail') : 'skip';
+  }
+  failMessage(st: ActionState, id: number) { const o = st.outcome.get(id); return o && !o.ok ? o.message || 'Failed' : null; }
+  cancelAction(st: ActionState) { st.result = 'cancelled'; }
+
+  confirmAction(st: ActionState, ac: Extract<Block, { type: 'action' }>, m: Msg) {
+    if (st.busy || !st.selected.size) return;
+    if (st.decision === 'reject' && !st.note.trim()) return;
+    const list = this.messages();
+    const idx = list.indexOf(m);
+    const question = [...list.slice(0, idx)].reverse().find((x) => x.role === 'user')?.content ?? '';
+    st.busy = true;
+    this.http.post<{ done: number; failed: number; results: { id: number; ok: boolean; message?: string }[] }>(`${this.api}/execute`, {
+      kind: ac.kind, decision: st.decision, ids: [...st.selected], note: st.note.trim(), question,
+    }).subscribe({
+      next: (r) => {
+        st.busy = false;
+        st.result = 'done';
+        st.outcome = new Map(r.results.map((x) => [x.id, { ok: x.ok, message: x.message }]));
+        const verb = st.decision === 'approve' ? 'approved' : 'rejected';
+        st.summary = `✓ ${r.done} ${verb}` + (r.failed ? ` · ✕ ${r.failed} failed (see the reason under each)` : '') + ' · recorded in the audit log';
+      },
+      error: (e) => {
+        st.busy = false;
+        st.summary = '';
+        alert(e?.error?.message || 'Could not complete the action. Nothing was changed.');
+      },
+    });
+  }
+
+  /** The employee for a row, found from the original row so filtering can't mix people up. */
+  rowEmployeeId(t: Extract<Block, { type: 'table' }>, row: (string | number | null)[]): number | null {
+    const i = t.rows.indexOf(row);
+    return i >= 0 ? t.employeeIds?.[i] ?? null : null;
   }
 
   filteredRows(t: Extract<Block, { type: 'table' }>, key: string) {

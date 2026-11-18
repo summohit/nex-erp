@@ -173,6 +173,24 @@ export class TimesheetsService {
     return this.http.get<any[]>(`${this.apiUrl}/pending`);
   }
 
+  /** My tasks for a date + all my open tasks, for the Add work picker. */
+  getMyTasks(date: string) {
+    return this.http.get<{ onDate: any[]; all: any[] }>(`${this.apiUrl}/my-tasks`, { params: { date } });
+  }
+
+  /** Manual "Add work" lines (19 Nov 2026). minutes = how long. */
+  addWork(body: { date: string; minutes: number; description: string; projectId?: number | null; issueId?: number | null }) {
+    return this.http.post(`${this.apiUrl}/work`, body);
+  }
+
+  updateWork(id: number, body: { date?: string; minutes: number; description: string; projectId?: number | null; issueId?: number | null }) {
+    return this.http.put(`${this.apiUrl}/work/${id}`, body);
+  }
+
+  deleteWork(id: number) {
+    return this.http.delete(`${this.apiUrl}/work/${id}`);
+  }
+
   submitDay(date: string) {
     return this.http.post(`${this.apiUrl}/submit`, { date });
   }

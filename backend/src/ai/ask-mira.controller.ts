@@ -13,6 +13,12 @@ export class AskMiraController {
     return this.mira.briefing(req.user);
   }
 
+  /** Confirm card → approve / reject the ticked items (Super Admin only). */
+  @Post('execute')
+  execute(@Request() req, @Body() body: any) {
+    return this.mira.execute(req.user, body);
+  }
+
   @Post('chat')
   chat(@Request() req, @Body() body: { messages: { role: 'user' | 'assistant'; content: string }[] }) {
     const messages = (body?.messages ?? []).filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string');

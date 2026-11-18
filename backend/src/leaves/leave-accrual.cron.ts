@@ -103,6 +103,7 @@ export class LeaveAccrualCron implements OnModuleInit, OnModuleDestroy {
         where: {
           leaveTypeId: type.id,
           year,
+          locked: false, // "Cannot edit" balances are fixed by hand (19 Nov 2026)
           OR: [{ lastAccruedPeriod: null }, { lastAccruedPeriod: { not: period } }],
         },
         data: {

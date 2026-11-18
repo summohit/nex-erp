@@ -219,6 +219,16 @@ export class EmployeesController {
   }
 
   /** Super Admin / HR: switch someone's login to their office email (16 Nov 2026). */
+  @Get(':id/hourly-cost')
+  getHourlyCost(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.employeesService.getHourlyCost(req.user.companyId, req.user.role, id);
+  }
+
+  @Post(':id/login-email/resend')
+  resendLoginEmailNotice(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.employeesService.resendLoginEmailNotice(req.user.companyId, req.user.role, req.user.sub ?? null, id);
+  }
+
   @Post(':id/login-email')
   changeLoginEmail(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: { email: string }) {
     return this.employeesService.changeLoginEmail(req.user.companyId, req.user.role, req.user.sub ?? null, id, body?.email);

@@ -4591,3 +4591,5 @@
   .detail-metrics-grid { grid-template-columns: 1fr !important; }
   .session-card-grid { grid-template-columns: 1fr !important; }
 }
+.status-fieldvisit { color: #2563eb; }
+.bg-fieldvisit { background-color: rgba(37, 99, 235, 0.12); }

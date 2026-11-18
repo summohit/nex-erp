@@ -165,6 +165,19 @@ export class PayrollController {
     return this.payrollService.setUngradedKmRate(req.user.companyId, body?.ungradedKmRate);
   }
 
+  /** Hourly cost rate per grade + ungraded, with history (19 Nov 2026). Super Admin only. */
+  @Get('grades/cost-rates')
+  getGradeCostRates(@Request() req) {
+    if (req.user?.role !== 'SUPERADMIN') throw new ForbiddenException('Only the Super Admin can see hourly cost rates.');
+    return this.payrollService.getGradeCostRates(req.user.companyId);
+  }
+
+  @Post('grades/cost-rates')
+  setGradeCostRate(@Request() req, @Body() body: { gradeName: string | null; rate: number; effectiveFrom: string }) {
+    if (req.user?.role !== 'SUPERADMIN') throw new ForbiddenException('Only the Super Admin can change hourly cost rates.');
+    return this.payrollService.setGradeCostRate(req.user.companyId, req.user.sub ?? null, body);
+  }
+
   @Put('grades')
   saveSalaryGrades(
     @Request() req,

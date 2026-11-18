@@ -24,7 +24,7 @@ function makeService(over: any = {}) {
 }
 
 describe('employee directory does not leak the cost rate', () => {
-  it.each(['SUPERADMIN', 'ADMIN', 'FINANCE'])('keeps the rate for %s', async (role) => {
+  it.each(['SUPERADMIN'])('keeps the rate for %s', async (role) => {
     const { service } = makeService();
     const rows = await service.findAll(1, role);
     expect(rows[0]).toHaveProperty('hourlyCostRate', 500);
@@ -32,7 +32,7 @@ describe('employee directory does not leak the cost rate', () => {
 
   // The case this exists for. HR passes assertDirectoryAccess and must still
   // not see the rate.
-  it.each(['HR', 'EMPLOYEE', 'PROJECT_MANAGER'])('strips the rate for %s', async (role) => {
+  it.each(['HR', 'EMPLOYEE', 'PROJECT_MANAGER', 'ADMIN', 'FINANCE'])('strips the rate for %s', async (role) => {
     const { service } = makeService();
     const rows = await service.findAll(1, role);
 
@@ -44,12 +44,12 @@ describe('employee directory does not leak the cost rate', () => {
 });
 
 describe('EmployeesService.setCostRate', () => {
-  it.each(['HR', 'EMPLOYEE'])('refuses %s', async (role) => {
+  it.each(['HR', 'EMPLOYEE', 'ADMIN', 'FINANCE'])('refuses %s', async (role) => {
     const { service } = makeService();
     await expect(service.setCostRate(1, 1, role, 500)).rejects.toThrow(ForbiddenException);
   });
 
-  it.each(['SUPERADMIN', 'ADMIN', 'FINANCE'])('lets %s set a rate', async (role) => {
+  it.each(['SUPERADMIN'])('lets %s set a rate', async (role) => {
     const { service, prisma } = makeService();
     await service.setCostRate(1, 1, role, 500);
     expect(prisma.employee.update).toHaveBeenCalledWith(
@@ -61,7 +61,7 @@ describe('EmployeesService.setCostRate', () => {
   // the project rollup reports separately rather than treating as free.
   it('accepts null to clear the rate', async () => {
     const { service, prisma } = makeService();
-    await service.setCostRate(1, 1, 'FINANCE', null);
+    await service.setCostRate(1, 1, 'SUPERADMIN', null);
     expect(prisma.employee.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { hourlyCostRate: null } }),
     );
@@ -69,18 +69,18 @@ describe('EmployeesService.setCostRate', () => {
 
   it('rejects a negative rate', async () => {
     const { service } = makeService();
-    await expect(service.setCostRate(1, 1, 'ADMIN', -5)).rejects.toThrow(BadRequestException);
+    await expect(service.setCostRate(1, 1, 'SUPERADMIN', -5)).rejects.toThrow(BadRequestException);
   });
 
   it('rejects a non-finite rate', async () => {
     const { service } = makeService();
-    await expect(service.setCostRate(1, 1, 'ADMIN', Number.NaN)).rejects.toThrow(BadRequestException);
+    await expect(service.setCostRate(1, 1, 'SUPERADMIN', Number.NaN)).rejects.toThrow(BadRequestException);
   });
 
   it('404s for an employee in another company', async () => {
     const { service, prisma } = makeService();
     prisma.employee.findFirst.mockResolvedValue(null);
-    await expect(service.setCostRate(1, 1, 'ADMIN', 500)).rejects.toThrow(NotFoundException);
+    await expect(service.setCostRate(1, 1, 'SUPERADMIN', 500)).rejects.toThrow(NotFoundException);
   });
 
   // Authorisation is checked before existence, so a refused caller cannot use

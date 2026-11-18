@@ -553,6 +553,7 @@
                     <svg *ngIf="s.icon === 'zap'" lucideZap class="status-icon" [ngClass]="s.iconClass"></svg>
                     <svg *ngIf="s.icon === 'timer-off'" lucideTimerOff class="status-icon" [ngClass]="s.iconClass"></svg>
                     <svg *ngIf="s.icon === 'map-pin'" lucideMapPin class="status-icon" [ngClass]="s.iconClass"></svg>
+          <svg *ngIf="s.icon === 'route'" lucideRoute class="status-icon" [ngClass]="s.iconClass"></svg>
                   </div>
                   <span class="option-primary">{{ s.label }}</span>
                 </div>
@@ -620,6 +621,7 @@
           <svg *ngIf="tag.icon === 'zap'" lucideZap class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'timer-off'" lucideTimerOff class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'map-pin'" lucideMapPin class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'route'" lucideRoute class="status-icon" [ngClass]="tag.iconClass"></svg>
         </div>
         <span class="legend-label">{{ tag.label }}</span>
       </button>

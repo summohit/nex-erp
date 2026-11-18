@@ -8,8 +8,14 @@ export class LeavesController {
   constructor(private readonly leavesService: LeavesService) {}
 
   @Post('assign-balance')
-  assignBalance(@Request() req, @Body() data: { employeeId: number, leaveTypeId: number, allocated: number, year: number }) {
-    return this.leavesService.assignLeaveBalance(data);
+  assignBalance(@Request() req, @Body() data: { employeeId: number, leaveTypeId: number, allocated: number, year: number, locked?: boolean, bulk?: boolean }) {
+    return this.leavesService.assignLeaveBalance(data, { role: req.user.role, companyId: req.user.companyId });
+  }
+
+  /** All leave types with one person's balance (Individual assign table, 19 Nov 2026). */
+  @Get('balances/employee/:employeeId/grid')
+  employeeQuotaGrid(@Request() req, @Param('employeeId', ParseIntPipe) employeeId: number, @Query('year') year: string) {
+    return this.leavesService.getEmployeeQuotaGrid(req.user.companyId, req.user.role, employeeId, year ? parseInt(year) : new Date().getFullYear());
   }
 
   @Get('balances/me')

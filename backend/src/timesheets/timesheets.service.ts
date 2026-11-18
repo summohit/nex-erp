@@ -1,3 +1,5 @@
+import { isRestDay } from '../common/rest-day';
+import { personalDaysOff } from '../common/weekly-offs';
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -124,6 +126,97 @@ export class TimesheetsService {
    * `includeEntries` is off for the list views, where a row per person per day
    * is the whole payload and nobody has opened anything yet.
    */
+  /**
+   * Tag days that are a company holiday, approved leave or the person's weekly
+   * off (19 Nov 2026), so timesheets show the whole row as "Holiday · Diwali",
+   * "On leave · Casual Leave" or "Week off" instead of an empty / unlogged day.
+   * Works for one person (My Timesheet) or many (team views).
+   */
+  private async markOffDays(companyId: number, daysByEmployee: Map<number, any[]>, start: Date, end: Date) {
+    const ids = [...daysByEmployee.keys()];
+    if (!ids.length) return;
+    const pad = 86400000;
+    const [leaves, holidays, people] = await Promise.all([
+      this.prisma.leaveRequest.findMany({
+        where: { employeeId: { in: ids }, status: 'APPROVED', deletedAt: null, startDate: { lte: new Date(end.getTime() + pad) }, endDate: { gte: new Date(start.getTime() - pad) } },
+        select: { employeeId: true, startDate: true, endDate: true, isHalfDay: true, halfDayPeriod: true, leaveType: { select: { name: true, isPaid: true } } },
+      }),
+      this.prisma.holiday.findMany({
+        where: { companyId, date: { gte: new Date(start.getTime() - pad), lte: new Date(end.getTime() + pad) } },
+        select: { name: true, date: true },
+      }),
+      this.prisma.employee.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, weeklyOffs: true, shift: { select: { workingDays: true } }, branch: { select: { weeklyOffs: true } } },
+      }),
+    ]);
+    const holidayBy = new Map(holidays.map((h) => [this.dateColumnKey(h.date), h.name]));
+    const personBy = new Map(people.map((p) => [p.id, personalDaysOff(p as any)]));
+    for (const [empId, days] of daysByEmployee) {
+      const mine = leaves.filter((l) => l.employeeId === empId);
+      const rule = personBy.get(empId);
+      for (const d of days) {
+        const hol = holidayBy.get(d.date);
+        if (hol) { d.offDay = { type: 'HOLIDAY', label: `Holiday · ${hol}`, short: 'Holiday' }; continue; }
+        const lv = mine.find((l) => this.dateColumnKey(l.startDate) <= d.date && this.dateColumnKey(l.endDate) >= d.date);
+        if (lv) {
+          const name = lv.leaveType?.name ?? 'Leave';
+          d.offDay = {
+            type: lv.leaveType?.isPaid === false ? 'LOP' : 'LEAVE',
+            label: `On leave · ${name}${lv.isHalfDay ? ` (half day${lv.halfDayPeriod ? ' ' + lv.halfDayPeriod : ''})` : ''}`,
+            short: lv.isHalfDay ? 'Half leave' : 'Leave',
+            halfDay: !!lv.isHalfDay,
+          };
+          continue;
+        }
+        if (rule && isRestDay(new Date(`${d.date}T00:00:00.000Z`), null, rule.shiftWorkingDays, rule.weeklyOffs)) {
+          d.offDay = { type: 'WEEK_OFF', label: 'Week off', short: 'Week off' };
+        }
+      }
+    }
+  }
+
+  /**
+   * Work that isn't a task timer, shaped like a time log so assembleDays
+   * treats it the same (19 Nov 2026): ticket time entries, field-visit time
+   * on site (clock-in → clock-out), and manual "Add work" lines.
+   */
+  private async extraLogs(companyId: number, employeeIds: number[], start: Date, end: Date): Promise<any[]> {
+    if (!employeeIds.length) return [];
+    const mins = (a: Date, b: Date | null) => (b ? Math.max(0, Math.round((b.getTime() - a.getTime()) / 60000)) : 0);
+    const [tickets, visits, work] = await Promise.all([
+      this.prisma.ticketTimeEntry.findMany({
+        where: { userId: { in: employeeIds }, startTime: { gte: start, lte: end }, endTime: { not: null }, ticket: { companyId } },
+        select: { id: true, userId: true, startTime: true, endTime: true, notes: true, ticket: { select: { id: true, ticketNumber: true, title: true } } },
+      }),
+      this.prisma.fieldVisitAttendance.findMany({
+        where: { employeeId: { in: employeeIds }, companyId, clockInTime: { gte: start, lte: end }, clockOutTime: { not: null } },
+        select: { id: true, employeeId: true, clockInTime: true, clockOutTime: true, request: { select: { id: true, requestNumber: true, location: true, project: { select: { id: true, name: true } } } } },
+      }),
+      this.prisma.timesheetWorkEntry.findMany({
+        where: { companyId, employeeId: { in: employeeIds }, date: { gte: new Date(start.toISOString().slice(0, 10) + 'T00:00:00.000Z'), lte: end } },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+    const out: any[] = [];
+    for (const t of tickets) out.push({
+      id: `T${t.id}`, employeeId: t.userId, startedAt: t.startTime, endedAt: t.endTime, durationMin: mins(t.startTime, t.endTime),
+      source: 'TICKET', note: t.notes ?? null, kind: 'TICKET', title: `${t.ticket.ticketNumber} · ${t.ticket.title}`, ticketId: t.ticket.id,
+    });
+    for (const v of visits) out.push({
+      id: `F${v.id}`, employeeId: v.employeeId, startedAt: v.clockInTime, endedAt: v.clockOutTime, durationMin: mins(v.clockInTime!, v.clockOutTime),
+      source: 'FIELD_VISIT', note: v.request?.location ?? null, kind: 'FIELD_VISIT',
+      title: `Field visit ${v.request?.requestNumber ?? ''}`.trim(), projectName: v.request?.project?.name ?? null,
+    });
+    for (const w of work) out.push({
+      // Noon of the stored day so it lands on that date in any time zone.
+      id: `W${w.id}`, workId: w.id, employeeId: w.employeeId, startedAt: new Date(w.date.toISOString().slice(0, 10) + 'T12:00:00'), endedAt: null,
+      durationMin: w.minutes, source: 'WORK', note: w.description, kind: 'WORK', title: w.description,
+      projectId: w.projectId, issueId: w.issueId, ticketId: w.ticketId,
+    });
+    return out;
+  }
+
   private assembleDays(
     start: Date,
     end: Date,
@@ -161,7 +254,7 @@ export class TimesheetsService {
       // §20's Manual/Timer column, as a split rather than a flag: a day is
       // rarely all one or all the other.
       const manualMin = dayLogs
-        .filter((l) => l.source === 'MANUAL')
+        .filter((l) => l.source === 'MANUAL' || l.source === 'WORK')
         .reduce((sum, l) => sum + (l.durationMin ?? 0), 0);
 
       // The longest single sitting on this day. Reported rather than corrected:
@@ -207,14 +300,18 @@ export class TimesheetsService {
       if (includeEntries) {
         day.entries = dayLogs.map((l) => ({
           id: l.id,
-          issueId: l.issue.id,
-          issueKey: l.issue.key,
-          issueTitle: l.issue.title,
-          projectId: l.issue.project?.id ?? null,
-          projectName: l.issue.project?.name ?? null,
-          projectCode: l.issue.project?.key ?? null,
-          clientName: l.issue.project?.client?.name ?? null,
-          taskType: l.issue.taskType?.name ?? null,
+          // TASK (timer / manual task log) · TICKET · FIELD_VISIT · WORK (manual "Add work")
+          kind: l.kind ?? 'TASK',
+          workId: l.workId ?? null,
+          title: l.title ?? null,
+          issueId: l.issue?.id ?? l.issueId ?? null,
+          issueKey: l.issue?.key ?? null,
+          issueTitle: l.issue?.title ?? null,
+          projectId: l.issue?.project?.id ?? l.projectId ?? null,
+          projectName: l.issue?.project?.name ?? l.projectName ?? null,
+          projectCode: l.issue?.project?.key ?? null,
+          clientName: l.issue?.project?.client?.name ?? null,
+          taskType: l.issue?.taskType?.name ?? null,
           startedAt: l.startedAt,
           endedAt: l.endedAt,
           hours: this.hours(l.durationMin ?? 0),
@@ -268,7 +365,10 @@ export class TimesheetsService {
       }),
     ]);
 
-    const days = this.assembleDays(start, end, attendance, logs, submissions, true);
+    const extras = await this.extraLogs(companyId, [employeeId], start, end);
+    const allLogs = [...logs, ...extras].sort((a: any, b: any) => +new Date(a.startedAt) - +new Date(b.startedAt));
+    const days = this.assembleDays(start, end, attendance, allLogs, submissions, true);
+    await this.markOffDays(companyId, new Map([[employeeId, days]]), start, end);
 
     const totals = days.reduce(
       (acc, d) => ({
@@ -309,6 +409,74 @@ export class TimesheetsService {
       )).includes(employeeId);
     if (!allowed) throw new ForbiddenException("You can't view this person's timesheet");
     return this.getWeek(companyId, employeeId, startDateStr, endDateStr);
+  }
+
+  /**
+   * Tasks to pick in "Add work" (19 Nov 2026): the caller's tasks for that
+   * date (scheduled across it, due that day, or worked on that day) plus all
+   * their open tasks and anything finished in the last 30 days.
+   */
+  async myTasksForDate(companyId: number, employeeId: number | null, dateStr: string) {
+    if (!employeeId) return { onDate: [], all: [] };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateStr))) throw new BadRequestException('A valid date is required');
+    const dayStart = new Date(`${dateStr}T00:00:00`), dayEnd = new Date(`${dateStr}T23:59:59.999`);
+    const since = new Date(dayStart.getTime() - 30 * 86400000);
+    const select = { id: true, key: true, title: true, status: true, startDate: true, dueDate: true, project: { select: { id: true, name: true } } } as const;
+    const [mine, worked] = await Promise.all([
+      this.prisma.issue.findMany({
+        where: { companyId, assigneeId: employeeId, isArchived: false, OR: [{ status: { notIn: ['DONE', 'CANCELLED'] } }, { completedAt: { gte: since } }, { dueDate: { gte: since } }] },
+        select, orderBy: [{ dueDate: 'asc' }], take: 300,
+      }),
+      this.prisma.issueTimeLog.findMany({ where: { employeeId, startedAt: { gte: dayStart, lte: dayEnd } }, select: { issueId: true } }),
+    ]);
+    const workedIds = new Set(worked.map((w) => w.issueId));
+    const onDay = (t: any) => workedIds.has(t.id)
+      || (t.dueDate && t.dueDate >= dayStart && t.dueDate <= dayEnd)
+      || (t.startDate && t.startDate <= dayEnd && (!t.dueDate || t.dueDate >= dayStart));
+    const shape = (t: any) => ({ id: t.id, key: t.key, title: t.title, status: t.status, projectId: t.project?.id ?? null, projectName: t.project?.name ?? null });
+    return { onDate: mine.filter(onDay).map(shape), all: mine.map(shape) };
+  }
+
+  // ── Manual "Add work" entries (19 Nov 2026) ──────────────────────────────
+
+  private async assertDayOpen(employeeId: number, dateStr: string) {
+    const day = await this.prisma.timesheetDay.findFirst({ where: { employeeId, date: new Date(`${dateStr}T00:00:00`) }, select: { status: true } });
+    if (day?.status === 'APPROVED') throw new BadRequestException('This day is already approved — it can no longer be changed.');
+  }
+
+  private validWork(body: any) {
+    const date = String(body?.date ?? '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new BadRequestException('Pick the date.');
+    const minutes = Math.round(Number(body?.minutes));
+    if (!Number.isFinite(minutes) || minutes < 5 || minutes > 16 * 60) throw new BadRequestException('Time must be between 5 minutes and 16 hours.');
+    const description = String(body?.description ?? '').trim();
+    if (description.length < 3) throw new BadRequestException('Describe what you did.');
+    const num = (v: any) => (v == null || v === '' ? null : Number(v));
+    return { date, minutes, description: description.slice(0, 1000), projectId: num(body?.projectId), issueId: num(body?.issueId), ticketId: num(body?.ticketId) };
+  }
+
+  async addWork(companyId: number, employeeId: number | null, body: any) {
+    if (!employeeId) throw new ForbiddenException('No employee profile');
+    const w = this.validWork(body);
+    await this.assertDayOpen(employeeId, w.date);
+    return this.prisma.timesheetWorkEntry.create({ data: { companyId, employeeId, ...w, date: new Date(`${w.date}T00:00:00.000Z`) } });
+  }
+
+  async updateWork(companyId: number, employeeId: number | null, id: number, body: any) {
+    const row = await this.prisma.timesheetWorkEntry.findFirst({ where: { id, companyId, employeeId: employeeId ?? -1 } });
+    if (!row) throw new NotFoundException('Entry not found');
+    const w = this.validWork({ ...body, date: body?.date ?? row.date.toISOString().slice(0, 10) });
+    await this.assertDayOpen(row.employeeId, row.date.toISOString().slice(0, 10));
+    await this.assertDayOpen(row.employeeId, w.date);
+    return this.prisma.timesheetWorkEntry.update({ where: { id }, data: { ...w, date: new Date(`${w.date}T00:00:00.000Z`) } });
+  }
+
+  async deleteWork(companyId: number, employeeId: number | null, id: number) {
+    const row = await this.prisma.timesheetWorkEntry.findFirst({ where: { id, companyId, employeeId: employeeId ?? -1 } });
+    if (!row) throw new NotFoundException('Entry not found');
+    await this.assertDayOpen(row.employeeId, row.date.toISOString().slice(0, 10));
+    await this.prisma.timesheetWorkEntry.delete({ where: { id } });
+    return { deleted: true };
   }
 
   /**
@@ -560,7 +728,8 @@ export class TimesheetsService {
       companyId, viewerEmployeeId, scope, start, end, filters,
     );
 
-    const canViewCost = this.FINANCE_ROLES.includes(role);
+    // Hourly cost and cost totals: Super Admin only (19 Nov 2026).
+    const canViewCost = role === 'SUPERADMIN';
 
     // Narrowing the logs changes what "logged" means for a day, so unlogged
     // hours stop being the gap they claim to be. The flag tells the screen to
@@ -653,17 +822,27 @@ export class TimesheetsService {
       return by;
     };
     const attBy = bucket(attendance as any[]);
-    const logBy = bucket(logs as any[]);
+    // Tickets, field visits and manual work belong to no project filter; leave
+    // them out when the view is filtered by project / task / source.
+    const narrowed = Object.keys(issueWhere).length > 0 || !!filters.source;
+    const extras = narrowed ? [] : await this.extraLogs(companyId, employeeIds, start, end);
+    const logBy = bucket([...(logs as any[]), ...extras]);
     const subBy = bucket(submissions as any[]);
 
-    const employees = people.map((person) => {
-      const days = this.assembleDays(
+    const daysBy = new Map<number, any[]>();
+    for (const person of people) {
+      daysBy.set(person.id, this.assembleDays(
         start, end,
         attBy.get(person.id) ?? [],
         logBy.get(person.id) ?? [],
         subBy.get(person.id) ?? [],
         false,
-      );
+      ));
+    }
+    await this.markOffDays(companyId, daysBy, start, end);
+
+    const employees = people.map((person) => {
+      const days = daysBy.get(person.id)!;
 
       const totals = days.reduce(
         (acc, d) => ({
@@ -701,6 +880,7 @@ export class TimesheetsService {
           changedSinceSubmission: d.changedSinceSubmission,
           hasImplausibleEntry: d.hasImplausibleEntry,
           loggedWithoutLogin: d.loggedWithoutLogin,
+          offDay: d.offDay ?? null,
         })),
         totals,
         counts: { pending, approved, rejected, needsAttention },

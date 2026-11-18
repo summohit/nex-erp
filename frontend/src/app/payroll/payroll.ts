@@ -879,6 +879,48 @@ export class PayrollComponent implements OnInit {
     this.payrollService.getSalaryTemplate().subscribe({ next: t => this.salaryTemplate.set(t), error: () => this.salaryTemplate.set(null) });
   }
 
+  // ── Hourly cost rate by grade (19 Nov 2026, Super Admin only) ──
+  isSuperAdminUser = computed(() => this.authService.currentUser()?.role === 'SUPERADMIN');
+  costRates = signal<any | null>(null);
+  costRateDraft: Record<string, { rate: number | null; from: string }> = {};
+  costRateSaving: string | null = null;
+  costRateKey(name: string | null) { return name ?? '__UNGRADED__'; }
+  todayYmd() { return new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10); }
+
+  loadCostRates() {
+    if (!this.isSuperAdminUser()) return;
+    this.payrollService.getGradeCostRates().subscribe({
+      next: (r) => {
+        this.costRates.set(r);
+        // Pre-fill each box (19 Nov 2026): the rate in force, else the suggested rate.
+        const rows = [...(r?.grades ?? []), { name: null, ...(r?.ungraded ?? {}) }];
+        for (const g of rows) {
+          const k = this.costRateKey(g.name ?? null);
+          const prefill = g.current?.rate ?? g.suggestedRate ?? null;
+          if (!this.costRateDraft[k] || this.costRateDraft[k].rate == null) this.costRateDraft[k] = { rate: prefill, from: this.costRateDraft[k]?.from || this.todayYmd() };
+        }
+      },
+      error: () => this.costRates.set(null),
+    });
+  }
+
+  saveCostRate(gradeName: string | null) {
+    const k = this.costRateKey(gradeName);
+    const d = this.costRateDraft[k];
+    if (!d || d.rate === null || (d.rate as any) === '' || !(Number(d.rate) >= 0)) { this.toast.error('Enter the hourly rate.'); return; }
+    if (!d.from) { this.toast.error('Pick the date this rate applies from.'); return; }
+    this.costRateSaving = k;
+    this.payrollService.setGradeCostRate(gradeName, Number(d.rate), d.from).subscribe({
+      next: (r) => {
+        this.costRates.set(r);
+        this.costRateDraft[k] = { rate: Number(d.rate), from: this.todayYmd() };
+        this.costRateSaving = null;
+        this.toast.success(`${gradeName ?? 'Ungraded'}: ₹${Number(d.rate).toLocaleString('en-IN')}/h from ${d.from}`);
+      },
+      error: (e) => { this.costRateSaving = null; this.toast.error(e?.error?.message || 'Could not save the rate'); },
+    });
+  }
+
   openGradesModal() {
     this.gradesDraft = this.salaryGrades().map(g => ({ name: g.name, label: g.label ?? '', minGross: g.minGross, maxGross: g.maxGross, kmRate: g.kmRate ?? null, minAnnualCtc: g.minAnnualCtc ?? null, maxAnnualCtc: g.maxAnnualCtc ?? null }));
     this.payrollService.getUngradedKmRate().subscribe({
@@ -886,6 +928,7 @@ export class PayrollComponent implements OnInit {
       error: () => this.ungradedKmRateDraft = null,
     });
     this.templateDraft = this.salaryTemplate() ? { ...this.salaryTemplate()! } : null;
+    this.loadCostRates();
     this.isGradesModalOpen.set(true);
   }
 

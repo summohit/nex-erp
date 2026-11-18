@@ -100,7 +100,8 @@ export class EmployeeDrawerComponent implements OnInit {
    */
   get canSetCostRate(): boolean {
     const role = this.authService.currentUser()?.role;
-    return role === 'SUPERADMIN' || role === 'ADMIN' || role === 'FINANCE';
+    // Hourly cost is Super Admin only (19 Nov 2026).
+    return role === 'SUPERADMIN';
   }
 
   /**

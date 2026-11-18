@@ -317,6 +317,16 @@ export class EmployeeService {
   }
 
   /** Super Admin / HR: switch someone's MIRA login to their office email (16 Nov 2026). */
+  /** Hourly cost today + source (Super Admin only, 19 Nov 2026). */
+  getHourlyCost(employeeId: number): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${employeeId}/hourly-cost`, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
+  }
+
+  /** Resend the "login email has been changed" email + notification (19 Nov 2026). */
+  resendLoginEmailNotice(employeeId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${employeeId}/login-email/resend`, {}, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
+  }
+
   changeLoginEmail(employeeId: number, email: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/${employeeId}/login-email`, { email }, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
   }

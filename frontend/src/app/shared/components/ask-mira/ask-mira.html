@@ -296,6 +296,70 @@
 
                 @for (b of m.blocks || []; track $index; let bi = $index) {
                   @switch (b.type) {
+                    @case ('action') {
+                      <!-- Confirm card (Ask MIRA actions v1, 18 Nov) -->
+                      @let ac = asAction(b);
+                      @let st = actionState(mi + '-' + bi, ac);
+                      <div class="am-action" [class.done]="!!st.result" [attr.data-decision]="st.decision">
+                        <div class="am-action-head">
+                          <div>
+                            <div class="am-action-title">{{ st.decision === 'approve' ? 'Approve' : 'Reject' }} {{ kindLabel(ac.kind) }}</div>
+                            <div class="am-action-sub">{{ ac.total }} waiting{{ ac.total > ac.items.length ? ' · showing first ' + ac.items.length : '' }}</div>
+                          </div>
+                          @if (!st.result) {
+                            <div class="am-action-toggle" role="group" aria-label="Decision">
+                              <button type="button" [class.on]="st.decision === 'approve'" (click)="st.decision = 'approve'">Approve</button>
+                              <button type="button" [class.on]="st.decision === 'reject'" (click)="st.decision = 'reject'">Reject</button>
+                            </div>
+                          }
+                        </div>
+
+                        @if (!st.result) {
+                          <label class="am-action-all">
+                            <input type="checkbox" [checked]="st.selected.size === ac.items.length" (change)="toggleAll(st, ac)">
+                            <span>Select all ({{ st.selected.size }}/{{ ac.items.length }})</span>
+                          </label>
+                        }
+
+                        <ul class="am-action-list">
+                          @for (it of ac.items; track it.id) {
+                            <li [class.off]="!st.selected.has(it.id)" [attr.data-res]="resultFor(st, it.id)">
+                              @if (!st.result) {
+                                <input type="checkbox" [checked]="st.selected.has(it.id)" (change)="toggleItem(st, it.id)" [attr.aria-label]="'Select ' + it.name">
+                              } @else {
+                                <span class="am-action-res">{{ resultFor(st, it.id) === 'ok' ? '✓' : resultFor(st, it.id) === 'fail' ? '✕' : '–' }}</span>
+                              }
+                              <div class="am-action-body">
+                                <div class="am-action-line">
+                                  <a class="am-person" (click)="openProfile(it.employeeId)">{{ it.name }}</a>
+                                  <span class="am-action-meta">{{ it.line }}</span>
+                                </div>
+                                @if (it.detail) { <div class="am-action-detail">{{ it.detail }}</div> }
+                                @if (it.warn) { <div class="am-action-warn">⚠ {{ it.warn }}</div> }
+                                @if (failMessage(st, it.id); as fm) { <div class="am-action-err">{{ fm }}</div> }
+                              </div>
+                            </li>
+                          }
+                        </ul>
+
+                        @if (!st.result) {
+                          <textarea class="am-action-note" rows="2" [(ngModel)]="st.note"
+                                    [placeholder]="st.decision === 'reject' ? 'Reason for rejecting (required)' : 'Note (optional)'"></textarea>
+                          <div class="am-action-foot">
+                            <span class="am-action-hint">Nothing changes until you confirm · recorded in the audit log</span>
+                            <button type="button" class="am-action-cancel" (click)="cancelAction(st)" [disabled]="st.busy">Cancel</button>
+                            <button type="button" class="am-action-go" (click)="confirmAction(st, ac, m)"
+                                    [disabled]="st.busy || !st.selected.size || (st.decision === 'reject' && !st.note.trim())">
+                              {{ st.busy ? 'Working…' : (st.decision === 'approve' ? 'Approve' : 'Reject') + ' (' + st.selected.size + ')' }}
+                            </button>
+                          </div>
+                        } @else {
+                          <div class="am-action-summary">
+                            {{ st.result === 'cancelled' ? 'Cancelled — nothing was changed.' : st.summary }}
+                          </div>
+                        }
+                      </div>
+                    }
                     @case ('kpis') {
                       <div class="am-kpis">
                         @if (asKpis(b).title) {
@@ -414,21 +478,23 @@
                             </thead>
                             <tbody>
                               @for (r of rows.slice(0, limitFor(tKey)); track $index; let ri = $index) {
+                                <!-- Look the person up by the row itself, not its position: the filter changes positions (18 Nov) -->
+                                @let eid = rowEmployeeId(asTable(b), r);
                                 <tr>
                                   @for (v of r; track $index; let ci = $index) {
                                     @let colName = asTable(b).columns[ci];
-                                    @if (ci === 0 && asTable(b).employeeIds?.[ri] && colName === 'Employee') {
+                                    @if (ci === 0 && eid && colName === 'Employee') {
                                       <td>
-                                        <a class="am-person" (click)="openProfile(asTable(b).employeeIds?.[ri])">
-                                          @if (asTable(b).avatars?.[asTable(b).employeeIds?.[ri] ?? 0]; as av) { <img class="am-emp-ini am-emp-img" [src]="av" alt="" (error)="$any($event.target).style.display='none'"> } @else { <span class="am-emp-ini">{{ initials(v) }}</span> }
+                                        <a class="am-person" (click)="openProfile(eid)">
+                                          @if (asTable(b).avatars?.[eid ?? 0]; as av) { <img class="am-emp-ini am-emp-img" [src]="av" alt="" (error)="$any($event.target).style.display='none'"> } @else { <span class="am-emp-ini">{{ initials(v) }}</span> }
                                           <span>{{ v }}</span>
                                           <span class="am-ext-arr" aria-hidden="true">↗</span>
                                         </a>
                                       </td>
-                                    } @else if (colName === 'Assignee' && asTable(b).employeeIds?.[ri]) {
+                                    } @else if (colName === 'Assignee' && eid) {
                                       <td>
-                                        <a class="am-person" (click)="openProfile(asTable(b).employeeIds?.[ri])">
-                                          @if (asTable(b).avatars?.[asTable(b).employeeIds?.[ri] ?? 0]; as av) { <img class="am-emp-ini am-emp-img" [src]="av" alt="" (error)="$any($event.target).style.display='none'"> } @else { <span class="am-emp-ini">{{ initials(v) }}</span> }
+                                        <a class="am-person" (click)="openProfile(eid)">
+                                          @if (asTable(b).avatars?.[eid ?? 0]; as av) { <img class="am-emp-ini am-emp-img" [src]="av" alt="" (error)="$any($event.target).style.display='none'"> } @else { <span class="am-emp-ini">{{ initials(v) }}</span> }
                                           <span>{{ v }}</span>
                                           <span class="am-ext-arr" aria-hidden="true">↗</span>
                                         </a>

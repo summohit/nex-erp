@@ -2,6 +2,8 @@ import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as fs from 'fs';
 import { AskMiraMoreTools, MORE_TOOLS } from './ask-mira-more-tools';
+import { ModuleRef } from '@nestjs/core';
+import { AskMiraActions, ACTION_TOOL } from './ask-mira-actions';
 import * as path from 'path';
 
 /**
@@ -27,7 +29,11 @@ const IST_OFFSET = 330 * 60000;
 @Injectable()
 export class AskMiraService {
   private more: AskMiraMoreTools;
-  constructor(private prisma: PrismaService) { this.more = new AskMiraMoreTools(prisma); }
+  private actions: AskMiraActions;
+  constructor(private prisma: PrismaService, moduleRef: ModuleRef) {
+    this.more = new AskMiraMoreTools(prisma);
+    this.actions = new AskMiraActions(prisma, moduleRef);
+  }
 
   private get apiKey(): string {
     if (process.env.GROQ_API_KEY) return process.env.GROQ_API_KEY;
@@ -146,10 +152,11 @@ export class AskMiraService {
     },
   ];
 
-  readonly tools: any[] = [...this.coreTools, ...MORE_TOOLS];
+  readonly tools: any[] = [...this.coreTools, ...MORE_TOOLS, ACTION_TOOL];
 
   private async runTool(companyId: number, name: string, args: any): Promise<ToolResult> {
     if (this.more.has(name)) return this.more.run(companyId, name, args);
+    if (name === 'pending_approvals') return this.actions.prepare(companyId, args);
     switch (name) {
       case 'day_attendance': return this.dayAttendance(companyId, args);
       case 'attendance_range': return this.attendanceRange(companyId, args);
@@ -439,6 +446,9 @@ Rules:
 - ALWAYS call a tool to get data. Never invent names or numbers. If no tool fits, say what you can answer (attendance, leave, tasks, employees, timesheets, tickets, field visits, payroll totals, assets, probation, period comparisons).
 - For "why", "compared to", "better/worse", "trend" questions use compare_periods (pick comparable periods, e.g. 1-17 Nov vs 1-17 Oct) and explain the change: which department and which people drove it. You may also call other tools to explain causes (e.g. leave or field visits behind absences).
 - Payroll: totals only; never claim individual salaries.
+- ANY question about approvals or what is pending/waiting (e.g. "today clock out approval", "pending leaves", "out of office approvals") is NOT an attendance question: call pending_approvals (with from/to for a date). "Clock out approval(s)" = kind clock_out (both queues). "Today's approvals" means what is waiting as of today — do not pass from/to unless they clearly ask for items dated a specific day.
+- Approve / reject requests (leave incl. comp-off and leave raised on behalf, regularization, late clock-out, away-from-office/site clock, field visit, timesheet, work from home, field visit change, field visit early release, visit location / site pin): call pending_approvals. You can NOT approve or reject anything yourself — the user sees a Confirm card and decides. Never say something was approved or rejected; say what is waiting and ask them to review and press Confirm. Mention any warnings (e.g. team already off).
+- Only these approval types are supported here. For expenses, salary, probation, onboarding, resignations, assets etc. tell them to use the normal MIRA approval pages.
 - The UI already shows the tool's tables, KPI cards and charts below your reply. So do NOT repeat full tables; write a short, sharp answer (2-6 lines) with the key numbers and 1-2 insights worth a manager's attention.
 - Use **bold** for key numbers. Plain markdown, bullet points allowed. No headings.
 - Reply in English by default. Only if the user writes in Hindi or Hinglish, reply in Hinglish (Roman script).
@@ -523,6 +533,12 @@ Rules:
       blocks: blocks.filter((b) => { const k = JSON.stringify(b); if (seen.has(k)) return false; seen.add(k); return true; }),
       sources: [...new Set(sources)],
     };
+  }
+
+  /** Runs a decision the Super Admin confirmed on an action card. */
+  async execute(user: any, body: any) {
+    this.assertAllowed(user);
+    return this.actions.execute(user, body);
   }
 
   /** Morning briefing — computed directly, no AI call, so it is instant. */

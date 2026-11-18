@@ -1727,10 +1727,11 @@ export class ProjectsService {
     });
     const approvalRequired = settings?.timesheetApprovalRequired ?? false;
 
-    // The rate per hour (19 Oct 2026): the employee's own hourlyCostRate when
-    // set; otherwise their monthly salary (the earnings in their salary
-    // structure) over STANDARD_MONTH_HOURS. Only hours with neither are
-    // "unrated" and priced at 0.
+    // The rate per hour. Order (19 Nov 2026): the employee's own
+    // hourlyCostRate; else their grade's dated rate (GradeCostRate in force on
+    // the day of the hours; grade from monthly gross, consultants/no salary =
+    // "ungraded" rate); else monthly salary over STANDARD_MONTH_HOURS. Only
+    // hours with none of these are "unrated" and priced at 0.
     const rows = await this.prisma.$queryRaw<
       { projectId: number; minutes: bigint | null; cost: number | null; unratedMinutes: bigint | null }[]
     >`
@@ -1740,10 +1741,15 @@ export class ProjectsService {
           JOIN "SalaryComponent" sc ON sc.id = ss."componentId"
          WHERE sc.type = 'EARNING'
          GROUP BY ss."employeeId"
-      ), rate AS (
-        SELECT e.id,
-               COALESCE(e."hourlyCostRate",
-                        CASE WHEN s.monthly > 0 THEN s.monthly / ${Prisma.raw(String(STANDARD_MONTH_HOURS) + '.0')} END) AS r
+      ), person AS (
+        SELECT e.id, e."companyId", e."hourlyCostRate" AS own,
+               CASE WHEN s.monthly > 0 THEN s.monthly / ${Prisma.raw(String(STANDARD_MONTH_HOURS) + '.0')} END AS fromSalary,
+               -- Grade name from monthly gross; NULL = ungraded (consultants, no salary).
+               CASE WHEN e."payType" = 'EMPLOYEE' AND s.monthly > 0 THEN (
+                 SELECT g.name FROM "SalaryGrade" g
+                  WHERE g."companyId" = e."companyId"
+                    AND s.monthly >= g."minGross" AND (g."maxGross" IS NULL OR s.monthly <= g."maxGross")
+                  ORDER BY g.position, g."minGross" LIMIT 1) END AS grade
           FROM "Employee" e
           LEFT JOIN salary s ON s."employeeId" = e.id
       )
@@ -1755,7 +1761,18 @@ export class ProjectsService {
                       THEN COALESCE(t."durationMin", 0) ELSE 0 END) AS "unratedMinutes"
         FROM "IssueTimeLog" t
         JOIN "Issue" i    ON i.id = t."issueId"
-        JOIN rate rt      ON rt.id = t."employeeId"
+        JOIN person pe    ON pe.id = t."employeeId"
+        CROSS JOIN LATERAL (
+          SELECT COALESCE(
+            pe.own,
+            (SELECT gr.rate FROM "GradeCostRate" gr
+              WHERE gr."companyId" = pe."companyId"
+                AND gr."gradeName" IS NOT DISTINCT FROM pe.grade
+                AND gr."effectiveFrom" <= (t."startedAt")::date
+              ORDER BY gr."effectiveFrom" DESC, gr.id DESC LIMIT 1),
+            pe.fromSalary
+          ) AS r
+        ) rt
         -- The day this log belongs to, if anybody has judged it. LEFT, because
         -- most days have no row at all and those hours still count.
         LEFT JOIN "TimesheetDay" d

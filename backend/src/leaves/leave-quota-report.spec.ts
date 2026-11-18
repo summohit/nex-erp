@@ -40,6 +40,8 @@ describe('LeavesService.getQuotaReport', () => {
     prisma = {
       leaveType: { findMany: jest.fn(async () => types) },
       employee: {
+        // A non-admin asking for someone who is not their direct report (17 Nov 2026).
+        findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn(async ({ where }: any) =>
           employees.filter((e) => (where.id ? e.id === where.id : true)),
         ),

@@ -130,7 +130,20 @@ export class ProfileTabComponent implements OnInit {
     this._employeeData = value;
     if (value) {
       this.initForm();
+      this.loadHourlyCost();
     }
+  }
+
+  // ── Hourly cost (19 Nov 2026) — Super Admin only ──
+  hourlyCost: any = null;
+  get canSeeHourlyCost(): boolean { return this.authService.currentUser()?.role === 'SUPERADMIN'; }
+  hourlyCostSource(src: string | null): string {
+    return ({ OWN: 'Own rate (set on this profile)', GRADE: 'Grade rate', UNGRADED: 'Ungraded rate', SALARY: 'Monthly gross ÷ hours' } as any)[src ?? ''] ?? 'Not set';
+  }
+  private loadHourlyCost() {
+    const id = this._employeeData?.id;
+    if (!id || !this.canSeeHourlyCost) { this.hourlyCost = null; return; }
+    this.employeeService.getHourlyCost(id).subscribe({ next: (r) => (this.hourlyCost = r), error: () => (this.hourlyCost = null) });
   }
   get employeeData(): any {
     return this._employeeData;

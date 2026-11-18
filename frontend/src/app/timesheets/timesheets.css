@@ -2694,3 +2694,87 @@ button:disabled {
 /* Inside an employee profile tab (17 Nov 2026): same edges as Documents */
 .ts-page.in-profile { background: transparent; padding: 0; min-height: 0; }
 .ts-page.in-profile .ts-container { max-width: none; padding: 0; }
+
+/* Manual "Add work" + new entry kinds (19 Nov 2026) */
+.ts-source[data-kind='TICKET'] { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
+.ts-source[data-kind='FIELD_VISIT'] { background: #ecfeff; color: #0e7490; border-color: #a5f3fc; }
+.ts-work-actions { display: inline-flex; gap: 4px; margin-left: 6px; }
+.ts-work-actions button { border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; width: 24px; height: 22px; cursor: pointer; font-size: 12px; color: #475569; }
+.ts-work-actions button:hover { border-color: #6366f1; color: #4338ca; }
+.ts-addwork { margin-top: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ts-addwork-btn { border: 1px dashed #94a3b8; background: #f8fafc; color: #334155; border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.ts-addwork-btn:hover { border-color: #6366f1; color: #4338ca; background: #eef2ff; }
+.ts-addwork-hint { font-size: 12px; }
+.ts-addwork-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; }
+.ts-addwork-desc { flex: 1; min-width: 240px; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; }
+.ts-addwork-time { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #64748b; }
+.ts-addwork-time input { width: 56px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; }
+.ts-addwork-save { background: #2563eb; color: #fff; border: 0; border-radius: 8px; padding: 7px 14px; font-weight: 600; font-size: 13px; cursor: pointer; }
+.ts-addwork-save:disabled { opacity: .5; }
+.ts-addwork-cancel { background: transparent; border: 0; color: #64748b; font-size: 13px; cursor: pointer; }
+.ts-gap-warn { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: #b45309; }
+
+.ts-addwork-task { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; }
+.ts-addwork-task select { flex: 1; min-width: 260px; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; background: #fff; }
+.ts-addwork-scope { display: inline-flex; background: #f1f5f9; border-radius: 999px; padding: 2px; }
+.ts-addwork-scope button { border: 0; background: transparent; padding: 4px 10px; border-radius: 999px; font-size: 12px; color: #64748b; cursor: pointer; }
+.ts-addwork-scope button.on { background: #fff; color: #1e293b; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+/* Leave / holiday rows (19 Nov 2026) */
+.ts-day[data-off] .ts-day-row { position: relative; }
+.ts-day.ts-off-day[data-off='LEAVE'] { background: #eff6ff; border-color: #bfdbfe; }
+.ts-day.ts-off-day[data-off='LOP'] { background: #fff1f2; border-color: #fecdd3; }
+.ts-day.ts-off-day[data-off='HOLIDAY'] { background: #faf5ff; border-color: #e9d5ff; }
+.ts-off-overlay {
+  position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  background: rgba(255, 255, 255, 0.35); border-radius: inherit; pointer-events: none;
+}
+.ts-off-pill {
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 999px;
+  font-size: 14px; font-weight: 700; background: #fff; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+.ts-day[data-off='LEAVE'] .ts-off-pill { color: #1d4ed8; border: 1px solid #bfdbfe; }
+.ts-day[data-off='LOP'] .ts-off-pill { color: #be123c; border: 1px solid #fecdd3; }
+.ts-day[data-off='HOLIDAY'] .ts-off-pill { color: #7e22ce; border: 1px solid #e9d5ff; }
+.ts-off-half { position: absolute; top: 6px; right: 70px; z-index: 2; font-size: 11px; font-weight: 600; color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 999px; padding: 2px 10px; }
+
+.ts-day.ts-off-day[data-off='WEEK_OFF'] { background: #f1f5f9; border-color: #e2e8f0; }
+.ts-day[data-off='WEEK_OFF'] .ts-off-pill { color: #475569; border: 1px solid #cbd5e1; }
+.ts-off-half[data-off='HOLIDAY'] { color: #7e22ce; background: #faf5ff; border-color: #e9d5ff; }
+.ts-off-half[data-off='WEEK_OFF'] { color: #475569; background: #f1f5f9; border-color: #cbd5e1; }
+.ts-off-half[data-off='LOP'] { color: #be123c; background: #fff1f2; border-color: #fecdd3; }
+/* Team grid */
+.ts-day-cell[data-off='LEAVE'] { background: #eff6ff; }
+.ts-day-cell[data-off='LOP'] { background: #fff1f2; }
+.ts-day-cell[data-off='HOLIDAY'] { background: #faf5ff; }
+.ts-day-cell[data-off='WEEK_OFF'] { background: #f8fafc; }
+.ts-cell-off { display: block; font-size: 10.5px; font-weight: 600; color: #64748b; white-space: nowrap; }
+.ts-day-cell[data-off='LEAVE'] .ts-cell-off { color: #1d4ed8; }
+.ts-day-cell[data-off='LOP'] .ts-cell-off { color: #be123c; }
+.ts-day-cell[data-off='HOLIDAY'] .ts-cell-off { color: #7e22ce; }
+.ts-detail-day[data-off='LEAVE'] { background: #eff6ff; }
+.ts-detail-day[data-off='LOP'] { background: #fff1f2; }
+.ts-detail-day[data-off='HOLIDAY'] { background: #faf5ff; }
+.ts-detail-day[data-off='WEEK_OFF'] { background: #f8fafc; }
+.ts-detail-off { font-size: 11.5px; font-weight: 600; color: #475569; margin-right: 8px; }
+
+/* Off-day label sits under the date in team detail rows (19 Nov 2026) */
+.ts-detail-date .ts-detail-off { display: inline-block; margin: 3px 0 0; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; background: #f1f5f9; color: #475569; }
+.ts-detail-off[data-off='LEAVE'] { background: #dbeafe; color: #1d4ed8; }
+.ts-detail-off[data-off='LOP'] { background: #ffe4e6; color: #be123c; }
+.ts-detail-off[data-off='HOLIDAY'] { background: #f3e8ff; color: #7e22ce; }
+.ts-detail-date { display: flex; flex-direction: column; align-items: flex-start; }
+
+/* Team / All detail rows: same off-day look as My Timesheet (19 Nov 2026) */
+.ts-detail-day { position: relative; }
+.ts-detail-day.ts-off-day[data-off='LEAVE'] { background: #eff6ff; }
+.ts-detail-day.ts-off-day[data-off='LOP'] { background: #fff1f2; }
+.ts-detail-day.ts-off-day[data-off='HOLIDAY'] { background: #faf5ff; }
+.ts-detail-day.ts-off-day[data-off='WEEK_OFF'] { background: #f1f5f9; }
+.ts-detail-day[data-off='LEAVE'] .ts-off-pill { color: #1d4ed8; border: 1px solid #bfdbfe; }
+.ts-detail-day[data-off='LOP'] .ts-off-pill { color: #be123c; border: 1px solid #fecdd3; }
+.ts-detail-day[data-off='HOLIDAY'] .ts-off-pill { color: #7e22ce; border: 1px solid #e9d5ff; }
+.ts-detail-day[data-off='WEEK_OFF'] .ts-off-pill { color: #475569; border: 1px solid #cbd5e1; }
+/* A worked off-day keeps a normal row (only the small tag shows), like My Timesheet. */
+.ts-detail-day[data-off]:not(.ts-off-day) { background: inherit; }

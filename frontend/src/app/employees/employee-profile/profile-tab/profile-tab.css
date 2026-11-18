@@ -2012,3 +2012,12 @@ select.form-control:disabled {
 /* Missing profile photo on save (16 Nov 2026). */
 .profile-pic-upload.error { border-color: #dc2626; background: #fef2f2; }
 .field-note { display: block; margin-top: 4px; font-size: 12px; color: #64748b; }
+
+/* Hourly cost (19 Nov 2026) */
+.hourly-cost-value { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.hc-rate { font-size: 18px; font-weight: 700; color: #0f172a; }
+.hc-rate small { font-size: 12px; font-weight: 500; color: #64748b; margin-left: 2px; }
+.hc-rate.hc-none { font-size: 14px; color: #94a3b8; font-weight: 500; }
+.hc-src { font-size: 12.5px; color: #475569; }
+.hc-calc { font-size: 12px; color: #0f766e; background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 6px; padding: 1px 8px; }
+.hc-lock { font-size: 11px; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 999px; padding: 1px 8px; }

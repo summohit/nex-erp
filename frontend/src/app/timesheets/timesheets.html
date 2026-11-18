@@ -409,9 +409,19 @@
 
       <div class="ts-day-list">
         <div class="ts-day" *ngFor="let day of week.days; trackBy: trackByDate"
-             [class.muted]="isEmptyWeekend(day)">
+             [class.muted]="isEmptyWeekend(day) && !day.offDay"
+             [class.ts-off-day]="isFullOff(day)"
+             [attr.data-off]="day.offDay?.type">
 
           <div class="ts-day-row" (click)="toggleDay(day.date)">
+            <!-- Leave / holiday (19 Nov 2026): whole row tinted, reason over a blur -->
+            <div class="ts-off-overlay" *ngIf="isFullOff(day)" aria-hidden="false">
+              <span class="ts-off-pill">
+                <span class="ts-off-ico">{{ offIcon(day.offDay.type) }}</span>
+                {{ day.offDay.label }}
+              </span>
+            </div>
+            <span class="ts-off-half" [attr.data-off]="day.offDay?.type" *ngIf="day.offDay && !isFullOff(day)">{{ day.offDay.label }}{{ day.offDay.halfDay ? '' : ' · worked' }}</span>
             <div class="ts-day-date">
               <span class="ts-day-dow">{{ day.date + 'T00:00:00' | date:'EEE' }}</span>
               <span class="ts-day-num">{{ day.date + 'T00:00:00' | date:'d MMM' }}</span>
@@ -439,6 +449,9 @@
               <div class="ts-hour-cell" [class.warn]="day.unloggedHours > 0">
                 <span class="ts-hour-label">Unlogged</span>
                 <span class="ts-hour-value">{{ hhmm(day.unloggedHours) }}</span>
+                <!-- Gap warning (19 Nov 2026): under 80% of login time accounted for -->
+                <span class="ts-gap-warn" *ngIf="day.loginHours > 0 && day.loggedHours < day.loginHours * 0.8"
+                      title="Less than 80% of your login time is logged — add the missing work">⚠ {{ hhmm(day.unloggedHours) }} not accounted for</span>
               </div>
             </div>
 
@@ -519,8 +532,8 @@
                   <td>{{ e.clientName || '—' }}</td>
                   <td>
                     <div class="ts-task-cell">
-                      <span class="ts-key-badge">{{ e.issueKey }}</span>
-                      <span class="ts-task-title">{{ e.issueTitle }}</span>
+                      <span class="ts-key-badge" *ngIf="e.issueKey">{{ e.issueKey }}</span>
+                      <span class="ts-task-title">{{ e.issueTitle || e.title || '—' }}</span>
                     </div>
                   </td>
                   <td>{{ e.taskType || '—' }}</td>
@@ -528,10 +541,14 @@
                   <td>{{ time(e.endedAt) }}</td>
                   <td class="num strong">{{ hhmm(e.hours) }}</td>
                   <td>
-                    <span class="ts-source" [class.manual]="e.source === 'MANUAL'">
-                      <svg *ngIf="e.source === 'MANUAL'" lucidePencilLine size="12"></svg>
+                    <span class="ts-source" [class.manual]="e.source === 'MANUAL' || e.kind === 'WORK'" [attr.data-kind]="e.kind">
+                      <svg *ngIf="e.source === 'MANUAL' || e.kind === 'WORK'" lucidePencilLine size="12"></svg>
                       <svg *ngIf="e.source === 'TIMER'" lucideTimer size="12"></svg>
-                      {{ e.source === 'MANUAL' ? 'Manual' : 'Timer' }}
+                      {{ entryKindLabel(e) }}
+                    </span>
+                    <span class="ts-work-actions" *ngIf="e.kind === 'WORK' && canAddWork(day)">
+                      <button type="button" (click)="$event.stopPropagation(); openWorkForm(day.date, e)" title="Edit">✎</button>
+                      <button type="button" (click)="deleteWorkEntry(e, $event)" title="Delete">✕</button>
                     </span>
                   </td>
                   <td class="ts-note-cell" [title]="e.note || ''">{{ e.note || '—' }}</td>
@@ -541,6 +558,37 @@
             <ng-template #noEntries>
               <div class="ts-empty-inline">Nothing booked on this day.</div>
             </ng-template>
+
+            <!-- Manual "Add work" (19 Nov 2026) -->
+            <div class="ts-addwork" *ngIf="canAddWork(day)">
+              <ng-container *ngIf="workForm.date === day.date; else addBtn">
+                <div class="ts-addwork-form">
+                  <!-- Task picker (19 Nov 2026): that day's tasks or all my tasks -->
+                  <div class="ts-addwork-task">
+                    <div class="ts-addwork-scope" role="group" aria-label="Which tasks">
+                      <button type="button" [class.on]="workTaskScope === 'date'" (click)="workTaskScope = 'date'">This day ({{ workTasks.onDate.length }})</button>
+                      <button type="button" [class.on]="workTaskScope === 'all'" (click)="workTaskScope = 'all'">All tasks ({{ workTasks.all.length }})</button>
+                    </div>
+                    <select [(ngModel)]="workForm.issueId" (ngModelChange)="onWorkTaskPicked()" aria-label="Task">
+                      <option [ngValue]="null">No task — general work</option>
+                      <option *ngFor="let t of workTaskOptions" [ngValue]="t.id">{{ t.key }} · {{ t.title }}{{ t.projectName ? ' — ' + t.projectName : '' }}</option>
+                    </select>
+                  </div>
+                  <input class="ts-addwork-desc" type="text" maxlength="1000" [(ngModel)]="workForm.description"
+                         placeholder="What did you do? e.g. Client call with Airtel about BOM issue">
+                  <div class="ts-addwork-time">
+                    <input type="number" min="0" max="16" [(ngModel)]="workForm.hours" aria-label="Hours"><span>h</span>
+                    <input type="number" min="0" max="59" step="5" [(ngModel)]="workForm.mins" aria-label="Minutes"><span>m</span>
+                  </div>
+                  <button type="button" class="ts-addwork-save" (click)="saveWork()" [disabled]="workSaving">{{ workSaving ? 'Saving…' : (workForm.id ? 'Update' : 'Add') }}</button>
+                  <button type="button" class="ts-addwork-cancel" (click)="cancelWork()">Cancel</button>
+                </div>
+              </ng-container>
+              <ng-template #addBtn>
+                <button type="button" class="ts-addwork-btn" (click)="openWorkForm(day.date)">+ Add work</button>
+                <span class="ts-dim ts-addwork-hint">For time not on a task timer — meetings, calls, training. Ticket time and field visits are added automatically.</span>
+              </ng-template>
+            </div>
           </div>
         </div>
       </div>
@@ -830,9 +878,12 @@
                 </td>
 
                 <ng-container *ngIf="showDayColumns()">
-                <td class="num ts-day-cell" *ngFor="let d of weekDays()" [class.today]="d.isToday">
+                <td class="num ts-day-cell" *ngFor="let d of weekDays()" [class.today]="d.isToday"
+                    [attr.data-off]="dayOf(row, d.key)?.offDay?.type"
+                    [title]="dayOf(row, d.key)?.offDay?.label || ''">
                   <ng-container *ngIf="dayOf(row, d.key) as cell">
-                    <span class="ts-cell-hours" [class.zero]="!cell.loggedHours">
+                    <span class="ts-cell-off" *ngIf="cell.offDay && !cell.loggedHours">{{ offIcon(cell.offDay.type) }} {{ cell.offDay.short }}</span>
+                    <span class="ts-cell-hours" [class.zero]="!cell.loggedHours" *ngIf="!(cell.offDay && !cell.loggedHours)">
                       {{ cell.loggedHours ? hhmm(cell.loggedHours) : '·' }}
                     </span>
                     <span class="ts-cell-dot" [ngClass]="cell.status.toLowerCase()"
@@ -896,10 +947,20 @@
 
                     <div class="ts-detail-days" *ngIf="!expandedLoading() && expandedWeek() as w">
                       <div class="ts-detail-day" *ngFor="let day of w.days; trackBy: trackByDate"
-                           [class.muted]="isEmptyWeekend(day)">
+                           [class.muted]="isEmptyWeekend(day) && !day.offDay"
+                           [class.ts-off-day]="isFullOff(day)"
+                           [attr.data-off]="day.offDay?.type">
+                        <!-- Same as My Timesheet: whole row tinted, reason over a blur -->
+                        <div class="ts-off-overlay" *ngIf="isFullOff(day)">
+                          <span class="ts-off-pill">
+                            <span class="ts-off-ico">{{ offIcon(day.offDay.type) }}</span>
+                            {{ day.offDay.label }}
+                          </span>
+                        </div>
                         <div class="ts-detail-date">
                           <span class="ts-day-dow">{{ day.date + 'T00:00:00' | date:'EEE' }}</span>
                           <span class="ts-day-num">{{ day.date + 'T00:00:00' | date:'d MMM' }}</span>
+                          <span class="ts-detail-off" *ngIf="day.offDay && !isFullOff(day)" [attr.data-off]="day.offDay.type">{{ offIcon(day.offDay.type) }} {{ day.offDay.label }}{{ day.offDay.halfDay ? '' : ' · worked' }}</span>
                         </div>
 
                         <div class="ts-detail-hours">

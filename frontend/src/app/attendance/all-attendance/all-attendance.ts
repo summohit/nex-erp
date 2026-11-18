@@ -273,6 +273,8 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     { value: 'Late', label: 'Late', icon: 'alert-circle', bgClass: 'bg-late', iconClass: 'status-late' },
     { value: 'Absent', label: 'Absent', icon: 'x', bgClass: 'bg-absent', iconClass: 'status-absent' },
     { value: 'On Meeting', label: 'On Meeting', icon: 'map-pin', bgClass: 'bg-meeting', iconClass: 'status-meeting' },
+    // Every day spent on a field visit or on site, whatever its status (18 Nov 2026).
+    { value: 'Field Visit', label: 'Field Visit', icon: 'route', bgClass: 'bg-fieldvisit', iconClass: 'status-fieldvisit' },
     { value: 'On Leave', label: 'On Leave', icon: 'plane', bgClass: 'bg-leave', iconClass: 'status-leave' },
     { value: 'Holiday', label: 'Holiday', icon: 'star', bgClass: 'bg-holiday', iconClass: 'status-holiday' },
     { value: 'Day Off', label: 'Day Off', icon: 'calendar', bgClass: 'bg-day-off', iconClass: 'status-day-off' },
@@ -1905,6 +1907,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     const f = this.filterStatus;
     if (!f) return true;
     if (f === 'Missed Clock Out') return this.isMissedClockOut(r);
+    if (f === 'Field Visit') return this.isFieldVisit(r);
     return this.recordDayStatus(r) === f;
   }
 
@@ -1913,6 +1916,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     if (!f) return true;
     if (day.status === 'Empty') return false;
     if (f === 'Missed Clock Out') return !!day.record && this.isMissedClockOut(day.record);
+    if (f === 'Field Visit') return this.isFieldVisit(day.record);
     return day.status === f;
   }
 

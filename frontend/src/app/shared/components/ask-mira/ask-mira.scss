@@ -1665,3 +1665,55 @@
 
 /* Profile photos in result tables (17 Nov) */
 .am-emp-img { object-fit: cover; padding: 0; }
+
+/* ===== Confirm cards — Ask MIRA actions v1 (18 Nov) ===== */
+.am-action {
+  border: 1px solid #e3e6f3;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(40, 46, 110, 0.06);
+  &[data-decision='approve'] { border-left: 4px solid #16a34a; }
+  &[data-decision='reject'] { border-left: 4px solid #dc2626; }
+  &.done { opacity: 0.95; }
+}
+.am-action-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.am-action-title { font: 600 14px 'Outfit', 'Inter', sans-serif; color: #1f2333; }
+.am-action-sub { font-size: 11.5px; color: #6b7185; margin-top: 2px; }
+.am-action-toggle {
+  display: inline-flex; padding: 2px; border-radius: 999px; background: #f2f3f9; flex-shrink: 0;
+  button { border: 0; background: transparent; padding: 4px 12px; border-radius: 999px; font-size: 12px; color: #6b7185; cursor: pointer; }
+  button.on { background: #fff; color: #1f2333; font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); }
+}
+.am-action-all { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7185; margin: 2px 0 6px; cursor: pointer; }
+.am-action-list {
+  list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto;
+  li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 4px; border-top: 1px solid #f0f1f6; }
+  li.off { opacity: 0.5; }
+  li[data-res='ok'] .am-action-res { color: #16a34a; }
+  li[data-res='fail'] .am-action-res { color: #dc2626; }
+  li[data-res='skip'] { opacity: 0.45; }
+  input[type='checkbox'] { margin-top: 3px; accent-color: #4f46e5; }
+}
+.am-action-res { width: 14px; font-weight: 700; text-align: center; margin-top: 1px; }
+.am-action-body { flex: 1; min-width: 0; }
+.am-action-line { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 13px; }
+.am-action-meta { color: #4b5068; font-size: 12.5px; }
+.am-action-detail { font-size: 12px; color: #6b7185; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.am-action-warn { font-size: 11.5px; color: #b45309; margin-top: 3px; }
+.am-action-err { font-size: 11.5px; color: #dc2626; margin-top: 3px; }
+.am-action-note {
+  width: 100%; box-sizing: border-box; margin-top: 8px; resize: vertical; padding: 8px 10px;
+  border: 1px solid #e3e6f3; border-radius: 10px; font: 13px 'Inter', sans-serif; outline: none;
+  &:focus { border-color: #6542f5; }
+}
+.am-action-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.am-action-hint { flex: 1; font-size: 11px; color: #8a8fa3; min-width: 160px; }
+.am-action-cancel { border: 1px solid #e3e6f3; background: #fff; border-radius: 9px; padding: 7px 14px; font-size: 12.5px; cursor: pointer; }
+.am-action-go {
+  border: 0; border-radius: 9px; padding: 7px 16px; font: 600 12.5px 'Inter', sans-serif; color: #fff; cursor: pointer;
+  background: linear-gradient(135deg, #6542f5, #8438ed);
+  &:disabled { opacity: 0.45; cursor: default; }
+}
+.am-action[data-decision='reject'] .am-action-go { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.am-action-summary { margin-top: 8px; font-size: 12.5px; font-weight: 500; color: #1f2333; }

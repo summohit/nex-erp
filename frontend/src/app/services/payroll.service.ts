@@ -320,6 +320,15 @@ export class PayrollService {
     return this.http.put<SalaryGrade[]>(`${this.apiUrl}/grades`, grades);
   }
 
+  /** Hourly cost rate per grade + ungraded, with history (19 Nov 2026). Super Admin only. */
+  getGradeCostRates(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/grades/cost-rates`);
+  }
+
+  setGradeCostRate(gradeName: string | null, rate: number, effectiveFrom: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/grades/cost-rates`, { gradeName, rate, effectiveFrom });
+  }
+
   /** Per-km travel rate for interns and consultants (outside grades). */
   getUngradedKmRate(): Observable<{ ungradedKmRate: number | null }> {
     return this.http.get<{ ungradedKmRate: number | null }>(`${this.apiUrl}/grades/ungraded-km-rate`);
