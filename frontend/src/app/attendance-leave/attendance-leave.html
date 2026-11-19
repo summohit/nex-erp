@@ -84,6 +84,9 @@
           <div class="legend-item">
             <div class="legend-icon-wrapper bg-day-off"><svg lucideCalendar class="status-day-off"></svg></div> Day Off
           </div>
+          <div class="legend-item">
+            <div class="legend-icon-wrapper bg-reg-applied"><svg lucideClock class="status-reg-applied"></svg></div> Regularization Applied
+          </div>
         </div>
         
         <!-- Skeleton Loader -->
@@ -110,7 +113,8 @@
                   <span class="day-week">{{ day.weekdayStr }}</span>
                 </div>
                 <div class="day-cell" [class.is-empty]="day.status === 'Empty'"
-                     [title]="day.tooltip"
+                     [class.has-pending-reg]="!!pendingRegForDay(day)"
+                     [title]="dayTooltipWithReg(day)"
                      (click)="openDayDetailsModal(day)"
                      style="cursor: pointer;"
                      [ngClass]="{
@@ -130,6 +134,9 @@
                   <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
                   <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
                   <span *ngIf="day.clockInLat && day.clockInLng" class="day-location-pin" title="GPS location logged">📍</span>
+                  <span *ngIf="pendingRegForDay(day)" class="day-reg-badge" title="Applied for regularization (Pending)">
+                    <svg lucideClock [size]="9" aria-hidden="true"></svg>
+                  </span>
                 </div>
               </div>
             </div>
@@ -2331,6 +2338,23 @@
           </span>
         </div>
 
+        <!-- Pending Regularization Indicator Banner -->
+        <div class="dd-reg-banner" *ngIf="pendingRegForDay(selectedDayDetails()?.day) as reg">
+          <div class="dd-reg-icon" aria-hidden="true">
+            <svg lucideClock [size]="15"></svg>
+          </div>
+          <div class="dd-reg-copy">
+            <div class="dd-reg-head">
+              <strong>Applied for Regularization</strong>
+              <span class="dd-reg-pill">Pending Approval</span>
+            </div>
+            <div class="dd-reg-times" *ngIf="reg.proposedClockIn || reg.proposedClockOut">
+              Proposed: <strong>{{ (reg.proposedClockIn | date:'shortTime') || '—' }}</strong> → <strong>{{ (reg.proposedClockOut | date:'shortTime') || '—' }}</strong>
+            </div>
+            <p class="dd-reg-reason" *ngIf="reg.reason">“{{ reg.reason }}”</p>
+          </div>
+        </div>
+
         <!-- Never clocked out: the 23:00 sweep closed this day -->
         <div *ngIf="selectedDayDetails()?.log?.autoClockedOut"
              style="display: flex; align-items: flex-start; gap: 9px; margin-bottom: 14px; padding: 10px 12px; background: #f3efff; border: 1px solid #e0d7ff; border-left: 3px solid #6b3fd6; border-radius: 8px; font-size: 11.5px; line-height: 1.5; color: #434344;">
@@ -2500,6 +2524,27 @@
               <label class="reg-label">Proposed Clock Out</label>
               <input type="time" class="form-control reg-input" [(ngModel)]="d.proposedClockOut">
             </div>
+          </div>
+          <div class="reg-overnight-note" *ngIf="d.date && isOvernightRegularizationDay(d)">
+            <svg lucideClock size="13" aria-hidden="true"></svg>
+            <span>{{ overnightRegularizationLabel(d) }}</span>
+          </div>
+          <div class="reg-shift-match-bar" *ngIf="detectShiftForDay(d) as sh">
+            <span class="reg-shift-dot" [style.background]="sh.colorCode || '#2563eb'" aria-hidden="true"></span>
+            <div class="reg-shift-match-copy">
+              <span class="reg-shift-match-title">
+                Working on <strong>{{ sh.name }}</strong>
+              </span>
+              <span class="reg-shift-match-window">{{ formatShiftTime12h(sh.startTime) }} – {{ formatShiftTime12h(sh.endTime) }}</span>
+            </div>
+            <span class="reg-shift-badge matched" *ngIf="myShift()?.shift?.id === sh.id">Your shift</span>
+            <span class="reg-shift-badge diff" *ngIf="myShift()?.shift && myShift()?.shift?.id !== sh.id">
+              Assigned: {{ myShift()?.shift?.name }}
+            </span>
+          </div>
+          <div class="reg-error-box" *ngIf="d.proposedClockIn && d.proposedClockOut && d.proposedClockIn === d.proposedClockOut">
+            <svg lucideAlertCircle size="13" aria-hidden="true"></svg>
+            <span>Clock-out time must be different from clock-in time.</span>
           </div>
         </div>
 
@@ -2707,6 +2752,18 @@
             <div class="reg-detail-time-chip out">
               <span>🌙</span>
               <span>{{ (reg.proposedClockOut | date:'shortTime') || '—' }}</span>
+            </div>
+          </div>
+
+          <!-- Detected Working Shift (based on proposed times) -->
+          <div class="reg-detail-item reg-detail-shift-full" *ngIf="detectShiftForRecord(reg) as sh">
+            <span class="reg-detail-label">Working Shift (Matched from Timing)</span>
+            <div class="reg-shift-match-bar detail">
+              <span class="reg-shift-dot" [style.background]="sh.colorCode || '#2563eb'" aria-hidden="true"></span>
+              <div class="reg-shift-match-copy">
+                <span class="reg-shift-match-title"><strong>{{ sh.name }}</strong></span>
+                <span class="reg-shift-match-window">{{ formatShiftTime12h(sh.startTime) }} – {{ formatShiftTime12h(sh.endTime) }}</span>
+              </div>
             </div>
           </div>
         </div>

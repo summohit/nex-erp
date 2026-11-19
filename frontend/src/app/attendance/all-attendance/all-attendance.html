@@ -556,6 +556,7 @@
           <svg *ngIf="tag.icon === 'route'" lucideRoute class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'car'" lucideCar class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'users'" lucideUsers class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'clock'" lucideClock class="status-icon" [ngClass]="tag.iconClass"></svg>
         </div>
         <span class="legend-label">{{ tag.label }}</span>
       </button>
@@ -628,6 +629,7 @@
                 [class.is-holiday]="day.status === 'Holiday'">
               <div class="day-cell-badge"
                    [class.is-empty]="day.status === 'Empty'"
+                   [class.has-pending-reg]="!!day.pendingRegularization"
                    (mouseenter)="onCellMouseEnter($event, day)"
                    (mouseleave)="onCellMouseLeave()"
                    (click)="openDayDetails(row.employee, day, day.record)"
@@ -672,6 +674,10 @@
                   <!-- Outside Office Geofence indicator (Top-Right, if not field visit) -->
                   <span *ngIf="!isFieldVisit(day.record) && isOutsideOffice(day.record)" class="day-badge-corner day-badge-outside" title="Clocked outside office radius">
                     <svg lucideMapPin class="day-badge-icon"></svg>
+                  </span>
+                  <!-- Pending Regularization Applied indicator (Bottom-Right) -->
+                  <span *ngIf="day.pendingRegularization" class="day-badge-corner day-badge-reg" title="Applied for regularization (Pending)">
+                    <svg lucideClock class="day-badge-icon"></svg>
                   </span>
                   <!-- corner timer markers replaced by the full #27 icon -->
                 </ng-container>
@@ -779,6 +785,18 @@
 
     <div class="cell-tooltip-reason" *ngIf="tip.day.reason">
       {{ tip.day.reason }}
+    </div>
+
+    <div class="cell-tooltip-reg" *ngIf="tip.day.pendingRegularization as reg">
+      <div class="cell-tip-reg-head">
+        <svg lucideClock [size]="12" aria-hidden="true"></svg>
+        <strong>Applied for Regularization</strong>
+        <span class="cell-tip-reg-pill">Pending</span>
+      </div>
+      <div class="cell-tip-reg-times" *ngIf="reg.proposedClockIn || reg.proposedClockOut">
+        Proposed: <strong>{{ formatTime(reg.proposedClockIn) }}</strong> → <strong>{{ formatTime(reg.proposedClockOut) }}</strong>
+      </div>
+      <div class="cell-tip-reg-reason" *ngIf="reg.reason">“{{ reg.reason }}”</div>
     </div>
 
     <div class="cell-tooltip-shift" *ngIf="$any(tip.day).shift as sh">
@@ -1029,6 +1047,22 @@
           <span class="note-title">Outside office · {{ oo.state }}</span>
           <span class="note-reason" *ngFor="let l of oo.lines">{{ l.label }} ({{ l.km }}): “{{ l.reason }}”</span>
           <a *ngIf="oo.proofUrl" class="note-reason" [href]="oo.proofUrl" target="_blank" rel="noopener">View attachment</a>
+        </span>
+      </div>
+
+      <div class="missed-clockout-note reg-applied-note" *ngIf="selectedDayDetails()?.pendingRegularization as reg">
+        <svg lucideClock [size]="15"></svg>
+        <span>
+          <span class="note-title">Applied for Regularization · Pending approval</span>
+          <span class="note-reason" *ngIf="reg.proposedClockIn || reg.proposedClockOut">
+            Proposed: <strong>{{ formatTime(reg.proposedClockIn) }}</strong> → <strong>{{ formatTime(reg.proposedClockOut) }}</strong>
+          </span>
+          <span class="note-reason" *ngIf="reg.reason">“{{ reg.reason }}”</span>
+          <span class="reg-act" *ngIf="canResolveReg()">
+            <input type="text" class="mco-note" [(ngModel)]="regNote" placeholder="Note (required to reject)">
+            <button type="button" class="mco-btn reject" [disabled]="regBusy() || !regNote.trim()" (click)="resolveReg(reg, 'REJECTED')">Reject</button>
+            <button type="button" class="mco-btn approve" [disabled]="regBusy()" (click)="resolveReg(reg, 'APPROVED')">{{ regBusy() ? 'Saving…' : 'Approve' }}</button>
+          </span>
         </span>
       </div>
 

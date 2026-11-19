@@ -5716,6 +5716,213 @@ app-page-header { display: block; margin-bottom: 16px; }
 .reg-proof-remove:hover { color: #dc2626; }
 .reg-proof-preview { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; text-decoration: none; color: #4338ca; font-size: 13px; font-weight: 600; }
 .reg-proof-preview img { max-width: 100%; max-height: 220px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.reg-overnight-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.reg-overnight-note svg { flex-shrink: 0; color: #4f46e5; }
+
+/* My Attendance: Pending Regularization Indicator on Day Cell & Legend */
+.bg-reg-applied {
+  background: #eef2ff !important;
+  border: 1px solid #c7d2fe !important;
+}
+.status-reg-applied {
+  color: #4f46e5 !important;
+}
+.day-cell.has-pending-reg {
+  position: relative;
+  box-shadow: inset 0 0 0 1.5px rgba(79, 70, 229, 0.55) !important;
+}
+.day-reg-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #4f46e5;
+  color: #ffffff;
+  border: 1.5px solid #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.45);
+  z-index: 3;
+}
+.dd-reg-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-left: 3px solid #4f46e5;
+}
+.dd-reg-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #4f46e5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid #dbeafe;
+}
+.dd-reg-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.dd-reg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dd-reg-head strong {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #312e81;
+}
+.dd-reg-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
+}
+.dd-reg-times {
+  font-size: 12px;
+  color: #3730a3;
+  font-variant-numeric: tabular-nums;
+}
+.dd-reg-reason {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: #4338ca;
+  line-height: 1.4;
+}
+
+/* Detected Shift Match Banner (Request Drawer & Detail Modal) */
+.reg-shift-match-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 8px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #334155;
+}
+.reg-shift-match-bar.detail {
+  margin-top: 4px;
+  background: #f8fbff;
+  border-color: #dbeafe;
+}
+.reg-detail-shift-full {
+  grid-column: 1 / -1;
+}
+.reg-shift-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2.5px rgba(37, 99, 235, 0.12);
+}
+.reg-shift-match-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.25;
+}
+.reg-shift-match-title {
+  color: #475569;
+  font-size: 12px;
+}
+.reg-shift-match-title strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+.reg-shift-match-window {
+  font-size: 11px;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+.reg-shift-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.reg-shift-badge.matched {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+}
+.reg-shift-badge.diff {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
+}
+
+/* Inline Shift Pill inside Regularization Table */
+:host ::ng-deep .reg-time-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2 !important;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+:host ::ng-deep .reg-shift-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+:host ::ng-deep .reg-shift-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 /* ── Employee Leave Balances & Breakdown Modal (Enhanced) ── */
 .leave-balances-card {
   border: 1px solid #e2e8f0 !important;

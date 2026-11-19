@@ -1196,6 +1196,7 @@ export class AttendanceLeaveComponent implements OnInit {
         const outStr = outRaw ? (this.datePipe.transform(outRaw, 'shortTime') || outRaw) : '';
         const dur = this.getRegularizationDuration(params.data);
         const hasDur = dur && dur !== 'N/A';
+        const matchedShift = this.detectShiftForRecord(params.data);
         if (!inStr && !outStr) return '<span class="lv-dash">—</span>';
         const inHtml = inStr
           ? `<span class="reg-time-pill in">${inStr}</span>`
@@ -1203,6 +1204,12 @@ export class AttendanceLeaveComponent implements OnInit {
         const outHtml = outStr
           ? `<span class="reg-time-pill out">${outStr}</span>`
           : `<span class="reg-time-miss">No out</span>`;
+        const shiftHtml = matchedShift
+          ? `<span class="reg-shift-pill" title="${matchedShift.name} (${this.formatShiftTime12h(matchedShift.startTime)} – ${this.formatShiftTime12h(matchedShift.endTime)})"><span class="reg-shift-pill-dot" style="background:${matchedShift.colorCode || '#2563eb'};"></span>${matchedShift.name}</span>`
+          : '';
+        const subMeta = (hasDur || shiftHtml)
+          ? `<div class="reg-time-sub">${hasDur ? `<span class="reg-dur-meta">${dur}</span>` : ''}${shiftHtml}</div>`
+          : '';
         return `
           <div class="reg-time-cell">
             <div class="reg-time-row">
@@ -1210,7 +1217,7 @@ export class AttendanceLeaveComponent implements OnInit {
               <span class="reg-time-arrow">→</span>
               ${outHtml}
             </div>
-            ${hasDur ? `<span class="reg-dur-meta">${dur}</span>` : ''}
+            ${subMeta}
           </div>
         `;
       }
@@ -2491,7 +2498,145 @@ export class AttendanceLeaveComponent implements OnInit {
     this.resolveRegularization(detail.id, detail.status);
   }
 
+  /** Pending regularizations for the employee's own attendance strip, keyed by YYYY-MM-DD. */
+  pendingRegularizationByDate = computed(() => {
+    const map = new Map<string, any>();
+    for (const r of (this.myRegularizations() || []) as any[]) {
+      if (String(r?.status || '').toUpperCase() !== 'PENDING') continue;
+      const key = typeof r?.date === 'string' ? r.date.slice(0, 10) : '';
+      if (key && !map.has(key)) map.set(key, r);
+    }
+    return map;
+  });
+
+  pendingRegForDay(day: DayStatus | null | undefined): any | null {
+    if (!day?.date) return null;
+    const d = new Date(day.date);
+    if (isNaN(d.getTime())) return null;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return this.pendingRegularizationByDate().get(key) || null;
+  }
+
+  dayTooltipWithReg(day: DayStatus): string {
+    const base = day.tooltip || day.status || '';
+    const reg = this.pendingRegForDay(day);
+    if (!reg) return base;
+    const inStr = reg.proposedClockIn ? (this.datePipe.transform(reg.proposedClockIn, 'shortTime') || '') : '';
+    const outStr = reg.proposedClockOut ? (this.datePipe.transform(reg.proposedClockOut, 'shortTime') || '') : '';
+    const range = inStr || outStr ? ` (${inStr || '—'} → ${outStr || '—'})` : '';
+    return base ? `${base} · Regularization applied (Pending)${range}` : `Regularization applied (Pending)${range}`;
+  }
+
+  private shiftsFetchInFlight = false;
+  private ensureShiftsLoaded() {
+    if (this.allShifts().length || this.shiftsFetchInFlight) return;
+    this.shiftsFetchInFlight = true;
+    this.shiftsService.getShifts().subscribe({
+      next: (res) => {
+        this.allShifts.set(res || []);
+        this.shiftsFetchInFlight = false;
+        this.regGridApi?.refreshCells({ columns: ['proposedTiming'], force: true });
+      },
+      error: () => {
+        this.shiftsFetchInFlight = false;
+      },
+    });
+  }
+
+  formatShiftTime12h(hhmm?: string | null): string {
+    if (!hhmm || !hhmm.includes(':')) return hhmm || '';
+    const [hRaw, mRaw] = hhmm.split(':').map(Number);
+    if (!Number.isFinite(hRaw) || !Number.isFinite(mRaw)) return hhmm;
+    const ampm = hRaw >= 12 ? 'PM' : 'AM';
+    const h = hRaw % 12 || 12;
+    return `${h}:${String(mRaw).padStart(2, '0')} ${ampm}`;
+  }
+
+  private parseMinutesOfDay(val?: string | null): number | null {
+    if (!val) return null;
+    const s = String(val).trim();
+    const hm = /^(\d{1,2}):(\d{2})/.exec(s);
+    if (hm) {
+      const h = Number(hm[1]);
+      const m = Number(hm[2]);
+      if (h >= 0 && h < 24 && m >= 0 && m < 60) return h * 60 + m;
+    }
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return null;
+    // Convert instant to IST (UTC+5:30) wall-clock minutes
+    const istMs = d.getTime() + 330 * 60000;
+    const ist = new Date(istMs);
+    return ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  }
+
+  detectShiftFromTimes(inVal?: string | null, outVal?: string | null): Shift | null {
+    const shifts = this.allShifts();
+    if (!shifts.length) return null;
+    const inMins = this.parseMinutesOfDay(inVal);
+    const outMins = this.parseMinutesOfDay(outVal);
+    if (inMins === null && outMins === null) return null;
+
+    const circDiff = (a: number, b: number) => {
+      const diff = Math.abs(a - b);
+      return Math.min(diff, 1440 - diff);
+    };
+
+    const isInputOvernight = inMins !== null && outMins !== null && outMins < inMins;
+    let bestShift: Shift | null = null;
+    let bestScore = Infinity;
+
+    for (const sh of shifts) {
+      const sStart = this.parseMinutesOfDay(sh.startTime);
+      const sEnd = this.parseMinutesOfDay(sh.endTime);
+      if (sStart === null || sEnd === null) continue;
+
+      const startDiff = inMins !== null ? circDiff(inMins, sStart) : 0;
+      const endDiff = outMins !== null ? circDiff(outMins, sEnd) : 0;
+
+      if (inMins !== null && outMins !== null) {
+        const isShiftOvernight = sEnd < sStart;
+        // Strongly prefer matching overnight vs daytime orientation
+        if (isInputOvernight !== isShiftOvernight && startDiff > 120) continue;
+        if (startDiff > 210 || endDiff > 240) continue;
+        const score = startDiff + endDiff + (isInputOvernight === isShiftOvernight ? 0 : 120);
+        if (score < bestScore) {
+          bestScore = score;
+          bestShift = sh;
+        }
+      } else if (inMins !== null) {
+        if (startDiff > 150) continue;
+        if (startDiff < bestScore) {
+          bestScore = startDiff;
+          bestShift = sh;
+        }
+      } else if (outMins !== null) {
+        if (endDiff > 150) continue;
+        if (endDiff < bestScore) {
+          bestScore = endDiff;
+          bestShift = sh;
+        }
+      }
+    }
+    return bestShift;
+  }
+
+  detectShiftForDay(d: { proposedClockIn?: string; proposedClockOut?: string }): Shift | null {
+    return this.detectShiftFromTimes(d?.proposedClockIn, d?.proposedClockOut);
+  }
+
+  detectShiftForRecord(reg: any): Shift | null {
+    if (!reg) return null;
+    return this.detectShiftFromTimes(reg.proposedClockIn, reg.proposedClockOut);
+  }
+
   openRegularizationModal(dateStr?: string) {
+    this.ensureShiftsLoaded();
+    if (!this.myShift()) {
+      this.shiftsService.getMyShift().subscribe({
+        next: (res) => this.myShift.set(res),
+        error: () => {},
+      });
+    }
     this.regularizationForm = {
       days: [{ date: dateStr || '', proposedClockIn: '', proposedClockOut: '' }],
       reason: '',
@@ -2533,23 +2678,68 @@ export class AttendanceLeaveComponent implements OnInit {
     this.regularizationForm.proofFile = f;
   }
 
+  private nextCalendarDate(isoDate: string): string {
+    const [y, m, day] = isoDate.slice(0, 10).split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, day + 1)).toISOString().slice(0, 10);
+  }
+
+  isOvernightRegularizationDay(d: { date?: string; proposedClockIn?: string; proposedClockOut?: string }): boolean {
+    return !!d?.proposedClockIn && !!d?.proposedClockOut && d.proposedClockOut < d.proposedClockIn;
+  }
+
+  overnightRegularizationLabel(d: { date?: string; proposedClockIn?: string; proposedClockOut?: string }): string {
+    if (!d?.date || !this.isOvernightRegularizationDay(d)) return '';
+    const nextDate = this.nextCalendarDate(d.date);
+    const nextLabel = this.datePipe.transform(`${nextDate}T00:00:00`, 'd MMM yyyy') || nextDate;
+    const dur = this.getRegularizationDuration({
+      proposedClockIn: `${d.date}T${d.proposedClockIn}:00+05:30`,
+      proposedClockOut: `${nextDate}T${d.proposedClockOut}:00+05:30`,
+    });
+    return dur && dur !== 'N/A'
+      ? `Overnight shift: Clock-out ends next day (${nextLabel}) · ${dur}`
+      : `Overnight shift: Clock-out ends next day (${nextLabel})`;
+  }
+
   submitRegularization() {
     this.showFormErrors.set(true);
     const days = this.regularizationForm.days;
     if (!this.regularizationForm.reason.trim() || days.some((d) => !d.date)
       || days.some((_, i) => this.isDuplicateRegularizationDay(i))) return;
 
+    const sameTimeDay = days.find((d) => d.proposedClockIn && d.proposedClockOut && d.proposedClockIn === d.proposedClockOut);
+    if (sameTimeDay) {
+      this.toast.error(`${sameTimeDay.date}: clock-out must be different from clock-in.`);
+      return;
+    }
+
+    // Guard against an AM/PM slip turning into a very long "overnight" day.
+    const mins = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const longDay = days.find((d) => {
+      if (!d.proposedClockIn || !d.proposedClockOut) return false;
+      const span = (mins(d.proposedClockOut) - mins(d.proposedClockIn) + 1440) % 1440;
+      return span > 14 * 60;
+    });
+    if (longDay) {
+      const span = (mins(longDay.proposedClockOut) - mins(longDay.proposedClockIn) + 1440) % 1440;
+      const hrs = Math.floor(span / 60), rest = span % 60;
+      if (!confirm(`${longDay.date}: ${longDay.proposedClockIn} → ${longDay.proposedClockOut} is ${hrs}h${rest ? ' ' + rest + 'm' : ''}${this.isOvernightRegularizationDay(longDay) ? ' (clock-out next day)' : ''}. Is that right? Check AM/PM.`)) return;
+    }
+
     this.isSubmittingRequest.set(true);
     // The times are IST wall-clock. Without the offset the server — which does
-    // not run in India — read 09:30 in its own time zone.
+    // not run in India — read 09:30 in its own time zone. For overnight / night
+    // shifts (clock-out earlier than clock-in), clock-out falls on the next day.
     const at = (date: string, time: string) => (time ? `${date}T${time}:00+05:30` : undefined);
     const data: any = {
       reason: this.regularizationForm.reason.trim(),
-      entries: days.map((d) => ({
-        date: d.date,
-        proposedClockIn: at(d.date, d.proposedClockIn),
-        proposedClockOut: at(d.date, d.proposedClockOut),
-      })),
+      entries: days.map((d) => {
+        const outDate = this.isOvernightRegularizationDay(d) ? this.nextCalendarDate(d.date) : d.date;
+        return {
+          date: d.date,
+          proposedClockIn: at(d.date, d.proposedClockIn),
+          proposedClockOut: at(outDate, d.proposedClockOut),
+        };
+      }),
     };
 
     const send = () => this.attendanceService.requestRegularization(data as any).subscribe({
@@ -2653,6 +2843,7 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   openRegularizationDetail(data: any) {
+    this.ensureShiftsLoaded();
     this.selectedRegularization.set(data);
     this.isRegularizationDetailOpen.set(true);
   }
@@ -4066,6 +4257,7 @@ export class AttendanceLeaveComponent implements OnInit {
 
   /** HR / admin queue of attendance corrections awaiting a decision. */
   loadPendingRegularizations() {
+    this.ensureShiftsLoaded();
     this.isLoadingRegularizations.set(true);
     this.attendanceService.getPendingRegularizations('ALL').subscribe({
       next: (res: any) => {

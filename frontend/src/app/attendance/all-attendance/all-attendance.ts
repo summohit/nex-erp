@@ -43,6 +43,8 @@ export interface DayMatrixStatus {
   countsPresent?: boolean;
   /** This day counts towards the row's "working days" denominator. */
   countsWorking?: boolean;
+  /** Pending regularization request applied by the employee for this day. */
+  pendingRegularization?: any;
 }
 
 export interface EmployeeMatrixRow {
@@ -169,6 +171,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
       state: string;
       proofUrl: string | null;
     } | null;
+    pendingRegularization?: any;
   } | null>(null);
   isDetailsModalOpen = signal(false);
   isChangeShiftOpen = signal(false);
@@ -278,7 +281,8 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     { value: 'On Leave', label: 'On Leave', icon: 'plane', bgClass: 'bg-leave', iconClass: 'status-leave' },
     { value: 'Holiday', label: 'Holiday', icon: 'star', bgClass: 'bg-holiday', iconClass: 'status-holiday' },
     { value: 'Day Off', label: 'Day Off', icon: 'calendar', bgClass: 'bg-day-off', iconClass: 'status-day-off' },
-    { value: 'Missed Clock Out', label: 'Missed Clock Out', icon: 'timer-off', bgClass: 'bg-clockoff', iconClass: 'status-clockoff' }
+    { value: 'Missed Clock Out', label: 'Missed Clock Out', icon: 'timer-off', bgClass: 'bg-clockoff', iconClass: 'status-clockoff' },
+    { value: 'Regularization Applied', label: 'Regularization Applied', icon: 'clock', bgClass: 'bg-reg-applied', iconClass: 'status-reg-applied' }
   ];
 
   get statusTags() {
@@ -430,6 +434,48 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
+  pendingRegularizations = signal<any[]>([]);
+  pendingRegularizationMap = computed(() => {
+    const map = new Map<string, any>();
+    for (const r of (this.pendingRegularizations() || []) as any[]) {
+      if (String(r?.status || '').toUpperCase() !== 'PENDING') continue;
+      const empId = r?.employeeId ?? r?.employee?.id;
+      const dateStr = r?.date ? this.getBackendDateString(r.date) : '';
+      if (empId && dateStr) {
+        const key = `${empId}_${dateStr}`;
+        if (!map.has(key)) map.set(key, r);
+      }
+    }
+    return map;
+  });
+
+  /** Allowed to see the pending queue = allowed to decide (the server checks again). */
+  canResolveReg = signal(false);
+  regBusy = signal(false);
+  regNote = '';
+
+  resolveReg(reg: any, status: 'APPROVED' | 'REJECTED') {
+    if (!reg?.id) return;
+    if (status === 'REJECTED' && !this.regNote.trim()) { this.toast.error('Add a reason to reject.'); return; }
+    this.regBusy.set(true);
+    this.attendanceService.resolveRegularization(reg.id, status, status === 'REJECTED' ? this.regNote.trim() : undefined).subscribe({
+      next: () => {
+        this.regBusy.set(false); this.regNote = '';
+        this.toast.success(status === 'APPROVED' ? 'Regularization approved: attendance updated.' : 'Regularization rejected.');
+        this.isDetailsModalOpen.set(false);
+        this.load();
+      },
+      error: (e: any) => { this.regBusy.set(false); this.toast.error(e?.error?.message || 'Could not save the decision'); },
+    });
+  }
+
+  private loadPendingRegularizations() {
+    this.attendanceService.getPendingRegularizations('PENDING').subscribe({
+      next: (res: any) => { this.pendingRegularizations.set(res || []); this.canResolveReg.set(true); },
+      error: () => this.canResolveReg.set(false),
+    });
+  }
+
   ngOnInit() {
     this.attendanceService.canApproveClockOuts().subscribe({ next: (r) => this.canApproveClockOut.set(!!r?.canApprove), error: () => this.canApproveClockOut.set(false) });
     this.loadToday();
@@ -460,6 +506,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     const loadYearAfter = () => { if (this.performersPeriod() === 'year') this.loadYear(); };
     this.isLoading.set(true);
     this.loadRosterDays();
+    this.loadPendingRegularizations();
     this.attendanceService.getAllEmployeesAttendance({
       month: this.filterMonth,
       year: this.filterYear,
@@ -977,6 +1024,8 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
         }
 
         const reason = this.statusReason(status, record, holiday);
+        const pendingRegularization = this.pendingRegularizationMap().get(key) || null;
+        const baseTooltip = reason ? `${tooltip} · ${reason}` : tooltip;
 
         return {
           dayNumber: day.dayNumber,
@@ -987,12 +1036,13 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
           isWeekend: isDayOff,
           isFuture: day.isFuture,
           status,
-          tooltip: reason ? `${tooltip} · ${reason}` : tooltip,
+          tooltip: pendingRegularization ? `${baseTooltip} · Applied for regularization (Pending)` : baseTooltip,
           reason,
           shift: this.dayShiftLabel(emp, key, isDayOff),
           record,
           countsPresent,
-          countsWorking
+          countsWorking,
+          pendingRegularization
         };
       });
   }
@@ -2011,6 +2061,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     if (day.status === 'Empty') return false;
     if (f === 'Missed Clock Out') return this.missedMatches(day.record);
     if (f === 'Field Visit') return this.isFieldVisit(day.record);
+    if (f === 'Regularization Applied') return !!day.pendingRegularization;
     return day.status === f;
   }
 
@@ -2240,7 +2291,8 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
       isToday: this.getIstDateString(day.date) === this.getIstDateString(new Date()),
       autoClockedOut: !!record?.autoClockedOut,
       missedClockOutReason: record?.clockOutReason ?? null,
-      outsideOffice: this.outsideOfficeNote(record)
+      outsideOffice: this.outsideOfficeNote(record),
+      pendingRegularization: day?.pendingRegularization || null
     });
 
     this.isDetailsModalOpen.set(true);
