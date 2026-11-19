@@ -516,7 +516,8 @@ export class CareersComponent implements OnInit, OnDestroy {
     } catch (err: any) {
       console.error('Error submitting application:', err);
       if (err?.status === 409) {
-        this.submitError.set('You have already applied for this position with this email.');
+        // #30: the server says which application blocks this one and its status.
+        this.submitError.set(err?.error?.message || 'You already have an application in progress.');
       } else {
         this.submitError.set('Something went wrong while submitting your application. Please try again.');
       }

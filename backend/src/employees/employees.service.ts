@@ -1075,6 +1075,9 @@ export class EmployeesService {
     if (!doc) throw new NotFoundException('Document not found');
     const deleted = await this.prisma.employeeDocument.delete({ where: { id: doc.id } });
     await this.notifyDocumentDeleted(companyId, currentUserId, employee.id, doc.fileName, doc.documentType);
+    // #35 (19 Nov 2026): record who removed which file.
+    await this.prisma.auditLog.create({ data: { companyId, actorId: currentUserId, action: 'DOCUMENT_DELETED', entityType: 'EmployeeDocument', entityId: String(doc.id),
+      oldValue: { employeeId: employee.id, fileName: doc.fileName, fileUrl: doc.fileUrl, type: doc.documentType } as any } }).catch(() => undefined);
     return deleted;
   }
 
@@ -1107,6 +1110,23 @@ export class EmployeesService {
    * Change what a document is filed as, e.g. a resume uploaded as "Other"
    * (16 Oct 2026). Same permission as uploading it.
    */
+  /** #35 (19 Nov 2026): HR marks an uploaded document verified or rejected (audit logged). */
+  async verifyDocument(id: number, documentId: number, companyId: number, actorUserId: number, role: string, status: string, note?: string) {
+    if (!['SUPERADMIN', 'ADMIN', 'HR'].includes(role)) throw new ForbiddenException('Only HR can verify documents.');
+    const s = String(status || '').toUpperCase();
+    if (!['VERIFIED', 'REJECTED', 'PENDING'].includes(s)) throw new BadRequestException('Status must be VERIFIED, REJECTED or PENDING.');
+    if (s === 'REJECTED' && !String(note || '').trim()) throw new BadRequestException('Say why the document is rejected.');
+    const doc = await this.prisma.employeeDocument.findFirst({ where: { id: documentId, employeeId: id, employee: { companyId } } });
+    if (!doc) throw new NotFoundException('Document not found');
+    const updated = await this.prisma.employeeDocument.update({
+      where: { id: documentId },
+      data: { verificationStatus: s, verificationNote: note?.trim() || null, verifiedById: s === 'PENDING' ? null : actorUserId, verifiedAt: s === 'PENDING' ? null : new Date() },
+    });
+    await this.prisma.auditLog.create({ data: { companyId, actorId: actorUserId, action: 'DOCUMENT_VERIFICATION', entityType: 'EmployeeDocument', entityId: String(documentId),
+      oldValue: { status: (doc as any).verificationStatus, employeeId: id } as any, newValue: { status: s, note: note?.trim() || null, fileName: doc.fileName, type: doc.documentType } as any } }).catch(() => undefined);
+    return updated;
+  }
+
   async updateDocumentType(id: number, documentId: number, companyId: number, currentUserId: number, role: string, documentType: string, fileName?: string) {
     const employee = await this.checkProfileEditPermission(id, companyId, currentUserId, role);
     // Rename (13 Nov 2026): Super Admin only; changes the name shown, never the stored file.

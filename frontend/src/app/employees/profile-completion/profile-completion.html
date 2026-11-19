@@ -115,7 +115,7 @@
   @if (report(); as r) {
     <div class="stats-cards-grid">
       <!-- Card 1: Total Workforce -->
-      <div class="metric-card">
+      <div class="metric-card metric-clickable" role="button" tabindex="0" [class.metric-on]="filter() === 'ALL'" (click)="filter.set('ALL')" (keydown.enter)="filter.set('ALL')">
         <div class="metric-squircle squircle-blue">
           <svg lucideUsers size="18"></svg>
         </div>
@@ -127,7 +127,7 @@
       </div>
 
       <!-- Card 2: Incomplete Profiles -->
-      <div class="metric-card">
+      <div class="metric-card metric-clickable" role="button" tabindex="0" [class.metric-on]="filter() === 'INCOMPLETE'" (click)="filter.set('INCOMPLETE')" (keydown.enter)="filter.set('INCOMPLETE')">
         <div class="metric-squircle squircle-amber">
           <svg lucideAlertCircle size="18"></svg>
         </div>
@@ -139,7 +139,7 @@
       </div>
 
       <!-- Card 3: Fully Completed -->
-      <div class="metric-card">
+      <div class="metric-card metric-clickable" role="button" tabindex="0" [class.metric-on]="filter() === 'COMPLETE'" (click)="filter.set('COMPLETE')" (keydown.enter)="filter.set('COMPLETE')">
         <div class="metric-squircle squircle-green">
           <svg lucideCheckCircle2 size="18"></svg>
         </div>
@@ -191,40 +191,7 @@
       </select>
     </div>
 
-    <div class="tab-filters-pills">
-      <button
-        type="button"
-        class="filter-tab-pill"
-        [class.active]="filter() === 'INCOMPLETE'"
-        (click)="filter.set('INCOMPLETE')"
-      >
-        <svg lucideAlertCircle size="14"></svg>
-        <span>Incomplete</span>
-        <span class="tab-badge" *ngIf="report()">{{ report()?.incomplete }}</span>
-      </button>
-
-      <button
-        type="button"
-        class="filter-tab-pill"
-        [class.active]="filter() === 'COMPLETE'"
-        (click)="filter.set('COMPLETE')"
-      >
-        <svg lucideCheckCircle2 size="14"></svg>
-        <span>Complete</span>
-        <span class="tab-badge" *ngIf="report()">{{ report()?.complete }}</span>
-      </button>
-
-      <button
-        type="button"
-        class="filter-tab-pill"
-        [class.active]="filter() === 'ALL'"
-        (click)="filter.set('ALL')"
-      >
-        <svg lucideUsers size="14"></svg>
-        <span>All</span>
-        <span class="tab-badge" *ngIf="report()">{{ report()?.total }}</span>
-      </button>
-    </div>
+    <!-- #35 (19 Nov 2026): the KPI cards above are the status filter -->
 
     <!-- Joined within (12 Nov 2026) -->
     <app-date-preset-filter label="Joined" [preset]="datePreset()" (presetChange)="datePreset.set($event)" (rangeChange)="dateRange.set($event)"></app-date-preset-filter>
@@ -275,6 +242,7 @@
               <th class="th-dept">DEPARTMENT</th>
               <th class="th-mgr">REPORTING MANAGER</th>
               <th class="th-missing">STATUS & MISSING REQUIREMENTS</th>
+              <th class="th-docs">DOCUMENTS</th>
             </tr>
           </thead>
           <tbody>
@@ -386,10 +354,11 @@
                     </div>
                   }
                 </td>
+                <td class="td-docs"><button type="button" class="btn-view-docs" (click)="openDocs(row)">View documents</button></td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="4" class="pc-empty-cell">
+                <td colspan="5" class="pc-empty-cell">
                   <div class="pc-empty-wrap">
                     <div class="empty-icon-circle">
                       <svg lucideCheckCircle2 size="32" class="text-emerald-500" *ngIf="filter() === 'INCOMPLETE' && !query()"></svg>
@@ -441,4 +410,44 @@
 
 @if (showDocRules()) {
   <app-document-requirements (closed)="showDocRules.set(false); $event && load()"></app-document-requirements>
+}
+
+
+<!-- #35 (19 Nov 2026): one person's documents, with HR edits -->
+@if (docsFor(); as d) {
+  <div class="pd-overlay" (click)="closeDocs()">
+    <div class="pd-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+      <header class="pd-head">
+        <div>
+          <h3>{{ d.employee.firstName }} {{ d.employee.lastName }} · Documents</h3>
+          <p>{{ docs().length }} uploaded · {{ d.missing.length }} missing</p>
+        </div>
+        <button type="button" class="pd-x" (click)="closeDocs()" aria-label="Close">×</button>
+      </header>
+      @if (docsLoading()) { <p class="pd-muted">Loading documents…</p> }
+      @if (!docsLoading() && !docs().length) { <p class="pd-muted">No documents uploaded yet.</p> }
+      @for (doc of docs(); track doc.id) {
+        <div class="pd-row">
+          <div class="pd-main">
+            <a [href]="doc.fileUrl" target="_blank" rel="noopener" class="pd-file">{{ doc.fileName }}</a>
+            <small>Uploaded {{ doc.createdAt | date:'d MMM y, h:mm a' }}</small>
+            @if (doc.verificationNote) { <small class="pd-note">“{{ doc.verificationNote }}”</small> }
+          </div>
+          <select class="pd-type" [ngModel]="doc.documentType" (ngModelChange)="changeType(doc, $event)" [disabled]="docBusy() === doc.id">
+            @for (t of docTypes(); track t) { <option [value]="t">{{ t }}</option> }
+          </select>
+          <span class="pd-pill" [class]="'pd-pill pd-' + (doc.verificationStatus || 'PENDING')">{{ doc.verificationStatus === 'VERIFIED' ? 'Verified' : doc.verificationStatus === 'REJECTED' ? 'Rejected' : 'Not checked' }}</span>
+          <div class="pd-actions">
+            <button type="button" (click)="verify(doc, 'VERIFIED')" [disabled]="docBusy() === doc.id" title="Mark verified">✓</button>
+            <button type="button" (click)="verify(doc, 'REJECTED')" [disabled]="docBusy() === doc.id" title="Reject with a note">✕</button>
+            <label class="pd-replace" title="Replace file">⟳<input type="file" hidden (change)="replace(doc, $event)"></label>
+            <button type="button" class="pd-del" (click)="remove(doc)" [disabled]="docBusy() === doc.id" title="Delete">🗑</button>
+          </div>
+        </div>
+      }
+      @if (d.missing.length) {
+        <div class="pd-missing"><b>Missing:</b> {{ d.missing.join(', ') }}</div>
+      }
+    </div>
+  </div>
 }

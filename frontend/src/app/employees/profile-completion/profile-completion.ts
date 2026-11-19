@@ -7,6 +7,8 @@ import { WaiverQueueComponent } from './waiver-queue/waiver-queue';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { DatePresetFilterComponent, DatePreset, DateRange, inDateRange } from '../../shared/components/date-preset-filter/date-preset-filter';
+import { UploadService } from '../../services/upload.service';
+import { HotToastService } from '@ngneat/hot-toast';
 import { EmployeeService, ExemptEmployee, ProfileCompletenessReport, ProfileLock } from '../../services/employee.service';
 import {
   LucideArrowLeft,
@@ -71,6 +73,70 @@ export class ProfileCompletionComponent implements OnInit {
 
   private employees = inject(EmployeeService);
   profileModal = inject(ProfileModalService);
+  private uploads = inject(UploadService);
+  private toastSvc = inject(HotToastService);
+
+  // ── #35 (19 Nov 2026): documents window ──
+  docsFor = signal<any | null>(null);
+  docs = signal<any[]>([]);
+  docsLoading = signal(false);
+  docBusy = signal<number | null>(null);
+  docTypes = signal<string[]>([]);
+
+  openDocs(row: any) {
+    this.docsFor.set(row);
+    this.loadDocs();
+    if (!this.docTypes().length) {
+      this.employees.getDocumentTypes().subscribe({ next: (r) => this.docTypes.set(r?.all || []), error: () => {} });
+    }
+  }
+  closeDocs() { this.docsFor.set(null); this.docs.set([]); }
+  private loadDocs() {
+    const id = this.docsFor()?.employee?.id;
+    if (!id) return;
+    this.docsLoading.set(true);
+    this.employees.getProfile(id).subscribe({
+      next: (p: any) => { this.docs.set((p?.documents || []).sort((a: any, b: any) => String(b.createdAt).localeCompare(String(a.createdAt)))); this.docsLoading.set(false); },
+      error: (e: any) => { this.docsLoading.set(false); this.toastSvc.error(e?.error?.message || 'Could not load documents'); },
+    });
+  }
+  private empId(): number { return this.docsFor()?.employee?.id; }
+  private done(msg: string) { this.docBusy.set(null); this.toastSvc.success(msg); this.loadDocs(); this.load(); }
+  private fail(e: any) { this.docBusy.set(null); this.toastSvc.error(e?.error?.message || 'Could not save'); }
+
+  changeType(doc: any, type: string) {
+    if (!type || type === doc.documentType) return;
+    this.docBusy.set(doc.id);
+    this.employees.updateDocumentType(this.empId(), doc.id, type).subscribe({ next: () => this.done(`Saved as ${type}`), error: (e) => this.fail(e) });
+  }
+  verify(doc: any, status: 'VERIFIED' | 'REJECTED') {
+    let note: string | undefined;
+    if (status === 'REJECTED') { note = prompt('Why is this document rejected?') || ''; if (!note.trim()) return; }
+    this.docBusy.set(doc.id);
+    this.employees.verifyDocument(this.empId(), doc.id, status, note).subscribe({ next: () => this.done(status === 'VERIFIED' ? 'Marked verified' : 'Marked rejected'), error: (e) => this.fail(e) });
+  }
+  remove(doc: any) {
+    if (!confirm(`Delete "${doc.fileName}"? This can't be undone.`)) return;
+    this.docBusy.set(doc.id);
+    this.employees.deleteDocument(this.empId(), doc.id).subscribe({ next: () => this.done('Document deleted'), error: (e) => this.fail(e) });
+  }
+  replace(doc: any, ev: Event) {
+    const file = (ev.target as HTMLInputElement).files?.[0];
+    (ev.target as HTMLInputElement).value = '';
+    if (!file) return;
+    this.docBusy.set(doc.id);
+    this.uploads.uploadFile(file).subscribe({
+      next: (u: any) => {
+        const url = u?.url || u?.fileUrl;
+        if (!url) { this.fail({ error: { message: 'Upload failed' } }); return; }
+        this.employees.addDocument(this.empId(), { fileName: file.name, fileUrl: url, documentType: doc.documentType }).subscribe({
+          next: () => this.employees.deleteDocument(this.empId(), doc.id).subscribe({ next: () => this.done('File replaced'), error: (e) => this.fail(e) }),
+          error: (e) => this.fail(e),
+        });
+      },
+      error: (e) => this.fail(e),
+    });
+  }
 
   report = signal<ProfileCompletenessReport | null>(null);
   loading = signal(true);

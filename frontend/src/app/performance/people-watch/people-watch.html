@@ -126,6 +126,7 @@
         </div>
 
         <div class="pw-head-actions">
+          <app-date-preset-filter label="Probation ends" [preset]="probationPreset" (presetChange)="probationPreset = $event" (rangeChange)="probationRange.set($event)"></app-date-preset-filter>
           <!-- Search input -->
           <div class="pw-table-search">
             <svg lucideSearch size="14" class="search-icon"></svg>
@@ -192,7 +193,7 @@
       <div class="pw-empty-state small" *ngIf="d.probation.length > 0 && !filteredProbation().length">
         <svg lucideSearch size="22" class="empty-sub-icon"></svg>
         <p>No probation records found matching your filters</p>
-        <button type="button" class="pw-btn" (click)="probationSearch.set(''); probationFilter.set('all')">Reset filters</button>
+        <button type="button" class="pw-btn" (click)="probationSearch.set(''); probationFilter.set('all'); probationRange.set(null); probationPreset = 'ALL'">Reset filters</button>
       </div>
 
       <!-- Table Header & Rows -->
@@ -427,7 +428,12 @@
         </div>
 
         <div class="pw-head-actions">
+          <app-date-preset-filter label="Plan period" [preset]="pipPreset" (presetChange)="pipPreset = $event" (rangeChange)="pipRange.set($event)"></app-date-preset-filter>
         </div>
+      </div>
+
+      <div class="pw-empty-state small" *ngIf="d.pips.length > 0 && !filteredPips().length">
+        <p>No PIPs in this period.</p>
       </div>
 
       <!-- Empty State -->

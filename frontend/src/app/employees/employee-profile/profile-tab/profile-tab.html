@@ -227,13 +227,7 @@
               </div>
             </div>
             <ng-template #noManager>
-              <div class="org-node placeholder-node">
-                <div class="org-avatar-skeleton"></div>
-                <div class="org-details-skeleton">
-                  <div class="sk-line wide"></div>
-                  <div class="sk-line narrow"></div>
-                </div>
-              </div>
+              <div class="org-node org-empty-node">No manager set</div>
             </ng-template>
 
             <!-- Connector Line -->
@@ -243,14 +237,14 @@
             <div class="org-node current-node">
               <div class="org-avatar blue-avatar">
                 <img *ngIf="formData.avatarUrl" [src]="formData.avatarUrl" alt="Current Employee">
-                <div class="avatar-initials" *ngIf="!formData.avatarUrl">{{ (formData.firstName?.charAt(0) || 'M') + (formData.lastName?.charAt(0) || 'S') }}</div>
+                <div class="avatar-initials" *ngIf="!formData.avatarUrl">{{ (formData.firstName?.charAt(0) || '') + (formData.lastName?.charAt(0) || '') }}</div>
               </div>
               <div class="org-details">
                 <div class="org-name">
                   <span>{{ formData.firstName }} {{ formData.lastName }}</span>
-                  <span class="you-badge">YOU</span>
+                  <span class="you-badge" *ngIf="isOwnProfile">YOU</span>
                 </div>
-                <div class="org-title">{{ formData.jobPosition || employeeData?.designation?.name || 'Full Stack Engineer' }} • {{ currentEmployeeCode }}</div>
+                <div class="org-title">{{ formData.jobPosition || employeeData?.designation?.name || '—' }} • {{ currentEmployeeCode }}</div>
               </div>
             </div>
 
@@ -265,7 +259,7 @@
                   </div>
                   <div class="org-details">
                     <div class="org-name">{{ report.firstName }} {{ report.lastName }}</div>
-                    <div class="org-title">{{ report.designation?.name || 'Developer' }}</div>
+                    <div class="org-title">{{ report.designation?.name || '—' }}</div>
                   </div>
                 </div>
               </div>
@@ -273,13 +267,7 @@
 
             <ng-container *ngIf="subordinatesList.length === 0">
               <div class="tree-line-vertical"></div>
-              <div class="org-node placeholder-node">
-                <div class="org-avatar-skeleton"></div>
-                <div class="org-details-skeleton">
-                  <div class="sk-line wide"></div>
-                  <div class="sk-line narrow"></div>
-                </div>
-              </div>
+              <div class="org-node org-empty-node">No direct reports</div>
             </ng-container>
           </div>
         </div>

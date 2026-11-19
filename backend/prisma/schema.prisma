@@ -698,6 +698,11 @@ model EmployeeDocument {
   fileName     String
   fileUrl      String
   documentType String?  @default("Other")
+  /// #35 (19 Nov 2026): HR check of the file — PENDING, VERIFIED or REJECTED.
+  verificationStatus String    @default("PENDING")
+  verificationNote   String?
+  verifiedById       Int?
+  verifiedAt         DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

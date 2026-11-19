@@ -139,17 +139,34 @@ export class PublicJobsService {
 
     const email = (dto.email || '').trim().toLowerCase();
 
-    // A candidate may re-apply to the same job once their earlier application was
-    // rejected — only an active (non-rejected) application blocks a duplicate.
-    const existing = await this.prisma.jobApplication.findFirst({
+    // #30 (19 Nov 2026): one application at a time per person, across ALL jobs.
+    // Matched by email OR phone (last 10 digits). Only a REJECTED application
+    // frees them to apply again; hired / onboarded people cannot re-apply.
+    const phoneDigits = String(dto.phone || '').replace(/\D/g, '').slice(-10);
+    const blocking = await this.prisma.jobApplication.findFirst({
       where: {
-        jobId: job.id,
-        email: { equals: email, mode: 'insensitive' },
         status: { not: 'REJECTED' },
-      }
+        job: { companyId: job.companyId },
+        OR: [
+          { email: { equals: email, mode: 'insensitive' } },
+          ...(phoneDigits.length === 10 ? [{ phone: { endsWith: phoneDigits } }] : []),
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { status: true, createdAt: true, job: { select: { title: true } } },
     });
-    if (existing) {
-      throw new ConflictException('You have already applied for this position with this email.');
+    if (blocking) {
+      const title = blocking.job?.title || 'another position';
+      const applied = blocking.createdAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+      const label: Record<string, string> = {
+        NEW: 'Received', REVIEWING: 'In review', SHORTLISTED: 'Shortlisted', INTERVIEWING: 'Interviewing',
+        OFFERED: 'Offer made', HIRED: 'Hired', ONBOARDED: 'Joined',
+      };
+      const state = label[blocking.status] || 'In progress';
+      if (['HIRED', 'ONBOARDED'].includes(blocking.status)) {
+        throw new ConflictException(`You were already hired for ${title} (applied ${applied}), so you can't apply again here. Please contact HR.`);
+      }
+      throw new ConflictException(`You already have an application in progress for ${title} (applied ${applied} · status: ${state}). You can apply again once it is closed.`);
     }
 
     // Screening questions are mandatory. Validate here as well as in the form —

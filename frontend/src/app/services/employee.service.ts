@@ -213,6 +213,11 @@ export class EmployeeService {
     });
   }
 
+  /** #35: HR marks a document verified / rejected. */
+  verifyDocument(id: number | string, documentId: number, status: string, note?: string): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/${id}/documents/${documentId}/verify`, { status, note }, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
+  }
+
   deleteDocument(id: number | string, documentId: number): Observable<any> {
     const token = getAccessToken();
     return this.http.delete<any>(`${this.apiUrl}/${id}/documents/${documentId}`, {

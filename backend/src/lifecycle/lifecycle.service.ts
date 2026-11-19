@@ -134,13 +134,15 @@ export class LifecycleService {
       this.prisma.resignation.findMany({
         where: {
           companyId: v.companyId, status: { in: ['PENDING', 'APPROVED'] },
+          // #31 (19 Nov 2026): deactivated / separated people drop off the lists.
+          employee: { user: { status: { not: 'SUSPENDED' } }, offboardingStatus: { not: 'SEPARATED' } },
           ...(ids === null ? {} : { employeeId: { in: ids } }),
         },
         include: { employee: { select: PERSON } },
         orderBy: { intendedLastWorkingDay: 'asc' },
       }),
       this.prisma.pip.findMany({
-        where: { companyId: v.companyId, status: { in: OPEN_PIP }, ...(ids === null ? {} : { employeeId: { in: ids } }) },
+        where: { companyId: v.companyId, status: { in: OPEN_PIP }, employee: { user: { status: { not: 'SUSPENDED' } }, offboardingStatus: { not: 'SEPARATED' } }, ...(ids === null ? {} : { employeeId: { in: ids } }) },
         include: { employee: { select: PERSON }, raisedBy: { select: { id: true, firstName: true, lastName: true } }, _count: { select: { checkIns: true } } },
         orderBy: { endDate: 'asc' },
       }),

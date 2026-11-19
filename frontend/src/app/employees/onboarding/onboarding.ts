@@ -98,6 +98,22 @@ export class OnboardingComponent implements OnInit {
     this.dateRange.set(null);
   }
 
+  selfStatusMeta(v: string | null | undefined): { label: string; color: string; bg: string } {
+    switch (v) {
+      case 'PENDING': return { label: 'Filling form', color: '#2563eb', bg: '#eff6ff' };
+      case 'CHANGES_REQUESTED': return { label: 'Changes requested', color: '#c2410c', bg: '#fff7ed' };
+      case 'SUBMITTED': return { label: 'Waiting HR review', color: '#7c3aed', bg: '#f5f3ff' };
+      case 'APPROVED': return { label: 'Approved', color: '#059669', bg: '#ecfdf5' };
+      default: return { label: 'Not invited', color: '#64748b', bg: '#f1f5f9' };
+    }
+  }
+
+  // #33: cards follow the self-service flow.
+  private allHires = computed(() => { const d = this.boardData(); return [...(d.pending || []), ...(d.inProgress || []), ...(d.completed || [])]; });
+  selfFillingCount = computed(() => this.allHires().filter((e: any) => e.selfOnboardingStatus === 'PENDING' || e.selfOnboardingStatus === 'CHANGES_REQUESTED').length);
+  selfReviewCount = computed(() => this.allHires().filter((e: any) => e.selfOnboardingStatus === 'SUBMITTED').length);
+  selfApprovedCount = computed(() => this.allHires().filter((e: any) => e.selfOnboardingStatus === 'APPROVED').length);
+
   // Summary Metrics
   totalCount = computed(() => {
     const d = this.boardData();
@@ -124,7 +140,7 @@ export class OnboardingComponent implements OnInit {
       if (!inDateRange(emp.joiningDate, range)) return false;
       if (!term) return true;
       const name = `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase();
-      const designation = (emp.designation?.name || '').toLowerCase();
+      const designation = `${emp.designation?.name || ''} ${emp.user?.email || ''}`.toLowerCase();
       const department = (emp.department?.name || '').toLowerCase();
       const code = (emp.employeeCode || '').toLowerCase();
       return name.includes(term) || designation.includes(term) || department.includes(term) || code.includes(term);
@@ -166,7 +182,7 @@ export class OnboardingComponent implements OnInit {
             ${avatar}
             <div style="min-width: 0; overflow: hidden;">
               <div style="font-weight: 600; color: #0f172a; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${params.data.firstName} ${params.data.lastName || ''}</div>
-              <div style="font-size: 11.5px; color: #64748b; margin-top: 1px;">#${params.data.employeeCode || 'N/A'} • ${params.data.designation?.name || 'No Designation'}</div>
+              <div style="font-size: 11.5px; color: #64748b; margin-top: 1px;">#${params.data.employeeCode || 'N/A'} • ${params.data.user?.email || '—'}</div>
             </div>
           </div>
         `;
@@ -182,39 +198,13 @@ export class OnboardingComponent implements OnInit {
       minWidth: 160
     },
     { 
-      field: 'onboardingStatus', 
+      field: 'selfOnboardingStatus',
       headerName: 'Status',
       minWidth: 140,
+      // #33 (19 Nov 2026): the self-service onboarding status, not the old checklist.
       cellRenderer: (params: any) => {
-        if (!params.value) return '';
-        const statusStr = params.value;
-        let color = '#d97706'; let bg = '#fef3c7'; let label = 'Not Started';
-        if (statusStr === 'IN_PROGRESS') { color = '#2563eb'; bg = '#eff6ff'; label = 'In Progress'; }
-        if (statusStr === 'COMPLETED') { color = '#059669'; bg = '#ecfdf5'; label = 'Completed'; }
-        // align-self/height: the grid cell is a stretching flex box, which pulled the tag to full row height.
-        return `<span style="align-self: center; height: auto; line-height: 1.4; background: ${bg}; color: ${color}; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">${label}</span>`;
-      }
-    },
-    {
-      headerName: 'Progress',
-      minWidth: 180,
-      valueGetter: (params) => {
-        return this.getProgressPercentage(params.data?.onboardingTasks);
-      },
-      cellRenderer: (params: any) => {
-        if (!params.data) return '';
-        const percent = this.getProgressPercentage(params.data.onboardingTasks);
-        const completed = this.getCompletedCount(params.data.onboardingTasks);
-        const total = params.data.onboardingTasks?.length || 0;
-        const color = percent === 100 ? '#10b981' : (percent > 0 ? '#2563eb' : '#94a3b8');
-        return `
-          <div style="width: 100%; display: flex; align-items: center; gap: 10px;">
-            <div style="flex: 1; height: 6px; background: #f1f5f9; border-radius: 4px; overflow: hidden;">
-              <div style="width: ${percent}%; height: 100%; background: ${color}; border-radius: 4px;"></div>
-            </div>
-            <span style="font-size: 12px; font-weight: 600; color: #475569; min-width: 42px;">${completed}/${total}</span>
-          </div>
-        `;
+        const m = this.selfStatusMeta(params.value);
+        return `<span style="align-self: center; height: auto; line-height: 1.4; background: ${m.bg}; color: ${m.color}; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">${m.label}</span>`;
       }
     },
     { 

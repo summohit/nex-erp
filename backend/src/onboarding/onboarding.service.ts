@@ -109,7 +109,16 @@ export class OnboardingService {
   // --- Board (HR view) ---
   async getOnboardingBoard(companyId: number) {
     const employees = await this.prisma.employee.findMany({
-      where: { companyId },
+      // #33 (19 Nov 2026): deactivated / separated people drop off the board.
+      where: {
+        companyId, isCompanyAccount: false, user: { status: { not: 'SUSPENDED' } }, offboardingStatus: { not: 'SEPARATED' },
+        // 19 Nov 2026: only new hires — anyone mid self-onboarding, plus anyone
+        // who joined in the last 30 days. Long-standing staff stay off the board.
+        OR: [
+          { selfOnboardingStatus: { in: ['PENDING', 'SUBMITTED', 'CHANGES_REQUESTED'] } },
+          { joiningDate: { gte: new Date(Date.now() - 30 * 86400000) } },
+        ],
+      },
       // Only what the board shows. This used to return every column of every
       // employee — bank, passport and ID numbers included.
       select: {

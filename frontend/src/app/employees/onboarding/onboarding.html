@@ -39,8 +39,8 @@
       </div>
       <div class="metric-card-content">
         <div class="metric-big-num">{{ totalCount() }}</div>
-        <div class="metric-card-label">TOTAL WORKFORCE IN PIPELINE</div>
-        <div class="metric-card-sub">Active new hire records</div>
+        <div class="metric-card-label">NEW HIRES</div>
+        <div class="metric-card-sub">Joined in the last 30 days or still onboarding</div>
       </div>
     </div>
 
@@ -50,9 +50,9 @@
         <svg lucideListTodo size="20"></svg>
       </div>
       <div class="metric-card-content">
-        <div class="metric-big-num">{{ pendingCount() }}</div>
-        <div class="metric-card-label">NOT STARTED</div>
-        <div class="metric-card-sub">Checklists uninitiated</div>
+        <div class="metric-big-num">{{ selfFillingCount() }}</div>
+        <div class="metric-card-label">FILLING FORM</div>
+        <div class="metric-card-sub">Invited, or asked for changes</div>
       </div>
     </div>
 
@@ -62,9 +62,9 @@
         <svg lucideClock size="20"></svg>
       </div>
       <div class="metric-card-content">
-        <div class="metric-big-num">{{ inProgressCount() }}</div>
-        <div class="metric-card-label">IN PROGRESS</div>
-        <div class="metric-card-sub">Tasks actively underway</div>
+        <div class="metric-big-num">{{ selfReviewCount() }}</div>
+        <div class="metric-card-label">WAITING HR REVIEW</div>
+        <div class="metric-card-sub">Submitted by the new hire</div>
       </div>
     </div>
 
@@ -74,9 +74,9 @@
         <svg lucideCheckCircle2 size="20"></svg>
       </div>
       <div class="metric-card-content">
-        <div class="metric-big-num">{{ completedCount() }}</div>
-        <div class="metric-card-label">COMPLETED</div>
-        <div class="metric-card-sub">{{ completionRate() }}% pipeline completion rate</div>
+        <div class="metric-big-num">{{ selfApprovedCount() }}</div>
+        <div class="metric-card-label">APPROVED</div>
+        <div class="metric-card-sub">Profile reviewed and approved</div>
       </div>
     </div>
   </div>
@@ -86,7 +86,7 @@
     <div class="filter-search-box">
       <svg lucideSearch size="14" class="filter-search-icon"></svg>
       <input type="text" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)"
-             placeholder="Search new hire, code, designation...">
+             placeholder="Search new hire, code, email...">
     </div>
 
     <div class="filter-dropdown-wrapper" *ngIf="departments().length > 1">
@@ -182,7 +182,7 @@
                   </div>
                   <div class="emp-sub-line">
                     <span class="emp-code">#{{ emp.employeeCode || 'N/A' }}</span>
-                    <span class="emp-desig" *ngIf="emp.designation?.name" [title]="emp.designation.name">• {{ emp.designation.name }}</span>
+                    <span class="emp-desig" *ngIf="emp.user?.email" [title]="emp.user.email">• {{ emp.user.email }}</span>
                   </div>
                 </div>
               </div>
@@ -273,7 +273,7 @@
                   </div>
                   <div class="emp-sub-line">
                     <span class="emp-code">#{{ emp.employeeCode || 'N/A' }}</span>
-                    <span class="emp-desig" *ngIf="emp.designation?.name" [title]="emp.designation.name">• {{ emp.designation.name }}</span>
+                    <span class="emp-desig" *ngIf="emp.user?.email" [title]="emp.user.email">• {{ emp.user.email }}</span>
                   </div>
                 </div>
               </div>
@@ -364,7 +364,7 @@
                   </div>
                   <div class="emp-sub-line">
                     <span class="emp-code">#{{ emp.employeeCode || 'N/A' }}</span>
-                    <span class="emp-desig" *ngIf="emp.designation?.name" [title]="emp.designation.name">• {{ emp.designation.name }}</span>
+                    <span class="emp-desig" *ngIf="emp.user?.email" [title]="emp.user.email">• {{ emp.user.email }}</span>
                   </div>
                 </div>
               </div>
@@ -574,7 +574,7 @@
           <div class="drawer-meta-line">
             <span class="drawer-code">#{{ selectedEmployee().employeeCode || 'N/A' }}</span>
             <span class="drawer-dot">•</span>
-            <span class="drawer-desig">{{ selectedEmployee().designation?.name || 'No Designation' }}</span>
+            <span class="drawer-desig">{{ selectedEmployee().user?.email || '—' }}</span>
           </div>
           <div class="drawer-chips-row">
             <span class="drawer-dept-chip" *ngIf="selectedEmployee().department?.name">

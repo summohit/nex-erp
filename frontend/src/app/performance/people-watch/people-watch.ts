@@ -33,6 +33,7 @@ import {
   LucideFileText,
   LucideChevronDown
 } from '@lucide/angular';
+import { DatePresetFilterComponent, DatePreset, DateRange } from '../../shared/components/date-preset-filter/date-preset-filter';
 import { ProbationPolicy, LifecycleService, LcOverview, LcPip, LcPipDetail, LcPerson, LcProbation, LcNotice } from '../../services/lifecycle.service';
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
 
@@ -45,6 +46,7 @@ import { ProfileModalService } from '../../shared/profile-modal/profile-modal.se
   selector: 'app-people-watch',
   standalone: true,
   imports: [
+    DatePresetFilterComponent,
     CommonModule,
     FormsModule,
     LucideUserCheck,
@@ -153,6 +155,17 @@ export class PeopleWatchComponent implements OnInit {
   probationFilter = signal<'all' | 'overdue' | 'ending_soon' | 'pending_review' | 'on_track'>('all');
   noticeSearch = signal('');
   pipSearch = signal('');
+  // #31 (19 Nov 2026): date filters — probation by end date, PIP by plan period.
+  probationPreset: DatePreset = 'ALL';
+  pipPreset: DatePreset = 'ALL';
+  probationRange = signal<DateRange>(null);
+  pipRange = signal<DateRange>(null);
+  private inRange(d: string | null | undefined, r: DateRange): boolean {
+    if (!r) return true;
+    if (!d) return false;
+    const t = new Date(d).getTime();
+    return t >= r.from.getTime() && t <= r.to.getTime() + 86399999;
+  }
 
   probationStats = computed(() => {
     const list = this.data()?.probation || [];
@@ -180,7 +193,8 @@ export class PeopleWatchComponent implements OnInit {
   });
 
   filteredProbation = computed(() => {
-    let list = this.data()?.probation || [];
+    const pr = this.probationRange();
+    let list = (this.data()?.probation || []).filter((p) => this.inRange(p.endDate, pr));
     const filter = this.probationFilter();
     if (filter === 'overdue') {
       list = list.filter((p) => p.daysLeft !== null && p.daysLeft < 0);
@@ -209,7 +223,10 @@ export class PeopleWatchComponent implements OnInit {
   });
 
   filteredPips = computed(() => {
-    const list = this.data()?.pips || [];
+    const r = this.pipRange();
+    // A plan matches when its period overlaps the chosen range.
+    const list = (this.data()?.pips || []).filter((p) => !r
+      || (new Date(p.startDate).getTime() <= r.to.getTime() + 86399999 && new Date(p.endDate).getTime() >= r.from.getTime()));
     const q = this.pipSearch().trim().toLowerCase();
     if (!q) return list;
     return list.filter((p) =>

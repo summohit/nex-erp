@@ -484,30 +484,26 @@ export class ProfileTabComponent implements OnInit {
     return this.allEmployees.find(e => Number(e.id) === Number(this.formData.managerId)) || null;
   }
 
+  // #34 (19 Nov 2026): the org chart shows only real data — the set manager
+  // and people whose managerId is this person. No guessing from titles or
+  // departments (that invented reportees).
   get managerNode(): any {
-    if (this.selectedManager) return this.selectedManager;
-    if (this.allEmployees?.length > 0) {
-      const mgr = this.allEmployees.find(e => (e as any).isProjectManager || /manager|director|lead|head|cto|ceo/i.test(e.designation?.name || ''));
-      if (mgr && mgr.id !== this.employeeData?.id) return mgr;
-    }
-    return null;
+    return this.selectedManager;
   }
 
   get directReports() {
     if (!this.employeeData?.id) return [];
-    return this.allEmployees.filter(e => e.id !== this.employeeData.id && (e as any).managerId === this.employeeData.id);
+    return this.allEmployees.filter(e => e.id !== this.employeeData.id && Number((e as any).managerId) === Number(this.employeeData.id));
   }
 
   get subordinatesList(): any[] {
-    if (this.directReports.length > 0) return this.directReports;
-    if (this.allEmployees?.length > 0) {
-      const colleagues = this.allEmployees.filter(e => e.id !== this.employeeData?.id && (
-        (this.employeeData?.managerId && (e as any).managerId === this.employeeData.managerId) ||
-        (this.employeeData?.departmentId && (e as any).departmentId === this.employeeData.departmentId)
-      ));
-      if (colleagues.length > 0) return colleagues.slice(0, 2);
-    }
-    return [];
+    return this.directReports;
+  }
+
+  /** "YOU" only when the viewer is looking at their own profile. */
+  get isOwnProfile(): boolean {
+    const me = this.authService.currentUser()?.employeeId;
+    return !!me && Number(me) === Number(this.employeeData?.id);
   }
 
   get currentEmployeeCode(): string {

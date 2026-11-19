@@ -309,6 +309,11 @@ export class EmployeesController {
   }
 
   /** { documentType } — re-file an uploaded document, e.g. one saved as "Other". */
+  @Put(':id/documents/:documentId/verify')
+  verifyDocument(@Request() req, @Param('id', ParseIntPipe) id: number, @Param('documentId', ParseIntPipe) documentId: number, @Body() body: { status: string; note?: string }) {
+    return this.employeesService.verifyDocument(id, documentId, req.user.companyId, req.user.sub, req.user.role, body?.status, body?.note);
+  }
+
   @Put(':id/documents/:documentId')
   updateDocumentType(@Request() req, @Param('id') id: string, @Param('documentId') documentId: string, @Body() body: { documentType?: string; fileName?: string }) {
     return this.employeesService.updateDocumentType(+id, +documentId, req.user.companyId, req.user.sub, req.user.role, body?.documentType ?? '', body?.fileName);
