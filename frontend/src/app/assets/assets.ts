@@ -712,6 +712,33 @@ export class AssetsComponent implements OnInit {
     return [...new Set([...saved, ...custom])].sort((a, b) => a.localeCompare(b));
   }
 
+  inventoryCategorySelectOptions(): SearchableSelectOption[] {
+    return this.inventoryCategories().map(category => ({ id: category.value, name: category.label }));
+  }
+
+  inventorySubcategorySelectOptions(): SearchableSelectOption[] {
+    return [{ id: '', name: 'No subcategory' }, ...this.inventorySubcategories().map(name => ({ id: name, name }))];
+  }
+
+  inventoryBrandSelectOptions(): SearchableSelectOption[] {
+    return [{ id: '', name: 'Select a brand' }, ...this.inventoryBrands().map(name => ({ id: name, name }))];
+  }
+
+  inventoryVendorSelectOptions(): SearchableSelectOption[] {
+    return [{ id: '', name: 'Select a supplier or vendor' }, ...this.inventoryVendors().map(name => ({ id: name, name }))];
+  }
+
+  inventoryItemTypeSelectOptions(): SearchableSelectOption[] {
+    return [
+      { id: 'CONSUMABLE', name: 'Consumable / Perishable' },
+      { id: 'ASSET', name: 'Durable Asset' },
+    ];
+  }
+
+  inventoryUnitSelectOptions(): SearchableSelectOption[] {
+    return this.unitOptions.map(name => ({ id: name, name }));
+  }
+
   startAddingInventorySubcategory() {
     if (!this.invItemForm.category) {
       this.toast.error('Select a category first');
@@ -1582,6 +1609,17 @@ export class AssetsComponent implements OnInit {
       if (params['tab']) {
         this.activeTab.set(params['tab'] as 'inventory' | 'assignments' | 'requests');
       }
+    });
+
+    this.route.queryParams.subscribe(params => {
+      const setup = params['setup'];
+      if (!['category', 'brand', 'subcategory', 'vendor'].includes(setup)) return;
+      this.activeTab.set('inventory');
+      this.openAddItemModal();
+      if (setup === 'category') this.startAddingInventoryCategory();
+      if (setup === 'brand') this.startAddingInventoryBrand();
+      if (setup === 'subcategory') this.startAddingInventorySubcategory();
+      if (setup === 'vendor') this.startAddingInventoryVendor();
     });
 
     this.loadAllData();

@@ -863,9 +863,7 @@
             <svg lucidePlus size="15"></svg> Add category
           </button>
         </div>
-        <select class="form-control" [class.input-error]="inventoryFormErrors['category']" [(ngModel)]="invItemForm.category" (change)="onCategoryChange(); clearInventoryError('category')">
-          <option *ngFor="let c of inventoryCategories()" [value]="c.value">{{ c.label }}</option>
-        </select>
+        <app-searchable-select class="inventory-modal-select category-select" [options]="inventoryCategorySelectOptions()" [value]="invItemForm.category" (valueChange)="invItemForm.category = $event; onCategoryChange(); clearInventoryError('category')" placeholder="Select a category"></app-searchable-select>
         <span class="field-error" *ngIf="inventoryFormErrors['category']">{{ inventoryFormErrors['category'] }}</span>
         <div class="add-category-inline" *ngIf="isAddingInventoryCategory()">
           <input type="text" class="form-control" [ngModel]="newInventoryCategoryName()" (ngModelChange)="newInventoryCategoryName.set($event)" (keydown.enter)="addInventoryCategory()" placeholder="Enter new category name" autofocus>
@@ -882,10 +880,7 @@
             <svg lucidePlus size="15"></svg> Add subcategory
           </button>
         </div>
-        <select class="form-control" [(ngModel)]="invItemForm.subcategory" [disabled]="!invItemForm.category">
-          <option value="">No subcategory</option>
-          <option *ngFor="let subcategory of inventorySubcategories()" [value]="subcategory">{{ subcategory }}</option>
-        </select>
+        <app-searchable-select class="inventory-modal-select" [options]="inventorySubcategorySelectOptions()" [value]="invItemForm.subcategory" (valueChange)="invItemForm.subcategory = $event" [disabled]="!invItemForm.category" placeholder="No subcategory"></app-searchable-select>
         <div class="add-value-inline" *ngIf="isAddingInventorySubcategory()">
           <input type="text" class="form-control" [ngModel]="newInventorySubcategoryName()" (ngModelChange)="newInventorySubcategoryName.set($event)" (keydown.enter)="addInventorySubcategory()" placeholder="e.g. Biscuits, Laptops, Cables" autofocus>
           <button type="button" class="btn btn-primary btn-sm" (click)="addInventorySubcategory()">Add</button>
@@ -906,10 +901,7 @@
               <svg lucidePlus size="15"></svg> Add brand
             </button>
           </div>
-          <select class="form-control" [(ngModel)]="invItemForm.brand">
-            <option value="">Select a brand</option>
-            <option *ngFor="let brand of inventoryBrands()" [value]="brand">{{ brand }}</option>
-          </select>
+          <app-searchable-select class="inventory-modal-select brand-select" [options]="inventoryBrandSelectOptions()" [value]="invItemForm.brand" (valueChange)="invItemForm.brand = $event" placeholder="Select a brand"></app-searchable-select>
           <div class="add-value-inline" *ngIf="isAddingInventoryBrand()">
             <input type="text" class="form-control" [ngModel]="newInventoryBrandName()" (ngModelChange)="newInventoryBrandName.set($event)" (keydown.enter)="addInventoryBrand()" placeholder="Enter brand name" autofocus>
             <button type="button" class="btn btn-primary btn-sm" (click)="addInventoryBrand()">Add</button>
@@ -918,16 +910,11 @@
         </div>
         <div class="form-group inventory-basic-detail-field">
           <label class="form-label">Item Type</label>
-          <select class="form-control" [(ngModel)]="invItemForm.itemType">
-            <option value="CONSUMABLE">Consumable / Perishable</option>
-            <option value="ASSET">Durable Asset</option>
-          </select>
+          <app-searchable-select class="inventory-modal-select" [options]="inventoryItemTypeSelectOptions()" [value]="invItemForm.itemType" (valueChange)="invItemForm.itemType = $event" placeholder="Select item type"></app-searchable-select>
         </div>
         <div class="form-group inventory-basic-detail-field">
           <label class="form-label">Unit</label>
-          <select class="form-control" [(ngModel)]="invItemForm.unit">
-            <option *ngFor="let u of unitOptions" [value]="u">{{ u }}</option>
-          </select>
+          <app-searchable-select class="inventory-modal-select" [options]="inventoryUnitSelectOptions()" [value]="invItemForm.unit" (valueChange)="invItemForm.unit = $event" placeholder="Select a unit"></app-searchable-select>
         </div>
       </div>
       </section>
@@ -997,10 +984,7 @@
               <svg lucidePlus size="15"></svg> Add vendor
             </button>
           </div>
-          <select class="form-control" [(ngModel)]="invItemForm.supplier">
-            <option value="">Select a supplier or vendor</option>
-            <option *ngFor="let vendor of inventoryVendors()" [value]="vendor">{{ vendor }}</option>
-          </select>
+          <app-searchable-select class="inventory-modal-select" [options]="inventoryVendorSelectOptions()" [value]="invItemForm.supplier" (valueChange)="invItemForm.supplier = $event" placeholder="Select a supplier or vendor"></app-searchable-select>
           <div class="add-value-inline" *ngIf="isAddingInventoryVendor()">
             <input type="text" class="form-control" [ngModel]="newInventoryVendorName()" (ngModelChange)="newInventoryVendorName.set($event)" (keydown.enter)="addInventoryVendor()" placeholder="Enter vendor name" autofocus>
             <button type="button" class="btn btn-primary btn-sm" (click)="addInventoryVendor()">Add</button>

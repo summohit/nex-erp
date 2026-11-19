@@ -740,3 +740,11 @@
 .cdk-drag-preview { box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2); border-radius: 10px; opacity: 0.95; }
 .cdk-drag-placeholder { opacity: 0.3; }
 .cdk-drop-list-dragging .cdk-drag { transition: transform 200ms cubic-bezier(0, 0, 0.2, 1); }
+.sub-nav-group-label {
+  color: #72809a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  margin: 16px 0 6px 46px;
+  text-transform: uppercase;
+}

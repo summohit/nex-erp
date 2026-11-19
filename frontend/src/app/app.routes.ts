@@ -303,6 +303,12 @@ export const routes: Routes = [
         pathMatch: 'full'
       },
       {
+        path: 'assets/setup',
+        canActivate: [permissionGuard],
+        data: { module: 'assets/inventory' },
+        loadComponent: () => import('./assets/inventory-setup/inventory-setup').then(m => m.InventorySetupComponent)
+      },
+      {
         path: 'assets/:tab',
         canActivate: [permissionGuard],
         data: { module: 'assets' },

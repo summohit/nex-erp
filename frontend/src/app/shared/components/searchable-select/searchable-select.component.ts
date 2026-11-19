@@ -27,6 +27,8 @@ export interface SearchableSelectOption {
 })
 export class SearchableSelectComponent {
   private elementRef = inject(ElementRef);
+  private static nextInstanceId = 0;
+  private readonly instanceId = ++SearchableSelectComponent.nextInstanceId;
 
   @Input() options: SearchableSelectOption[] = [];
   @Input() placeholder = 'All';
@@ -75,6 +77,9 @@ export class SearchableSelectComponent {
     if (this.disabled) return;
     this.isOpen = !this.isOpen;
     if (this.isOpen && !this.loading) {
+      // A picker should never compete with another open picker. This is a
+      // document event so separate component instances stay in sync.
+      document.dispatchEvent(new CustomEvent('app-select-open', { detail: this.instanceId }));
       this.searchText = '';
       setTimeout(() => {
         const inputEl = this.elementRef.nativeElement.querySelector('.select-search input') as HTMLInputElement;
@@ -101,6 +106,11 @@ export class SearchableSelectComponent {
     if (!this.elementRef.nativeElement.contains(event.target)) {
       this.isOpen = false;
     }
+  }
+
+  @HostListener('document:app-select-open', ['$event'])
+  onAnotherSelectOpened(event: CustomEvent<number>) {
+    if (event.detail !== this.instanceId) this.isOpen = false;
   }
 }
 

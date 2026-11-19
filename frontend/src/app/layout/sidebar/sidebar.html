@@ -107,6 +107,7 @@
               <div class="tree-line-container" cdkDropList [cdkDropListDisabled]="!arranging()" (cdkDropListDropped)="dropSub(item, $event)" [class.arranging]="arranging()">
                 <ng-container *ngFor="let sub of item.subItems; let last = last">
                   <div class="sub-nav-item-wrapper" cdkDrag [cdkDragDisabled]="!arranging()" cdkDragLockAxis="y">
+                    <div class="sub-nav-group-label" *ngIf="isFirstInventorySetupItem(sub)">Inventory Setup</div>
                     <div class="tree-line" [class.last]="last"></div>
                     <a [attr.href]="sub.route || '#'" class="sub-nav-item" [class.active]="isSubItemActive(sub)" (click)="handleSubMenuClick(sub, $event)">
                       {{ sub.title }}

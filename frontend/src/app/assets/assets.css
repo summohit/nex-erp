@@ -1852,10 +1852,14 @@
   width: 820px;
   border: 1px solid #DCE6F2;
   box-shadow: 0 28px 70px -18px rgba(15, 23, 42, .42);
+  overflow: visible;
+  border-radius: 18px;
+  background: transparent;
 }
 .inventory-item-form-header {
   padding: 20px 28px 18px;
   background: linear-gradient(120deg, #FFFFFF 20%, #F4F8FF 100%);
+  border-radius: 18px 18px 0 0;
 }
 .inventory-item-form-header h3 { max-width: none; }
 .inventory-item-form-header p {
@@ -2037,7 +2041,7 @@
   text-transform: uppercase;
 }
 .inventory-section-details > .form-section-title + .detail-subheading { margin-top: 0; }
-.inventory-item-form-panel .modal-panel-footer { padding: 18px 28px; background: #FFFFFF; }
+.inventory-item-form-panel .modal-panel-footer { padding: 18px 28px; background: #FFFFFF; position: relative; z-index: 1; border-radius: 0 0 18px 18px; }
 .additions-history { padding: 20px; }
 .additions-history-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
 .additions-history-header h3 { margin:0; color:#172033; font-size:1rem; }
@@ -2074,7 +2078,9 @@
   gap: 14px;
 }
 .modal-panel-body.inventory-item-form-body {
-  overflow-y: hidden;
+  overflow: visible;
+  position: relative;
+  z-index: 2;
 }
 .modal-panel-footer {
   padding: 13px 22px;
@@ -2745,3 +2751,7 @@
   .tc-grid { grid-template-columns: 1fr !important; }
   .detail-info-grid { grid-template-columns: 1fr !important; }
 }
+.inventory-modal-select { display: block; width: 100%; }
+.inventory-item-form-panel .inventory-modal-select ::ng-deep .select-options { max-height: 180px; }
+.inventory-item-form-panel .category-select ::ng-deep .select-dropdown { max-height: 200px; }
+.inventory-item-form-panel .category-select ::ng-deep .select-options { max-height: 138px; }

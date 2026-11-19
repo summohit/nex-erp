@@ -178,6 +178,7 @@ export class SidebarComponent implements OnInit {
 
   isSubItemActive(sub: any): boolean {
     if (!sub?.route) return false;
+    if (sub.route.includes('?')) return this.router.url === sub.route;
     const currentPath = this.router.url.split('?')[0];
     if (this.isMergedLeavesItem(sub)) return this.isLeaveRoute(currentPath);
     // Super Admin and HR are redirected from the Attendance item's own route
@@ -187,10 +188,30 @@ export class SidebarComponent implements OnInit {
     return currentPath === sub.route;
   }
 
+  isFirstInventorySetupItem(sub: any): boolean {
+    return sub?.route === '/assets/inventory?setup=category';
+  }
+
   private mergeLeaveMenuItems(sections: any[]): any[] {
     return sections.map(section => ({
       ...section,
       items: section.items.map((item: any) => {
+        // Inventory Setup is client-composed as well as seeded in the database.
+        // This keeps the shortcuts visible for existing workspaces whose menu
+        // rows predate the setup links (or when a database seed is delayed).
+        if (item.id === 'assets' || item.route === '/assets') {
+          const setupItems = [
+            { id: 'assets/inventory?setup=category', title: 'Add Category', route: '/assets/inventory?setup=category' },
+            { id: 'assets/inventory?setup=brand', title: 'Add Brand', route: '/assets/inventory?setup=brand' },
+            { id: 'assets/inventory?setup=subcategory', title: 'Add Subcategory', route: '/assets/inventory?setup=subcategory' },
+            { id: 'assets/inventory?setup=vendor', title: 'Add Vendor', route: '/assets/inventory?setup=vendor' },
+          ];
+          const current = item.subItems || [];
+          return {
+            ...item,
+            subItems: [...current, ...setupItems.filter(setup => !current.some((sub: any) => sub.route === setup.route))],
+          };
+        }
         if (item.id === 'recruitment' && item.subItems?.some((sub: any) => sub.route === '/recruitment/candidates') && !item.subItems.some((sub: any) => sub.route === '/recruitment/offer-letters')) {
           return { ...item, subItems: [...item.subItems, { id: 'recruitment/offer-letters', title: 'Offer Letters', route: '/recruitment/offer-letters' }] };
         }

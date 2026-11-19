@@ -1,0 +1,20 @@
+<main class="setup-page">
+  <header class="setup-header">
+    <button class="back" (click)="back()"><svg lucideArrowLeft size="18"></svg> Inventory</button>
+    <div><p class="eyebrow">Assets & Inventory</p><h1>Inventory Setup</h1><p class="subtitle">Manage the reference lists used when creating inventory items.</p></div>
+  </header>
+  <section class="setup-grid">
+    <article class="setup-card" *ngFor="let card of cards">
+      <div class="card-icon" [ngSwitch]="card.icon"><svg *ngSwitchCase="'category'" lucideTag size="22"></svg><svg *ngSwitchCase="'brand'" lucideBox size="22"></svg><svg *ngSwitchCase="'subcategory'" lucideLayers size="22"></svg><svg *ngSwitchCase="'vendor'" lucideTruck size="22"></svg></div>
+      <div class="card-copy"><h2>{{ card.title }}</h2><p>{{ card.description }}</p></div>
+      <div class="value-list" *ngIf="!loading(); else loadingValues"><span *ngFor="let value of values()[card.key] | slice:0:6">{{ value }}</span><em *ngIf="values()[card.key].length === 0">No entries yet</em></div>
+      <ng-template #loadingValues><div class="value-list"><em>Loading entries…</em></div></ng-template>
+      <button class="add-button" *ngIf="adding() !== card.key" (click)="openAdd(card.key)"><svg lucidePlus size="16"></svg>{{ card.action }}</button>
+      <div class="inline-add" *ngIf="adding() === card.key">
+        <input [(ngModel)]="draft" [placeholder]="'Enter ' + card.title.toLowerCase() + ' name'" (keydown.enter)="add(card.key)" autofocus>
+        <button type="button" class="save-add" (click)="add(card.key)">Add</button>
+        <button type="button" class="cancel-add" (click)="cancelAdd()">Cancel</button>
+      </div>
+    </article>
+  </section>
+</main>

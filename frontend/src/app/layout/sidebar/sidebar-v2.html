@@ -170,9 +170,9 @@
       <ng-container *ngIf="mode() === 'single'">
 
         <nav class="drawer-items-nav" cdkDropList [cdkDropListDisabled]="!arranging()" (cdkDropListDropped)="dropSub($event)" [class.arranging]="arranging()">
+          <ng-container *ngFor="let item of filteredActiveItems()">
           <a
             cdkDrag [cdkDragDisabled]="!arranging()" cdkDragLockAxis="y"
-            *ngFor="let item of filteredActiveItems()"
             [attr.href]="item.route"
             class="drawer-item"
             [class.active]="isSubItemActive(item)"
@@ -187,6 +187,7 @@
               {{ item.badge }}
             </span>
           </a>
+          </ng-container>
         </nav>
       </ng-container>
 

@@ -286,6 +286,15 @@ export class SidebarComponentV2 implements OnInit {
     let subs: SidebarSubItem[] = (item.subItems || []).map((s: any) => ({
       id: s.id, title: s.title, route: s.route, external: !!s.external,
     }));
+    // These are Inventory setup shortcuts, not separate permission surfaces.
+    // Keep them in the drawer even for workspaces whose database menu was
+    // created before the shortcuts existed.
+    if (item.id === 'assets' || item.route === '/assets') {
+      const inventorySetup: SidebarSubItem[] = [
+        { id: 'assets/setup', title: 'Inventory Setup', route: '/assets/setup' },
+      ];
+      subs = [...subs, ...inventorySetup.filter(setup => !subs.some(sub => sub.route === setup.route))];
+    }
     if (item.id === 'recruitment' && subs.some(s => s.route === '/recruitment/candidates') && !subs.some(s => s.route === '/recruitment/offer-letters')) {
       subs.push({ id: 'recruitment/offer-letters', title: 'Offer Letters', route: '/recruitment/offer-letters' });
     }
@@ -400,7 +409,9 @@ export class SidebarComponentV2 implements OnInit {
     if (event instanceof MouseEvent && (event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1)) return;
     event.preventDefault();
     if (item.route) {
-      this.router.navigate([item.route]);
+      // Query routes are used by Inventory Setup to open the relevant add
+      // control. navigateByUrl preserves the query string.
+      this.router.navigateByUrl(item.route);
     }
     this.closeMobileNav();
   }
@@ -408,6 +419,7 @@ export class SidebarComponentV2 implements OnInit {
   isSubItemActive(item: SidebarSubItem): boolean {
     return !!item && item.id === this.activeSubId();
   }
+
 
   getUserInitials(): string {
     const u = this.user();
