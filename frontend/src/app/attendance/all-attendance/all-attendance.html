@@ -110,7 +110,7 @@
       <!-- 1. Clocked in -->
       <div class="today-kpi k-in" (click)="openTodayKpi('clockedIn', 'Clocked in')" title="Show all who clocked in today">
         <div class="kpi-header">
-          <span class="kpi-dot"></span>
+          <span class="legend-icon-wrapper kpi-ico bg-present"><svg lucideCheck class="status-icon status-present"></svg></span>
           <span class="kpi-label">Clocked in</span>
           <span class="kpi-percent">{{ todayPercent(t.clockedIn, t.totalEmployees) }}%</span>
         </div>
@@ -127,7 +127,7 @@
       <!-- 2. On time -->
       <div class="today-kpi k-ok" (click)="openTodayKpi('present', 'On time')" title="Arrived before or at shift start">
         <div class="kpi-header">
-          <span class="kpi-dot"></span>
+          <span class="legend-icon-wrapper kpi-ico bg-present"><svg lucideCheck class="status-icon status-present"></svg></span>
           <span class="kpi-label">On time</span>
           <span class="kpi-percent">{{ todayPercent(t.present, t.totalEmployees) }}%</span>
         </div>
@@ -143,7 +143,7 @@
       <!-- 3. Late -->
       <div class="today-kpi k-late" (click)="openTodayKpi('late', 'Late')" title="Clocked in within grace/late window">
         <div class="kpi-header">
-          <span class="kpi-dot"></span>
+          <span class="legend-icon-wrapper kpi-ico bg-late"><svg lucideAlertCircle class="status-icon status-late"></svg></span>
           <span class="kpi-label">Late</span>
           <span class="kpi-percent">{{ todayPercent(t.late, t.totalEmployees) }}%</span>
         </div>
@@ -159,7 +159,7 @@
       <!-- 4. Half day -->
       <div class="today-kpi k-half" (click)="openTodayKpi('halfDay', 'Half day')" title="Clocked in after half-day cutoff">
         <div class="kpi-header">
-          <span class="kpi-dot"></span>
+          <span class="legend-icon-wrapper kpi-ico bg-half-day"><svg lucideStarHalf class="status-icon status-half-day"></svg></span>
           <span class="kpi-label">Half day</span>
           <span class="kpi-percent">{{ todayPercent(t.halfDay, t.totalEmployees) }}%</span>
         </div>
@@ -175,7 +175,7 @@
       <!-- 5. On leave -->
       <div class="today-kpi k-leave" (click)="openTodayKpi('onLeave', 'On leave')" title="Approved leave for today">
         <div class="kpi-header">
-          <span class="kpi-dot"></span>
+          <span class="legend-icon-wrapper kpi-ico bg-leave"><svg lucidePlane class="status-icon status-leave"></svg></span>
           <span class="kpi-label">On leave</span>
           <span class="kpi-percent">{{ todayPercent(t.onLeave, t.totalEmployees) }}%</span>
         </div>
@@ -191,7 +191,7 @@
       <!-- 6. Day off -->
       <div class="today-kpi k-off" (click)="openTodayKpi('dayOff', 'Day off')" title="Weekly off or rostered day off">
         <div class="kpi-header">
-          <span class="kpi-dot"></span>
+          <span class="legend-icon-wrapper kpi-ico bg-day-off"><svg lucideCalendar class="status-icon status-day-off"></svg></span>
           <span class="kpi-label">Day off</span>
           <span class="kpi-percent">{{ todayPercent(t.dayOff, t.totalEmployees) }}%</span>
         </div>
@@ -207,7 +207,7 @@
       <!-- 7. Not clocked in -->
       <div class="today-kpi k-miss" (click)="openTodayKpi('notClockedIn', isTodayStrip() ? 'Not clocked in yet' : 'Did not clock in')" title="Pending clock-in or unexcused absence">
         <div class="kpi-header">
-          <span class="kpi-dot"></span>
+          <span class="legend-icon-wrapper kpi-ico bg-day-off"><svg lucideClock class="status-icon status-day-off kpi-clock"></svg></span>
           <span class="kpi-label">Not clocked in</span>
           <span class="kpi-percent">{{ todayPercent(t.notClockedIn, t.totalEmployees) }}%</span>
         </div>
@@ -523,75 +523,7 @@
           <div class="dropdown-backdrop-transparent" *ngIf="showDeptDropdown" (click)="showDeptDropdown = false"></div>
         </div>
 
-        <!-- 5. Status Dropdown (Searchable) -->
-        <div class="searchable-filter-dropdown">
-          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterStatus" (click)="showStatusDropdown = !showStatusDropdown; showMonthDropdown=false; showYearDropdown=false; showEmployeeDropdown=false; showDeptDropdown=false; showFlagDropdown=false">
-            <svg lucideCheckCircle2 [size]="14" class="trigger-prefix-icon"></svg>
-            <span class="trigger-text">{{ getSelectedStatusLabel() }}</span>
-            <button type="button" class="btn-clear-trigger" *ngIf="filterStatus" (click)="$event.stopPropagation(); clearStatusFilter()" title="Clear status filter">
-              <svg lucideX [size]="12"></svg>
-            </button>
-            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showStatusDropdown" *ngIf="!filterStatus"></svg>
-          </button>
-          <div class="filter-dropdown-popover" *ngIf="showStatusDropdown">
-            <div class="popover-search-box">
-              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
-              <input type="text" placeholder="Search statuses..." [(ngModel)]="statusSearchQuery" (click)="$event.stopPropagation()" />
-              <button type="button" class="popover-search-clear" *ngIf="statusSearchQuery" (click)="statusSearchQuery = ''"><svg lucideX [size]="11"></svg></button>
-            </div>
-            <div class="popover-options-scroll">
-              <div class="popover-option-item" *ngFor="let s of getFilteredStatuses(statusSearchQuery)" (click)="selectStatus(s.value)" [class.selected]="filterStatus === s.value">
-                <div class="popover-status-row">
-                  <div class="legend-icon-wrapper mini-icon" [ngClass]="s.bgClass" *ngIf="s.value">
-                    <svg *ngIf="s.icon === 'check'" lucideCheck class="status-icon" [ngClass]="s.iconClass"></svg>
-                    <svg *ngIf="s.icon === 'star-half'" lucideStarHalf class="status-icon" [ngClass]="s.iconClass"></svg>
-                    <svg *ngIf="s.icon === 'alert-circle'" lucideAlertCircle class="status-icon" [ngClass]="s.iconClass"></svg>
-                    <svg *ngIf="s.icon === 'x'" lucideX class="status-icon" [ngClass]="s.iconClass"></svg>
-                    <svg *ngIf="s.icon === 'plane'" lucidePlane class="status-icon" [ngClass]="s.iconClass"></svg>
-                    <svg *ngIf="s.icon === 'star'" lucideStar class="status-icon" [ngClass]="s.iconClass"></svg>
-                    <svg *ngIf="s.icon === 'calendar'" lucideCalendar class="status-icon" [ngClass]="s.iconClass"></svg>
-                    <svg *ngIf="s.icon === 'zap'" lucideZap class="status-icon" [ngClass]="s.iconClass"></svg>
-                    <svg *ngIf="s.icon === 'timer-off'" lucideTimerOff class="status-icon" [ngClass]="s.iconClass"></svg>
-                    <svg *ngIf="s.icon === 'map-pin'" lucideMapPin class="status-icon" [ngClass]="s.iconClass"></svg>
-          <svg *ngIf="s.icon === 'route'" lucideRoute class="status-icon" [ngClass]="s.iconClass"></svg>
-                  </div>
-                  <span class="option-primary">{{ s.label }}</span>
-                </div>
-                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterStatus === s.value"></svg>
-              </div>
-              <div class="popover-empty" *ngIf="getFilteredStatuses(statusSearchQuery).length === 0">
-                No status matches "{{ statusSearchQuery }}"
-              </div>
-            </div>
-          </div>
-          <div class="dropdown-backdrop-transparent" *ngIf="showStatusDropdown" (click)="showStatusDropdown = false"></div>
-        </div>
-
-        <!-- 6. Attendance Flags Filter (Searchable) -->
-        <div class="searchable-filter-dropdown">
-          <button type="button" class="filter-dropdown-trigger" [class.has-selection]="filterFlag !== 'ALL'" (click)="showFlagDropdown = !showFlagDropdown; showMonthDropdown=false; showYearDropdown=false; showEmployeeDropdown=false; showDeptDropdown=false; showStatusDropdown=false">
-            <svg lucideLayers [size]="14" class="trigger-prefix-icon"></svg>
-            <span class="trigger-text">{{ getSelectedFlagLabel() }}</span>
-            <svg lucideChevronDown [size]="13" class="trigger-chevron" [class.rotated]="showFlagDropdown"></svg>
-          </button>
-          <div class="filter-dropdown-popover" *ngIf="showFlagDropdown">
-            <div class="popover-search-box">
-              <svg lucideSearch [size]="13" class="popover-search-icon"></svg>
-              <input type="text" placeholder="Search flags..." [(ngModel)]="flagSearchQuery" (click)="$event.stopPropagation()" />
-              <button type="button" class="popover-search-clear" *ngIf="flagSearchQuery" (click)="flagSearchQuery = ''"><svg lucideX [size]="11"></svg></button>
-            </div>
-            <div class="popover-options-scroll">
-              <div class="popover-option-item" *ngFor="let f of getFilteredFlags(flagSearchQuery)" (click)="selectFlag(f.value)" [class.selected]="filterFlag === f.value">
-                <span class="option-primary">{{ f.label }}</span>
-                <svg lucideCheck [size]="14" class="check-icon" *ngIf="filterFlag === f.value"></svg>
-              </div>
-              <div class="popover-empty" *ngIf="getFilteredFlags(flagSearchQuery).length === 0">
-                No flags match "{{ flagSearchQuery }}"
-              </div>
-            </div>
-          </div>
-          <div class="dropdown-backdrop-transparent" *ngIf="showFlagDropdown" (click)="showFlagDropdown = false"></div>
-        </div>
+        <!-- 19 Nov 2026 (#21): Status and Flags dropdowns removed. Status filters via the legend chips; flags via the Filters panel. -->
 
       </div>
     </div>
@@ -601,9 +533,9 @@
   <!-- Status legend -->
   <div class="status-legend" *ngIf="!isLoading()">
     <div class="legend-items-list">
+      <span class="legend-slot" *ngFor="let tag of statusTags">
       <button
         type="button"
-        *ngFor="let tag of statusTags"
         class="legend-item"
         [class.active]="filterStatus === tag.value"
         [attr.data-status]="tag.value"
@@ -622,9 +554,27 @@
           <svg *ngIf="tag.icon === 'timer-off'" lucideTimerOff class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'map-pin'" lucideMapPin class="status-icon" [ngClass]="tag.iconClass"></svg>
           <svg *ngIf="tag.icon === 'route'" lucideRoute class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'car'" lucideCar class="status-icon" [ngClass]="tag.iconClass"></svg>
+          <svg *ngIf="tag.icon === 'users'" lucideUsers class="status-icon" [ngClass]="tag.iconClass"></svg>
         </div>
         <span class="legend-label">{{ tag.label }}</span>
       </button>
+      <!-- #27: open / close the state card -->
+      <button type="button" class="mco-card-toggle" *ngIf="tag.value === 'Missed Clock Out' && filterStatus === 'Missed Clock Out'"
+              [class.open]="missedCardOpen()" (click)="missedCardOpen.set(!missedCardOpen())"
+              [attr.aria-expanded]="missedCardOpen()" [title]="missedCardOpen() ? 'Hide state filter' : 'Show state filter'">
+        <svg lucideChevronDown [size]="15"></svg>
+        <span class="mco-toggle-badge" *ngIf="missedSub() !== 'ALL'"></span>
+      </button>
+      <!-- #27 (19 Nov 2026): state filter as a card pointing at the Missed Clock Out chip -->
+      <div class="mco-subfilter" *ngIf="tag.value === 'Missed Clock Out' && filterStatus === 'Missed Clock Out' && missedCardOpen()" role="group" aria-label="Missed clock-out state">
+        <div class="mco-sub-head"><span class="mco-sub-l">Missed clock-out state</span>
+          <button type="button" class="mco-sub-x" (click)="missedCardOpen.set(false)" aria-label="Hide">×</button></div>
+        <button type="button" *ngFor="let s of missedSubOptions" [class.on]="missedSub() === s.v" [ngClass]="'mco-chip-' + s.v" (click)="missedSub.set(s.v)">
+          <span class="mco-dot"></span>{{ s.label }} <b>{{ missedCounts()[s.v] }}</b>
+        </button>
+      </div>
+      </span>
     </div>
   </div>
   </div>
@@ -681,10 +631,13 @@
                    (mouseenter)="onCellMouseEnter($event, day)"
                    (mouseleave)="onCellMouseLeave()"
                    (click)="openDayDetails(row.employee, day, day.record)"
+                   [class.mco-bg-PENDING]="missedState(day.record) === 'PENDING'"
+                   [class.mco-bg-APPROVED]="missedState(day.record) === 'APPROVED'"
+                   [class.mco-bg-REJECTED]="missedState(day.record) === 'REJECTED'"
                    [ngClass]="{
-                     'bg-present': day.status === 'Present',
-                     'bg-half-day': day.status === 'Half Day',
-                     'bg-late': day.status === 'Late',
+                     'bg-present': day.status === 'Present' && !missedState(day.record),
+                     'bg-half-day': day.status === 'Half Day' && !missedState(day.record),
+                     'bg-late': day.status === 'Late' && !missedState(day.record),
                      'bg-absent': day.status === 'Absent',
                      'bg-meeting': day.status === 'On Meeting',
                      'bg-leave': day.status === 'On Leave',
@@ -695,15 +648,22 @@
                      'cell-highlighted': filterStatus && dayMatchesStatus(day)
                    }">
                 <ng-container *ngIf="day.status !== 'Empty'">
+                  <!-- #27 (19 Nov 2026): a missed clock-out replaces the cell icon, coloured by state -->
+                  <ng-container *ngIf="missedState(day.record) as ms">
+                    <svg lucideTimerOff class="status-icon mco-icon" [ngClass]="'mco-' + ms" [attr.title]="missedStateLabel(ms)"></svg>
+                    <svg *ngIf="ms === 'APPROVED'" lucideCheck class="mco-tick"></svg>
+                  </ng-container>
+                  <ng-container *ngIf="!missedState(day.record)">
                   <svg *ngIf="day.status === 'Present'" lucideCheck class="status-present status-icon"></svg>
                   <svg *ngIf="day.status === 'Half Day'" lucideStarHalf class="status-half-day status-icon"></svg>
                   <svg *ngIf="day.status === 'Late'" lucideAlertCircle class="status-late status-icon"></svg>
                   <svg *ngIf="day.status === 'Absent'" lucideX class="status-absent status-icon"></svg>
-                  <svg *ngIf="day.status === 'On Meeting'" lucideMapPin class="status-meeting status-icon"></svg>
+                  <svg *ngIf="day.status === 'On Meeting'" lucideUsers class="status-meeting status-icon"></svg>
                   <svg *ngIf="day.status === 'On Leave'" lucidePlane class="status-leave status-icon"></svg>
                   <svg *ngIf="day.status === 'Holiday'" lucideStar class="status-holiday status-icon"></svg>
                   <svg *ngIf="day.status === 'Day Off'" lucideCalendar class="status-day-off status-icon"></svg>
                   <svg *ngIf="day.status === 'Missed Clock Out'" lucideTimerOff class="status-clockoff-full status-icon" title="Clock-out approval pending"></svg>
+                  </ng-container>
                   <!-- Field Visit / Onsite badge (Top-Right) -->
                   <span *ngIf="isFieldVisit(day.record)" class="day-badge-corner day-badge-onsite" title="Field Visit / On-site">
                     <svg lucideCar class="day-badge-icon"></svg>
@@ -713,8 +673,7 @@
                   <span *ngIf="!isFieldVisit(day.record) && isOutsideOffice(day.record)" class="day-badge-corner day-badge-outside" title="Clocked outside office radius">
                     <svg lucideMapPin class="day-badge-icon"></svg>
                   </span>
-                  <svg *ngIf="showResolvedClockOutMarker(day.record)" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" title="Approved clock-out"></svg>
-                  <svg *ngIf="day.record && clockOutHalfDay(day.record)" lucideTimerOff class="day-corner-symbol day-missed-symbol status-clockoff" [attr.title]="'Half day — ' + clockOutHalfDayReason(day.record)"></svg>
+                  <!-- corner timer markers replaced by the full #27 icon -->
                 </ng-container>
                 <span *ngIf="day.isFuture && day.status === 'Empty'" class="future-dot">·</span>
               </div>
@@ -746,12 +705,15 @@
 
   <!-- Floating Custom Cell Tooltip (Never clipped by table overflow or boundaries) -->
   <div class="fixed-cell-tooltip"
+       role="tooltip"
        *ngIf="hoveredTooltip() as tip"
        [class.placement-top]="tip.placement === 'top'"
        [class.placement-bottom]="tip.placement === 'bottom'"
+       [class.has-shift]="!!$any(tip.day).shift"
        [style.top.px]="tip.top"
        [style.left.px]="tip.left">
     <div class="cell-tooltip-arrow" [style.left.px]="tip.arrowLeft"></div>
+
     <div class="cell-tooltip-header">
       <span class="cell-tooltip-status"
             [ngClass]="{
@@ -762,29 +724,70 @@
               'tip-leave': tip.day.status === 'On Leave',
               'tip-holiday': tip.day.status === 'Holiday',
               'tip-day-off': tip.day.status === 'Day Off'
-            }">{{ tip.day.status }}</span>
-      <span class="cell-tooltip-date">{{ tip.day.dayNumber }} {{ tip.day.weekdayStr }}</span>
+            }">
+        <span class="tip-status-dot" aria-hidden="true"></span>
+        <span>{{ tip.day.status }}</span>
+      </span>
+      <span class="cell-tooltip-date">
+        <svg lucideCalendar [size]="11" aria-hidden="true"></svg>
+        <span>{{ tip.day.dayNumber }} {{ tip.day.weekdayStr }}</span>
+      </span>
     </div>
-    <div class="cell-tooltip-body" *ngIf="tooltipTimeline(tip.day.record!).clockIn">
-      <div class="cell-tooltip-times">
-        <span class="cell-tooltip-time"><strong>In:</strong> {{ formatTime(tooltipTimeline(tip.day.record!).clockIn) }}</span>
-        <span class="cell-tooltip-time"><strong>Out:</strong> {{ tooltipTimeline(tip.day.record!).clockOut ? formatTime(tooltipTimeline(tip.day.record!).clockOut) : 'Not clocked out' }}</span>
+
+    <ng-container *ngIf="tip.day.record && tooltipTimeline(tip.day.record) as tl">
+      <div class="cell-tooltip-body" *ngIf="tl.clockIn">
+        <div class="cell-tip-punch-grid">
+          <div class="cell-tip-punch">
+            <span class="cell-tip-punch-label">
+              <span class="punch-dot in"></span>Clock In
+            </span>
+            <strong class="cell-tip-punch-val">{{ formatTime(tl.clockIn) }}</strong>
+          </div>
+          <div class="cell-tip-punch" [class.is-open]="!tl.clockOut">
+            <span class="cell-tip-punch-label">
+              <span class="punch-dot" [class.out]="tl.clockOut" [class.pending]="!tl.clockOut"></span>Clock Out
+            </span>
+            <strong class="cell-tip-punch-val" *ngIf="tl.clockOut">{{ formatTime(tl.clockOut) }}</strong>
+            <span class="cell-tip-open-val" *ngIf="!tl.clockOut">Not clocked out</span>
+          </div>
+        </div>
+
+        <div class="cell-tooltip-duration" *ngIf="tl.clockIn && tl.clockOut">
+          <span class="cell-tip-dur-label">
+            <svg lucideTimer [size]="12" aria-hidden="true"></svg>
+            <span>Duration</span>
+          </span>
+          <strong class="cell-tip-dur-val">{{ calculateWorkHours(tl.clockIn, tl.clockOut).text }}</strong>
+        </div>
+
+        <div class="cell-tooltip-missed" *ngIf="tip.day.record?.clockOutReason">
+          <svg lucideAlertTriangle [size]="12" aria-hidden="true"></svg>
+          <span><strong>Missed clock-out:</strong> "{{ tip.day.record?.clockOutReason }}"</span>
+        </div>
+
+        <div class="cell-tooltip-field-visit" *ngIf="tip.day.record?.fieldVisit as fv">
+          <div class="fv-tip-head">
+            <svg lucideCar [size]="12" class="fv-tip-svg" aria-hidden="true"></svg>
+            <strong>Field Visit</strong>
+            <span class="fv-tip-code">{{ fv.requestNumber || 'On-site' }}</span>
+          </div>
+          <div class="fv-tip-sub" *ngIf="fv.location">{{ fv.location }}</div>
+          <div class="fv-tip-time" *ngIf="fv.startTime && fv.endTime">Expected: {{ fv.startTime }} – {{ fv.endTime }}</div>
+        </div>
       </div>
-      <div class="cell-tooltip-detail" *ngIf="tooltipTimeline(tip.day.record!).clockIn && tooltipTimeline(tip.day.record!).clockOut">
-        <strong>Duration:</strong> {{ calculateWorkHours(tooltipTimeline(tip.day.record!).clockIn, tooltipTimeline(tip.day.record!).clockOut).text }}
-      </div>
-      <div class="cell-tooltip-detail cell-tooltip-missed" *ngIf="tip.day.record?.clockOutReason">
-        ⏱ Missed clock-out: "{{ tip.day.record?.clockOutReason }}"
-      </div>
-      <div class="cell-tooltip-field-visit" *ngIf="tip.day.record?.fieldVisit as fv">
-        <svg lucideCar [size]="12" class="fv-tip-svg"></svg>
-        <strong>Field Visit:</strong> {{ fv.requestNumber || 'On-site' }}
-        <div class="fv-tip-sub" *ngIf="fv.location">{{ fv.location }}</div>
-        <div class="fv-tip-time" *ngIf="fv.startTime && fv.endTime">Expected: {{ fv.startTime }} – {{ fv.endTime }}</div>
-      </div>
-    </div>
+    </ng-container>
+
     <div class="cell-tooltip-reason" *ngIf="tip.day.reason">
       {{ tip.day.reason }}
+    </div>
+
+    <div class="cell-tooltip-shift" *ngIf="$any(tip.day).shift as sh">
+      <span class="cell-tooltip-shift-left">
+        <span class="cell-tooltip-shift-dot" [style.background]="sh.color"></span>
+        <svg lucideClock [size]="13" aria-hidden="true" [style.color]="sh.color"></svg>
+        <span class="cell-tooltip-shift-text">{{ sh.text }}</span>
+      </span>
+      <span class="cell-tooltip-rostered" *ngIf="sh.rostered">Rostered</span>
     </div>
   </div>
 
@@ -892,7 +895,7 @@
               <div class="flags-group">
                 <span class="flag-badge field-visit-flag" *ngIf="r.fieldVisit || r.isOnsite"
                       [title]="r.fieldVisit ? ('Field Visit ' + (r.fieldVisit?.requestNumber || '') + ' at ' + (r.fieldVisit?.location || 'site') + (r.fieldVisit?.startTime ? ' (' + r.fieldVisit?.startTime + ' - ' + r.fieldVisit?.endTime + ')' : '')) : 'On-site Field Visit'">
-                  <svg lucideRoute [size]="11"></svg> Field Visit{{ r.fieldVisit?.requestNumber ? (': ' + r.fieldVisit?.requestNumber) : '' }}
+                  <svg lucideCar [size]="11"></svg> Field Visit{{ r.fieldVisit?.requestNumber ? (': ' + r.fieldVisit?.requestNumber) : '' }}
                 </span>
                 <span class="flag-badge late" *ngIf="r.isLate">
                   <svg lucideAlertTriangle [size]="11"></svg> Late
@@ -988,8 +991,31 @@
         </span>
       </div>
 
+      <!-- #27 (19 Nov 2026): missed clock-out state, reason, proof and approve / reject here -->
+      <div class="mco-panel" *ngIf="selectedDayDetails()?.durationRecord as rec">
+        <ng-container *ngIf="missedState(rec) as ms">
+          <div class="mco-head">
+            <span class="mco-pill" [ngClass]="'mco-' + ms">{{ missedStateLabel(ms) }}</span>
+            <span class="mco-sub" *ngIf="rec.clockOutApprovedAt">{{ ms === 'REJECTED' ? 'Rejected' : 'Approved' }} {{ rec.clockOutApprovedAt | date:'d MMM, h:mm a' }}</span>
+          </div>
+          <p class="mco-line" *ngIf="rec.clockOut"><b>Clock-out recorded:</b> {{ formatTime(rec.clockOut) }}<ng-container *ngIf="rec.autoClockedOut"> (closed automatically)</ng-container></p>
+          <p class="mco-line" *ngIf="rec.clockOutReason"><b>Reason:</b> “{{ rec.clockOutReason }}”</p>
+          <p class="mco-line" *ngIf="!rec.clockOutReason">No reason given yet: the person hasn't applied.</p>
+          <p class="mco-line" *ngIf="rec.clockOutReviewNote"><b>Reviewer note:</b> “{{ rec.clockOutReviewNote }}”</p>
+          <a class="mco-proof" *ngIf="rec.clockOutProofUrl" [href]="rec.clockOutProofUrl" target="_blank" rel="noopener">
+            <img *ngIf="isImageUrl(rec.clockOutProofUrl)" [src]="rec.clockOutProofUrl" alt="Proof">
+            <span>View proof</span>
+          </a>
+          <div class="mco-actions" *ngIf="canApproveClockOut() && ms !== 'APPROVED'">
+            <input type="text" class="mco-note" [(ngModel)]="mcoNote" placeholder="Note (required to reject)">
+            <button type="button" class="mco-btn reject" [disabled]="mcoBusy() || !mcoNote.trim()" (click)="reviewMissed(rec, 'REJECT')" *ngIf="ms !== 'REJECTED'">Reject</button>
+            <button type="button" class="mco-btn approve" [disabled]="mcoBusy()" (click)="reviewMissed(rec, 'APPROVE')">{{ mcoBusy() ? 'Saving…' : 'Approve · full day' }}</button>
+          </div>
+        </ng-container>
+      </div>
+
       <!-- Missed clock out: the day was left open and closed late with a reason -->
-      <div class="missed-clockout-note" *ngIf="selectedDayDetails()?.missedClockOutReason">
+      <div class="missed-clockout-note" *ngIf="selectedDayDetails()?.missedClockOutReason && !missedState(selectedDayDetails()?.durationRecord)">
         <svg lucideTimerOff [size]="15"></svg>
         <span>
           <span class="note-title">Missed clock out — closed late (reason recorded)</span>
@@ -1320,6 +1346,18 @@
           <span class="qdot"></span>
           <span>On Site</span>
           <b>{{ kpiBreakdown().onsite }}</b>
+        </button>
+
+        <button
+          type="button"
+          class="kpi-qchip field"
+          *ngIf="kpiBreakdown().field > 0"
+          [class.active]="kpiQuickFilter() === 'FIELD'"
+          (click)="setKpiQuickFilter('FIELD')"
+        >
+          <span class="qdot"></span>
+          <span>Field Visit</span>
+          <b>{{ kpiBreakdown().field }}</b>
         </button>
 
         <button

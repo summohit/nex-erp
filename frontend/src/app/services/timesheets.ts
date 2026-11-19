@@ -32,6 +32,18 @@ export interface TimesheetEntry {
   source: 'TIMER' | 'MANUAL';
   /** What the person was doing (§19). Null on rows written before the field. */
   note: string | null;
+  /** Where the line came from (19 Nov 2026): ticket, field visit or manual work. */
+  kind?: 'LOG' | 'TICKET' | 'FIELD_VISIT' | 'WORK' | string;
+  title?: string | null;
+  workId?: number | null;
+}
+
+/** Leave, holiday or weekly off on a timesheet day (19 Nov 2026). */
+export interface TimesheetOffDay {
+  type: 'HOLIDAY' | 'LEAVE' | 'LOP' | 'WEEK_OFF' | string;
+  label: string;
+  short?: string;
+  halfDay?: boolean;
 }
 
 export interface TimesheetDay {
@@ -61,6 +73,7 @@ export interface TimesheetDay {
   reviewedBy: { id: number; firstName: string; lastName: string } | null;
   reviewedAt: string | null;
   entries?: TimesheetEntry[];
+  offDay?: TimesheetOffDay | null;
 }
 
 export interface TimesheetWeek {
@@ -88,7 +101,7 @@ export interface OverviewRow {
     TimesheetDay,
     'date' | 'loginHours' | 'loggedHours' | 'unloggedHours' | 'manualHours'
     | 'timerHours' | 'status' | 'sessionOpen' | 'overLogged' | 'changedSinceSubmission'
-    | 'hasImplausibleEntry' | 'loggedWithoutLogin'
+    | 'hasImplausibleEntry' | 'loggedWithoutLogin' | 'offDay'
   >[];
   totals: {
     loginHours: number; loggedHours: number; unloggedHours: number;

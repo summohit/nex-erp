@@ -1,6 +1,6 @@
 import { countWorkingDays } from '../common/working-days';
 import { compOffUsedDays } from '../common/comp-off-used';
-import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { FieldVisitActivationService } from '../field-visits/requests/field-visit-activation.service';
@@ -1266,5 +1266,55 @@ export class LeavesService {
     const set = new Set<string>();
     holidays.forEach(h => set.add(h.date.toISOString().split('T')[0]));
     return set;
+  }
+
+  /**
+   * Leave details window context (#24b, 19 Nov 2026): balance before/after for
+   * that type, colleagues in the same department off on overlapping dates,
+   * who raised it, and the status history from the audit log. Read-only.
+   */
+  async getRequestContext(companyId: number, actor: { role: string; employeeId: number | null }, id: number) {
+    const r = await this.prisma.leaveRequest.findFirst({
+      where: { id, employee: { companyId } },
+      select: { id: true, employeeId: true, leaveTypeId: true, startDate: true, endDate: true, isHalfDay: true, status: true, createdAt: true, updatedAt: true,
+        rejectionReason: true,
+        employee: { select: { departmentId: true, managerId: true } },
+        leaveType: { select: { name: true, isPaid: true } },
+        raisedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true } } } },
+        approvedBy: { select: { email: true, employee: { select: { firstName: true, lastName: true } } } } },
+    });
+    if (!r) throw new NotFoundException('Leave request not found');
+    const isAdmin = ['SUPERADMIN', 'ADMIN', 'HR'].includes(actor.role);
+    if (!isAdmin && actor.employeeId !== r.employeeId && r.employee?.managerId !== actor.employeeId) {
+      throw new ForbiddenException('You cannot view this leave request.');
+    }
+    const days = r.isHalfDay ? 0.5 : Math.max(1, Math.round((r.endDate.getTime() - r.startDate.getTime()) / 86400000) + 1);
+    const year = r.startDate.getUTCFullYear();
+    const bal = await this.prisma.leaveBalance.findFirst({ where: { employeeId: r.employeeId, leaveTypeId: r.leaveTypeId, year }, select: { allocated: true, used: true } });
+    let balance: any = null;
+    if (bal && r.leaveType?.isPaid !== false) {
+      const remaining = Number(bal.allocated) - Number(bal.used);
+      // An approved leave is already inside `used`; a pending one is not yet.
+      const before = r.status === 'APPROVED' ? remaining + days : remaining;
+      const after = r.status === 'APPROVED' ? remaining : remaining - days;
+      balance = { type: r.leaveType?.name, allocated: Number(bal.allocated), before, after, days, counted: r.status === 'APPROVED' };
+    }
+    const teamOff = r.employee?.departmentId ? await this.prisma.leaveRequest.findMany({
+      where: { id: { not: r.id }, employeeId: { not: r.employeeId }, status: { in: ['APPROVED', 'PENDING'] }, deletedAt: null,
+        startDate: { lte: r.endDate }, endDate: { gte: r.startDate },
+        employee: { companyId, departmentId: r.employee.departmentId } },
+      select: { id: true, startDate: true, endDate: true, isHalfDay: true, status: true, leaveType: { select: { name: true } },
+        employee: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, designation: { select: { name: true } } } } },
+      orderBy: { startDate: 'asc' }, take: 12,
+    }) : [];
+    const name = (u: any) => u?.employee ? `${u.employee.firstName} ${u.employee.lastName ?? ''}`.trim() : u?.email ?? null;
+    const timeline: { label: string; at: Date | null; by: string | null; note?: string | null }[] = [
+      { label: r.raisedBy ? 'Applied on behalf' : 'Applied', at: r.createdAt, by: name(r.raisedBy) },
+    ];
+    if (r.status !== 'PENDING') {
+      timeline.push({ label: r.status === 'APPROVED' ? 'Approved' : r.status === 'REJECTED' ? 'Rejected' : 'Cancelled',
+        at: r.updatedAt, by: r.status === 'CANCELLED' ? null : name(r.approvedBy), note: r.status === 'REJECTED' ? r.rejectionReason : null });
+    }
+    return { days, balance, teamOff, raisedBy: name(r.raisedBy), timeline };
   }
 }

@@ -134,7 +134,7 @@ export class ShiftRemindersCron implements OnModuleInit, OnModuleDestroy {
       this.prisma.employee.findMany({
         // Suspended accounts are excluded the way leave accrual does it — there
         // is no `active` flag on Employee, the user's status is the authority.
-        where: { shiftId: { not: null }, user: { status: { not: 'SUSPENDED' } } },
+        where: { shiftId: { not: null }, isCompanyAccount: false, user: { status: { not: 'SUSPENDED' } } },
         select: { id: true },
       }),
       this.prisma.shiftRosterEntry.findMany({

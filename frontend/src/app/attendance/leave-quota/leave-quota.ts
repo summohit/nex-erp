@@ -2,12 +2,13 @@ import { ProfileModalService } from '../../shared/profile-modal/profile-modal.se
 import { Component, Input, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
 import { AgGridModule } from 'ag-grid-angular';
 import { ColDef, GridApi, GridReadyEvent, GridOptions, AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { HotToastService } from '@ngneat/hot-toast';
 import {
-  LucideDownload, LucideRefreshCw, LucideX,
+  LucideDownload, LucideRefreshCw, LucideX, LucidePlus,
   LucideTriangleAlert, LucideCalendarDays,
   LucideSearch, LucideClock, LucideCheckCircle2,
   LucideTrendingUp, LucidePieChart, LucideUsers,
@@ -29,7 +30,7 @@ export type QuickFilterType = 'ALL' | 'LOW_REMAINING' | 'HIGH_USED' | 'UNASSIGNE
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterModule, AgGridModule,
-    LucideDownload, LucideRefreshCw, LucideX, LucideTriangleAlert, LucideCalendarDays,
+    LucideDownload, LucideRefreshCw, LucideX, LucidePlus, LucideTriangleAlert, LucideCalendarDays,
     LucideSearch, LucideClock, LucideCheckCircle2, LucideTrendingUp, LucidePieChart,
     LucideUsers, LucideFilter, LucideChevronRight, LucideInfo, LucideFileText, LucideAlertCircle,
     LucideExternalLink, AttendanceFilterDrawerComponent, PageHeaderComponent,
@@ -40,6 +41,10 @@ export type QuickFilterType = 'ALL' | 'LOW_REMAINING' | 'HIGH_USED' | 'UNASSIGNE
 export class LeaveQuotaComponent implements OnInit {
   private leavesService = inject(LeavesService);
   private toast = inject(HotToastService);
+  private router = inject(Router);
+  private auth = inject(AuthService);
+  /** #29 (19 Nov 2026): Super Admin can manage a person's quota from here. */
+  get canManageQuota(): boolean { return this.auth.currentUser()?.role === 'SUPERADMIN'; }
   profileModal = inject(ProfileModalService);
 
   /** 17 Nov 2026: set inside an employee profile — shows only that person's breakdown. */
@@ -67,7 +72,17 @@ export class LeaveQuotaComponent implements OnInit {
     return [current, current - 1, current - 2, current - 3, current - 4, current + 1];
   });
 
+  private route = inject(ActivatedRoute);
+
+  /** #29: open Assign Leave Balance (Individual) from the report; closing comes back here. */
+  openAssignBalance() {
+    this.router.navigate(['/attendance/balances'], { queryParams: { assign: '', year: this.year(), from: 'leave-quota' } });
+  }
+
   ngOnInit() {
+    // Back from Manage (#29): keep the year that was being viewed.
+    const yr = Number(this.route.snapshot.queryParamMap.get('year'));
+    if (yr > 2000) this.year.set(yr);
     this.load();
   }
 
@@ -426,19 +441,32 @@ export class LeaveQuotaComponent implements OnInit {
     },
     {
       headerName: 'Action',
-      width: 90,
+      width: 120,
       flex: 0,
       sortable: false,
       cellRenderer: () => `
         <div class="lq-action-cell">
-          <button class="lq-btn-icon" type="button" title="View leave breakdown" aria-label="View leave breakdown">
+          <button class="lq-btn-icon" data-act="view" type="button" title="View leave breakdown" aria-label="View leave breakdown">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
               <circle cx="12" cy="12" r="3"/>
             </svg>
           </button>
+          ${this.canManageQuota ? `<button class="lq-btn-icon" data-act="manage" type="button" title="Manage leave quota" aria-label="Manage leave quota">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+            </svg>
+          </button>` : ''}
         </div>`,
-      onCellClicked: (p: any) => this.openDetail(p.data),
+      onCellClicked: (p: any) => {
+        const act = (p.event?.target as HTMLElement)?.closest?.('[data-act]')?.getAttribute('data-act');
+        if (act === 'manage' && this.canManageQuota) {
+          const id = p.data?.employee?.id ?? p.data?.employeeId;
+          this.router.navigate(['/attendance/balances'], { queryParams: { assign: id, year: this.year(), from: 'leave-quota' } });
+          return;
+        }
+        this.openDetail(p.data);
+      },
     },
   ];
 

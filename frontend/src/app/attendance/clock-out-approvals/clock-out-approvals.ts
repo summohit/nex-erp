@@ -119,12 +119,28 @@ export class ClockOutApprovalsComponent implements OnInit {
   historyType = signal('ALL');
   historyOutcome = signal('ALL');
   historyPage = signal(1);
+  /** #25c (19 Nov 2026): which punch was outside the office. */
+  historyPunch = signal<'ALL' | 'IN' | 'OUT'>('ALL');
+  historyPunchCount(p: 'IN' | 'OUT'): number {
+    return this.historyRows().filter(r => r.type === 'GEO' && (p === 'IN' ? r.clockInOutside : r.clockOutOutside)).length;
+  }
+  /** History KPI cards filter the table (19 Nov 2026); clicking the active one clears it. */
+  pickHistoryKpi(k: 'ALL' | 'APPROVED' | 'REJECTED' | 'GEO' | 'LATE') {
+    if (k === 'ALL') { this.historyType.set('ALL'); this.historyOutcome.set('ALL'); }
+    else if (k === 'APPROVED' || k === 'REJECTED') this.historyOutcome.set(this.historyOutcome() === k ? 'ALL' : k);
+    else this.historyType.set(this.historyType() === k ? 'ALL' : k);
+    this.historyPage.set(1);
+  }
+  historyInitials(e: any): string { return `${e?.firstName?.[0] ?? ''}${e?.lastName?.[0] ?? ''}`.toUpperCase() || '?'; }
   historyFiltered = computed(() => {
     const q = this.historySearch().trim().toLowerCase();
     const from = this.geoFrom(), to = this.geoTo();
     return this.historyRows().filter(r => {
       const day = String(r.date).slice(0, 10);
       const name = `${r.employee?.firstName || ''} ${r.employee?.lastName || ''} ${r.employee?.employeeCode || ''} ${r.reviewer?.firstName || ''} ${r.reviewer?.lastName || ''}`.toLowerCase();
+      const p = this.historyPunch();
+      if (p === 'IN' && !r.clockInOutside) return false;
+      if (p === 'OUT' && !r.clockOutOutside) return false;
       return (!q || name.includes(q)) && (this.historyType() === 'ALL' || r.type === this.historyType()) &&
         (this.historyOutcome() === 'ALL' || r.outcome === this.historyOutcome()) && (!from || day >= from) && (!to || day <= to);
     });

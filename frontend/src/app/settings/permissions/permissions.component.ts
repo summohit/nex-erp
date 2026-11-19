@@ -128,7 +128,7 @@ export class PermissionsComponent implements OnInit {
       ]
     },
     {
-      id: 'assets', title: 'Assets & IT', isExpanded: true, enabled: false,
+      id: 'assets', title: 'Assets & Inventory', isExpanded: true, enabled: false,
       subItems: [
         { id: 'assets/inventory', title: 'Asset Inventory', enabled: false },
         { id: 'assets/assignments', title: 'Assignments', enabled: false },

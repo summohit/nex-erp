@@ -104,6 +104,7 @@ export class LeaveAccrualCron implements OnModuleInit, OnModuleDestroy {
           leaveTypeId: type.id,
           year,
           locked: false, // "Cannot edit" balances are fixed by hand (19 Nov 2026)
+          employee: { isCompanyAccount: false }, // shared company logins accrue nothing
           OR: [{ lastAccruedPeriod: null }, { lastAccruedPeriod: { not: period } }],
         },
         data: {
@@ -144,7 +145,7 @@ export class LeaveAccrualCron implements OnModuleInit, OnModuleDestroy {
     const employees = await this.prisma.employee.findMany({
       // People still on probation get no leave; theirs is credited pro-rata
       // when probation is confirmed (LifecycleService.confirmProbation).
-      where: { user: { status: { not: 'SUSPENDED' } }, NOT: { probationEndDate: { not: null }, probationConfirmedAt: null } },
+      where: { isCompanyAccount: false, user: { status: { not: 'SUSPENDED' } }, NOT: { probationEndDate: { not: null }, probationConfirmedAt: null } },
       select: { id: true, companyId: true },
     });
     if (!employees.length) return 0;

@@ -92,6 +92,12 @@ export class LeavesController {
     return this.leavesService.getEmployeeRequests(req.user.companyId, { role: req.user.role, employeeId: req.user.employeeId ?? null }, employeeId);
   }
 
+  /** Extra context for the leave details window (#24b, 19 Nov 2026). Read-only. */
+  @Get('requests/:id/context')
+  getRequestContext(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.leavesService.getRequestContext(req.user.companyId, { role: req.user.role, employeeId: req.user.employeeId ?? null }, id);
+  }
+
   @Get('requests/managers')
   getManagerRequests(@Request() req) {
     return this.leavesService.getManagerRequests(req.user.sub);

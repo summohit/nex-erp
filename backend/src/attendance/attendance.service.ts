@@ -93,12 +93,13 @@ export class AttendanceService {
     if (end.getTime() - start.getTime() > 400 * 86400000) throw new BadRequestException('Ask for at most about a year at a time');
     const rows = await this.prisma.shiftRosterEntry.findMany({
       where: { companyId, date: { gte: start, lte: end }, ...(employeeId != null ? { employeeId } : {}) },
-      select: { employeeId: true, date: true, isDayOff: true, onsiteApprovalStatus: true },
+      select: { employeeId: true, date: true, isDayOff: true, onsiteApprovalStatus: true, shift: { select: { name: true, startTime: true, endTime: true, colorCode: true } } },
     });
     // An unapproved on-site request decides nothing, as in isRestDay.
     return rows
       .filter((r) => r.isDayOff || r.onsiteApprovalStatus !== 'PENDING')
-      .map((r) => ({ employeeId: r.employeeId, date: r.date.toISOString().slice(0, 10), isDayOff: r.isDayOff }));
+      .map((r) => ({ employeeId: r.employeeId, date: r.date.toISOString().slice(0, 10), isDayOff: r.isDayOff,
+        shift: r.shift ? { name: r.shift.name, startTime: r.shift.startTime, endTime: r.shift.endTime, colorCode: r.shift.colorCode } : null }));
   }
 
   /**
@@ -137,7 +138,12 @@ export class AttendanceService {
       },
       select: { id: true },
     });
-    if (!onVisit) return;
+    // #28 (19 Nov 2026): working an optional holiday also earns 1 day.
+    const optionalHoliday = holiday ? await this.prisma.holiday.findFirst({
+      where: { companyId: attendance.employee.companyId, isOptional: true, date: { gte: date, lt: new Date(date.getTime() + 86400000) } },
+      select: { id: true },
+    }) : null;
+    if (!onVisit && !optionalHoliday) return;
 
     const companyId = attendance.employee.companyId;
     const year = date.getUTCFullYear();
@@ -246,9 +252,10 @@ export class AttendanceService {
       if (leave) return `On leave: ${leave.leaveType?.name || 'approved leave'}`;
     }
     const holiday = await this.prisma.holiday.findFirst({
-      where: { companyId, date: { gte: day, lt: end } }, select: { name: true },
+      where: { companyId, date: { gte: day, lt: end } }, select: { name: true, isOptional: true },
     });
-    if (holiday) return `Holiday: ${holiday.name || "company holiday"}`;
+    // An optional holiday (#28) is open: people may come in and earn comp-off.
+    if (holiday && !holiday.isOptional) return `Holiday: ${holiday.name || "company holiday"}`;
     if (effective.isDayOff) return effective.source === 'ROSTER' ? 'Rostered day off' : 'Weekly off';
     return null;
   }
@@ -1219,7 +1226,7 @@ export class AttendanceService {
     const tomorrow = new Date(today.getTime() + 86400000);
 
     const people = await this.prisma.employee.findMany({
-      where: { companyId, user: { status: { not: 'SUSPENDED' } }, ...(opts.departmentId ? { departmentId: opts.departmentId } : {}) },
+      where: { companyId, isCompanyAccount: false, user: { status: { not: 'SUSPENDED' } }, ...(opts.departmentId ? { departmentId: opts.departmentId } : {}) },
       select: {
         id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true,
         department: { select: { name: true } }, designation: { select: { name: true } },
@@ -1433,6 +1440,26 @@ export class AttendanceService {
             project: visit.project ? `${visit.project.name} (${visit.project.key})` : null } : null,
         };
       });
+      // #26 (19 Nov 2026): which approved comp-off leave used each credit.
+      // Leave is not linked to a credit, so match oldest credit first (FIFO).
+      const myLeaves = usedLeaves.filter((l) => l.employeeId === p.id)
+        .map((l) => ({ id: l.id, from: day(l.startDate), to: day(l.endDate), left: l.isHalfDay ? 0.5
+          : Math.max(1, Math.round((l.endDate.getTime() - l.startDate.getTime()) / 86400000) + 1) }))
+        .sort((a, b2) => a.from.localeCompare(b2.from));
+      for (const c of [...mine].sort((a, b2) => String(a.date).localeCompare(String(b2.date)))) {
+        let need = c.days || 0;
+        const usedBy: { id: number; from: string; to: string }[] = [];
+        for (const l of myLeaves) {
+          if (need <= 0) break;
+          if (l.left <= 0 || (c.date && l.to < c.date)) continue;
+          const take = Math.min(need, l.left);
+          l.left -= take; need -= take;
+          usedBy.push({ id: l.id, from: l.from, to: l.to });
+        }
+        (c as any).usedBy = usedBy;
+        (c as any).status = need <= 0 ? 'USED' : usedBy.length ? 'PARTLY_USED' : 'AVAILABLE';
+        (c as any).source = c.fieldVisit ? 'FIELD_VISIT' : /holiday/i.test(c.reason) ? 'HOLIDAY' : 'WEEK_OFF';
+      }
       const allocated = b?.allocated ?? earned;
       const used = compOffUsed.get(`${p.id}:${leaveType.id}`) ?? 0;
       return {
@@ -1462,9 +1489,10 @@ export class AttendanceService {
       select: {
         id: true, date: true, clockOutApproval: true, clockOutApprovedAt: true, clockOutReviewNote: true,
         geofenceApproval: true, geofenceReviewedAt: true, geofenceReviewNote: true,
-        employee: { select: { firstName: true, lastName: true, employeeCode: true, department: { select: { name: true } } } },
-        clockOutApprovedBy: { select: { firstName: true, lastName: true } },
-        geofenceReviewedBy: { select: { firstName: true, lastName: true } },
+        clockInOutside: true, clockOutOutside: true, // #25 (19 Nov 2026): IN / OUT badge
+        employee: { select: { firstName: true, lastName: true, employeeCode: true, avatarUrl: true, department: { select: { name: true } } } },
+        clockOutApprovedBy: { select: { firstName: true, lastName: true, avatarUrl: true } },
+        geofenceReviewedBy: { select: { firstName: true, lastName: true, avatarUrl: true } },
       },
     });
     const history: any[] = [];
@@ -1476,6 +1504,7 @@ export class AttendanceService {
       if (canGeo && ['APPROVED', 'REJECTED'].includes(row.geofenceApproval ?? '')) history.push({
         id: row.id, type: 'GEO', date: row.date, employee: row.employee, outcome: row.geofenceApproval,
         decidedAt: row.geofenceReviewedAt, reviewer: row.geofenceReviewedBy, note: row.geofenceReviewNote,
+        clockInOutside: !!row.clockInOutside, clockOutOutside: !!row.clockOutOutside,
       });
     }
     return history.sort ( (a, b) => (b.decidedAt?.getTime() ?? 0) - (a.decidedAt?.getTime() ?? 0));
@@ -1512,7 +1541,7 @@ export class AttendanceService {
             department: { select: { id: true, name: true } },
           },
         },
-        shift: { select: { id: true, name: true, startTime: true, endTime: true } },
+        shift: { select: { id: true, name: true, startTime: true, endTime: true, colorCode: true } },
         project: { select: { id: true, name: true, key: true } },
       },
       orderBy: { date: 'asc' },
@@ -1693,7 +1722,7 @@ export class AttendanceService {
             department: { select: { id: true, name: true } },
           },
         },
-        shift: { select: { id: true, name: true, startTime: true, endTime: true } },
+        shift: { select: { id: true, name: true, startTime: true, endTime: true, colorCode: true } },
       },
       orderBy: { date: 'asc' },
     });
@@ -2102,7 +2131,7 @@ export class AttendanceService {
     }
 
     const employees = await this.prisma.employee.findMany({
-      where: { companyId, user: { status: { not: 'SUSPENDED' } } },
+      where: { companyId, isCompanyAccount: false, user: { status: { not: 'SUSPENDED' } } },
       include: {
         department: true,
         designation: true,
@@ -2285,7 +2314,7 @@ export class AttendanceService {
             department: { select: { id: true, name: true } },
             designation: { select: { id: true, name: true } },
             user: { select: { email: true, role: true } },
-            shift: { select: { id: true, name: true, startTime: true, endTime: true, workingDays: true } },
+            shift: { select: { id: true, name: true, startTime: true, endTime: true, workingDays: true, colorCode: true } },
             branch: { select: { weeklyOffs: true } },
             weeklyOffs: true,
           },
@@ -2318,7 +2347,7 @@ export class AttendanceService {
         department: { select: { id: true, name: true } },
         designation: { select: { id: true, name: true } },
         user: { select: { email: true, role: true } },
-        shift: { select: { id: true, name: true, workingDays: true } },
+        shift: { select: { id: true, name: true, workingDays: true, startTime: true, endTime: true, colorCode: true } },
         branch: { select: { weeklyOffs: true } },
         weeklyOffs: true,
       } as const;

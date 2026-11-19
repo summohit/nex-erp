@@ -248,26 +248,26 @@
 
   <!-- Attendance corrections waiting on HR / admin -->
   <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() === 'regularizations' && isAdmin()">
-    <!-- Filter card: same as Leave Applications -->
-    <div class="leave-list-toolbar">
+    <!-- Filter card: unified with Leave Applications -->
+    <div class="leave-list-toolbar lv-clean-toolbar">
       <div class="leave-search-filter-wrap">
-        <label class="leave-application-search">
+        <label class="leave-application-search lv-main-search">
           <svg lucideSearch [size]="16" aria-hidden="true"></svg>
-          <input type="search" aria-label="Search regularizations" placeholder="Search employee, date, reason..."
+          <input type="search" aria-label="Search regularizations" placeholder="Search employee, date, or reason..."
                  [ngModel]="regularizationSearch()" (ngModelChange)="regularizationSearch.set($event)">
           <button type="button" *ngIf="regularizationSearch()" aria-label="Clear search" (click)="regularizationSearch.set('')">×</button>
         </label>
         <app-searchable-select class="lv-status-select"
           [options]="regStatusOptions"
-          placeholder="All statuses"
-          [clearable]="true"
-          [value]="regularizationStatusFilter() === 'ALL' ? null : regularizationStatusFilter()"
+          placeholder="All"
+          [clearable]="false"
+          [value]="regularizationStatusFilter()"
           (valueChange)="setRegularizationStatusFilter($event || 'ALL')">
         </app-searchable-select>
         <button type="button" class="clear-all-filters" *ngIf="regularizationSearch() || regularizationStatusFilter() !== 'ALL'"
                 (click)="regularizationSearch.set(''); setRegularizationStatusFilter('ALL')">Clear all</button>
         <span class="lv-spacer"></span>
-        <span class="tl-count">Showing {{ filteredPendingRegularizations().length }} of {{ allRegularizations().length }}</span>
+        <span class="tl-count lv-count-right">Showing <strong>{{ filteredPendingRegularizations().length }}</strong> of {{ allRegularizations().length }}</span>
         <button type="button" class="btn btn-outline reg-btn" (click)="exportPendingRegularizationsCsv()" [disabled]="allRegularizations().length === 0" title="Export list to CSV">
           <svg lucideDownload [size]="15"></svg><span>Export</span>
         </button>
@@ -278,25 +278,29 @@
     </div>
 
     <!-- Main Regularizations Table Card -->
-    <div class="widget-card reg-table-card">
-      <div class="widget-header reg-table-header">
-        <div class="reg-title-wrap">
-          <div class="reg-title-row">
-            <h3 class="reg-title">
-              {{ regularizationStatusFilter() === 'ALL' ? 'Regularization History' : (regularizationStatusFilter() === 'PENDING' ? 'Pending Regularizations' : (regularizationStatusFilter() === 'APPROVED' ? 'Approved Regularizations' : 'Rejected Regularizations')) }}
-            </h3>
-            <span class="reg-count-pill" *ngIf="regularizationStatusFilter() === 'PENDING' && pendingRegularizations().length > 0">
-              {{ pendingRegularizations().length }} pending
-            </span>
-            <span class="reg-count-pill neutral" *ngIf="regularizationStatusFilter() !== 'PENDING'">
-              {{ filteredPendingRegularizations().length }} records
-            </span>
+    <div class="widget-card reg-table-card lv-applications-card">
+      <div class="widget-header reg-table-header lv-app-header">
+        <div class="lv-app-header-left">
+          <div class="lv-app-icon" aria-hidden="true">
+            <svg lucideClock [size]="18"></svg>
           </div>
-          <p class="reg-subtitle">
-            Attendance corrections raised by employees. Approving one corrects the shift log automatically and credits comp-off if applicable.
-          </p>
+          <div class="reg-title-wrap">
+            <div class="reg-title-row">
+              <h3 class="reg-title">
+                {{ regularizationStatusFilter() === 'ALL' ? 'Regularization History' : (regularizationStatusFilter() === 'PENDING' ? 'Pending Regularizations' : (regularizationStatusFilter() === 'APPROVED' ? 'Approved Regularizations' : 'Rejected Regularizations')) }}
+              </h3>
+              <span class="reg-count-pill" *ngIf="regularizationStatusFilter() === 'PENDING' && pendingRegularizations().length > 0">
+                {{ pendingRegularizations().length }} pending
+              </span>
+              <span class="reg-count-pill neutral" *ngIf="regularizationStatusFilter() !== 'PENDING'">
+                {{ filteredPendingRegularizations().length }} records
+              </span>
+            </div>
+            <p class="reg-subtitle">
+              Attendance corrections raised by employees. Approving one corrects the shift log automatically and credits comp-off if applicable.
+            </p>
+          </div>
         </div>
-
       </div>
 
       <!-- Bulk actions: Pending regularizations only -->
@@ -307,11 +311,12 @@
         <button type="button" class="lv-bulk-btn ghost" (click)="clearRegSelection()">Clear</button>
       </div>
 
-      <div class="table-container mt-3">
+      <div class="table-container lv-grid-wrap mt-3">
         <ag-grid-angular
-          class="ag-theme-quartz"
+          class="ag-theme-quartz lv-requests-grid"
           [theme]="'legacy'"
-          style="width: 100%; height: 560px;"
+          style="width: 100%;"
+          [domLayout]="'autoHeight'"
           [rowData]="filteredPendingRegularizations()"
           [columnDefs]="hrRegularizationColDefs"
           [rowSelection]="regRowSelection"
@@ -319,8 +324,8 @@
           (gridReady)="regGridApi = $event.api"
           (selectionChanged)="onRegSelectionChanged($event)"
           [defaultColDef]="defaultColDef"
-          [rowHeight]="64"
-          [headerHeight]="48"
+          [rowHeight]="72"
+          [headerHeight]="44"
           [pagination]="true"
           [paginationPageSize]="20"
           [paginationPageSizeSelector]="leavePageSizes"
@@ -334,29 +339,33 @@
 
   <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() !== 'balances' && leaveSection() !== 'regularizations'">
     <!-- Executive KPI Metric Cards -->
-    <div class="leave-list-toolbar">
+    <div class="leave-list-toolbar lv-clean-toolbar">
       <div class="leave-search-filter-wrap">
-        <label class="leave-application-search" *ngIf="!profileEmployeeId">
+        <label class="leave-application-search lv-main-search" *ngIf="!profileEmployeeId">
           <svg lucideSearch [size]="16" aria-hidden="true"></svg>
           <input
             type="search"
             aria-label="Search leave applications"
-            placeholder="Search employee, date, duration, status, leave type..."
+            placeholder="Search employee, ID, date, or leave type..."
             [ngModel]="leaveApplicationsSearch()"
             (ngModelChange)="leaveApplicationsSearch.set($event)">
           <button type="button" *ngIf="leaveApplicationsSearch()" aria-label="Clear search"
                   (click)="leaveApplicationsSearch.set('')">×</button>
         </label>
 
-        <app-searchable-select *ngIf="isAdmin() || profileEmployeeId" class="lv-status-select"
+        <app-searchable-select *ngIf="profileEmployeeId" class="lv-status-select"
           [options]="leaveStatusOptions"
-          placeholder="All statuses"
-          [clearable]="true"
-          [value]="approvalStatusFilter() === 'ALL' ? null : approvalStatusFilter()"
+          placeholder="All"
+          [clearable]="false"
+          [value]="approvalStatusFilter()"
           (valueChange)="setApprovalFilter($event || 'ALL')">
         </app-searchable-select>
 
         <app-date-preset-filter label="Leave date" [preset]="leaveDatePreset" (presetChange)="leaveDatePreset = $event" (rangeChange)="onLeaveDateRange($event)"></app-date-preset-filter>
+
+        <button type="button" class="lv-urg-chip emergency" [class.on]="urgencyFilter() === 'EMERGENCY'" (click)="toggleUrgency('EMERGENCY')"
+                title="Leave applied on the same day it starts">
+          Emergency <b>{{ emergencyLeaveCount() }}</b></button>
 
         <button type="button" class="btn btn-outline leave-filter-btn" (click)="openLeaveFilters()" title="Advanced filters">
           <svg lucideFilter [size]="15"></svg>
@@ -364,17 +373,40 @@
           <span class="leave-filter-active-dot" *ngIf="hasActiveLeaveFilters()" aria-label="Filters active"></span>
         </button>
         <button type="button" class="clear-all-filters" *ngIf="hasActiveLeaveFilters()" (click)="clearAllLeaveFilters()">Clear all</button>
-        <span class="tl-count lv-count-right" *ngIf="leaveViewMode() !== 'employee'">Showing {{ filteredLeaveApplications().length }} of {{ totalLeaveCount() }}</span>
+        <span class="tl-count lv-count-right" *ngIf="leaveViewMode() !== 'employee'">Showing <strong>{{ filteredLeaveApplications().length }}</strong> of {{ totalLeaveCount() }}</span>
       </div>
 
     </div>
 
+      <!-- #24d (19 Nov 2026): KPI cards; follow every filter except status, click to filter -->
+      <div class="lv-kpis" *ngIf="leaveViewMode() !== 'employee'">
+        <button type="button" class="lv-kpi" [class.on]="approvalStatusFilter() === 'ALL' && urgencyFilter() === 'ALL'" (click)="pickLeaveKpi('ALL')">
+          <span class="lv-kpi-l">Total</span><b>{{ leaveKpis().total }}</b><small>applications</small></button>
+        <button type="button" class="lv-kpi pending" [class.on]="approvalStatusFilter() === 'PENDING' && urgencyFilter() === 'ALL'" (click)="pickLeaveKpi('PENDING')">
+          <span class="lv-kpi-l">Pending</span><b>{{ leaveKpis().PENDING }}</b><small>need action</small></button>
+        <button type="button" class="lv-kpi approved" [class.on]="approvalStatusFilter() === 'APPROVED' && urgencyFilter() === 'ALL'" (click)="pickLeaveKpi('APPROVED')">
+          <span class="lv-kpi-l">Approved</span><b>{{ leaveKpis().APPROVED }}</b><small>{{ leaveKpis().days }} days</small></button>
+        <button type="button" class="lv-kpi rejected" [class.on]="approvalStatusFilter() === 'REJECTED'" (click)="pickLeaveKpi('REJECTED')">
+          <span class="lv-kpi-l">Rejected</span><b>{{ leaveKpis().REJECTED }}</b><small>declined</small></button>
+        <button type="button" class="lv-kpi cancelled" [class.on]="approvalStatusFilter() === 'CANCELLED'" (click)="pickLeaveKpi('CANCELLED')">
+          <span class="lv-kpi-l">Cancelled</span><b>{{ leaveKpis().CANCELLED }}</b><small>withdrawn</small></button>
+        <button type="button" class="lv-kpi emergency" [class.on]="urgencyFilter() === 'EMERGENCY'" (click)="pickLeaveKpi('EMERGENCY')">
+          <span class="lv-kpi-l">Emergency</span><b>{{ leaveKpis().emergency }}</b><small>same-day</small></button>
+      </div>
+
       <!-- Leave Requests -->
-      <div class="widget-card">
-        <div class="widget-header">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #0f172a;">{{ leaveViewMode() === 'employee' ? 'My Leaves' : 'Leave Applications' }}</h3>
-            <span class="leave-count-pill" *ngIf="isAdmin() && leaveViewMode() !== 'employee'">{{ filteredLeaveApplications().length }} applications</span>
+      <div class="widget-card lv-applications-card">
+        <div class="widget-header lv-app-header">
+          <div class="lv-app-header-left">
+            <div class="lv-app-icon" aria-hidden="true">
+              <svg lucideCalendar [size]="18"></svg>
+            </div>
+            <div class="lv-app-title-group">
+              <h3>{{ leaveViewMode() === 'employee' ? 'My Leaves' : 'Leave Applications' }}</h3>
+              <span class="leave-count-pill" *ngIf="isAdmin() && leaveViewMode() !== 'employee'">
+                {{ filteredLeaveApplications().length }} {{ filteredLeaveApplications().length === 1 ? 'application' : 'applications' }}
+              </span>
+            </div>
           </div>
         </div>
         <!-- Skeleton Loader for Leave Requests -->
@@ -408,17 +440,17 @@
         </div>
 
         <!-- Actual Table -->
-        <div class="table-container mt-4" *ngIf="!isLoadingLeaveApplications() && leaveViewMode() === 'list'">
+        <div class="table-container lv-grid-wrap mt-3" *ngIf="!isLoadingLeaveApplications() && leaveViewMode() === 'list'">
           <ag-grid-angular
-            class="ag-theme-quartz"
+            class="ag-theme-quartz lv-requests-grid"
             [theme]="'legacy'"
             style="width: 100%;"
             [domLayout]="'autoHeight'"
             [rowData]="filteredLeaveApplications()"
             [columnDefs]="isAdmin() || isManager() || managerRequests().length > 0 ? hrRequestsColDefs : leaveColDefs"
             [defaultColDef]="defaultColDef"
-            [rowHeight]="64"
-            [headerHeight]="48"
+            [rowHeight]="62"
+            [headerHeight]="44"
             [rowClassRules]="rowClassRules"
             [pagination]="true"
             [paginationPageSize]="20"
@@ -1002,7 +1034,7 @@
     </div>
   </div>
 
-  <!-- LEAVE DETAIL MODAL (redesigned 12 Nov) -->
+  <!-- LEAVE DETAIL MODAL (compact enhanced) -->
   <div class="lr-overlay" *ngIf="isLeaveDetailOpen()" (click)="closeLeaveDetail()">
     <div class="lr-dialog" role="dialog" aria-modal="true" aria-labelledby="lr-title" (click)="$event.stopPropagation()" *ngIf="selectedLeave() as leave">
       <header class="lr-head">
@@ -1010,43 +1042,113 @@
         <div class="lr-who">
           <div class="lr-name-row">
             <h3 id="lr-title">{{ leaveEmployeeName(leave) }}</h3>
-            <span *ngIf="leave.employee?.employeeCode" class="lr-code">#{{ leave.employee.employeeCode }}</span>
+            <span *ngIf="leaveUrgency(leave) === 'EMERGENCY'" class="lr-tag emergency" title="Applied on the same day the leave starts">Emergency</span>
+            <span *ngIf="leaveContext()?.raisedBy" class="lr-tag raised" [title]="'Applied by ' + leaveContext()?.raisedBy">Raised by {{ leaveContext()?.raisedBy }}</span>
           </div>
-          <p>
-            <span *ngIf="leave.employee?.designation?.name">{{ leave.employee.designation.name }}</span>
-            <span *ngIf="leave.employee?.designation?.name && leave.employee?.department?.name"> · </span>
+          <div class="lr-meta-inline">
             <span *ngIf="leave.employee?.department?.name">{{ leave.employee.department.name }}</span>
-          </p>
-          <a *ngIf="leaveEmployeeEmail(leave)" class="lr-mail" [href]="'mailto:' + leaveEmployeeEmail(leave)">{{ leaveEmployeeEmail(leave) }}</a>
+            <span class="lr-meta-sep" *ngIf="leave.employee?.department?.name && leaveEmployeeEmail(leave)">·</span>
+            <a *ngIf="leaveEmployeeEmail(leave)" class="lr-mail" [href]="'mailto:' + leaveEmployeeEmail(leave)">{{ leaveEmployeeEmail(leave) }}</a>
+          </div>
         </div>
-        <button type="button" class="lr-close" (click)="closeLeaveDetail()" aria-label="Close"><svg lucideX size="18"></svg></button>
+        <button type="button" class="lr-close" (click)="closeLeaveDetail()" aria-label="Close"><svg lucideX size="17"></svg></button>
       </header>
 
       <div class="lr-body">
         <section class="lr-summary">
           <div class="lr-summary-main">
-            <span class="lr-status" [ngClass]="'s-' + (leave.status || '').toLowerCase()">{{ leave.status | titlecase }}</span>
-            <div class="lr-type">{{ leave.leaveType?.name || 'Leave' }} <span class="lr-paid" [class.unpaid]="leave.leaveType?.isPaid === false">{{ leave.leaveType?.isPaid === false ? 'Unpaid' : 'Paid' }}</span></div>
+            <div class="lr-type-top">
+              <span class="lr-status" [ngClass]="'s-' + (leave.status || '').toLowerCase()">
+                <span class="lr-status-dot" aria-hidden="true"></span>
+                {{ leave.status | titlecase }}
+              </span>
+              <span class="lr-type-label">{{ leave.leaveType?.name || 'Leave' }}</span>
+              <span class="lr-paid" [class.unpaid]="leave.leaveType?.isPaid === false">{{ leave.leaveType?.isPaid === false ? 'Unpaid' : 'Paid' }}</span>
+            </div>
             <div class="lr-dates">
-              {{ leave.startDate | date: 'EEE, d MMM y' }}
-              <ng-container *ngIf="(leave.endDate | date:'yMd') !== (leave.startDate | date:'yMd')"> → {{ leave.endDate | date: 'EEE, d MMM y' }}</ng-container>
+              <svg lucideCalendar [size]="13" aria-hidden="true"></svg>
+              <span>
+                {{ leave.startDate | date: 'EEE, d MMM y' }}
+                <ng-container *ngIf="(leave.endDate | date:'yMd') !== (leave.startDate | date:'yMd')"> → {{ leave.endDate | date: 'EEE, d MMM y' }}</ng-container>
+              </span>
             </div>
           </div>
           <div class="lr-duration">
             <strong>{{ leaveDuration(leave) }}</strong>
-            <span>day{{ leaveDuration(leave) === 1 ? '' : 's' }}<ng-container *ngIf="leave.isHalfDay"> · Half ({{ leave.halfDayPeriod || 'AM' }})</ng-container></span>
+            <span>day{{ leaveDuration(leave) === 1 ? '' : 's' }}<ng-container *ngIf="leave.isHalfDay"> · {{ leave.halfDayPeriod || 'AM' }}</ng-container></span>
           </div>
         </section>
 
-        <dl class="lr-list">
-          <div><dt>Applied on</dt><dd>{{ leave.createdAt ? (leave.createdAt | date: 'd MMM y, h:mm a') : '—' }}</dd></div>
+        <dl class="lr-list" *ngIf="!leaveContext()?.timeline?.length || leave.approvedBy || leave.approvedById || leave.attachmentUrl">
+          <div *ngIf="!leaveContext()?.timeline?.length"><dt>Applied on</dt><dd>{{ leave.createdAt ? (leave.createdAt | date: 'd MMM y, h:mm a') : '—' }}</dd></div>
           <div *ngIf="leave.approvedBy || leave.approvedById"><dt>{{ leave.status === 'REJECTED' ? 'Rejected by' : 'Approved by' }}</dt><dd>{{ leave.approvedBy?.employee?.firstName ? (leave.approvedBy.employee.firstName + ' ' + (leave.approvedBy.employee.lastName || '')) : (leave.approvedBy?.email || '—') }}</dd></div>
-          <div *ngIf="leave.attachmentUrl"><dt>Attachment</dt><dd><a [href]="leave.attachmentUrl" target="_blank" class="lr-link"><svg lucidePaperclip size="14"></svg>View attachment</a></dd></div>
+          <div *ngIf="leave.attachmentUrl"><dt>Attachment</dt><dd><a [href]="leave.attachmentUrl" target="_blank" class="lr-link"><svg lucidePaperclip size="13"></svg>View attachment</a></dd></div>
         </dl>
 
-        <section class="lr-block">
+        <!-- Compact 2-Column Row: Balance Impact + Activity Timeline -->
+        <div class="lr-two-col" *ngIf="leaveContext()?.balance || leaveContext()?.timeline?.length || (leaveContext() && !leaveContext()?.balance && leave.leaveType?.isPaid === false)">
+          <section class="lr-card-section lr-balance" *ngIf="leaveContext()?.balance as b">
+            <div class="lr-sec-head">
+              <h4>Balance Impact</h4>
+              <span class="lr-bal-of">{{ b.allocated }}d quota</span>
+            </div>
+            <div class="lr-bal-row">
+              <div class="lr-bal-pill">
+                <small>{{ b.counted ? 'Before' : 'Current' }}</small>
+                <b>{{ b.before }}</b>
+              </div>
+              <span class="lr-bal-arrow" aria-hidden="true">→</span>
+              <div class="lr-bal-pill" [class.is-neg]="b.after < 0">
+                <small>{{ b.counted ? 'After' : 'If approved' }}</small>
+                <b [class.neg]="b.after < 0">{{ b.after }}</b>
+              </div>
+            </div>
+            <p class="lr-bal-warn" *ngIf="b.after < 0">Exceeds quota by {{ -b.after }} day{{ b.after === -1 ? '' : 's' }}.</p>
+          </section>
+
+          <section class="lr-card-section lr-balance" *ngIf="leaveContext() && !leaveContext()?.balance && leave.leaveType?.isPaid === false">
+            <h4>Balance Impact</h4>
+            <p class="lr-inline-note">Unpaid leave (LOP) — deducted from salary.</p>
+          </section>
+
+          <section class="lr-card-section lr-timeline" *ngIf="leaveContext()?.timeline?.length">
+            <h4>Timeline</h4>
+            <ol>
+              <li *ngFor="let s of leaveContext().timeline" [ngClass]="'t-' + s.label.split(' ')[0].toLowerCase()">
+                <span class="lr-t-dot"></span>
+                <div><b>{{ s.label }}</b><span *ngIf="s.by"> by {{ s.by }}</span>
+                  <small>{{ s.at | date: 'd MMM, h:mm a' }}</small>
+                  <em *ngIf="s.note">“{{ s.note }}”</em></div>
+              </li>
+              <li *ngIf="leave.status === 'PENDING'" class="t-waiting"><span class="lr-t-dot"></span><div><b>Waiting for approval</b></div></li>
+            </ol>
+          </section>
+        </div>
+
+        <!-- Team Overlap: compact strip when clear, full list when overlapping -->
+        <div class="lr-team-clear" *ngIf="leaveContext() && !leaveContext().teamOff?.length">
+          <svg lucideCheck [size]="14" aria-hidden="true"></svg>
+          <span>No team overlap in <strong>{{ leave.employee?.department?.name || 'the department' }}</strong> on these dates.</span>
+        </div>
+
+        <section class="lr-card-section lr-team" *ngIf="leaveContext()?.teamOff?.length">
+          <h4>Also off in {{ leave.employee?.department?.name || 'the department' }} ({{ leaveContext().teamOff.length }})</h4>
+          <ul>
+            <li *ngFor="let t of leaveContext().teamOff">
+              <img *ngIf="t.employee?.avatarUrl" [src]="t.employee.avatarUrl" alt="">
+              <span *ngIf="!t.employee?.avatarUrl" class="lr-team-i">{{ teamOffInitials(t) }}</span>
+              <div><b>{{ teamOffName(t) }}</b>
+                <small>{{ t.startDate | date:'d MMM':'UTC' }}<ng-container *ngIf="(t.endDate | date:'yMd':'UTC') !== (t.startDate | date:'yMd':'UTC')"> – {{ t.endDate | date:'d MMM':'UTC' }}</ng-container> · {{ t.leaveType?.name }}<ng-container *ngIf="t.isHalfDay"> · half</ng-container></small></div>
+              <span class="lr-team-st" [class.pending]="t.status === 'PENDING'">{{ t.status | titlecase }}</span>
+            </li>
+          </ul>
+        </section>
+        <p class="lr-ctx-loading" *ngIf="leaveContextLoading()">Loading balance and team…</p>
+
+        <section class="lr-block" *ngIf="leave.reason">
           <h4>Reason</h4>
-          <p [class.muted]="!leave.reason">{{ leave.reason || 'No reason provided by employee' }}</p>
+          <p [class.lr-clamp]="!leaveReasonExpanded() && (leave.reason?.length || 0) > 220">{{ leave.reason }}</p>
+          <button type="button" class="lr-more" *ngIf="(leave.reason?.length || 0) > 220" (click)="leaveReasonExpanded.set(!leaveReasonExpanded())">{{ leaveReasonExpanded() ? 'Show less' : 'Show more' }}</button>
         </section>
 
         <section class="lr-block danger" *ngIf="leave.status === 'REJECTED' && leave.rejectionReason">
@@ -1062,7 +1164,10 @@
           <button type="button" class="lr-btn danger" (click)="closeLeaveDetail(); openRejectModal(leave.id)">Reject</button>
           <button type="button" class="lr-btn primary" (click)="closeLeaveDetail(); approveLeaveRequest(leave.id)"><svg lucideCheck size="15"></svg>Approve</button>
         </ng-container>
-        <ng-template #lrCloseOnly><span class="lr-spacer"></span><button type="button" class="lr-btn" (click)="closeLeaveDetail()">Close</button></ng-template>
+        <ng-template #lrCloseOnly>
+          <button type="button" class="lr-btn danger" *ngIf="leave.status !== 'CANCELLED' && leave.status !== 'REJECTED' && canCancelLeaveApplication(leave)"
+                  (click)="closeLeaveDetail(); cancelLeaveRequest(leave.id)">Cancel leave</button>
+          <span class="lr-spacer"></span><button type="button" class="lr-btn" (click)="closeLeaveDetail()">Close</button></ng-template>
       </footer>
     </div>
   </div>
@@ -1071,47 +1176,54 @@
   <div class="tab-content" *ngIf="activeTab() === 'leave' && leaveSection() === 'balances' && isAdmin()">
       
       <!-- Assign Balances Form -->
-      <div class="alb-overlay" *ngIf="isAssignModalOpen()" (click)="isAssignModalOpen.set(false)">
-      <div class="widget-card alb-card" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
-        <button type="button" class="alb-close" (click)="isAssignModalOpen.set(false)" aria-label="Close"><svg lucideX size="18"></svg></button>
+      <div class="alb-overlay" *ngIf="isAssignModalOpen()" (click)="closeAssignModal()">
+      <div class="widget-card alb-card" role="dialog" aria-modal="true" aria-labelledby="alb-modal-title" (click)="$event.stopPropagation()">
         <div class="alb-header">
           <div class="alb-header-left">
             <div class="alb-icon-badge" aria-hidden="true">
-              <svg lucideCalendarPlus size="22"></svg>
+              <svg lucideCalendarPlus size="20"></svg>
             </div>
             <div>
               <div class="alb-title-row">
-                <h3 class="alb-title">Assign Leave Balance</h3>
-                <span class="alb-tag">Quota Allocation</span>
+                <h3 id="alb-modal-title" class="alb-title">Assign Leave Balance</h3>
               </div>
-              <p class="alb-subtitle">Allocate annual leave quotas to individual employees or bulk assign across the team</p>
             </div>
           </div>
 
-          <!-- Scope Segmented Switch -->
-          <div class="alb-scope-switch" role="radiogroup" aria-label="Assignment scope">
-            <button
-              type="button"
-              class="alb-scope-btn"
-              [class.active]="!assignToAll()"
-              (click)="assignToAll.set(false)"
-              aria-label="Individual Employee scope"
-            >
-              <svg lucideUser size="14"></svg>
-              <span>Individual</span>
-            </button>
-            <button
-              type="button"
-              class="alb-scope-btn"
-              [class.active]="assignToAll()"
-              (click)="assignToAll.set(true)"
-              aria-label="All Employees scope"
-            >
-              <svg lucideUsers size="14"></svg>
-              <span>All Employees</span>
-              <span class="alb-scope-count" *ngIf="employees().length">({{ employees().length }})</span>
-            </button>
+          <div class="alb-header-right">
+            <!-- Scope Segmented Switch -->
+            <!-- Scope switch hidden while only Individual is offered (19 Nov 2026) -->
+            <div class="alb-scope-switch" role="radiogroup" aria-label="Assignment scope" hidden>
+              <button
+                type="button"
+                class="alb-scope-btn"
+                [class.active]="!assignToAll()"
+                (click)="assignToAll.set(false)"
+                aria-label="Individual Employee scope"
+              >
+                <svg lucideUser size="14"></svg>
+                <span>Individual</span>
+              </button>
+              <!-- All Employees mode hidden for now (19 Nov 2026) — not removed; drop the hidden flag to bring it back -->
+              <button
+                type="button"
+                class="alb-scope-btn"
+                hidden
+                [class.active]="assignToAll()"
+                (click)="assignToAll.set(true)"
+                aria-label="All Employees scope"
+              >
+                <svg lucideUsers size="14"></svg>
+                <span>All Employees</span>
+                <span class="alb-scope-count" *ngIf="employees().length">({{ employees().length }})</span>
+              </button>
+            </div>
+
           </div>
+          <!-- 19 Nov 2026: close sits at the far right of the header -->
+          <button type="button" class="alb-close alb-close-top" (click)="closeAssignModal()" aria-label="Close modal" title="Close">
+            <svg lucideX size="18" aria-hidden="true"></svg>
+          </button>
         </div>
 
         <!-- Form Fields Container -->
@@ -1127,7 +1239,7 @@
             </div>
           </div>
 
-          <div class="alb-fields-row">
+          <div class="alb-fields-row" [class.is-individual]="!assignToAll()">
             <!-- Searchable Employee Select (only when not bulk) -->
             <div class="alb-field-group alb-field-employee" *ngIf="!assignToAll()">
               <label class="alb-label">
@@ -1203,6 +1315,20 @@
               </div>
             </div>
 
+            <!-- Compact Selected Employee Summary Pill (Individual mode) -->
+            <div class="alb-emp-inline-card" *ngIf="!assignToAll() && selectedAssignEmployee() as emp">
+              <div class="alb-emp-inline-avatar">
+                <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" [alt]="emp.firstName">
+                <span *ngIf="!emp.avatarUrl">{{ (emp.firstName.charAt(0) || '') + (emp.lastName.charAt(0) || '') }}</span>
+              </div>
+              <div class="alb-emp-inline-info">
+                <div class="alb-emp-inline-top">
+                  <strong>{{ emp.firstName }} {{ emp.lastName }}</strong>
+                </div>
+                <span class="alb-emp-inline-meta">{{ $any(emp).user?.email || $any(emp).email || '—' }}</span>
+              </div>
+            </div>
+
             <!-- Submit Button -->
             <div class="alb-action-group" *ngIf="assignToAll()">
               <button
@@ -1212,88 +1338,131 @@
                 [disabled]="isAssigning()"
               >
                 <svg lucideCheck size="16" *ngIf="!isAssigning()"></svg>
-                <span>{{ isAssigning() ? 'Assigning...' : (assignToAll() ? 'Assign to All' : 'Assign Balance') }}</span>
+                <span>{{ isAssigning() ? 'Assigning...' : 'Assign to All' }}</span>
               </button>
             </div>
           </div>
 
-          <!-- Individual: every leave type in one table (19 Nov 2026, like the old tool's Leaves Quota) -->
+          <!-- Individual: every leave type in one table -->
           <div class="alq" *ngIf="!assignToAll()">
-            <div class="alq-title" *ngIf="selectedEmployeeId()">Leaves Quota</div>
-            <div class="alq-empty" *ngIf="!selectedEmployeeId()">Pick an employee to see and set all their leave quotas.</div>
-            <div class="alq-empty" *ngIf="selectedEmployeeId() && quotaGridLoading()">Loading leave quotas…</div>
-            <table class="alq-table" *ngIf="selectedEmployeeId() && !quotaGridLoading() && quotaGrid().length">
-              <thead><tr><th>Leave Type</th><th>No of Leaves</th><th></th><th class="alq-act">Action</th></tr></thead>
-              <tbody>
-                <tr *ngFor="let r of quotaGrid()" [class.locked]="r.locked">
-                  <td><span class="alq-dot" [class.unpaid]="!r.isPaid" [class.optional]="r.name.toLowerCase().includes('optional')"></span>{{ r.name }}
-                    <span class="alq-tag" *ngIf="!r.isPaid">Unpaid</span></td>
-                  <td><input type="number" min="0" step="0.5" class="alq-input" [(ngModel)]="r.draft" [disabled]="r.locked && !isSuperAdminUser()"></td>
-                  <td>
-                    <label class="alq-lock" [title]="'Locked balances are not changed by monthly accrual, probation pro-rata or bulk assign. Only the Super Admin can change or unlock them.'">
-                      <input type="checkbox" [(ngModel)]="r.lockDraft" [disabled]="!isSuperAdminUser()">
-                      <span>Cannot Edit</span><span class="alq-help">?</span>
-                    </label>
-                  </td>
-                  <td class="alq-act">
-                    <button type="button" class="alq-save" (click)="saveQuotaRow(r)" title="Save this row"
-                            [disabled]="quotaSaving === r.leaveTypeId || !quotaRowChanged(r) || (r.locked && !isSuperAdminUser())">
-                      {{ quotaSaving === r.leaveTypeId ? '…' : '✓' }}
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="alq-header" *ngIf="selectedEmployeeId()">
+              <div>
+                <h4 id="alq-heading" class="alq-title">Leaves Quota</h4>
+                <p class="alq-subtitle">Set annual leave days per type for {{ assignYear() }}. Each row saves independently.</p>
+              </div>
+              <div class="alq-header-pills" *ngIf="!quotaGridLoading() && quotaGrid().length">
+                <span class="alq-stat-pill">{{ quotaGrid().length }} types</span>
+                <span class="alq-stat-pill blue">{{ quotaGridPaidTotal() }} paid days</span>
+                <span class="alq-stat-pill amber" *ngIf="quotaGridLockedCount() > 0">{{ quotaGridLockedCount() }} locked</span>
+              </div>
+            </div>
+
+            <!-- Empty state: no employee picked yet (19 Nov 2026) -->
+            <div class="alq-start" *ngIf="!selectedEmployeeId()">
+              <div class="alq-start-art" aria-hidden="true">
+                <span class="alq-start-ring"></span>
+                <span class="alq-start-icon"><svg lucideCalendarPlus size="26"></svg></span>
+              </div>
+              <h4>Pick an employee to set their {{ assignYear() }} leave</h4>
+              <p>Search by name or email above. You'll see every leave type with its days, what's been used, and a lock for days that must not change.</p>
+              <div class="alq-start-steps">
+                <span><b>1</b>Choose employee</span>
+                <span class="alq-start-dash"></span>
+                <span><b>2</b>Edit days per type</span>
+                <span class="alq-start-dash"></span>
+                <span><b>3</b>Save each row ✓</span>
+              </div>
+            </div>
+
+            <div class="alq-empty" *ngIf="selectedEmployeeId() && quotaGridLoading()">
+              <span>Loading leave quotas…</span>
+            </div>
+
+            <div class="alq-table-wrap"
+                 *ngIf="selectedEmployeeId() && !quotaGridLoading() && quotaGrid().length"
+                 tabindex="0"
+                 role="region"
+                 aria-labelledby="alq-heading">
+              <table class="alq-table">
+                <thead>
+                  <tr>
+                    <th>Leave Type</th>
+                    <th>Remaining</th>
+                    <th class="alq-col-lock">Protection</th>
+                    <th class="alq-act">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let r of quotaGrid()"
+                      [class.locked]="r.locked"
+                      [class.is-dirty]="quotaRowChanged(r) && !(r.locked && !isSuperAdminUser())"
+                      [class.is-unpaid]="!r.isPaid">
+                    <td>
+                      <div class="alq-type-cell">
+                        <span class="alq-dot"
+                              [class.unpaid]="!r.isPaid"
+                              [class.optional]="r.isPaid && (r.name.toLowerCase().includes('optional') || r.name.toLowerCase().includes('comp-off'))"></span>
+                        <div class="alq-type-copy">
+                          <div class="alq-type-name-row">
+                            <span class="alq-type-name">{{ r.name }}</span>
+                            <span class="alq-tag unpaid" *ngIf="!r.isPaid">Unpaid</span>
+                            <span class="alq-tag used" *ngIf="r.used > 0">{{ r.used }}d used</span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="alq-input-wrap"
+                           [class.is-disabled]="r.locked && !isSuperAdminUser()"
+                           [class.is-dirty]="quotaRowChanged(r) && !(r.locked && !isSuperAdminUser())">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          class="alq-input"
+                          [attr.aria-label]="r.name + ' days'"
+                          [(ngModel)]="r.draft"
+                          [disabled]="r.locked && !isSuperAdminUser()"
+                        >
+                        <span class="alq-input-unit">days</span>
+                      </div>
+                      <small class="alq-alloc-hint" *ngIf="r.used > 0 || r.allocated > 0">of {{ (+r.draft || 0) + (+r.used || 0) }} allocated · {{ r.used || 0 }} used</small>
+                    </td>
+                    <td class="alq-col-lock">
+                      <label class="alq-lock"
+                             [class.is-checked]="r.lockDraft"
+                             [class.is-disabled]="!isSuperAdminUser()"
+                             [title]="'Locked balances are not changed by monthly accrual, probation pro-rata or bulk assign. Only the Super Admin can change or unlock them.'">
+                        <input type="checkbox" [(ngModel)]="r.lockDraft" [disabled]="!isSuperAdminUser()">
+                        <span>Cannot Edit</span>
+                        <span class="alq-help" aria-hidden="true">?</span>
+                      </label>
+                    </td>
+                    <td class="alq-act">
+                      <button
+                        type="button"
+                        class="alq-save"
+                        [class.is-ready]="quotaRowChanged(r) && !(r.locked && !isSuperAdminUser())"
+                        (click)="saveQuotaRow(r)"
+                        [title]="quotaRowChanged(r) ? 'Save changes for ' + r.name : 'Saved'"
+                        [disabled]="quotaSaving === r.leaveTypeId || !quotaRowChanged(r) || (r.locked && !isSuperAdminUser())"
+                      >
+                        <svg lucideCheck [size]="14" *ngIf="quotaSaving !== r.leaveTypeId" aria-hidden="true"></svg>
+                        <span>{{ quotaSaving === r.leaveTypeId ? 'Saving…' : (quotaRowChanged(r) ? 'Save' : 'Saved') }}</span>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <!-- Selected Employee Profile Card & Current Balances Preview -->
-        <div *ngIf="!assignToAll() && selectedAssignEmployee() as emp" class="assign-employee-profile-card">
-          <div class="profile-card-left">
-            <div class="profile-avatar-container">
-              <img *ngIf="emp.avatarUrl" [src]="emp.avatarUrl" [alt]="emp.firstName" class="profile-avatar-img">
-              <div *ngIf="!emp.avatarUrl" class="profile-avatar-placeholder">
-                {{ (emp.firstName?.charAt(0) || '') + (emp.lastName?.charAt(0) || '') }}
-              </div>
-            </div>
-            <div class="profile-info-block">
-              <div class="profile-name-line">
-                <h4 class="profile-display-name">{{ emp.firstName }} {{ emp.lastName }}</h4>
-                <span *ngIf="emp.employeeCode" class="profile-chip code-chip">#{{ emp.employeeCode }}</span>
-                <span *ngIf="emp.user?.role" class="profile-chip role-chip">{{ emp.user?.role }}</span>
-              </div>
-              <div class="profile-meta-line">
-                <span *ngIf="emp.designation?.name" class="meta-tag">
-                  <svg lucideBriefcase size="13"></svg>
-                  <span>{{ emp.designation?.name }}</span>
-                </span>
-                <span *ngIf="emp.department?.name" class="meta-tag">
-                  <svg lucideBuilding size="13"></svg>
-                  <span>{{ emp.department?.name }}</span>
-                </span>
-                <span *ngIf="emp.user?.email || emp.email" class="meta-tag">
-                  <svg lucideMail size="13"></svg>
-                  <span>{{ emp.user?.email || emp.email }}</span>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div class="profile-card-right">
-            <div class="balances-summary-title">
-              <span>{{ assignYear() }} Current Leave Balances</span>
-            </div>
-            <div class="balances-badges-list" *ngIf="selectedEmployeeCurrentBalances().length > 0">
-              <div *ngFor="let b of selectedEmployeeCurrentBalances()" class="existing-balance-chip">
-                <span class="type-name">{{ b.leaveType?.name }}:</span>
-                <span class="days-remaining">{{ b.allocated - b.used }} left</span>
-                <span class="days-total">({{ b.allocated }} total)</span>
-              </div>
-            </div>
-            <div class="no-existing-balances" *ngIf="selectedEmployeeCurrentBalances().length === 0">
-              <span>No leave balances assigned for {{ assignYear() }} yet</span>
-            </div>
-          </div>
+        <div class="alb-modal-foot">
+          <span class="alb-modal-foot-note">
+            <ng-container *ngIf="assignToAll()">Existing locked balances on individual employees will be preserved.</ng-container>
+          </span>
+          <button type="button" class="alb-done-btn" (click)="closeAssignModal()">Done</button>
         </div>
       </div>
       </div>
@@ -1624,6 +1793,10 @@
               <span class="lb-modal-foot-note">
                 Paid totals exclude unpaid Loss of Pay (LOP) days.
               </span>
+              <!-- 19 Nov 2026: jump straight to editing this person's quota -->
+              <button type="button" class="lb-modal-edit-btn" *ngIf="canEditBalances()" (click)="editFromBreakdown(b)">
+                <svg lucidePencil size="14" aria-hidden="true"></svg>Edit balance
+              </button>
               <button type="button" class="lb-modal-done-btn" (click)="closeBalanceBreakdown()">
                 Done
               </button>
@@ -1889,8 +2062,9 @@
               </div>
 
               <div class="holiday-details">
-                <h4 class="holiday-name">{{ h.name }}</h4>
+                <h4 class="holiday-name" [title]="h.name">{{ h.name }}</h4>
                 <span class="holiday-weekday">{{ h.date | date:'EEEE, yyyy' }}</span>
+                <span class="hd-opt-tag hd-opt-tag-line" *ngIf="$any(h).isOptional" title="Office open · 1 comp-off day if worked">Optional · comp-off</span>
               </div>
 
               <div class="holiday-actions">
@@ -2097,6 +2271,13 @@
         <label class="hd-label" for="hd-date">Date <b>*</b></label>
         <input id="hd-date" type="date" class="hd-input" [class.invalid]="holidayTried() && !holidayForm.date" name="hDate" [(ngModel)]="holidayForm.date" required>
         <small class="hd-error" *ngIf="holidayTried() && !holidayForm.date">Pick a date.</small>
+
+        <!-- #28 (19 Nov 2026): optional holiday -->
+        <label class="hd-opt">
+          <input type="checkbox" name="hOptional" [(ngModel)]="holidayForm.isOptional">
+          <span class="hd-opt-text"><b>Optional holiday</b>
+            <small>Office stays open. Anyone who clocks in gets 1 comp-off day automatically. On other holidays clock-in is closed (except approved field visits).</small></span>
+        </label>
 
         <div class="hd-preview" *ngIf="holidayForm.name && holidayForm.date">
           <span class="hd-preview-date"><b>{{ holidayForm.date | date:'dd' }}</b>{{ holidayForm.date | date:'MMM' }}</span>

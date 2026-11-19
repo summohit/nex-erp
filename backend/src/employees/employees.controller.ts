@@ -224,6 +224,21 @@ export class EmployeesController {
     return this.employeesService.getHourlyCost(req.user.companyId, req.user.role, id);
   }
 
+  @Get(':id/intro-status')
+  introStatus(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.employeesService.introStatus(req.user.companyId, req.user.role, id);
+  }
+
+  @Post(':id/welcome-email')
+  sendWelcome(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: { force?: boolean }) {
+    return this.employeesService.sendWelcome(req.user.companyId, req.user.role, req.user.sub ?? null, id, !!body?.force);
+  }
+
+  @Post(':id/intro-email')
+  sendIntro(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() body: any) {
+    return this.employeesService.sendIntro(req.user.companyId, req.user.role, req.user.sub ?? null, id, body || {});
+  }
+
   @Post(':id/login-email/resend')
   resendLoginEmailNotice(@Request() req, @Param('id', ParseIntPipe) id: number) {
     return this.employeesService.resendLoginEmailNotice(req.user.companyId, req.user.role, req.user.sub ?? null, id);

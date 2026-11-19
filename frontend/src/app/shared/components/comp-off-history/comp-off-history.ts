@@ -138,6 +138,23 @@ export class CompOffHistoryComponent implements OnChanges {
   people = signal<CompOffPerson[]>([]);
   query = signal('');
   filterStatus = signal<'all' | 'balance' | 'zero'>('all');
+
+  // ── #26 (19 Nov 2026): All credits tab ──
+  view = signal<'person' | 'credits'>('person');
+  crEmployee = signal('');
+  crSource = signal('');
+  crStatus = signal('');
+  allCredits = computed(() => this.people().flatMap((p: any) => (p.credits || []).map((c: any) => ({ ...c, employee: p.employee })))
+    .sort((a: any, b: any) => String(b.date).localeCompare(String(a.date))));
+  private creditsByEmployee = computed(() => this.allCredits().filter((c: any) => !this.crEmployee() || String(c.employee.id) === String(this.crEmployee())));
+  filteredCredits = computed(() => this.creditsByEmployee().filter((c: any) =>
+    (!this.crSource() || c.source === this.crSource()) && (!this.crStatus() || c.status === this.crStatus())));
+  filteredCreditDays = computed(() => this.filteredCredits().reduce((s: number, c: any) => s + (c.days || 0), 0));
+  resetCreditFilters() { this.crEmployee.set(''); this.crSource.set(''); this.crStatus.set(''); }
+  crCount(field: 'source' | 'status', v: string): number {
+    return this.creditsByEmployee().filter((c: any) => c[field] === v
+      && (field === 'source' ? (!this.crStatus() || c.status === this.crStatus()) : (!this.crSource() || c.source === this.crSource()))).length;
+  }
   expandedIds = signal<Set<number>>(new Set());
 
   countWithBalance = computed(() => this.people().filter((p) => p.remaining > 0).length);

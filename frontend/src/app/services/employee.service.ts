@@ -323,6 +323,17 @@ export class EmployeeService {
   }
 
   /** Resend the "login email has been changed" email + notification (19 Nov 2026). */
+  // Welcome + intro emails (#16, 19 Nov 2026)
+  getIntroStatus(employeeId: number): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${employeeId}/intro-status`, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
+  }
+  sendWelcomeEmail(employeeId: number, force = false): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${employeeId}/welcome-email`, { force }, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
+  }
+  sendIntroEmail(employeeId: number, body: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${employeeId}/intro-email`, body, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
+  }
+
   resendLoginEmailNotice(employeeId: number): Observable<any> {
     return this.http.post(`${this.apiUrl}/${employeeId}/login-email/resend`, {}, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
   }

@@ -62,13 +62,13 @@ export class EmployeesService {
   async findAll(companyId: number, role: string) {
     await this.assertDirectoryAccess(companyId, role);
     const employees = await this.prisma.employee.findMany({
-      where: { companyId },
+      where: { companyId, isCompanyAccount: false },
       include: {
         user: { select: { email: true, role: true, status: true } },
         department: { select: { name: true } },
         designation: { select: { name: true } },
         branch: { select: { name: true } },
-        shift: { select: { id: true, name: true, startTime: true, endTime: true } },
+        shift: { select: { id: true, name: true, startTime: true, endTime: true, colorCode: true } },
         documents: true,
         // The directory only needs the latest exit request to show the
         // offboarding milestone and link into its full history.
@@ -1290,6 +1290,90 @@ export class EmployeesService {
         newValue: { email, oldEmail, emailed } as any },
     }).catch(() => undefined);
     return { email, previousEmail: oldEmail, emailed };
+  }
+
+  // ── Welcome + intro emails (#16, 19 Nov 2026) ───────────────────────
+  private static readonly INTRO_ROLES = ['SUPERADMIN', 'HR'];
+
+  private async introPerson(companyId: number, employeeId: number) {
+    const emp = await this.prisma.employee.findFirst({
+      where: { id: employeeId, companyId },
+      select: { id: true, firstName: true, lastName: true, avatarUrl: true, joiningDate: true,
+        user: { select: { id: true, email: true } },
+        designation: { select: { name: true } }, department: { select: { name: true } },
+        branch: { select: { name: true } }, manager: { select: { firstName: true, lastName: true } } },
+    });
+    if (!emp?.user) throw new NotFoundException('Employee not found');
+    const name = `${emp.firstName} ${emp.lastName}`.replace(/\s+/g, ' ').trim();
+    const card = {
+      name, designation: emp.designation?.name, department: emp.department?.name,
+      manager: emp.manager ? `${emp.manager.firstName} ${emp.manager.lastName}`.replace(/\s+/g, ' ').trim() : undefined,
+      joined: emp.joiningDate ? new Date(emp.joiningDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }) : undefined,
+      location: emp.branch?.name, photo: emp.avatarUrl || undefined,
+    };
+    const companyName = (await this.prisma.company.findUnique({ where: { id: companyId }, select: { name: true } }))?.name ?? undefined;
+    return { emp, name, card, companyName };
+  }
+
+  private async lastSend(companyId: number, action: string, employeeId: number) {
+    const last = await this.prisma.auditLog.findFirst({ where: { companyId, action, entityType: 'Employee', entityId: String(employeeId) }, orderBy: { createdAt: 'desc' } });
+    if (!last) return null;
+    const by = last.actorId ? await this.prisma.user.findUnique({ where: { id: last.actorId }, select: { email: true, employee: { select: { firstName: true, lastName: true } } } }) : null;
+    return { at: last.createdAt, by: by?.employee ? `${by.employee.firstName} ${by.employee.lastName}`.trim() : by?.email ?? 'someone', details: last.newValue };
+  }
+
+  async introStatus(companyId: number, role: string, employeeId: number) {
+    if (!EmployeesService.INTRO_ROLES.includes(role)) throw new ForbiddenException('Only the Super Admin or HR can do this.');
+    const { card, name, companyName } = await this.introPerson(companyId, employeeId);
+    const first = name.split(' ')[0];
+    const what = [card.designation && `as ${card.designation}`, card.department && `in ${card.department}`].filter(Boolean).join(' ');
+    return {
+      card,
+      welcome: await this.lastSend(companyId, 'WELCOME_EMAIL_SENT', employeeId),
+      intro: await this.lastSend(companyId, 'INTRO_EMAIL_SENT', employeeId),
+      defaultSubject: `Please welcome ${name} to ${companyName || 'the team'}`,
+      defaultMessage: `Hi everyone,\n\nPlease join us in welcoming ${name}, who has joined us ${what || 'today'}${card.manager ? `, reporting to ${card.manager}` : ''}.\n\nDo say hello and help ${first} settle in.\n\nWarm regards,\nHR Team`,
+    };
+  }
+
+  async sendWelcome(companyId: number, role: string, actorUserId: number | null, employeeId: number, force = false) {
+    if (!EmployeesService.INTRO_ROLES.includes(role)) throw new ForbiddenException('Only the Super Admin or HR can do this.');
+    const { emp, name, companyName } = await this.introPerson(companyId, employeeId);
+    const prev = await this.lastSend(companyId, 'WELCOME_EMAIL_SENT', employeeId);
+    if (prev && !force) throw new ConflictException(`Welcome email was already sent on ${new Date(prev.at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} by ${prev.by}.`);
+    let emailed = true;
+    try { await this.mailService.sendJoinerWelcomeEmail(emp.user!.email, name, emp.user!.email, companyName); } catch { emailed = false; }
+    try { await this.notifications.createNotification(emp.user!.id, `Welcome to ${companyName || 'the team'}!`, 'Start by completing your profile and uploading your documents.', 'INFO', `/employees/${emp.id}/profile`, companyId); } catch { /* best-effort */ }
+    await this.prisma.auditLog.create({ data: { companyId, actorId: actorUserId, action: 'WELCOME_EMAIL_SENT', entityType: 'Employee', entityId: String(emp.id), newValue: { to: emp.user!.email, emailed, resent: !!prev } as any } }).catch(() => undefined);
+    return { to: emp.user!.email, emailed };
+  }
+
+  async sendIntro(companyId: number, role: string, actorUserId: number | null, employeeId: number,
+    body: { departmentIds?: number[]; employeeIds?: number[]; everyone?: boolean; subject?: string; message?: string; force?: boolean }) {
+    if (!EmployeesService.INTRO_ROLES.includes(role)) throw new ForbiddenException('Only the Super Admin or HR can do this.');
+    const subject = (body.subject || '').trim(); const message = (body.message || '').trim();
+    if (!subject || !message) throw new BadRequestException('Subject and message are required.');
+    const { emp, name, card, companyName } = await this.introPerson(companyId, employeeId);
+    const prev = await this.lastSend(companyId, 'INTRO_EMAIL_SENT', employeeId);
+    if (prev && !body.force) throw new ConflictException(`An intro for ${name} was already sent on ${new Date(prev.at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} by ${prev.by}.`);
+    const deptIds = (body.departmentIds || []).map(Number).filter(Boolean);
+    const empIds = (body.employeeIds || []).map(Number).filter(Boolean);
+    if (!body.everyone && !deptIds.length && !empIds.length) throw new BadRequestException('Pick at least one department or person.');
+    const people = await this.prisma.employee.findMany({
+      where: { companyId, isCompanyAccount: false, user: { status: 'ACTIVE' },
+        ...(body.everyone ? {} : { OR: [{ id: { in: [...empIds, emp.id] } }, ...(deptIds.length ? [{ departmentId: { in: deptIds } }] : [])] }) },
+      select: { id: true, user: { select: { id: true, email: true } } },
+    });
+    const list = people.filter(p => p.user?.email);
+    if (!list.some(p => p.id === emp.id) && emp.user) list.push({ id: emp.id, user: emp.user } as any);
+    let emailed = 0, failed = 0;
+    for (const p of list) {
+      try { await this.mailService.sendIntroEmail(p.user!.email, subject, message, card, companyName); emailed++; } catch { failed++; }
+      try { await this.notifications.createNotification(p.user!.id, `Please welcome ${name}`, [card.designation, card.department].filter(Boolean).join(' · ') || 'Our newest team member', 'INFO', `/employees/${emp.id}/profile`, companyId); } catch { /* best-effort */ }
+    }
+    await this.prisma.auditLog.create({ data: { companyId, actorId: actorUserId, action: 'INTRO_EMAIL_SENT', entityType: 'Employee', entityId: String(emp.id),
+      newValue: { recipients: list.length, emailed, failed, departmentIds: deptIds, employeeIds: empIds, everyone: !!body.everyone, subject, resent: !!prev } as any } }).catch(() => undefined);
+    return { recipients: list.length, emailed, failed };
   }
 
   // ── Shared login hand over (16 Nov 2026) ───────────────────────────────

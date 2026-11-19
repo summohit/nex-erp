@@ -51,7 +51,7 @@ import {
   LucideHistory,
   LucideUpload,
   LucideDownload,
-  LucideCalendarPlus,
+  LucideCalendarPlus, LucidePencil,
   LucideUsers,
   LucideSparkles,
   LucideRefreshCw
@@ -124,7 +124,7 @@ import { AttendanceFilterDrawerComponent, AttendanceFilterValue, AttendanceDateP
     LucideHistory,
     LucideUpload,
     LucideDownload,
-    LucideCalendarPlus,
+    LucideCalendarPlus, LucidePencil,
     LucideUsers,
     LucideSparkles,
     LucideRefreshCw
@@ -312,6 +312,13 @@ export class AttendanceLeaveComponent implements OnInit {
           { value: 'CANCELLED', label: 'Cancelled' },
         ],
       });
+      // #24c (19 Nov 2026): Emergency = applied on the day the leave starts.
+      groups.push({
+        key: 'urgency',
+        label: 'Applied',
+        placeholder: 'Any time',
+        options: [{ value: 'EMERGENCY', label: `Emergency · same day (${this.emergencyLeaveCount()})` }],
+      });
     }
     return groups;
   });
@@ -324,6 +331,7 @@ export class AttendanceLeaveComponent implements OnInit {
       status: this.isAdmin() && this.leaveSection() !== 'balances'
         ? (this.approvalStatusFilter() === 'ALL' ? '' : this.approvalStatusFilter())
         : this.leaveStatusFilter(),
+      urgency: this.urgencyFilter() === 'ALL' ? '' : this.urgencyFilter(),
     };
   });
 
@@ -416,7 +424,51 @@ export class AttendanceLeaveComponent implements OnInit {
   private newestAppliedFirst = (a: LeaveRequest, b: LeaveRequest) =>
     String((b as any).createdAt ?? '').localeCompare(String((a as any).createdAt ?? '')) || b.id - a.id;
 
+  /** #24d (19 Nov 2026): the KPI cards' scope — every filter except status and Emergency. */
+  leaveKpiScope = computed(() => this.leaveApplicationsList().filter(r =>
+    this.matchesLeaveApplicationSearch(r)
+    && (!this.filterLeaveTypeId() || String(r.leaveTypeId) === this.filterLeaveTypeId())
+    && this.matchesAttendanceFilters((r as any).employee, r.startDate, r.endDate)));
+
+  private leaveDays(r: any): number {
+    if (r?.isHalfDay) return 0.5;
+    const s = new Date(String(r?.startDate).slice(0, 10) + 'T00:00:00Z').getTime();
+    const e = new Date(String(r?.endDate ?? r?.startDate).slice(0, 10) + 'T00:00:00Z').getTime();
+    return Number.isFinite(s) && Number.isFinite(e) ? Math.max(1, Math.round((e - s) / 86400000) + 1) : 0;
+  }
+
+  leaveKpis = computed(() => {
+    const rows = this.leaveKpiScope();
+    const k = { total: rows.length, PENDING: 0, APPROVED: 0, REJECTED: 0, CANCELLED: 0, emergency: 0, days: 0, paidDays: 0, unpaidDays: 0 };
+    for (const r of rows as any[]) {
+      if (r.status in k) (k as any)[r.status]++;
+      if (this.leaveUrgency(r) === 'EMERGENCY') k.emergency++;
+      if (r.status === 'APPROVED') {
+        const d = this.leaveDays(r);
+        k.days += d;
+        if (r.leaveType?.isPaid === false) k.unpaidDays += d; else k.paidDays += d;
+      }
+    }
+    return k;
+  });
+
+  pickLeaveKpi(kind: 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'EMERGENCY') {
+    if (kind === 'EMERGENCY') { this.approvalStatusFilter.set('ALL'); this.toggleUrgency('EMERGENCY'); return; }
+    this.urgencyFilter.set('ALL');
+    this.approvalStatusFilter.set(kind);
+  }
+
+  /** #24c (19 Nov 2026): Emergency / After-the-fact filter on top of the others. */
+  urgencyFilter = signal<'ALL' | 'EMERGENCY' | 'LATE'>('ALL');
+  emergencyLeaveCount = computed(() => this.baseLeaveApplications().filter(r => this.leaveUrgency(r) === 'EMERGENCY').length);
+  toggleUrgency(v: 'EMERGENCY' | 'LATE') { this.urgencyFilter.set(this.urgencyFilter() === v ? 'ALL' : v); }
   filteredLeaveApplications = computed(() => {
+    const u = this.urgencyFilter();
+    const base = this.baseLeaveApplications();
+    return u === 'ALL' ? base : base.filter(r => this.leaveUrgency(r) === u);
+  });
+
+  baseLeaveApplications = computed(() => {
     if (this.profileEmployeeId) {
       const status = this.approvalStatusFilter();
       return this.profileRequests().filter(r =>
@@ -849,8 +901,18 @@ export class AttendanceLeaveComponent implements OnInit {
       }
     },
     {
+      // #24a/c (19 Nov 2026): when it was raised, plus Emergency / After the fact.
+      headerName: 'Applied on',
+      colId: 'appliedOn',
+      minWidth: 170,
+      flex: 0.9,
+      sortable: true,
+      valueGetter: (p: any) => p.data?.createdAt ? new Date(p.data.createdAt).getTime() : 0,
+      cellRenderer: (p: any) => this.appliedOnCell(p.data),
+    },
+    {
       headerName: 'Paid',
-      minWidth: 85,
+      minWidth: 100,
       flex: 0.6,
       cellRenderer: (params: any) => {
         const isPaid = params.data?.leaveType?.isPaid !== false;
@@ -1070,43 +1132,31 @@ export class AttendanceLeaveComponent implements OnInit {
     { 
       field: 'employee',
       headerName: 'Employee',
+      filter: false,
       valueGetter: (p: any) => {
         const emp = p.data?.employee;
         if (!emp) return `Employee #${p.data?.employeeId ?? '—'}`;
         return `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() || `Employee #${p.data?.employeeId ?? '—'}`;
       },
       valueFormatter: (p) => p.value || 'Employee',
-      filter: 'agTextColumnFilter',
-      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
-      minWidth: 240,
-      flex: 1.5,
-      pinned: 'left',
+      minWidth: 205,
+      flex: 1.55,
       cellRenderer: (params: any) => {
         const emp = params.data?.employee;
         if (!emp) return `<span class="text-secondary" style="font-size: 13px;">Employee #${params.data?.employeeId ?? '—'}</span>`;
+        const fullEmp = (this.employees() || []).find((e: any) => e.id === (emp.id ?? params.data?.employeeId));
         const name = `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() || `Employee #${params.data?.employeeId ?? '—'}`;
-        const dept = emp.department?.name || '';
-        const des = emp.designation?.name || '';
-        const sub = [des, dept].filter(Boolean).join(' · ') || 'Employee';
-        const codeBadge = emp.employeeCode 
-          ? `<span class="table-emp-code" style="font-size: 10px !important; font-weight: 600 !important; color: #0369a1 !important; background: #e0f2fe !important; border: 1px solid #bae6fd !important; border-radius: 4px !important; padding: 1px 5px !important; flex-shrink: 0 !important; line-height: 1.2 !important;">#${emp.employeeCode}</span>` 
-          : '';
-        const safeName = (name || '').replace(/"/g, '&quot;');
-        const uiAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B82F6&color=fff&size=128&bold=true`;
-        const avatarSrc = emp.avatarUrl || uiAvatarUrl;
+        const email = emp.user?.email || emp.email || fullEmp?.user?.email || fullEmp?.email || '';
+        const safeName = (name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        const safeEmail = (email || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        const uiAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=2563EB&color=fff&size=128&bold=true`;
+        const avatarSrc = emp.avatarUrl || fullEmp?.avatarUrl || uiAvatarUrl;
         return `
-          <div class="cell-user-avatar-row cursor-pointer" style="display: flex !important; align-items: center !important; gap: 10px !important; height: 100% !important; min-width: 0 !important; width: 100% !important; cursor: pointer !important;" title="Click to view details">
-            <img src="${avatarSrc}" 
-                 class="table-emp-avatar" 
-                 alt="${safeName}" 
-                 style="width: 36px !important; height: 36px !important; min-width: 36px !important; min-height: 36px !important; max-width: 36px !important; max-height: 36px !important; border-radius: 50% !important; object-fit: cover !important; flex-shrink: 0 !important; border: 1.5px solid #e2e8f0 !important; display: block !important;" 
-                 onerror="this.onerror=null; this.src='${uiAvatarUrl}';" />
-            <div class="cell-stacked" style="min-width: 0 !important; flex: 1 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; justify-content: center !important; line-height: 1.25 !important;">
-              <div class="cell-title-bold" style="display: flex !important; align-items: center !important; gap: 6px !important; min-width: 0 !important;">
-                <span class="emp-name-text" style="font-size: 13px !important; font-weight: 600 !important; color: #0f172a !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;">${name}</span>
-                ${codeBadge}
-              </div>
-              <div class="user-text-stack text-secondary" style="font-size: 11.5px !important; color: #64748B !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 2px !important;">${sub}</div>
+          <div class="lv-emp-cell" title="Click to view details">
+            <img src="${avatarSrc}" class="lv-emp-avatar" alt="${safeName}" onerror="this.onerror=null; this.src='${uiAvatarUrl}';" />
+            <div class="lv-emp-info">
+              <span class="lv-emp-name">${safeName}</span>
+              ${safeEmail ? `<span class="lv-emp-email" title="${safeEmail}">${safeEmail}</span>` : ''}
             </div>
           </div>
         `;
@@ -1114,166 +1164,104 @@ export class AttendanceLeaveComponent implements OnInit {
     },
     { 
       field: 'date', 
-      headerName: 'Date', 
-      valueGetter: (p: any) => {
-        if (!p.data?.date) return '';
-        return this.datePipe.transform(p.data.date, 'dd MMM yyyy') || p.data.date;
-      },
-      filter: 'agTextColumnFilter',
-      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
-      minWidth: 145, 
-      flex: 1, 
+      headerName: 'Date',
+      filter: false,
+      valueGetter: (p: any) => p.data?.date ? new Date(p.data.date).getTime() : 0,
+      minWidth: 120,
+      flex: 0.95,
       cellRenderer: (params: any) => {
-        if (!params.value && !params.data?.date) return '—';
-        const raw = params.data?.date || params.value;
+        const raw = params.data?.date;
+        if (!raw) return '<span class="lv-dash">—</span>';
         const formattedDate = this.datePipe.transform(raw, 'dd MMM yyyy') || raw;
-        const dayOfWeek = this.datePipe.transform(raw, 'EEEE') || '';
+        const dayOfWeek = this.datePipe.transform(raw, 'EEE') || '';
         return `
-          <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; line-height: 1.3;">
-            <span style="font-size: 13px; font-weight: 600; color: #0f172a; letter-spacing: -0.2px;">${formattedDate}</span>
-            <span style="font-size: 11.5px; color: #64748b; margin-top: 1px;">${dayOfWeek}</span>
-          </div>
-        `;
-      }
-    },
-    { 
-      field: 'proposedClockIn', 
-      headerName: 'Proposed In', 
-      valueGetter: (p: any) => {
-        if (!p.data?.proposedClockIn) return '-';
-        return this.datePipe.transform(p.data.proposedClockIn, 'shortTime') || p.data.proposedClockIn;
-      },
-      filter: 'agTextColumnFilter',
-      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
-      minWidth: 130, 
-      flex: 0.9, 
-      cellRenderer: (params: any) => {
-        const raw = params.data?.proposedClockIn;
-        if (!raw) return '<span style="color:#94a3b8;">—</span>';
-        const t = this.datePipe.transform(raw, 'shortTime') || raw;
-        return `
-          <div style="display: flex; align-items: center; height: 100%;">
-            <span style="display: inline-flex; align-items: center; gap: 5px; height: 24px; line-height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; white-space: nowrap;">
-              <span style="font-size: 11px;">☀️</span>
-              <span>${t}</span>
-            </span>
-          </div>
-        `;
-      }
-    },
-    { 
-      field: 'proposedClockOut', 
-      headerName: 'Proposed Out', 
-      valueGetter: (p: any) => {
-        if (!p.data?.proposedClockOut) return '-';
-        return this.datePipe.transform(p.data.proposedClockOut, 'shortTime') || p.data.proposedClockOut;
-      },
-      filter: 'agTextColumnFilter',
-      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
-      minWidth: 130, 
-      flex: 0.9, 
-      cellRenderer: (params: any) => {
-        const raw = params.data?.proposedClockOut;
-        if (!raw) return '<span style="color:#94a3b8;">—</span>';
-        const t = this.datePipe.transform(raw, 'shortTime') || raw;
-        return `
-          <div style="display: flex; align-items: center; height: 100%;">
-            <span style="display: inline-flex; align-items: center; gap: 5px; height: 24px; line-height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; white-space: nowrap;">
-              <span style="font-size: 11px;">🌙</span>
-              <span>${t}</span>
-            </span>
+          <div class="lv-date-cell">
+            <span class="lv-date-primary">${formattedDate}</span>
+            <span class="lv-date-sub">${dayOfWeek}</span>
           </div>
         `;
       }
     },
     {
-      headerName: 'Duration',
-      valueGetter: (p: any) => this.getRegularizationDuration(p.data),
-      filter: 'agTextColumnFilter',
-      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
-      minWidth: 115,
-      flex: 0.8,
+      headerName: 'Proposed Timing',
+      colId: 'proposedTiming',
+      filter: false,
+      minWidth: 185,
+      flex: 1.4,
+      valueGetter: (p: any) => p.data?.proposedClockIn ? new Date(p.data.proposedClockIn).getTime() : 0,
       cellRenderer: (params: any) => {
-        const text = this.getRegularizationDuration(params.data);
-        if (text === 'N/A' || !text) return '<span style="color:#94a3b8;">—</span>';
+        const inRaw = params.data?.proposedClockIn;
+        const outRaw = params.data?.proposedClockOut;
+        const inStr = inRaw ? (this.datePipe.transform(inRaw, 'shortTime') || inRaw) : '';
+        const outStr = outRaw ? (this.datePipe.transform(outRaw, 'shortTime') || outRaw) : '';
+        const dur = this.getRegularizationDuration(params.data);
+        const hasDur = dur && dur !== 'N/A';
+        if (!inStr && !outStr) return '<span class="lv-dash">—</span>';
+        const inHtml = inStr
+          ? `<span class="reg-time-pill in">${inStr}</span>`
+          : `<span class="reg-time-miss">—</span>`;
+        const outHtml = outStr
+          ? `<span class="reg-time-pill out">${outStr}</span>`
+          : `<span class="reg-time-miss">No out</span>`;
         return `
-          <div style="display: flex; align-items: center; height: 100%;">
-            <span style="display: inline-flex; align-items: center; gap: 4px; height: 22px; line-height: 20px; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; white-space: nowrap;">
-              <span style="font-size: 10px;">⏱️</span>
-              <span>${text}</span>
-            </span>
+          <div class="reg-time-cell">
+            <div class="reg-time-row">
+              ${inHtml}
+              <span class="reg-time-arrow">→</span>
+              ${outHtml}
+            </div>
+            ${hasDur ? `<span class="reg-dur-meta">${dur}</span>` : ''}
           </div>
         `;
       }
     },
     { 
       field: 'reason', 
-      headerName: 'Reason', 
-      filter: 'agTextColumnFilter',
-      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
-      minWidth: 180, 
-      flex: 1.4,
+      headerName: 'Reason',
+      filter: false,
+      minWidth: 190,
+      flex: 1.5,
       cellRenderer: (params: any) => {
-        const reason = params.value || 'No reason provided';
-        const safeReason = (reason || '').replace(/"/g, '&quot;');
+        const raw = String(params.value || '').trim();
+        const reason = raw || 'No reason provided';
+        const safeReason = reason.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        const isLong = raw.length > 46;
+        const url = String(params.data?.proofUrl || '');
+        const proofHtml = /^https?:\/\//i.test(url)
+          ? `<a href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="lv-attach-chip">📎 View proof</a>`
+          : '';
+        const readMoreHtml = isLong
+          ? `<button type="button" class="reg-read-more">Read more</button>`
+          : '';
+        const actionsHtml = (readMoreHtml || proofHtml)
+          ? `<div class="reg-reason-actions">${readMoreHtml}${proofHtml}</div>`
+          : '';
         return `
-          <div style="display: flex; align-items: center; height: 100%; min-width: 0;" title="${safeReason}">
-            <span style="font-size: 12.5px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; max-width: 100%; line-height: 1.4;">
-              ${safeReason}
-            </span>
+          <div class="reg-reason-cell" title="${safeReason}">
+            <span class="reg-reason-text">${safeReason}</span>
+            ${actionsHtml}
           </div>
         `;
       }
     },
-    {
-      // Optional proof attached to the request (18 Nov 2026).
-      field: 'proofUrl',
-      headerName: 'Proof',
-      minWidth: 90,
-      maxWidth: 110,
-      sortable: false,
-      cellRenderer: (params: any) => {
-        const url = String(params.value || '');
-        if (!/^https?:\/\//i.test(url)) return `<span style="color:#94a3b8;font-size:12px;">—</span>`;
-        const safe = url.replace(/"/g, '&quot;');
-        return `<a href="${safe}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:6px;font-size:11.5px;font-weight:600;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;text-decoration:none;">📎 View</a>`;
-      }
-    },
     { 
       field: 'status', 
-      headerName: 'Status', 
+      headerName: 'Status',
+      filter: false,
       valueGetter: (p: any) => {
         const s = (p.data?.status || 'PENDING').toUpperCase();
         return s === 'APPROVED' ? 'Approved' : (s === 'REJECTED' ? 'Rejected' : 'Pending');
       },
-      filter: 'agTextColumnFilter',
-      filterParams: { buttons: ['reset', 'apply'], closeOnApply: true },
-      minWidth: 125, 
-      flex: 0.8,
+      minWidth: 105,
+      flex: 0.85,
       cellRenderer: (params: any) => {
         const s = (params.data?.status || params.value || 'PENDING').toUpperCase();
-        let bg = '#fffbeb';
-        let border = '#fde68a';
-        let color = '#92400e';
-        let dot = '#f59e0b';
-        let label = 'Pending';
-        if (s === 'APPROVED') {
-          bg = '#ecfdf5';
-          border = '#a7f3d0';
-          color = '#065f46';
-          dot = '#10b981';
-          label = 'Approved';
-        } else if (s === 'REJECTED') {
-          bg = '#fef2f2';
-          border = '#fecaca';
-          color = '#991b1b';
-          dot = '#ef4444';
-          label = 'Rejected';
-        }
+        const cls = s === 'APPROVED' ? 'approved' : s === 'REJECTED' ? 'rejected' : 'pending';
+        const label = s === 'APPROVED' ? 'Approved' : s === 'REJECTED' ? 'Rejected' : 'Pending';
         return `
-          <div style="display: flex; align-items: center; height: 100%;">
-            <span style="display: inline-flex; align-items: center; height: 22px; line-height: 20px; padding: 0 8px; border-radius: 11px; font-size: 11px; font-weight: 600; background:${bg}; border: 1px solid ${border}; color:${color}; white-space: nowrap; flex-shrink: 0; box-sizing: border-box;">
-              <span style="width: 6px; height: 6px; min-width: 6px; min-height: 6px; border-radius: 50%; background:${dot}; margin-right: 5px; flex-shrink: 0; display: inline-block;"></span>
+          <div class="lv-status-cell">
+            <span class="lv-status-pill ${cls}">
+              <span class="lv-status-dot"></span>
               <span>${label}</span>
             </span>
           </div>
@@ -1281,12 +1269,14 @@ export class AttendanceLeaveComponent implements OnInit {
       }
     },
     {
-      headerName: 'Actions',
-      width: 100,
-      minWidth: 90,
-      pinned: 'right',
+      headerName: 'Action',
+      width: 82,
+      minWidth: 78,
+      maxWidth: 86,
       sortable: false,
       filter: false,
+      cellClass: 'lv-action-cell',
+      headerClass: 'lv-action-hdr',
       cellRenderer: LeaveActionCellRendererComponent,
       cellRendererParams: {
         onView: (data: any) => this.openRegularizationDetail(data),
@@ -1314,40 +1304,29 @@ export class AttendanceLeaveComponent implements OnInit {
     { 
       field: 'employee',
       headerName: 'Employee',
+      filter: false,
       valueGetter: (p: any) => {
         const emp = p.data?.employee;
         return emp ? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() : `Employee #${p.data?.employeeId ?? '—'}`;
       },
       valueFormatter: (p) => p.value || 'Employee',
-      minWidth: 260,
-      flex: 1.5,
-      pinned: 'left',
+      minWidth: 215,
+      flex: 1.65,
       cellRenderer: (params: any) => {
         const emp = params.data?.employee;
         if (!emp) return `<span class="text-secondary">Employee #${params.data?.employeeId ?? '—'}</span>`;
         const name = `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() || `Employee #${params.data?.employeeId ?? '—'}`;
-        const dept = emp.department?.name || '';
-        const des = emp.designation?.name || '';
-        const sub = [des, dept].filter(Boolean).join(' · ') || 'General';
-        const codeBadge = emp.employeeCode 
-          ? `<span class="table-emp-code" style="font-size: 10px !important; font-weight: 600 !important; color: #0369a1 !important; background: #e0f2fe !important; border: 1px solid #bae6fd !important; border-radius: 4px !important; padding: 1px 5px !important; flex-shrink: 0 !important; line-height: 1.2 !important;">#${emp.employeeCode}</span>` 
-          : '';
-        const safeName = (name || '').replace(/"/g, '&quot;');
-        const uiAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B82F6&color=fff&size=128&bold=true`;
+        const email = emp.user?.email || emp.email || '';
+        const safeName = (name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        const safeEmail = (email || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        const uiAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=2563EB&color=fff&size=128&bold=true`;
         const avatarSrc = emp.avatarUrl || uiAvatarUrl;
         return `
-          <div class="cell-user-avatar-row cursor-pointer" style="display: flex !important; align-items: center !important; gap: 10px !important; height: 100% !important; min-width: 0 !important; width: 100% !important; cursor: pointer !important;" title="Click to view details">
-            <img src="${avatarSrc}" 
-                 class="table-emp-avatar" 
-                 alt="${safeName}" 
-                 style="width: 38px !important; height: 38px !important; min-width: 38px !important; min-height: 38px !important; max-width: 38px !important; max-height: 38px !important; border-radius: 50% !important; object-fit: cover !important; flex-shrink: 0 !important; border: 1.5px solid #e2e8f0 !important; display: block !important;" 
-                 onerror="this.onerror=null; this.src='${uiAvatarUrl}';" />
-            <div class="cell-stacked" style="min-width: 0 !important; flex: 1 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; justify-content: center !important; line-height: 1.25 !important;">
-              <div class="cell-title-bold" style="display: flex !important; align-items: center !important; gap: 6px !important; min-width: 0 !important;">
-                <span class="emp-name-text" style="font-size: 13px !important; font-weight: 600 !important; color: #0f172a !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;">${name}</span>
-                ${codeBadge}
-              </div>
-              <div class="user-text-stack text-secondary" style="font-size: 11.5px !important; color: #64748B !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 2px !important;">${sub}</div>
+          <div class="lv-emp-cell" title="Click to view details">
+            <img src="${avatarSrc}" class="lv-emp-avatar" alt="${safeName}" onerror="this.onerror=null; this.src='${uiAvatarUrl}';" />
+            <div class="lv-emp-info">
+              <span class="lv-emp-name">${safeName}</span>
+              ${safeEmail ? `<span class="lv-emp-email" title="${safeEmail}">${safeEmail}</span>` : ''}
             </div>
           </div>
         `;
@@ -1355,110 +1334,106 @@ export class AttendanceLeaveComponent implements OnInit {
     },
     {
       headerName: 'Leave Date',
-      minWidth: 200,
-      flex: 1.3,
+      filter: false,
+      minWidth: 165,
+      flex: 1.25,
+      valueGetter: (p: any) => p.data?.startDate ? new Date(p.data.startDate).getTime() : 0,
       cellRenderer: (params: any) => {
-        if (!params.data?.startDate || !params.data?.endDate) return '-';
+        if (!params.data?.startDate || !params.data?.endDate) return '<span class="lv-dash">—</span>';
         const isSingleDay = params.data.startDate.slice(0, 10) === params.data.endDate.slice(0, 10);
         const sDate = this.datePipe.transform(params.data.startDate, 'dd MMM yyyy');
+        const isHalf = !!params.data?.isHalfDay;
+        const durChip = isHalf
+          ? `<span class="lv-dur-chip half">Half (${params.data.halfDayPeriod || 'AM'})</span>`
+          : `<span class="lv-dur-chip full">Full Day</span>`;
         if (isSingleDay) {
-          const fullDay = this.datePipe.transform(params.data.startDate, 'EEEE');
+          const shortDay = this.datePipe.transform(params.data.startDate, 'EEE');
           return `
-            <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; line-height: 1.3;">
-              <span style="font-size: 13px; font-weight: 600; color: #0f172a; letter-spacing: -0.2px;">${sDate}</span>
-              <span style="font-size: 11.5px; color: #64748b; margin-top: 1px;">${fullDay}</span>
+            <div class="lv-date-cell">
+              <span class="lv-date-primary">${sDate}</span>
+              <div class="lv-date-sub">
+                <span>${shortDay}</span>
+                ${durChip}
+              </div>
             </div>
           `;
         }
-        const eDate = this.datePipe.transform(params.data.endDate, 'dd MMM yyyy');
-        const sDay = this.datePipe.transform(params.data.startDate, 'EEE');
-        const eDay = this.datePipe.transform(params.data.endDate, 'EEE');
+        const eDate = this.datePipe.transform(params.data.endDate, 'dd MMM');
+        const sShort = this.datePipe.transform(params.data.startDate, 'dd MMM');
         const days = this.leaveDuration(params.data);
         return `
-          <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; line-height: 1.3;">
-            <div style="display: flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: #0f172a;">
-              <span>${sDate}</span>
-              <span style="color: #94a3b8; font-weight: 400;">→</span>
+          <div class="lv-date-cell">
+            <div class="lv-date-primary lv-date-range">
+              <span>${sShort}</span>
+              <span class="lv-date-arrow">→</span>
               <span>${eDate}</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #64748b; margin-top: 2px;">
-              <span>${sDay} – ${eDay}</span>
-              <span style="display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: #94a3b8;"></span>
-              <span style="color: #475569; font-weight: 600;">${days} ${days === 1 ? 'day' : 'days'}</span>
+            <div class="lv-date-sub">
+              <strong class="lv-days-count">${days} ${days === 1 ? 'day' : 'days'}</strong>
+              ${durChip}
             </div>
           </div>
         `;
       }
     },
     {
-      headerName: 'Duration',
-      minWidth: 125,
-      flex: 0.8,
-      cellRenderer: (params: any) => {
-        if (params.data?.isHalfDay) {
-          const period = params.data.halfDayPeriod || 'AM';
-          const periodLabel = period === 'PM' ? 'Half Day (PM)' : 'Half Day (AM)';
-          return `
-            <div style="display: flex; align-items: center; height: 100%;">
-              <span style="display: inline-flex; align-items: center; gap: 4px; height: 22px; line-height: 20px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; white-space: nowrap; box-sizing: border-box; width: fit-content; max-width: fit-content; flex-shrink: 0;">
-                <span style="font-size: 11px; line-height: 1;">🌓</span>
-                <span>${periodLabel}</span>
-              </span>
-            </div>
-          `;
-        }
-        return `
-          <div style="display: flex; align-items: center; height: 100%;">
-            <span style="display: inline-flex; align-items: center; gap: 4px; height: 22px; line-height: 20px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; white-space: nowrap; box-sizing: border-box; width: fit-content; max-width: fit-content; flex-shrink: 0;">
-              <span style="font-size: 11px; line-height: 1;">☀️</span>
-              <span>Full Day</span>
-            </span>
-          </div>
-        `;
-      }
+      // #24a/c (19 Nov 2026): when it was raised, right after Leave Date
+      headerName: 'Applied On',
+      colId: 'appliedOn',
+      filter: false,
+      minWidth: 145,
+      flex: 1.05,
+      sortable: true,
+      valueGetter: (p: any) => p.data?.createdAt ? new Date(p.data.createdAt).getTime() : 0,
+      cellRenderer: (p: any) => this.appliedOnCell(p.data),
     },
     {
-      headerName: 'Leave Status',
-      field: 'status',
-      flex: 1.1,
+      field: 'leaveType.name',
+      headerName: 'Leave Type',
+      filter: false,
       minWidth: 155,
+      flex: 1.2,
+      cellRenderer: (params: any) => {
+        if (!params.value) return '<span class="lv-dash">—</span>';
+        const typeName = params.value;
+        const color = this.getLeaveTypeColor(typeName);
+        const bg = this.getLeaveTypeBgColor(typeName);
+        const border = this.getLeaveTypeBorderColor(typeName);
+        const isPaid = params.data?.leaveType?.isPaid !== false;
+        const unpaidHtml = !isPaid ? `<span class="lv-unpaid-chip">Unpaid</span>` : '';
+        const attachHtml = params.data?.attachmentUrl
+          ? `<a href="${params.data.attachmentUrl}" target="_blank" rel="noopener noreferrer" title="View attached document" class="lv-attach-chip">📎 Receipt</a>`
+          : '';
+        const subRow = (unpaidHtml || attachHtml) ? `<div class="lv-type-sub">${unpaidHtml}${attachHtml}</div>` : '';
+        return `
+          <div class="lv-type-cell">
+            <span class="lv-type-pill" style="background:${bg};color:${color};border-color:${border};" title="${typeName}">
+              <span class="lv-pill-dot" style="background:${color};"></span>
+              <span class="lv-pill-text">${typeName}</span>
+            </span>
+            ${subRow}
+          </div>
+        `;
+      }
+    },
+    {
+      headerName: 'Status',
+      field: 'status',
+      filter: false,
+      flex: 0.9,
+      minWidth: 112,
       cellRenderer: (params: any) => {
         const s = (params.value || 'PENDING').toUpperCase();
-        let bg = '#fffbeb';
-        let border = '#fde68a';
-        let color = '#92400e';
-        let dot = '#f59e0b';
-        let label = 'Pending';
-        if (s === 'APPROVED') {
-          bg = '#ecfdf5';
-          border = '#a7f3d0';
-          color = '#065f46';
-          dot = '#10b981';
-          label = 'Approved';
-        } else if (s === 'REJECTED') {
-          bg = '#fef2f2';
-          border = '#fecaca';
-          color = '#991b1b';
-          dot = '#ef4444';
-          label = 'Rejected';
-        } else if (s === 'CANCELLED') {
-          bg = '#f1f5f9';
-          border = '#e2e8f0';
-          color = '#475569';
-          dot = '#94a3b8';
-          label = 'Cancelled';
-        }
+        const cls = s === 'APPROVED' ? 'approved' : s === 'REJECTED' ? 'rejected' : s === 'CANCELLED' ? 'cancelled' : 'pending';
+        const label = s === 'APPROVED' ? 'Approved' : s === 'REJECTED' ? 'Rejected' : s === 'CANCELLED' ? 'Cancelled' : 'Pending';
         const safeReason = (params.data?.rejectionReason || '').replace(/"/g, '&quot;');
-        const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason 
-          ? `<div class="view-reason-link" title="Reason: ${safeReason}" style="font-size: 10.5px; color: #dc2626; font-weight: 500; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; display: inline-flex; align-items: center; gap: 3px; background: #fef2f2; padding: 1px 6px; border-radius: 4px; border: 1px solid #fecaca; margin-top: 3px; line-height: 1.2;">
-              <span style="opacity: 0.8;">Reason:</span>
-              <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85px;">${safeReason}</span>
-            </div>`
+        const reasonHtml = s === 'REJECTED' && params.data?.rejectionReason
+          ? `<div class="view-reason-link lv-rej-chip" title="Reason: ${safeReason}">${safeReason}</div>`
           : '';
         return `
-          <div style="display: flex; flex-direction: column; justify-content: center; align-items: flex-start; height: 100%; box-sizing: border-box;">
-            <span style="display: inline-flex; align-items: center; height: 22px; line-height: 20px; padding: 0 8px; border-radius: 11px; font-size: 11px; font-weight: 600; background:${bg}; border: 1px solid ${border}; color:${color}; white-space: nowrap; flex-shrink: 0; box-sizing: border-box;">
-              <span style="width: 6px; height: 6px; min-width: 6px; min-height: 6px; border-radius: 50%; background:${dot}; margin-right: 5px; flex-shrink: 0; display: inline-block;"></span>
+          <div class="lv-status-cell">
+            <span class="lv-status-pill ${cls}">
+              <span class="lv-status-dot"></span>
               <span>${label}</span>
             </span>
             ${reasonHtml}
@@ -1467,59 +1442,14 @@ export class AttendanceLeaveComponent implements OnInit {
       }
     },
     {
-      field: 'leaveType.name',
-      headerName: 'Leave Type',
-      minWidth: 165,
-      flex: 1.1,
-      cellRenderer: (params: any) => {
-        if (!params.value) return '<span style="color:#94a3b8;">—</span>';
-        const typeName = params.value;
-        const color = this.getLeaveTypeColor(typeName);
-        const bg = this.getLeaveTypeBgColor(typeName);
-        const border = this.getLeaveTypeBorderColor(typeName);
-        const attachHtml = params.data?.attachmentUrl
-          ? `<a href="${params.data.attachmentUrl}" target="_blank" rel="noopener noreferrer" 
-                title="View attached document" 
-                style="display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 500; color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 1px 6px; margin-top: 3px; text-decoration: none; width: fit-content; line-height: 1.2;">
-                <span>📎</span> Receipt
-             </a>`
-          : '';
-        return `
-          <div style="display: flex; flex-direction: column; justify-content: center; align-items: flex-start; height: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;">
-            <span style="display: inline-flex; align-items: center; height: 22px; line-height: 20px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background:${bg}; color:${color}; border: 1px solid ${border}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; box-sizing: border-box; flex-shrink: 0;" title="${typeName}">
-              <span style="width: 5px; height: 5px; min-width: 5px; min-height: 5px; border-radius: 50%; background:${color}; margin-right: 5px; flex-shrink: 0; display: inline-block;"></span>
-              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${typeName}</span>
-            </span>
-            ${attachHtml}
-          </div>
-        `;
-      }
-    },
-    {
-      headerName: 'Paid',
-      minWidth: 85,
-      flex: 0.6,
-      cellRenderer: (params: any) => {
-        const isPaid = params.data?.leaveType?.isPaid !== false;
-        const label = isPaid ? 'Paid' : 'Unpaid';
-        const color = isPaid ? '#15803d' : '#b91c1c';
-        const background = isPaid ? '#dcfce7' : '#fee2e2';
-        const border = isPaid ? '#bbf7d0' : '#fecaca';
-        return `
-          <div style="display: flex; align-items: center; height: 100%;">
-            <span style="display: inline-flex; align-items: center; height: 22px; line-height: 20px; padding: 0 8px; background:${background}; color:${color}; border: 1px solid ${border}; font-size: 11px; font-weight: 600; border-radius: 6px; white-space: nowrap; box-sizing: border-box;">
-              ${label}
-            </span>
-          </div>
-        `;
-      }
-    },
-    {
       headerName: 'Action',
-      width: 150,
-      pinned: 'right',
+      width: 72,
+      minWidth: 68,
+      maxWidth: 78,
       sortable: false,
       filter: false,
+      cellClass: 'lv-action-cell',
+      headerClass: 'lv-action-hdr',
       cellRenderer: LeaveActionCellRendererComponent,
       cellRendererParams: {
         onView: (data: any) => this.openLeaveDetail(data),
@@ -1550,7 +1480,8 @@ export class AttendanceLeaveComponent implements OnInit {
   allBalances = signal<LeaveBalance[]>([]);
   allRequests = signal<LeaveRequest[]>([]);
   isLoadingLeaveApprovals = signal<boolean>(true);
-  approvalStatusFilter = signal<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('ALL');
+  // #23 (19 Nov 2026): opens on Pending so HR sees what needs action first.
+  approvalStatusFilter = signal<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'>('PENDING');
 
   leaveApplicationsList = computed(() => {
     if (this.profileEmployeeId) return this.profileRequests();
@@ -1569,9 +1500,42 @@ export class AttendanceLeaveComponent implements OnInit {
   cancelledLeaveCount = computed(() => this.leaveApplicationsList().filter(r => r.status === 'CANCELLED').length);
   pendingCount = computed(() => this.pendingLeaveCount());
 
+  /** IST calendar day (YYYY-MM-DD) of an instant or a date-only value. */
+  private istDay(v: any): string {
+    if (!v) return '';
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}(T00:00:00(\.000)?Z?)?$/.test(v)) return v.slice(0, 10);
+    return new Date(new Date(v).getTime() + 330 * 60000).toISOString().slice(0, 10);
+  }
+
+  /** #24c: EMERGENCY = applied on the start day (IST); LATE = applied after it starts. */
+  leaveUrgency(r: any): 'EMERGENCY' | 'LATE' | null {
+    if (!r?.createdAt || !r?.startDate) return null;
+    const applied = this.istDay(r.createdAt);
+    const start = String(r.startDate).slice(0, 10);
+    if (applied === start) return 'EMERGENCY';
+    if (applied > start) return 'LATE';
+    return null;
+  }
+
+  appliedOnCell(r: any): string {
+    if (!r?.createdAt) return '<span class="lv-dash">—</span>';
+    const d = new Date(r.createdAt);
+    const date = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+    const time = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+    const u = this.leaveUrgency(r);
+    const tag = u === 'EMERGENCY'
+      ? '<span class="lv-emerg-chip" title="Applied on the same day the leave starts">Emergency</span>'
+      : '';
+    return `<div class="lv-applied-cell">
+      <span class="lv-applied-date">${date}</span>
+      <div class="lv-applied-sub"><span>${time}</span>${tag}</div>
+    </div>`;
+  }
+
   /** Status dropdown in the filter row (replaces the KPI cards). */
   get leaveStatusOptions(): SearchableSelectOption[] {
     return [
+      { id: 'ALL', name: `All (${this.totalLeaveCount()})` },
       { id: 'PENDING', name: `Pending (${this.pendingLeaveCount()})` },
       { id: 'APPROVED', name: `Approved (${this.approvedLeaveCount()})` },
       { id: 'REJECTED', name: `Rejected (${this.rejectedLeaveCount()})` },
@@ -1585,7 +1549,8 @@ export class AttendanceLeaveComponent implements OnInit {
 
   clearAllLeaveFilters(): void {
     this.leaveApplicationsSearch.set('');
-    this.approvalStatusFilter.set('ALL');
+    this.urgencyFilter.set('ALL');
+    this.approvalStatusFilter.set('PENDING');
     this.filterStartDate.set('');
     this.filterEndDate.set('');
     this.filterEmployeeQuery.set('');
@@ -1875,8 +1840,9 @@ export class AttendanceLeaveComponent implements OnInit {
       return {
         id: emp.id.toString(),
         name: `${emp.firstName} ${emp.lastName}`.trim(),
-        subtitle: `${des}${dept}`.trim() || emp.email,
-        tag: code || undefined,
+        // 19 Nov 2026: show the login email instead of code + designation · department.
+        subtitle: (emp as any).user?.email || emp.email || `${des}${dept}`.trim(),
+        tag: undefined,
         avatarUrl: emp.avatarUrl || undefined,
         avatarText: initials,
         avatarColor: this.getAvatarBgColor(emp.firstName)
@@ -2009,6 +1975,7 @@ export class AttendanceLeaveComponent implements OnInit {
   /** Status dropdown and bulk select for Pending Regularizations (12 Nov 2026). */
   get regStatusOptions(): SearchableSelectOption[] {
     return [
+      { id: 'ALL', name: `All (${this.pendingRegularizations().length + this.approvedRegularizations().length + this.rejectedRegularizations().length})` },
       { id: 'PENDING', name: `Pending (${this.pendingRegularizations().length})` },
       { id: 'APPROVED', name: `Approved (${this.approvedRegularizations().length})` },
       { id: 'REJECTED', name: `Rejected (${this.rejectedRegularizations().length})` },
@@ -2172,7 +2139,8 @@ export class AttendanceLeaveComponent implements OnInit {
   holidayForm = {
     id: 0,
     name: '',
-    date: ''
+    date: '',
+    isOptional: false, // #28 (19 Nov 2026)
   };
 
   filteredHolidays = computed(() => {
@@ -2708,7 +2676,7 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   onRegularizationCellClicked(params: CellClickedEvent) {
-    if (params.colDef.field === 'employee' && params.data) {
+    if ((params.colDef.field === 'employee' || params.colDef.field === 'reason') && params.data) {
       this.openRegularizationDetail(params.data);
     }
   }
@@ -3048,15 +3016,32 @@ export class AttendanceLeaveComponent implements OnInit {
     });
   }
 
+  // #24b (19 Nov 2026): balance impact, team off, timeline for the details window.
+  leaveContext = signal<any>(null);
+  leaveContextLoading = signal(false);
+  leaveReasonExpanded = signal(false);
+
   openLeaveDetail(data: any) {
     this.selectedLeave.set(data);
     this.isLeaveDetailOpen.set(true);
+    this.leaveContext.set(null);
+    this.leaveReasonExpanded.set(false);
+    if (!data?.id) return;
+    this.leaveContextLoading.set(true);
+    this.leavesService.getRequestContext(data.id).subscribe({
+      next: (c) => { if (this.selectedLeave()?.id === data.id) this.leaveContext.set(c); this.leaveContextLoading.set(false); },
+      error: () => this.leaveContextLoading.set(false),
+    });
   }
 
   closeLeaveDetail() {
     this.isLeaveDetailOpen.set(false);
     this.selectedLeave.set(null);
+    this.leaveContext.set(null);
   }
+
+  teamOffName(t: any): string { return `${t?.employee?.firstName ?? ''} ${t?.employee?.lastName ?? ''}`.trim(); }
+  teamOffInitials(t: any): string { return this.teamOffName(t).split(/\s+/).map((w: string) => w[0]).slice(0, 2).join('').toUpperCase(); }
 
   /** Whole days between start and end, or 0.5 when the leave is a half day. */
   leaveDuration(leave: any): number {
@@ -3437,12 +3422,27 @@ export class AttendanceLeaveComponent implements OnInit {
 
   balanceBreakdown = signal<any | null>(null);
   openBalanceBreakdown(row: any) { this.balanceBreakdown.set(row); }
+  /** Breakdown → Assign Leave Balance (Individual) for the same person and year. */
+  canEditBalances(): boolean { return ['SUPERADMIN', 'ADMIN', 'HR'].includes(this.authService.currentUser()?.role || ''); }
+  editFromBreakdown(b: any) {
+    const id = b?.employeeData?.id ?? b?.employeeId ?? b?.id;
+    this.balanceBreakdown.set(null);
+    if (!id) return;
+    this.assignToAll.set(false);
+    this.selectedEmployeeId.set(String(id));
+    this.isAssignModalOpen.set(true);
+    this.loadQuotaGrid();
+  }
   closeBalanceBreakdown() { this.balanceBreakdown.set(null); }
 
   @HostListener('document:keydown.escape')
   onBalanceBreakdownEscape() {
-    if (this.balanceBreakdown()) {
+    if (this.isLeaveDetailOpen()) {
+      this.closeLeaveDetail();
+    } else if (this.balanceBreakdown()) {
       this.closeBalanceBreakdown();
+    } else if (this.isAssignModalOpen()) {
+      this.closeAssignModal();
     }
   }
 
@@ -3869,6 +3869,20 @@ export class AttendanceLeaveComponent implements OnInit {
     // Deep link from the ticket form: ?regularize=1 opens the request form.
     if (this.route.snapshot.queryParamMap.get('regularize')) {
       setTimeout(() => this.openRegularizationModal(), 300);
+    }
+    // #29 (19 Nov 2026): Leave Quota Report "Manage" → open Assign Leave Balance
+    // (Individual) for that person. Super Admin only.
+    const assignFor = this.route.snapshot.queryParamMap.get('assign');
+    this.assignReturnTo = this.route.snapshot.queryParamMap.get('from');
+    if (this.route.snapshot.queryParamMap.has('assign') && this.authService.currentUser()?.role === 'SUPERADMIN') {
+      const yr = this.route.snapshot.queryParamMap.get('year');
+      setTimeout(() => {
+        this.assignToAll.set(false);
+        if (yr) this.assignYear.set(yr as any);
+        this.selectedEmployeeId.set(assignFor ? String(assignFor) : '');
+        this.isAssignModalOpen.set(true);
+        if (assignFor) this.loadQuotaGrid();
+      }, 300);
     }
     // Deep link from the dashboard's "Apply Leave": ?apply=1 opens the leave form.
     if (this.route.snapshot.queryParamMap.get('apply')) {
@@ -4588,7 +4602,7 @@ export class AttendanceLeaveComponent implements OnInit {
     return !!(
       this.filterStartDate() || this.filterEndDate() || this.filterEmployeeQuery()
       || this.filterLeaveTypeId() || this.leaveStatusFilter()
-      || this.approvalStatusFilter() !== 'ALL'
+      || this.approvalStatusFilter() !== 'PENDING' || this.urgencyFilter() !== 'ALL'
     );
   }
 
@@ -4670,6 +4684,7 @@ export class AttendanceLeaveComponent implements OnInit {
     this.filterEmployeeQuery.set(filters.employeeQuery);
     this.filterLeaveTypeId.set(filters.filters['leaveType'] || '');
     const status = filters.filters['status'] || '';
+    this.urgencyFilter.set(filters.filters['urgency'] === 'EMERGENCY' ? 'EMERGENCY' : 'ALL');
     if (this.isAdmin() && this.leaveSection() !== 'balances') {
       this.approvalStatusFilter.set(
         status === 'PENDING' || status === 'APPROVED' || status === 'REJECTED' || status === 'CANCELLED'
@@ -4724,13 +4739,13 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   openAddHolidayModal() {
-    this.holidayForm = { id: 0, name: '', date: '' };
+    this.holidayForm = { id: 0, name: '', date: '', isOptional: false };
     this.isHolidayModalOpen.set(true);
   }
 
   openEditHolidayModal(h: Holiday) {
     const dateFormatted = h.date ? new Date(h.date).toISOString().split('T')[0] : '';
-    this.holidayForm = { id: h.id, name: h.name, date: dateFormatted };
+    this.holidayForm = { id: h.id, name: h.name, date: dateFormatted, isOptional: !!(h as any).isOptional };
     this.isHolidayModalOpen.set(true);
   }
 
@@ -4811,15 +4826,19 @@ export class AttendanceLeaveComponent implements OnInit {
     if (!id || this.assignToAll()) { this.quotaGrid.set([]); return; }
     this.quotaGridLoading.set(true);
     this.leavesService.getEmployeeQuotaGrid(id, Number(this.assignYear()) || new Date().getFullYear()).subscribe({
-      next: (rows) => { this.quotaGrid.set((rows || []).map((r) => ({ ...r, draft: r.allocated, lockDraft: r.locked }))); this.quotaGridLoading.set(false); },
+      next: (rows) => { this.quotaGrid.set((rows || []).map((r) => ({ ...r, draft: this.remainingOf(r), lockDraft: r.locked }))); this.quotaGridLoading.set(false); },
       error: (e) => { this.quotaGridLoading.set(false); this.toast.error(e?.error?.message || 'Could not load leave balances'); },
     });
   }
 
+  /** 19 Nov 2026: the input is the REMAINING days; allocated = remaining + used. */
+  remainingOf(r: any): number { return Math.round(((Number(r.allocated) || 0) - (Number(r.used) || 0)) * 100) / 100; }
+
   saveQuotaRow(r: any) {
     const id = Number(this.selectedEmployeeId());
-    const days = Number(r.draft);
-    if (!id || !Number.isFinite(days) || days < 0) { this.toast.error('Enter a valid number of days'); return; }
+    const remaining = Number(r.draft);
+    if (!id || !Number.isFinite(remaining) || remaining < 0) { this.toast.error('Enter a valid number of days'); return; }
+    const days = Math.round((remaining + (Number(r.used) || 0)) * 100) / 100;
     this.quotaSaving = r.leaveTypeId;
     this.leavesService.assignBalance({
       employeeId: id, leaveTypeId: r.leaveTypeId, allocated: days, year: Number(this.assignYear()) || new Date().getFullYear(),
@@ -4828,7 +4847,7 @@ export class AttendanceLeaveComponent implements OnInit {
       next: () => {
         this.quotaSaving = null;
         r.allocated = days; r.locked = this.isSuperAdminUser() ? !!r.lockDraft : r.locked; r.exists = true;
-        this.toast.success(`${r.name}: ${days} day${days === 1 ? '' : 's'} saved${r.locked ? ' · locked' : ''}`);
+        this.toast.success(`${r.name}: ${remaining} day${remaining === 1 ? '' : 's'} remaining (${days} allocated)${r.locked ? ' · locked' : ''}`);
         this.loadAdminData();
       },
       error: (e) => { this.quotaSaving = null; this.toast.error(e?.error?.message || 'Could not save'); },
@@ -4836,7 +4855,18 @@ export class AttendanceLeaveComponent implements OnInit {
   }
 
   quotaRowChanged(r: any): boolean {
-    return Number(r.draft) !== Number(r.allocated) || !!r.lockDraft !== !!r.locked || !r.exists;
+    return Number(r.draft) !== this.remainingOf(r) || !!r.lockDraft !== !!r.locked || !r.exists;
+  }
+
+  quotaGridPaidTotal(): number {
+    const sum = this.quotaGrid()
+      .filter((r) => r.isPaid !== false)
+      .reduce((acc, r) => acc + (Number(r.draft) || 0), 0);
+    return Math.round(sum * 10) / 10;
+  }
+
+  quotaGridLockedCount(): number {
+    return this.quotaGrid().filter((r) => !!r.lockDraft).length;
   }
 
   /** Assign Leave Balance lives in a pop-up opened from the header (12 Nov 2026). */
@@ -4892,6 +4922,17 @@ export class AttendanceLeaveComponent implements OnInit {
           this.isAssigning.set(false);
         }
       });
+    }
+  }
+
+  /** Where Assign Leave Balance was opened from (#29): close goes back there. */
+  assignReturnTo: string | null = null;
+  closeAssignModal() {
+    this.isAssignModalOpen.set(false);
+    if (this.assignReturnTo === 'leave-quota') {
+      this.assignReturnTo = null;
+      const yr = this.route.snapshot.queryParamMap.get('year');
+      this.router.navigate(['/attendance/leave-quota'], yr ? { queryParams: { year: yr } } : {});
     }
   }
 

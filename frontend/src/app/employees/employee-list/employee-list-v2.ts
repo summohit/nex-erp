@@ -588,6 +588,14 @@ export class EmployeeListComponentV2 implements OnInit {
         onResendVerification: (data: any) => this.resendVerification(data),
         // Super Admin only, and only on the shared HR login (16 Nov 2026).
         extraActions: [{
+          label: 'Send welcome email',
+          show: () => this.canIntro(),
+          onClick: (data: any) => this.sendWelcome(data),
+        }, {
+          label: 'Send intro email',
+          show: () => this.canIntro(),
+          onClick: (data: any) => this.openIntro(data),
+        }, {
           label: 'Change login email',
           show: (data: any) => this.canChangeEmail(data),
           onClick: (data: any) => this.openEmailChange(data),
@@ -626,6 +634,83 @@ export class EmployeeListComponentV2 implements OnInit {
 
   personalEmailCount(): number {
     return this.employees().filter((e: any) => e.user?.status === 'ACTIVE' && this.isPersonalEmail(e)).length;
+  }
+
+  // ── Welcome + intro emails (#16, 19 Nov 2026) ──
+  introFor: any = null;
+  introStatus: any = null;
+  introSubject = '';
+  introMessage = '';
+  introDeptIds = new Set<number>();
+  introPeople: any[] = [];
+  introEveryone = false;
+  introSearch = '';
+  introStep: 'compose' | 'preview' = 'compose';
+  introBusy = false;
+
+  canIntro(): boolean { return ['SUPERADMIN', 'HR'].includes(this.authService.currentUser()?.role || ''); }
+
+  sendWelcome(data: any, force = false) {
+    const name = `${data?.firstName ?? ''} ${data?.lastName ?? ''}`.trim();
+    if (!force && !confirm(`Send the welcome email to ${name} (${data?.user?.email})?`)) return;
+    this.employeeService.sendWelcomeEmail(data.id, force).subscribe({
+      next: (r: any) => this.toast.success(r?.emailed ? `Welcome email sent to ${r.to}.` : 'Notification sent; the email could not be delivered.'),
+      error: (e: any) => {
+        if (e?.status === 409 && confirm(`${e.error?.message}\n\nSend it again?`)) { this.sendWelcome(data, true); return; }
+        if (e?.status !== 409) this.toast.error(e?.error?.message || 'Could not send the welcome email');
+      },
+    });
+  }
+
+  openIntro(data: any) {
+    this.introFor = data; this.introStatus = null; this.introStep = 'compose';
+    this.introDeptIds = new Set(data?.departmentId ? [Number(data.departmentId)] : []);
+    this.introPeople = []; this.introEveryone = false; this.introSearch = '';
+    this.introSubject = ''; this.introMessage = '';
+    this.employeeService.getIntroStatus(data.id).subscribe({
+      next: (s: any) => { this.introStatus = s; this.introSubject = s.defaultSubject; this.introMessage = s.defaultMessage; },
+      error: (e: any) => { this.toast.error(e?.error?.message || 'Could not open the intro'); this.introFor = null; },
+    });
+  }
+
+  toggleIntroDept(id: number) { this.introDeptIds.has(id) ? this.introDeptIds.delete(id) : this.introDeptIds.add(id); this.introDeptIds = new Set(this.introDeptIds); }
+
+  introSearchResults(): any[] {
+    const q = this.introSearch.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const picked = new Set(this.introPeople.map(p => p.id));
+    return this.employees().filter((e: any) => e.user?.status === 'ACTIVE' && e.id !== this.introFor?.id && !picked.has(e.id)
+      && `${e.firstName} ${e.lastName} ${e.employeeCode ?? ''}`.toLowerCase().includes(q)).slice(0, 6);
+  }
+
+  addIntroPerson(e: any) { this.introPeople = [...this.introPeople, e]; this.introSearch = ''; }
+  removeIntroPerson(id: number) { this.introPeople = this.introPeople.filter(p => p.id !== id); }
+
+  introRecipientCount(): number {
+    const active = this.employees().filter((e: any) => e.user?.status === 'ACTIVE');
+    if (this.introEveryone) return active.length;
+    const ids = new Set<number>([this.introFor?.id, ...this.introPeople.map(p => p.id)]);
+    active.forEach((e: any) => { if (e.departmentId && this.introDeptIds.has(Number(e.departmentId))) ids.add(e.id); });
+    return ids.size;
+  }
+
+  sendIntro(force = false) {
+    if (!this.introFor) return;
+    this.introBusy = true;
+    this.employeeService.sendIntroEmail(this.introFor.id, {
+      departmentIds: [...this.introDeptIds], employeeIds: this.introPeople.map(p => p.id), everyone: this.introEveryone,
+      subject: this.introSubject, message: this.introMessage, force,
+    }).subscribe({
+      next: (r: any) => {
+        this.introBusy = false; this.introFor = null;
+        this.toast.success(`Intro sent to ${r.recipients} ${r.recipients === 1 ? 'person' : 'people'} (email + notification)${r.failed ? ` · ${r.failed} email(s) failed` : ''}.`, { duration: 6000 });
+      },
+      error: (e: any) => {
+        this.introBusy = false;
+        if (e?.status === 409 && confirm(`${e.error?.message}\n\nSend it again?`)) { this.sendIntro(true); return; }
+        if (e?.status !== 409) this.toast.error(e?.error?.message || 'Could not send the intro');
+      },
+    });
   }
 
   resendLoginNotice(data: any) {

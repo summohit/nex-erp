@@ -417,11 +417,11 @@
             <!-- Leave / holiday (19 Nov 2026): whole row tinted, reason over a blur -->
             <div class="ts-off-overlay" *ngIf="isFullOff(day)" aria-hidden="false">
               <span class="ts-off-pill">
-                <span class="ts-off-ico">{{ offIcon(day.offDay.type) }}</span>
-                {{ day.offDay.label }}
+                <span class="ts-off-ico">{{ offIcon(day.offDay?.type || "") }}</span>
+                {{ day.offDay?.label }}
               </span>
             </div>
-            <span class="ts-off-half" [attr.data-off]="day.offDay?.type" *ngIf="day.offDay && !isFullOff(day)">{{ day.offDay.label }}{{ day.offDay.halfDay ? '' : ' · worked' }}</span>
+            <span class="ts-off-half" [attr.data-off]="day.offDay?.type" *ngIf="day.offDay && !isFullOff(day)">{{ day.offDay?.label }}{{ day.offDay.halfDay ? '' : ' · worked' }}</span>
             <div class="ts-day-date">
               <span class="ts-day-dow">{{ day.date + 'T00:00:00' | date:'EEE' }}</span>
               <span class="ts-day-num">{{ day.date + 'T00:00:00' | date:'d MMM' }}</span>
@@ -953,14 +953,14 @@
                         <!-- Same as My Timesheet: whole row tinted, reason over a blur -->
                         <div class="ts-off-overlay" *ngIf="isFullOff(day)">
                           <span class="ts-off-pill">
-                            <span class="ts-off-ico">{{ offIcon(day.offDay.type) }}</span>
-                            {{ day.offDay.label }}
+                            <span class="ts-off-ico">{{ offIcon(day.offDay?.type || "") }}</span>
+                            {{ day.offDay?.label }}
                           </span>
                         </div>
                         <div class="ts-detail-date">
                           <span class="ts-day-dow">{{ day.date + 'T00:00:00' | date:'EEE' }}</span>
                           <span class="ts-day-num">{{ day.date + 'T00:00:00' | date:'d MMM' }}</span>
-                          <span class="ts-detail-off" *ngIf="day.offDay && !isFullOff(day)" [attr.data-off]="day.offDay.type">{{ offIcon(day.offDay.type) }} {{ day.offDay.label }}{{ day.offDay.halfDay ? '' : ' · worked' }}</span>
+                          <span class="ts-detail-off" *ngIf="day.offDay && !isFullOff(day)" [attr.data-off]="day.offDay.type">{{ offIcon(day.offDay?.type || "") }} {{ day.offDay?.label }}{{ day.offDay.halfDay ? '' : ' · worked' }}</span>
                         </div>
 
                         <div class="ts-detail-hours">

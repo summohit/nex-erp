@@ -9,7 +9,10 @@
     <button type="button" class="lq-hdr-btn" (click)="load()" [disabled]="loading()" title="Reload report data">
       <svg lucideRefreshCw [size]="15" [class.spin-anim]="loading()"></svg>Refresh
     </button>
-    <button type="button" class="lq-hdr-btn primary" (click)="exportCsv()" [disabled]="loading() || !rows().length" title="Export current quota report to CSV">
+    <button type="button" class="lq-hdr-btn primary" *ngIf="canManageQuota" (click)="openAssignBalance()" title="Assign leave balance to one employee">
+      <svg lucidePlus [size]="15"></svg>Assign balance
+    </button>
+    <button type="button" class="lq-hdr-btn" (click)="exportCsv()" [disabled]="loading() || !rows().length" title="Export current quota report to CSV">
       <svg lucideDownload [size]="15"></svg>Export CSV
     </button>
   </app-page-header>

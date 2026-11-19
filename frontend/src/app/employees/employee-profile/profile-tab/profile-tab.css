@@ -731,8 +731,6 @@
   font-size: 13px;
   line-height: 1.6;
 }
-  animation: pulse 1.5s infinite ease-in-out;
-}
 
 .org-details-skeleton {
   display: flex;

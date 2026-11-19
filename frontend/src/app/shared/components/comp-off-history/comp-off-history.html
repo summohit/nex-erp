@@ -1,5 +1,5 @@
 <div class="coh-backdrop" *ngIf="open" (click)="close()">
-  <div class="coh-panel" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Comp-off history">
+  <div class="coh-panel" [class.is-wide]="view() === 'credits'" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Comp-off history">
     <!-- Drawer Header -->
     <div class="coh-head">
       <div class="coh-head-title-wrap">
@@ -19,8 +19,14 @@
       </div>
     </div>
 
+    <!-- #26 (19 Nov 2026): By person | All credits -->
+    <div class="coh-view-tabs" role="tablist">
+      <button type="button" role="tab" [class.on]="view() === 'person'" (click)="view.set('person')">By person</button>
+      <button type="button" role="tab" [class.on]="view() === 'credits'" (click)="view.set('credits')">All credits <b>{{ allCredits().length }}</b></button>
+    </div>
+
     <!-- Search, Filter Tabs & Metrics Toolbar (For All Employees) -->
-    <div class="coh-toolbar" *ngIf="allEmployees">
+    <div class="coh-toolbar" *ngIf="allEmployees && view() === 'person'">
       <!-- Search Input -->
       <div class="coh-search-box">
         <svg lucideSearch size="16" class="coh-search-icon"></svg>
@@ -103,7 +109,7 @@
     </div>
 
     <!-- Scrollable Body Content -->
-    <div class="coh-body">
+    <div class="coh-body" *ngIf="view() === 'person'">
       <!-- Loading Skeleton -->
       <div class="coh-skeleton-wrap" *ngIf="loading()">
         <div class="coh-skeleton-card" *ngFor="let s of [1, 2, 3, 4]">
@@ -402,6 +408,139 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- #26: one row per comp-off credit (enhanced) -->
+    <div class="coh-credits" *ngIf="view() === 'credits'">
+      <!-- Quick Status KPI Strip -->
+      <div class="coh-cr-kpis" *ngIf="!loading() && allCredits().length">
+        <button type="button" class="coh-cr-kpi" [class.active]="!crStatus()" (click)="crStatus.set('')">
+          <span class="coh-cr-kpi-l">Total Credits</span>
+          <div class="coh-cr-kpi-v">
+            <strong>{{ allCredits().length }}</strong>
+            <small>{{ filteredCreditDays() }}d shown</small>
+          </div>
+        </button>
+        <button type="button" class="coh-cr-kpi kpi-avail" [class.active]="crStatus() === 'AVAILABLE'" (click)="crStatus.set(crStatus() === 'AVAILABLE' ? '' : 'AVAILABLE')">
+          <span class="coh-cr-kpi-l">Available</span>
+          <div class="coh-cr-kpi-v">
+            <strong>{{ crCount('status', 'AVAILABLE') }}</strong>
+            <small>ready to use</small>
+          </div>
+        </button>
+        <button type="button" class="coh-cr-kpi kpi-part" [class.active]="crStatus() === 'PARTLY_USED'" (click)="crStatus.set(crStatus() === 'PARTLY_USED' ? '' : 'PARTLY_USED')">
+          <span class="coh-cr-kpi-l">Partly Used</span>
+          <div class="coh-cr-kpi-v">
+            <strong>{{ crCount('status', 'PARTLY_USED') }}</strong>
+            <small>partial left</small>
+          </div>
+        </button>
+        <button type="button" class="coh-cr-kpi kpi-used" [class.active]="crStatus() === 'USED'" (click)="crStatus.set(crStatus() === 'USED' ? '' : 'USED')">
+          <span class="coh-cr-kpi-l">Used</span>
+          <div class="coh-cr-kpi-v">
+            <strong>{{ crCount('status', 'USED') }}</strong>
+            <small>redeemed</small>
+          </div>
+        </button>
+      </div>
+
+      <!-- Filters Card -->
+      <div class="coh-cr-toolbar">
+        <div class="coh-cr-filters">
+          <select *ngIf="allEmployees" [ngModel]="crEmployee()" (ngModelChange)="crEmployee.set($event)" aria-label="Employee">
+            <option value="">All employees ({{ allCredits().length }})</option>
+            <option *ngFor="let p of people()" [value]="p.employee.id">{{ p.employee.firstName }} {{ p.employee.lastName }} ({{ p.credits.length }})</option>
+          </select>
+          <select [ngModel]="crSource()" (ngModelChange)="crSource.set($event)" aria-label="Source">
+            <option value="">All sources</option>
+            <option value="FIELD_VISIT">Field visit ({{ crCount('source', 'FIELD_VISIT') }})</option>
+            <option value="HOLIDAY">Holiday worked ({{ crCount('source', 'HOLIDAY') }})</option>
+            <option value="WEEK_OFF">Weekly off worked ({{ crCount('source', 'WEEK_OFF') }})</option>
+          </select>
+          <select [ngModel]="crStatus()" (ngModelChange)="crStatus.set($event)" aria-label="Status">
+            <option value="">All statuses</option>
+            <option value="AVAILABLE">Available ({{ crCount('status', 'AVAILABLE') }})</option>
+            <option value="PARTLY_USED">Partly used ({{ crCount('status', 'PARTLY_USED') }})</option>
+            <option value="USED">Used ({{ crCount('status', 'USED') }})</option>
+          </select>
+          <button type="button" class="coh-cr-reset" *ngIf="crEmployee() || crSource() || crStatus()" (click)="resetCreditFilters()" title="Clear the filters">
+            <svg lucideRotateCcw [size]="13" aria-hidden="true"></svg>
+            <span>Reset</span>
+          </button>
+          <span class="coh-cr-count">
+            <strong>{{ filteredCredits().length }}</strong> credit{{ filteredCredits().length === 1 ? '' : 's' }} · <strong>{{ filteredCreditDays() }}</strong> day{{ filteredCreditDays() === 1 ? '' : 's' }}
+          </span>
+        </div>
+        <p class="coh-cr-hint">
+          <svg lucideInfo [size]="12" aria-hidden="true"></svg>
+          <span>Filtered by earned date using the Duration range above.</span>
+        </p>
+      </div>
+
+      <div class="coh-cr-empty" *ngIf="!loading() && !filteredCredits().length">
+        <svg lucideCalendar [size]="24" aria-hidden="true"></svg>
+        <span>No comp-off credits match these filters.</span>
+      </div>
+
+      <div class="coh-cr-scroll" *ngIf="filteredCredits().length" tabindex="0" role="region" aria-label="Comp-off credits table">
+        <table class="coh-cr-table">
+          <thead>
+            <tr>
+              <th *ngIf="allEmployees">Employee</th>
+              <th>Earned For</th>
+              <th>Source</th>
+              <th>Used On</th>
+              <th class="col-status">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let c of filteredCredits()">
+              <td *ngIf="allEmployees">
+                <div class="coh-cr-person">
+                  <img *ngIf="c.employee.avatarUrl" [src]="c.employee.avatarUrl" alt="">
+                  <span *ngIf="!c.employee.avatarUrl" class="coh-cr-i">{{ (c.employee.firstName?.[0] || '') + (c.employee.lastName?.[0] || '') }}</span>
+                  <div class="coh-cr-person-copy">
+                    <b>{{ c.employee.firstName }} {{ c.employee.lastName }}</b>
+                    <small *ngIf="c.employee.employeeCode">#{{ c.employee.employeeCode }}</small>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div class="coh-cr-earned">
+                  <div class="coh-cr-earned-top">
+                    <b>{{ c.date ? (c.date | date:'EEE, d MMM y') : '—' }}</b>
+                    <span class="coh-cr-days">+{{ c.days }}d</span>
+                  </div>
+                  <small class="coh-cr-credited">Credited {{ c.creditedOn | date:'d MMM y, h:mm a' }}</small>
+                </div>
+              </td>
+              <td>
+                <div class="coh-cr-source-cell">
+                  <span class="coh-cr-src" [ngClass]="'s-' + c.source">
+                    {{ c.source === 'FIELD_VISIT' ? 'Field visit' : c.source === 'HOLIDAY' ? 'Holiday worked' : 'Weekly off worked' }}
+                  </span>
+                  <small class="coh-cr-sub" *ngIf="c.fieldVisit">{{ c.fieldVisit.number }}<ng-container *ngIf="c.fieldVisit.location"> · {{ c.fieldVisit.location }}</ng-container></small>
+                  <small class="coh-cr-sub" *ngIf="!c.fieldVisit">{{ c.reason }}</small>
+                </div>
+              </td>
+              <td>
+                <div class="coh-cr-used-list" *ngIf="c.usedBy?.length; else notUsed">
+                  <span *ngFor="let u of c.usedBy" class="coh-cr-used-chip">
+                    {{ u.from | date:'d MMM y' }}<ng-container *ngIf="u.to !== u.from"> – {{ u.to | date:'d MMM' }}</ng-container>
+                  </span>
+                </div>
+                <ng-template #notUsed><span class="coh-cr-dash">Not used</span></ng-template>
+              </td>
+              <td class="col-status">
+                <span class="coh-cr-st" [ngClass]="'st-' + c.status">
+                  <span class="coh-cr-st-dot" aria-hidden="true"></span>
+                  <span>{{ c.status === 'USED' ? 'Used' : c.status === 'PARTLY_USED' ? 'Partly used' : 'Available' }}</span>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

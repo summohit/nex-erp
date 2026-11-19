@@ -148,7 +148,7 @@ export class SidebarComponent implements OnInit {
     const doneModules = [
       'Dashboard', 'Employees', 'Recruitment', 'Delivery', 'Attendance & Leave',
       'Performance', 'CRM', 'Sales', 'Settings',
-      'Appreciation', 'Offboarding', 'Payroll & Expenses', 'Clients', 'Assets & IT',
+      'Appreciation', 'Offboarding', 'Payroll & Expenses', 'Clients', 'Assets & IT', 'Assets & Inventory',
       'Notice Board', 'Website Chat',
     ];
     if (doneModules.includes(title)) return 'DONE';

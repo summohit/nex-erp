@@ -737,6 +737,88 @@ export class MailService {
     await this.sendWithRetry({ from: `"MIRA" <${this.fromEmail}>`, envelope: { from: this.fromEmail, to }, to, subject, html });
   }
 
+  /** Shared MIRA email shell (dark header, white card, footer) — 19 Nov 2026. */
+  private miraShell(o: { title: string; preheader: string; heading: string; sub: string; body: string; companyName?: string }) {
+    const baseUrl = (process.env.APP_URL || 'http://localhost:4200').replace(/\/+$/, '');
+    const logoUrl = `${baseUrl}/mira-small-logo.png`;
+    const company = this.escapeHtml(o.companyName || 'your company');
+    const font = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${this.escapeHtml(o.title)}</title>
+<style>body{margin:0;padding:0;background:#eef2f8}table{border-collapse:collapse}img{border:0;display:block}a{color:#2f5bea}
+@media only screen and (max-width:620px){.container{width:100%!important}.px{padding-left:20px!important;padding-right:20px!important}.h1{font-size:24px!important;line-height:30px!important}}</style></head>
+<body style="margin:0;padding:0;background:#eef2f8;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;">${this.escapeHtml(o.preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f8;"><tr><td align="center" style="padding:32px 12px;">
+<table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+<tr><td class="px" style="background:#0f1e3d;border-radius:16px 16px 0 0;padding:28px 40px 40px 40px;">
+  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+    <td style="background:#ffffff;border-radius:10px;width:40px;height:40px;text-align:center;vertical-align:middle;"><img src="${logoUrl}" width="28" height="23" alt="M" style="display:inline-block;width:28px;height:23px;margin:8px auto;"></td>
+    <td style="padding-left:12px;font-family:${font};font-size:18px;font-weight:700;color:#ffffff;">MIRA</td>
+    <td style="padding-left:12px;font-family:${font};font-size:13px;color:#9fb0d3;">by ${company}</td>
+  </tr></table>
+  <h1 class="h1" style="margin:28px 0 0 0;font-family:${font};font-size:30px;line-height:38px;font-weight:700;color:#ffffff;">${o.heading}</h1>
+  <p style="margin:10px 0 0 0;font-family:${font};font-size:16px;line-height:24px;color:#c4d0ea;">${o.sub}</p>
+</td></tr>
+<tr><td class="px" style="background:#ffffff;padding:32px 40px;font-family:${font};font-size:15px;line-height:23px;color:#3d4863;">${o.body}</td></tr>
+<tr><td class="px" style="background:#f7f9fc;border-top:1px solid #e3e8f1;border-radius:0 0 16px 16px;padding:22px 40px;font-family:${font};font-size:13px;line-height:20px;color:#7a869e;">Sent by MIRA on behalf of ${company}.</td></tr>
+</table></td></tr></table></body></html>`;
+  }
+
+  private async sendMira(to: string, subject: string, html: string) {
+    if (this.brevoApiKey) { await this.sendBrevoEmail({ to, subject, html }); return; }
+    await this.sendWithRetry({ from: `"MIRA" <${this.fromEmail}>`, envelope: { from: this.fromEmail, to }, to, subject, html });
+  }
+
+  /** Welcome email to a new joiner (#16a, 19 Nov 2026). Password is never touched. */
+  async sendJoinerWelcomeEmail(to: string, name: string, loginEmail: string, companyName?: string) {
+    const baseUrl = (process.env.APP_URL || 'http://localhost:4200').replace(/\/+$/, '');
+    const link = `${baseUrl}/auth/login`;
+    const font = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+    const first = this.escapeHtml((name || '').trim().split(/\s+/)[0] || 'there');
+    const co = this.escapeHtml(companyName || 'the team');
+    const step = (n: number, t: string, d: string) => `<tr><td style="padding-bottom:14px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr>
+      <td valign="top" width="28"><div style="width:28px;height:28px;background:#eef3ff;border-radius:50%;text-align:center;font-family:${font};font-size:13px;font-weight:700;color:#2f5bea;line-height:28px;">${n}</div></td>
+      <td style="padding-left:14px;font-family:${font};font-size:15px;line-height:22px;color:#3d4863;"><strong style="color:#0f1e3d;">${t}</strong> ${d}</td></tr></table></td></tr>`;
+    const body = `
+      <p style="margin:0 0 18px 0;">We're glad to have you with us. MIRA is where you'll mark attendance, apply for leave, see your payslips and keep your documents.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #dfe5f0;border-radius:12px;"><tr><td style="padding:16px 20px;">
+        <div style="font-size:13px;color:#64708a;">Your login email</div>
+        <div style="margin-top:6px;display:inline-block;background:#eef3ff;border:1px dashed #9db4f5;border-radius:8px;padding:7px 12px;font-weight:700;color:#1f3fb5;">${this.escapeHtml(loginEmail)}</div>
+        <div style="margin-top:10px;font-size:13px;color:#64708a;">Use the password you were given. Forgot it? Use "Forgot password" on the login page.</div>
+      </td></tr></table>
+      <div style="text-align:center;padding:28px 0 6px 0;"><a href="${link}" style="display:inline-block;background:#2f5bea;color:#ffffff;text-decoration:none;font-weight:700;padding:15px 34px;border-radius:10px;">Sign in to MIRA</a></div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:26px;">
+        <tr><td style="font-size:16px;font-weight:700;color:#0f1e3d;padding-bottom:14px;">Your first steps</td></tr>
+        ${step(1, 'Complete your profile.', 'Add your personal, bank and emergency contact details.')}
+        ${step(2, 'Upload your documents.', 'ID proof, education and previous employment documents.')}
+        ${step(3, 'Install the MIRA app.', 'Clock in and out from your phone.')}
+        ${step(4, 'Clock in every working day.', 'Your attendance and leave are tracked in MIRA.')}
+      </table>`;
+    await this.sendMira(to, `Welcome to ${companyName || 'the team'}, ${(name || '').split(' ')[0]}!`,
+      this.miraShell({ title: 'Welcome to MIRA', preheader: `Welcome aboard! Sign in to MIRA with ${loginEmail}.`, heading: `Welcome to ${co}, ${first}!`, sub: 'Here is everything you need to get started.', body, companyName }));
+  }
+
+  /** "Please welcome…" intro email (#16b, 19 Nov 2026). */
+  async sendIntroEmail(to: string, subject: string, message: string, card: { name: string; designation?: string; department?: string; manager?: string; joined?: string; location?: string; photo?: string }, companyName?: string) {
+    const esc = (t?: string) => this.escapeHtml(t || '');
+    const msg = esc(message).replace(/\n/g, '<br>');
+    const row = (k: string, v?: string) => v ? `<tr><td style="padding:6px 0;color:#64708a;font-size:13px;width:40%;">${k}</td><td style="padding:6px 0;color:#0f1e3d;font-size:14px;font-weight:600;">${esc(v)}</td></tr>` : '';
+    const initials = esc(card.name.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase());
+    const photo = card.photo && /^https?:\/\//.test(card.photo)
+      ? `<img src="${esc(card.photo)}" width="72" height="72" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;">`
+      : `<div style="width:72px;height:72px;border-radius:50%;background:#2f5bea;color:#fff;font-size:26px;font-weight:700;line-height:72px;text-align:center;">${initials}</div>`;
+    const body = `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #dfe5f0;border-radius:12px;"><tr>
+        <td width="96" valign="top" style="padding:20px 0 20px 20px;">${photo}</td>
+        <td style="padding:20px;"><div style="font-size:18px;font-weight:700;color:#0f1e3d;">${esc(card.name)}</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+            ${row('Designation', card.designation)}${row('Department', card.department)}${row('Reports to', card.manager)}${row('Joined', card.joined)}${row('Location', card.location)}
+          </table></td></tr></table>
+      <p style="margin:24px 0 0 0;">${msg}</p>`;
+    await this.sendMira(to, subject, this.miraShell({ title: subject, preheader: `Please welcome ${card.name}`, heading: `Please welcome ${esc(card.name)}`, sub: [card.designation, card.department].filter(Boolean).map(esc).join(' · ') || 'Our newest team member', body, companyName }));
+  }
+
   async sendNoticeEmail(email: string, title: string, body: string, attachmentCount = 0) {
     const baseUrl = process.env.APP_URL || 'http://localhost:4200';
     const escape = (t: string) =>

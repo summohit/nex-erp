@@ -2110,3 +2110,20 @@ th.sticky-actions-col {
 .hk-card strong { font-size: 26px; line-height: 1.15; color: #0f172a; font-variant-numeric: tabular-nums; }
 .hk-appr strong { color: #15803d; } .hk-rej strong { color: #b91c1c; } .hk-geo strong { color: #3b5bdb; } .hk-late strong { color: #b45309; }
 .hk-card small { font-size: 12px; color: #64748b; }
+
+/* #25 (19 Nov 2026): History avatars + IN / OUT badges */
+.hist-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hist-person > div { display: flex; flex-direction: column; min-width: 0; }
+.hist-av { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1.5px solid #e2e8f0; }
+.hist-av.sm { width: 24px; height: 24px; border-width: 1px; }
+.hist-av-i { display: inline-flex; align-items: center; justify-content: center; background: #eff6ff; color: #2563eb; font-size: 11.5px; font-weight: 700; }
+.hist-av.sm.hist-av-i { font-size: 9.5px; }
+.hist-person.sm { gap: 7px; }
+.punch-badges { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: middle; }
+.punch-badge { font-size: 10.5px; font-weight: 700; letter-spacing: .03em; border-radius: 6px; padding: 1px 6px; }
+.punch-badge.in { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.punch-badge.out { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+
+.hk-card[role=button] { cursor: pointer; transition: box-shadow .15s, border-color .15s; }
+.hk-card[role=button]:hover { box-shadow: 0 4px 14px rgba(15,23,42,.08); }
+.hk-card.hk-on { border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }

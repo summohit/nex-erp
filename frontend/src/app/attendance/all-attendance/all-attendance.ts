@@ -13,9 +13,9 @@ import {
   LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
   LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
   LucideZap, LucideExternalLink, LucideTrophy, LucideAward,
-  LucideRoute, LucideCar, LucideHouse, LucideRepeat
+  LucideRoute, LucideCar, LucideHouse, LucideRepeat, LucideUsers
 } from '@lucide/angular';
-import { forkJoin, firstValueFrom, switchMap } from 'rxjs';
+import { forkJoin, firstValueFrom, switchMap, of } from 'rxjs';
 import { ProfileModalService } from '../../shared/profile-modal/profile-modal.service';
 import { AttendanceService, AttendanceRecord } from '../../services/attendance';
 import { isRestDay } from '../../shared/utils/weekly-offs';
@@ -77,7 +77,7 @@ interface WorkLocationBreakdown {
     LucideArrowUpDown, LucideSparkles, LucideStarHalf, LucideAlertCircle,
     LucidePlane, LucideStar, LucideCalendar, LucideLayoutGrid, LucideList,
     LucideZap, LucideExternalLink, LucideTrophy, LucideAward,
-    LucideRoute, LucideCar, LucideHouse, LucideRepeat
+    LucideRoute, LucideCar, LucideHouse, LucideRepeat, LucideUsers
   ],
   templateUrl: './all-attendance.html',
   styleUrls: ['./all-attendance.css']
@@ -272,9 +272,9 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     { value: 'Half Day', label: 'Half Day', icon: 'star-half', bgClass: 'bg-half-day', iconClass: 'status-half-day' },
     { value: 'Late', label: 'Late', icon: 'alert-circle', bgClass: 'bg-late', iconClass: 'status-late' },
     { value: 'Absent', label: 'Absent', icon: 'x', bgClass: 'bg-absent', iconClass: 'status-absent' },
-    { value: 'On Meeting', label: 'On Meeting', icon: 'map-pin', bgClass: 'bg-meeting', iconClass: 'status-meeting' },
+    { value: 'On Meeting', label: 'On Meeting', icon: 'users', bgClass: 'bg-meeting', iconClass: 'status-meeting' },
     // Every day spent on a field visit or on site, whatever its status (18 Nov 2026).
-    { value: 'Field Visit', label: 'Field Visit', icon: 'route', bgClass: 'bg-fieldvisit', iconClass: 'status-fieldvisit' },
+    { value: 'Field Visit', label: 'Field Visit', icon: 'car', bgClass: 'bg-fieldvisit', iconClass: 'status-fieldvisit' },
     { value: 'On Leave', label: 'On Leave', icon: 'plane', bgClass: 'bg-leave', iconClass: 'status-leave' },
     { value: 'Holiday', label: 'Holiday', icon: 'star', bgClass: 'bg-holiday', iconClass: 'status-holiday' },
     { value: 'Day Off', label: 'Day Off', icon: 'calendar', bgClass: 'bg-day-off', iconClass: 'status-day-off' },
@@ -374,7 +374,64 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     return Math.round((count / total) * 100);
   }
 
+  // ── #27: sub-filter under the Missed Clock Out legend chip ──
+  missedSub = signal<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  missedCardOpen = signal(true);
+  readonly missedSubOptions: { v: 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'; label: string }[] = [
+    { v: 'ALL', label: 'All' }, { v: 'PENDING', label: 'Pending' }, { v: 'APPROVED', label: 'Approved' },
+    { v: 'REJECTED', label: 'Rejected' },
+  ];
+  missedCounts = computed(() => {
+    const c: Record<string, number> = { ALL: 0, PENDING: 0, APPROVED: 0, REJECTED: 0 };
+    for (const row of this.employeeGridRows()) for (const d of row.days) {
+      const s = this.missedState(d.record);
+      if (s) { c[s]++; c['ALL']++; }
+    }
+    return c;
+  });
+  private missedMatches(r: AttendanceRecord | null | undefined): boolean {
+    const s = this.missedState(r);
+    return !!s && (this.missedSub() === 'ALL' || this.missedSub() === s);
+  }
+
+  // ── #27 (19 Nov 2026): missed clock-out states on the grid ──
+  canApproveClockOut = signal(false);
+  mcoBusy = signal(false);
+  mcoNote = '';
+
+  missedState(r: AttendanceRecord | null | undefined): 'PENDING' | 'APPROVED' | 'REJECTED' | null {
+    if (!r?.clockIn) return null;
+    if (r.clockOutApproval === 'APPROVED') return (r.clockOutReason || r.autoClockedOut) ? 'APPROVED' : null;
+    if (r.clockOutApproval === 'REJECTED') return 'REJECTED';
+    if (r.clockOutApproval === 'PENDING') return 'PENDING';
+    if (!this.clockOutHalfDay(r)) return null;
+    return 'PENDING'; // 19 Nov 2026: no separate Auto-closed state — no reason yet counts as Pending
+  }
+
+  missedStateLabel(s: string): string {
+    return s === 'APPROVED' ? 'Missed clock-out · approved (Present)'
+      : s === 'REJECTED' ? 'Missed clock-out · rejected (Half day)'
+      : 'Missed clock-out · waiting for approval (Half day)';
+  }
+
+  isImageUrl(u?: string | null): boolean { return !!u && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(u); }
+
+  reviewMissed(rec: AttendanceRecord, action: 'APPROVE' | 'REJECT') {
+    if (!rec?.id) return;
+    this.mcoBusy.set(true);
+    this.attendanceService.reviewClockOut(rec.id, action, this.mcoNote.trim() || undefined).subscribe({
+      next: () => {
+        this.mcoBusy.set(false); this.mcoNote = '';
+        this.toast.success(action === 'APPROVE' ? 'Clock-out approved: the day counts as Present.' : 'Clock-out rejected: the day stays a half day.');
+        this.isDetailsModalOpen.set(false);
+        this.load();
+      },
+      error: (e: any) => { this.mcoBusy.set(false); this.toast.error(e?.error?.message || 'Could not save the decision'); },
+    });
+  }
+
   ngOnInit() {
+    this.attendanceService.canApproveClockOuts().subscribe({ next: (r) => this.canApproveClockOut.set(!!r?.canApprove), error: () => this.canApproveClockOut.set(false) });
     this.loadToday();
     // No date is picked on load (19 Oct 2026): the "Today" strip above already
     // answers "who is here today?", and the cards and table show the month.
@@ -398,7 +455,9 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     // them change. Bump this version so daysOfMonth (and the grid that derives from
     // it) recompute for the newly selected month instead of reusing the first one.
     this.periodVersion.update(v => v + 1);
-    if (this.performersPeriod() === 'year') this.loadYear();
+    // Perf (19 Nov 2026): the year view (Champions) loads AFTER the grid, so its
+    // 11 month calls no longer queue in front of the grid the user is waiting for.
+    const loadYearAfter = () => { if (this.performersPeriod() === 'year') this.loadYear(); };
     this.isLoading.set(true);
     this.loadRosterDays();
     this.attendanceService.getAllEmployeesAttendance({
@@ -413,10 +472,12 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.records.set(res || []);
         this.isLoading.set(false);
+        loadYearAfter();
       },
       error: () => {
         this.toast.error('Failed to load attendance records');
         this.isLoading.set(false);
+        loadYearAfter();
       }
     });
   }
@@ -726,6 +787,23 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   /** One employee's status for each of `days`, and whether each day counts. */
   /** `employeeId_YYYY-MM-DD` → rostered day off (true) or working (false). */
   rosterDays = signal<Map<string, boolean>>(new Map());
+  /** #20 (19 Nov 2026): `employeeId_YYYY-MM-DD` → the rostered shift for that day. */
+  rosterShifts = signal<Map<string, { name: string; startTime: string; endTime: string; colorCode?: string | null }>>(new Map());
+
+  /** The shift in effect that day for the grid tooltip: roster wins over the standing shift. */
+  dayShiftLabel(emp: any, key: string, isDayOff: boolean): { text: string; rostered: boolean; color: string } {
+    // Colours match the Shift Roster (shift.colorCode, grey fallback) — 19 Nov 2026.
+    const hm = (t?: string) => (t || '').slice(0, 5);
+    const grey = '#94A3B8';
+    const rostered = this.rosterDays().has(key);
+    if (rostered && this.rosterDays().get(key)) return { text: 'Day off', rostered: true, color: grey };
+    const rs = this.rosterShifts().get(key);
+    if (rs) return { text: `${rs.name} · ${hm(rs.startTime)}–${hm(rs.endTime)}`, rostered: true, color: rs.colorCode || grey };
+    if (isDayOff) return { text: 'Weekly day off', rostered: false, color: grey };
+    const s = emp?.shift;
+    if (!s) return { text: 'No shift assigned', rostered: false, color: grey };
+    return { text: s.startTime ? `${s.name} · ${hm(s.startTime)}–${hm(s.endTime)}` : s.name, rostered: false, color: s.colorCode || grey };
+  }
   /** The same for the year view. */
   yearRoster = signal<Map<string, boolean>>(new Map());
 
@@ -737,7 +815,10 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     const from = this.filterStartDate() || `${y}-${pad(m)}-01`;
     const to = this.filterEndDate() || `${y}-${pad(m)}-${pad(last)}`;
     this.attendanceService.getRosterDays(from.slice(0, 10), to.slice(0, 10)).subscribe({
-      next: (rows) => this.rosterDays.set(new Map(rows.map((r) => [`${r.employeeId}_${r.date}`, r.isDayOff]))),
+      next: (rows) => {
+        this.rosterDays.set(new Map(rows.map((r) => [`${r.employeeId}_${r.date}`, r.isDayOff])));
+        this.rosterShifts.set(new Map(rows.filter((r) => r.shift).map((r) => [`${r.employeeId}_${r.date}`, r.shift!])));
+      },
       // Without it the grid falls back to shift and branch, as before.
       error: () => this.rosterDays.set(new Map()),
     });
@@ -908,6 +989,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
           status,
           tooltip: reason ? `${tooltip} · ${reason}` : tooltip,
           reason,
+          shift: this.dayShiftLabel(emp, key, isDayOff),
           record,
           countsPresent,
           countsWorking
@@ -994,7 +1076,13 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
       },
       error: () => this.yearRoster.set(new Map()),
     });
-    forkJoin(months.map(month => this.attendanceService.getAllEmployeesAttendance({
+    // The grid's month is already loaded with the same filters — reuse it rather
+    // than fetching it a second time (19 Nov 2026).
+    const gridMonthReusable = year === this.filterYear && !this.isLoading()
+      && !this.filterStartDate() && !this.filterEndDate() && !this.filterAllDates();
+    forkJoin(months.map(month => gridMonthReusable && month === Number(this.filterMonth)
+      ? of(this.records())
+      : this.attendanceService.getAllEmployeesAttendance({
       month,
       year,
       employeeId: this.filterEmployeeId || undefined,
@@ -1409,6 +1497,8 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   }
 
   toggleStatusFilter(status: string) {
+    this.missedSub.set('ALL');
+    this.missedCardOpen.set(true);
     if (this.filterStatus === status) {
       this.clearStatusFilter();
     } else {
@@ -1470,7 +1560,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     rows: any[];
   } | null>(null);
   kpiQuery = signal('');
-  kpiQuickFilter = signal<'ALL' | 'OFFICE' | 'WFH' | 'ONSITE' | 'WORKING' | 'LATE'>('ALL');
+  kpiQuickFilter = signal<'ALL' | 'OFFICE' | 'WFH' | 'ONSITE' | 'FIELD' | 'WORKING' | 'LATE'>('ALL');
   kpiDeptFilter = signal<string>('ALL');
   kpiVisibleLimit = signal<number>(60);
 
@@ -1492,14 +1582,16 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     let onsite = 0;
     let working = 0;
     let late = 0;
+    let field = 0;
     for (const r of rows) {
+      if ((r as any).fieldVisit) field++;
       if (r.where === 'Office') office++;
       else if (r.where === 'WFH / outside') wfh++;
       else if (r.where === 'On site') onsite++;
       if (r.clockIn && !r.clockOut) working++;
       if (r.isLate) late++;
     }
-    return { total: rows.length, office, wfh, onsite, working, late };
+    return { total: rows.length, office, wfh, onsite, field, working, late };
   });
 
   kpiRows = computed(() => {
@@ -1514,6 +1606,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
       if (qf === 'OFFICE' && r.where !== 'Office') return false;
       if (qf === 'WFH' && r.where !== 'WFH / outside') return false;
       if (qf === 'ONSITE' && r.where !== 'On site') return false;
+      if (qf === 'FIELD' && !(r as any).fieldVisit) return false;
       if (qf === 'WORKING' && !(r.clockIn && !r.clockOut)) return false;
       if (qf === 'LATE' && !r.isLate) return false;
       if (q) {
@@ -1543,7 +1636,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     this.kpiVisibleLimit.set(60);
   }
 
-  setKpiQuickFilter(f: 'ALL' | 'OFFICE' | 'WFH' | 'ONSITE' | 'WORKING' | 'LATE') {
+  setKpiQuickFilter(f: 'ALL' | 'OFFICE' | 'WFH' | 'ONSITE' | 'FIELD' | 'WORKING' | 'LATE') {
     this.kpiQuickFilter.set(this.kpiQuickFilter() === f && f !== 'ALL' ? 'ALL' : f);
     this.kpiVisibleLimit.set(60);
   }
@@ -1603,6 +1696,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
       where: r.clockIn ? (r.isOnsite || r.fieldVisit ? 'On site' : r.clockInOutside || r.clockOutOutside ? 'WFH / outside' : 'Office') : null,
       leaveType: r.leaveType ?? null,
       halfDayLeave: !!r.isHalfDay,
+      fieldVisit: !!r.fieldVisit, // #19 (19 Nov 2026): Field Visit chip
     }));
     const scope = this.statsScopeLabel();
     this.resetKpiModalFilters();
@@ -1906,7 +2000,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
   recordMatchesStatus(r: AttendanceRecord): boolean {
     const f = this.filterStatus;
     if (!f) return true;
-    if (f === 'Missed Clock Out') return this.isMissedClockOut(r);
+    if (f === 'Missed Clock Out') return this.missedMatches(r); // #27: same rule as the cell icon + sub-filter
     if (f === 'Field Visit') return this.isFieldVisit(r);
     return this.recordDayStatus(r) === f;
   }
@@ -1915,7 +2009,7 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
     const f = this.filterStatus;
     if (!f) return true;
     if (day.status === 'Empty') return false;
-    if (f === 'Missed Clock Out') return !!day.record && this.isMissedClockOut(day.record);
+    if (f === 'Missed Clock Out') return this.missedMatches(day.record);
     if (f === 'Field Visit') return this.isFieldVisit(day.record);
     return day.status === f;
   }
@@ -1967,7 +2061,8 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
    * The hover card should echo the session modal: first punch in and last
    * punch out.  Fall back to the attendance row for records without logs.
    */
-  tooltipTimeline(record: AttendanceRecord): { clockIn: string | null; clockOut: string | null } {
+  tooltipTimeline(record?: AttendanceRecord | null): { clockIn: string | null; clockOut: string | null } {
+    if (!record) return { clockIn: null, clockOut: null };
     const logs = Array.isArray(record.logs) ? record.logs.filter((log: any) => log?.clockIn) : [];
     if (!logs.length) return { clockIn: record.clockIn, clockOut: record.clockOut };
     return {
@@ -2318,10 +2413,10 @@ export class AllAttendanceComponent implements OnInit, OnDestroy {
 
     const target = event.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
-    const tooltipWidth = 270;
+    const tooltipWidth = 286;
 
     // Flip to bottom if there's not enough room above (e.g. single user row right under sticky thead)
-    const placeBelow = rect.top < 195;
+    const placeBelow = rect.top < 220;
     const placement: 'top' | 'bottom' = placeBelow ? 'bottom' : 'top';
 
     const badgeCenterX = rect.left + rect.width / 2;

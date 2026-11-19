@@ -850,7 +850,7 @@ export class DashboardService {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const [totalEmployees, records, onLeave] = await Promise.all([
-      this.prisma.employee.count({ where: { companyId } }),
+      this.prisma.employee.count({ where: { companyId, isCompanyAccount: false } }),
       this.prisma.attendance.findMany({
         where: { employee: { companyId }, date: { gte: today, lt: tomorrow } },
         select: { status: true, isLate: true }

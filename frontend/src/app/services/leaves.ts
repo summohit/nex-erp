@@ -123,6 +123,11 @@ export class LeavesService {
   private http = inject(HttpClient);
   private apiUrl = `${environment.apiUrl}/leaves`;
 
+  /** Leave details window context (#24b, 19 Nov 2026). */
+  getRequestContext(id: number) {
+    return this.http.get<any>(`${this.apiUrl}/requests/${id}/context`);
+  }
+
   /** Every leave type with one person's balance (Individual assign table, 19 Nov 2026). */
   getEmployeeQuotaGrid(employeeId: number, year: number) {
     return this.http.get<any[]>(`${this.apiUrl}/balances/employee/${employeeId}/grid`, { params: { year: String(year) } });

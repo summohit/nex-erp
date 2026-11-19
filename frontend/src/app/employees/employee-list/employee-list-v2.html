@@ -516,3 +516,71 @@
     </footer>
   </div>
 </div>
+
+
+<!-- Send intro email — Super Admin / HR (#16, 19 Nov 2026) -->
+<div class="ho-overlay" *ngIf="introFor" (click)="introFor = null">
+  <div class="ho-modal in-modal" role="dialog" aria-modal="true" aria-labelledby="in-title" (click)="$event.stopPropagation()">
+    <header class="ho-head">
+      <div>
+        <span class="ho-kicker in-kicker">Intro email</span>
+        <h3 id="in-title">Introduce {{ introFor.firstName }} to the team</h3>
+      </div>
+      <button type="button" class="ho-x" (click)="introFor = null" aria-label="Close">✕</button>
+    </header>
+
+    <div class="in-loading" *ngIf="!introStatus">Loading…</div>
+
+    <ng-container *ngIf="introStatus">
+      <div class="in-warn" *ngIf="introStatus.intro">Already sent on {{ introStatus.intro.at | date:'d MMM y, h:mm a' }} by {{ introStatus.intro.by }} — sending again will ask you to confirm.</div>
+
+      <ng-container *ngIf="introStep === 'compose'">
+        <label class="ho-label">Send to</label>
+        <label class="in-every"><input type="checkbox" [(ngModel)]="introEveryone"> Everyone in the company</label>
+        <div class="in-chips" *ngIf="!introEveryone">
+          <button type="button" *ngFor="let d of departments()" class="in-chip" [class.on]="introDeptIds.has(d.id)" (click)="toggleIntroDept(d.id)">{{ d.name }}</button>
+        </div>
+        <div *ngIf="!introEveryone">
+          <div class="ho-search"><span aria-hidden="true">🔍</span>
+            <input type="text" [(ngModel)]="introSearch" placeholder="Add individual people…" autocomplete="off">
+          </div>
+          <div class="in-results" *ngIf="introSearchResults().length">
+            <button type="button" *ngFor="let e of introSearchResults()" (click)="addIntroPerson(e)">{{ e.firstName }} {{ e.lastName }} <small>{{ e.department?.name }}</small></button>
+          </div>
+          <div class="in-picked" *ngIf="introPeople.length">
+            <span *ngFor="let p of introPeople" class="in-pill">{{ p.firstName }} {{ p.lastName }} <button type="button" (click)="removeIntroPerson(p.id)" aria-label="Remove">✕</button></span>
+          </div>
+        </div>
+        <small class="em-hint">{{ introRecipientCount() }} {{ introRecipientCount() === 1 ? 'person' : 'people' }} will get it by email and as a MIRA notification ({{ introFor.firstName }} is always included).</small>
+
+        <label class="ho-label" for="in-subject">Subject</label>
+        <input id="in-subject" class="in-input" type="text" [(ngModel)]="introSubject">
+        <label class="ho-label" for="in-msg">Message</label>
+        <textarea id="in-msg" class="in-input in-text" rows="8" [(ngModel)]="introMessage"></textarea>
+      </ng-container>
+
+      <div *ngIf="introStep === 'preview'" class="in-preview">
+        <div class="in-prev-subject">{{ introSubject }}</div>
+        <div class="in-prev-card">
+          <img *ngIf="introStatus.card.photo" [src]="introStatus.card.photo" alt="" class="in-prev-av">
+          <span *ngIf="!introStatus.card.photo" class="in-prev-av in-prev-i">{{ getEmployeeInitials(introFor) }}</span>
+          <div>
+            <b>{{ introStatus.card.name }}</b>
+            <small *ngIf="introStatus.card.designation">{{ introStatus.card.designation }}</small>
+            <small *ngIf="introStatus.card.department">{{ introStatus.card.department }}</small>
+            <small *ngIf="introStatus.card.manager">Reports to {{ introStatus.card.manager }}</small>
+            <small *ngIf="introStatus.card.joined">Joined {{ introStatus.card.joined }}</small>
+          </div>
+        </div>
+        <p class="in-prev-msg">{{ introMessage }}</p>
+        <small class="em-hint">Going to {{ introRecipientCount() }} {{ introRecipientCount() === 1 ? 'person' : 'people' }} · email + notification</small>
+      </div>
+    </ng-container>
+
+    <footer class="ho-actions">
+      <button type="button" class="ho-cancel" (click)="introStep === 'preview' ? introStep = 'compose' : introFor = null">{{ introStep === 'preview' ? 'Back' : 'Cancel' }}</button>
+      <button *ngIf="introStep === 'compose'" type="button" class="ho-confirm em-confirm" [disabled]="!introStatus || !introSubject.trim() || !introMessage.trim()" (click)="introStep = 'preview'">Preview</button>
+      <button *ngIf="introStep === 'preview'" type="button" class="ho-confirm em-confirm" [disabled]="introBusy" (click)="sendIntro()">{{ introBusy ? 'Sending…' : 'Send intro' }}</button>
+    </footer>
+  </div>
+</div>

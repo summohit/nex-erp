@@ -1717,3 +1717,7 @@
 }
 .am-action[data-decision='reject'] .am-action-go { background: linear-gradient(135deg, #ef4444, #dc2626); }
 .am-action-summary { margin-top: 8px; font-size: 12.5px; font-weight: 500; color: #1f2333; }
+
+// 19 Nov 2026: floating launcher hidden everywhere (it covered table actions).
+// Ask MIRA still opens with Ctrl/⌘ + J.
+.mira-launcher-wrap { display: none !important; }

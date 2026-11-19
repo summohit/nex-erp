@@ -389,7 +389,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       icon: 'assets',
       badge: 'Inventory Control',
       colorTheme: 'teal',
-      title: 'Assets & IT Inventory',
+      title: 'Assets & Inventory',
       description: 'Know who has what hardware, manage maintenance schedules, and monitor stock ledger in real time.',
       points: [
         'Hardware & Laptop Custody Tracking',

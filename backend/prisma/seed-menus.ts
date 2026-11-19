@@ -122,7 +122,7 @@ const menuSections: MenuSection[] = [
       },
       {
         id: 'assets',
-        title: 'Assets & IT',
+        title: 'Assets & Inventory',
         icon: 'lucideLaptop',
         route: '/assets',
         subItems: [

@@ -419,6 +419,9 @@ model Employee {
   ///
   /// Defaults true; suspended staff are still excluded regardless.
   allowPayrollGenerate Boolean      @default(true)
+  /// A shared company login (e.g. info@), not a person (19 Nov 2026): kept out of
+  /// the directory, headcount, attendance sheets, reminders, leave and payroll.
+  isCompanyAccount     Boolean      @default(false)
   /// EMPLOYEE is graded and paid on the salary template; CONSULTANT is paid on
   /// a contract (TDS / GST) and stays outside grades and the template.
   payType              String       @default("EMPLOYEE")
@@ -747,6 +750,9 @@ model Holiday {
   id        Int      @id @default(autoincrement())
   name      String
   date      DateTime
+  /// #28 (19 Nov 2026): office stays open; whoever works it gets 1 comp-off day.
+  /// Other holidays are closed (no clock-in) unless on an approved field visit.
+  isOptional Boolean @default(false)
   companyId Int
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())

@@ -609,6 +609,7 @@ export class MasterDataController {
         name: data.name,
         date: new Date(data.date),
         companyId: req.user.companyId,
+        isOptional: !!data.isOptional,
       }
     });
   }
@@ -628,8 +629,9 @@ export class MasterDataController {
   }
 
   @Put('holidays/:id')
-  async updateHoliday(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { name?: string, date?: string }) {
+  async updateHoliday(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: { name?: string, date?: string, isOptional?: boolean }) {
     const updateData: any = {};
+    if (data.isOptional !== undefined) updateData.isOptional = !!data.isOptional;
     if (data.name !== undefined) {
       if (data.name.trim().length === 0) throw new BadRequestException('Holiday name cannot be empty');
       if (data.name.length > 100) throw new BadRequestException('Holiday name cannot exceed 100 characters');
