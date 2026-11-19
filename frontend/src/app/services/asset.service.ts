@@ -36,6 +36,8 @@ export interface AssetAssignment {
     id: number;
     firstName: string;
     lastName: string;
+    avatarUrl?: string;
+    user?: { avatarUrl?: string };
     department?: { name: string };
     designation?: { name: string };
   };
@@ -113,6 +115,7 @@ export interface InventoryItem {
 export interface InventoryTransaction {
   id: number;
   itemId: number;
+  item?: Pick<InventoryItem, 'id' | 'name' | 'unit' | 'category' | 'brand' | 'supplier'>;
   type: 'PURCHASE' | 'ASSIGNMENT' | 'RETURN' | 'CONSUMPTION' | 'EXPIRED' | 'ADJUSTMENT';
   quantity: number;
   date: string;
@@ -220,6 +223,14 @@ export class AssetService {
     return this.http.put<InventoryItem>(`${this.apiUrl}/inventory/${id}`, data);
   }
 
+  getInventoryPurchases(): Observable<InventoryTransaction[]> {
+    return this.http.get<InventoryTransaction[]>(`${this.apiUrl}/inventory/purchases`);
+  }
+
+  addInventoryPurchase(id: number, data: { quantity: number; purchaseDate?: string; supplier?: string; unitCost?: number; notes?: string }): Observable<InventoryTransaction> {
+    return this.http.post<InventoryTransaction>(`${this.apiUrl}/inventory/${id}/purchase`, data);
+  }
+
   setInventoryItemStatus(id: number, status: string): Observable<InventoryItem> {
     return this.http.put<InventoryItem>(`${this.apiUrl}/inventory/${id}/status`, { status });
   }
@@ -234,7 +245,7 @@ export class AssetService {
 
   assignInventoryItem(itemId: number, data: {
     quantity: number; employeeId?: number; assigneeText?: string;
-    date?: string; expectedReturnDate?: string; purpose?: string;
+    date?: string; expectedReturnDate?: string; purpose?: string; assignmentLocation?: string; clientDetails?: string;
   }): Observable<InventoryTransaction> {
     return this.http.post<InventoryTransaction>(`${this.apiUrl}/inventory/${itemId}/assign`, data);
   }

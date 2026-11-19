@@ -32,7 +32,8 @@ import {
   LucideAlertTriangle,
   LucideArchive,
   LucideIndianRupee,
-  LucideSettings
+  LucideSettings,
+  LucideArrowRight
 } from '@lucide/angular';
 
 import { AssetActionCellRendererComponent } from '../shared/components/asset-action-cell-renderer.component';
@@ -106,6 +107,7 @@ const IT_CATEGORIES = ['LAPTOP', 'DESKTOP', 'MONITOR', 'PRINTER', 'PERIPHERAL', 
     LucideIndianRupee,
     LucideMoreHorizontal,
     LucideSettings,
+    LucideArrowRight,
     SearchableSelectComponent,
     SkeletonComponent
   ],
@@ -139,6 +141,8 @@ export class AssetsComponent implements OnInit {
 
   // Product/Batch Inventory state
   inventoryItems = signal<InventoryItem[]>([]);
+  inventoryPurchases = signal<InventoryTransaction[]>([]);
+  inventoryPage = signal<'STOCK' | 'ADDITIONS'>('STOCK');
   inventoryAssignments = signal<any[]>([]);
   inventoryLoading = signal<boolean>(false);
   requestsLoading = signal<boolean>(false);
@@ -163,6 +167,41 @@ export class AssetsComponent implements OnInit {
     { value: 'MOBILE', label: 'Mobile / Tablet' },
     { value: 'OTHER', label: 'Other' }
   ];
+  customInventoryCategories = signal<{ value: string; label: string }[]>([]);
+  inventoryCategories = computed(() => {
+    const usedCategories = this.inventoryItems()
+      .map(item => String(item.category || '').trim().toUpperCase())
+      .filter(Boolean)
+      .map(value => ({ value, label: this.categoryLabel(value) }));
+    const all = [...this.categories, ...usedCategories, ...this.customInventoryCategories()];
+    return all.filter((category, index) => all.findIndex(item => item.value === category.value) === index);
+  });
+  isAddingInventoryCategory = signal(false);
+  newInventoryCategoryName = signal('');
+  customInventorySubcategories = signal<Record<string, string[]>>({});
+  isAddingInventorySubcategory = signal(false);
+  newInventorySubcategoryName = signal('');
+  customInventoryBrands = signal<string[]>([]);
+  customInventoryVendors = signal<string[]>([]);
+  inventoryBrands = computed(() => this.uniqueInventoryValues([
+    ...this.inventoryItems().map(item => item.brand || ''),
+    ...this.customInventoryBrands()
+  ]));
+  inventoryVendors = computed(() => this.uniqueInventoryValues([
+    ...this.inventoryItems().map(item => item.supplier || ''),
+    ...this.customInventoryVendors()
+  ]));
+  isAddingInventoryBrand = signal(false);
+  isAddingInventoryVendor = signal(false);
+  isAddingInventoryOffice = signal(false);
+  newInventoryBrandName = signal('');
+  newInventoryVendorName = signal('');
+  newInventoryOfficeName = signal('');
+  customInventoryOffices = signal<string[]>([]);
+  inventoryOffices = computed(() => this.uniqueInventoryValues([
+    ...this.inventoryItems().map(item => this.parseStorageLocation(item.location).office),
+    ...this.customInventoryOffices()
+  ]));
   readonly unitOptions = ['units', 'pcs', 'packets', 'boxes', 'bottles', 'pairs', 'sets', 'kg', 'litres'];
 
   // User Auth Role
@@ -185,6 +224,70 @@ export class AssetsComponent implements OnInit {
   invExpiringCount = computed(() => this.inventoryItems().filter(i => i.expiringSoon && i.statusLabel !== 'Expired').length);
   invExpiredCount = computed(() => this.inventoryItems().filter(i => i.statusLabel === 'Expired').length);
   invTotalValue = computed(() => this.inventoryItems().reduce((s, i) => s + (i.totalValue || 0), 0));
+  inventoryKpiFilter = signal<'ALL' | 'AVAILABLE' | 'ASSIGNED' | 'LOW_STOCK' | 'EXPIRING' | 'EXPIRED' | 'VALUE'>('ALL');
+  isInventoryFilterOpen = signal(false);
+  inventoryFilters = signal({
+    dateRange: 'ALL', category: '', brand: '', supplier: '', itemType: '', stock: 'ALL', expiry: 'ALL'
+  });
+  filteredInventoryItems = computed(() => {
+    let items = this.inventoryItems();
+    switch (this.inventoryKpiFilter()) {
+      case 'AVAILABLE': items = items.filter(item => item.available > 0); break;
+      case 'ASSIGNED': items = items.filter(item => item.netAssigned > 0); break;
+      case 'LOW_STOCK': items = items.filter(item => item.lowStock); break;
+      case 'EXPIRING': items = items.filter(item => item.expiringSoon && item.statusLabel !== 'Expired'); break;
+      case 'EXPIRED': items = items.filter(item => item.statusLabel === 'Expired'); break;
+      case 'VALUE': items = items.filter(item => item.totalValue > 0); break;
+    }
+    const filters = this.inventoryFilters();
+    return items.filter(item => this.matchesInventoryFilters(item, filters));
+  });
+
+  setInventoryKpiFilter(filter: 'ALL' | 'AVAILABLE' | 'ASSIGNED' | 'LOW_STOCK' | 'EXPIRING' | 'EXPIRED' | 'VALUE') {
+    this.inventoryKpiFilter.set(this.inventoryKpiFilter() === filter ? 'ALL' : filter);
+  }
+
+  updateInventoryFilter(field: string, value: string) {
+    this.inventoryFilters.update(filters => ({ ...filters, [field]: value }));
+  }
+
+  clearInventoryFilters() {
+    this.inventoryFilters.set({ dateRange: 'ALL', category: '', brand: '', supplier: '', itemType: '', stock: 'ALL', expiry: 'ALL' });
+  }
+
+  get activeInventoryFilterCount(): number {
+    const filters = this.inventoryFilters();
+    return Object.values(filters).filter(value => value && value !== 'ALL').length;
+  }
+
+  private matchesInventoryFilters(item: InventoryItem, filters: { dateRange: string; category: string; brand: string; supplier: string; itemType: string; stock: string; expiry: string }): boolean {
+    if (filters.category && item.category !== filters.category) return false;
+    if (filters.brand && item.brand !== filters.brand) return false;
+    if (filters.supplier && item.supplier !== filters.supplier) return false;
+    if (filters.itemType && item.itemType !== filters.itemType) return false;
+    if (filters.stock === 'AVAILABLE' && item.available <= 0) return false;
+    if (filters.stock === 'ASSIGNED' && item.netAssigned <= 0) return false;
+    if (filters.stock === 'LOW_STOCK' && !item.lowStock) return false;
+    if (filters.stock === 'OUT_OF_STOCK' && item.available > 0) return false;
+    if (filters.expiry === 'NO_EXPIRY' && item.expiryDate) return false;
+    if (filters.expiry === 'EXPIRING' && (!item.expiringSoon || item.statusLabel === 'Expired')) return false;
+    if (filters.expiry === 'EXPIRED' && item.statusLabel !== 'Expired') return false;
+    if (!this.matchesInventoryDateRange(item.purchaseDate, filters.dateRange)) return false;
+    return true;
+  }
+
+  private matchesInventoryDateRange(dateValue: string | undefined, range: string): boolean {
+    if (range === 'ALL') return true;
+    if (!dateValue) return false;
+    const date = new Date(dateValue); date.setHours(0, 0, 0, 0);
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    if (range === 'TODAY') return date.getTime() === now.getTime();
+    if (range === 'THIS_MONTH') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    if (range === 'LAST_MONTH') { const last = new Date(now.getFullYear(), now.getMonth() - 1, 1); return date.getMonth() === last.getMonth() && date.getFullYear() === last.getFullYear(); }
+    const days = range === 'LAST_7_DAYS' ? 7 : range === 'LAST_60_DAYS' ? 60 : range === 'LAST_90_DAYS' ? 90 : 365;
+    const start = new Date(now); start.setDate(now.getDate() - days);
+    return date >= start && date <= now;
+  }
 
   // Filter Query
   searchQuery = signal<string>('');
@@ -201,7 +304,7 @@ export class AssetsComponent implements OnInit {
   detailItemId = signal<number | null>(null);
   detailTxns = signal<InventoryTransaction[]>([]);
   detailLoading = signal<boolean>(false);
-  detailTab = signal<'ALL' | 'ASSIGNMENT' | 'RETURN' | 'CONSUMPTION' | 'ADJUSTMENT'>('ALL');
+  detailTab = signal<'ALL' | 'AVAILABLE' | 'PURCHASE' | 'ASSIGNMENT' | 'RETURN' | 'CONSUMPTION' | 'EXPIRED' | 'ADJUSTMENT'>('ALL');
 
   selectedItem = computed(() => this.inventoryItems().find(i => i.id === this.detailItemId()) || null);
 
@@ -209,18 +312,27 @@ export class AssetsComponent implements OnInit {
     const tab = this.detailTab();
     const txns = this.detailTxns();
     switch (tab) {
+      case 'AVAILABLE': return txns.filter(t => t.type === 'PURCHASE' || t.type === 'RETURN' || (t.type === 'ADJUSTMENT' && t.quantity > 0));
+      case 'PURCHASE': return txns.filter(t => t.type === 'PURCHASE');
       case 'ASSIGNMENT': return txns.filter(t => t.type === 'ASSIGNMENT');
       case 'RETURN': return txns.filter(t => t.type === 'RETURN');
       case 'CONSUMPTION': return txns.filter(t => t.type === 'CONSUMPTION');
-      case 'ADJUSTMENT': return txns.filter(t => t.type === 'ADJUSTMENT' || t.type === 'EXPIRED');
+      case 'EXPIRED': return txns.filter(t => t.type === 'EXPIRED');
+      case 'ADJUSTMENT': return txns.filter(t => t.type === 'ADJUSTMENT');
       default: return txns;
     }
   });
 
+  filterTransactionsFromKpi(tab: 'ALL' | 'AVAILABLE' | 'PURCHASE' | 'ASSIGNMENT' | 'RETURN' | 'CONSUMPTION' | 'EXPIRED') {
+    this.detailTab.set(tab);
+  }
+
   // ===== Inventory Item Form (Add/Edit) =====
   isInvItemFormOpen = signal(false);
   savingItem = signal(false);
+  inventoryFormStep = signal<1 | 2 | 3 | 4>(1);
   invItemForm: any = this.emptyItemForm();
+  inventoryFormErrors: Record<string, string> = {};
 
   get isItCategory(): boolean {
     return IT_CATEGORIES.includes(this.invItemForm.category);
@@ -229,7 +341,18 @@ export class AssetsComponent implements OnInit {
     return this.invItemForm.itemType === 'CONSUMABLE';
   }
   get invTotalCostPreview(): number {
-    return (Number(this.invItemForm.quantity) || 0) * (Number(this.invItemForm.unitCost) || 0);
+    return Number(this.invItemForm.totalPurchaseAmount) || 0;
+  }
+  get invTotalQuantityPreview(): number {
+    return (Number(this.invItemForm.quantity) || 0) * (Number(this.invItemForm.itemsPerUnit) || 0);
+  }
+  get invCostPerUnitPreview(): number {
+    const units = Number(this.invItemForm.quantity) || 0;
+    return units > 0 ? this.invTotalCostPreview / units : 0;
+  }
+  get invCostPerItemPreview(): number {
+    const items = this.invTotalQuantityPreview;
+    return items > 0 ? this.invTotalCostPreview / items : 0;
   }
 
   // ===== Assign / Return / Consume / Expire / Adjust modals =====
@@ -259,6 +382,10 @@ export class AssetsComponent implements OnInit {
   invExpireForm: any = {};
 
   isInvAdjustOpen = signal(false);
+  isInvRestockOpen = signal(false);
+  invRestockSubmitting = signal(false);
+  invRestockError = signal('');
+  invRestockForm: any = {};
   invAdjustSubmitting = signal(false);
   invAdjustError = signal('');
   invAdjustForm: any = {};
@@ -505,16 +632,23 @@ export class AssetsComponent implements OnInit {
       id: null as number | null,
       name: '',
       category: 'PANTRY',
+      subcategory: '',
       itemType: 'CONSUMABLE',
       brand: '',
       unit: 'packets',
       quantity: null as number | null,
+      itemsPerUnit: 1,
+      totalPurchaseAmount: null as number | null,
       unitCost: null as number | null,
       purchaseDate: new Date().toISOString().split('T')[0],
       supplier: '',
       batchNumber: '',
       expiryDate: '',
-      location: '',
+      noExpiry: false,
+      office: '',
+      storageAddress1: '',
+      storageAddress2: '',
+      storageAddress3: '',
       model: '',
       serialNumber: '',
       warrantyExpiry: '',
@@ -524,6 +658,7 @@ export class AssetsComponent implements OnInit {
 
   onCategoryChange() {
     const cat = this.invItemForm.category;
+    this.invItemForm.subcategory = '';
     if (CONSUMABLE_CATEGORIES.includes(cat)) {
       this.invItemForm.itemType = 'CONSUMABLE';
       if (!this.unitOptions.includes(this.invItemForm.unit)) this.invItemForm.unit = 'packets';
@@ -536,13 +671,174 @@ export class AssetsComponent implements OnInit {
     }
   }
 
+  startAddingInventoryCategory() {
+    this.newInventoryCategoryName.set('');
+    this.isAddingInventoryCategory.set(true);
+  }
+
+  cancelAddingInventoryCategory() {
+    this.isAddingInventoryCategory.set(false);
+    this.newInventoryCategoryName.set('');
+  }
+
+  addInventoryCategory() {
+    const label = this.newInventoryCategoryName().trim();
+    if (!label) {
+      this.toast.error('Please enter a category name');
+      return;
+    }
+
+    const value = label.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+    if (!value) {
+      this.toast.error('Please enter a valid category name');
+      return;
+    }
+
+    if (!this.inventoryCategories().some(category => category.value === value)) {
+      this.customInventoryCategories.update(categories => [...categories, { value, label }]);
+    }
+    this.invItemForm.category = value;
+    this.onCategoryChange();
+    this.cancelAddingInventoryCategory();
+  }
+
+  inventorySubcategories(category = this.invItemForm.category): string[] {
+    if (!category) return [];
+    const saved = this.inventoryItems()
+      .filter(item => item.category === category)
+      .map(item => this.inventoryPurchase(item).subcategory || '')
+      .filter(Boolean);
+    const custom = this.customInventorySubcategories()[category] || [];
+    return [...new Set([...saved, ...custom])].sort((a, b) => a.localeCompare(b));
+  }
+
+  startAddingInventorySubcategory() {
+    if (!this.invItemForm.category) {
+      this.toast.error('Select a category first');
+      return;
+    }
+    this.newInventorySubcategoryName.set('');
+    this.isAddingInventorySubcategory.set(true);
+  }
+
+  cancelAddingInventorySubcategory() {
+    this.isAddingInventorySubcategory.set(false);
+    this.newInventorySubcategoryName.set('');
+  }
+
+  addInventorySubcategory() {
+    const subcategory = this.newInventorySubcategoryName().trim();
+    const category = this.invItemForm.category;
+    if (!subcategory) {
+      this.toast.error('Please enter a subcategory name');
+      return;
+    }
+    this.customInventorySubcategories.update(values => ({
+      ...values,
+      [category]: [...new Set([...(values[category] || []), subcategory])]
+    }));
+    this.invItemForm.subcategory = subcategory;
+    this.cancelAddingInventorySubcategory();
+  }
+
+  startAddingInventoryBrand() {
+    this.newInventoryBrandName.set('');
+    this.isAddingInventoryBrand.set(true);
+  }
+
+  addInventoryBrand() {
+    const brand = this.newInventoryBrandName().trim();
+    if (!brand) {
+      this.toast.error('Please enter a brand name');
+      return;
+    }
+    if (!this.inventoryBrands().some(value => value.toLowerCase() === brand.toLowerCase())) {
+      this.customInventoryBrands.update(values => [...values, brand]);
+    }
+    this.invItemForm.brand = brand;
+    this.isAddingInventoryBrand.set(false);
+  }
+
+  startAddingInventoryVendor() {
+    this.newInventoryVendorName.set('');
+    this.isAddingInventoryVendor.set(true);
+  }
+
+  addInventoryVendor() {
+    const vendor = this.newInventoryVendorName().trim();
+    if (!vendor) {
+      this.toast.error('Please enter a vendor name');
+      return;
+    }
+    if (!this.inventoryVendors().some(value => value.toLowerCase() === vendor.toLowerCase())) {
+      this.customInventoryVendors.update(values => [...values, vendor]);
+    }
+    this.invItemForm.supplier = vendor;
+    this.isAddingInventoryVendor.set(false);
+  }
+
+  startAddingInventoryOffice() {
+    this.newInventoryOfficeName.set('');
+    this.isAddingInventoryOffice.set(true);
+  }
+
+  addInventoryOffice() {
+    const office = this.newInventoryOfficeName().trim();
+    if (!office) {
+      this.toast.error('Please enter an office name');
+      return;
+    }
+    if (!this.inventoryOffices().some(value => value.toLowerCase() === office.toLowerCase())) {
+      this.customInventoryOffices.update(values => [...values, office]);
+    }
+    this.invItemForm.office = office;
+    this.isAddingInventoryOffice.set(false);
+  }
+
+  formatStorageLocation(): string | null {
+    const f = this.invItemForm;
+    const parts = [
+      f.office && `Office: ${String(f.office).trim()}`,
+      f.storageAddress1 && `Storage: ${String(f.storageAddress1).trim()}`,
+      f.storageAddress2 && `Level 2: ${String(f.storageAddress2).trim()}`,
+      f.storageAddress3 && `Level 3: ${String(f.storageAddress3).trim()}`
+    ].filter(Boolean);
+    return parts.length ? parts.join(' | ') : null;
+  }
+
+  private parseStorageLocation(location?: string | null): { office: string; address1: string; address2: string; address3: string } {
+    const result = { office: '', address1: '', address2: '', address3: '' };
+    if (!location) return result;
+    const parts = String(location).split(' | ').map(part => part.trim());
+    for (const part of parts) {
+      if (part.startsWith('Office: ')) result.office = part.slice(8);
+      else if (part.startsWith('Storage: ')) result.address1 = part.slice(9);
+      else if (part.startsWith('Level 2: ')) result.address2 = part.slice(9);
+      else if (part.startsWith('Level 3: ')) result.address3 = part.slice(9);
+    }
+    if (!result.office && !result.address1 && !result.address2 && !result.address3) result.address1 = String(location);
+    return result;
+  }
+
+  private uniqueInventoryValues(values: string[]): string[] {
+    return values
+      .map(value => String(value || '').trim())
+      .filter(Boolean)
+      .filter((value, index, list) => list.findIndex(item => item.toLowerCase() === value.toLowerCase()) === index)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  private categoryLabel(value: string): string {
+    return value.toLowerCase().split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  }
+
   // ==========================================
   // INVENTORY GRID
   // ==========================================
   catLabel(cat?: string): string {
     const c = String(cat || '').toUpperCase();
     if (!c) return '-';
-    const found = this.categories.find(x => x.value === c);
+    const found = this.inventoryCategories().find(x => x.value === c);
     return found ? found.label : c;
   }
 
@@ -550,6 +846,17 @@ export class AssetsComponent implements OnInit {
     const nameLen = String(params?.data?.name || '').length;
     return nameLen > 34 ? 72 : 56;
   };
+
+  private inventoryExpiryCell(item: InventoryItem): string {
+    if (!item.expiryDate) return '<span class="expiry-chip expiry-none">No expiry</span>';
+    const expiry = new Date(item.expiryDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Math.ceil((expiry.getTime() - today.getTime()) / 86400000);
+    if (days < 0) return `<span class="expiry-chip expiry-overdue">Expired ${this.fmtDate(item.expiryDate)}</span>`;
+    if (days <= 30) return `<span class="expiry-chip expiry-soon">${this.fmtDate(item.expiryDate)} · ${days}d</span>`;
+    return `<span class="expiry-chip expiry-ok">${this.fmtDate(item.expiryDate)}</span>`;
+  }
 
   inventoryColDefs: ColDef[] = [
     {
@@ -560,7 +867,7 @@ export class AssetsComponent implements OnInit {
       cellRenderer: (params: any) => {
         if (!params.data) return '';
         const sub: string[] = [];
-        if (params.data.batchNumber) sub.push(`Batch: ${params.data.batchNumber}`);
+        if (params.data.batchNumber) sub.push(`Serial: ${params.data.batchNumber}`);
         if (params.data.location) sub.push(params.data.location);
         return `
           <div class="cell-stacked" title="${params.data.name}">
@@ -604,22 +911,6 @@ export class AssetsComponent implements OnInit {
       cellRenderer: (params: any) => params.value != null ? `<span class="cell-num">${params.value}</span>` : '-'
     },
     {
-      headerName: 'Cost',
-      field: 'unitCost',
-      width: 92,
-      type: 'rightAligned',
-      filter: 'agNumberColumnFilter',
-      valueFormatter: (p: any) => this.fmtMoney(p.value)
-    },
-    {
-      headerName: 'Value',
-      field: 'totalValue',
-      width: 105,
-      type: 'rightAligned',
-      filter: 'agNumberColumnFilter',
-      cellRenderer: (params: any) => `<span class="cell-num-strong">${this.fmtMoney(params.value)}</span>`
-    },
-    {
       headerName: 'Purchased',
       field: 'purchaseDate',
       width: 116,
@@ -627,6 +918,14 @@ export class AssetsComponent implements OnInit {
       valueFormatter: () => '',
       valueGetter: (p: any) => p.data?.purchaseDate || '',
       cellRenderer: (params: any) => this.fmtDate(params.value)
+    },
+    {
+      headerName: 'Expiry',
+      field: 'expiryDate',
+      width: 138,
+      type: 'alignedCenter',
+      valueGetter: (p: any) => p.data?.expiryDate || '',
+      cellRenderer: (params: any) => this.inventoryExpiryCell(params.data as InventoryItem)
     },
     {
       headerName: 'In Stock',
@@ -652,24 +951,6 @@ export class AssetsComponent implements OnInit {
       }
     },
     {
-      headerName: 'Status',
-      field: 'statusLabel',
-      width: 122,
-      type: 'alignedCenter',
-      cellRenderer: (params: any) => {
-        if (!params.data) return '';
-        const cls = this.statusClassFor(params.value || 'In Stock');
-        return `
-          <div class="status-stack">
-            <span class="status-pill ${cls}">
-              <span class="status-dot"></span>
-              ${params.value}
-            </span>
-          </div>
-        `;
-      }
-    },
-    {
       headerName: 'Actions',
       field: 'actions',
       width: 96,
@@ -678,10 +959,14 @@ export class AssetsComponent implements OnInit {
       pinned: 'right',
       cellRenderer: AssetActionCellRendererComponent,
       cellRendererParams: {
+        onViewDetails: (data: InventoryItem) => this.openItemDetail(data.id),
+        onAddStock: (data: InventoryItem) => this.openRestockForItem(data.id),
         editLabel: 'Edit Item',
         onEdit: (data: InventoryItem) => this.openEditItemModal(data),
         onAssign: (data: InventoryItem) => this.openDetailThenAssign(data.id),
-        onDelete: (data: InventoryItem) => this.deleteInventoryItem(data)
+        onDelete: (data: InventoryItem) => this.deleteInventoryItem(data),
+        canDelete: () => this.isSuperAdmin(),
+        deleteLabel: 'Delete Item'
       }
     }
   ];
@@ -794,6 +1079,81 @@ export class AssetsComponent implements OnInit {
 
   assignmentQuery = signal('');
   reqQuery = signal('');
+  isAssignmentFilterOpen = signal(false);
+  isRequestFilterOpen = signal(false);
+  assignmentFilters = signal({ dateRange: 'ALL', source: 'ALL', status: 'ALL', employeeId: '', due: 'ALL' });
+  requestFilters = signal({ dateRange: 'ALL', status: 'ALL', requestType: 'ALL', category: '', urgency: 'ALL' });
+
+  assignmentFilterEmployees = computed(() => {
+    const seen = new Map<number, any>();
+    this.unifiedAssignments().forEach(row => {
+      if (row.employee?.id) seen.set(row.employee.id, row.employee);
+    });
+    return [...seen.values()];
+  });
+
+  requestCategories = computed(() => [...new Set(this.requests().map(request => request.category).filter(Boolean))].sort());
+
+  filteredAssignments = computed(() => {
+    const filters = this.assignmentFilters();
+    return this.unifiedAssignments().filter(row => {
+      // Inventory rows have an expected return date; device rows retain their
+      // return date. The combined grid intentionally supports both shapes.
+      const returnDate = (row as { expectedReturnDate?: string; returnDate?: string }).expectedReturnDate
+        || (row as { returnDate?: string }).returnDate;
+      if (filters.source !== 'ALL' && row.source !== filters.source) return false;
+      if (filters.employeeId && String(row.employee?.id || '') !== filters.employeeId) return false;
+      if (filters.status === 'ACTIVE' && row.status !== 'ACTIVE') return false;
+      if (filters.status === 'RETURNED' && row.status !== 'RETURNED') return false;
+      if (filters.status === 'OVERDUE' && !this.isOverdueRow(row)) return false;
+      if (filters.due === 'OVERDUE' && !this.isOverdueRow(row)) return false;
+      if (filters.due === 'DUE_7' && (!returnDate || !this.isDueWithinDays(returnDate, 7))) return false;
+      if (filters.due === 'NO_DUE' && returnDate) return false;
+      return this.matchesInventoryDateRange(row.assignedDate, filters.dateRange);
+    });
+  });
+
+  filteredRequests = computed(() => {
+    const filters = this.requestFilters();
+    return this.requests().filter(request => {
+      if (filters.status !== 'ALL' && request.status !== filters.status) return false;
+      if (filters.requestType !== 'ALL' && request.requestType !== filters.requestType) return false;
+      if (filters.category && request.category !== filters.category) return false;
+      if (filters.urgency !== 'ALL' && request.urgency !== filters.urgency) return false;
+      return this.matchesInventoryDateRange(request.createdAt, filters.dateRange);
+    });
+  });
+
+  get activeAssignmentFilterCount(): number {
+    return Object.values(this.assignmentFilters()).filter(value => value && value !== 'ALL').length;
+  }
+
+  get activeRequestFilterCount(): number {
+    return Object.values(this.requestFilters()).filter(value => value && value !== 'ALL').length;
+  }
+
+  updateAssignmentFilter(field: string, value: string) {
+    this.assignmentFilters.update(filters => ({ ...filters, [field]: value }));
+  }
+
+  updateRequestFilter(field: string, value: string) {
+    this.requestFilters.update(filters => ({ ...filters, [field]: value }));
+  }
+
+  clearAssignmentFilters() {
+    this.assignmentFilters.set({ dateRange: 'ALL', source: 'ALL', status: 'ALL', employeeId: '', due: 'ALL' });
+  }
+
+  clearRequestFilters() {
+    this.requestFilters.set({ dateRange: 'ALL', status: 'ALL', requestType: 'ALL', category: '', urgency: 'ALL' });
+  }
+
+  private isDueWithinDays(dateValue: string, days: number): boolean {
+    const date = new Date(dateValue); date.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const end = new Date(today); end.setDate(today.getDate() + days);
+    return !isNaN(date.getTime()) && date >= today && date <= end;
+  }
 
   asgRowHeight = (params: any): number => {
     const nameLen = String(params?.data?.itemName || params?.data?.itemAsset?.name || '').length;
@@ -1401,6 +1761,7 @@ export class AssetsComponent implements OnInit {
 
   loadInventory() {
     this.inventoryLoading.set(true);
+    this.assetService.getInventoryPurchases().subscribe({ next: rows => this.inventoryPurchases.set(rows) });
     this.assetService.getInventoryItems().subscribe({
       next: res => {
         this.inventoryItems.set(res);
@@ -1520,46 +1881,123 @@ export class AssetsComponent implements OnInit {
     setTimeout(() => this.openInvAssignModal(), 50);
   }
 
+  openInvRestockModal() {
+    const item = this.selectedItem();
+    if (!item) return;
+    this.invRestockForm = { quantity: null, purchaseDate: new Date().toISOString().slice(0, 10), supplier: item.supplier || '', unitCost: item.unitCost || 0, notes: '' };
+    this.invRestockError.set('');
+    this.isInvRestockOpen.set(true);
+  }
+
+  get restockPriceMismatch(): boolean {
+    const item = this.selectedItem();
+    return !!item && this.invRestockForm?.unitCost != null && Number(this.invRestockForm.unitCost) !== Number(item.unitCost);
+  }
+
+  openRestockForItem(itemId: number) {
+    this.detailItemId.set(itemId);
+    this.openInvRestockModal();
+  }
+
+  submitInvRestock() {
+    const item = this.selectedItem(); const quantity = Number(this.invRestockForm.quantity);
+    if (!item || !Number.isInteger(quantity) || quantity < 1) { this.invRestockError.set('Enter a whole quantity of at least 1.'); return; }
+    if (this.restockPriceMismatch) { this.invRestockError.set(`This item uses ₹${item.unitCost} per item. Create a new item to record a different price.`); return; }
+    this.invRestockSubmitting.set(true);
+    this.assetService.addInventoryPurchase(item.id, { ...this.invRestockForm, quantity }).subscribe({ next: () => { this.toast.success(`${quantity} ${item.unit} added to ${item.name}`); this.invRestockSubmitting.set(false); this.isInvRestockOpen.set(false); this.refreshInventoryData(); }, error: err => { this.invRestockError.set(err.error?.message || 'Could not add stock'); this.invRestockSubmitting.set(false); } });
+  }
+
   // ==========================================
   // ADD / EDIT INVENTORY ITEM
   // ==========================================
   openAddItemModal() {
     this.invItemForm = this.emptyItemForm();
+    this.inventoryFormErrors = {};
+    this.inventoryFormStep.set(1);
     this.isInvItemFormOpen.set(true);
   }
 
   openEditItemModal(item: InventoryItem) {
+    const storage = this.parseStorageLocation(item.location);
     this.invItemForm = {
       id: item.id,
       name: item.name,
       category: item.category,
+      subcategory: this.inventoryPurchase(item).subcategory || '',
       itemType: item.itemType,
       brand: item.brand || '',
       unit: item.unit || 'units',
-      quantity: item.quantity,
+      quantity: this.inventoryPurchase(item).unitCount,
+      itemsPerUnit: this.inventoryPurchase(item).itemsPerUnit,
+      totalPurchaseAmount: this.inventoryPurchase(item).totalAmount,
       unitCost: item.unitCost,
       purchaseDate: item.purchaseDate ? new Date(item.purchaseDate).toISOString().split('T')[0] : '',
       supplier: item.supplier || '',
       batchNumber: item.batchNumber || '',
       expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : '',
-      location: item.location || '',
+      noExpiry: !item.expiryDate,
+      office: storage.office,
+      storageAddress1: storage.address1,
+      storageAddress2: storage.address2,
+      storageAddress3: storage.address3,
       model: item.model || '',
       serialNumber: item.serialNumber || '',
       warrantyExpiry: item.warrantyExpiry ? new Date(item.warrantyExpiry).toISOString().split('T')[0] : '',
-      notes: item.notes || ''
+      notes: this.inventoryNotes(item)
     };
+    this.inventoryFormErrors = {};
+    this.inventoryFormStep.set(1);
     this.isInvItemFormOpen.set(true);
+  }
+
+  nextInventoryFormStep() {
+    const step = this.inventoryFormStep();
+    if (step === 1) {
+      if (!this.invItemForm.category) this.inventoryFormErrors['category'] = 'Select a category.';
+      if (!String(this.invItemForm.name || '').trim()) this.inventoryFormErrors['name'] = 'Item name is required.';
+      if (Object.keys(this.inventoryFormErrors).length) return;
+    }
+    if (step === 2) {
+      if (this.invItemForm.quantity == null || Number(this.invItemForm.quantity) < 1 || !Number.isInteger(Number(this.invItemForm.quantity))) this.inventoryFormErrors['quantity'] = 'Enter a whole number of units (at least 1).';
+      if (this.invItemForm.totalPurchaseAmount == null || Number(this.invItemForm.totalPurchaseAmount) < 0) this.inventoryFormErrors['totalPurchaseAmount'] = 'Enter a valid total amount.';
+      if (!Number.isInteger(Number(this.invItemForm.itemsPerUnit)) || Number(this.invItemForm.itemsPerUnit) < 1) this.inventoryFormErrors['itemsPerUnit'] = 'Enter at least 1 item per unit.';
+      if (this.inventoryFormErrors['quantity'] || this.inventoryFormErrors['totalPurchaseAmount'] || this.inventoryFormErrors['itemsPerUnit']) return;
+    }
+    if (step < 4) this.inventoryFormStep.set((step + 1) as 1 | 2 | 3 | 4);
+  }
+
+  previousInventoryFormStep() {
+    const step = this.inventoryFormStep();
+    if (step > 1) this.inventoryFormStep.set((step - 1) as 1 | 2 | 3 | 4);
+  }
+
+  clearInventoryError(field: string) {
+    if (this.inventoryFormErrors[field]) delete this.inventoryFormErrors[field];
+  }
+
+  private validateInventoryForm(): boolean {
+    const f = this.invItemForm;
+    this.inventoryFormErrors = {};
+    if (!f.category) this.inventoryFormErrors['category'] = 'Select a category.';
+    if (!String(f.name || '').trim()) this.inventoryFormErrors['name'] = 'Item name is required.';
+    if (f.id == null && (f.quantity == null || Number(f.quantity) < 1 || !Number.isInteger(Number(f.quantity)))) {
+      this.inventoryFormErrors['quantity'] = 'Enter a whole number of units (at least 1).';
+    }
+    if (f.id == null && (!Number.isInteger(Number(f.itemsPerUnit)) || Number(f.itemsPerUnit) < 1)) {
+      this.inventoryFormErrors['itemsPerUnit'] = 'Enter at least 1 item per unit.';
+    }
+    if (f.totalPurchaseAmount == null || Number(f.totalPurchaseAmount) < 0) {
+      this.inventoryFormErrors['totalPurchaseAmount'] = 'Enter a valid total amount.';
+    }
+    if (f.itemType === 'CONSUMABLE' && !f.noExpiry && !f.expiryDate) {
+      this.inventoryFormErrors['expiryDate'] = 'Enter an expiry date or select No expiry date.';
+    }
+    return Object.keys(this.inventoryFormErrors).length === 0;
   }
 
   saveInventoryItem() {
     const f = this.invItemForm;
-    if (!f.name || !String(f.name).trim()) {
-      this.toast.error('Item name is required');
-      return;
-    }
-    if (f.id == null && (f.quantity == null || Number(f.quantity) < 0 || !Number.isInteger(Number(f.quantity)))) {
-      return;
-    }
+    if (!this.validateInventoryForm()) return;
 
     const payload: any = {
       name: f.name.trim(),
@@ -1567,16 +2005,16 @@ export class AssetsComponent implements OnInit {
       itemType: f.itemType,
       brand: f.brand,
       unit: f.unit,
-      unitCost: f.unitCost,
+      unitCost: this.invCostPerItemPreview,
       purchaseDate: f.purchaseDate || null,
       supplier: f.supplier,
       batchNumber: f.batchNumber,
-      expiryDate: f.showExpiry === false ? null : (f.expiryDate || null),
-      location: f.location,
+      expiryDate: f.noExpiry ? null : (f.expiryDate || null),
+      location: this.formatStorageLocation(),
       model: this.isItCategory ? f.model : null,
       serialNumber: this.isItCategory ? f.serialNumber : null,
       warrantyExpiry: this.isItCategory ? (f.warrantyExpiry || null) : null,
-      notes: f.notes
+      notes: this.notesWithPurchaseBreakdown(f.notes)
     };
 
     this.savingItem.set(true);
@@ -1595,7 +2033,7 @@ export class AssetsComponent implements OnInit {
         }
       });
     } else {
-      payload.quantity = Number(f.quantity);
+      payload.quantity = this.invTotalQuantityPreview;
       this.assetService.createInventoryItem(payload).subscribe({
         next: () => {
           this.toast.success('Item added to inventory');
@@ -1609,6 +2047,37 @@ export class AssetsComponent implements OnInit {
         }
       });
     }
+  }
+
+  inventoryPurchase(item: InventoryItem): { unitCount: number; itemsPerUnit: number; totalAmount: number; subcategory?: string } {
+    const match = String(item.notes || '').match(/\[\[inventory-purchase:(.*?)\]\]\s*$/s);
+    if (match) {
+      try {
+        const data = JSON.parse(match[1]);
+        return {
+          unitCount: Number(data.unitCount) || item.quantity || 0,
+          itemsPerUnit: Number(data.itemsPerUnit) || 1,
+          totalAmount: Number(data.totalAmount) || item.totalValue || 0,
+          subcategory: typeof data.subcategory === 'string' ? data.subcategory : ''
+        };
+      } catch { /* fall through to legacy values */ }
+    }
+    return { unitCount: item.quantity || 0, itemsPerUnit: 1, totalAmount: item.totalValue || 0, subcategory: '' };
+  }
+
+  inventoryNotes(item: InventoryItem): string {
+    return String(item.notes || '').replace(/\s*\[\[inventory-purchase:.*?\]\]\s*$/s, '').trim();
+  }
+
+  private notesWithPurchaseBreakdown(notes: string): string {
+    const userNotes = String(notes || '').trim();
+    const data = JSON.stringify({
+      unitCount: Number(this.invItemForm.quantity) || 0,
+      itemsPerUnit: Number(this.invItemForm.itemsPerUnit) || 1,
+      totalAmount: Number(this.invItemForm.totalPurchaseAmount) || 0,
+      subcategory: String(this.invItemForm.subcategory || '').trim()
+    });
+    return `${userNotes}${userNotes ? '\n' : ''}[[inventory-purchase:${data}]]`;
   }
 
   private validateAssetForm() {
@@ -1705,8 +2174,13 @@ export class AssetsComponent implements OnInit {
       mode: 'EMPLOYEE',
       employeeId: null,
       assigneeText: '',
+      clientName: '',
+      companyName: '',
+      clientEmail: '',
+      clientPhone: '',
       quantity: null,
       date: new Date().toISOString().split('T')[0],
+      assignmentLocation: '',
       expectedReturnDate: '',
       purpose: ''
     };
@@ -1736,14 +2210,29 @@ export class AssetsComponent implements OnInit {
       this.invAssignError.set('Please enter a person or location');
       return;
     }
+    if (f.mode === 'CLIENT' && (!f.clientName?.trim() || !f.companyName?.trim())) {
+      this.invAssignError.set('Please enter both the client name and company name');
+      return;
+    }
 
     const payload: any = {
       quantity: qty,
       date: f.date || new Date().toISOString().split('T')[0],
-      purpose: f.purpose
+      purpose: f.purpose,
+      assignmentLocation: f.assignmentLocation?.trim() || undefined,
+      clientDetails: f.mode === 'CLIENT'
+        ? [
+            `Client contact: ${f.clientName.trim()}`,
+            `Company: ${f.companyName.trim()}`,
+            f.clientEmail?.trim() ? `Email: ${f.clientEmail.trim()}` : '',
+            f.clientPhone?.trim() ? `Phone: ${f.clientPhone.trim()}` : ''
+          ].filter(Boolean).join(' | ')
+        : undefined
     };
     if (f.mode === 'EMPLOYEE') payload.employeeId = Number(f.employeeId);
-    else payload.assigneeText = f.assigneeText.trim();
+    else payload.assigneeText = f.mode === 'CLIENT'
+      ? `Client: ${f.clientName.trim()} · ${f.companyName.trim()}`
+      : f.assigneeText.trim();
 
     if (item.itemType === 'CONSUMABLE') payload.expectedReturnDate = f.expectedReturnDate || null;
     else payload.expectedReturnDate = f.expectedReturnDate || null;

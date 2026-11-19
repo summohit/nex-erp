@@ -10,6 +10,7 @@ export interface AssetActionCellParams extends ICellRendererParams {
   onEdit?: (data: any) => void;
   canEdit?: (data: any) => boolean;
   editLabel?: string;
+  onAddStock?: (data: any) => void;
    onAssign?: (data: any) => void;
    onReturn?: (data: any) => void;
    canReturn?: (data: any) => boolean;
@@ -39,8 +40,11 @@ export interface AssetActionCellParams extends ICellRendererParams {
         <button mat-menu-item class="menu-item" (click)="viewDetails()" *ngIf="params.onViewDetails">
           <span class="menu-text">View Details</span>
         </button>
-        <button mat-menu-item class="menu-item" (click)="edit()" *ngIf="params.onEdit && canEdit()">
-          <span class="menu-text">{{ params.editLabel || 'Edit' }}</span>
+        <button mat-menu-item class="menu-item text-primary" (click)="edit()" *ngIf="params.onEdit && canEdit()">
+          <span class="menu-text action-edit-label">{{ params.editLabel || 'Edit' }}</span>
+        </button>
+        <button mat-menu-item class="menu-item text-success" (click)="addStock()" *ngIf="params.onAddStock">
+          <span class="menu-text">Add stock</span>
         </button>
         <button mat-menu-item class="menu-item text-primary" (click)="assign()" *ngIf="params.onAssign">
           <span class="menu-text">Assign to Employee</span>
@@ -58,7 +62,7 @@ export interface AssetActionCellParams extends ICellRendererParams {
           <span class="menu-text">Cancel Request</span>
         </button>
         <button mat-menu-item class="menu-item text-danger" (click)="deleteAsset()" *ngIf="params.onDelete && canDelete()">
-          <span class="menu-text">{{ params.deleteLabel || 'Delete Asset' }}</span>
+          <span class="menu-text action-delete-label">{{ params.deleteLabel || 'Delete Asset' }}</span>
         </button>
       </mat-menu>
     </div>
@@ -87,9 +91,11 @@ export interface AssetActionCellParams extends ICellRendererParams {
       color: #0F172A;
       border-color: #CBD5E1;
     }
-    .text-primary { color: var(--color-primary) !important; font-weight: 600; }
+    .text-primary { color: #2563EB !important; font-weight: 600; }
     .text-success { color: #059669 !important; font-weight: 600; }
-    .text-danger { color: #1373e5 !important; font-weight: 600; }
+    .text-danger { color: #DC2626 !important; font-weight: 600; }
+    .menu-item .action-edit-label { color: #2563EB !important; font-weight: 600; }
+    .menu-item .action-delete-label { color: #DC2626 !important; font-weight: 600; }
   `]
 })
 export class AssetActionCellRendererComponent implements ICellRendererAngularComp {
@@ -136,6 +142,7 @@ export class AssetActionCellRendererComponent implements ICellRendererAngularCom
 
   viewDetails() { if (this.params?.onViewDetails) this.params.onViewDetails(this.params.data); }
   edit() { if (this.params?.onEdit) this.params.onEdit(this.params.data); }
+  addStock() { if (this.params?.onAddStock) this.params.onAddStock(this.params.data); }
   assign() { if (this.params?.onAssign) this.params.onAssign(this.params.data); }
   returnAsset() { if (this.params?.onReturn) this.params.onReturn(this.params.data); }
   approve() { if (this.params?.onApprove) this.params.onApprove(this.params.data); }

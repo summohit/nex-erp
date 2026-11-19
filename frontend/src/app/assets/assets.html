@@ -18,6 +18,11 @@
           <svg lucideSearch size="15" class="search-icon"></svg>
           <input type="text" placeholder="Search inventory..." [(ngModel)]="searchQuery">
         </div>
+        <button class="btn btn-outline inventory-filter-trigger" (click)="isInventoryFilterOpen.set(true)">
+          <svg lucideFilter size="16"></svg>
+          <span>Filters</span>
+          <span class="filter-count" *ngIf="activeInventoryFilterCount">{{ activeInventoryFilterCount }}</span>
+        </button>
         <input type="file" #importFileInput accept=".csv" class="hidden-file-input" (change)="onImportFileSelected($event)">
         <button class="btn btn-outline" (click)="importFileInput.click()" [disabled]="importing()">
           <svg lucideDownload size="16"></svg>
@@ -36,58 +41,121 @@
           <svg lucideSearch size="15" class="search-icon"></svg>
           <input type="text" placeholder="Search assignments..." [(ngModel)]="assignmentQuery">
         </div>
+        <button class="btn btn-outline inventory-filter-trigger" (click)="isAssignmentFilterOpen.set(true)">
+          <svg lucideFilter size="16"></svg><span>Filters</span>
+          <span class="filter-count" *ngIf="activeAssignmentFilterCount">{{ activeAssignmentFilterCount }}</span>
+        </button>
       </ng-container>
 
       <!-- Requests tab action -->
-      <button class="btn btn-primary" *ngIf="activeTab() === 'requests'" (click)="openRequestDrawer()">
-        <svg lucidePlus size="16"></svg>
-        <span>Submit Request</span>
-      </button>
+      <ng-container *ngIf="activeTab() === 'requests'">
+        <button class="btn btn-outline inventory-filter-trigger" (click)="isRequestFilterOpen.set(true)">
+          <svg lucideFilter size="16"></svg><span>Filters</span>
+          <span class="filter-count" *ngIf="activeRequestFilterCount">{{ activeRequestFilterCount }}</span>
+        </button>
+        <button class="btn btn-primary" (click)="openRequestDrawer()">
+          <svg lucidePlus size="16"></svg><span>Submit Request</span>
+        </button>
+      </ng-container>
     </div>
   </header>
 
+  <div class="drawer-overlay inventory-filter-overlay" *ngIf="isInventoryFilterOpen()" (click)="isInventoryFilterOpen.set(false)">
+    <aside class="drawer-panel inventory-filter-drawer" (click)="$event.stopPropagation()" aria-label="Inventory filters">
+      <div class="drawer-header inventory-filter-header">
+        <div><h3>Filter Inventory</h3><p>Refine the items shown in the table.</p></div>
+        <button class="btn-close" (click)="isInventoryFilterOpen.set(false)" aria-label="Close filters"><svg lucideX size="18"></svg></button>
+      </div>
+      <div class="drawer-body inventory-filter-body">
+        <div class="filter-section">
+          <span class="filter-section-label">Purchase date</span>
+          <label class="form-label">Show items purchased</label>
+          <select class="form-control" [ngModel]="inventoryFilters().dateRange" (ngModelChange)="updateInventoryFilter('dateRange', $event)">
+            <option value="ALL">All time</option><option value="TODAY">Today</option><option value="LAST_7_DAYS">Last week</option><option value="THIS_MONTH">This month</option><option value="LAST_MONTH">Last month</option><option value="LAST_60_DAYS">Last 60 days</option><option value="LAST_90_DAYS">Last 90 days</option><option value="LAST_YEAR">Last 1 year</option>
+          </select>
+        </div>
+        <div class="filter-section">
+          <span class="filter-section-label">Item details</span>
+          <div class="form-group"><label class="form-label">Category</label><select class="form-control" [ngModel]="inventoryFilters().category" (ngModelChange)="updateInventoryFilter('category', $event)"><option value="">All categories</option><option *ngFor="let c of inventoryCategories()" [value]="c.value">{{ c.label }}</option></select></div>
+          <div class="form-group"><label class="form-label">Brand</label><select class="form-control" [ngModel]="inventoryFilters().brand" (ngModelChange)="updateInventoryFilter('brand', $event)"><option value="">All brands</option><option *ngFor="let brand of inventoryBrands()" [value]="brand">{{ brand }}</option></select></div>
+          <div class="form-group"><label class="form-label">Supplier / Vendor</label><select class="form-control" [ngModel]="inventoryFilters().supplier" (ngModelChange)="updateInventoryFilter('supplier', $event)"><option value="">All suppliers</option><option *ngFor="let vendor of inventoryVendors()" [value]="vendor">{{ vendor }}</option></select></div>
+          <div class="form-group"><label class="form-label">Item type</label><select class="form-control" [ngModel]="inventoryFilters().itemType" (ngModelChange)="updateInventoryFilter('itemType', $event)"><option value="">All item types</option><option value="CONSUMABLE">Consumable / Perishable</option><option value="ASSET">Durable Asset</option></select></div>
+        </div>
+        <div class="filter-section">
+          <span class="filter-section-label">Stock &amp; expiry</span>
+          <div class="form-group"><label class="form-label">Stock condition</label><select class="form-control" [ngModel]="inventoryFilters().stock" (ngModelChange)="updateInventoryFilter('stock', $event)"><option value="ALL">All stock conditions</option><option value="AVAILABLE">Available</option><option value="ASSIGNED">Assigned out</option><option value="LOW_STOCK">Low stock</option><option value="OUT_OF_STOCK">Out of stock</option></select></div>
+          <div class="form-group"><label class="form-label">Expiry status</label><select class="form-control" [ngModel]="inventoryFilters().expiry" (ngModelChange)="updateInventoryFilter('expiry', $event)"><option value="ALL">All expiry statuses</option><option value="NO_EXPIRY">No expiry</option><option value="EXPIRING">Expiring soon</option><option value="EXPIRED">Expired</option></select></div>
+        </div>
+      </div>
+      <div class="drawer-footer inventory-filter-footer"><button class="btn btn-outline" (click)="clearInventoryFilters()">Clear all</button><button class="btn btn-primary" (click)="isInventoryFilterOpen.set(false)">Show {{ filteredInventoryItems().length }} items</button></div>
+    </aside>
+  </div>
+
+  <div class="drawer-overlay inventory-filter-overlay" *ngIf="isAssignmentFilterOpen()" (click)="isAssignmentFilterOpen.set(false)">
+    <aside class="drawer-panel inventory-filter-drawer" (click)="$event.stopPropagation()" aria-label="Assignment filters">
+      <div class="drawer-header inventory-filter-header"><div><h3>Filter Assignments</h3><p>Focus on the assignments that need attention.</p></div><button class="btn-close" (click)="isAssignmentFilterOpen.set(false)" aria-label="Close filters"><svg lucideX size="18"></svg></button></div>
+      <div class="drawer-body inventory-filter-body">
+        <div class="filter-section"><span class="filter-section-label">Assignment date</span><label class="form-label">Show assignments from</label><select class="form-control" [ngModel]="assignmentFilters().dateRange" (ngModelChange)="updateAssignmentFilter('dateRange', $event)"><option value="ALL">All time</option><option value="TODAY">Today</option><option value="LAST_7_DAYS">Last week</option><option value="THIS_MONTH">This month</option><option value="LAST_MONTH">Last month</option><option value="LAST_60_DAYS">Last 60 days</option><option value="LAST_90_DAYS">Last 90 days</option><option value="LAST_YEAR">Last 1 year</option></select></div>
+        <div class="filter-section"><span class="filter-section-label">Assignment details</span><div class="form-group"><label class="form-label">Assigned employee</label><select class="form-control" [ngModel]="assignmentFilters().employeeId" (ngModelChange)="updateAssignmentFilter('employeeId', $event)"><option value="">All employees</option><option *ngFor="let employee of assignmentFilterEmployees()" [value]="employee.id">{{ employee.firstName }} {{ employee.lastName }}</option></select></div><div class="form-group"><label class="form-label">Assignment source</label><select class="form-control" [ngModel]="assignmentFilters().source" (ngModelChange)="updateAssignmentFilter('source', $event)"><option value="ALL">All sources</option><option value="INVENTORY">Inventory items</option><option value="ASSET">Tracked devices</option></select></div><div class="form-group"><label class="form-label">Status</label><select class="form-control" [ngModel]="assignmentFilters().status" (ngModelChange)="updateAssignmentFilter('status', $event)"><option value="ALL">All statuses</option><option value="ACTIVE">Assigned</option><option value="RETURNED">Returned</option><option value="OVERDUE">Overdue</option></select></div></div>
+        <div class="filter-section"><span class="filter-section-label">Return schedule</span><label class="form-label">Expected return</label><select class="form-control" [ngModel]="assignmentFilters().due" (ngModelChange)="updateAssignmentFilter('due', $event)"><option value="ALL">Any due date</option><option value="OVERDUE">Overdue</option><option value="DUE_7">Due in the next 7 days</option><option value="NO_DUE">No due date recorded</option></select></div>
+      </div>
+      <div class="drawer-footer inventory-filter-footer"><button class="btn btn-outline" (click)="clearAssignmentFilters()">Clear all</button><button class="btn btn-primary" (click)="isAssignmentFilterOpen.set(false)">Show {{ filteredAssignments().length }} assignments</button></div>
+    </aside>
+  </div>
+
+  <div class="drawer-overlay inventory-filter-overlay" *ngIf="isRequestFilterOpen()" (click)="isRequestFilterOpen.set(false)">
+    <aside class="drawer-panel inventory-filter-drawer" (click)="$event.stopPropagation()" aria-label="Hardware request filters">
+      <div class="drawer-header inventory-filter-header"><div><h3>Filter Hardware Requests</h3><p>Find requests by stage, need, or submitted date.</p></div><button class="btn-close" (click)="isRequestFilterOpen.set(false)" aria-label="Close filters"><svg lucideX size="18"></svg></button></div>
+      <div class="drawer-body inventory-filter-body">
+        <div class="filter-section"><span class="filter-section-label">Submitted date</span><label class="form-label">Show requests from</label><select class="form-control" [ngModel]="requestFilters().dateRange" (ngModelChange)="updateRequestFilter('dateRange', $event)"><option value="ALL">All time</option><option value="TODAY">Today</option><option value="LAST_7_DAYS">Last week</option><option value="THIS_MONTH">This month</option><option value="LAST_MONTH">Last month</option><option value="LAST_60_DAYS">Last 60 days</option><option value="LAST_90_DAYS">Last 90 days</option><option value="LAST_YEAR">Last 1 year</option></select></div>
+        <div class="filter-section"><span class="filter-section-label">Request details</span><div class="form-group"><label class="form-label">Status</label><select class="form-control" [ngModel]="requestFilters().status" (ngModelChange)="updateRequestFilter('status', $event)"><option value="ALL">All statuses</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="FULFILLED">Fulfilled</option><option value="REJECTED">Rejected</option></select></div><div class="form-group"><label class="form-label">Request type</label><select class="form-control" [ngModel]="requestFilters().requestType" (ngModelChange)="updateRequestFilter('requestType', $event)"><option value="ALL">All request types</option><option value="NEW_DEVICE">New device</option><option value="REPLACEMENT">Replacement</option><option value="REPAIR">Repair</option><option value="PERIPHERAL">Peripheral</option></select></div><div class="form-group"><label class="form-label">Category</label><select class="form-control" [ngModel]="requestFilters().category" (ngModelChange)="updateRequestFilter('category', $event)"><option value="">All categories</option><option *ngFor="let category of requestCategories()" [value]="category">{{ category }}</option></select></div><div class="form-group"><label class="form-label">Urgency</label><select class="form-control" [ngModel]="requestFilters().urgency" (ngModelChange)="updateRequestFilter('urgency', $event)"><option value="ALL">All urgency levels</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select></div></div>
+      </div>
+      <div class="drawer-footer inventory-filter-footer"><button class="btn btn-outline" (click)="clearRequestFilters()">Clear all</button><button class="btn btn-primary" (click)="isRequestFilterOpen.set(false)">Show {{ filteredRequests().length }} requests</button></div>
+    </aside>
+  </div>
+
   <!-- Inventory Summary Cards -->
   <div class="kpi-grid inv-kpi-grid" *ngIf="isAdmin() && activeTab() === 'inventory'">
-    <div class="kpi-card">
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="inventoryKpiFilter() === 'ALL'" (click)="setInventoryKpiFilter('ALL')" title="Show all inventory items">
       <span class="kpi-icon-box kpi-icon-sm bg-blue-tint"><svg lucidePackage size="17" class="text-blue"></svg></span>
       <span class="kpi-label">Total Items</span>
       <h3 class="kpi-value">{{ invTotalItems() }}</h3>
-    </div>
-    <div class="kpi-card">
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="inventoryKpiFilter() === 'ALL'" (click)="setInventoryKpiFilter('ALL')" title="Show all inventory items">
       <span class="kpi-icon-box kpi-icon-sm bg-purple-tint"><svg lucideLayers size="17" class="text-purple"></svg></span>
       <span class="kpi-label">Total Units</span>
       <h3 class="kpi-value">{{ invTotalUnits() }}</h3>
-    </div>
-    <div class="kpi-card">
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="inventoryKpiFilter() === 'AVAILABLE'" (click)="setInventoryKpiFilter('AVAILABLE')" title="Show items with available stock">
       <span class="kpi-icon-box kpi-icon-sm bg-green-tint"><svg lucideCheckCircle size="17" class="text-green"></svg></span>
       <span class="kpi-label">Available</span>
       <h3 class="kpi-value">{{ invAvailableUnits() }}</h3>
-    </div>
-    <div class="kpi-card">
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="inventoryKpiFilter() === 'ASSIGNED'" (click)="setInventoryKpiFilter('ASSIGNED')" title="Show items currently assigned out">
       <span class="kpi-icon-box kpi-icon-sm bg-blue-tint"><svg lucideUserCheck size="17" class="text-blue"></svg></span>
       <span class="kpi-label">Assigned</span>
       <h3 class="kpi-value">{{ invAssignedUnits() }}</h3>
-    </div>
-    <div class="kpi-card">
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="inventoryKpiFilter() === 'LOW_STOCK'" (click)="setInventoryKpiFilter('LOW_STOCK')" title="Show low-stock items">
       <span class="kpi-icon-box kpi-icon-sm bg-amber-tint"><svg lucideAlertTriangle size="17" class="text-amber"></svg></span>
       <span class="kpi-label">Low Stock</span>
       <h3 class="kpi-value">{{ invLowStockCount() }}</h3>
-    </div>
-    <div class="kpi-card">
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="inventoryKpiFilter() === 'EXPIRING'" (click)="setInventoryKpiFilter('EXPIRING')" title="Show items expiring soon">
       <span class="kpi-icon-box kpi-icon-sm bg-amber-tint"><svg lucideClock size="17" class="text-amber"></svg></span>
       <span class="kpi-label">Expiring Soon</span>
       <h3 class="kpi-value">{{ invExpiringCount() }}</h3>
-    </div>
-    <div class="kpi-card">
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="inventoryKpiFilter() === 'EXPIRED'" (click)="setInventoryKpiFilter('EXPIRED')" title="Show expired items">
       <span class="kpi-icon-box kpi-icon-sm bg-rose-tint"><svg lucideArchive size="17" class="text-rose"></svg></span>
       <span class="kpi-label">Expired</span>
       <h3 class="kpi-value">{{ invExpiredCount() }}</h3>
-    </div>
-    <div class="kpi-card">
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="inventoryKpiFilter() === 'VALUE'" (click)="setInventoryKpiFilter('VALUE')" title="Show inventory with a recorded value">
       <span class="kpi-icon-box kpi-icon-sm bg-green-tint"><svg lucideIndianRupee size="17" class="text-green"></svg></span>
       <span class="kpi-label">Inventory Value</span>
       <h3 class="kpi-value kpi-money">{{ fmtMoney(invTotalValue()) }}</h3>
-    </div>
+    </button>
   </div>
 
   <!-- Assignments Summary Cards -->
@@ -128,14 +196,17 @@
     </button>
   </div>
 
-  <div class="inventory-view-switch" *ngIf="isAdmin() && activeTab() === 'inventory'" role="group" aria-label="Inventory view">
-    <span class="inventory-view-switch-label">View inventory by</span>
+  <div class="inventory-view-switch" *ngIf="isAdmin() && activeTab() === 'inventory'" role="group" aria-label="Inventory page">
+    <span class="inventory-view-switch-label">Inventory page</span>
     <div class="inventory-view-switch-options">
-      <button type="button" [class.active]="inventoryViewMode() === 'grouped'" (click)="inventoryViewMode.set('grouped')">
-        Grouped assets
+      <button type="button" [class.active]="inventoryPage() === 'STOCK' && inventoryViewMode() === 'grouped'" (click)="inventoryPage.set('STOCK'); inventoryViewMode.set('grouped')">
+        Stock overview
       </button>
-      <button type="button" [class.active]="inventoryViewMode() === 'tracked'" (click)="inventoryViewMode.set('tracked')">
-        Individually tracked assets
+      <button type="button" [class.active]="inventoryPage() === 'STOCK' && inventoryViewMode() === 'tracked'" (click)="inventoryPage.set('STOCK'); inventoryViewMode.set('tracked')">
+        Individually tracked
+      </button>
+      <button type="button" [class.active]="inventoryPage() === 'ADDITIONS'" (click)="inventoryPage.set('ADDITIONS')">
+        All additions
       </button>
     </div>
   </div>
@@ -160,10 +231,10 @@
       <div class="grid-loading-line" *ngIf="inventoryLoading()">Loading inventory...</div>
 
       <ag-grid-angular
-        *ngIf="!inventoryLoading() && inventoryViewMode() === 'grouped' && inventoryItems().length > 0"
+        *ngIf="!inventoryLoading() && inventoryPage() === 'STOCK' && inventoryViewMode() === 'grouped' && inventoryItems().length > 0"
         class="ag-theme-quartz assets-grid inventory-grid"
         [theme]="'legacy'"
-        [rowData]="inventoryItems()"
+        [rowData]="filteredInventoryItems()"
         [columnDefs]="inventoryColDefs"
         [defaultColDef]="defaultColDef"
         [domLayout]="'autoHeight'"
@@ -179,7 +250,7 @@
         (rowClicked)="onInventoryRowClicked($event)">
       </ag-grid-angular>
 
-      <section class="tracked-assets-section" *ngIf="inventoryViewMode() === 'tracked' && trackedAssetsInInventory().length > 0">
+      <section class="tracked-assets-section" *ngIf="inventoryPage() === 'STOCK' && inventoryViewMode() === 'tracked' && trackedAssetsInInventory().length > 0">
         <div class="tracked-assets-heading">
           <div>
             <h3>Individually Tracked Assets</h3>
@@ -204,6 +275,11 @@
           (rowClicked)="onTrackedAssetRowClicked($event)">
         </ag-grid-angular>
       </section>
+      <section class="additions-history" *ngIf="inventoryPage() === 'ADDITIONS'">
+        <div class="additions-history-header"><div><h3>All stock additions</h3><p>Every purchase and replenishment is retained here. Add more stock to the same item at any time.</p></div><button class="btn btn-primary btn-sm" (click)="openAddItemModal()"><svg lucidePlus size="15"></svg>Add new item</button></div>
+        <div class="additions-empty" *ngIf="inventoryPurchases().length === 0">No stock additions recorded yet.</div>
+        <div class="additions-list" *ngIf="inventoryPurchases().length > 0"><article class="addition-row" *ngFor="let purchase of inventoryPurchases()"><div class="addition-date"><b>{{ fmtDate(purchase.date) }}</b><span>{{ purchase.purpose === 'Initial Purchase' ? 'Initial purchase' : 'Stock added' }}</span></div><div class="addition-item"><strong>{{ purchase.item?.name || 'Inventory item' }}</strong><span>{{ purchase.item?.brand || 'No brand' }} · {{ catLabel(purchase.item?.category) }}</span></div><div class="addition-qty"><b>+{{ purchase.quantity }}</b><span>{{ purchase.item?.unit || 'units' }}</span></div><div class="addition-source">{{ purchase.assigneeText || purchase.purpose || 'Stock addition' }}</div><button class="btn btn-outline btn-sm" (click)="openRestockForItem(purchase.itemId)"><svg lucidePlus size="14"></svg>Add stock</button></article></div>
+      </section>
     </div>
   </div>
 
@@ -227,7 +303,7 @@
         *ngIf="unifiedAssignments().length > 0 && !assignmentsLoading()"
         class="ag-theme-quartz assets-grid inventory-grid assignments-grid"
         [theme]="'legacy'"
-        [rowData]="unifiedAssignments()"
+        [rowData]="filteredAssignments()"
         [getRowId]="getAssignmentRowId"
         [columnDefs]="assignmentsColDefs"
         [defaultColDef]="defaultColDef"
@@ -309,7 +385,7 @@
         *ngIf="!requestsLoading()"
         class="ag-theme-quartz assets-grid request-grid"
         [theme]="'legacy'"
-        [rowData]="requests()"
+        [rowData]="filteredRequests()"
         [columnDefs]="requestsColDefs"
         [defaultColDef]="defaultColDef"
         [domLayout]="'autoHeight'"
@@ -505,12 +581,13 @@
           <span *ngIf="selectedItem()!.brand"><b>Brand:</b>&nbsp;{{ selectedItem()!.brand }}</span>
           <span *ngIf="selectedItem()!.supplier"><b>Supplier:</b>&nbsp;{{ selectedItem()!.supplier }}</span>
           <span *ngIf="selectedItem()!.location"><b>Location:</b>&nbsp;{{ selectedItem()!.location }}</span>
-          <span *ngIf="selectedItem()!.batchNumber"><b>Batch:</b>&nbsp;{{ selectedItem()!.batchNumber }}</span>
+          <span *ngIf="selectedItem()!.batchNumber"><b>Serial:</b>&nbsp;{{ selectedItem()!.batchNumber }}</span>
           <span *ngIf="selectedItem()!.expiryDate"><b>Expiry:</b>&nbsp;{{ fmtDate(selectedItem()!.expiryDate) }}</span>
           <span *ngIf="selectedItem()!.serialNumber"><b>S/N:</b>&nbsp;{{ selectedItem()!.serialNumber }}</span>
         </div>
       </div>
       <div class="dm-actions">
+        <button class="btn btn-outline btn-sm add-stock-button" (click)="openInvRestockModal()"><svg lucidePlus size="15"></svg><span>Add stock</span></button>
         <button class="btn btn-primary btn-sm" (click)="openInvAssignModal()" [disabled]="selectedItem()!.available <= 0">
           <svg lucidePlus size="15"></svg>
           <span>Assign</span>
@@ -552,41 +629,74 @@
     <div class="detail-modal-body">
       <!-- Summary Cards -->
       <div class="summary-cards">
-        <div class="sum-card">
+        <button type="button" class="sum-card sum-card-button" [class.selected]="detailTab() === 'ALL'" (click)="filterTransactionsFromKpi('ALL')" title="Show all transactions">
           <span class="sum-label">{{ selectedItem()!.itemType === 'ASSET' ? 'Total Assets' : 'Total Quantity' }}</span>
           <span class="sum-value">{{ selectedItem()!.quantity }} <small>{{ selectedItem()!.unit }}</small></span>
-        </div>
-        <div class="sum-card sum-green">
+        </button>
+        <button type="button" class="sum-card sum-green sum-card-button" [class.selected]="detailTab() === 'AVAILABLE'" (click)="filterTransactionsFromKpi('AVAILABLE')" title="Show stock-increasing transactions">
           <span class="sum-label">Available</span>
           <span class="sum-value">{{ selectedItem()!.available }} <small>{{ selectedItem()!.unit }}</small></span>
-        </div>
-        <div class="sum-card sum-blue">
+        </button>
+        <button type="button" class="sum-card sum-blue sum-card-button" [class.selected]="detailTab() === 'ASSIGNMENT'" (click)="filterTransactionsFromKpi('ASSIGNMENT')" title="Show assignments">
           <span class="sum-label">Assigned</span>
           <span class="sum-value">{{ selectedItem()!.netAssigned }} <small>{{ selectedItem()!.unit }}</small></span>
-        </div>
-        <div class="sum-card sum-slate">
+        </button>
+        <button type="button" class="sum-card sum-slate sum-card-button" [class.selected]="detailTab() === 'RETURN'" (click)="filterTransactionsFromKpi('RETURN')" title="Show returns">
           <span class="sum-label">Returned</span>
           <span class="sum-value">{{ selectedItem()!.returned }} <small>{{ selectedItem()!.unit }}</small></span>
-        </div>
-        <div class="sum-card sum-amber">
+        </button>
+        <button type="button" class="sum-card sum-amber sum-card-button" [class.selected]="detailTab() === 'CONSUMPTION'" (click)="filterTransactionsFromKpi('CONSUMPTION')" title="Show consumption">
           <span class="sum-label">Consumed</span>
           <span class="sum-value">{{ selectedItem()!.consumed }} <small>{{ selectedItem()!.unit }}</small></span>
-        </div>
-        <div class="sum-card sum-rose">
+        </button>
+        <button type="button" class="sum-card sum-rose sum-card-button" [class.selected]="detailTab() === 'EXPIRED'" (click)="filterTransactionsFromKpi('EXPIRED')" title="Show expired stock transactions">
           <span class="sum-label">Expired</span>
           <span class="sum-value">{{ selectedItem()!.expired }} <small>{{ selectedItem()!.unit }}</small></span>
-        </div>
-        <div class="sum-card sum-value-card">
+        </button>
+        <button type="button" class="sum-card sum-value-card sum-card-button" [class.selected]="detailTab() === 'ALL'" (click)="filterTransactionsFromKpi('ALL')" title="Show all transactions">
           <span class="sum-label">Total Value</span>
           <span class="sum-value">{{ fmtMoney(selectedItem()!.totalValue) }}</span>
-        </div>
+        </button>
       </div>
+
+      <section class="item-detail-information">
+        <div class="item-info-card">
+          <span class="item-info-title">Purchase breakdown</span>
+          <div class="item-info-grid">
+            <div><span>Units bought</span><b>{{ inventoryPurchase(selectedItem()!).unitCount }} {{ selectedItem()!.unit }}</b></div>
+            <div><span>Items per unit</span><b>{{ inventoryPurchase(selectedItem()!).itemsPerUnit }}</b></div>
+            <div><span>Total items</span><b>{{ selectedItem()!.quantity }}</b></div>
+            <div><span>Total paid</span><b>{{ fmtMoney(inventoryPurchase(selectedItem()!).totalAmount) }}</b></div>
+            <div><span>Cost per unit</span><b>{{ fmtMoney(inventoryPurchase(selectedItem()!).totalAmount / (inventoryPurchase(selectedItem()!).unitCount || 1)) }}</b></div>
+            <div><span>Cost per item</span><b>{{ fmtMoney(selectedItem()!.unitCost) }}</b></div>
+          </div>
+        </div>
+        <div class="item-info-card">
+          <span class="item-info-title">Item details</span>
+          <div class="item-info-grid">
+            <div><span>Category</span><b>{{ catLabel(selectedItem()!.category) }}</b></div>
+            <div><span>Subcategory</span><b>{{ inventoryPurchase(selectedItem()!).subcategory || 'No subcategory' }}</b></div>
+            <div><span>Supplier / vendor</span><b>{{ selectedItem()!.supplier || '—' }}</b></div>
+            <div><span>Purchase date</span><b>{{ selectedItem()!.purchaseDate ? fmtDate(selectedItem()!.purchaseDate) : '—' }}</b></div>
+            <div><span>Serial number</span><b>{{ selectedItem()!.batchNumber || '—' }}</b></div>
+            <div><span>Expiry date</span><b>{{ selectedItem()!.expiryDate ? fmtDate(selectedItem()!.expiryDate) : 'No expiry date' }}</b></div>
+            <div *ngIf="selectedItem()!.model"><span>Model</span><b>{{ selectedItem()!.model }}</b></div>
+            <div *ngIf="selectedItem()!.serialNumber"><span>Serial number</span><b>{{ selectedItem()!.serialNumber }}</b></div>
+          </div>
+        </div>
+        <div class="item-info-card item-info-wide" *ngIf="selectedItem()!.location || selectedItem()!.notes">
+          <span class="item-info-title">Storage &amp; notes</span>
+          <div class="item-location-path" *ngIf="selectedItem()!.location">{{ selectedItem()!.location }}</div>
+          <p *ngIf="inventoryNotes(selectedItem()!)">{{ inventoryNotes(selectedItem()!) }}</p>
+        </div>
+      </section>
 
       <!-- Transactions Section -->
       <div class="txn-section">
         <div class="txn-tabs-row">
           <div class="txn-tabs">
             <button class="txn-tab" [class.active]="detailTab() === 'ALL'" (click)="detailTab.set('ALL')">All Transactions</button>
+            <button class="txn-tab" [class.active]="detailTab() === 'PURCHASE'" (click)="detailTab.set('PURCHASE')">Purchases &amp; Stock Added</button>
             <button class="txn-tab" [class.active]="detailTab() === 'ASSIGNMENT'" (click)="detailTab.set('ASSIGNMENT')">Assignments</button>
             <button class="txn-tab" [class.active]="detailTab() === 'RETURN'" (click)="detailTab.set('RETURN')">Returns</button>
             <button class="txn-tab" [class.active]="detailTab() === 'CONSUMPTION'" (click)="detailTab.set('CONSUMPTION')">Consumption</button>
@@ -657,21 +767,29 @@
       <button class="btn-close" (click)="isTxnCheckOpen.set(false)"><svg lucideX size="18"></svg></button>
     </div>
     <div class="modal-panel-body">
-      <div class="tc-item-strip">
-        <span class="tc-item-name">{{ selectedItem()?.name }}</span>
-        <span *ngIf="selectedItem()?.batchNumber" class="tag-mono">Batch: {{ selectedItem()!.batchNumber }}</span>
-        <span class="txn-badge" [class]="typeBadgeClass(checkedTxn()!)">{{ typeLabel(checkedTxn()!) }}</span>
+      <div class="tc-hero">
+        <div class="tc-hero-copy">
+          <span class="tc-hero-eyebrow">Inventory movement</span>
+          <div class="tc-item-strip">
+            <span class="tc-item-name">{{ selectedItem()?.name }}</span>
+            <span class="txn-badge" [class]="typeBadgeClass(checkedTxn()!)">{{ typeLabel(checkedTxn()!) }}</span>
+          </div>
+          <span *ngIf="selectedItem()?.batchNumber" class="tag-mono">Serial: {{ selectedItem()!.batchNumber }}</span>
+        </div>
+        <div class="tc-hero-quantity">
+          <span>Quantity</span>
+          <strong>{{ checkedTxn()!.quantity > 0 && checkedTxn()!.type === 'ADJUSTMENT' ? '+' : '' }}{{ checkedTxn()!.quantity }}</strong>
+          <small>{{ checkedTxn()!.type === 'ADJUSTMENT' ? 'adjustment' : selectedItem()?.unit }}</small>
+        </div>
       </div>
 
+      <div class="tc-section-heading">Transaction details</div>
       <div class="tc-grid">
         <div class="tc-field">
           <span class="tc-label">Date</span>
           <span class="tc-value">{{ fmtDate(checkedTxn()!.date) }}</span>
         </div>
-        <div class="tc-field">
-          <span class="tc-label">Quantity</span>
-          <span class="tc-value"><b>{{ checkedTxn()!.quantity > 0 && checkedTxn()!.type === 'ADJUSTMENT' ? '+' : '' }}{{ checkedTxn()!.quantity }}</b>&nbsp;{{ checkedTxn()!.type === 'ADJUSTMENT' ? '' : selectedItem()?.unit }}</span>
-        </div>
+        <div class="tc-field tc-quantity-field"><span class="tc-label">Movement quantity</span><span class="tc-value"><b>{{ checkedTxn()!.quantity > 0 && checkedTxn()!.type === 'ADJUSTMENT' ? '+' : '' }}{{ checkedTxn()!.quantity }}</b>&nbsp;{{ checkedTxn()!.type === 'ADJUSTMENT' ? '' : selectedItem()?.unit }}</span></div>
         <div class="tc-field tc-full">
           <span class="tc-label">{{ checkedTxn()!.type === 'PURCHASE' ? 'Vendor / Supplier' : 'Assigned To / Location' }}</span>
           <span class="tc-value">{{ txnParty(checkedTxn()!) }}</span>
@@ -692,10 +810,10 @@
 
       <!-- Assignment-specific: outstanding + linked returns -->
       <ng-container *ngIf="checkedTxn()!.type === 'ASSIGNMENT'">
-        <div class="avail-strip">
-          <span>Total Assigned: <b>{{ checkedTxn()!.quantity }}</b></span>
-          <span>Returned: {{ (checkedTxn()!.linkedReturns || []).reduce((s, r) => s + (r.quantity || 0), 0) }}</span>
-          <span>Outstanding: <b>{{ outstandingOf(checkedTxn()!) }}</b></span>
+        <div class="tc-status-summary">
+          <div><span>Total assigned</span><b>{{ checkedTxn()!.quantity }}</b></div>
+          <div><span>Returned</span><b>{{ (checkedTxn()!.linkedReturns || []).reduce((s, r) => s + (r.quantity || 0), 0) }}</b></div>
+          <div class="tc-status-outstanding"><span>Outstanding</span><b>{{ outstandingOf(checkedTxn()!) }}</b></div>
         </div>
 
         <div class="form-section-title">Linked Returns</div>
@@ -721,97 +839,245 @@
 <!-- MODAL: ADD / EDIT INVENTORY ITEM           -->
 <!-- ========================================== -->
 <div class="modal-overlay-blur modal-overlay-top" *ngIf="isInvItemFormOpen()" (click)="isInvItemFormOpen.set(false)">
-  <div class="modal-panel" (click)="$event.stopPropagation()">
-    <div class="modal-panel-header">
-      <h3>{{ invItemForm.id != null ? 'Edit Inventory Item' : 'Add New Inventory Item' }}</h3>
+  <div class="modal-panel inventory-item-form-panel" (click)="$event.stopPropagation()">
+    <div class="modal-panel-header inventory-item-form-header">
+      <div>
+        <h3>{{ invItemForm.id != null ? 'Edit Inventory Item' : 'Add New Inventory Item' }}</h3>
+        <p>{{ invItemForm.id != null ? 'Review and update the item details below.' : 'Add purchase, stock, and storage details in one place.' }}</p>
+      </div>
       <button class="btn-close" (click)="isInvItemFormOpen.set(false)"><svg lucideX size="18"></svg></button>
     </div>
-    <div class="modal-panel-body">
-      <div class="form-section-title">Basic Information</div>
+    <div class="inventory-wizard-progress" aria-label="Inventory form progress">
+      <span [class.active]="inventoryFormStep() === 1" [class.complete]="inventoryFormStep() > 1"><b>1</b> Item identity</span>
+      <span [class.active]="inventoryFormStep() === 2" [class.complete]="inventoryFormStep() > 2"><b>2</b> Purchase</span>
+      <span [class.active]="inventoryFormStep() === 3" [class.complete]="inventoryFormStep() > 3"><b>3</b> Storage</span>
+      <span [class.active]="inventoryFormStep() === 4"><b>4</b> Details</span>
+    </div>
+    <div class="modal-panel-body inventory-item-form-body">
+      <section class="inventory-form-section inventory-section-identity" *ngIf="inventoryFormStep() === 1">
+      <div class="category-subcategory-row">
+      <div class="form-group">
+        <div class="category-label-row">
+          <label class="form-label">Category <span class="text-danger">*</span></label>
+          <button type="button" class="add-category-button" (click)="startAddingInventoryCategory()" *ngIf="!isAddingInventoryCategory()">
+            <svg lucidePlus size="15"></svg> Add category
+          </button>
+        </div>
+        <select class="form-control" [class.input-error]="inventoryFormErrors['category']" [(ngModel)]="invItemForm.category" (change)="onCategoryChange(); clearInventoryError('category')">
+          <option *ngFor="let c of inventoryCategories()" [value]="c.value">{{ c.label }}</option>
+        </select>
+        <span class="field-error" *ngIf="inventoryFormErrors['category']">{{ inventoryFormErrors['category'] }}</span>
+        <div class="add-category-inline" *ngIf="isAddingInventoryCategory()">
+          <input type="text" class="form-control" [ngModel]="newInventoryCategoryName()" (ngModelChange)="newInventoryCategoryName.set($event)" (keydown.enter)="addInventoryCategory()" placeholder="Enter new category name" autofocus>
+          <button type="button" class="btn btn-primary btn-sm" (click)="addInventoryCategory()">Add</button>
+          <button type="button" class="btn btn-outline btn-sm" (click)="cancelAddingInventoryCategory()">Cancel</button>
+        </div>
+      </div>
+      <div class="form-group subcategory-field">
+        <div class="category-label-row">
+          <div>
+            <label class="form-label">Subcategory <span class="label-hint">(optional)</span></label>
+          </div>
+          <button type="button" class="add-category-button" (click)="startAddingInventorySubcategory()" *ngIf="!isAddingInventorySubcategory()">
+            <svg lucidePlus size="15"></svg> Add subcategory
+          </button>
+        </div>
+        <select class="form-control" [(ngModel)]="invItemForm.subcategory" [disabled]="!invItemForm.category">
+          <option value="">No subcategory</option>
+          <option *ngFor="let subcategory of inventorySubcategories()" [value]="subcategory">{{ subcategory }}</option>
+        </select>
+        <div class="add-value-inline" *ngIf="isAddingInventorySubcategory()">
+          <input type="text" class="form-control" [ngModel]="newInventorySubcategoryName()" (ngModelChange)="newInventorySubcategoryName.set($event)" (keydown.enter)="addInventorySubcategory()" placeholder="e.g. Biscuits, Laptops, Cables" autofocus>
+          <button type="button" class="btn btn-primary btn-sm" (click)="addInventorySubcategory()">Add</button>
+          <button type="button" class="btn btn-outline btn-sm" (click)="cancelAddingInventorySubcategory()">Cancel</button>
+        </div>
+      </div>
+      </div>
       <div class="form-group">
         <label class="form-label">Item Name <span class="text-danger">*</span></label>
-        <input type="text" class="form-control" [(ngModel)]="invItemForm.name" placeholder="e.g. Parle Monaco Biscuit / Dell Latitude 5440">
+        <input type="text" class="form-control" [class.input-error]="inventoryFormErrors['name']" [(ngModel)]="invItemForm.name" (ngModelChange)="clearInventoryError('name')" placeholder="e.g. Parle Monaco Biscuit / Dell Latitude 5440">
+        <span class="field-error" *ngIf="inventoryFormErrors['name']">{{ inventoryFormErrors['name'] }}</span>
       </div>
-      <div class="form-row">
-        <div class="form-group col-6">
-          <label class="form-label">Category</label>
-          <select class="form-control" [(ngModel)]="invItemForm.category" (change)="onCategoryChange()">
-            <option *ngFor="let c of categories" [value]="c.value">{{ c.label }}</option>
+      <div class="form-row inventory-basic-details-row">
+        <div class="form-group inventory-basic-detail-field">
+          <div class="category-label-row">
+            <label class="form-label">Brand</label>
+            <button type="button" class="add-category-button" (click)="startAddingInventoryBrand()" *ngIf="!isAddingInventoryBrand()">
+              <svg lucidePlus size="15"></svg> Add brand
+            </button>
+          </div>
+          <select class="form-control" [(ngModel)]="invItemForm.brand">
+            <option value="">Select a brand</option>
+            <option *ngFor="let brand of inventoryBrands()" [value]="brand">{{ brand }}</option>
           </select>
+          <div class="add-value-inline" *ngIf="isAddingInventoryBrand()">
+            <input type="text" class="form-control" [ngModel]="newInventoryBrandName()" (ngModelChange)="newInventoryBrandName.set($event)" (keydown.enter)="addInventoryBrand()" placeholder="Enter brand name" autofocus>
+            <button type="button" class="btn btn-primary btn-sm" (click)="addInventoryBrand()">Add</button>
+            <button type="button" class="btn btn-outline btn-sm" (click)="isAddingInventoryBrand.set(false)">Cancel</button>
+          </div>
         </div>
-        <div class="form-group col-6">
-          <label class="form-label">Brand</label>
-          <input type="text" class="form-control" [(ngModel)]="invItemForm.brand" placeholder="Parle, Dell, Classmate...">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group col-6">
+        <div class="form-group inventory-basic-detail-field">
           <label class="form-label">Item Type</label>
           <select class="form-control" [(ngModel)]="invItemForm.itemType">
             <option value="CONSUMABLE">Consumable / Perishable</option>
             <option value="ASSET">Durable Asset</option>
           </select>
         </div>
-        <div class="form-group col-6">
+        <div class="form-group inventory-basic-detail-field">
           <label class="form-label">Unit</label>
           <select class="form-control" [(ngModel)]="invItemForm.unit">
             <option *ngFor="let u of unitOptions" [value]="u">{{ u }}</option>
           </select>
         </div>
       </div>
+      </section>
 
-      <div class="form-section-title">Purchase Details</div>
-      <div class="form-row">
-        <div class="form-group col-6">
-          <label class="form-label">
-            Quantity <span class="text-danger">*</span>
-            <span class="label-hint" *ngIf="invItemForm.id != null">(locked - use Adjust Stock)</span>
-          </label>
-          <input type="number" min="0" step="1" class="form-control" [(ngModel)]="invItemForm.quantity"
-                 [readonly]="invItemForm.id != null" placeholder="10">
+      <section class="inventory-form-section inventory-section-purchase" *ngIf="inventoryFormStep() === 2">
+      <p class="purchase-flow-intro">Enter what you bought and paid. We’ll calculate the cost for each unit and individual item.</p>
+      <div class="purchase-input-grid">
+        <div class="form-group">
+          <label class="form-label">Total Units Bought <span class="text-danger">*</span></label>
+          <input type="number" min="1" step="1" class="form-control" [class.input-error]="inventoryFormErrors['quantity']" [(ngModel)]="invItemForm.quantity" (ngModelChange)="clearInventoryError('quantity')"
+                 [readonly]="invItemForm.id != null" placeholder="e.g. 10">
+          <span class="field-error" *ngIf="inventoryFormErrors['quantity']">{{ inventoryFormErrors['quantity'] }}</span>
+          <span class="field-helper">Packets, boxes, bottles, etc.</span>
         </div>
-        <div class="form-group col-6">
-          <label class="form-label">Unit Cost (&#8377;)</label>
-          <input type="number" min="0" step="0.01" class="form-control" [(ngModel)]="invItemForm.unitCost" placeholder="50">
+        <div class="form-group">
+          <label class="form-label">Total Amount Paid (&#8377;) <span class="text-danger">*</span></label>
+          <input type="number" min="0" step="0.01" class="form-control" [class.input-error]="inventoryFormErrors['totalPurchaseAmount']" [(ngModel)]="invItemForm.totalPurchaseAmount" (ngModelChange)="clearInventoryError('totalPurchaseAmount')" placeholder="e.g. 50">
+          <span class="field-error" *ngIf="inventoryFormErrors['totalPurchaseAmount']">{{ inventoryFormErrors['totalPurchaseAmount'] }}</span>
+          <span class="field-helper">For the complete purchase, not one unit</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Items Inside Each Unit <span class="text-danger">*</span></label>
+          <input type="number" min="1" step="1" class="form-control" [class.input-error]="inventoryFormErrors['itemsPerUnit']" [(ngModel)]="invItemForm.itemsPerUnit" (ngModelChange)="clearInventoryError('itemsPerUnit')"
+                 [readonly]="invItemForm.id != null" placeholder="e.g. 10">
+          <span class="field-error" *ngIf="inventoryFormErrors['itemsPerUnit']">{{ inventoryFormErrors['itemsPerUnit'] }}</span>
+          <span class="field-helper">How many individual items per unit</span>
+        </div>
+      </div>
+      <div class="purchase-calculation" aria-label="Purchase cost calculation">
+        <div class="purchase-step">
+          <span class="purchase-step-label">Purchase</span>
+          <strong>{{ invItemForm.quantity || 0 }} units</strong>
+          <span>{{ fmtMoney(invTotalCostPreview) }} paid in total</span>
+        </div>
+        <span class="purchase-arrow">→</span>
+        <div class="purchase-step purchase-step-accent">
+          <span class="purchase-step-label">Cost per unit</span>
+          <strong>{{ fmtMoney(invCostPerUnitPreview) }}</strong>
+          <span>per packet / box / unit</span>
+        </div>
+        <span class="purchase-arrow">→</span>
+        <div class="purchase-step">
+          <span class="purchase-step-label">Individual items</span>
+          <strong>{{ invTotalQuantityPreview }} items</strong>
+          <span>{{ invItemForm.itemsPerUnit || 0 }} in each unit</span>
+        </div>
+        <span class="purchase-arrow">→</span>
+        <div class="purchase-step purchase-step-highlight">
+          <span class="purchase-step-label">Cost per item</span>
+          <strong>{{ fmtMoney(invCostPerItemPreview) }}</strong>
+          <span>calculated automatically</span>
         </div>
       </div>
       <div class="total-cost-strip">
-        <span>Total Cost (auto-calculated)</span>
+        <span>Total Purchase Cost</span>
         <b>{{ fmtMoney(invTotalCostPreview) }}</b>
       </div>
-      <div class="form-row">
+      <div class="form-row purchase-meta-row">
         <div class="form-group col-6">
           <label class="form-label">Purchase Date</label>
           <input type="date" class="form-control" [(ngModel)]="invItemForm.purchaseDate">
         </div>
         <div class="form-group col-6">
-          <label class="form-label">Supplier / Vendor</label>
-          <input type="text" class="form-control" [(ngModel)]="invItemForm.supplier" placeholder="Metro Store">
+          <div class="category-label-row">
+            <label class="form-label">Supplier / Vendor</label>
+            <button type="button" class="add-category-button" (click)="startAddingInventoryVendor()" *ngIf="!isAddingInventoryVendor()">
+              <svg lucidePlus size="15"></svg> Add vendor
+            </button>
+          </div>
+          <select class="form-control" [(ngModel)]="invItemForm.supplier">
+            <option value="">Select a supplier or vendor</option>
+            <option *ngFor="let vendor of inventoryVendors()" [value]="vendor">{{ vendor }}</option>
+          </select>
+          <div class="add-value-inline" *ngIf="isAddingInventoryVendor()">
+            <input type="text" class="form-control" [ngModel]="newInventoryVendorName()" (ngModelChange)="newInventoryVendorName.set($event)" (keydown.enter)="addInventoryVendor()" placeholder="Enter vendor name" autofocus>
+            <button type="button" class="btn btn-primary btn-sm" (click)="addInventoryVendor()">Add</button>
+            <button type="button" class="btn btn-outline btn-sm" (click)="isAddingInventoryVendor.set(false)">Cancel</button>
+          </div>
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row purchase-batch-row">
         <div class="form-group col-6">
-          <label class="form-label">Batch Number <span class="label-hint">(optional)</span></label>
-          <input type="text" class="form-control font-mono" [(ngModel)]="invItemForm.batchNumber" placeholder="BATCH-001">
-        </div>
-        <div class="form-group col-6">
-          <label class="form-label">Location / Storage</label>
-          <input type="text" class="form-control" [(ngModel)]="invItemForm.location" placeholder="Pantry - 2nd Floor">
+          <label class="form-label">Serial Number <span class="label-hint">(optional)</span></label>
+          <input type="text" class="form-control font-mono" [(ngModel)]="invItemForm.batchNumber" placeholder="e.g. SN-001">
         </div>
       </div>
+      </section>
+      <section class="inventory-form-section inventory-section-storage" *ngIf="inventoryFormStep() === 3">
+      <div class="storage-location-card">
+        <div class="storage-location-heading">
+          <label class="form-label">Where is this item stored?</label>
+          <span>Build the exact path to find this item.</span>
+        </div>
+        <div class="form-group">
+          <div class="category-label-row">
+            <label class="form-label">Office</label>
+            <button type="button" class="add-category-button" (click)="startAddingInventoryOffice()" *ngIf="!isAddingInventoryOffice()">
+              <svg lucidePlus size="15"></svg> Add office
+            </button>
+          </div>
+          <select class="form-control" [(ngModel)]="invItemForm.office">
+            <option value="">Select an office</option>
+            <option *ngFor="let office of inventoryOffices()" [value]="office">{{ office }}</option>
+          </select>
+          <div class="add-value-inline" *ngIf="isAddingInventoryOffice()">
+            <input type="text" class="form-control" [ngModel]="newInventoryOfficeName()" (ngModelChange)="newInventoryOfficeName.set($event)" (keydown.enter)="addInventoryOffice()" placeholder="e.g. Delhi Office" autofocus>
+            <button type="button" class="btn btn-primary btn-sm" (click)="addInventoryOffice()">Add</button>
+            <button type="button" class="btn btn-outline btn-sm" (click)="isAddingInventoryOffice.set(false)">Cancel</button>
+          </div>
+        </div>
+        <div class="storage-address-grid">
+          <div class="form-group">
+            <label class="form-label">Address 1 / Storage Area</label>
+            <input type="text" class="form-control" [(ngModel)]="invItemForm.storageAddress1" placeholder="e.g. Cupboard 5">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Address 2 / Rack or Shelf</label>
+            <input type="text" class="form-control" [(ngModel)]="invItemForm.storageAddress2" placeholder="e.g. Rack 3">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Address 3 / Drawer or Bin</label>
+            <input type="text" class="form-control" [(ngModel)]="invItemForm.storageAddress3" placeholder="e.g. Drawer 2">
+          </div>
+        </div>
+        <div class="storage-preview" *ngIf="invItemForm.office || invItemForm.storageAddress1 || invItemForm.storageAddress2 || invItemForm.storageAddress3">
+          <span>Saved as</span>
+          <strong>{{ formatStorageLocation() }}</strong>
+        </div>
+      </div>
+      </section>
 
       <!-- Consumable-only -->
+      <section class="inventory-form-section inventory-section-details" *ngIf="inventoryFormStep() === 4">
       <div *ngIf="showConsumableFields">
-        <div class="form-section-title">Consumable Details</div>
         <div class="form-group">
-          <label class="form-label">Expiry Date <span class="label-hint">(optional)</span></label>
-          <input type="date" class="form-control" [(ngModel)]="invItemForm.expiryDate">
+          <div class="expiry-label-row">
+            <label class="form-label">Expiry Date <span class="text-danger" *ngIf="!invItemForm.noExpiry">*</span></label>
+            <label class="no-expiry-option">
+              <input type="checkbox" [(ngModel)]="invItemForm.noExpiry" (ngModelChange)="invItemForm.noExpiry && (invItemForm.expiryDate = '')">
+              <span>No expiry date</span>
+            </label>
+          </div>
+          <input type="date" class="form-control" [class.input-error]="inventoryFormErrors['expiryDate']" [(ngModel)]="invItemForm.expiryDate" (ngModelChange)="clearInventoryError('expiryDate')" [disabled]="invItemForm.noExpiry">
+          <span class="field-error" *ngIf="inventoryFormErrors['expiryDate']">{{ inventoryFormErrors['expiryDate'] }}</span>
+          <span class="field-helper" *ngIf="invItemForm.noExpiry">This item will be recorded without an expiry date.</span>
         </div>
       </div>
 
       <!-- IT-asset-only -->
       <div *ngIf="isItCategory">
-        <div class="form-section-title">IT Asset Details</div>
         <div class="form-row">
           <div class="form-group col-6">
             <label class="form-label">Model</label>
@@ -828,14 +1094,16 @@
         </div>
       </div>
 
-      <div class="form-section-title">Notes</div>
       <div class="form-group">
         <textarea class="form-control" rows="2" [(ngModel)]="invItemForm.notes" placeholder="Any additional information..."></textarea>
       </div>
+      </section>
     </div>
     <div class="modal-panel-footer">
       <button class="btn btn-outline" (click)="isInvItemFormOpen.set(false)">Cancel</button>
-      <button class="btn btn-primary" (click)="saveInventoryItem()" [disabled]="savingItem()">
+      <button class="btn btn-outline" *ngIf="inventoryFormStep() > 1" (click)="previousInventoryFormStep()">Back</button>
+      <button class="btn btn-primary" *ngIf="inventoryFormStep() < 4" (click)="nextInventoryFormStep()">Next <svg lucideArrowRight size="16"></svg></button>
+      <button class="btn btn-primary" *ngIf="inventoryFormStep() === 4" (click)="saveInventoryItem()" [disabled]="savingItem()">
         {{ savingItem() ? 'Saving...' : (invItemForm.id != null ? 'Save Changes' : 'Add Item') }}
       </button>
     </div>
@@ -845,23 +1113,38 @@
 <!-- ========================================== -->
 <!-- MODAL: ASSIGN INVENTORY ITEM               -->
 <!-- ========================================== -->
-<div class="modal-overlay-blur modal-overlay-top" *ngIf="isInvAssignOpen() && selectedItem()" (click)="isInvAssignOpen.set(false)">
+<div class="modal-overlay-blur modal-overlay-top" *ngIf="isInvRestockOpen() && selectedItem()" (click)="isInvRestockOpen.set(false)">
   <div class="modal-panel panel-form" (click)="$event.stopPropagation()">
-    <div class="modal-panel-header">
-      <h3>Assign "{{ selectedItem()!.name }}"</h3>
+    <div class="modal-panel-header restock-modal-header"><div><span class="restock-eyebrow">Stock replenishment</span><h3>Add stock to {{ selectedItem()!.name }}</h3><p>This creates a purchase entry and updates available stock.</p></div><button class="btn-close" (click)="isInvRestockOpen.set(false)"><svg lucideX size="18"></svg></button></div>
+    <div class="modal-panel-body">
+      <div class="avail-strip"><span>Current available: <b>{{ selectedItem()!.available }}</b> {{ selectedItem()!.unit }}</span><span>After adding: <b>{{ selectedItem()!.available + (invRestockForm.quantity || 0) }}</b></span></div>
+      <div class="form-row"><div class="form-group col-6"><label class="form-label">Quantity to add <span class="text-danger">*</span></label><input class="form-control" type="number" min="1" step="1" [(ngModel)]="invRestockForm.quantity" placeholder="e.g. 10"></div><div class="form-group col-6"><label class="form-label">Purchase date</label><input class="form-control" type="date" [(ngModel)]="invRestockForm.purchaseDate"></div></div>
+      <div class="form-row"><div class="form-group col-6"><label class="form-label">Supplier / vendor</label><input class="form-control" [(ngModel)]="invRestockForm.supplier" placeholder="Supplier name"><span class="field-helper">A new vendor is saved in this item’s purchase history.</span></div><div class="form-group col-6"><label class="form-label">Cost per item</label><input class="form-control" [class.input-error]="restockPriceMismatch" type="number" min="0" step="0.01" [(ngModel)]="invRestockForm.unitCost"><span class="field-helper">Must match the recorded cost: {{ fmtMoney(selectedItem()!.unitCost) }}</span></div></div>
+      <div class="restock-price-notice" *ngIf="restockPriceMismatch"><svg lucideAlertTriangle size="18"></svg><div><strong>Different price detected</strong><span>This item is saved at {{ fmtMoney(selectedItem()!.unitCost) }} per item. Create a new item to record this purchase at a different price.</span></div></div>
+      <div class="form-group"><label class="form-label">Purchase note <span class="label-hint">(optional)</span></label><input class="form-control" [(ngModel)]="invRestockForm.notes" placeholder="e.g. Monthly tissue replenishment"></div><div class="field-error" *ngIf="invRestockError()">{{ invRestockError() }}</div>
+    </div>
+    <div class="modal-panel-footer"><button class="btn btn-outline" (click)="isInvRestockOpen.set(false)">Cancel</button><button class="btn btn-primary" (click)="submitInvRestock()" [disabled]="invRestockSubmitting()"><svg lucidePlus size="16"></svg>{{ invRestockSubmitting() ? 'Adding…' : 'Add to inventory' }}</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay-blur modal-overlay-top" *ngIf="isInvAssignOpen() && selectedItem()" (click)="isInvAssignOpen.set(false)">
+  <div class="modal-panel panel-form assign-item-modal" (click)="$event.stopPropagation()">
+    <div class="modal-panel-header assign-item-header">
+      <div><span class="assign-modal-eyebrow">Create assignment</span><h3>Assign "{{ selectedItem()!.name }}"</h3></div>
       <button class="btn-close" (click)="isInvAssignOpen.set(false)"><svg lucideX size="18"></svg></button>
     </div>
-    <div class="modal-panel-body">
-      <div class="avail-strip">
-        <span>Available: <b>{{ selectedItem()!.available }}</b>&nbsp;{{ selectedItem()!.unit }}</span>
-        <span>Total: {{ selectedItem()!.quantity }} ┬╖ Assigned: {{ selectedItem()!.netAssigned }}</span>
+    <div class="modal-panel-body assign-item-body">
+      <div class="assign-stock-summary">
+        <div class="assign-stock-primary"><span>Available to assign</span><b>{{ selectedItem()!.available }} <small>{{ selectedItem()!.unit }}</small></b></div>
+        <div class="assign-stock-meta"><span>Total <b>{{ selectedItem()!.quantity }}</b></span><i></i><span>Already assigned <b>{{ selectedItem()!.netAssigned }}</b></span></div>
       </div>
 
-      <div class="form-group">
+      <div class="form-group assign-recipient-group">
         <label class="form-label">Assign To</label>
         <div class="mode-toggle">
           <button type="button" class="mode-btn" [class.active]="invAssignForm.mode === 'EMPLOYEE'" (click)="invAssignForm.mode = 'EMPLOYEE'">Employee</button>
           <button type="button" class="mode-btn" [class.active]="invAssignForm.mode === 'LOCATION'" (click)="invAssignForm.mode = 'LOCATION'">Person / Location</button>
+          <button type="button" class="mode-btn" [class.active]="invAssignForm.mode === 'CLIENT'" (click)="invAssignForm.mode = 'CLIENT'">Client</button>
         </div>
       </div>
 
@@ -880,6 +1163,29 @@
         <input type="text" class="form-control" [(ngModel)]="invAssignForm.assigneeText" placeholder="Pantry - 2nd Floor / Reception desk">
       </div>
 
+      <div class="client-assignment-fields" *ngIf="invAssignForm.mode === 'CLIENT'">
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label class="form-label">Client Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" [(ngModel)]="invAssignForm.clientName" placeholder="Contact person name">
+          </div>
+          <div class="form-group col-6">
+            <label class="form-label">Company Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" [(ngModel)]="invAssignForm.companyName" placeholder="Client company name">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label class="form-label">Email ID <span class="label-hint">(optional)</span></label>
+            <input type="email" class="form-control" [(ngModel)]="invAssignForm.clientEmail" placeholder="name@company.com">
+          </div>
+          <div class="form-group col-6">
+            <label class="form-label">Phone Number <span class="label-hint">(optional)</span></label>
+            <input type="tel" class="form-control" [(ngModel)]="invAssignForm.clientPhone" placeholder="Client contact number">
+          </div>
+        </div>
+      </div>
+
       <div class="form-row">
         <div class="form-group col-6">
           <label class="form-label">Quantity to Assign <span class="text-danger">*</span></label>
@@ -892,14 +1198,20 @@
         </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Expected Return Date <span class="label-hint">(optional)</span></label>
-        <input type="date" class="form-control" [(ngModel)]="invAssignForm.expectedReturnDate">
+      <div class="form-row">
+        <div class="form-group col-6">
+          <label class="form-label">Assignment Location <span class="label-hint">(optional)</span></label>
+          <input type="text" class="form-control" [(ngModel)]="invAssignForm.assignmentLocation" placeholder="e.g. Client site / Floor 2">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Expected Return <span class="label-hint">(optional)</span></label>
+          <input type="date" class="form-control" [(ngModel)]="invAssignForm.expectedReturnDate">
+        </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Purpose / Notes</label>
-        <textarea class="form-control" rows="2" [(ngModel)]="invAssignForm.purpose" placeholder="Daily office use..."></textarea>
+      <div class="form-group assign-notes-group">
+        <label class="form-label">Purpose / Notes <span class="label-hint">(optional)</span></label>
+        <textarea class="form-control" rows="2" [(ngModel)]="invAssignForm.purpose" placeholder="Daily office use, handover details, etc."></textarea>
       </div>
 
       <div class="field-error" *ngIf="invAssignError()">{{ invAssignError() }}</div>
@@ -1548,11 +1860,12 @@
 <!-- MODAL: VIEW ASSET DETAILS -->
 <!-- ========================================== -->
 <div class="drawer-overlay detail-overlay" *ngIf="isDetailModalOpen() && detailAsset()" (click)="closeDetailModal()">
-  <div class="asset-detail-sheet" (click)="$event.stopPropagation()">
+  <div class="asset-detail-sheet" role="dialog" aria-modal="true" aria-label="Asset details" (click)="$event.stopPropagation()">
     <div class="asset-detail-sheet-header">
       <div class="detail-title-group">
-        <span class="tag-mono">{{ detailAsset()!.assetTag }}</span>
+        <span class="detail-eyebrow">Individually tracked asset</span>
         <h3 class="detail-asset-name">{{ detailAsset()!.name }}</h3>
+        <div class="detail-header-meta"><span class="tag-mono">{{ detailAsset()!.assetTag }}</span><span>{{ detailAsset()!.category || 'Uncategorised' }}</span></div>
       </div>
       <button class="btn-close" (click)="closeDetailModal()"><svg lucideX size="18"></svg></button>
     </div>
@@ -1566,33 +1879,32 @@
           title="Click to enlarge" />
       </div>
       <div class="detail-no-photo" *ngIf="getDetailImages().length === 0">
-        <span style="font-size:40px;">≡ƒô╖</span>
-        <span>No photos uploaded</span>
+        <span class="detail-no-photo-icon"><svg lucideImage size="25"></svg></span>
+        <span><strong>No photos uploaded</strong><small>Photos can be added when this asset is edited.</small></span>
       </div>
 
       <!-- Info Grid -->
+      <section class="detail-section detail-asset-summary">
+        <div class="detail-section-heading">
+          <div><span class="detail-section-kicker">Asset snapshot</span><h4>Asset information</h4></div>
+          <span class="status-pill" [ngClass]="'status-' + (detailAsset()!.status || '').toLowerCase().replace('_', '-')"><span class="status-dot"></span>{{ detailAsset()!.status }}</span>
+        </div>
       <div class="detail-info-grid">
         <div class="detail-info-block">
           <span class="detail-info-label">Category</span>
           <span class="detail-info-value">{{ detailAsset()!.category }}</span>
         </div>
         <div class="detail-info-block">
-          <span class="detail-info-label">Status</span>
-          <span class="status-pill" [ngClass]="'status-' + (detailAsset()!.status || '').toLowerCase().replace('_', '-')">
-            <span class="status-dot"></span>{{ detailAsset()!.status }}
-          </span>
-        </div>
-        <div class="detail-info-block">
           <span class="detail-info-label">Brand</span>
-          <span class="detail-info-value">{{ detailAsset()!.brand || 'ΓÇö' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.brand || 'Not recorded' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Model</span>
-          <span class="detail-info-value">{{ detailAsset()!.model || 'ΓÇö' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.model || 'Not recorded' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Serial Number</span>
-          <span class="detail-info-value font-mono">{{ detailAsset()!.serialNumber || 'ΓÇö' }}</span>
+          <span class="detail-info-value font-mono">{{ detailAsset()!.serialNumber || 'Not recorded' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Quantity</span>
@@ -1600,19 +1912,19 @@
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Purchase Date</span>
-          <span class="detail-info-value">{{ detailAsset()!.purchaseDate ? (detailAsset()!.purchaseDate | date:'dd-MM-yyyy') : 'ΓÇö' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.purchaseDate ? (detailAsset()!.purchaseDate | date:'dd-MM-yyyy') : 'Not recorded' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Cost</span>
-          <span class="detail-info-value">{{ detailAsset()!.cost != null ? fmtMoney(detailAsset()!.cost) : '—' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.cost != null ? fmtMoney(detailAsset()!.cost) : 'Not recorded' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Warranty Expiry</span>
-          <span class="detail-info-value">{{ detailAsset()!.warrantyExpiry ? (detailAsset()!.warrantyExpiry | date:'dd-MM-yyyy') : 'ΓÇö' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.warrantyExpiry ? (detailAsset()!.warrantyExpiry | date:'dd-MM-yyyy') : 'Not recorded' }}</span>
         </div>
         <div class="detail-info-block">
           <span class="detail-info-label">Location / Storage</span>
-          <span class="detail-info-value">{{ detailAsset()!.location || 'ΓÇö' }}</span>
+          <span class="detail-info-value">{{ detailAsset()!.location || 'Not recorded' }}</span>
         </div>
 
         <!-- Specs (if available) -->
@@ -1634,11 +1946,15 @@
         <!-- Current Assignment -->
         <div class="detail-info-block col-span-2" *ngIf="detailAsset()!.assignments && detailAsset()!.assignments!.length > 0">
           <span class="detail-info-label">Currently Assigned To</span>
-          <span class="detail-info-value">
-            {{ detailAsset()!.assignments![0].employee?.firstName }} {{ detailAsset()!.assignments![0].employee?.lastName }}
-          </span>
+          <a class="assigned-employee-link" *ngIf="detailAsset()!.assignments![0].employee as employee" [href]="'/employees/' + employee.id + '/profile'" title="Open employee profile">
+            <img *ngIf="employee.avatarUrl || employee.user?.avatarUrl" [src]="employee.avatarUrl || employee.user?.avatarUrl" [alt]="employee.firstName + ' ' + employee.lastName" class="assigned-employee-avatar">
+            <span *ngIf="!employee.avatarUrl && !employee.user?.avatarUrl" class="assigned-employee-avatar assigned-employee-initial">{{ (employee.firstName || 'U').charAt(0) }}</span>
+            <span class="assigned-employee-copy"><strong>{{ employee.firstName }} {{ employee.lastName }}</strong></span>
+          </a>
+          <span class="detail-info-value" *ngIf="!detailAsset()!.assignments![0].employee">Unlinked assignment</span>
         </div>
       </div>
+      </section>
 
       <!-- Notes -->
       <div class="detail-notes-block" *ngIf="detailAsset()!.notes">

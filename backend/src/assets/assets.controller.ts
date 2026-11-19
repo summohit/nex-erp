@@ -104,6 +104,18 @@ export class AssetsController {
     return this.assetsService.createInventoryItem(req.user.companyId, req.user.sub, data);
   }
 
+  @Get('inventory/purchases')
+  @Permissions('assets/inventory')
+  getInventoryPurchases(@Request() req) {
+    return this.assetsService.getInventoryPurchases(req.user.companyId);
+  }
+
+  @Post('inventory/:id/purchase')
+  @Permissions('assets/inventory')
+  addInventoryPurchase(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() data: any) {
+    return this.assetsService.addInventoryPurchase(req.user.companyId, req.user.sub, id, data);
+  }
+
   @Post('inventory/import')
   @Permissions('assets/inventory')
   importInventoryItems(@Request() req, @Body() body: { rows: any[] }) {

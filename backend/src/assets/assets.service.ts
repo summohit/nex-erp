@@ -651,6 +651,24 @@ export class AssetsService {
     });
   }
 
+  async addInventoryPurchase(companyId: number, userId: number, id: number, data: any) {
+    const quantity = this.toInt(data.quantity, 0);
+    if (quantity < 1) throw new BadRequestException('Enter at least one unit to add');
+    return this.prisma.$transaction(async tx => {
+      const item = await tx.inventoryItem.findFirst({ where: { id, companyId } });
+      if (!item) throw new NotFoundException('Inventory item not found');
+      if (data.unitCost != null && Math.abs(this.toFloat(data.unitCost, item.unitCost) - item.unitCost) > 0.0001) {
+        throw new BadRequestException(`This item is recorded at ₹${item.unitCost} per item. Add it as a new inventory item to save a different price.`);
+      }
+      await tx.inventoryItem.update({ where: { id }, data: { quantity: { increment: quantity } } });
+      return tx.inventoryTransaction.create({ data: { companyId, itemId: id, type: 'PURCHASE', quantity, date: this.parseDate(data.purchaseDate) || new Date(), assigneeText: data.supplier ? `Vendor: ${data.supplier}` : null, purpose: data.notes || 'Stock replenishment', createdById: userId } });
+    });
+  }
+
+  async getInventoryPurchases(companyId: number) {
+    return this.prisma.inventoryTransaction.findMany({ where: { companyId, type: 'PURCHASE' }, orderBy: [{ date: 'desc' }, { id: 'desc' }], include: { item: { select: { id: true, name: true, unit: true, category: true, brand: true, supplier: true } }, createdBy: { select: { email: true } } } });
+  }
+
   async setInventoryItemStatus(companyId: number, id: number, status: string) {
     const item = await this.prisma.inventoryItem.findFirst({ where: { id, companyId } });
     if (!item) throw new NotFoundException('Inventory item not found');
@@ -743,7 +761,9 @@ export class AssetsService {
           employeeId: data.employeeId || null,
           assigneeText: data.assigneeText || null,
           expectedReturnDate: this.parseDate(data.expectedReturnDate),
-          purpose: data.purpose || null,
+          purpose: [data.purpose?.trim(), data.clientDetails?.trim(), data.assignmentLocation?.trim() ? `Assignment location: ${data.assignmentLocation.trim()}` : '']
+            .filter(Boolean)
+            .join('\n') || null,
           createdById: userId
         }
       });
