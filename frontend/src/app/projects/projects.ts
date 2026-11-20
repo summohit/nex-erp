@@ -3660,6 +3660,13 @@ export class ProjectsComponent implements OnInit {
     this.myTasksStatusMenu.set(null);
     const task = menu?.task;
     if (!task || task.projectId == null || task.status === status) return;
+    // 19 Nov 2026: Review and Completed need evidence, which is attached in the
+    // task itself — open it there instead of changing the status blind.
+    if (status === 'IN_REVIEW' || status === 'DONE') {
+      this.toast.info('Attach evidence to move this task — opening it now.');
+      this.router.navigate(['/projects', task.projectId], { queryParams: { task: task.id } });
+      return;
+    }
     this.projectsService.updateIssue(task.projectId, task.id, { status }).subscribe({
       next: () => {
         this.toast.success('Status updated');

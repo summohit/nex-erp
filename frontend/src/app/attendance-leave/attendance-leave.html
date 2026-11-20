@@ -1358,8 +1358,8 @@
                 <p class="alq-subtitle">Set annual leave days per type for {{ assignYear() }}. Each row saves independently.</p>
               </div>
               <div class="alq-header-pills" *ngIf="!quotaGridLoading() && quotaGrid().length">
-                <span class="alq-stat-pill">{{ quotaGrid().length }} types</span>
-                <span class="alq-stat-pill blue">{{ quotaGridPaidTotal() }} paid days</span>
+                <span class="alq-stat-pill">Taken <b>{{ quotaGridUsedTotal() }}</b> days</span>
+                <span class="alq-stat-pill blue">Remaining <b>{{ quotaGridPaidTotal() }}</b> days</span>
                 <span class="alq-stat-pill amber" *ngIf="quotaGridLockedCount() > 0">{{ quotaGridLockedCount() }} locked</span>
               </div>
             </div>
@@ -1500,7 +1500,7 @@
 
         <!-- Team Leave Summary Strip -->
         <div class="lb-overview-strip" *ngIf="!isLoadingBalances() && balanceOverviewStats() as st">
-          <div class="lb-overview-card accent-blue">
+          <div class="lb-overview-card accent-blue lb-ov-click" role="button" tabindex="0" title="Show all" [class.on]="balanceStatusFilter() === 'all'" (click)="balanceStatusFilter.set('all')">
             <div class="lb-ov-top">
               <span class="lb-ov-label">Total Allocated</span>
               <span class="lb-ov-tag blue">Paid Quota</span>
@@ -1512,7 +1512,7 @@
             <span class="lb-ov-sub">Across {{ st.totalEmployees }} employees in {{ selectedYear() }}</span>
           </div>
 
-          <div class="lb-overview-card accent-indigo">
+          <div class="lb-overview-card accent-indigo lb-ov-click" role="button" tabindex="0" title="Show exhausted / deficit" [class.on]="balanceStatusFilter() === 'exhausted'" (click)="balanceStatusFilter.set('exhausted')">
             <div class="lb-ov-top">
               <span class="lb-ov-label">Paid Leave Used</span>
               <span class="lb-ov-tag indigo">{{ st.utilizationPct }}% used</span>
@@ -1526,7 +1526,7 @@
             </div>
           </div>
 
-          <div class="lb-overview-card accent-emerald">
+          <div class="lb-overview-card accent-emerald lb-ov-click" role="button" tabindex="0" title="Show people with leave available" [class.on]="balanceStatusFilter() === 'available'" (click)="balanceStatusFilter.set('available')">
             <div class="lb-ov-top">
               <span class="lb-ov-label">Total Remaining</span>
               <span class="lb-ov-tag emerald">{{ st.availableCount }} available</span>
@@ -1538,7 +1538,7 @@
             <span class="lb-ov-sub">{{ st.exhaustedCount }} exhausted · {{ st.deficitCount }} deficit</span>
           </div>
 
-          <div class="lb-overview-card accent-rose">
+          <div class="lb-overview-card accent-rose lb-ov-click" role="button" tabindex="0" title="Show pending" [class.on]="balanceStatusFilter() === 'pending' || balanceStatusFilter() === 'lop'" (click)="balanceStatusFilter.set('pending')">
             <div class="lb-ov-top">
               <span class="lb-ov-label">Pending &amp; LOP</span>
               <span class="lb-ov-tag rose" *ngIf="st.totalLop > 0">{{ st.lopCount }} with LOP</span>
@@ -1550,7 +1550,7 @@
                 <small>pending</small>
               </span>
               <span class="lb-dual-sep">/</span>
-              <span class="lb-dual-metric">
+              <span class="lb-dual-metric lb-dual-click" title="Show LOP" (click)="$event.stopPropagation(); balanceStatusFilter.set('lop')">
                 <strong class="text-rose">{{ st.totalLop }}</strong>
                 <small>LOP days</small>
               </span>

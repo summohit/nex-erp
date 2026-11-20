@@ -452,6 +452,38 @@
       </div>
     </div>
 
+    <!-- Card: CEO stamp for exit letters (20 Nov 2026) -->
+    <div class="setting-card" *ngIf="tab() === 'letters'">
+      <div class="card-top">
+        <div class="card-icon-wrap"><svg lucidePenLine size="20"></svg></div>
+        <div class="card-title-group">
+          <h3>CEO stamp &amp; signature</h3>
+          <p>Printed at the foot of relieving and experience letters, under the company logo letterhead.</p>
+        </div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-preview" [class.has-image]="s.ceoStampUrl">
+          <img *ngIf="s.ceoStampUrl" [src]="s.ceoStampUrl" alt="CEO stamp and signature">
+          <span *ngIf="!s.ceoStampUrl">No stamp uploaded</span>
+        </div>
+        <input #stampInput type="file" accept="image/*" hidden (change)="onStampSelected($event)">
+        <div class="sig-actions">
+          <button type="button" class="btn-sig-upload" (click)="stampInput.click()" [disabled]="isUploadingStamp()">
+            <svg lucideLoader2 size="14" *ngIf="isUploadingStamp()" class="spin"></svg>
+            <svg lucideUploadCloud size="14" *ngIf="!isUploadingStamp()"></svg>
+            <span>{{ s.ceoStampUrl ? 'Replace' : 'Upload' }}</span>
+          </button>
+          <button type="button" class="btn-sig-remove" *ngIf="s.ceoStampUrl" (click)="removeStamp()" [disabled]="isUploadingStamp()">
+            <svg lucideTrash2 size="14"></svg><span>Remove</span>
+          </button>
+        </div>
+      </div>
+      <div class="card-footer-note">
+        <svg lucideInfo size="14"></svg>
+        <span>A transparent PNG works best. Max 2MB. Click Save after uploading.</span>
+      </div>
+    </div>
+
     <!-- Card: quotation signatory -->
     <div class="setting-card" *ngIf="tab() === 'sales'">
       <div class="card-top">

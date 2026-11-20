@@ -26,6 +26,7 @@ export interface SystemSetting {
   /** Signature or stamp image placed above that line. Optional — a quotation
    *  must still generate when nobody has uploaded one. */
   quotationSignatureUrl?: string | null;
+  ceoStampUrl?: string | null;
 }
 
 export interface PlaceholderTag {

@@ -1839,7 +1839,8 @@ export class AttendanceLeaveComponent implements OnInit {
 
   // Searchable options for Assign Leave Balance
   employeeAssignOptions = computed<SearchableSelectOption[]>(() => {
-    return this.employees().map(emp => {
+    // #37 (20 Nov 2026): active people only.
+    return this.employees().filter((e: any) => !e.isCompanyAccount && e.offboardingStatus !== 'SEPARATED' && (e.user?.status ?? e.status ?? 'ACTIVE') !== 'SUSPENDED' && e.isActive !== false).map(emp => {
       const code = emp.employeeCode ? `#${emp.employeeCode}` : '';
       const des = emp.designation?.name || '';
       const dept = emp.department?.name ? ` · ${emp.department.name}` : '';
@@ -5048,6 +5049,14 @@ export class AttendanceLeaveComponent implements OnInit {
 
   quotaRowChanged(r: any): boolean {
     return Number(r.draft) !== this.remainingOf(r) || !!r.lockDraft !== !!r.locked || !r.exists;
+  }
+
+  /** Paid leave already taken across all types (shown beside Remaining). */
+  quotaGridUsedTotal(): number {
+    const sum = this.quotaGrid()
+      .filter((r) => r.isPaid !== false)
+      .reduce((acc, r) => acc + (Number(r.used) || 0), 0);
+    return Math.round(sum * 10) / 10;
   }
 
   quotaGridPaidTotal(): number {

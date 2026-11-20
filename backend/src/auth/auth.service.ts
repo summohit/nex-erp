@@ -211,7 +211,11 @@ export class AuthService {
     // UserTwoFactor row — a row is created the moment enrolment starts, and a
     // half-finished enrolment must not count as protection.
     const twoFactorActive = !!user.twoFactor?.confirmedAt;
-    const companyRequires = await this.twoFactorService.companyRequires(user.companyId);
+    let companyRequires = await this.twoFactorService.companyRequires(user.companyId);
+    if (companyRequires && !twoFactorActive && (user as any).twoFactorExempt) {
+      this.logger.warn(`Two-factor skipped for ${user.email}: flagged as a test account (twoFactorExempt).`);
+      companyRequires = false;
+    }
 
     // TEMPORARY mobile bypass. Off unless ALLOW_MOBILE_2FA_BYPASS=true, so it
     // cannot leak into an environment by accident and can be closed instantly
@@ -305,7 +309,7 @@ export class AuthService {
       throw new UnauthorizedException('Session is no longer valid. Please sign in again.');
     }
 
-    if (!user.twoFactor?.confirmedAt && await this.twoFactorService.companyRequires(user.companyId)) {
+    if (!user.twoFactor?.confirmedAt && !(user as any).twoFactorExempt && await this.twoFactorService.companyRequires(user.companyId)) {
       throw new UnauthorizedException('Two-factor authentication setup is required. Please sign in again.');
     }
 

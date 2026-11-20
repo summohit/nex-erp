@@ -141,10 +141,19 @@ export class LeavesService {
     return this.withCompOffUsed(employee.companyId, year, balances);
   }
 
+  /** Active people only (#37): not suspended, not separated, not the company account. */
+  static ACTIVE_PERSON = {
+    isCompanyAccount: false,
+    offboardingStatus: { not: 'SEPARATED' },
+    user: { status: { not: 'SUSPENDED' } },
+  } as const;
+
   async getAllBalances(companyId: number, year: number, employeeId?: number, limit = 200) {
     const balances = await this.prisma.leaveBalance.findMany({
-      where: { 
-        employee: { companyId }, 
+      where: {
+        // #37 (20 Nov 2026): the company-wide list shows active people only —
+        // no suspended / separated accounts and no company account (info@).
+        employee: employeeId ? { companyId } : { companyId, ...LeavesService.ACTIVE_PERSON },
         year,
         ...(employeeId ? { employeeId } : {})
       },
@@ -220,7 +229,7 @@ export class LeavesService {
         orderBy: { name: 'asc' },
       }),
       this.prisma.employee.findMany({
-        where: { companyId, ...(scopeEmployeeId ? { id: scopeEmployeeId } : {}) },
+        where: { companyId, ...(scopeEmployeeId ? { id: scopeEmployeeId } : LeavesService.ACTIVE_PERSON) },
         select: {
           id: true, firstName: true, lastName: true, employeeCode: true, avatarUrl: true,
           designation: { select: { name: true } },
@@ -799,7 +808,7 @@ export class LeavesService {
     actorUserId: number,
     body: { employeeId: number; date: string; status: string; note?: string },
   ) {
-    const actor = await this.prisma.user.findUnique({ where: { id: actorUserId }, select: { role: true, companyId: true } });
+    const actor = await this.prisma.user.findUnique({ where: { id: actorUserId }, select: { role: true, companyId: true, employee: { select: { id: true } } } });
     if (!actor || !isSuperAdmin(actor.role)) throw new ForbiddenException('Only a Super Admin can override attendance.');
     const status = body.status === 'HALFDAY' ? 'HALF_DAY' : String(body.status || '').toUpperCase();
     // DAY_OFF (13 Nov 2026): a rostered day off for this date; no loss of pay.
@@ -871,7 +880,7 @@ export class LeavesService {
         missedClockOut: false,
         autoClockedOut: false,
         clockOutApproval: 'APPROVED',
-        clockOutApprovedById: actorUserId,
+        clockOutApprovedById: (actor as any)?.employee?.id ?? null, // employee id, not user id (20 Nov 2026)
         clockOutApprovedAt: new Date(),
         clockOutReason: `Override by Super Admin: ${note}`,
         shiftId: employee.shift?.id ?? null,

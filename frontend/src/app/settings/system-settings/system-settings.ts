@@ -491,6 +491,21 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  isUploadingStamp = signal(false);
+  onStampSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0]; input.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { this.toast.error('Please choose an image'); return; }
+    if (file.size > 2 * 1024 * 1024) { this.toast.error('File must be less than 2MB'); return; }
+    this.isUploadingStamp.set(true);
+    this.companyService.uploadLogo(file).subscribe({
+      next: (res) => { const c = this.settings(); if (c) this.settings.set({ ...c, ceoStampUrl: res.url }); this.isUploadingStamp.set(false); this.toast.success('Stamp uploaded. Save to apply it to exit letters.'); },
+      error: () => { this.isUploadingStamp.set(false); this.toast.error('Failed to upload the stamp'); },
+    });
+  }
+  removeStamp() { const c = this.settings(); if (c) this.settings.set({ ...c, ceoStampUrl: null }); }
+
   removeSignature() {
     const current = this.settings();
     if (!current) return;
@@ -519,7 +534,8 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
       // out here silently never reaches the server.
       quotationTerms: current.quotationTerms ?? null,
       quotationSignatoryName: current.quotationSignatoryName ?? null,
-      quotationSignatureUrl: current.quotationSignatureUrl ?? null
+      quotationSignatureUrl: current.quotationSignatureUrl ?? null,
+      ceoStampUrl: current.ceoStampUrl ?? null
     }).subscribe({
       next: (data) => {
         this.settings.set(data);

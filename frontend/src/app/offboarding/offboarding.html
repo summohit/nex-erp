@@ -17,37 +17,39 @@
         <svg lucideDoorOpen size="14"></svg>
         <span>Resignations</span>
       </button>
-      <button
+            <button
         type="button"
         class="pill-btn"
-        *ngIf="canClearTasks()"
-        [class.active]="activeTab() === 'tasks'"
-        (click)="setTab('tasks')">
-        <svg lucideCheckCircle2 size="14"></svg>
-        <span>Clearance Tasks</span>
+        *ngIf="isAdminOrHr()"
+        [class.active]="activeTab() === 'fnf'"
+        (click)="setTab('fnf')">
+        <svg lucideClipboardCheck size="14"></svg>
+        <span>Full &amp; Final</span>
       </button>
     </div>
 
-    <!-- Outlined secondary button next -->
-    <button
-      type="button"
-      class="btn-secondary"
-      (click)="loadData()"
-      title="Refresh records"
-      aria-label="Refresh records">
-      <svg lucideRefreshCw size="14"></svg>
-      <span>Refresh</span>
+
+    <!-- Offboarding part 1 (20 Nov 2026): HR tools -->
+    <button type="button" class="btn-secondary" *ngIf="isAdminOrHr()" (click)="openNoticePolicy()" title="Notice period per employment type">
+      <svg lucideClock size="14"></svg><span>Notice periods</span>
+    </button>
+    <button type="button" class="btn-secondary" *ngIf="isAdminOrHr() && activeTab() === 'resignations'" (click)="openStartExit()">
+      <svg lucideUserMinus size="14"></svg><span>Start exit</span>
     </button>
 
     <!-- Blue primary button last (rightmost) -->
     <button
       type="button"
       class="btn-primary"
-      *ngIf="activeTab() === 'resignations'"
+      *ngIf="activeTab() === 'resignations' && !myActiveResignation() && currentUserRole() !== 'SUPERADMIN'"
       (click)="openResignModal()">
       <svg lucidePlus size="16"></svg>
       <span>Submit Resignation</span>
     </button>
+    <span class="my-resign-chip" *ngIf="activeTab() === 'resignations' && myActiveResignation() as m"
+      [title]="'Last working day ' + ((m.approvedLastWorkingDay || m.intendedLastWorkingDay) | date:'d MMM y')">
+      Your resignation: {{ m.status === 'APPROVED' ? 'Approved' : 'Pending' }}
+    </span>
   </app-page-header>
 
   <!-- ════════════════════════════════════════════════════════════════════════
@@ -328,6 +330,173 @@
     </div>
   </ng-container>
 
+  <!-- ═══ TAB: FULL & FINAL (part 4, 20 Nov 2026) ═══ -->
+  <ng-container *ngIf="activeTab() === 'fnf' && isAdminOrHr()">
+    <section class="offb-kpi-grid" aria-label="Settlement summary">
+      <article class="offb-kpi-card" *ngFor="let k of [
+          {key:'ALL', label:'All exits', sub:'Approved exits', tone:'bg-blue-soft', icon:'door'},
+          {key:'TODO', label:'To prepare', sub:'Not started or draft', tone:'bg-amber-soft', icon:'clip'},
+          {key:'PENDING_APPROVAL', label:'Waiting approval', sub:'Super Admin review', tone:'bg-indigo-soft', icon:'clock'},
+          {key:'APPROVED', label:'To pay', sub:'Approved, not paid', tone:'bg-cyan-soft', icon:'cal'},
+          {key:'PAID', label:'Paid', sub:'Letters can go out', tone:'bg-emerald-soft', icon:'check'}]"
+        [class.active]="fnfFilter() === k.key"
+        (click)="fnfFilter.set($any(k.key))"
+        (keydown.enter)="fnfFilter.set($any(k.key))"
+        tabindex="0"
+        role="button">
+        <div class="offb-kpi-icon" [ngClass]="k.tone">
+          <svg *ngIf="k.icon === 'door'" lucideDoorOpen size="20"></svg>
+          <svg *ngIf="k.icon === 'clip'" lucideClipboardCheck size="20"></svg>
+          <svg *ngIf="k.icon === 'clock'" lucideClock size="20"></svg>
+          <svg *ngIf="k.icon === 'cal'" lucideCalendarDays size="20"></svg>
+          <svg *ngIf="k.icon === 'check'" lucideCheckCircle2 size="20"></svg>
+        </div>
+        <div class="offb-kpi-content">
+          <span class="offb-kpi-label">{{ k.label }}</span>
+          <span class="offb-kpi-value">{{ fnfCount(k.key) }}</span>
+          <span class="offb-kpi-sub">{{ k.sub }}</span>
+        </div>
+      </article>
+    </section>
+
+    <div class="filter-card">
+      <div class="offb-search-wrap">
+        <svg lucideSearch size="15" class="offb-search-icon"></svg>
+        <input
+          type="search"
+          [ngModel]="fnfSearch()"
+          (ngModelChange)="fnfSearch.set($event)"
+          placeholder="Search employee, ID, department or status…"
+          aria-label="Search Full and Final settlements" />
+        <button
+          type="button"
+          class="offb-search-clear"
+          *ngIf="fnfSearch()"
+          (click)="fnfSearch.set('')"
+          title="Clear search">
+          <svg lucideX size="13"></svg>
+        </button>
+      </div>
+
+      <div class="fnf-filter-pills" role="group" aria-label="Quick status filter">
+        <button
+          type="button"
+          class="fnf-filter-pill"
+          *ngFor="let p of [
+            {key:'ALL', label:'All'},
+            {key:'TODO', label:'To prepare'},
+            {key:'PENDING_APPROVAL', label:'Waiting approval'},
+            {key:'APPROVED', label:'To pay'},
+            {key:'PAID', label:'Paid'}]"
+          [class.active]="fnfFilter() === p.key"
+          (click)="fnfFilter.set($any(p.key))">
+          {{ p.label }}
+        </button>
+      </div>
+
+      <button
+        type="button"
+        class="clear-all-filters"
+        *ngIf="fnfSearch() || fnfFilter() !== 'ALL'"
+        (click)="clearFnfFilters()">
+        Clear all
+      </button>
+
+      <div class="offb-showing-count">
+        Showing <strong>{{ fnfFiltered().length }}</strong> of <strong>{{ fnfRows().length }}</strong>
+      </div>
+    </div>
+
+    <div class="table-container fnf-table-wrap" tabindex="0" role="region" aria-label="Full and Final settlements table">
+      <table class="data-table fnf-list">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Exit Type</th>
+            <th>Last Working Day</th>
+            <th>F&amp;F Due Date</th>
+            <th>Net Payable</th>
+            <th>Status</th>
+            <th class="fnf-col-action">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of fnfFiltered()" (click)="openFnf(r.resignationId)" class="fnf-row">
+            <td>
+              <div class="fnf-emp-cell">
+                <span class="fnf-emp-avatar">{{ getInitials((r.employee?.firstName || '') + ' ' + (r.employee?.lastName || '')) }}</span>
+                <div class="fnf-emp-info">
+                  <div class="fnf-emp-name-row">
+                    <strong class="fnf-emp-name">{{ r.employee?.firstName }} {{ r.employee?.lastName }}</strong>
+                    <span class="ho-code-pill" *ngIf="r.employee?.employeeCode">#{{ r.employee.employeeCode }}</span>
+                  </div>
+                  <span class="fnf-emp-dept">{{ r.employee?.department?.name || 'Unassigned department' }}</span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="fnf-type-pill">{{ exitTypeLabel(r.exitType) }}</span>
+            </td>
+            <td>
+              <div class="fnf-date-cell">
+                <span class="fnf-date-main">{{ r.lastWorkingDay | date:'d MMM y' }}</span>
+                <span class="fnf-date-sub">Approved LWD</span>
+              </div>
+            </td>
+            <td>
+              <div class="fnf-date-cell">
+                <div class="fnf-due-row">
+                  <span class="fnf-date-main" [class.fnf-overdue]="fnfOverdue(r)">{{ fnfDue(r) | date:'d MMM y' }}</span>
+                  <span class="fnf-overdue-badge" *ngIf="fnfOverdue(r)">Overdue</span>
+                </div>
+                <span class="fnf-date-sub">{{ r.fnf?.dueDate ? 'Scheduled settlement' : 'Est. 45 days post-LWD' }}</span>
+              </div>
+            </td>
+            <td>
+              <span *ngIf="r.fnf" class="fnf-amount-cell" [class.is-neg]="r.fnf.netPayable < 0">
+                ₹{{ (r.fnf.netPayable < 0 ? -r.fnf.netPayable : r.fnf.netPayable) | number:'1.2-2' }}
+                <small *ngIf="r.fnf.netPayable < 0">recoverable</small>
+              </span>
+              <span *ngIf="!r.fnf" class="fnf-amount-empty">—</span>
+            </td>
+            <td>
+              <span class="fnf-chip" [attr.data-s]="fnfState(r)">
+                <span class="fnf-chip-dot"></span>
+                {{ fnfStateLabel(fnfState(r)) }}
+              </span>
+            </td>
+            <td class="fnf-col-action" (click)="$event.stopPropagation()">
+              <button
+                type="button"
+                class="fnf-action-btn"
+                [class.is-prepare]="!r.fnf"
+                (click)="openFnf(r.resignationId)">
+                <span>{{ r.fnf ? 'Open' : 'Prepare' }}</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                </svg>
+              </button>
+              <button *ngIf="r.fnf?.status === 'PAID'" type="button" class="fnf-action-btn" style="margin-left:6px" (click)="openExitLetter(r.resignationId)">
+                <span>{{ r.exitLetterSentAt ? 'Letter ✓' : 'Send letter' }}</span>
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="!fnfFiltered().length">
+            <td colspan="7" class="fnf-empty-cell">
+              <div class="fnf-empty-state">
+                <div class="fnf-empty-icon">
+                  <svg lucideClipboardCheck size="22"></svg>
+                </div>
+                <strong>No exit settlements match your filter</strong>
+                <span>Try switching the status tab above or clearing your search query.</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </ng-container>
+
   <!-- Exit Interviews Tab (if triggered) -->
   <div class="tab-content" *ngIf="activeTab() === 'exit' && isAdminOrHr()">
     <div class="table-container">
@@ -425,50 +594,235 @@
       </div>
       <div class="form-group full-width">
         <label>Reason for leaving <span class="required-mark">*</span></label>
-        <textarea [(ngModel)]="resignForm.reason" rows="4" class="form-control reason-control" placeholder="Add a short explanation for your resignation..."></textarea>
+        <textarea [(ngModel)]="resignForm.reason" rows="4" class="form-control reason-control" [class.field-invalid]="resignReasonError()" [disabled]="resignSubmitting()" placeholder="Add a short explanation for your resignation..."></textarea>
+        <span class="field-error" *ngIf="resignReasonError()">{{ resignReasonError() }}</span>
         <span class="field-help">This is shared with your reviewer to help them process the request.</span>
       </div>
       <div class="form-group full-width resign-date-section">
         <div class="date-section-copy"><label>Intended last working day <span class="required-mark">*</span></label><span class="field-help">Your manager or HR will confirm the final date.</span></div>
-        <input type="date" [(ngModel)]="resignForm.intendedLastWorkingDay" class="form-control" />
+        <input type="date" [(ngModel)]="resignForm.intendedLastWorkingDay" class="form-control" [class.field-invalid]="resignDateError()" [disabled]="resignSubmitting()" />
+        <span class="field-error" *ngIf="resignDateError()">{{ resignDateError() }}</span>
+        <div class="exit-notice" *ngIf="myNotice() as n">
+          Your notice period is <b>{{ n.days }} days</b> · earliest last working day <b>{{ n.earliest | date:'d MMM y':'UTC' }}</b>.
+          <span class="exit-short" *ngIf="myShortDays() > 0">This is {{ myShortDays() }} day(s) short — HR will decide whether it's waived or recovered.</span>
+        </div>
       </div>
     </div>
     <div class="modal-footer resign-footer">
-      <button class="btn-outline" (click)="closeResignModal()">Cancel</button>
-      <button class="btn-primary" (click)="submitResignation()"><svg lucideDoorOpen size="16"></svg> Submit request</button>
+      <span class="field-error resign-server-error" *ngIf="resignError()">{{ resignError() }}</span>
+      <button class="btn-outline" (click)="closeResignModal()" [disabled]="resignSubmitting()">Cancel</button>
+      <button class="btn-primary" (click)="submitResignation()" [disabled]="resignSubmitting()">
+        <span class="btn-spinner" *ngIf="resignSubmitting()"></span>
+        <svg lucideDoorOpen size="16" *ngIf="!resignSubmitting()"></svg>
+        {{ resignSubmitting() ? 'Submitting…' : 'Submit request' }}
+      </button>
     </div>
   </div>
 </div>
 
-<!-- ── Approve / Review Resignation Modal ─────────────────────────────────── -->
-<div class="modal-overlay" *ngIf="showApproveModal()">
-  <div class="modal-content">
+<!-- ── Withdraw own resignation (20 Nov 2026) ── -->
+<div class="modal-overlay" *ngIf="withdrawing() as w" (click)="!withdrawBusy() && withdrawing.set(null)">
+  <div class="modal-content withdraw-modal" (click)="$event.stopPropagation()">
+    <div class="withdraw-header">
+      <div class="withdraw-header-left">
+        <div class="withdraw-icon-badge" aria-hidden="true">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>
+          </svg>
+        </div>
+        <div class="withdraw-title-wrap">
+          <h3>Withdraw resignation?</h3>
+          <p>Cancel your pending exit request and remain employed as usual.</p>
+        </div>
+      </div>
+      <button type="button" class="withdraw-close-btn" (click)="withdrawing.set(null)" [disabled]="withdrawBusy()" aria-label="Close">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <div class="withdraw-body">
+      <div class="withdraw-summary-card">
+        <div class="withdraw-summary-item">
+          <span class="withdraw-summary-label">Intended Last Working Day</span>
+          <span class="withdraw-summary-val">
+            <svg lucideCalendarDays size="14"></svg>
+            {{ w.intendedLastWorkingDay | date:'d MMM y' }}
+          </span>
+        </div>
+        <div class="withdraw-summary-divider"></div>
+        <div class="withdraw-summary-item">
+          <span class="withdraw-summary-label">Current Stage</span>
+          <span class="withdraw-stage-pill">
+            <span class="withdraw-stage-dot"></span>
+            Waiting: {{ stageLabel(w.stage) }}
+          </span>
+        </div>
+      </div>
+
+      <p class="withdraw-info-note">
+        Once withdrawn, your manager and HR will be notified automatically and your exit request will be closed.
+      </p>
+
+      <div class="withdraw-note-block">
+        <div class="withdraw-note-header">
+          <label for="withdraw-note-input">Note for Manager / HR</label>
+          <span class="withdraw-optional-tag">Optional</span>
+        </div>
+        <div class="withdraw-quick-chips">
+          <button
+            type="button"
+            class="withdraw-chip"
+            *ngFor="let preset of ['Decided to stay', 'Personal reasons resolved', 'Discussed with manager']"
+            [class.active]="withdrawNote === preset"
+            [disabled]="withdrawBusy()"
+            (click)="withdrawNote = preset">
+            {{ preset }}
+          </button>
+        </div>
+        <textarea
+          id="withdraw-note-input"
+          [(ngModel)]="withdrawNote"
+          rows="3"
+          class="withdraw-textarea"
+          [disabled]="withdrawBusy()"
+          placeholder="Add a brief reason or context (e.g. Decided to stay)…"></textarea>
+      </div>
+    </div>
+
+    <div class="withdraw-footer">
+      <button type="button" class="withdraw-btn-keep" (click)="withdrawing.set(null)" [disabled]="withdrawBusy()">
+        Keep resignation
+      </button>
+      <button type="button" class="withdraw-btn-confirm" (click)="confirmWithdraw()" [disabled]="withdrawBusy()">
+        <span class="btn-spinner" *ngIf="withdrawBusy()"></span>
+        <svg *ngIf="!withdrawBusy()" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>
+        </svg>
+        {{ withdrawBusy() ? 'Withdrawing…' : 'Withdraw resignation' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Review exit: Manager → HR → Super Admin (20 Nov 2026) ─────────────── -->
+<div class="modal-overlay" *ngIf="showApproveModal() && reviewing() as r">
+  <div class="modal-content exit-review">
     <div class="modal-header">
-      <h2>Review Resignation</h2>
+      <div>
+        <h2>Review exit · {{ r.employee?.firstName }} {{ r.employee?.lastName }}</h2>
+        <p class="exit-sub">{{ exitTypeLabel(r.exitType) }} · your step: <b>{{ stageLabel(r.stage) }}</b></p>
+      </div>
       <button class="close-btn" (click)="closeApproveModal()"><svg lucideX size="20"></svg></button>
     </div>
-    <div class="modal-body form-grid">
-      <div class="form-group">
-        <label>Action</label>
-        <select [(ngModel)]="approveForm.status" class="form-control">
-          <option value="APPROVED">Approve</option>
-          <option value="REJECTED">Reject / Retain</option>
-          <option value="WITHDRAWN">Withdrawn</option>
-        </select>
+    <div class="modal-body">
+      <ol class="exit-chain">
+        <li [class.done]="r.stage !== 'MANAGER'" [class.now]="r.stage === 'MANAGER'">Manager</li>
+        <li [class.done]="r.stage === 'SUPERADMIN'" [class.now]="r.stage === 'HR'">HR</li>
+        <li [class.now]="r.stage === 'SUPERADMIN'">Super Admin</li>
+      </ol>
+      <div class="exit-facts">
+        <div><small>Reason</small><span>{{ r.reason }}</span></div>
+        <div><small>Requested last day</small><span>{{ r.intendedLastWorkingDay | date:'d MMM y':'UTC' }}</span></div>
+        <div *ngIf="r.noticeDays != null"><small>Notice</small><span>{{ r.noticeDays }} days · earliest {{ r.earliestLastWorkingDay | date:'d MMM y':'UTC' }}</span></div>
+        <div *ngIf="r.approvedLastWorkingDay"><small>Last day set by HR</small><span>{{ r.approvedLastWorkingDay | date:'d MMM y':'UTC' }}</span></div>
+        <div *ngIf="r.shortNoticeAction"><small>Short notice</small><span>{{ r.shortNoticeDays }} day(s) · {{ r.shortNoticeAction === 'RECOVER' ? 'recover in FNF' : 'waived' }}</span></div>
       </div>
-      <div class="form-group" *ngIf="approveForm.status === 'APPROVED'">
-        <label>Approved Last Working Day</label>
-        <input type="date" [(ngModel)]="approveForm.approvedLastWorkingDay" class="form-control" />
-      </div>
-      <div class="form-group full-width">
-        <label>Remarks</label>
-        <textarea [(ngModel)]="approveForm.remarks" rows="2" class="form-control"></textarea>
+      <ul class="exit-log" *ngIf="r.approvals?.length">
+        <li *ngFor="let a of r.approvals"><b>{{ a.decision === 'SUBMITTED' ? 'Submitted' : a.decision === 'INITIATED' ? 'Started by HR' : (stageLabel(a.stage) + ' ' + (a.decision === 'APPROVE' ? 'approved' : 'rejected')) }}</b>
+          <span *ngIf="a.byName"> · {{ a.byName }}</span> · {{ a.at | date:'d MMM, h:mm a' }}<em *ngIf="a.note"> — “{{ a.note }}”</em></li>
+      </ul>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Decision</label>
+          <select [(ngModel)]="decision.decision" class="form-control">
+            <option value="APPROVE">Approve</option>
+            <option value="REJECT">Reject / Retain</option>
+          </select>
+        </div>
+        <div class="exit-notice full-width" *ngIf="saFinal(r) && decision.decision === 'APPROVE'">As Super Admin your approval is final — the remaining steps are skipped and the exit is approved now.</div>
+        <div class="form-group" *ngIf="setsFinalDay(r) && decision.decision === 'APPROVE'">
+          <label>Final last working day</label>
+          <input type="date" [(ngModel)]="decision.lastWorkingDay" class="form-control" />
+        </div>
+        <div class="form-group full-width" *ngIf="setsFinalDay(r) && decision.decision === 'APPROVE' && decisionShortDays() > 0">
+          <label>Notice is {{ decisionShortDays() }} day(s) short</label>
+          <div class="exit-radio">
+            <label><input type="radio" name="sn" value="WAIVE" [(ngModel)]="decision.shortNoticeAction"> Waive</label>
+            <label><input type="radio" name="sn" value="RECOVER" [(ngModel)]="decision.shortNoticeAction"> Recover in FNF</label>
+          </div>
+        </div>
+        <div class="form-group full-width">
+          <label>Note {{ decision.decision === 'REJECT' ? '(required)' : '(optional)' }}</label>
+          <textarea [(ngModel)]="decision.note" rows="2" class="form-control"></textarea>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-outline" (click)="closeApproveModal()">Cancel</button>
-      <button class="btn-primary" (click)="submitApprove()">Update Status</button>
+      <button class="btn-primary" [disabled]="deciding()" (click)="submitApprove()">{{ deciding() ? 'Saving…' : (decision.decision === 'APPROVE' ? (reviewing() && saFinal(reviewing()!) ? 'Approve (final)' : 'Approve') : 'Reject') }}</button>
     </div>
+  </div>
+</div>
+
+<!-- ── HR: start an exit ── -->
+<div class="modal-overlay" *ngIf="showStartExit()">
+  <div class="modal-content exit-review">
+    <div class="modal-header">
+      <div><h2>Start an exit</h2><p class="exit-sub">For resignations on someone's behalf, termination, absconding or contract end. Goes to the Super Admin to approve.</p></div>
+      <button class="close-btn" (click)="showStartExit.set(false)"><svg lucideX size="20"></svg></button>
+    </div>
+    <div class="modal-body form-grid">
+      <div class="form-group full-width">
+        <label>Employee <span class="required-mark">*</span></label>
+        <app-searchable-select [options]="employeeOptions()" placeholder="Search employee…" [value]="startForm.employeeId" (valueChange)="onStartEmployee($event)" [fullWidth]="true"></app-searchable-select>
+      </div>
+      <div class="form-group">
+        <label>Exit type <span class="required-mark">*</span></label>
+        <select [(ngModel)]="startForm.exitType" class="form-control">
+          <option value="RESIGNATION">Resignation (on behalf)</option>
+          <option value="TERMINATION">Termination</option>
+          <option value="ABSCONDING">Absconding</option>
+          <option value="CONTRACT_END">Contract end</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Last working day <span class="required-mark">*</span></label>
+        <input type="date" [(ngModel)]="startForm.lastWorkingDay" class="form-control" />
+      </div>
+      <div class="form-group full-width exit-notice" *ngIf="startForm.exitType === 'RESIGNATION' && startNotice() as n">
+        Notice for this person: <b>{{ n.days }} days</b> · earliest last day <b>{{ n.earliest | date:'d MMM y':'UTC' }}</b>.
+      </div>
+      <div class="form-group full-width" *ngIf="startShortDays() > 0">
+        <label>Notice is {{ startShortDays() }} day(s) short</label>
+        <div class="exit-radio">
+          <label><input type="radio" name="ssn" value="WAIVE" [(ngModel)]="startForm.shortNoticeAction"> Waive</label>
+          <label><input type="radio" name="ssn" value="RECOVER" [(ngModel)]="startForm.shortNoticeAction"> Recover in FNF</label>
+        </div>
+      </div>
+      <div class="form-group full-width">
+        <label>Reason <span class="required-mark">*</span></label>
+        <textarea [(ngModel)]="startForm.reason" rows="3" class="form-control"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" (click)="showStartExit.set(false)">Cancel</button>
+      <button class="btn-primary" [disabled]="starting()" (click)="submitStartExit()">{{ starting() ? 'Starting…' : 'Start exit' }}</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Notice periods ── -->
+<div class="modal-overlay" *ngIf="showNoticePolicy()">
+  <div class="modal-content" style="max-width: 440px;">
+    <div class="modal-header"><h2>Notice periods</h2><button class="close-btn" (click)="showNoticePolicy.set(false)"><svg lucideX size="20"></svg></button></div>
+    <div class="modal-body form-grid">
+      <div class="form-group"><label>On probation (days)</label><input type="number" min="0" max="180" [(ngModel)]="noticePolicy['PROBATION']" class="form-control"></div>
+      <div class="form-group"><label>Confirmed (days)</label><input type="number" min="0" max="180" [(ngModel)]="noticePolicy['CONFIRMED']" class="form-control"></div>
+      <div class="form-group"><label>Trainee / intern (days)</label><input type="number" min="0" max="180" [(ngModel)]="noticePolicy['TRAINEE']" class="form-control"></div>
+      <div class="form-group"><label>Contract / consultant (days)</label><input type="number" min="0" max="180" [(ngModel)]="noticePolicy['CONTRACT']" class="form-control"></div>
+    </div>
+    <div class="modal-footer"><button class="btn-outline" (click)="showNoticePolicy.set(false)">Cancel</button><button class="btn-primary" (click)="saveNoticePolicy()">Save</button></div>
   </div>
 </div>
 
@@ -483,6 +837,10 @@
       <div class="form-group">
         <label>Remarks / Notes (Optional)</label>
         <textarea [(ngModel)]="taskForm.remarks" rows="3" class="form-control"></textarea>
+      </div>
+      <div class="form-group" *ngIf="taskForm.department !== 'MANAGER' && taskForm.department !== 'HR'">
+        <label>Amount to recover in FNF (₹, optional)</label>
+        <input type="number" min="0" step="0.01" [(ngModel)]="taskForm.recoveryAmount" class="form-control" placeholder="e.g. unreturned charger, advance">
       </div>
     </div>
     <div class="modal-footer">
@@ -522,5 +880,782 @@
       <button class="btn-outline" (click)="closeInterviewModal()">Cancel</button>
       <button class="btn-primary" (click)="submitInterview()">Save Record</button>
     </div>
+  </div>
+</div>
+
+
+<!-- ── Exit handover form (Offboarding part 2, 20 Nov 2026) ── -->
+<div class="modal-overlay" *ngIf="handoverFor() as r" (click)="!handoverBusy() && closeHandover()">
+  <div class="modal-content ho-form" (click)="$event.stopPropagation()">
+    <div class="ho-header">
+      <div class="ho-header-left">
+        <div class="ho-icon-badge" aria-hidden="true">
+          <svg lucideClipboardCheck size="20"></svg>
+        </div>
+        <div class="ho-title-wrap">
+          <div class="ho-title-row">
+            <h2>Employee Exit Handover</h2>
+            <ng-container *ngIf="handover() as hv">
+              <span class="ho-status-pill is-received" *ngIf="hv.receivedAt">Received</span>
+              <span class="ho-status-pill is-submitted" *ngIf="hv.submittedAt && !hv.receivedAt">Submitted</span>
+              <span class="ho-status-pill is-draft" *ngIf="!hv.submittedAt">Draft</span>
+            </ng-container>
+          </div>
+          <p class="ho-subtitle">CES Tech handover document · Complete during your notice period</p>
+        </div>
+      </div>
+      <button type="button" class="ho-close-btn" (click)="closeHandover()" [disabled]="handoverBusy()" aria-label="Close">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <div class="ho-body ho-loading" *ngIf="!handover()">
+      <span class="ho-loading-dot"></span>
+      <span>Loading handover details…</span>
+    </div>
+
+    <ng-container *ngIf="handover() as hv">
+      <!-- Pinned Summary + Tab Bar -->
+      <div class="ho-top-bar">
+        <div class="ho-meta-grid">
+          <div class="ho-meta-item">
+            <span class="ho-meta-label">Employee</span>
+            <div class="ho-meta-val-row">
+              <span class="ho-meta-val">{{ hv.header.employeeName }}</span>
+              <span class="ho-code-pill" *ngIf="hv.header.employeeCode">#{{ hv.header.employeeCode }}</span>
+            </div>
+          </div>
+          <div class="ho-meta-item">
+            <span class="ho-meta-label">Department</span>
+            <span class="ho-meta-val">{{ hv.header.department || '—' }}</span>
+            <span class="ho-meta-sub" *ngIf="hv.header.designation">{{ hv.header.designation }}</span>
+          </div>
+          <div class="ho-meta-item">
+            <span class="ho-meta-label">Last Working Day</span>
+            <span class="ho-meta-val ho-meta-date">
+              <svg lucideCalendarDays size="13"></svg>
+              {{ hv.header.lastWorkingDay | date:'d MMM y':'UTC' }}
+            </span>
+          </div>
+          <div class="ho-meta-item">
+            <span class="ho-meta-label">Reporting Manager</span>
+            <span class="ho-meta-val">{{ hv.header.manager || '—' }}</span>
+          </div>
+        </div>
+
+        <div class="ho-state" *ngIf="hv.submittedAt">
+          <svg lucideCheckCircle2 size="16"></svg>
+          <div>
+            <strong>Submitted {{ hv.submittedAt | date:'d MMM, h:mm a' }}</strong>
+            <span *ngIf="hv.receivedAt"> · Received {{ hv.receivedAt | date:'d MMM, h:mm a' }}<em *ngIf="hv.receivedNote"> — “{{ hv.receivedNote }}”</em></span>
+            <span *ngIf="!hv.receivedAt"> · Waiting for manager confirmation</span>
+          </div>
+        </div>
+
+        <nav class="ho-tabs" role="tablist" aria-label="Handover sections">
+          <button
+            type="button"
+            role="tab"
+            class="ho-tab"
+            [class.active]="handoverTab() === 'projects'"
+            [attr.aria-selected]="handoverTab() === 'projects'"
+            (click)="handoverTab.set('projects')">
+            <span>Projects</span><span class="ho-tick" *ngIf="hv.clearance?.projects?.verified">✓</span>
+            <span class="ho-tab-badge">{{ hv.form.projects.length }}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="ho-tab"
+            [class.active]="handoverTab() === 'assets'"
+            [attr.aria-selected]="handoverTab() === 'assets'"
+            (click)="handoverTab.set('assets')">
+            <span>Assets &amp; Equipment</span><span class="ho-tick" *ngIf="hv.clearance?.assets?.verified">✓</span>
+            <span class="ho-tab-badge">{{ hv.form.assets.length }}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="ho-tab"
+            [class.active]="handoverTab() === 'documents'"
+            [attr.aria-selected]="handoverTab() === 'documents'"
+            (click)="handoverTab.set('documents')">
+            <span>Documents &amp; KT</span><span class="ho-tick" *ngIf="hv.clearance?.documents?.verified">✓</span>
+            <span class="ho-tab-badge" [class.is-done]="handoverDocsCheckedCount(hv) === 4">{{ handoverDocsCheckedCount(hv) }}/4</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="ho-tab"
+            *ngIf="isAdminOrHr()"
+            [class.active]="handoverTab() === 'separation'"
+            [attr.aria-selected]="handoverTab() === 'separation'"
+            (click)="handoverTab.set('separation')">
+            <span>Last Working Day</span>
+            <span class="ho-tab-badge" [class.is-done]="!!r.separatedAt">{{ r.separatedAt ? 'Done' : 'HR' }}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="ho-tab"
+            *ngIf="hv.canReceive"
+            [class.active]="handoverTab() === 'receive'"
+            [attr.aria-selected]="handoverTab() === 'receive'"
+            (click)="handoverTab.set('receive')">
+            <span>Manager Sign-off</span>
+            <span class="ho-tab-dot"></span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Scrollable Active Tab Content -->
+      <div class="ho-body">
+        <!-- Tab 1: Project Handover -->
+        <section class="ho-card" *ngIf="handoverTab() === 'projects'">
+          <div class="ho-card-head">
+            <div class="ho-card-title">
+              <span class="ho-step-num">1</span>
+              <div>
+                <h4>Project Handover</h4>
+                <p>Every project they're part of (member or lead) and who takes it over</p>
+              </div>
+            </div>
+            <div class="ho-card-right">
+              <button type="button" class="ho-add" *ngIf="hv.canEdit" (click)="addProjectRow()">+ Add project</button>
+            </div>
+          </div>
+          <div class="ho-table-wrap">
+            <table class="ho-table">
+              <thead>
+                <tr>
+                  <th style="width: 22%">Project</th>
+                  <th style="width: 17%">Client</th>
+                  <th style="width: 18%">Current status</th>
+                  <th style="width: 22%">Handover to</th>
+                  <th style="width: 16%">Status</th>
+                  <th style="width: 5%"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let p of hv.form.projects; let i = index">
+                  <td><input class="ho-input" [(ngModel)]="p.name" placeholder="Project name" [disabled]="!hv.canEdit"></td>
+                  <td><input class="ho-input" [(ngModel)]="p.client" placeholder="Client" [disabled]="!hv.canEdit"></td>
+                  <td><input class="ho-input" [(ngModel)]="p.currentStatus" placeholder="e.g. In progress" [disabled]="!hv.canEdit"></td>
+                  <td>
+                    <input class="ho-input" list="ho-people" [(ngModel)]="p.handoverToName" (ngModelChange)="matchHandoverPerson(p)"
+                      placeholder="Type a name…" [disabled]="!hv.canEdit" autocomplete="off">
+                  </td>
+                  <td>
+                    <select class="ho-input" [(ngModel)]="p.status" [disabled]="!hv.canEdit">
+                      <option value="PENDING">Pending</option>
+                      <option value="DONE">Handed over</option>
+                    </select>
+                  </td>
+                  <td class="ho-del-cell"><button type="button" class="ho-del" *ngIf="hv.canEdit" (click)="removeRow(hv.form.projects, i)" title="Remove row">✕</button></td>
+                </tr>
+                <tr *ngIf="!hv.form.projects.length"><td colspan="6" class="ho-empty">No projects listed yet. Click <strong>+ Add project</strong> to add one.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="ho-verify" [class.ok]="hv.clearance?.projects?.verified">
+            <div class="ho-verify-text" *ngIf="hv.clearance?.projects?.verified as v">✓ Projects verified by <b>{{ hv.clearance.projects.byName }}</b> · {{ hv.clearance.projects.at | date:'d MMM, h:mm a' }}<span *ngIf="hv.clearance.projects.recoveryAmount"> · Recovery ₹{{ hv.clearance.projects.recoveryAmount | number:'1.0-2' }}</span><span *ngIf="hv.clearance.projects.note"> · {{ hv.clearance.projects.note }}</span></div>
+            <div class="ho-verify-text" *ngIf="!hv.clearance?.projects?.verified">{{ hv.canVerify ? 'HR / Super Admin: check this section and verify it.' : 'Waiting for HR / Super Admin to verify (after the manager receives the handover).' }}</div>
+            <input *ngIf="hv.canVerify && !hv.clearance?.projects?.verified" class="ho-input ho-verify-note" [(ngModel)]="clearNote" placeholder="Note (optional)" />
+            <button type="button" class="btn-primary ho-btn-sm" *ngIf="hv.canVerify && !hv.clearance?.projects?.verified" [disabled]="clearBusy()" (click)="verifySection('projects', true)">{{ clearBusy() ? 'Saving…' : 'Verify Projects' }}</button>
+            <button type="button" class="btn-outline ho-btn-sm" *ngIf="hv.canVerify && hv.clearance?.projects?.verified" [disabled]="clearBusy()" (click)="verifySection('projects', false)">Reopen</button>
+          </div>
+        </section>
+
+        <datalist id="ho-people"><option *ngFor="let e of handoverPeople()" [value]="personLabel(e)"></option></datalist>
+        <!-- Tab 2: Assets & Equipment -->
+        <section class="ho-card" *ngIf="handoverTab() === 'assets'">
+          <div class="ho-card-head">
+            <div class="ho-card-title">
+              <span class="ho-step-num">2</span>
+              <div>
+                <h4>Assets &amp; Equipment</h4>
+                <p>Company devices, badges, and accessories to be returned</p>
+              </div>
+            </div>
+            <div class="ho-card-right">
+              <button type="button" class="ho-add" *ngIf="hv.canEdit" (click)="addAssetRow()">+ Add equipment</button>
+            </div>
+          </div>
+          <div class="ho-table-wrap">
+            <table class="ho-table">
+              <thead>
+                <tr>
+                  <th style="width: 24%">Asset</th>
+                  <th style="width: 17%">Asset ID</th>
+                  <th style="width: 18%">Serial no.</th>
+                  <th style="width: 13%">Returned</th>
+                  <th style="width: 23%">Condition</th>
+                  <th style="width: 5%"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let a of hv.form.assets; let i = index">
+                  <td><input class="ho-input" [(ngModel)]="a.name" placeholder="Equipment name" [disabled]="!hv.canEdit || a.assignmentId"></td>
+                  <td><input class="ho-input" [(ngModel)]="a.assetId" placeholder="ID" [disabled]="!hv.canEdit || a.assignmentId"></td>
+                  <td><input class="ho-input" [(ngModel)]="a.serialNo" placeholder="Serial no." [disabled]="!hv.canEdit || a.assignmentId"></td>
+                  <td>
+                    <select class="ho-input ho-select-returned" [(ngModel)]="a.returned" [disabled]="!hv.canEdit">
+                      <option [ngValue]="null">—</option>
+                      <option [ngValue]="true">Yes</option>
+                      <option [ngValue]="false">No</option>
+                    </select>
+                  </td>
+                  <td><input class="ho-input" [(ngModel)]="a.condition" placeholder="Good / damaged…" [disabled]="!hv.canEdit"></td>
+                  <td class="ho-del-cell"><button type="button" class="ho-del" *ngIf="hv.canEdit && !a.assignmentId" (click)="removeRow(hv.form.assets, i)" title="Remove row">✕</button></td>
+                </tr>
+                <tr *ngIf="!hv.form.assets.length"><td colspan="6" class="ho-empty">No equipment recorded.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="ho-verify" [class.ok]="hv.clearance?.assets?.verified">
+            <div class="ho-verify-text" *ngIf="hv.clearance?.assets?.verified as v">✓ Assets verified by <b>{{ hv.clearance.assets.byName }}</b> · {{ hv.clearance.assets.at | date:'d MMM, h:mm a' }}<span *ngIf="hv.clearance.assets.recoveryAmount"> · Recovery ₹{{ hv.clearance.assets.recoveryAmount | number:'1.0-2' }}</span><span *ngIf="hv.clearance.assets.note"> · {{ hv.clearance.assets.note }}</span></div>
+            <div class="ho-verify-text" *ngIf="!hv.clearance?.assets?.verified">{{ hv.canVerify ? 'HR / Super Admin: check this section and verify it.' : 'Waiting for HR / Super Admin to verify (after the manager receives the handover).' }}</div>
+            <label class="ho-verify-rec" *ngIf="hv.canVerify && !hv.clearance?.assets?.verified">Recovery for missing / damaged items (₹)
+              <input type="number" min="0" class="ho-input" [(ngModel)]="clearRecovery" placeholder="0" /></label>
+            <input *ngIf="hv.canVerify && !hv.clearance?.assets?.verified" class="ho-input ho-verify-note" [(ngModel)]="clearNote" placeholder="Note (optional)" />
+            <button type="button" class="btn-primary ho-btn-sm" *ngIf="hv.canVerify && !hv.clearance?.assets?.verified" [disabled]="clearBusy()" (click)="verifySection('assets', true)">{{ clearBusy() ? 'Saving…' : 'Verify Assets' }}</button>
+            <button type="button" class="btn-outline ho-btn-sm" *ngIf="hv.canVerify && hv.clearance?.assets?.verified" [disabled]="clearBusy()" (click)="verifySection('assets', false)">Reopen</button>
+          </div>
+        </section>
+
+        <!-- Tab 3: Documents & Knowledge Transfer -->
+        <section class="ho-card" *ngIf="handoverTab() === 'documents'">
+          <div class="ho-card-head">
+            <div class="ho-card-title">
+              <span class="ho-step-num">3</span>
+              <div>
+                <h4>Documents &amp; Knowledge Transfer</h4>
+                <p>Confirm all files, credentials, and handover notes are shared</p>
+              </div>
+            </div>
+          </div>
+          <div class="ho-card-body">
+            <div class="ho-checks">
+              <label class="ho-check-card" [class.checked]="hv.form.documents.clientDocuments" [class.disabled]="!hv.canEdit">
+                <input type="checkbox" [(ngModel)]="hv.form.documents.clientDocuments" [disabled]="!hv.canEdit">
+                <span class="ho-check-box" aria-hidden="true"></span>
+                <span class="ho-check-text">Client documents</span>
+              </label>
+              <label class="ho-check-card" [class.checked]="hv.form.documents.projectFiles" [class.disabled]="!hv.canEdit">
+                <input type="checkbox" [(ngModel)]="hv.form.documents.projectFiles" [disabled]="!hv.canEdit">
+                <span class="ho-check-box" aria-hidden="true"></span>
+                <span class="ho-check-text">Project files</span>
+              </label>
+              <label class="ho-check-card" [class.checked]="hv.form.documents.passwordTransfer" [class.disabled]="!hv.canEdit">
+                <input type="checkbox" [(ngModel)]="hv.form.documents.passwordTransfer" [disabled]="!hv.canEdit">
+                <span class="ho-check-box" aria-hidden="true"></span>
+                <span class="ho-check-text">Password / access transfer</span>
+              </label>
+              <label class="ho-check-card" [class.checked]="hv.form.documents.knowledgeTransfer" [class.disabled]="!hv.canEdit">
+                <input type="checkbox" [(ngModel)]="hv.form.documents.knowledgeTransfer" [disabled]="!hv.canEdit">
+                <span class="ho-check-box" aria-hidden="true"></span>
+                <span class="ho-check-text">Knowledge transfer completed</span>
+              </label>
+            </div>
+            <div class="ho-remarks-wrap">
+              <label class="ho-lbl" for="ho-remarks-input">Remarks &amp; Handover Notes</label>
+              <textarea
+                id="ho-remarks-input"
+                class="ho-textarea"
+                rows="3"
+                [(ngModel)]="hv.form.remarks"
+                [disabled]="!hv.canEdit"
+                placeholder="Add any extra notes, links, or handover instructions…"></textarea>
+            </div>
+          </div>
+          <div class="ho-verify" [class.ok]="hv.clearance?.documents?.verified">
+            <div class="ho-verify-text" *ngIf="hv.clearance?.documents?.verified as v">✓ Documents & KT verified by <b>{{ hv.clearance.documents.byName }}</b> · {{ hv.clearance.documents.at | date:'d MMM, h:mm a' }}<span *ngIf="hv.clearance.documents.recoveryAmount"> · Recovery ₹{{ hv.clearance.documents.recoveryAmount | number:'1.0-2' }}</span><span *ngIf="hv.clearance.documents.note"> · {{ hv.clearance.documents.note }}</span></div>
+            <div class="ho-verify-text" *ngIf="!hv.clearance?.documents?.verified">{{ hv.canVerify ? 'HR / Super Admin: check this section and verify it.' : 'Waiting for HR / Super Admin to verify (after the manager receives the handover).' }}</div>
+            <input *ngIf="hv.canVerify && !hv.clearance?.documents?.verified" class="ho-input ho-verify-note" [(ngModel)]="clearNote" placeholder="Note (optional)" />
+            <button type="button" class="btn-primary ho-btn-sm" *ngIf="hv.canVerify && !hv.clearance?.documents?.verified" [disabled]="clearBusy()" (click)="verifySection('documents', true)">{{ clearBusy() ? 'Saving…' : 'Verify Documents & KT' }}</button>
+            <button type="button" class="btn-outline ho-btn-sm" *ngIf="hv.canVerify && hv.clearance?.documents?.verified" [disabled]="clearBusy()" (click)="verifySection('documents', false)">Reopen</button>
+          </div>
+        </section>
+
+        <!-- Tab 4: Admin/HR Last Working Day & Separation Controls -->
+        <ng-container *ngIf="isAdminOrHr() && handoverTab() === 'separation'">
+          <section class="ho-card">
+            <div class="ho-card-head">
+              <div class="ho-card-title">
+                <span class="ho-step-num">4</span>
+                <div>
+                  <h4>Last Working Day &amp; Settlement Schedule</h4>
+                  <p>Manage exit dates, F&amp;F due date, and reporting line transfer</p>
+                </div>
+              </div>
+              <div class="ho-card-right">
+                <span class="ho-sep-badge" *ngIf="r.separatedAt">
+                  <svg lucideCheckCircle2 size="13"></svg>
+                  Separated {{ r.separatedAt | date:'d MMM y, h:mm a' }}
+                </span>
+                <span class="ho-auto-badge" *ngIf="!r.separatedAt && r.approvals?.length">
+                  <svg lucideClock size="12"></svg>
+                  Auto-separation scheduled
+                </span>
+                <span class="ho-manual-badge" *ngIf="!r.separatedAt && !r.approvals?.length">
+                  Manual separation
+                </span>
+              </div>
+            </div>
+
+            <div class="ho-card-body">
+              <div class="ho-info-banner" *ngIf="!r.separatedAt && r.approvals?.length">
+                <svg lucideClock size="16"></svg>
+                <span>At the end of <strong>{{ hv.header.lastWorkingDay | date:'d MMM y':'UTC' }}</strong>, MIRA automatically disables login, stops attendance, marks the employee <strong>Separated</strong>, and transfers reportees.</span>
+              </div>
+              <div class="ho-info-banner is-warn" *ngIf="!r.separatedAt && !r.approvals?.length">
+                <svg lucideClock size="16"></svg>
+                <span>This exit was approved before automatic separation, so MIRA won't switch off access automatically. Once <strong>{{ hv.header.lastWorkingDay | date:'d MMM y':'UTC' }}</strong> ends, use <strong>Separate now</strong> below.</span>
+              </div>
+
+              <!-- Editable Dates & Reportees -->
+              <ng-container *ngIf="!r.separatedAt">
+                <div class="ho-lwd-grid">
+                  <div class="ho-field">
+                    <div class="ho-field-head">
+                      <label for="ho-lwd-input">Last working day</label>
+                    </div>
+                    <input id="ho-lwd-input" type="date" class="ho-input ho-input-lg" [(ngModel)]="lastDayInput" />
+                    <span class="ho-field-hint">Final active day before access is turned off</span>
+                  </div>
+
+                  <div class="ho-field">
+                    <div class="ho-field-head">
+                      <label for="ho-fnf-input">F&amp;F settlement date</label>
+                      <span class="ho-field-tag" [class.is-custom]="hv.header.fnfDueDateSet">
+                        {{ hv.header.fnfDueDateSet ? 'Set by HR' : 'Auto · 45 days' }}
+                      </span>
+                    </div>
+                    <input id="ho-fnf-input" type="date" class="ho-input ho-input-lg" [(ngModel)]="fnfDueInput" [min]="lastDayInput" />
+                    <span class="ho-field-hint">Default: 45 days after LWD, excluding holidays</span>
+                  </div>
+                </div>
+
+                <div class="ho-reportees-bar">
+                  <div class="ho-field ho-reportees-field">
+                    <div class="ho-field-head">
+                      <label for="ho-reportees-select">Transfer reportees to</label>
+                    </div>
+                    <select id="ho-reportees-select" class="ho-input ho-input-lg" [(ngModel)]="reporteesTo">
+                      <option [ngValue]="null">Their own manager ({{ hv.header.manager || 'none' }})</option>
+                      <option *ngFor="let e of handoverPeople()" [ngValue]="e.id">{{ e.firstName }} {{ e.lastName }}</option>
+                    </select>
+                  </div>
+                  <button type="button" class="ho-btn-save-lwd" [disabled]="lastDaySaving()" (click)="setReportees()">
+                    <span class="btn-spinner" *ngIf="lastDaySaving()"></span>
+                    {{ lastDaySaving() ? 'Saving…' : 'Save changes' }}
+                  </button>
+                </div>
+              </ng-container>
+
+              <!-- Read-only Summary After Separation -->
+              <div class="ho-dates-ro-grid" *ngIf="r.separatedAt">
+                <div class="ho-ro-tile">
+                  <span class="ho-ro-label">Last Working Day</span>
+                  <span class="ho-ro-val">
+                    <svg lucideCalendarDays size="14"></svg>
+                    {{ hv.header.lastWorkingDay | date:'d MMM y':'UTC' }}
+                  </span>
+                </div>
+                <div class="ho-ro-tile">
+                  <span class="ho-ro-label">F&amp;F Settlement Date</span>
+                  <span class="ho-ro-val">
+                    <svg lucideCalendarDays size="14"></svg>
+                    {{ hv.header.fnfDueDate | date:'d MMM y':'UTC' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Distinct Danger Zone for Immediate Separation -->
+          <section class="ho-danger-zone" *ngIf="!r.separatedAt">
+            <div class="ho-danger-copy">
+              <div class="ho-danger-icon" aria-hidden="true">
+                <svg lucideUserMinus size="17"></svg>
+              </div>
+              <div>
+                <h5>Immediate separation</h5>
+                <p>Disable login, stop attendance, mark as Separated, and transfer reportees right away instead of waiting for LWD.</p>
+              </div>
+            </div>
+            <button type="button" class="ho-btn-separate" (click)="separateNow()">
+              Separate now
+            </button>
+          </section>
+        </ng-container>
+
+        <!-- Tab 5: Manager Confirmation -->
+        <section class="ho-receive" *ngIf="hv.canReceive && handoverTab() === 'receive'">
+          <h4>Confirm handover receipt</h4>
+          <p class="ho-lastday-copy">Review projects, assets, and documents across the tabs above, then confirm receipt below.</p>
+          <textarea class="ho-textarea" rows="3" [(ngModel)]="receiveNote" placeholder="Optional confirmation note for the employee & HR…"></textarea>
+        </section>
+      </div>
+    </ng-container>
+
+    <div class="ho-footer" *ngIf="handover() as hv">
+      <span class="ho-footer-hint" *ngIf="hv.canEdit">Save draft anytime · Submitting locks &amp; notifies your manager</span>
+      <span class="ho-footer-hint" *ngIf="!hv.canEdit && hv.canReceive">Confirm once all tasks, projects &amp; assets are received</span>
+      <div class="ho-footer-actions">
+        <button type="button" class="ho-btn-ghost" (click)="closeHandover()" [disabled]="handoverBusy()">Close</button>
+        <ng-container *ngIf="hv.canEdit">
+          <button type="button" class="ho-btn-secondary" [disabled]="handoverBusy()" (click)="saveHandover(false)">Save draft</button>
+          <button type="button" class="ho-btn-primary" [disabled]="handoverBusy()" (click)="saveHandover(true)">
+            <span class="btn-spinner" *ngIf="handoverBusy()"></span>
+            Submit with declaration
+          </button>
+        </ng-container>
+        <button type="button" class="ho-btn-primary" *ngIf="hv.canReceive" [disabled]="handoverBusy()" (click)="receiveHandover()">
+          <span class="btn-spinner" *ngIf="handoverBusy()"></span>
+          Mark handover received
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FNF statement window (part 4) ═══ -->
+<div class="modal-overlay" *ngIf="fnfOpen()" (click)="!fnfBusy() && closeFnf()">
+  <div class="modal-content ho-form fnf-modal" (click)="$event.stopPropagation()">
+    <!-- Pinned Header -->
+    <div class="ho-header">
+      <div class="ho-header-left">
+        <div class="ho-icon-badge" aria-hidden="true">
+          <svg lucideClipboardCheck size="20"></svg>
+        </div>
+        <div class="ho-title-wrap">
+          <div class="ho-title-row">
+            <h2>Full &amp; Final Settlement</h2>
+            <ng-container *ngIf="fnfData() as d">
+              <span class="fnf-chip" [attr.data-s]="d.fnf?.status || 'TODO'">
+                <span class="fnf-chip-dot"></span>
+                {{ d.preview ? 'Preview' : fnfStateLabel(d.fnf?.status || 'TODO') }}
+              </span>
+            </ng-container>
+          </div>
+          <p class="ho-subtitle">Settlement statement, proration breakdown &amp; payout approval</p>
+        </div>
+      </div>
+      <button type="button" class="ho-close-btn" (click)="closeFnf()" [disabled]="fnfBusy()" aria-label="Close">
+        <svg lucideX size="18"></svg>
+      </button>
+    </div>
+
+    <!-- Loading state -->
+    <div class="ho-body ho-loading" *ngIf="!fnfData() && !fnfError()">
+      <span class="ho-loading-dot"></span>
+      <span>Loading settlement statement…</span>
+    </div>
+
+    <!-- Top-level Error Banner -->
+    <div class="fnf-error-wrap" *ngIf="fnfError()">
+      <div class="fnf-error">{{ fnfError() }}</div>
+    </div>
+
+    <ng-container *ngIf="fnfData() as d">
+      <!-- Pinned Employee & Schedule Summary Bar -->
+      <div class="fnf-top-bar">
+        <div class="ho-meta-grid fnf-meta-grid">
+          <div class="ho-meta-item">
+            <span class="ho-meta-label">Employee</span>
+            <div class="ho-meta-val-row">
+              <span class="ho-meta-val">{{ d.resignation.employee?.firstName }} {{ d.resignation.employee?.lastName }}</span>
+              <span class="ho-code-pill" *ngIf="d.resignation.employee?.employeeCode">#{{ d.resignation.employee.employeeCode }}</span>
+            </div>
+            <span class="ho-meta-sub">{{ d.resignation.employee?.designation?.name || 'No designation' }} · {{ d.resignation.employee?.department?.name || 'No department' }}</span>
+          </div>
+
+          <div class="ho-meta-item">
+            <span class="ho-meta-label">Last Working Day</span>
+            <span class="ho-meta-val ho-meta-date">
+              <svg lucideCalendarDays size="13"></svg>
+              {{ (d.fnf?.lastWorkingDay || d.resignation?.approvedLastWorkingDay || d.resignation?.intendedLastWorkingDay) | date:'d MMM y' }}
+            </span>
+            <span class="ho-meta-sub">{{ exitTypeLabel(d.resignation?.exitType) }}</span>
+          </div>
+
+          <div class="ho-meta-item">
+            <span class="ho-meta-label">F&amp;F Settlement Due</span>
+            <span class="ho-meta-val ho-meta-date">
+              <svg lucideCalendarDays size="13"></svg>
+              {{ d.fnf?.dueDate | date:'d MMM y' }}
+            </span>
+            <span class="ho-meta-sub">Target payout date</span>
+          </div>
+
+          <div class="ho-meta-item" *ngIf="d.fnf?.basis as b; else noBasisTile">
+            <span class="ho-meta-label">Monthly Gross</span>
+            <div class="ho-meta-val-row">
+              <span class="ho-meta-val fnf-tabular">₹{{ b.grossMonthly | number:'1.2-2' }}</span>
+              <span class="fnf-lop-pill" [class.has-lop]="b.lopDays > 0">LOP: {{ b.lopDays }}d</span>
+            </div>
+            <span class="ho-meta-sub">From {{ b.periodStart | date:'d MMM y' }} · Last slip: {{ b.lastPayslip || 'none' }}</span>
+          </div>
+          <ng-template #noBasisTile>
+            <div class="ho-meta-item">
+              <span class="ho-meta-label">Settlement Status</span>
+              <span class="ho-meta-val">{{ fnfStateLabel(d.fnf?.status || 'TODO') }}</span>
+            </div>
+          </ng-template>
+        </div>
+
+        <!-- Proration Breakdown Accordion Pills -->
+        <div class="fnf-basis-bar" *ngIf="d.fnf?.basis as b">
+          <div class="fnf-warn-banner" *ngIf="b.noStructure">
+            No salary structure found for this employee — please add earning and deduction line items manually below.
+          </div>
+          <div class="fnf-months-list" *ngIf="b.months?.length">
+            <details *ngFor="let m of b.months" class="fnf-month">
+              <summary>
+                <span class="fnf-month-title">{{ m.month }}</span>
+                <span class="fnf-month-pill">{{ m.days }} active days</span>
+                <span class="fnf-month-pill is-lop" [class.zero]="!m.lopDays">{{ m.lopDays }} LOP</span>
+                <span class="fnf-month-proj" *ngIf="m.projectedDays">{{ m.projectedDays }} future days counted as worked</span>
+                <span class="fnf-month-rate">₹{{ m.perDay | number:'1.2-2' }}/day ({{ m.daysInMonth }}-day month)</span>
+              </summary>
+              <div class="fnf-month-body">
+                <strong>LOP dates:</strong> {{ m.lopDates?.length ? m.lopDates.join(', ') : 'None recorded in this month' }}
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrollable Settlement Body -->
+      <div class="ho-body fnf-body">
+        <div *ngIf="!d.fnf" class="fnf-unapproved-box">
+          The exit isn't approved yet. Approve the resignation first to prepare Full &amp; Final settlement.
+        </div>
+
+        <ng-container *ngIf="d.fnf">
+          <!-- Preview Notice Banner -->
+          <div class="ho-info-banner is-warn" *ngIf="d.preview">
+            <svg lucideClock size="16"></svg>
+            <span><strong>Preview — not saved yet.</strong> Holidays, week offs and approved paid leave are paid; other unworked days are LOP. No leave encashment. Click <strong>Create draft</strong> below to begin editing.</span>
+          </div>
+
+          <!-- Paid Verification Banner -->
+          <div class="ho-state fnf-paid-banner" *ngIf="d.fnf.status === 'PAID'">
+            <svg lucideCheckCircle2 size="18"></svg>
+            <div>
+              <strong>Paid on {{ d.fnf.paidAt | date:'d MMM y' }}</strong>
+              <span *ngIf="d.fnf.paidRef"> · UTR / Ref: <b>{{ d.fnf.paidRef }}</b></span>
+              <a *ngIf="d.fnf.paidProofUrl" [href]="d.fnf.paidProofUrl" target="_blank" rel="noopener" class="fnf-proof-link">View payment proof ↗</a>
+              <div class="fnf-paid-sub">Settlement complete. Relieving and experience letters can now be sent to the employee.</div>
+              <button type="button" class="btn-primary btn-sm" style="margin-top:8px" (click)="openExitLetter(d.resignation.id)">{{ d.resignation.exitLetterSentAt ? 'Letter sent · open' : 'Send relieving letter' }}</button>
+            </div>
+          </div>
+
+          <!-- Earnings & Deductions 2-Column Grid -->
+          <div class="fnf-cols">
+            <section
+              *ngFor="let t of ['EARNING','DEDUCTION']"
+              class="fnf-col"
+              [class.is-earning]="t === 'EARNING'"
+              [class.is-deduction]="t === 'DEDUCTION'">
+              <div class="fnf-col-head">
+                <div class="fnf-col-title-wrap">
+                  <span class="fnf-col-badge" [class.is-earning]="t === 'EARNING'" [class.is-deduction]="t === 'DEDUCTION'">
+                    {{ t === 'EARNING' ? '+' : '−' }}
+                  </span>
+                  <div>
+                    <h4>{{ t === 'EARNING' ? 'Earnings' : 'Deductions' }}</h4>
+                    <p>{{ t === 'EARNING' ? 'Prorated salary, bonus & reimbursements' : 'LOP, statutory PF/PT, tax & recoveries' }}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  *ngIf="fnfEditable()"
+                  class="ho-add fnf-add-btn"
+                  (click)="addFnfLine($any(t))">
+                  + Add {{ t === 'EARNING' ? 'earning' : 'deduction' }}
+                </button>
+              </div>
+
+              <div class="fnf-lines-wrap">
+                <div class="fnf-line" *ngFor="let l of fnfLines($any(t))">
+                  <ng-container *ngIf="fnfEditable() && !l.auto; else ro">
+                    <input
+                      class="ho-input fnf-in"
+                      [(ngModel)]="l.label"
+                      [placeholder]="t === 'EARNING' ? 'e.g. Bonus, Incentive, Reimbursement' : 'e.g. Notice recovery, Advance, TDS'" />
+                    <div class="fnf-amt-wrap">
+                      <span class="fnf-curr">₹</span>
+                      <input class="ho-input fnf-amt" type="number" min="0" [(ngModel)]="l.amount" />
+                    </div>
+                    <button type="button" class="ho-del fnf-x" (click)="removeFnfLine(l)" title="Remove line" aria-label="Remove line">✕</button>
+                  </ng-container>
+                  <ng-template #ro>
+                    <div class="fnf-lbl-wrap">
+                      <span class="fnf-lbl">{{ l.label }}</span>
+                      <span *ngIf="l.auto" class="fnf-auto-tag">Auto</span>
+                    </div>
+                    <div class="fnf-amt-wrap" *ngIf="fnfEditable()">
+                      <span class="fnf-curr">₹</span>
+                      <input class="ho-input fnf-amt" type="number" min="0" [(ngModel)]="l.amount" title="Override calculated amount" />
+                    </div>
+                    <span *ngIf="!fnfEditable()" class="fnf-val">₹{{ l.amount | number:'1.2-2' }}</span>
+                  </ng-template>
+                </div>
+
+                <div class="fnf-lines-empty" *ngIf="!fnfLines($any(t)).length">
+                  No {{ t === 'EARNING' ? 'earning' : 'deduction' }} items listed.
+                </div>
+              </div>
+
+              <div class="fnf-sum">
+                <span>Total {{ t === 'EARNING' ? 'Earnings' : 'Deductions' }}</span>
+                <b>₹{{ fnfTotal($any(t)) | number:'1.2-2' }}</b>
+              </div>
+            </section>
+          </div>
+
+          <!-- Net Payable Summary Card -->
+          <div class="fnf-net" [class.neg]="fnfNet() < 0">
+            <div class="fnf-net-left">
+              <span class="fnf-net-eyebrow">{{ fnfNet() < 0 ? 'Final Recovery Amount' : 'Final Settlement Payout' }}</span>
+              <strong class="fnf-net-title">{{ fnfNet() < 0 ? 'Recoverable from employee' : 'Net payable to employee' }}</strong>
+              <span class="fnf-net-sub">
+                Earnings ₹{{ fnfTotal('EARNING') | number:'1.2-2' }} − Deductions ₹{{ fnfTotal('DEDUCTION') | number:'1.2-2' }}
+              </span>
+            </div>
+            <div class="fnf-net-amount">
+              ₹{{ (fnfNet() < 0 ? -fnfNet() : fnfNet()) | number:'1.2-2' }}
+            </div>
+          </div>
+
+          <!-- Notes Card -->
+          <div class="fnf-notes-card" *ngIf="fnfEditable() || d.fnf.notes">
+            <label class="ho-lbl" for="fnf-notes-textarea">Settlement Notes &amp; Remarks</label>
+            <textarea
+              id="fnf-notes-textarea"
+              class="ho-textarea"
+              [(ngModel)]="d.fnf.notes"
+              [readonly]="!fnfEditable()"
+              rows="2"
+              placeholder="Add any breakdown notes, recovery remarks, or approval comments…"></textarea>
+          </div>
+        </ng-container>
+      </div>
+
+      <!-- Pinned Footer Actions -->
+      <div class="ho-footer fnf-footer" *ngIf="d.fnf">
+        <!-- Super Admin Approval Bar -->
+        <div class="fnf-footer-inputs" *ngIf="d.fnf.status === 'PENDING_APPROVAL' && isSuperAdminRole()">
+          <input
+            class="ho-input fnf-footer-note"
+            [(ngModel)]="fnfNote"
+            placeholder="Review note (required if sending back to HR)…" />
+        </div>
+
+        <!-- HR Mark Paid Bar -->
+        <div class="fnf-footer-inputs" *ngIf="d.fnf.status === 'APPROVED' && isAdminOrHr()">
+          <div class="fnf-pay-field">
+            <span class="fnf-pay-lbl">Paid Date</span>
+            <input type="date" class="ho-input" [(ngModel)]="fnfPaidAt" />
+          </div>
+          <div class="fnf-pay-field is-grow">
+            <span class="fnf-pay-lbl">UTR / Reference</span>
+            <input class="ho-input" [(ngModel)]="fnfPaidRef" placeholder="Enter bank UTR or reference…" />
+          </div>
+          <label class="ho-btn-secondary fnf-upload" [title]="fnfProofName() || 'Upload payment proof (image or PDF)'">
+            <span>{{ fnfUploading() ? 'Uploading…' : (fnfProofName() || 'Upload payment proof *') }}</span>
+            <input type="file" accept="image/*,.pdf" hidden (change)="uploadFnfProof($event)" />
+          </label>
+        </div>
+
+        <!-- Default Hint when not in special input modes -->
+        <span class="ho-footer-hint" *ngIf="d.preview">
+          Create a draft to adjust line items or override auto-calculated values
+        </span>
+        <span class="ho-footer-hint" *ngIf="!d.preview && d.fnf.status === 'DRAFT'">
+          Save draft anytime · Submitting sends statement to Super Admin for approval
+        </span>
+        <span class="ho-footer-hint" *ngIf="d.fnf.status === 'PENDING_APPROVAL' && !isSuperAdminRole()">
+          Waiting for Super Admin approval before payout can be recorded
+        </span>
+        <span class="ho-footer-hint" *ngIf="d.fnf.status === 'PAID'">
+          Settlement is locked and marked as paid
+        </span>
+
+        <div class="ho-footer-actions">
+          <button type="button" class="ho-btn-ghost" (click)="closeFnf()" [disabled]="fnfBusy()">Close</button>
+          <button type="button" class="ho-btn-ghost" (click)="printFnf()" *ngIf="!d.preview">Print</button>
+
+          <ng-container *ngIf="d.preview || d.fnf.status === 'DRAFT'">
+            <button type="button" class="ho-btn-secondary" [disabled]="fnfBusy()" (click)="prepareFnf()">
+              <span class="btn-spinner" *ngIf="fnfBusy()"></span>
+              {{ d.preview ? 'Create draft' : 'Recalculate auto lines' }}
+            </button>
+          </ng-container>
+
+          <ng-container *ngIf="fnfEditable()">
+            <button type="button" class="ho-btn-secondary" [disabled]="fnfBusy()" (click)="saveFnf()">Save draft</button>
+            <button type="button" class="ho-btn-primary" [disabled]="fnfBusy()" (click)="saveFnf('submit')">
+              <span class="btn-spinner" *ngIf="fnfBusy()"></span>
+              Send to Super Admin
+            </button>
+          </ng-container>
+
+          <ng-container *ngIf="d.fnf.status === 'PENDING_APPROVAL' && isSuperAdminRole()">
+            <button type="button" class="ho-btn-secondary" [disabled]="fnfBusy()" (click)="fnfAct('reject')">Send back</button>
+            <button type="button" class="ho-btn-primary" [disabled]="fnfBusy()" (click)="fnfAct('approve')">
+              <span class="btn-spinner" *ngIf="fnfBusy()"></span>
+              Approve
+            </button>
+          </ng-container>
+
+          <ng-container *ngIf="d.fnf.status === 'APPROVED' && isAdminOrHr()">
+            <button
+              type="button"
+              class="ho-btn-primary"
+              [disabled]="fnfBusy() || fnfUploading() || !fnfProofUrl()"
+              (click)="fnfAct('paid')">
+              <span class="btn-spinner" *ngIf="fnfBusy()"></span>
+              Mark paid
+            </button>
+          </ng-container>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+</div>
+
+<!-- ═══ Exit letter (part 5) ═══ -->
+<div class="modal-overlay" *ngIf="letterOpen()" (click)="letterOpen.set(false)">
+  <div class="modal-content fnf-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>{{ letterData()?.title || 'Relieving letter' }}</h3>
+      <button class="fnf-close" (click)="letterOpen.set(false)" aria-label="Close">×</button>
+    </div>
+    <div class="fnf-error" *ngIf="letterError()">{{ letterError() }}</div>
+    <div *ngIf="!letterData() && !letterError()" class="muted" style="padding:24px">Loading…</div>
+    <ng-container *ngIf="letterData() as L">
+      <div class="fnf-error" *ngIf="L.blocked">{{ L.blocked }}</div>
+      <ng-container *ngIf="!L.blocked">
+        <div class="fnf-preview" *ngIf="!L.fnfPaid">FNF isn't paid yet — the letter can be sent after payment.</div>
+        <div class="fnf-preview" *ngIf="!L.stampUrl">No CEO stamp uploaded — add it in Settings → Letters, or the letter goes without it.</div>
+        <div class="muted" *ngIf="L.sentAt" style="margin:6px 0">✓ Sent to {{ L.sentTo }} on {{ L.sentAt | date:'d MMM y, h:mm a' }}<a *ngIf="L.pdfUrl" [href]="L.pdfUrl" target="_blank" rel="noopener"> · open PDF</a></div>
+        <label class="fnf-notes">Send to (personal email)
+          <input class="fnf-in" type="email" [(ngModel)]="letterTo" placeholder="name@gmail.com" /></label>
+        <div class="muted" style="font-size:12px;margin-bottom:6px">Signed by {{ L.signatory || '—' }} · company logo on top, CEO stamp at the foot. You can edit the text below before sending.</div>
+        <div class="letter-page">
+          <img *ngIf="L.logoUrl" [src]="L.logoUrl" class="letter-logo" alt="Logo" />
+          <div class="letter-body" contenteditable="true" [innerHTML]="letterBodyInit" (input)="letterBody = $any($event.target).innerHTML"></div>
+          <img *ngIf="L.stampUrl" [src]="L.stampUrl" class="letter-stamp" alt="CEO stamp" />
+        </div>
+        <div class="fnf-actions">
+          <button class="btn-secondary" (click)="letterOpen.set(false)">Close</button>
+          <button class="btn-primary" [disabled]="letterBusy() || !L.fnfPaid" (click)="sendExitLetter()">
+            <span class="btn-spinner" *ngIf="letterBusy()"></span>{{ letterBusy() ? 'Sending…' : (L.sentAt ? 'Send again' : 'Send letter') }}</button>
+        </div>
+      </ng-container>
+    </ng-container>
   </div>
 </div>

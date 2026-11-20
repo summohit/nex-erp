@@ -1857,6 +1857,66 @@
       "status": "Done",
       "release": "19 Nov",
       "assignee": "Mohit Singh"
+    },
+    {
+      "date": "2026-11-19",
+      "module": "Attendance",
+      "feature": "Regularization: overnight shifts + matched shift",
+      "what": "Clock-out next day for night shifts, confirm for days over 14h, shift matched from times; pending markers on attendance; approve/reject from the day window",
+      "users": "HR / Super Admin",
+      "status": "Done",
+      "release": "19 Nov (evening)",
+      "assignee": "Mohit Singh"
+    },
+    {
+      "date": "2026-11-19",
+      "module": "Recruitment",
+      "feature": "One active application per candidate",
+      "what": "Email or phone match across jobs; hired people can't re-apply; status in the message",
+      "users": "Candidates / HR",
+      "status": "Done",
+      "release": "19 Nov (evening)",
+      "assignee": "Mohit Singh"
+    },
+    {
+      "date": "2026-11-19",
+      "module": "Performance",
+      "feature": "Probation / PIP clean-up",
+      "what": "Deactivated people hidden from PIP & Notice; date filters on Probation and PIP",
+      "users": "HR / Super Admin",
+      "status": "Done",
+      "release": "19 Nov (evening)",
+      "assignee": "Mohit Singh"
+    },
+    {
+      "date": "2026-11-19",
+      "module": "Employees",
+      "feature": "Onboarding new hires",
+      "what": "Only people onboarding or joined in 30 days; self-onboarding status and cards; email shown",
+      "users": "HR / Super Admin",
+      "status": "Done",
+      "release": "19 Nov (evening)",
+      "assignee": "Mohit Singh"
+    },
+    {
+      "date": "2026-11-19",
+      "module": "Employees",
+      "feature": "Org chart fix",
+      "what": "Only real manager and direct reports; YOU on own profile only",
+      "users": "Everyone",
+      "status": "Done",
+      "release": "19 Nov (evening)",
+      "assignee": "Mohit Singh"
+    },
+    {
+      "date": "2026-11-19",
+      "module": "Employees",
+      "feature": "Document review in Profile completion",
+      "what": "KPI cards filter; per-person documents: type, verify/reject, replace, delete (audit logged)",
+      "users": "HR / Super Admin",
+      "status": "Done",
+      "release": "19 Nov (evening)",
+      "assignee": "Mohit Singh"
     }
   ],
   "bugs": [
@@ -3267,8 +3327,8 @@
       "cause": "Same person can apply to several jobs at once.",
       "fix": "[Due: 19 Nov 2026 EOD] Block new application (match email/phone) until current one is rejected/closed; message on apply page; let candidate see status incl. Rejected.",
       "severity": "Medium",
-      "status": "Open",
-      "fixed_on": null,
+      "status": "Fixed",
+      "fixed_on": "2026-11-19",
       "verified": "Pending",
       "assignee": "Mohit Singh",
       "steps": "See details; reported 18 Nov (fresh list)",
@@ -3281,8 +3341,8 @@
       "cause": "Deactivated/duplicate accounts (Shiv #20263, Rakesh #20260, Kishore #20261) inflate probation lists.",
       "fix": "[Due: 19 Nov 2026 EOD] Hide deactivated people from Probation/PIP lists & counts; date filter Today/Yesterday/Week/Month/range; decide on deactivating duplicates.",
       "severity": "Medium",
-      "status": "Open",
-      "fixed_on": null,
+      "status": "Fixed",
+      "fixed_on": "2026-11-19",
       "verified": "Pending",
       "assignee": "Mohit Singh",
       "steps": "See details; reported 18 Nov (fresh list)",
@@ -3309,8 +3369,8 @@
       "cause": "New hires list shows old checklist progress (0/3) and deactivated accounts.",
       "fix": "[Due: 19 Nov 2026 EOD] Remove Progress column; decide on checklist KPI/statuses → self-service stages; hide deactivated (Yash #20262, Mohit #20258).",
       "severity": "Low",
-      "status": "Open",
-      "fixed_on": null,
+      "status": "Fixed",
+      "fixed_on": "2026-11-19",
       "verified": "Pending",
       "assignee": "Mohit Singh",
       "steps": "See details; reported 18 Nov (fresh list)",
@@ -3323,8 +3383,8 @@
       "cause": "/employees/104/profile (Pradyumna): Developer Account & Nitin Chourey shown below him though nobody reports to him; \"YOU\" on wrong card.",
       "fix": "[Due: 19 Nov 2026 EOD] Show only the profile person's real direct reports (or \"No direct reports\"); \"YOU\" only on the viewer's card.",
       "severity": "High",
-      "status": "Open",
-      "fixed_on": null,
+      "status": "Fixed",
+      "fixed_on": "2026-11-19",
       "verified": "Pending",
       "assignee": "Mohit Singh",
       "steps": "See details; reported 18 Nov (fresh list)",
@@ -3337,8 +3397,8 @@
       "cause": "Profile completion page has extra chip row; documents not visible from the list.",
       "fix": "[Due: 19 Nov 2026 EOD] Remove Incomplete/Complete/All chips; KPI cards filter; per row show uploaded documents (preview, status, missing) with HR edit/replace/verify/delete (audited).",
       "severity": "Medium",
-      "status": "Open",
-      "fixed_on": null,
+      "status": "Fixed",
+      "fixed_on": "2026-11-19",
       "verified": "Pending",
       "assignee": "Mohit Singh",
       "steps": "See details; reported 18 Nov (fresh list)",
@@ -3651,6 +3711,34 @@
       "assignee": "Mohit Singh",
       "steps": "Reported on WhatsApp 19 Nov",
       "screenshot": null
+    },
+    {
+      "found": "2026-11-19",
+      "module": "Infrastructure",
+      "bug": "Production server down (VPS suspended)",
+      "cause": "Contabo invoice unpaid (manual PayPal billing).",
+      "fix": "Balance paid; server back. Switch Contabo to automatic payment.",
+      "severity": "High",
+      "status": "Fixed",
+      "fixed_on": "2026-11-19",
+      "verified": "Pending",
+      "assignee": "Mohit Singh",
+      "steps": "Site, SSH and Tailscale unreachable ~11:15–11:32",
+      "screenshot": null
+    },
+    {
+      "found": "2026-11-19",
+      "module": "Employees",
+      "bug": "Duplicate Gmail accounts (Shiv Kumar #20263, Kishore #20261, Rakesh #20260)",
+      "cause": "Second accounts created with personal email.",
+      "fix": "Gmail accounts deactivated; office accounts kept. Shiv Kumar has no active account — confirm if he left.",
+      "severity": "Medium",
+      "status": "Fixed",
+      "fixed_on": "2026-11-19",
+      "verified": "Pending",
+      "assignee": "Mohit Singh",
+      "steps": "Probation overdue pop-up for Shiv Kumar",
+      "screenshot": null
     }
   ],
   "roadmap": [
@@ -3913,6 +4001,14 @@
       "version": "—",
       "what": "19 Nov batch: leave balances/quota/applications, timesheets, hourly cost, attendance grid (missed clock-out, icons, speed), optional holidays, welcome/intro emails, company account",
       "db": "GradeCostRate, TimesheetWorkEntry, LeaveBalance.locked, Employee.isCompanyAccount, Holiday.isOptional (pushed)",
+      "status": "Live",
+      "verified_by": null
+    },
+    {
+      "date": "2026-11-19",
+      "version": "—",
+      "what": "19 Nov evening: regularization (overnight, approve from grid), one application per candidate, probation/PIP filters, onboarding new hires, org chart fix, document review",
+      "db": "EmployeeDocument verification columns (pushed)",
       "status": "Live",
       "verified_by": null
     }

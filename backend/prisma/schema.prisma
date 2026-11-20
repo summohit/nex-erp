@@ -145,6 +145,10 @@ model User {
   companyId                Int
   company                  Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   emailVerifiedAt          DateTime?
+  /// Test accounts only (20 Nov 2026): skip the company 2FA requirement.
+  /// Set in the database with an audit entry; no screen changes it. Someone
+  /// who has enrolled an authenticator is still asked for the code.
+  twoFactorExempt          Boolean                    @default(false)
   status                   String                     @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, ACTIVE, SUSPENDED
   /// This person's own sidebar order (16 Nov 2026): { modules: [id], subs: { moduleId: [id] } }.
   /// Order only — what they may see still comes from permissions. Null = default.
@@ -3097,8 +3101,68 @@ model Resignation {
   approverId             Int?
   approver               User?     @relation("ResignationApprover", fields: [approverId], references: [id], onDelete: SetNull)
   remarks                String?   @db.Text
+  /// Offboarding part 1 (20 Nov 2026)
+  exitType               String    @default("RESIGNATION") // RESIGNATION, TERMINATION, ABSCONDING, CONTRACT_END
+  stage                  String    @default("MANAGER") // MANAGER, HR, SUPERADMIN, DONE
+  initiatedById          Int?      // HR user who started it (null = the employee resigned)
+  documentUrl            String?
+  noticeDays             Int?
+  earliestLastWorkingDay DateTime?
+  shortNoticeDays        Int?
+  shortNoticeAction      String?   // WAIVE, RECOVER
+  approvals              Json?     // [{ stage, decision, byUserId, byName, at, note }]
+  /// Offboarding part 2 (20 Nov 2026): the exit handover form
+  /// { work: [], projects: [], assets: [], documents: {}, remarks }
+  handover               Json?
+  handoverSubmittedAt    DateTime?
+  handoverSubmittedById  Int?
+  handoverReceivedAt     DateTime?
+  handoverReceivedById   Int?
+  handoverReceivedNote   String?
+  /// Offboarding part 3 (20 Nov 2026)
+  reporteesToId          Int?      // who takes this person's reportees (default: their own manager)
+  separatedAt            DateTime? // set by the last-day job: login off, status SEPARATED
+  /// Clearance (20 Nov 2026): HR / Super Admin verify each handover section.
+  /// { projects|assets|documents: { verified, byUserId, byName, at, note, recoveryAmount? } }
+  clearance              Json?
+  /// Part 5 (20 Nov 2026): relieving/experience letter sent after FNF is paid.
+  exitLetterId           Int?
+  exitLetterSentAt       DateTime?
+  exitLetterTo           String?
+  fnfDueDate             DateTime? // HR's chosen FNF date; default LWD + 45 days (holidays not counted)
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
+}
+
+/// Offboarding part 4 (20 Nov 2026): full & final settlement, due 45 days after LWD.
+model FnfSettlement {
+  id              Int       @id @default(autoincrement())
+  companyId       Int
+  resignationId   Int       @unique
+  employeeId      Int
+  status          String    @default("DRAFT") // DRAFT, PENDING_APPROVAL, APPROVED, PAID
+  lastWorkingDay  DateTime
+  dueDate         DateTime
+  /// [{ key, label, type: EARNING|DEDUCTION, amount, auto, note }]
+  lines           Json
+  /// how the auto lines were worked out (days, rates) for the statement
+  basis           Json?
+  totalEarnings   Float     @default(0)
+  totalDeductions Float     @default(0)
+  netPayable      Float     @default(0)
+  notes           String?   @db.Text
+  preparedById    Int?
+  submittedAt     DateTime?
+  approvedById    Int?
+  approvedAt      DateTime?
+  paidAt          DateTime?
+  paidRef         String?
+  paidProofUrl    String?   // payment proof uploaded when marked paid
+  paidById        Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([companyId, status])
 }
 
 model ExitInterview {
@@ -3128,6 +3192,8 @@ model OffboardingTask {
   status      String   @default("PENDING") // PENDING, CLEARED
   clearedById Int?
   clearedBy   User?    @relation("TaskClearer", fields: [clearedById], references: [id], onDelete: SetNull)
+  /// Offboarding part 3: amount to recover in FNF (e.g. asset not returned)
+  recoveryAmount Float?
   remarks     String?  @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -3277,6 +3343,8 @@ model SystemSetting {
   attendanceTicketAssigneeId    Int?
   quotationSignatoryName        String?
   quotationSignatureUrl         String?
+  /// CEO stamp & signature image printed on exit letters (20 Nov 2026).
+  ceoStampUrl                   String?
   // SUPERADMIN switch: when true, every user in the company must complete TOTP
   // enrolment at next sign-in, and nobody may turn their own 2FA off.
   twoFactorRequired             Boolean  @default(false)
@@ -3287,6 +3355,8 @@ model SystemSetting {
   profileLockFrom               DateTime?
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @updatedAt
+  /// Offboarding (20 Nov 2026): notice days per employment type.
+  noticePolicy Json?
 }
 
 // ═══════════════════════════════════════════

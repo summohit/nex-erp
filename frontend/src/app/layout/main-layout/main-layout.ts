@@ -1,4 +1,5 @@
 import { ProfileReminderComponent } from '../../shared/components/profile-reminder/profile-reminder';
+import { ExitHandoverReminderComponent } from '../../shared/components/exit-handover-reminder/exit-handover-reminder';
 import { ProfileModalComponent } from '../../shared/profile-modal/profile-modal';
 import { Component, computed, inject } from '@angular/core';
 import { AuthService } from '../../services/auth.service';
@@ -19,7 +20,7 @@ import { ChatMessagePopupComponent } from '../../shared/components/chat-message-
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule, SidebarComponent, SidebarComponentV2, HeaderComponent, HeaderComponentV2, DialogHostComponent, NoticePopupComponent, ProfileReminderComponent, ProfileModalComponent, ChatMessagePopupComponent, SelfOnboardingGateComponent, AskMiraComponent],
+  imports: [CommonModule, RouterModule, SidebarComponent, SidebarComponentV2, HeaderComponent, HeaderComponentV2, DialogHostComponent, NoticePopupComponent, ProfileReminderComponent, ExitHandoverReminderComponent, ProfileModalComponent, ChatMessagePopupComponent, SelfOnboardingGateComponent, AskMiraComponent],
   templateUrl: './main-layout.html',
   styleUrls: ['./main-layout.css']
 })

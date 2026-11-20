@@ -1184,10 +1184,9 @@ export class AttendanceService {
     role?: string | null,
     employeeId?: number | null,
   ): Promise<boolean> {
-    if (isHrAdmin(role)) return true;
-    return this.approvals.mayApprove(
-      companyId, APPROVAL_WORKFLOW.CLOCK_OUT, role, employeeId,
-    );
+    // 20 Nov 2026: late clock-outs are decided by a Super Admin only (no HR,
+    // no delegates).
+    return String(role || '').toUpperCase() === 'SUPERADMIN';
   }
 
   private async assertMayApproveClockOut(
@@ -1195,7 +1194,7 @@ export class AttendanceService {
   ) {
     if (!(await this.mayApproveClockOut(companyId, role, employeeId))) {
       throw new ForbiddenException(
-        'You are not on the late clock-out approval list. A Super Admin can add you.',
+        'Only a Super Admin can approve or reject late clock-outs.',
       );
     }
   }
@@ -2059,11 +2058,18 @@ export class AttendanceService {
       if (rescore) {
         Object.assign(score, {
           status: 'PRESENT', isLate: false, isEarlyLeave: false,
-          // A missed or pending clock-out counts as half a day in payroll; the
-          // approval settles it.
-          missedClockOut: false, autoClockedOut: false, clockOutApproval: 'APPROVED',
-          clockOutApprovedById: approverUserId, clockOutApprovedAt: new Date(),
+          missedClockOut: false, autoClockedOut: false,
         });
+        // 20 Nov 2026: only a Super Admin's approval also settles the day's late
+        // clock-out. A manager / HR approval corrects the times but a pending
+        // late clock-out stays pending for the Super Admin.
+        if (String(actor?.role || '').toUpperCase() === 'SUPERADMIN') {
+          Object.assign(score, {
+            clockOutApproval: 'APPROVED',
+            // Employee id of the approver (this used to store the user id).
+            clockOutApprovedById: actor?.employeeId ?? null, clockOutApprovedAt: new Date(),
+          });
+        }
       }
       const saved = attendance
         ? await this.prisma.attendance.update({

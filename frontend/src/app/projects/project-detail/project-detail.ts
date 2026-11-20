@@ -3248,10 +3248,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   }
 
   private needsProofUpload(columnId: number | null | undefined): boolean {
-    // Review is part of the assignee's normal workflow, including for overdue
-    // work. Evidence is collected only when authorised leadership completes
-    // the task; an elapsed due date must never stop a task from progressing.
-    return this.isDoneOrArchiveColumn(columnId);
+    // 19 Nov 2026 (Mohit): evidence is required when a task is sent to Review
+    // as well as when it is completed — a task reached In Review with no proof.
+    // An elapsed due date still never blocks the move itself.
+    return this.isReviewColumn(columnId) || this.isDoneOrArchiveColumn(columnId);
   }
 
   isStatusMoveBlocked(columnId: number): boolean {

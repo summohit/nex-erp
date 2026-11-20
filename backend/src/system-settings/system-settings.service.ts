@@ -34,6 +34,7 @@ export class SystemSettingsService {
       quotationTerms?: string | null;
       quotationSignatoryName?: string | null;
       quotationSignatureUrl?: string | null;
+      ceoStampUrl?: string | null;
     },
   ) {
     return this.prisma.systemSetting.upsert({
@@ -70,6 +71,7 @@ export class SystemSettingsService {
         ...(data.quotationTerms !== undefined && { quotationTerms: data.quotationTerms }),
         ...(data.quotationSignatoryName !== undefined && { quotationSignatoryName: data.quotationSignatoryName }),
         ...(data.quotationSignatureUrl !== undefined && { quotationSignatureUrl: data.quotationSignatureUrl }),
+        ...(data.ceoStampUrl !== undefined && { ceoStampUrl: data.ceoStampUrl }),
       },
     });
   }

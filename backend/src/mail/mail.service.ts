@@ -369,6 +369,23 @@ export class MailService {
    * than a failure, because nobody notices. SMTP via sendWithRetry is the only
    * transport here that carries attachments.
    */
+  /** Relieving / experience letter to the leaver's personal email, PDF attached (20 Nov 2026). SMTP only — Brevo drops attachments. */
+  async sendExitLetterEmail(params: { to: string; employeeName: string; companyName: string; title: string; pdf: Buffer; fileName: string; isPdf: boolean }) {
+    const { to, employeeName, companyName, title, pdf, fileName, isPdf } = params;
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <p style="color:#475569; font-size:15px; line-height:1.6;">Dear ${employeeName},</p>
+        <p style="color:#475569; font-size:15px; line-height:1.6;">Please find attached your <strong>${title}</strong> from ${companyName}.</p>
+        <p style="color:#475569; font-size:15px; line-height:1.6;">We thank you for your contribution and wish you the very best for the future.</p>
+        <p style="color:#475569; font-size:15px; line-height:1.6;">Regards,<br>HR, ${companyName}</p>
+      </div>`;
+    return this.sendWithRetry({
+      from: `"${companyName}" <${this.fromEmail}>`, to, envelope: { from: this.fromEmail, to: [to] },
+      subject: `${title} — ${companyName}`, html,
+      attachments: [{ filename: fileName, content: pdf, contentType: isPdf ? 'application/pdf' : 'text/html' }],
+    });
+  }
+
   async sendQuotationEmail(params: {
     /** One address or several — nodemailer accepts a list and sends one message. */
     to: string | string[];

@@ -8772,3 +8772,12 @@ app-page-header { display: block; margin-bottom: 16px; }
 
 .lb-modal-edit-btn { display: inline-flex; align-items: center; gap: 7px; height: 42px; padding: 0 18px; margin-left: auto; margin-right: 10px; border: 0; border-radius: 999px; background: #2563eb; color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 .lb-modal-edit-btn:hover { background: #1d4ed8; }
+
+/* Leave Balances: KPI cards filter the table (20 Nov 2026) */
+.lb-ov-click { cursor: pointer; transition: box-shadow .15s, transform .15s; }
+.lb-ov-click:hover { box-shadow: 0 6px 18px rgba(15, 23, 42, .08); transform: translateY(-1px); }
+.lb-ov-click.on { outline: 2px solid #3b82f6; outline-offset: -2px; }
+.lb-dual-click { cursor: pointer; border-radius: 6px; padding: 0 4px; }
+.lb-dual-click:hover { background: #fee2e2; }
+
+.alq-stat-pill { gap: 4px; }
