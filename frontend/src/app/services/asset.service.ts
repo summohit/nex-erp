@@ -65,6 +65,7 @@ export interface HardwareRequest {
   urgency: 'LOW' | 'MEDIUM' | 'HIGH';
   subject?: string;
   reason: string;
+  requestDetails?: { neededBy?: string; workLocation?: string; preferredSpecs?: string; budget?: string };
   images?: string | string[];
   status: 'PENDING' | 'APPROVED' | 'FULFILLED' | 'REJECTED';
   rejectionReason?: string;
@@ -115,7 +116,7 @@ export interface InventoryItem {
 export interface InventoryTransaction {
   id: number;
   itemId: number;
-  item?: Pick<InventoryItem, 'id' | 'name' | 'unit' | 'category' | 'brand' | 'supplier'>;
+  item?: Pick<InventoryItem, 'id' | 'name' | 'unit' | 'category' | 'brand' | 'supplier' | 'batchNumber'>;
   type: 'PURCHASE' | 'ASSIGNMENT' | 'RETURN' | 'CONSUMPTION' | 'EXPIRED' | 'ADJUSTMENT';
   quantity: number;
   date: string;
@@ -126,6 +127,7 @@ export interface InventoryTransaction {
   parentTransactionId?: number;
   linkedReturns?: { id: number; quantity: number; date?: string; conditionOnReturn?: string; notes?: string }[];
   purpose?: string;
+  assignmentImageUrl?: string;
   conditionOnReturn?: string;
   reason?: string;
   createdById?: number;
@@ -167,7 +169,7 @@ export class AssetService {
     return this.http.get<AssetAssignment[]>(`${this.apiUrl}/assignments`);
   }
 
-  assignAsset(data: { assetId: number; employeeId: number; assignedDate?: string; conditionOnAssign?: string; notes?: string }): Observable<AssetAssignment> {
+  assignAsset(data: { assetId: number; employeeId: number; assignedDate?: string; conditionOnAssign?: string; notes?: string; assetImageUrl?: string }): Observable<AssetAssignment> {
     return this.http.post<AssetAssignment>(`${this.apiUrl}/assign`, data);
   }
 
@@ -186,11 +188,11 @@ export class AssetService {
   // 3. Hardware Requests
   getHardwareRequests(): Observable<HardwareRequest[]> {
     return this.http.get<HardwareRequest[]>(`${this.apiUrl}/requests`);
-  }  createHardwareRequest(data: { requestType: string; category: string; urgency: string; subject: string; reason: string; images?: string[] }): Observable<HardwareRequest> {
+  }  createHardwareRequest(data: { requestType: string; category: string; urgency: string; subject: string; reason: string; neededBy?: string; workLocation?: string; preferredSpecs?: string; budget?: string; images?: string[] }): Observable<HardwareRequest> {
     return this.http.post<HardwareRequest>(`${this.apiUrl}/requests`, data);
   }
 
-  updateHardwareRequest(id: number, data: { requestType?: string; category?: string; urgency?: string; subject?: string; reason?: string; images?: string[] }): Observable<HardwareRequest> {
+  updateHardwareRequest(id: number, data: { requestType?: string; category?: string; urgency?: string; subject?: string; reason?: string; neededBy?: string; workLocation?: string; preferredSpecs?: string; budget?: string; images?: string[] }): Observable<HardwareRequest> {
     return this.http.put<HardwareRequest>(`${this.apiUrl}/requests/${id}`, data);
   }
 
@@ -245,7 +247,7 @@ export class AssetService {
 
   assignInventoryItem(itemId: number, data: {
     quantity: number; employeeId?: number; assigneeText?: string;
-    date?: string; expectedReturnDate?: string; purpose?: string; assignmentLocation?: string; clientDetails?: string;
+    date?: string; expectedReturnDate?: string; purpose?: string; assignmentLocation?: string; clientDetails?: string; assignmentImageUrl?: string;
   }): Observable<InventoryTransaction> {
     return this.http.post<InventoryTransaction>(`${this.apiUrl}/inventory/${itemId}/assign`, data);
   }

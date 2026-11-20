@@ -285,7 +285,12 @@ export class SidebarComponentV2 implements OnInit {
   private toModule(item: any): SidebarModule {
     let subs: SidebarSubItem[] = (item.subItems || []).map((s: any) => ({
       id: s.id, title: s.title, route: s.route, external: !!s.external,
-    }));
+    })).filter((sub: SidebarSubItem) => ![
+      '/assets/inventory?setup=category',
+      '/assets/inventory?setup=brand',
+      '/assets/inventory?setup=subcategory',
+      '/assets/inventory?setup=vendor',
+    ].includes(sub.route));
     // These are Inventory setup shortcuts, not separate permission surfaces.
     // Keep them in the drawer even for workspaces whose database menu was
     // created before the shortcuts existed.

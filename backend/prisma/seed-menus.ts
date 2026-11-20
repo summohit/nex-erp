@@ -129,10 +129,7 @@ const menuSections: MenuSection[] = [
           { id: 'assets/inventory', title: 'Asset Inventory', route: '/assets/inventory' },
           { id: 'assets/assignments', title: 'Assignments', route: '/assets/assignments' },
           { id: 'assets/requests', title: 'Hardware Requests', route: '/assets/requests' },
-          { id: 'assets/inventory?setup=category', title: 'Add Category', route: '/assets/inventory?setup=category' },
-          { id: 'assets/inventory?setup=brand', title: 'Add Brand', route: '/assets/inventory?setup=brand' },
-          { id: 'assets/inventory?setup=subcategory', title: 'Add Subcategory', route: '/assets/inventory?setup=subcategory' },
-          { id: 'assets/inventory?setup=vendor', title: 'Add Vendor', route: '/assets/inventory?setup=vendor' }
+          { id: 'assets/setup', title: 'Inventory Setup', route: '/assets/setup' }
         ]
       }
     ]

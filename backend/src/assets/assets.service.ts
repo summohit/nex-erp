@@ -10,21 +10,29 @@ export class AssetsService {
   ) {}
 
   /** Keeps the new subject/justification split compatible with existing databases. */
-  private packRequestText(subject: string, reason: string): string {
-    return `[SUBJECT] ${subject.trim()}\n[JUSTIFICATION]\n${reason.trim()}`;
+  private packRequestText(subject: string, reason: string, details?: { neededBy?: string; workLocation?: string; preferredSpecs?: string; budget?: string }): string {
+    const cleanDetails = Object.fromEntries(Object.entries(details || {}).filter(([, value]) => typeof value === 'string' && value.trim()));
+    const metadata = Object.keys(cleanDetails).length ? `\n[REQUEST_DETAILS]\n${JSON.stringify(cleanDetails)}` : '';
+    return `[SUBJECT] ${subject.trim()}\n[JUSTIFICATION]\n${reason.trim()}${metadata}`;
   }
 
-  private unpackRequestText(reason: string): { subject?: string; reason: string } {
+  private unpackRequestText(reason: string): { subject?: string; reason: string; requestDetails?: { neededBy?: string; workLocation?: string; preferredSpecs?: string; budget?: string } } {
     const match = /^\[SUBJECT\]\s*(.*?)\n\[JUSTIFICATION\]\n([\s\S]*)$/.exec(reason || '');
-    return match ? { subject: match[1], reason: match[2] } : { reason };
+    if (!match) return { reason };
+    const marker = '\n[REQUEST_DETAILS]\n';
+    const markerIndex = match[2].lastIndexOf(marker);
+    if (markerIndex < 0) return { subject: match[1], reason: match[2] };
+    try {
+      return { subject: match[1], reason: match[2].slice(0, markerIndex), requestDetails: JSON.parse(match[2].slice(markerIndex + marker.length)) };
+    } catch { return { subject: match[1], reason: match[2] }; }
   }
 
-  private presentHardwareRequest<T extends { reason: string }>(request: T): T & { subject?: string } {
+  private presentHardwareRequest<T extends { reason: string }>(request: T): T & { subject?: string; requestDetails?: { neededBy?: string; workLocation?: string; preferredSpecs?: string; budget?: string } } {
     const content = this.unpackRequestText(request.reason);
     // Older records stored only a long reason. Give them a compact, readable
     // title so the details drawer never uses the entire justification as its heading.
     const legacySubject = content.reason.replace(/\s+/g, ' ').trim().slice(0, 72).replace(/[,:;\-\s]+$/, '');
-    return { ...request, reason: content.reason, subject: content.subject || legacySubject || undefined };
+    return { ...request, reason: content.reason, subject: content.subject || legacySubject || undefined, requestDetails: content.requestDetails };
   }
 
   // ==========================================
@@ -206,7 +214,7 @@ export class AssetsService {
     });
   }
 
-  async assignAsset(companyId: number, data: { assetId: number; employeeId: number; assignedDate?: string; conditionOnAssign?: string; notes?: string }) {
+  async assignAsset(companyId: number, data: { assetId: number; employeeId: number; assignedDate?: string; conditionOnAssign?: string; notes?: string; assetImageUrl?: string }) {
     const asset = await this.prisma.asset.findFirst({ where: { id: data.assetId, companyId } });
     if (!asset) throw new NotFoundException('Asset not found');
 
@@ -226,10 +234,14 @@ export class AssetsService {
       }
     });
 
-    // Update Asset Status to ASSIGNED
+    // Update asset status and retain an assignment photo in its top-level gallery.
+    let currentImages: string[] = [];
+    try { currentImages = asset.images ? JSON.parse(asset.images) : []; } catch { currentImages = []; }
+    const imageUrl = data.assetImageUrl?.trim();
+    if (imageUrl && !currentImages.includes(imageUrl)) currentImages.push(imageUrl);
     await this.prisma.asset.update({
       where: { id: data.assetId },
-      data: { status: 'ASSIGNED' }
+      data: { status: 'ASSIGNED', ...(imageUrl ? { images: JSON.stringify(currentImages) } : {}) }
     });
 
     return assignment;
@@ -336,7 +348,7 @@ export class AssetsService {
     return requests.map(request => this.presentHardwareRequest(request));
   }
 
-  async createHardwareRequest(companyId: number, userId: number, data: { requestType: string; category: string; urgency: string; subject: string; reason: string; images?: string[] }) {
+  async createHardwareRequest(companyId: number, userId: number, data: { requestType: string; category: string; urgency: string; subject: string; reason: string; neededBy?: string; workLocation?: string; preferredSpecs?: string; budget?: string; images?: string[] }) {
     const employee = await this.prisma.employee.findFirst({ where: { userId, companyId } });
     if (!employee) throw new NotFoundException('Employee profile not found');
 
@@ -349,7 +361,7 @@ export class AssetsService {
         requestType: data.requestType || 'NEW_DEVICE',
         category: data.category || 'LAPTOP',
         urgency: data.urgency || 'MEDIUM',
-        reason: this.packRequestText(data.subject, data.reason),
+        reason: this.packRequestText(data.subject, data.reason, data),
         images: imagesStr,
         status: 'PENDING'
       }
@@ -372,7 +384,7 @@ export class AssetsService {
     return this.presentHardwareRequest(created);
   }
 
-  async updateHardwareRequest(companyId: number, id: number, userId: number, userRole: string, data: { requestType?: string; category?: string; urgency?: string; subject?: string; reason?: string; images?: string[] }) {
+  async updateHardwareRequest(companyId: number, id: number, userId: number, userRole: string, data: { requestType?: string; category?: string; urgency?: string; subject?: string; reason?: string; neededBy?: string; workLocation?: string; preferredSpecs?: string; budget?: string; images?: string[] }) {
     const request = await this.prisma.hardwareRequest.findFirst({
       where: { id, companyId },
       include: { employee: true }
@@ -391,16 +403,22 @@ export class AssetsService {
     const imagesStr = data.images && data.images.length > 0 ? (Array.isArray(data.images) ? JSON.stringify(data.images) : data.images) : null;
     const currentContent = this.unpackRequestText(request.reason);
 
-    return this.prisma.hardwareRequest.update({
+    const updated = await this.prisma.hardwareRequest.update({
       where: { id },
       data: {
         requestType: data.requestType || request.requestType,
         category: data.category || request.category,
         urgency: data.urgency || request.urgency,
-        reason: this.packRequestText(data.subject?.trim() || currentContent.subject || '', data.reason?.trim() || currentContent.reason),
+        reason: this.packRequestText(data.subject?.trim() || currentContent.subject || '', data.reason?.trim() || currentContent.reason, {
+          neededBy: data.neededBy ?? currentContent.requestDetails?.neededBy,
+          workLocation: data.workLocation ?? currentContent.requestDetails?.workLocation,
+          preferredSpecs: data.preferredSpecs ?? currentContent.requestDetails?.preferredSpecs,
+          budget: data.budget ?? currentContent.requestDetails?.budget,
+        }),
         images: imagesStr
       }
     });
+    return this.presentHardwareRequest(updated);
   }
 
   async cancelHardwareRequest(companyId: number, id: number, userId: number, userRole?: string) {
@@ -563,6 +581,15 @@ export class AssetsService {
       })
     ]);
 
+    const missingSerials = items.filter(item => !item.batchNumber);
+    if (missingSerials.length) {
+      await this.prisma.$transaction(missingSerials.map(item => this.prisma.inventoryItem.update({
+        where: { id: item.id },
+        data: { batchNumber: this.inventorySerial(item) }
+      })));
+      items.forEach(item => { if (!item.batchNumber) item.batchNumber = this.inventorySerial(item); });
+    }
+
     const byItem = new Map<number, { type: string; quantity: number }[]>();
     for (const t of txns) {
       if (!byItem.has(t.itemId)) byItem.set(t.itemId, []);
@@ -570,6 +597,12 @@ export class AssetsService {
     }
 
     return items.map(item => this.decorateItem(item, byItem.get(item.id) || []));
+  }
+
+  private inventorySerial(item: { id: number; purchaseDate?: Date | null; createdAt?: Date | null }): string {
+    const date = item.purchaseDate || item.createdAt || new Date();
+    const stamp = date.toISOString().slice(0, 10).replace(/-/g, '');
+    return `INV-${stamp}-${String(item.id).padStart(2, '0')}`;
   }
 
   async createInventoryItem(companyId: number, userId: number, data: any) {
@@ -621,6 +654,9 @@ export class AssetsService {
       }
     });
 
+    if (!item.batchNumber) {
+      return this.prisma.inventoryItem.update({ where: { id: item.id }, data: { batchNumber: this.inventorySerial(item) } });
+    }
     return item;
   }
 
@@ -712,7 +748,7 @@ export class AssetsService {
       where: { companyId, type: 'ASSIGNMENT' },
       orderBy: [{ date: 'desc' }, { id: 'desc' }],
       include: {
-        item: { select: { id: true, name: true, category: true, unit: true, itemType: true } },
+        item: { select: { id: true, name: true, category: true, unit: true, itemType: true, batchNumber: true } },
         employee: {
           select: {
             id: true, firstName: true, lastName: true,
@@ -761,6 +797,9 @@ export class AssetsService {
           employeeId: data.employeeId || null,
           assigneeText: data.assigneeText || null,
           expectedReturnDate: this.parseDate(data.expectedReturnDate),
+          // Assignment photos use the existing transaction metadata column.
+          // It keeps the change backward-compatible with deployed databases.
+          reason: data.assignmentImageUrl?.trim() || null,
           purpose: [data.purpose?.trim(), data.clientDetails?.trim(), data.assignmentLocation?.trim() ? `Assignment location: ${data.assignmentLocation.trim()}` : '']
             .filter(Boolean)
             .join('\n') || null,

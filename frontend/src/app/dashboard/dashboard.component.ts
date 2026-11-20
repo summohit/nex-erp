@@ -277,7 +277,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // null when its duplicate /users/me request failed, leaving an empty page
   // while the rest of the shell showed the signed-in user.
   user = this.authService.currentUser;
+  profileLoading = signal(true);
+  profileError = signal<string | null>(null);
   private initializedUserKey: string | number | null = null;
+  private profileRetryTimeout: ReturnType<typeof setTimeout> | null = null;
   private authUserWatcher = effect(() => {
     const user = this.authService.currentUser();
     if (user) this.initializeForUser(user);
@@ -1110,21 +1113,51 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.currentTime.set(new Date());
     }, 1000);
 
+    const cachedUser = this.authService.currentUser();
+    if (cachedUser) this.initializeForUser(cachedUser);
+    this.loadDashboardProfile();
+  }
+
+  private loadDashboardProfile(retryCount = 0) {
     this.authService.getMe().subscribe({
-      next: (user) => this.initializeForUser(user),
+      next: (user) => {
+        this.profileLoading.set(false);
+        this.profileError.set(null);
+        this.initializeForUser(user);
+      },
       error: (err) => {
-        // Only a rejected session signs out. No answer at all — the API
-        // restarting — leaves the session alone; the dashboard just stays
-        // empty until the next load.
-        if (err?.status !== 401 && err?.status !== 403) return;
-        this.authService.logout();
-        this.router.navigate(['/']);
+        if (err?.status === 401 || err?.status === 403) {
+          this.profileLoading.set(false);
+          this.authService.logout();
+          this.router.navigate(['/']);
+          return;
+        }
+        if (retryCount < 3) {
+          this.profileRetryTimeout = setTimeout(() => {
+            this.profileRetryTimeout = null;
+            this.loadDashboardProfile(retryCount + 1);
+          }, 1500);
+          return;
+        }
+        this.profileLoading.set(false);
+        this.profileError.set(
+          err?.status === 0
+            ? 'Cannot reach the API. Check that the backend is running, then try again.'
+            : 'Could not load your profile. Check the API service, then try again.',
+        );
       },
     });
   }
 
+  retryDashboardProfile() {
+    this.profileLoading.set(true);
+    this.profileError.set(null);
+    this.loadDashboardProfile();
+  }
+
   /** Load dashboard data once for the authenticated profile. */
   private initializeForUser(user: any) {
+    this.profileLoading.set(false);
     const key = user?.id ?? user?.email ?? null;
     if (key === null || this.initializedUserKey === key) return;
     this.initializedUserKey = key;
@@ -1139,6 +1172,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.profileRetryTimeout) {
+      clearTimeout(this.profileRetryTimeout);
+      this.profileRetryTimeout = null;
+    }
     if (this.clockInterval) {
       clearInterval(this.clockInterval);
       this.clockInterval = null;

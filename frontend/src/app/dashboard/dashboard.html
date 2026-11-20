@@ -1077,10 +1077,19 @@
 
   <ng-template #dashboardLoading>
     <div style="min-height: 360px; display: grid; place-items: center; color: #64748b; text-align: center;">
-      <div>
+      <div *ngIf="profileLoading(); else dashboardProfileError">
         <strong style="display: block; color: #334155; margin-bottom: 8px;">Loading your dashboard…</strong>
         <span>Fetching your profile and workspace data.</span>
       </div>
+      <ng-template #dashboardProfileError>
+        <div>
+          <strong style="display: block; color: #334155; margin-bottom: 8px;">Dashboard data is unavailable.</strong>
+          <span>{{ profileError() }}</span>
+          <div style="margin-top: 16px;">
+            <button type="button" class="cmd-theme-btn" (click)="retryDashboardProfile()">Retry</button>
+          </div>
+        </div>
+      </ng-template>
     </div>
   </ng-template>
 </div>

@@ -391,36 +391,6 @@ export class MenusService implements OnModuleInit {
         }
       }
 
-      // Inventory reference data is managed from the same add-item workflow,
-      // but it needs a discoverable home in the Assets & Inventory menu.
-      // Query routes keep these shortcuts in the existing inventory permission
-      // surface instead of introducing four permissions for the same job.
-      const assetsMenu = await this.prisma.menu.findFirst({
-        where: { route: '/assets', parentId: { not: null } },
-      });
-      if (assetsMenu) {
-        const inventorySetupItems = [
-          { title: 'Add Category', route: '/assets/inventory?setup=category', displayOrder: 4 },
-          { title: 'Add Brand', route: '/assets/inventory?setup=brand', displayOrder: 5 },
-          { title: 'Add Subcategory', route: '/assets/inventory?setup=subcategory', displayOrder: 6 },
-          { title: 'Add Vendor', route: '/assets/inventory?setup=vendor', displayOrder: 7 },
-        ];
-        for (const setupItem of inventorySetupItems) {
-          const existing = await this.prisma.menu.findFirst({
-            where: { parentId: assetsMenu.id, route: setupItem.route },
-          });
-          if (existing) {
-            await this.prisma.menu.update({
-              where: { id: existing.id },
-              data: { title: setupItem.title, displayOrder: setupItem.displayOrder, isActive: true },
-            });
-          } else {
-            await this.prisma.menu.create({
-              data: { ...setupItem, parentId: assetsMenu.id, isActive: true },
-            });
-          }
-        }
-      }
     } catch (err) {
       this.logger.error('Failed to auto-seed menus:', err);
     }
@@ -568,9 +538,12 @@ export class MenusService implements OnModuleInit {
         if (item.subItems && item.subItems.length > 0) {
           item.subItems = item.subItems.filter(sub =>
             allowedModules.has(sub.id)
-            // Inventory Setup shortcuts use query routes, but inherit the
-            // existing Asset Inventory permission.
-            || (sub.route?.startsWith('/assets/inventory?setup=') && allowedModules.has('assets/inventory'))
+            && ![
+              '/assets/inventory?setup=category',
+              '/assets/inventory?setup=brand',
+              '/assets/inventory?setup=subcategory',
+              '/assets/inventory?setup=vendor',
+            ].includes(sub.route ?? '')
           );
           return item.subItems.length > 0;
         }

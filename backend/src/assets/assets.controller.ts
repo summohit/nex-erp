@@ -58,7 +58,7 @@ export class AssetsController {
   @Permissions('assets/inventory', 'assets/assignments')
   assignAsset(
     @Request() req,
-    @Body() data: { assetId: number; employeeId: number; assignedDate?: string; conditionOnAssign?: string; notes?: string }
+    @Body() data: { assetId: number; employeeId: number; assignedDate?: string; conditionOnAssign?: string; notes?: string; assetImageUrl?: string }
   ) {
     return this.assetsService.assignAsset(req.user.companyId, data);
   }

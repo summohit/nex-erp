@@ -188,28 +188,23 @@ export class SidebarComponent implements OnInit {
     return currentPath === sub.route;
   }
 
-  isFirstInventorySetupItem(sub: any): boolean {
-    return sub?.route === '/assets/inventory?setup=category';
-  }
-
   private mergeLeaveMenuItems(sections: any[]): any[] {
     return sections.map(section => ({
       ...section,
       items: section.items.map((item: any) => {
-        // Inventory Setup is client-composed as well as seeded in the database.
-        // This keeps the shortcuts visible for existing workspaces whose menu
-        // rows predate the setup links (or when a database seed is delayed).
+        // These creation shortcuts were previously composed client-side and
+        // may also exist in older database menu rows. Keep setup accessible
+        // through Inventory Setup, without exposing each shortcut in the menu.
         if (item.id === 'assets' || item.route === '/assets') {
-          const setupItems = [
-            { id: 'assets/inventory?setup=category', title: 'Add Category', route: '/assets/inventory?setup=category' },
-            { id: 'assets/inventory?setup=brand', title: 'Add Brand', route: '/assets/inventory?setup=brand' },
-            { id: 'assets/inventory?setup=subcategory', title: 'Add Subcategory', route: '/assets/inventory?setup=subcategory' },
-            { id: 'assets/inventory?setup=vendor', title: 'Add Vendor', route: '/assets/inventory?setup=vendor' },
-          ];
-          const current = item.subItems || [];
+          const hiddenSetupRoutes = new Set([
+            '/assets/inventory?setup=category',
+            '/assets/inventory?setup=brand',
+            '/assets/inventory?setup=subcategory',
+            '/assets/inventory?setup=vendor',
+          ]);
           return {
             ...item,
-            subItems: [...current, ...setupItems.filter(setup => !current.some((sub: any) => sub.route === setup.route))],
+            subItems: (item.subItems || []).filter((sub: any) => !hiddenSetupRoutes.has(sub.route)),
           };
         }
         if (item.id === 'recruitment' && item.subItems?.some((sub: any) => sub.route === '/recruitment/candidates') && !item.subItems.some((sub: any) => sub.route === '/recruitment/offer-letters')) {

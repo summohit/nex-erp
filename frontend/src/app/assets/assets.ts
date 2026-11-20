@@ -33,7 +33,8 @@ import {
   LucideArchive,
   LucideIndianRupee,
   LucideSettings,
-  LucideArrowRight
+  LucideArrowRight,
+  LucideChevronDown
 } from '@lucide/angular';
 
 import { AssetActionCellRendererComponent } from '../shared/components/asset-action-cell-renderer.component';
@@ -90,6 +91,7 @@ const IT_CATEGORIES = ['LAPTOP', 'DESKTOP', 'MONITOR', 'PRINTER', 'PERIPHERAL', 
     LucideLaptop,
     LucidePlus,
     LucideSearch,
+    LucideFilter,
     LucideUserCheck,
     LucideCheckCircle,
     LucideWrench,
@@ -108,6 +110,7 @@ const IT_CATEGORIES = ['LAPTOP', 'DESKTOP', 'MONITOR', 'PRINTER', 'PERIPHERAL', 
     LucideMoreHorizontal,
     LucideSettings,
     LucideArrowRight,
+    LucideChevronDown,
     SearchableSelectComponent,
     SkeletonComponent
   ],
@@ -214,6 +217,8 @@ export class AssetsComponent implements OnInit {
 
   // Legacy KPI Metrics (requests tab)
   pendingRequestsCount = computed(() => this.requests().filter(r => r.status === 'PENDING').length);
+  highPriorityRequestsCount = computed(() => this.requests().filter(r => r.status === 'PENDING' && r.urgency === 'HIGH').length);
+  fulfilledRequestsCount = computed(() => this.requests().filter(r => r.status === 'FULFILLED').length);
 
   // Inventory KPI Metrics
   invTotalItems = computed(() => this.inventoryItems().length);
@@ -253,11 +258,13 @@ export class AssetsComponent implements OnInit {
 
   clearInventoryFilters() {
     this.inventoryFilters.set({ dateRange: 'ALL', category: '', brand: '', supplier: '', itemType: '', stock: 'ALL', expiry: 'ALL' });
+    this.inventoryKpiFilter.set('ALL');
+    this.searchQuery.set('');
   }
 
   get activeInventoryFilterCount(): number {
     const filters = this.inventoryFilters();
-    return Object.values(filters).filter(value => value && value !== 'ALL').length;
+    return Object.values(filters).filter(value => value && value !== 'ALL').length + (this.inventoryKpiFilter() === 'ALL' ? 0 : 1);
   }
 
   private matchesInventoryFilters(item: InventoryItem, filters: { dateRange: string; category: string; brand: string; supplier: string; itemType: string; stock: string; expiry: string }): boolean {
@@ -282,7 +289,9 @@ export class AssetsComponent implements OnInit {
     const date = new Date(dateValue); date.setHours(0, 0, 0, 0);
     const now = new Date(); now.setHours(0, 0, 0, 0);
     if (range === 'TODAY') return date.getTime() === now.getTime();
+    if (range === 'THIS_WEEK') { const start = new Date(now); start.setDate(now.getDate() - ((now.getDay() + 6) % 7)); const end = new Date(start); end.setDate(start.getDate() + 6); return date >= start && date <= end; }
     if (range === 'THIS_MONTH') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    if (range === 'THIS_YEAR') return date.getFullYear() === now.getFullYear();
     if (range === 'LAST_MONTH') { const last = new Date(now.getFullYear(), now.getMonth() - 1, 1); return date.getMonth() === last.getMonth() && date.getFullYear() === last.getFullYear(); }
     const days = range === 'LAST_7_DAYS' ? 7 : range === 'LAST_60_DAYS' ? 60 : range === 'LAST_90_DAYS' ? 90 : 365;
     const start = new Date(now); start.setDate(now.getDate() - days);
@@ -358,6 +367,7 @@ export class AssetsComponent implements OnInit {
   // ===== Assign / Return / Consume / Expire / Adjust modals =====
   isInvAssignOpen = signal(false);
   invAssignSubmitting = signal(false);
+  invAssignImageUploading = signal(false);
   invAssignError = signal('');
   invAssignForm: any = {};
 
@@ -399,6 +409,7 @@ export class AssetsComponent implements OnInit {
 
   // Drawer & Modal States (legacy flows)
   isAssignDrawerOpen = signal<boolean>(false);
+  isAssignmentItemPickerOpen = signal(false);
   editingAssignmentId = signal<number | null>(null);
   editingAssignmentAsset = signal<Asset | null>(null);
   isAssetDrawerOpen = signal<boolean>(false);
@@ -494,11 +505,23 @@ export class AssetsComponent implements OnInit {
   isSaving = false;
 
   assignForm = {
+    assignmentSource: 'INVENTORY' as 'INVENTORY' | 'ASSET',
     assetId: 0,
+    inventoryItemId: 0,
+    quantity: 1,
     employeeId: 0,
+    recipientType: 'EMPLOYEE' as 'EMPLOYEE' | 'LOCATION' | 'CLIENT',
+    personOrLocation: '',
+    clientName: '',
+    clientCompany: '',
+    clientEmail: '',
+    clientPhone: '',
+    assignmentLocation: '',
+    expectedReturnDate: '',
     assignedDate: new Date().toISOString().split('T')[0],
     conditionOnAssign: 'GOOD',
-    notes: ''
+    notes: '',
+    assetImageUrl: ''
   };
 
   returnForm = {
@@ -515,6 +538,10 @@ export class AssetsComponent implements OnInit {
     urgency: 'MEDIUM',
     subject: '',
     reason: '',
+    neededBy: '',
+    workLocation: '',
+    preferredSpecs: '',
+    budget: '',
     images: [] as string[]
   };
 
@@ -571,6 +598,20 @@ export class AssetsComponent implements OnInit {
   openTxnCheck(t: InventoryTransaction) {
     this.checkedTxn.set(t);
     this.isTxnCheckOpen.set(true);
+  }
+
+  transactionAssetImages(transaction: InventoryTransaction): string[] {
+    const imageUrl = transaction.type === 'ASSIGNMENT' ? transaction.reason?.trim() : '';
+    return imageUrl && /^https?:\/\//i.test(imageUrl) ? [imageUrl] : [];
+  }
+
+  viewTransactionAssetMedia(transaction: InventoryTransaction) {
+    const images = this.transactionAssetImages(transaction);
+    if (!images.length) {
+      this.toast.info('No asset images or documents have been uploaded for this assignment yet');
+      return;
+    }
+    this.openImageViewer(images, 0);
   }
 
   returnConditionLabel(c?: string | null): string {
@@ -887,6 +928,13 @@ export class AssetsComponent implements OnInit {
 
   inventoryColDefs: ColDef[] = [
     {
+      headerName: 'Inventory No.',
+      field: 'batchNumber',
+      minWidth: 155,
+      width: 155,
+      cellRenderer: (params: any) => `<span class="tag-mono inventory-serial">${params.value || '-'}</span>`
+    },
+    {
       headerName: 'Item Name',
       field: 'name',
       flex: 2.4,
@@ -1059,9 +1107,13 @@ export class AssetsComponent implements OnInit {
       outstanding: this.outstandingOf(t),
       lastCondition: (t.linkedReturns || []).map((r: any) => r.conditionOnReturn).filter((c: any) => !!c).slice(-1)[0] || null,
       employee: t.employee || null,
+      assigneeText: t.assigneeText || null,
+      inventorySerial: t.item?.batchNumber || '-',
       assignedDate: t.date,
       expectedReturnDate: t.expectedReturnDate || null,
+      assignmentImageUrl: t.reason || null,
       purpose: t.purpose || t.assigneeText || '',
+      createdBy: t.createdBy || null,
       status: this.outstandingOf(t) > 0 ? 'ACTIVE' : 'RETURNED'
     }));
     const legacyRows = this.assignments().map(a => ({
@@ -1076,6 +1128,7 @@ export class AssetsComponent implements OnInit {
       returnDate: a.returnDate || null,
       conditionOnAssign: a.conditionOnAssign,
       notes: a.notes,
+      createdBy: (a as any).createdBy || null,
       outstanding: 0,
       quantity: 1,
       returnedQty: 0,
@@ -1095,6 +1148,7 @@ export class AssetsComponent implements OnInit {
   );
   asgDevicesOut = computed(() => this.unifiedAssignments().filter(r => r.source === 'ASSET' && r.status === 'ACTIVE').length);
   asgOverdueCount = computed(() => this.unifiedAssignments().filter(r => this.isOverdueRow(r)).length);
+  assignmentKpiFilter = signal<'ALL' | 'ACTIVE' | 'INVENTORY_UNITS' | 'ASSET_DEVICES' | 'OVERDUE'>('ALL');
 
   isOverdueRow(r: any): boolean {
     if (!r || r.status !== 'ACTIVE' || r.source !== 'INVENTORY' || !r.expectedReturnDate) return false;
@@ -1105,10 +1159,11 @@ export class AssetsComponent implements OnInit {
   }
 
   assignmentQuery = signal('');
+  assignmentQuickFilter = signal<'ALL' | 'ACTIVE' | 'DUE_7' | 'OVERDUE'>('ALL');
   reqQuery = signal('');
   isAssignmentFilterOpen = signal(false);
   isRequestFilterOpen = signal(false);
-  assignmentFilters = signal({ dateRange: 'ALL', source: 'ALL', status: 'ALL', employeeId: '', due: 'ALL' });
+  assignmentFilters = signal({ dateRange: 'ALL', assignedFrom: '', assignedTo: '', source: 'ALL', status: 'ALL', employeeId: '', item: '', quantity: 'ALL', condition: 'ALL', due: 'ALL', expectedFrom: '', expectedTo: '' });
   requestFilters = signal({ dateRange: 'ALL', status: 'ALL', requestType: 'ALL', category: '', urgency: 'ALL' });
 
   assignmentFilterEmployees = computed(() => {
@@ -1123,19 +1178,46 @@ export class AssetsComponent implements OnInit {
 
   filteredAssignments = computed(() => {
     const filters = this.assignmentFilters();
-    return this.unifiedAssignments().filter(row => {
+    let assignments = this.unifiedAssignments();
+    switch (this.assignmentKpiFilter()) {
+      case 'ACTIVE': assignments = assignments.filter(row => row.status === 'ACTIVE'); break;
+      case 'INVENTORY_UNITS': assignments = assignments.filter(row => row.source === 'INVENTORY' && row.status === 'ACTIVE'); break;
+      case 'ASSET_DEVICES': assignments = assignments.filter(row => row.source === 'ASSET' && row.status === 'ACTIVE'); break;
+      case 'OVERDUE': assignments = assignments.filter(row => this.isOverdueRow(row)); break;
+    }
+    switch (this.assignmentQuickFilter()) {
+      case 'ACTIVE': assignments = assignments.filter(row => row.status === 'ACTIVE'); break;
+      case 'DUE_7': assignments = assignments.filter(row => {
+        const expected = (row as any).expectedReturnDate;
+        return !!expected && this.isDueWithinDays(expected, 7);
+      }); break;
+      case 'OVERDUE': assignments = assignments.filter(row => this.isOverdueRow(row)); break;
+    }
+    return assignments.filter(row => {
       // Inventory rows have an expected return date; device rows retain their
       // return date. The combined grid intentionally supports both shapes.
       const returnDate = (row as { expectedReturnDate?: string; returnDate?: string }).expectedReturnDate
         || (row as { returnDate?: string }).returnDate;
       if (filters.source !== 'ALL' && row.source !== filters.source) return false;
+      const itemText = `${this.assignmentItemName(row)} ${(row as any).itemAsset?.assetTag || ''}`.toLowerCase();
+      if (filters.item && !itemText.includes(filters.item.toLowerCase().trim())) return false;
       if (filters.employeeId && String(row.employee?.id || '') !== filters.employeeId) return false;
+      const outstandingQty = row.source === 'INVENTORY' ? Number(row.outstanding ?? 0) : 1;
+      if (filters.quantity === 'ONE' && outstandingQty !== 1) return false;
+      if (filters.quantity === 'MULTIPLE' && outstandingQty <= 1) return false;
+      const condition = row.source === 'INVENTORY' ? (row.lastCondition || '') : ((row as any).conditionOnAssign || '');
+      if (filters.condition === 'NOT_RECORDED' && condition) return false;
+      if (filters.condition !== 'ALL' && filters.condition !== 'NOT_RECORDED' && condition !== filters.condition) return false;
       if (filters.status === 'ACTIVE' && row.status !== 'ACTIVE') return false;
       if (filters.status === 'RETURNED' && row.status !== 'RETURNED') return false;
       if (filters.status === 'OVERDUE' && !this.isOverdueRow(row)) return false;
       if (filters.due === 'OVERDUE' && !this.isOverdueRow(row)) return false;
       if (filters.due === 'DUE_7' && (!returnDate || !this.isDueWithinDays(returnDate, 7))) return false;
+      if (filters.due === 'DUE_30' && (!returnDate || !this.isDueWithinDays(returnDate, 30))) return false;
+      if (['THIS_WEEK', 'THIS_MONTH', 'THIS_YEAR'].includes(filters.due) && (!returnDate || !this.matchesInventoryDateRange(returnDate, filters.due))) return false;
       if (filters.due === 'NO_DUE' && returnDate) return false;
+      if (filters.dateRange === 'CUSTOM' && !this.matchesCustomDateRange(row.assignedDate, filters.assignedFrom, filters.assignedTo)) return false;
+      if (filters.due === 'CUSTOM' && !this.matchesCustomDateRange(returnDate, filters.expectedFrom, filters.expectedTo)) return false;
       return this.matchesInventoryDateRange(row.assignedDate, filters.dateRange);
     });
   });
@@ -1152,7 +1234,9 @@ export class AssetsComponent implements OnInit {
   });
 
   get activeAssignmentFilterCount(): number {
-    return Object.values(this.assignmentFilters()).filter(value => value && value !== 'ALL').length;
+    return Object.values(this.assignmentFilters()).filter(value => value && value !== 'ALL').length
+      + (this.assignmentKpiFilter() === 'ALL' ? 0 : 1)
+      + (this.assignmentQuickFilter() === 'ALL' ? 0 : 1);
   }
 
   get activeRequestFilterCount(): number {
@@ -1163,12 +1247,26 @@ export class AssetsComponent implements OnInit {
     this.assignmentFilters.update(filters => ({ ...filters, [field]: value }));
   }
 
+  setAssignmentKpiFilter(filter: 'ALL' | 'ACTIVE' | 'INVENTORY_UNITS' | 'ASSET_DEVICES' | 'OVERDUE') {
+    this.assignmentKpiFilter.set(this.assignmentKpiFilter() === filter ? 'ALL' : filter);
+  }
+
+  setAssignmentQuickFilter(filter: 'ALL' | 'ACTIVE' | 'DUE_7' | 'OVERDUE') {
+    this.assignmentQuickFilter.set(this.assignmentQuickFilter() === filter ? 'ALL' : filter);
+  }
+
   updateRequestFilter(field: string, value: string) {
     this.requestFilters.update(filters => ({ ...filters, [field]: value }));
   }
 
+  setRequestQuickFilter(field: 'status' | 'urgency', value: string) {
+    this.requestFilters.update(filters => ({ ...filters, [field]: filters[field] === value ? 'ALL' : value }));
+  }
+
   clearAssignmentFilters() {
-    this.assignmentFilters.set({ dateRange: 'ALL', source: 'ALL', status: 'ALL', employeeId: '', due: 'ALL' });
+    this.assignmentFilters.set({ dateRange: 'ALL', assignedFrom: '', assignedTo: '', source: 'ALL', status: 'ALL', employeeId: '', item: '', quantity: 'ALL', condition: 'ALL', due: 'ALL', expectedFrom: '', expectedTo: '' });
+    this.assignmentKpiFilter.set('ALL');
+    this.assignmentQuickFilter.set('ALL');
   }
 
   clearRequestFilters() {
@@ -1180,6 +1278,15 @@ export class AssetsComponent implements OnInit {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const end = new Date(today); end.setDate(today.getDate() + days);
     return !isNaN(date.getTime()) && date >= today && date <= end;
+  }
+
+  private matchesCustomDateRange(dateValue: string | undefined | null, from: string, to: string): boolean {
+    if (!dateValue) return false;
+    const date = new Date(dateValue); date.setHours(0, 0, 0, 0);
+    if (isNaN(date.getTime())) return false;
+    if (from) { const start = new Date(from); start.setHours(0, 0, 0, 0); if (date < start) return false; }
+    if (to) { const end = new Date(to); end.setHours(23, 59, 59, 999); if (date > end) return false; }
+    return !!(from || to);
   }
 
   asgRowHeight = (params: any): number => {
@@ -1215,6 +1322,16 @@ export class AssetsComponent implements OnInit {
     return assignment?.source === 'INVENTORY' ? assignment.itemName : assignment?.itemAsset?.name || 'Asset';
   }
 
+  assignmentLocation(assignment: any): string | null {
+    const match = String(assignment?.purpose || assignment?.notes || '').match(/(?:^|\n)Assignment location:\s*(.+)/i);
+    return match?.[1]?.trim() || null;
+  }
+
+  assignmentNotes(assignment: any): string | null {
+    const details = String(assignment?.purpose || assignment?.notes || '').trim();
+    return details || null;
+  }
+
   returnAssignmentFromDetail() {
     const row = this.selectedAssignment();
     if (!row || row.status !== 'ACTIVE' || !this.isAdmin()) return;
@@ -1242,6 +1359,14 @@ export class AssetsComponent implements OnInit {
   }
 
   assignmentsColDefs: ColDef[] = [
+    {
+      headerName: 'Inventory No.',
+      field: 'inventorySerial',
+      minWidth: 145,
+      width: 145,
+      valueGetter: (p: any) => p.data?.source === 'INVENTORY' ? (p.data?.inventorySerial || '-') : (p.data?.itemAsset?.assetTag || '-'),
+      cellRenderer: (params: any) => `<span class="tag-mono inventory-serial">${params.value || '-'}</span>`
+    },
     {
       headerName: 'Item / Asset',
       field: 'itemName',
@@ -1295,11 +1420,11 @@ export class AssetsComponent implements OnInit {
           : `<div class="avatar-circle-sm">${initial}</div>`;
 
         return `
-          <a class="cell-user-avatar-row employee-profile-link" href="/employees/${emp.id}/profile" onclick="event.stopPropagation()" title="View ${fullName}'s profile">
+          <a class="cell-user-avatar-row employee-profile-link" href="/employees/${emp.id}/profile" onclick="event.stopPropagation()" title="View ${fullName}'s profile" style="color:#111111 !important;text-decoration:none !important;">
             ${avatarHtml}
             <div class="user-text-stack">
-              <div class="cell-title-bold">${fullName}</div>
-              <div class="user-dept">${dept}</div>
+              <div class="cell-title-bold" style="color:#111111 !important;text-decoration:none !important;">${fullName}</div>
+              <div class="user-dept" style="color:#111111 !important;text-decoration:none !important;">${dept}</div>
             </div>
           </a>
         `;
@@ -1318,7 +1443,6 @@ export class AssetsComponent implements OnInit {
       field: 'quantity',
       flex: 0.7,
       minWidth: 80,
-      type: 'rightAligned',
       valueGetter: (p: any) => {
         const d = p.data;
         if (!d) return '';
@@ -1397,6 +1521,7 @@ export class AssetsComponent implements OnInit {
       pinned: 'right',
       cellRenderer: AssetActionCellRendererComponent,
       cellRendererParams: {
+        onViewDetails: (row: any) => this.openAssignmentDetail(row),
         onEdit: (row: any) => this.openEditAssignment(row),
         canEdit: (row: any) => !!row && row.source === 'ASSET' && row.status === 'ACTIVE' && this.isAdmin(),
         editLabel: 'Edit assignment',
@@ -1438,11 +1563,11 @@ export class AssetsComponent implements OnInit {
         const profileUrl = emp.id ? `/employees/${emp.id}/profile` : '';
 
         return `
-          <a class="cell-user-avatar-row employee-profile-link" href="${profileUrl}" onclick="event.stopPropagation()" title="View ${emp.firstName} ${emp.lastName}'s profile" style="display:flex;align-items:center;gap:9px;min-width:0;line-height:1.2;color:inherit;text-decoration:none;">
+          <a class="cell-user-avatar-row employee-profile-link" href="${profileUrl}" onclick="event.stopPropagation()" title="View ${emp.firstName} ${emp.lastName}'s profile" style="display:flex;align-items:center;gap:9px;min-width:0;line-height:1.2;color:#111111 !important;text-decoration:none !important;">
             ${avatarHtml}
             <div class="user-text-stack" style="min-width:0;display:flex;flex-direction:column;gap:2px;">
-              <div class="cell-title-bold" style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${emp.firstName} ${emp.lastName}</div>
-              <div class="user-dept" style="font-size:10.5px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${emp.department?.name || 'Employee'}</div>
+              <div class="cell-title-bold" style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#111111 !important;text-decoration:none !important;">${emp.firstName} ${emp.lastName}</div>
+              <div class="user-dept" style="font-size:10.5px;color:#111111 !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none !important;">${emp.department?.name || 'Employee'}</div>
             </div>
           </a>
         `;
@@ -2220,7 +2345,8 @@ export class AssetsComponent implements OnInit {
       date: new Date().toISOString().split('T')[0],
       assignmentLocation: '',
       expectedReturnDate: '',
-      purpose: ''
+      purpose: '',
+      assignmentImageUrl: ''
     };
     this.invAssignError.set('');
     this.isInvAssignOpen.set(true);
@@ -2258,6 +2384,7 @@ export class AssetsComponent implements OnInit {
       date: f.date || new Date().toISOString().split('T')[0],
       purpose: f.purpose,
       assignmentLocation: f.assignmentLocation?.trim() || undefined,
+      assignmentImageUrl: f.assignmentImageUrl || undefined,
       clientDetails: f.mode === 'CLIENT'
         ? [
             `Client contact: ${f.clientName.trim()}`,
@@ -2288,6 +2415,41 @@ export class AssetsComponent implements OnInit {
         this.invAssignSubmitting.set(false);
       }
     });
+  }
+
+  onInvAssignmentImageSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      this.toast.error('Please choose an image file');
+      input.value = '';
+      return;
+    }
+    if (file.size > this.maxUploadFileSizeBytes) {
+      this.toast.error(`"${file.name}" is too large. Maximum allowed size is ${this.maxUploadFileSizeMb}MB.`);
+      input.value = '';
+      return;
+    }
+    this.invAssignImageUploading.set(true);
+    this.uploadService.uploadFile(file).subscribe({
+      next: (res) => {
+        if (res?.url) {
+          this.invAssignForm.assignmentImageUrl = res.url;
+          this.toast.success('Assignment photo uploaded');
+        }
+        this.invAssignImageUploading.set(false);
+      },
+      error: (err) => {
+        this.toast.error(this.getUploadErrorMessage(err, file.name));
+        this.invAssignImageUploading.set(false);
+      }
+    });
+    input.value = '';
+  }
+
+  removeInvAssignmentImage() {
+    this.invAssignForm.assignmentImageUrl = '';
   }
 
   // ==========================================
@@ -2652,22 +2814,113 @@ export class AssetsComponent implements OnInit {
     this.editingAssignmentId.set(null);
     this.editingAssignmentAsset.set(null);
     this.assignForm = {
+      assignmentSource: assetId ? 'ASSET' : 'INVENTORY',
       assetId: assetId || (this.availableAssets()[0]?.id || 0),
+      inventoryItemId: assetId ? 0 : (this.inventoryItems()[0]?.id || 0),
+      quantity: 1,
       employeeId: this.employees()[0]?.id || 0,
+      recipientType: 'EMPLOYEE',
+      personOrLocation: '',
+      clientName: '',
+      clientCompany: '',
+      clientEmail: '',
+      clientPhone: '',
+      assignmentLocation: '',
+      expectedReturnDate: '',
       assignedDate: new Date().toISOString().split('T')[0],
       conditionOnAssign: 'GOOD',
-      notes: ''
+      notes: '',
+      assetImageUrl: ''
     };
+    this.isAssignmentItemPickerOpen.set(false);
     this.isAssignDrawerOpen.set(true);
   }
 
+  assignmentPickerLabel(): string {
+    if (this.assignForm.assignmentSource === 'INVENTORY') {
+      return this.inventoryItems().find(i => i.id === Number(this.assignForm.inventoryItemId))?.name || 'Select an inventory item';
+    }
+    const asset = this.assets().find(a => a.id === Number(this.assignForm.assetId));
+    return asset ? `[${asset.assetTag}] ${asset.name}` : 'Select a tracked device';
+  }
+
+  assignmentInventoryAvailable(): number {
+    return this.inventoryItems().find(i => i.id === Number(this.assignForm.inventoryItemId))?.available || 0;
+  }
+
+  selectAssignmentInventoryItem(item: InventoryItem) {
+    if (item.available < 1) return;
+    this.assignForm.assignmentSource = 'INVENTORY';
+    this.assignForm.inventoryItemId = item.id;
+    this.assignForm.quantity = Math.min(Math.max(1, Number(this.assignForm.quantity) || 1), item.available);
+    this.isAssignmentItemPickerOpen.set(false);
+  }
+
+  selectAssignmentTrackedAsset(asset: Asset) {
+    this.assignForm.assignmentSource = 'ASSET';
+    this.assignForm.assetId = asset.id;
+    this.isAssignmentItemPickerOpen.set(false);
+  }
+
   submitAssign() {
-    if (!this.assignForm.assetId || !this.assignForm.employeeId) {
-      this.toast.error('Please select both an Asset and an Employee');
+    const form = this.assignForm;
+    if (form.assignmentSource === 'INVENTORY') {
+      const item = this.inventoryItems().find(i => i.id === Number(form.inventoryItemId));
+      const quantity = Number(form.quantity);
+      if (!item) { this.toast.error('Please select an inventory item'); return; }
+      if (!item.available) { this.toast.error('This inventory item is out of stock'); return; }
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > item.available) { this.toast.error(`Enter a quantity from 1 to ${item.available}`); return; }
+      if (form.recipientType === 'EMPLOYEE' && !form.employeeId) { this.toast.error('Please select an employee'); return; }
+      if (form.recipientType === 'LOCATION' && !form.personOrLocation.trim()) { this.toast.error('Please enter the person or location'); return; }
+      if (form.recipientType === 'CLIENT' && (!form.clientName.trim() || !form.clientCompany.trim())) { this.toast.error('Please enter both the client name and company name'); return; }
+      const payload: any = {
+        quantity, date: form.assignedDate, expectedReturnDate: form.expectedReturnDate || undefined,
+        assignmentLocation: form.assignmentLocation.trim() || undefined, purpose: form.notes.trim() || undefined,
+        assignmentImageUrl: form.assetImageUrl || undefined,
+        clientDetails: form.recipientType === 'CLIENT' ? [
+          `Client contact: ${form.clientName.trim()}`,
+          form.clientCompany.trim() ? `Company: ${form.clientCompany.trim()}` : '',
+          form.clientEmail.trim() ? `Email: ${form.clientEmail.trim()}` : '',
+          form.clientPhone.trim() ? `Phone: ${form.clientPhone.trim()}` : ''
+        ].filter(Boolean).join(' | ') : undefined
+      };
+      if (form.recipientType === 'EMPLOYEE') payload.employeeId = Number(form.employeeId);
+      else payload.assigneeText = form.recipientType === 'CLIENT' ? `Client: ${form.clientName.trim()}${form.clientCompany.trim() ? ` · ${form.clientCompany.trim()}` : ''}` : form.personOrLocation.trim();
+      this.assetService.assignInventoryItem(item.id, payload).subscribe({
+        next: () => { this.toast.success('Inventory item assigned successfully'); this.isAssignDrawerOpen.set(false); this.refreshInventoryData(); this.loadAllData(); },
+        error: err => this.toast.error(err.error?.message || 'Failed to assign inventory item')
+      });
+      return;
+    }
+    if (!form.assetId || !form.employeeId) {
+      this.toast.error('Please select both an asset and a responsible employee');
+      return;
+    }
+    if (form.recipientType === 'LOCATION' && !form.personOrLocation.trim()) {
+      this.toast.error('Please enter the person or location');
+      return;
+    }
+    if (form.recipientType === 'CLIENT' && (!form.clientName.trim() || !form.clientCompany.trim())) {
+      this.toast.error('Please enter both the client name and company name');
       return;
     }
 
-    this.assetService.assignAsset(this.assignForm).subscribe({
+    const assignmentDetails = [
+      form.recipientType === 'LOCATION' ? `Person / Location: ${form.personOrLocation.trim()}` : '',
+      form.recipientType === 'CLIENT' ? `Client: ${form.clientName.trim()}${form.clientCompany.trim() ? ` (${form.clientCompany.trim()})` : ''}${form.clientEmail.trim() ? ` · Email: ${form.clientEmail.trim()}` : ''}${form.clientPhone.trim() ? ` · Phone: ${form.clientPhone.trim()}` : ''}` : '',
+      form.assignmentLocation.trim() ? `Assignment location: ${form.assignmentLocation.trim()}` : '',
+      form.expectedReturnDate ? `Expected return: ${form.expectedReturnDate}` : ''
+    ].filter(Boolean);
+    const notes = [form.notes.trim(), ...assignmentDetails].filter(Boolean).join('\n');
+
+    this.assetService.assignAsset({
+      assetId: form.assetId,
+      employeeId: form.employeeId,
+      assignedDate: form.assignedDate,
+      conditionOnAssign: form.conditionOnAssign,
+      notes,
+      assetImageUrl: form.assetImageUrl
+    }).subscribe({
       next: () => {
         this.toast.success('Asset assigned successfully');
         this.isAssignDrawerOpen.set(false);
@@ -2677,16 +2930,58 @@ export class AssetsComponent implements OnInit {
     });
   }
 
+  onAssetAssignmentImageSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      this.toast.error('Please choose an image file');
+      input.value = '';
+      return;
+    }
+    if (file.size > this.maxUploadFileSizeBytes) {
+      this.toast.error(`"${file.name}" is too large. Maximum allowed size is ${this.maxUploadFileSizeMb}MB.`);
+      input.value = '';
+      return;
+    }
+    this.uploadService.uploadFile(file).subscribe({
+      next: (res) => {
+        if (res?.url) {
+          this.assignForm.assetImageUrl = res.url;
+          this.toast.success('Asset photo uploaded');
+        }
+      },
+      error: (err) => this.toast.error(this.getUploadErrorMessage(err, file.name))
+    });
+    input.value = '';
+  }
+
+  removeAssetAssignmentImage() {
+    this.assignForm.assetImageUrl = '';
+  }
+
   openEditAssignment(assignment: any) {
     if (!assignment || assignment.source !== 'ASSET' || assignment.status !== 'ACTIVE') return;
     this.editingAssignmentId.set(assignment.id);
     this.editingAssignmentAsset.set(assignment.itemAsset || this.assets().find(asset => asset.id === assignment.assetId) || null);
     this.assignForm = {
+      assignmentSource: 'ASSET',
       assetId: assignment.assetId,
+      inventoryItemId: 0,
+      quantity: 1,
       employeeId: assignment.employeeId,
+      recipientType: 'EMPLOYEE',
+      personOrLocation: '',
+      clientName: '',
+      clientCompany: '',
+      clientEmail: '',
+      clientPhone: '',
+      assignmentLocation: '',
+      expectedReturnDate: '',
       assignedDate: this.toDateInput(assignment.assignedDate),
       conditionOnAssign: assignment.conditionOnAssign || 'GOOD',
-      notes: assignment.notes || ''
+      notes: assignment.notes || '',
+      assetImageUrl: ''
     };
     this.isAssignDrawerOpen.set(true);
   }
@@ -2799,6 +3094,10 @@ export class AssetsComponent implements OnInit {
       urgency: 'MEDIUM',
       subject: '',
       reason: '',
+      neededBy: '',
+      workLocation: '',
+      preferredSpecs: '',
+      budget: '',
       images: []
     };
     this.isRequestDrawerOpen.set(true);
@@ -2819,6 +3118,10 @@ export class AssetsComponent implements OnInit {
       urgency: data.urgency || 'MEDIUM',
       subject: data.subject || '',
       reason: data.reason || '',
+      neededBy: data.requestDetails?.neededBy || '',
+      workLocation: data.requestDetails?.workLocation || '',
+      preferredSpecs: data.requestDetails?.preferredSpecs || '',
+      budget: data.requestDetails?.budget || '',
       images: [...imgs]
     };
     this.isRequestDrawerOpen.set(true);

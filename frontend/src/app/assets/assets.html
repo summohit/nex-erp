@@ -8,16 +8,12 @@
       <p class="page-subtitle">
         {{ activeTab() === 'inventory' ? 'Track and manage all purchased items'
            : activeTab() === 'assignments' ? 'Items and devices currently issued across the company'
-           : 'Manage company IT inventory, track device assignments, and process hardware requests.' }}
+           : 'Review employee requests, prioritise urgent needs, and track fulfilment.' }}
       </p>
     </div>
     <div class="header-actions">
       <!-- Inventory tab actions -->
       <ng-container *ngIf="isAdmin() && activeTab() === 'inventory'">
-        <div class="search-box search-box-sm">
-          <svg lucideSearch size="15" class="search-icon"></svg>
-          <input type="text" placeholder="Search inventory..." [(ngModel)]="searchQuery">
-        </div>
         <button class="btn btn-outline inventory-filter-trigger" (click)="isInventoryFilterOpen.set(true)">
           <svg lucideFilter size="16"></svg>
           <span>Filters</span>
@@ -37,13 +33,13 @@
 
       <!-- Assignments tab actions -->
       <ng-container *ngIf="isAdmin() && activeTab() === 'assignments'">
-        <div class="search-box search-box-sm">
-          <svg lucideSearch size="15" class="search-icon"></svg>
-          <input type="text" placeholder="Search assignments..." [(ngModel)]="assignmentQuery">
-        </div>
         <button class="btn btn-outline inventory-filter-trigger" (click)="isAssignmentFilterOpen.set(true)">
           <svg lucideFilter size="16"></svg><span>Filters</span>
           <span class="filter-count" *ngIf="activeAssignmentFilterCount">{{ activeAssignmentFilterCount }}</span>
+        </button>
+        <button class="btn btn-primary" (click)="openAssignDrawer()">
+          <svg lucidePlus size="16"></svg>
+          <span>Assign Asset</span>
         </button>
       </ng-container>
 
@@ -95,9 +91,10 @@
     <aside class="drawer-panel inventory-filter-drawer" (click)="$event.stopPropagation()" aria-label="Assignment filters">
       <div class="drawer-header inventory-filter-header"><div><h3>Filter Assignments</h3><p>Focus on the assignments that need attention.</p></div><button class="btn-close" (click)="isAssignmentFilterOpen.set(false)" aria-label="Close filters"><svg lucideX size="18"></svg></button></div>
       <div class="drawer-body inventory-filter-body">
-        <div class="filter-section"><span class="filter-section-label">Assignment date</span><label class="form-label">Show assignments from</label><select class="form-control" [ngModel]="assignmentFilters().dateRange" (ngModelChange)="updateAssignmentFilter('dateRange', $event)"><option value="ALL">All time</option><option value="TODAY">Today</option><option value="LAST_7_DAYS">Last week</option><option value="THIS_MONTH">This month</option><option value="LAST_MONTH">Last month</option><option value="LAST_60_DAYS">Last 60 days</option><option value="LAST_90_DAYS">Last 90 days</option><option value="LAST_YEAR">Last 1 year</option></select></div>
-        <div class="filter-section"><span class="filter-section-label">Assignment details</span><div class="form-group"><label class="form-label">Assigned employee</label><select class="form-control" [ngModel]="assignmentFilters().employeeId" (ngModelChange)="updateAssignmentFilter('employeeId', $event)"><option value="">All employees</option><option *ngFor="let employee of assignmentFilterEmployees()" [value]="employee.id">{{ employee.firstName }} {{ employee.lastName }}</option></select></div><div class="form-group"><label class="form-label">Assignment source</label><select class="form-control" [ngModel]="assignmentFilters().source" (ngModelChange)="updateAssignmentFilter('source', $event)"><option value="ALL">All sources</option><option value="INVENTORY">Inventory items</option><option value="ASSET">Tracked devices</option></select></div><div class="form-group"><label class="form-label">Status</label><select class="form-control" [ngModel]="assignmentFilters().status" (ngModelChange)="updateAssignmentFilter('status', $event)"><option value="ALL">All statuses</option><option value="ACTIVE">Assigned</option><option value="RETURNED">Returned</option><option value="OVERDUE">Overdue</option></select></div></div>
-        <div class="filter-section"><span class="filter-section-label">Return schedule</span><label class="form-label">Expected return</label><select class="form-control" [ngModel]="assignmentFilters().due" (ngModelChange)="updateAssignmentFilter('due', $event)"><option value="ALL">Any due date</option><option value="OVERDUE">Overdue</option><option value="DUE_7">Due in the next 7 days</option><option value="NO_DUE">No due date recorded</option></select></div>
+        <div class="filter-section"><span class="filter-section-label">Item &amp; recipient</span><div class="form-group"><label class="form-label">Item / Asset</label><input class="form-control" [ngModel]="assignmentFilters().item" (ngModelChange)="updateAssignmentFilter('item', $event)" placeholder="Search item or asset tag"></div><div class="form-group"><label class="form-label">Assigned employee</label><select class="form-control" [ngModel]="assignmentFilters().employeeId" (ngModelChange)="updateAssignmentFilter('employeeId', $event)"><option value="">All employees</option><option *ngFor="let employee of assignmentFilterEmployees()" [value]="employee.id">{{ employee.firstName }} {{ employee.lastName }}</option></select></div><div class="form-group"><label class="form-label">Assignment source</label><select class="form-control" [ngModel]="assignmentFilters().source" (ngModelChange)="updateAssignmentFilter('source', $event)"><option value="ALL">All sources</option><option value="INVENTORY">Inventory items</option><option value="ASSET">Tracked devices</option></select></div></div>
+        <div class="filter-section"><span class="filter-section-label">Assigned date</span><label class="form-label">Show assignments from</label><select class="form-control" [ngModel]="assignmentFilters().dateRange" (ngModelChange)="updateAssignmentFilter('dateRange', $event)"><option value="ALL">All dates</option><option value="TODAY">Today</option><option value="THIS_WEEK">This week</option><option value="LAST_7_DAYS">Last week</option><option value="THIS_MONTH">This month</option><option value="LAST_MONTH">Last month</option><option value="THIS_YEAR">This year</option><option value="LAST_60_DAYS">Last 60 days</option><option value="LAST_90_DAYS">Last 90 days</option><option value="LAST_YEAR">Last 1 year</option><option value="CUSTOM">Custom range</option></select><div class="filter-date-row" *ngIf="assignmentFilters().dateRange === 'CUSTOM'"><input type="date" class="form-control" [ngModel]="assignmentFilters().assignedFrom" (ngModelChange)="updateAssignmentFilter('assignedFrom', $event)" aria-label="Assigned from date"><input type="date" class="form-control" [ngModel]="assignmentFilters().assignedTo" (ngModelChange)="updateAssignmentFilter('assignedTo', $event)" aria-label="Assigned to date"></div></div>
+        <div class="filter-section"><span class="filter-section-label">Quantity &amp; condition</span><div class="form-group"><label class="form-label">Quantity</label><select class="form-control" [ngModel]="assignmentFilters().quantity" (ngModelChange)="updateAssignmentFilter('quantity', $event)"><option value="ALL">Any quantity</option><option value="ONE">1 unit / device</option><option value="MULTIPLE">More than 1 unit</option></select></div><div class="form-group"><label class="form-label">Condition</label><select class="form-control" [ngModel]="assignmentFilters().condition" (ngModelChange)="updateAssignmentFilter('condition', $event)"><option value="ALL">Any condition</option><option value="BRAND_NEW">Brand new</option><option value="GOOD">Good</option><option value="FAIR">Fair</option><option value="NOT_RECORDED">Not recorded</option></select></div><div class="form-group"><label class="form-label">Status</label><select class="form-control" [ngModel]="assignmentFilters().status" (ngModelChange)="updateAssignmentFilter('status', $event)"><option value="ALL">All statuses</option><option value="ACTIVE">Assigned</option><option value="RETURNED">Returned</option><option value="OVERDUE">Overdue</option></select></div></div>
+        <div class="filter-section"><span class="filter-section-label">Return / expected date</span><label class="form-label">Expected return</label><select class="form-control" [ngModel]="assignmentFilters().due" (ngModelChange)="updateAssignmentFilter('due', $event)"><option value="ALL">Any due date</option><option value="OVERDUE">Overdue</option><option value="THIS_WEEK">This week</option><option value="THIS_MONTH">This month</option><option value="THIS_YEAR">This year</option><option value="DUE_7">Due in the next 7 days</option><option value="DUE_30">Due in the next 30 days</option><option value="NO_DUE">No due date recorded</option><option value="CUSTOM">Custom range</option></select><div class="filter-date-row" *ngIf="assignmentFilters().due === 'CUSTOM'"><input type="date" class="form-control" [ngModel]="assignmentFilters().expectedFrom" (ngModelChange)="updateAssignmentFilter('expectedFrom', $event)" aria-label="Expected from date"><input type="date" class="form-control" [ngModel]="assignmentFilters().expectedTo" (ngModelChange)="updateAssignmentFilter('expectedTo', $event)" aria-label="Expected to date"></div></div>
       </div>
       <div class="drawer-footer inventory-filter-footer"><button class="btn btn-outline" (click)="clearAssignmentFilters()">Clear all</button><button class="btn btn-primary" (click)="isAssignmentFilterOpen.set(false)">Show {{ filteredAssignments().length }} assignments</button></div>
     </aside>
@@ -121,11 +118,11 @@
       <span class="kpi-label">Total Items</span>
       <h3 class="kpi-value">{{ invTotalItems() }}</h3>
     </button>
-    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="inventoryKpiFilter() === 'ALL'" (click)="setInventoryKpiFilter('ALL')" title="Show all inventory items">
+    <div class="kpi-card inventory-summary-card" title="Total quantity across inventory">
       <span class="kpi-icon-box kpi-icon-sm bg-purple-tint"><svg lucideLayers size="17" class="text-purple"></svg></span>
       <span class="kpi-label">Total Units</span>
       <h3 class="kpi-value">{{ invTotalUnits() }}</h3>
-    </button>
+    </div>
     <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="inventoryKpiFilter() === 'AVAILABLE'" (click)="setInventoryKpiFilter('AVAILABLE')" title="Show items with available stock">
       <span class="kpi-icon-box kpi-icon-sm bg-green-tint"><svg lucideCheckCircle size="17" class="text-green"></svg></span>
       <span class="kpi-label">Available</span>
@@ -159,27 +156,46 @@
   </div>
 
   <!-- Assignments Summary Cards -->
-  <div class="kpi-grid inv-kpi-grid" *ngIf="isAdmin() && activeTab() === 'assignments'">
-    <div class="kpi-card">
+  <div class="kpi-grid inv-kpi-grid assignment-kpi-grid" *ngIf="isAdmin() && activeTab() === 'assignments'">
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="assignmentKpiFilter() === 'ACTIVE'" (click)="setAssignmentKpiFilter('ACTIVE')" title="Show all active assignments">
       <span class="kpi-icon-box kpi-icon-sm bg-blue-tint"><svg lucideUserCheck size="17" class="text-blue"></svg></span>
       <span class="kpi-label">Active Assignments</span>
       <h3 class="kpi-value">{{ asgActiveCount() }}</h3>
-    </div>
-    <div class="kpi-card">
+      <span class="assignment-kpi-detail">Currently in use</span>
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="assignmentKpiFilter() === 'INVENTORY_UNITS'" (click)="setAssignmentKpiFilter('INVENTORY_UNITS')" title="Show active inventory assignments">
       <span class="kpi-icon-box kpi-icon-sm bg-purple-tint"><svg lucideLayers size="17" class="text-purple"></svg></span>
       <span class="kpi-label">Units Out</span>
       <h3 class="kpi-value">{{ asgUnitsOut() }}</h3>
-    </div>
-    <div class="kpi-card">
+      <span class="assignment-kpi-detail">Inventory items issued</span>
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="assignmentKpiFilter() === 'ASSET_DEVICES'" (click)="setAssignmentKpiFilter('ASSET_DEVICES')" title="Show active device assignments">
       <span class="kpi-icon-box kpi-icon-sm bg-green-tint"><svg lucideLaptop size="17" class="text-green"></svg></span>
       <span class="kpi-label">Devices Assigned</span>
       <h3 class="kpi-value">{{ asgDevicesOut() }}</h3>
-    </div>
-    <div class="kpi-card">
+      <span class="assignment-kpi-detail">Tracked equipment</span>
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card" [class.active-filter]="assignmentKpiFilter() === 'OVERDUE'" (click)="setAssignmentKpiFilter('OVERDUE')" title="Show overdue returns">
       <span class="kpi-icon-box kpi-icon-sm bg-rose-tint"><svg lucideAlertTriangle size="17" class="text-rose"></svg></span>
       <span class="kpi-label">Overdue Returns</span>
       <h3 class="kpi-value">{{ asgOverdueCount() }}</h3>
-    </div>
+      <span class="assignment-kpi-detail" [class.is-clear]="asgOverdueCount() === 0">{{ asgOverdueCount() === 0 ? 'All returns on time' : 'Needs attention' }}</span>
+    </button>
+  </div>
+
+  <div class="kpi-grid request-kpi-grid" *ngIf="activeTab() === 'requests'">
+    <button type="button" class="kpi-card kpi-filter-card request-kpi-card" [class.active-filter]="requestFilters().status === 'PENDING'" (click)="setRequestQuickFilter('status', 'PENDING')">
+      <span class="kpi-icon-box kpi-icon-sm bg-purple-tint"><svg lucideClock size="17" class="text-purple"></svg></span>
+      <span class="kpi-label">Awaiting Review</span><h3 class="kpi-value">{{ pendingRequestsCount() }}</h3><span class="assignment-kpi-detail">Needs a decision</span>
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card request-kpi-card" [class.active-filter]="requestFilters().urgency === 'HIGH'" (click)="setRequestQuickFilter('urgency', 'HIGH')">
+      <span class="kpi-icon-box kpi-icon-sm bg-rose-tint"><svg lucideAlertTriangle size="17" class="text-rose"></svg></span>
+      <span class="kpi-label">High Priority</span><h3 class="kpi-value">{{ highPriorityRequestsCount() }}</h3><span class="assignment-kpi-detail">Pending urgent needs</span>
+    </button>
+    <button type="button" class="kpi-card kpi-filter-card request-kpi-card" [class.active-filter]="requestFilters().status === 'FULFILLED'" (click)="setRequestQuickFilter('status', 'FULFILLED')">
+      <span class="kpi-icon-box kpi-icon-sm bg-green-tint"><svg lucideCheckCircle size="17" class="text-green"></svg></span>
+      <span class="kpi-label">Fulfilled</span><h3 class="kpi-value">{{ fulfilledRequestsCount() }}</h3><span class="assignment-kpi-detail">Completed requests</span>
+    </button>
   </div>
 
   <!-- Navigation Tabs -->
@@ -214,6 +230,20 @@
   <!-- Tab 1: Inventory -->
   <div class="tab-content" *ngIf="isAdmin() && activeTab() === 'inventory'">
     <div class="section-card">
+      <div class="assignment-table-toolbar inventory-table-toolbar" *ngIf="inventoryPage() === 'STOCK' && inventoryViewMode() === 'grouped' && inventoryItems().length > 0">
+        <div class="assignment-toolbar-main">
+          <div class="search-box assignment-table-search">
+            <svg lucideSearch size="16" class="search-icon"></svg>
+            <input type="text" placeholder="Search inventory..." [(ngModel)]="searchQuery">
+          </div>
+          <div class="assignment-quick-filters" aria-label="Quick inventory filters">
+            <button type="button" class="quick-filter-chip" [class.active]="inventoryFilters().stock === 'AVAILABLE'" (click)="updateInventoryFilter('stock', inventoryFilters().stock === 'AVAILABLE' ? 'ALL' : 'AVAILABLE')">Available</button>
+            <button type="button" class="quick-filter-chip" [class.active]="inventoryFilters().stock === 'LOW_STOCK'" (click)="updateInventoryFilter('stock', inventoryFilters().stock === 'LOW_STOCK' ? 'ALL' : 'LOW_STOCK')">Low stock</button>
+            <button type="button" class="quick-filter-chip quick-filter-warning" [class.active]="inventoryFilters().stock === 'OUT_OF_STOCK'" (click)="updateInventoryFilter('stock', inventoryFilters().stock === 'OUT_OF_STOCK' ? 'ALL' : 'OUT_OF_STOCK')">Out of stock</button>
+          </div>
+        </div>
+        <button type="button" class="clear-table-filters" (click)="clearInventoryFilters()" *ngIf="searchQuery() || activeInventoryFilterCount">Clear filters</button>
+      </div>
       <!-- Compact empty state (replaces oversized blank grid) -->
       <div class="inv-empty" *ngIf="!inventoryLoading() && ((inventoryViewMode() === 'grouped' && inventoryItems().length === 0) || (inventoryViewMode() === 'tracked' && trackedAssetsInInventory().length === 0))">
         <div class="inv-empty-icon bg-blue-tint"><svg lucidePackage size="24" class="text-blue"></svg></div>
@@ -286,6 +316,23 @@
   <!-- Tab 2: Assignments -->
   <div class="tab-content" *ngIf="isAdmin() && activeTab() === 'assignments'">
     <div class="section-card">
+      <div class="assignment-table-toolbar" *ngIf="unifiedAssignments().length > 0">
+        <div class="assignment-toolbar-main">
+          <div class="search-box assignment-table-search">
+            <svg lucideSearch size="16" class="search-icon"></svg>
+            <input type="text" placeholder="Search item, asset, employee..." [(ngModel)]="assignmentQuery">
+          </div>
+          <div class="assignment-quick-filters" aria-label="Quick assignment filters">
+            <button type="button" class="quick-filter-chip" [class.active]="assignmentQuickFilter() === 'ACTIVE'" (click)="setAssignmentQuickFilter('ACTIVE')">Active</button>
+            <button type="button" class="quick-filter-chip" [class.active]="assignmentQuickFilter() === 'DUE_7'" (click)="setAssignmentQuickFilter('DUE_7')">Due in 7 days</button>
+            <button type="button" class="quick-filter-chip quick-filter-warning" [class.active]="assignmentQuickFilter() === 'OVERDUE'" (click)="setAssignmentQuickFilter('OVERDUE')">Overdue</button>
+          </div>
+        </div>
+        <div class="assignment-toolbar-end">
+          <button type="button" class="clear-table-filters" (click)="clearAssignmentFilters(); assignmentQuery.set('')" *ngIf="assignmentQuery() || activeAssignmentFilterCount">Clear filters</button>
+          <span class="assignment-table-count">{{ filteredAssignments().length }} shown</span>
+        </div>
+      </div>
       <!-- Compact empty state -->
       <div class="inv-empty" *ngIf="unifiedAssignments().length === 0">
         <div class="inv-empty-icon bg-blue-tint"><svg lucideUserCheck size="24" class="text-blue"></svg></div>
@@ -378,7 +425,10 @@
           <svg lucideSearch size="16" class="search-icon"></svg>
           <input type="text" placeholder="Search by employee, subject or category..." [(ngModel)]="reqQuery">
         </div>
-        <span class="request-search-hint">Click a row to view its complete request</span>
+        <div class="request-search-actions">
+          <button type="button" class="clear-table-filters" *ngIf="reqQuery() || activeRequestFilterCount" (click)="clearRequestFilters(); reqQuery.set('')">Clear filters</button>
+          <span class="request-search-hint">{{ filteredRequests().length }} shown · click a row for full details</span>
+        </div>
       </div>
 
       <ag-grid-angular
@@ -476,10 +526,21 @@
       <section class="assignment-detail-section">
         <span class="request-section-label">Assignment details</span>
         <div class="request-meta-grid">
+          <div><span>Inventory number</span><b>{{ assignment.source === 'INVENTORY' ? (assignment.inventorySerial || 'Not recorded') : (assignment.itemAsset?.assetTag || 'Not recorded') }}</b></div>
           <div><span>{{ assignment.source === 'INVENTORY' ? 'Item category' : 'Asset tag' }}</span><b>{{ assignment.source === 'INVENTORY' ? (assignment.category || '—') : (assignment.itemAsset?.assetTag || '—') }}</b></div>
           <div><span>Quantity</span><b>{{ assignment.source === 'INVENTORY' ? ((assignment.outstanding || 0) + ' of ' + (assignment.quantity || 0)) : '1 device' }}</b></div>
           <div><span>Assigned on</span><b>{{ fmtDate(assignment.assignedDate) }}</b></div>
+          <div><span>Condition on issue</span><b>{{ (assignment.source === 'INVENTORY' ? assignment.lastCondition : assignment.conditionOnAssign) || 'Not recorded' }}</b></div>
+          <div><span>Created by</span><b>{{ assignment.createdBy?.email || 'Not recorded' }}</b></div>
           <div><span>{{ assignment.source === 'INVENTORY' ? 'Expected return' : 'Returned on' }}</span><b>{{ fmtDate(assignment.source === 'INVENTORY' ? assignment.expectedReturnDate : assignment.returnDate) }}</b></div>
+        </div>
+      </section>
+
+      <section class="assignment-detail-section">
+        <span class="request-section-label">Handover information</span>
+        <div class="request-meta-grid assignment-handover-grid">
+          <div><span>Assigned to / recipient</span><b>{{ assignment.assigneeText || (assignment.employee ? (assignment.employee.firstName + ' ' + assignment.employee.lastName) : 'Not recorded') }}</b></div>
+          <div><span>Assignment location</span><b>{{ assignmentLocation(assignment) || 'Not recorded' }}</b></div>
         </div>
       </section>
 
@@ -496,9 +557,18 @@
         <div class="assignment-return-progress"><span>{{ assignment.returnedQty }} returned</span><b>{{ assignment.outstanding }} still assigned</b></div>
       </section>
 
-      <section class="assignment-detail-section" *ngIf="assignment.notes || assignment.purpose">
-        <span class="request-section-label">Notes</span>
-        <p class="request-description">{{ assignment.notes || assignment.purpose }}</p>
+      <section class="assignment-detail-section">
+        <span class="request-section-label">Asset photo</span>
+        <button type="button" class="assignment-detail-photo" *ngIf="assignment.assignmentImageUrl" (click)="openImageViewer([assignment.assignmentImageUrl], 0)">
+          <img [src]="assignment.assignmentImageUrl" alt="Assigned asset photo">
+          <span>View photo</span>
+        </button>
+        <div class="assignment-detail-empty" *ngIf="!assignment.assignmentImageUrl">No asset photo uploaded</div>
+      </section>
+
+      <section class="assignment-detail-section">
+        <span class="request-section-label">Purpose, notes &amp; client details</span>
+        <p class="request-description assignment-notes-display" [class.is-empty]="!assignmentNotes(assignment)">{{ assignmentNotes(assignment) || 'No notes recorded' }}</p>
       </section>
     </section>
   </aside>
@@ -548,6 +618,16 @@
       <section class="request-detail-section">
         <span class="request-section-label">Reason / description</span>
         <p class="request-description">{{ request.reason || 'No additional details were provided.' }}</p>
+      </section>
+
+      <section class="request-detail-section" *ngIf="request.requestDetails?.neededBy || request.requestDetails?.workLocation || request.requestDetails?.preferredSpecs || request.requestDetails?.budget">
+        <span class="request-section-label">Planning &amp; preferences</span>
+        <div class="request-meta-grid request-preference-grid">
+          <div *ngIf="request.requestDetails?.neededBy"><span>Needed by</span><b>{{ request.requestDetails?.neededBy | date:'dd MMM yyyy' }}</b></div>
+          <div *ngIf="request.requestDetails?.workLocation"><span>Work / delivery location</span><b>{{ request.requestDetails?.workLocation }}</b></div>
+          <div *ngIf="request.requestDetails?.budget"><span>Budget / cost centre</span><b>{{ request.requestDetails?.budget }}</b></div>
+          <div class="request-preference-wide" *ngIf="request.requestDetails?.preferredSpecs"><span>Preferred model or specifications</span><b>{{ request.requestDetails?.preferredSpecs }}</b></div>
+        </div>
       </section>
 
       <section class="request-detail-section" *ngIf="request.status === 'REJECTED' && request.rejectionReason">
@@ -796,7 +876,7 @@
         </div>
         <div class="tc-field tc-full">
           <span class="tc-label">Purpose / Notes</span>
-          <span class="tc-value">{{ checkedTxn()!.purpose || checkedTxn()!.reason || '-' }}</span>
+          <span class="tc-value">{{ checkedTxn()!.purpose || (transactionAssetImages(checkedTxn()!).length ? '-' : checkedTxn()!.reason || '-') }}</span>
         </div>
         <div class="tc-field">
           <span class="tc-label">Return / Expiry Date</span>
@@ -826,6 +906,10 @@
       </ng-container>
     </div>
     <div class="modal-panel-footer">
+      <button class="btn btn-outline" (click)="viewTransactionAssetMedia(checkedTxn()!)">
+        <svg lucideImage size="15"></svg>
+        View Asset Images / Docs
+      </button>
       <button class="btn btn-outline" (click)="isTxnCheckOpen.set(false)">Close</button>
       <button class="btn btn-primary" *ngIf="checkedTxn()!.type === 'ASSIGNMENT' && outstandingOf(checkedTxn()!) > 0" (click)="openInvReturnModal(checkedTxn()!)">
         <svg lucideRotateCcw size="14"></svg>
@@ -1198,12 +1282,27 @@
         <textarea class="form-control" rows="2" [(ngModel)]="invAssignForm.purpose" placeholder="Daily office use, handover details, etc."></textarea>
       </div>
 
+      <div class="form-group assignment-photo-group">
+        <label class="form-label">Asset Photo <span class="label-hint">(optional)</span></label>
+        <input #assignmentImageInput type="file" accept="image/*" class="hidden-file-input" (change)="onInvAssignmentImageSelected($event)">
+        <div class="assignment-photo-upload" *ngIf="!invAssignForm.assignmentImageUrl" (click)="assignmentImageInput.click()">
+          <svg lucideImage size="18"></svg>
+          <span>{{ invAssignImageUploading() ? 'Uploading photo...' : 'Upload handover / asset photo' }}</span>
+          <small>JPG, PNG, or WEBP · up to 20 MB</small>
+        </div>
+        <div class="assignment-photo-preview" *ngIf="invAssignForm.assignmentImageUrl">
+          <img [src]="invAssignForm.assignmentImageUrl" alt="Assignment asset preview">
+          <div><strong>Asset photo ready</strong><span>Saved with this assignment</span></div>
+          <button type="button" class="btn-remove-img" (click)="removeInvAssignmentImage()" aria-label="Remove assignment photo"><svg lucideX size="14"></svg></button>
+        </div>
+      </div>
+
       <div class="field-error" *ngIf="invAssignError()">{{ invAssignError() }}</div>
     </div>
     <div class="modal-panel-footer">
       <button class="btn btn-outline" (click)="isInvAssignOpen.set(false)">Cancel</button>
-      <button class="btn btn-primary" (click)="submitInvAssign()" [disabled]="invAssignSubmitting()">
-        {{ invAssignSubmitting() ? 'Saving...' : 'Submit Assignment' }}
+      <button class="btn btn-primary" (click)="submitInvAssign()" [disabled]="invAssignSubmitting() || invAssignImageUploading()">
+        {{ invAssignImageUploading() ? 'Uploading photo...' : invAssignSubmitting() ? 'Saving...' : 'Submit Assignment' }}
       </button>
     </div>
   </div>
@@ -1416,6 +1515,14 @@
         </select>
       </div>
 
+      <div class="request-form-section">
+        <div class="request-form-section-heading"><span>Planning details</span><small>Optional, but helps IT prioritise and deliver correctly.</small></div>
+        <div class="form-row">
+          <div class="form-group col-6"><label class="form-label">Needed by</label><input type="date" class="form-control" [(ngModel)]="requestForm.neededBy"></div>
+          <div class="form-group col-6"><label class="form-label">Work / delivery location</label><input class="form-control" maxlength="120" [(ngModel)]="requestForm.workLocation" placeholder="e.g. Noida office, Floor 2"></div>
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Subject <span class="text-danger">*</span></label>
         <input class="form-control" maxlength="180" [(ngModel)]="requestForm.subject" placeholder="Short summary, e.g. Laptop keyboard not working">
@@ -1426,6 +1533,12 @@
         <label class="form-label">Reason / Justification <span class="text-danger">*</span></label>
         <textarea class="form-control" rows="4" [(ngModel)]="requestForm.reason" placeholder="Explain the business need, the issue you are facing, and any relevant details..."></textarea>
         <span class="form-field-hint">Include the work impact and any troubleshooting already attempted.</span>
+      </div>
+
+      <div class="request-form-section request-preference-section">
+        <div class="request-form-section-heading"><span>Device preferences</span><small>Optional</small></div>
+        <div class="form-group"><label class="form-label">Preferred model or specifications</label><textarea class="form-control" rows="2" maxlength="500" [(ngModel)]="requestForm.preferredSpecs" placeholder="e.g. 16 GB RAM, 512 GB SSD, Windows 11; or describe the accessory needed"></textarea></div>
+        <div class="form-group form-group-last"><label class="form-label">Budget / cost centre</label><input class="form-control" maxlength="120" [(ngModel)]="requestForm.budget" placeholder="e.g. Up to ₹65,000 · Engineering cost centre"></div>
       </div>
 
       <!-- Multiple Images & Attachment Upload Section -->
@@ -1785,24 +1898,59 @@
 <div class="drawer-overlay" *ngIf="isAssignDrawerOpen()" (click)="closeAssignmentDrawer()">
   <div class="drawer-panel" (click)="$event.stopPropagation()">
     <div class="drawer-header">
-      <h3>{{ editingAssignmentId() ? 'Edit Assignment' : 'Assign Asset to Employee' }}</h3>
+      <div>
+        <span class="drawer-eyebrow" *ngIf="!editingAssignmentId()">CREATE ASSIGNMENT</span>
+        <h3>{{ editingAssignmentId() ? 'Edit Assignment' : 'Assign Asset' }}</h3>
+      </div>
       <button class="btn-close" (click)="closeAssignmentDrawer()"><svg lucideX size="18"></svg></button>
     </div>
     <div class="drawer-body">
-      <div class="form-group">
-        <label class="form-label">{{ editingAssignmentId() ? 'Assigned Asset' : 'Select Available Asset' }} <span class="text-danger">*</span></label>
-        <select class="form-control" [(ngModel)]="assignForm.assetId" [disabled]="!!editingAssignmentId()">
-          <option [ngValue]="0" disabled>-- Choose Asset --</option>
-          <option *ngIf="editingAssignmentId() && editingAssignmentAsset()" [ngValue]="assignForm.assetId">
-            [{{ editingAssignmentAsset()!.assetTag }}] {{ editingAssignmentAsset()!.name }} ({{ editingAssignmentAsset()!.brand || editingAssignmentAsset()!.category }})
-          </option>
-          <option *ngFor="let a of availableAssets()" [ngValue]="a.id">
-            [{{ a.assetTag }}] {{ a.name }} ({{ a.brand || a.category }})
-          </option>
-        </select>
+      <div class="assign-stock-summary" *ngIf="!editingAssignmentId()">
+        <div>
+          <span>AVAILABLE TO ASSIGN</span>
+          <strong *ngIf="assignForm.assignmentSource === 'ASSET'">1 <small>device</small></strong>
+          <strong *ngIf="assignForm.assignmentSource === 'INVENTORY'">{{ assignmentInventoryAvailable() }} <small>units</small></strong>
+        </div>
+        <div class="assign-stock-meta">
+          <span *ngIf="assignForm.assignmentSource === 'ASSET' && assignForm.assetId">Ready for handover</span>
+          <span *ngIf="assignForm.assignmentSource === 'INVENTORY'">Stock availability shown below</span>
+        </div>
+      </div>
+      <div class="form-group" *ngIf="!editingAssignmentId()">
+        <label class="form-label">Select inventory item or device <span class="text-danger">*</span></label>
+        <div class="assignment-item-picker">
+          <button type="button" class="assignment-picker-trigger" (click)="isAssignmentItemPickerOpen.set(!isAssignmentItemPickerOpen())" [attr.aria-expanded]="isAssignmentItemPickerOpen()">
+            <span>{{ assignmentPickerLabel() }}</span><svg lucideChevronDown size="17"></svg>
+          </button>
+          <div class="assignment-picker-menu" *ngIf="isAssignmentItemPickerOpen()">
+            <span class="assignment-picker-heading">INVENTORY ITEMS</span>
+            <button type="button" class="assignment-picker-option" *ngFor="let item of inventoryItems()" [class.is-out-of-stock]="item.available <= 0" [disabled]="item.available <= 0" (click)="selectAssignmentInventoryItem(item)">
+              <span><b>{{ item.name }}</b><small>{{ item.brand || item.category }} · {{ item.unit }}</small></span>
+              <strong>{{ item.available }}/{{ item.quantity }} left</strong>
+            </button>
+            <span class="assignment-picker-heading">TRACKED DEVICES</span>
+            <button type="button" class="assignment-picker-option" *ngFor="let asset of availableAssets()" (click)="selectAssignmentTrackedAsset(asset)">
+              <span><b>{{ asset.name }}</b><small>{{ asset.assetTag }} · {{ asset.brand || asset.category }}</small></span>
+              <strong>1/1 left</strong>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group" *ngIf="editingAssignmentId()">
+        <label class="form-label">Assigned Asset</label>
+        <input class="form-control" [value]="'[' + (editingAssignmentAsset()?.assetTag || '') + '] ' + (editingAssignmentAsset()?.name || '')" disabled>
       </div>
 
-      <div class="form-group">
+      <div class="form-group" *ngIf="!editingAssignmentId()">
+        <label class="form-label">Assign To</label>
+        <div class="mode-toggle">
+          <button type="button" class="mode-btn" [class.active]="assignForm.recipientType === 'EMPLOYEE'" (click)="assignForm.recipientType = 'EMPLOYEE'">Employee</button>
+          <button type="button" class="mode-btn" [class.active]="assignForm.recipientType === 'LOCATION'" (click)="assignForm.recipientType = 'LOCATION'">Person / Location</button>
+          <button type="button" class="mode-btn" [class.active]="assignForm.recipientType === 'CLIENT'" (click)="assignForm.recipientType = 'CLIENT'">Client</button>
+        </div>
+      </div>
+
+      <div class="form-group" *ngIf="assignForm.recipientType === 'EMPLOYEE' || editingAssignmentId()">
         <label class="form-label">Select Employee <span class="text-danger">*</span></label>
         <select class="form-control" [(ngModel)]="assignForm.employeeId">
           <option [ngValue]="0" disabled>-- Choose Employee --</option>
@@ -1812,12 +1960,60 @@
         </select>
       </div>
 
+      <div *ngIf="assignForm.recipientType === 'LOCATION' && !editingAssignmentId()">
+        <div class="form-group">
+          <label class="form-label">Person / Location <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" [(ngModel)]="assignForm.personOrLocation" placeholder="e.g. Client site / Floor 2">
+        </div>
+        <div class="form-group" *ngIf="assignForm.assignmentSource === 'ASSET'">
+          <label class="form-label">Responsible Employee <span class="text-danger">*</span></label>
+          <select class="form-control" [(ngModel)]="assignForm.employeeId">
+            <option [ngValue]="0" disabled>-- Choose Employee --</option>
+            <option *ngFor="let emp of employees()" [ngValue]="emp.id">{{ emp.firstName }} {{ emp.lastName }} ({{ emp.department?.name || 'Employee' }})</option>
+          </select>
+        </div>
+      </div>
+
+      <div *ngIf="assignForm.recipientType === 'CLIENT' && !editingAssignmentId()">
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label class="form-label">Client Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" [(ngModel)]="assignForm.clientName" placeholder="Client name">
+          </div>
+          <div class="form-group col-6">
+            <label class="form-label">Company Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" [(ngModel)]="assignForm.clientCompany" placeholder="Company name">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label class="form-label">Email ID <span class="label-hint">(optional)</span></label>
+            <input type="email" class="form-control" [(ngModel)]="assignForm.clientEmail" placeholder="name@company.com">
+          </div>
+          <div class="form-group col-6">
+            <label class="form-label">Phone Number <span class="label-hint">(optional)</span></label>
+            <input type="tel" class="form-control" [(ngModel)]="assignForm.clientPhone" placeholder="Client contact number">
+          </div>
+        </div>
+        <div class="form-group" *ngIf="assignForm.assignmentSource === 'ASSET'">
+          <label class="form-label">Responsible Employee <span class="text-danger">*</span></label>
+          <select class="form-control" [(ngModel)]="assignForm.employeeId">
+            <option [ngValue]="0" disabled>-- Choose Employee --</option>
+            <option *ngFor="let emp of employees()" [ngValue]="emp.id">{{ emp.firstName }} {{ emp.lastName }} ({{ emp.department?.name || 'Employee' }})</option>
+          </select>
+        </div>
+      </div>
+
       <div class="form-row">
         <div class="form-group col-6">
           <label class="form-label">Assignment Date</label>
           <input type="date" class="form-control" [(ngModel)]="assignForm.assignedDate">
         </div>
-        <div class="form-group col-6">
+        <div class="form-group col-6" *ngIf="assignForm.assignmentSource === 'INVENTORY' && !editingAssignmentId()">
+          <label class="form-label">Quantity to Assign <span class="text-danger">*</span></label>
+          <input type="number" min="1" class="form-control" [(ngModel)]="assignForm.quantity">
+        </div>
+        <div class="form-group col-6" *ngIf="assignForm.assignmentSource === 'ASSET' || editingAssignmentId()">
           <label class="form-label">Condition on Issue</label>
           <select class="form-control" [(ngModel)]="assignForm.conditionOnAssign">
             <option value="BRAND_NEW">Brand New</option>
@@ -1827,9 +2023,34 @@
         </div>
       </div>
 
+      <div class="form-row" *ngIf="!editingAssignmentId()">
+        <div class="form-group col-6">
+          <label class="form-label">Assignment Location <span class="label-hint">(optional)</span></label>
+          <input type="text" class="form-control" [(ngModel)]="assignForm.assignmentLocation" placeholder="Office / site">
+        </div>
+        <div class="form-group col-6">
+          <label class="form-label">Expected Return <span class="label-hint">(optional)</span></label>
+          <input type="date" class="form-control" [(ngModel)]="assignForm.expectedReturnDate">
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Notes / Accessories Provided</label>
         <textarea class="form-control" rows="3" [(ngModel)]="assignForm.notes" placeholder="Charger, bag, HDMI adapter included..."></textarea>
+      </div>
+      <div class="form-group assignment-photo-group">
+        <label class="form-label">Asset Photo <span class="label-hint">(optional)</span></label>
+        <input #assetAssignmentImageInput type="file" accept="image/*" class="hidden-file-input" (change)="onAssetAssignmentImageSelected($event)">
+        <div class="assignment-photo-upload" *ngIf="!assignForm.assetImageUrl" (click)="assetAssignmentImageInput.click()">
+          <svg lucideImage size="18"></svg>
+          <span>Upload asset photo</span>
+          <small>It will appear in Asset Information</small>
+        </div>
+        <div class="assignment-photo-preview" *ngIf="assignForm.assetImageUrl">
+          <img [src]="assignForm.assetImageUrl" alt="Asset photo preview">
+          <div><strong>Asset photo ready</strong><span>Saved in the asset gallery</span></div>
+          <button type="button" class="btn-remove-img" (click)="removeAssetAssignmentImage()" aria-label="Remove asset photo"><svg lucideX size="14"></svg></button>
+        </div>
       </div>
     </div>
     <div class="drawer-footer">
