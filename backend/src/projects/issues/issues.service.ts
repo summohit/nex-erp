@@ -60,6 +60,9 @@ const ISSUE_EDIT_LABELS = { title: 'title', priority: 'priority', startDate: 'st
 
 @Injectable()
 export class IssuesService {
+  /** Serializes start/stop requests for one task within this API process. */
+  private readonly taskTimerLocks = new Map<number, Promise<void>>();
+
   constructor(
     private prisma: PrismaService,
     private tasksGateway: TasksGateway,
@@ -1766,8 +1769,41 @@ export class IssuesService {
 
   /** The timer itself, for callers that already know the employee. */
   async startTimerForEmployee(companyId: number, employeeId: number, projectId: number, issueId: number) {
+    return this.withTaskTimerLock(issueId, () =>
+      this.startTimerForEmployeeLocked(companyId, employeeId, projectId, issueId),
+    );
+  }
+
+  private async withTaskTimerLock<T>(issueId: number, work: () => Promise<T>): Promise<T> {
+    const previous = this.taskTimerLocks.get(issueId) ?? Promise.resolve();
+    let release!: () => void;
+    const ownLock = new Promise<void>((resolve) => { release = resolve; });
+    const queueTail = previous.catch(() => undefined).then(() => ownLock);
+    this.taskTimerLocks.set(issueId, queueTail);
+
+    await previous.catch(() => undefined);
+    try {
+      return await work();
+    } finally {
+      release();
+      if (this.taskTimerLocks.get(issueId) === queueTail) this.taskTimerLocks.delete(issueId);
+    }
+  }
+
+  private async startTimerForEmployeeLocked(companyId: number, employeeId: number, projectId: number, issueId: number) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
+
+    // A repeated HTTP request (double click, retry, or status transition
+    // racing the button) must be idempotent. The previous implementation
+    // created a second row here, then each Stop closed a different row.
+    const activeLog = await this.prisma.issueTimeLog.findFirst({
+      where: { issueId, endedAt: null },
+      orderBy: { startedAt: 'desc' },
+    });
+    if (activeLog) {
+      return { success: true, alreadyRunning: true, startedAt: activeLog.startedAt };
+    }
 
     // The timer is gated on START, never on stop.
     //
@@ -1791,9 +1827,23 @@ export class IssuesService {
       data: { workStartedAt: now, workCompletedAt: null }
     });
 
-    await this.prisma.issueTimeLog.create({
-      data: { issueId, employeeId, startedAt: now }
-    });
+    try {
+      await this.prisma.issueTimeLog.create({
+        data: { issueId, employeeId, startedAt: now }
+      });
+    } catch (error: any) {
+      // The partial unique index is the cross-instance guard. Another API
+      // worker may have won this race after our read; treat that as the same
+      // idempotent Start rather than surfacing an error or creating a twin.
+      if (error?.code === 'P2002') {
+        const running = await this.prisma.issueTimeLog.findFirst({
+          where: { issueId, endedAt: null },
+          orderBy: { startedAt: 'desc' },
+        });
+        return { success: true, alreadyRunning: true, startedAt: running?.startedAt ?? now };
+      }
+      throw error;
+    }
 
     await this.prisma.issueActivity.create({
       data: { action: 'WORK_STARTED', issueId, actorId: employeeId }
@@ -1813,6 +1863,12 @@ export class IssuesService {
 
   /** The timer itself, for callers that already know the employee. */
   async stopTimerForEmployee(companyId: number, employeeId: number, projectId: number, issueId: number) {
+    return this.withTaskTimerLock(issueId, () =>
+      this.stopTimerForEmployeeLocked(companyId, employeeId, projectId, issueId),
+    );
+  }
+
+  private async stopTimerForEmployeeLocked(companyId: number, employeeId: number, projectId: number, issueId: number) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId, companyId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found');
 
@@ -1824,13 +1880,15 @@ export class IssuesService {
       orderBy: { startedAt: 'desc' }
     });
 
-    if (openLog) {
-      const durationMin = Math.round((now.getTime() - openLog.startedAt.getTime()) / 60000);
-      await this.prisma.issueTimeLog.update({
-        where: { id: openLog.id },
-        data: { endedAt: now, durationMin }
-      });
-    }
+    // A duplicate Stop used to add another activity row even after the timer
+    // was closed. Do nothing when there is no running session to close.
+    if (!openLog) return { success: true, alreadyStopped: true, completedAt: issue.workCompletedAt };
+
+    const durationMin = Math.round((now.getTime() - openLog.startedAt.getTime()) / 60000);
+    await this.prisma.issueTimeLog.update({
+      where: { id: openLog.id },
+      data: { endedAt: now, durationMin }
+    });
 
     await this.prisma.issue.update({
       where: { id: issueId },
